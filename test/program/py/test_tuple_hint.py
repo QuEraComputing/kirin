@@ -7,4 +7,4 @@ def tuple_hint(xs: tuple[int, ...]):
 
 
 def test_tuple_hint():
-    tuple_hint.arg_types[0].is_subtype()
+    assert tuple_hint.arg_types[0].is_subtype(types.Tuple[types.PyVararg(types.Int)])
