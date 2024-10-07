@@ -7,9 +7,9 @@ from typing import Any, Generic, Iterable, NoReturn, TypeVar, Union
 
 from beartype.door import (
     ClassTypeHint,
+    TupleVariableTypeHint,
     TypeHint,
     TypeVarTypeHint,
-    TupleVariableTypeHint,
 )
 from typing_extensions import Never
 

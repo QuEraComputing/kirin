@@ -1,5 +1,6 @@
-from kirin.prelude import basic
 from kirin.dialects.py import types
+from kirin.prelude import basic
+
 
 @basic
 def tuple_hint(xs: tuple[int, ...]):
