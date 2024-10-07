@@ -177,6 +177,7 @@ class FuncLowering(FromPythonAST):
             return types.Any
 
         try:
-            return types.hint2type(ctx.get_global(node).unwrap())
+            t = ctx.get_global(node).unwrap()
+            return types.hint2type(t)
         except:  # noqa: E722
             raise DialectLoweringError(f"expect a type hint, got {ast.unparse(node)}")

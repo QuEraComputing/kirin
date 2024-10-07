@@ -5,7 +5,12 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Generic, Iterable, NoReturn, TypeVar, Union
 
-from beartype.door import ClassTypeHint, TypeHint, TypeVarTypeHint
+from beartype.door import (
+    ClassTypeHint,
+    TypeHint,
+    TypeVarTypeHint,
+    TupleVariableTypeHint,
+)
 from typing_extensions import Never
 
 from kirin.ir import (
@@ -421,9 +426,11 @@ class PyGeneric(PyType, Generic[Type]):
     def print_impl(self, printer: Printer) -> None:
         printer.print(self.body)
         printer.print_str("[")
-        printer.show_list(self.vars, delim=", ")
+        if self.vars:
+            printer.show_list(self.vars, delim=", ")
         if self.vararg is not None:
-            printer.print_str(", ")
+            if self.vars:
+                printer.print_str(", ")
             self.vararg.print_impl(printer)
         printer.print_str("]")
 
@@ -509,6 +516,10 @@ def hint2type(hint):
         )
     elif isinstance(bear_hint, ClassTypeHint):
         return PyClass(hint)
+    elif isinstance(bear_hint, TupleVariableTypeHint):
+        if len(bear_hint.args) != 1:
+            raise TypeError("Tuple hint must have exactly one argument")
+        return PyGeneric(tuple, PyVararg(hint2type(bear_hint.args[0])))
 
     origin: type | None = typing.get_origin(hint)
     if origin is None:  # non-generic
