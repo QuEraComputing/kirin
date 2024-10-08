@@ -138,7 +138,7 @@ class PyConst(PyType, Generic[Type]):
             return PyUnion(self.typ, other)
 
     def meet(self, other: Lattice[PyType]) -> Lattice[PyType]:
-        if self.is_equal(other):
+        if self.is_subseteq(other):
             return self
         else:
             return PyBottomType()

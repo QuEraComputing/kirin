@@ -102,9 +102,14 @@ class BaseInterpreter(ABC, Generic[ValueType]):
         # NOTE: this should be checked via static validation, we just assume
         # number of args is correct here
         # NOTE: Method is used as if it is a singleton type, but it is not recognized by mypy
-        results = self.run_ssacfg_region(body, (mt,) + args)  # type: ignore
+        results = self.run_method_region(mt, body, args)
         self.state.pop_frame()
         return results
+
+    def run_method_region(
+        self, mt: Method, body: Region, args: tuple[ValueType, ...]
+    ) -> InterpResult[ValueType]:
+        return self.run_ssacfg_region(body, (mt,) + args)  # type: ignore
 
     @staticmethod
     def get_args(left_arg_names, args: tuple, kwargs: dict | None) -> tuple:

@@ -15,8 +15,8 @@ class TypeInfer(Pass):
 
     def __call__(self, mt: Method) -> None:
         return_type = self.infer.eval(mt, mt.arg_types).expect()
-        self.return_type = return_type
-        self.inferred = True
+        mt.return_type = return_type
+        mt.inferred = True
         Walk(ApplyType(return_type, self.infer.results)).rewrite(mt.code)
         self.infer.results.clear()
         return
