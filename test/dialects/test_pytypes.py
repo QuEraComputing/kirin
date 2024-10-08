@@ -44,6 +44,7 @@ def test_union():
     assert hash(PyUnion(PyClass(int), PyClass(float))) == hash(
         PyUnion(PyClass(float), PyClass(int))
     )
+    assert PyUnion(PyUnion(Int, Float), PyBottomType()) == PyUnion(Int, Float)
     assert PyUnion(PyClass(int), PyAnyType()) == PyAnyType()
     assert PyUnion(PyAnyType(), PyClass(int)) == PyAnyType()
     assert PyUnion(PyBottomType(), PyClass(int)) == PyClass(int)

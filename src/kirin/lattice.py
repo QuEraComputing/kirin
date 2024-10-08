@@ -82,14 +82,24 @@ class UnionMeta(LatticeMeta):
             )
 
         # try if the union can be simplified
-        it = iter(typs)
-        typ_upper = next(it)
-        for each in it:
-            if typ_upper.is_subseteq(each):
-                typ_upper = each
-            elif not each.is_subseteq(typ_upper):
-                return super(UnionMeta, self).__call__(typ, *others)
-        return typ_upper
+        params: list[Lattice[LatticeElem]] = []
+        for typ in typs:
+            contains = False
+            for idx, other in enumerate(params):
+                if typ.is_subseteq(other):
+                    contains = True
+                    break
+                elif other.is_subseteq(typ):
+                    params[idx] = typ
+                    contains = True
+                    break
+
+            if not contains:
+                params.append(typ)
+
+        if len(params) == 1:
+            return params[0]
+        return super(UnionMeta, self).__call__(typ, *params)
 
 
 class EmptyLattice(Lattice["EmptyLattice"], metaclass=SingletonMeta):
