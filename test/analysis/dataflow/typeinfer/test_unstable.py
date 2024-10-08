@@ -24,13 +24,19 @@ def test_untable_branch():
     def results_at(block_id, stmt_id):
         return stmt_at(block_id, stmt_id).results
 
-    assert [infer.results[result] for result in results_at(0, 0)] == [types.Int]
+    assert [infer.results[result] for result in results_at(0, 0)] == [
+        types.PyConst(1, types.Int)
+    ]
     assert [infer.results[result] for result in results_at(0, 1)] == [types.Int]
-    assert [infer.results[result] for result in results_at(0, 2)] == [types.Int]
+    assert [infer.results[result] for result in results_at(0, 2)] == [
+        types.PyConst(10, types.Int)
+    ]
     assert [infer.results[result] for result in results_at(0, 3)] == [types.Bool]
 
     assert [infer.results[result] for result in results_at(1, 0)] == [types.Int]
-    assert [infer.results[result] for result in results_at(2, 0)] == [types.Float]
+    assert [infer.results[result] for result in results_at(2, 0)] == [
+        types.PyConst(1.2, types.Float)
+    ]
     assert [infer.results[result] for result in results_at(2, 1)] == [types.Float]
 
     stmt = stmt_at(3, 0)
