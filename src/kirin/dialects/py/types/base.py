@@ -77,6 +77,9 @@ class PyBottomType(BottomType, PyType):
     def __hash__(self) -> int:
         return id(self)
 
+    def is_subseteq(self, other: Lattice) -> bool:
+        return True
+
 
 class LiteralMeta(TypeAttributeMeta):
 
@@ -93,6 +96,61 @@ class LiteralMeta(TypeAttributeMeta):
         instance = super(LiteralMeta, self).__call__(data)
         self._cache[data] = instance
         return instance
+
+
+@dialect.register
+@dataclass(init=False)
+class PyConst(PyType, Generic[Type]):
+    """This will not appear in user-space. It is used to
+    pass around constant values interprocedurally.
+    """
+
+    name = "Const"
+    data: Type
+    typ: PyType
+
+    def __init__(self, data: Type, typ: PyType | None = None):
+        self.data = data
+        if isinstance(typ, PyConst):
+            raise TypeError("Cannot nest PyConst")
+
+        if typ is not None:
+            self.typ = typ
+        else:
+            self.typ = PyClass(type(data))
+
+    def is_equal(self, other: Lattice[PyType]) -> bool:
+        return isinstance(other, PyConst) and self.data == other.data
+
+    def is_subseteq(self, other: Lattice[PyType]) -> bool:
+        if other.is_top():
+            return True
+        elif other.is_bottom():
+            return False
+        elif isinstance(other, PyConst):
+            return self.is_equal(other)
+        return self.typ.is_subseteq(other)
+
+    def join(self, other: Lattice[PyType]) -> Lattice[PyType]:
+        if self.is_equal(other):
+            return self
+        else:  # widen constant
+            return PyUnion(self.typ, other)
+
+    def meet(self, other: Lattice[PyType]) -> Lattice[PyType]:
+        if self.is_equal(other):
+            return self
+        else:
+            return PyBottomType()
+
+    def __hash__(self) -> int:
+        return hash(self.typ)
+
+    def __repr__(self) -> str:
+        return f"Const({self.data})"
+
+    def print_impl(self, printer: Printer) -> None:
+        printer.print("Const(", repr(self.data), ", ", self.typ, ")")
 
 
 @dialect.register

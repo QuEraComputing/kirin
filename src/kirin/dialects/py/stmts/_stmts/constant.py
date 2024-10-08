@@ -1,7 +1,7 @@
 from typing import Generic, TypeVar
 
 from kirin.decl import info, statement
-from kirin.dialects.py import data
+from kirin.dialects.py import data, types
 from kirin.dialects.py.stmts.dialect import dialect
 from kirin.ir import ConstantLike, Pure, ResultValue, Statement
 
@@ -21,6 +21,6 @@ class Constant(Statement, Generic[T]):
             value = data.PyAttr(value)
         super().__init__(
             properties={"value": value},
-            result_types=(value.type,),
+            result_types=(types.PyConst(value.data, value.type),),
             args_slice={"value": 0},
         )

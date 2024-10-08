@@ -3,6 +3,7 @@ from kirin.dialects.py.types.base import (
     PyAnyType as PyAnyType,
     PyBottomType as PyBottomType,
     PyClass as PyClass,
+    PyConst as PyConst,
     PyGeneric as PyGeneric,
     PyLiteral as PyLiteral,
     PyType as PyType,
