@@ -247,7 +247,7 @@ class TypeInfer(DialectInterpreter):
                 )
             elif data.stop is None or data.stop < len(obj.vars):
                 return ResultValue(
-                    types.Tuple[*obj.vars[slice(data.start, data.stop, data.step)]]
+                    types.Tuple.where(obj.vars[slice(data.start, data.stop, data.step)])
                 )
             else:  # out of bounds
                 return ResultValue(types.Bottom)
