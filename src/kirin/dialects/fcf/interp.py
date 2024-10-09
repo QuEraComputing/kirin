@@ -1,6 +1,6 @@
 from kirin import ir
 from kirin.dialects.fcf.dialect import dialect
-from kirin.dialects.fcf.stmts import Foldl, Foldr, MapList, Scan
+from kirin.dialects.fcf.stmts import Foldl, Foldr, Map, Scan
 from kirin.interp import DialectInterpreter, Interpreter, ResultValue, impl
 
 
@@ -39,8 +39,8 @@ class FCFInterpreter(DialectInterpreter):
                 return _acc
         return ResultValue(acc)
 
-    @impl(MapList)
-    def map_list(self, interp: Interpreter, stmt: MapList, values: tuple):
+    @impl(Map)
+    def map_list(self, interp: Interpreter, stmt: Map, values: tuple):
         fn: ir.Method = values[0]
         coll = values[1]
         ret = []

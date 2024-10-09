@@ -167,3 +167,7 @@ class PyInterpreter(DialectInterpreter):
     @impl(py.GetAttr)
     def getattr(self, interp, stmt: py.GetAttr, values: tuple) -> ResultValue:
         return ResultValue(getattr(values[0], stmt.attrname))
+
+    @impl(py.Range)
+    def _range(self, interp, stmt: py.Range, values: tuple) -> ResultValue:
+        return ResultValue(range(*values))

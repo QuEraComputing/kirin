@@ -21,9 +21,9 @@ class Foldr(ir.Statement):
 
 
 @statement(dialect=dialect)
-class MapList(ir.Statement):
+class Map(ir.Statement):
     fn: ir.SSAValue = info.argument(types.PyClass(ir.Method))
-    coll: ir.SSAValue = info.argument(types.List)
+    coll: ir.SSAValue = info.argument(types.Any)
     result: ir.ResultValue = info.result(types.List)
 
 

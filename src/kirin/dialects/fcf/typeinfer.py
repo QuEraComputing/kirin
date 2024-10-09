@@ -3,7 +3,7 @@ from typing import Callable, Iterable
 from kirin import ir
 from kirin.analysis.dataflow.typeinfer import TypeInference
 from kirin.dialects.fcf.dialect import dialect
-from kirin.dialects.fcf.stmts import Foldl, Foldr, MapList, Scan
+from kirin.dialects.fcf.stmts import Foldl, Foldr, Map, Scan
 from kirin.dialects.py import types
 from kirin.interp import DialectInterpreter, ResultValue, impl
 
@@ -57,8 +57,10 @@ class TypeInfer(DialectInterpreter):
 
         return ResultValue(types.Bottom)
 
-    @impl(MapList)
-    def map_list(self, interp: TypeInference, stmt: MapList, values):
+    @impl(Map, types.PyClass(ir.Method), types.PyClass(list))
+    def map_list(
+        self, interp: TypeInference, stmt, values: tuple[types.PyType, types.PyType]
+    ):
         if not isinstance(values[0], types.PyConst):
             return ResultValue(types.List)  # give up on dynamic calls
 
@@ -71,6 +73,20 @@ class TypeInfer(DialectInterpreter):
             else:  # fn errors forward the error
                 return elem
         return ResultValue(types.Bottom)
+
+    @impl(Map, types.PyClass(ir.Method), types.PyClass(range))
+    def map_range(
+        self, interp: TypeInference, stmt, values: tuple[types.PyType, types.PyType]
+    ):
+        if not isinstance(values[0], types.PyConst):
+            return ResultValue(types.List)  # give up on dynamic calls
+
+        fn: ir.Method = values[0].data
+        elem = interp.eval(fn, (types.Int,)).to_result()
+        if isinstance(elem, ResultValue):
+            return ResultValue(types.List[elem.values[0]])
+        else:  # fn errors forward the error
+            return elem
 
     @impl(Scan)
     def scan(self, interp: TypeInference, stmt: Scan, values: tuple[types.PyType, ...]):

@@ -1,4 +1,4 @@
-from kirin.dialects.fcf import Foldl, Foldr, MapList, Scan
+from kirin.dialects.fcf import Foldl, Foldr, Map, Scan
 from kirin.dialects.py import types
 from kirin.prelude import basic
 
@@ -30,7 +30,7 @@ def foldr(xs: list[int]):
 
 @basic(typeinfer=True)
 def map_list(xs: list[int]):
-    return MapList(add1, xs)
+    return Map(add1, xs)
 
 
 @basic(typeinfer=True)

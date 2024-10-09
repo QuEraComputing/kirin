@@ -27,6 +27,8 @@ class FuncLowering(FromPythonAST):
                     return global_callee.from_python_call(ctx, node)
                 elif issubclass(global_callee, slice):
                     return stmts.Slice.from_python_call(ctx, node)
+                elif issubclass(global_callee, range):
+                    return stmts.Range.from_python_call(ctx, node)
 
             # symbol exist in global, but not ir.Statement, lookup local first
             try:
