@@ -1,11 +1,11 @@
-from kirin.dialects import cf, func, math
+from kirin.dialects import cf, fcf, func, math
 from kirin.dialects.py import data, stmts, types
 from kirin.ir import Method, dialect_group
 from kirin.passes.fold import Fold
 from kirin.passes.typeinfer import TypeInfer
 
 
-@dialect_group([cf, func, math, types, data, stmts])
+@dialect_group([cf, fcf, func, math, types, data, stmts])
 def basic_no_opt(self):
     def run_pass(mt: Method) -> None:
         pass

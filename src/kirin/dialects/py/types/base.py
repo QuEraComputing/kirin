@@ -393,6 +393,8 @@ class PyClass(PyType, Generic[Type], metaclass=PyClassMeta):
             return False
         elif isinstance(other, PyTypeVar):
             return self.is_subseteq(other.bound)
+        elif isinstance(other, PyConst):
+            return self.is_subseteq(other.typ)
         raise TypeError(f"Unexpected type {other}")
 
     def __hash__(self) -> int:
