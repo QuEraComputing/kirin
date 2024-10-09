@@ -26,9 +26,18 @@ class TypeInference(ForwardDataFlowAnalysis[TypeAttribute, WorkList[Successor]])
 
     def build_signature(self, stmt: Statement, args: tuple):
         """we use value here as signature as they will be types"""
+        _args = []
+        for x in args:
+            if isinstance(x, types.PyConst):
+                _args.append(x)
+            elif isinstance(x, types.PyGeneric):
+                _args.append(x.body)
+            else:
+                _args.append(x)
+
         return (
             stmt.__class__,
-            tuple(x.typ if isinstance(x, types.PyConst) else x for x in args),
+            tuple(_args),
         )
 
     def run_method_region(
