@@ -22,10 +22,11 @@ class FuncLowering(FromPythonAST):
             callee = ctx.visit(node.func).expect_one()
         else:
             global_callee = global_callee_result.unwrap()
-            if inspect.isclass(global_callee) and issubclass(
-                global_callee, ir.Statement
-            ):
-                return global_callee.from_python_call(ctx, node)
+            if inspect.isclass(global_callee):
+                if issubclass(global_callee, ir.Statement):
+                    return global_callee.from_python_call(ctx, node)
+                elif issubclass(global_callee, slice):
+                    return stmts.Slice.from_python_call(ctx, node)
 
             # symbol exist in global, but not ir.Statement, lookup local first
             try:
