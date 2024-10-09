@@ -13,8 +13,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import deprecated
-
+from kirin.exceptions import CompilerError
 from kirin.ir.method import Method
 
 if TYPE_CHECKING:
@@ -142,10 +141,6 @@ class DialectGroup(Generic[PassParams]):
             return getattr(dialect, "dialect")
         return dialect
 
-    @deprecated("use DialectGroup.union instead")
-    def merge(self, dialect: "DialectGroup") -> "DialectGroup":
-        return self.union(dialect.data)
-
     def add(self, dialect: Union["Dialect", ModuleType]) -> "DialectGroup":
         return self.union([dialect])
 
@@ -189,6 +184,11 @@ class DialectGroup(Generic[PassParams]):
             if py_func.__name__ == "<lambda>":
                 raise ValueError("Cannot compile lambda functions")
 
+            frame = inspect.currentframe()
+            if frame and py_func.__name__ in frame.f_back.f_back.f_locals:
+                raise CompilerError(
+                    f"overwriting function definition of `{py_func.__name__}`"
+                )
             code = emit_ir.run(py_func)
             mt = Method(
                 mod=inspect.getmodule(py_func),
