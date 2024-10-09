@@ -20,15 +20,15 @@ class Slice(Statement):
     def __init__(self, start: SSAValue, stop: SSAValue, step: SSAValue) -> None:
         if start.type.is_subtype(types.NoneType):
             if stop.type.is_subtype(types.NoneType):
-                T = types.Bottom
+                result_type = types.Bottom
             else:
-                T = stop.type
+                result_type = types.Slice[types.widen_const(stop.type)]
         else:
-            T = start.type
+            result_type = types.Slice[types.widen_const(start.type)]
 
         super().__init__(
             args=(start, stop, step),
-            result_types=[types.Slice[types.widen_const(T)]],
+            result_types=[result_type],
             args_slice={"start": 0, "stop": 1, "step": 2},
         )
 
