@@ -597,3 +597,9 @@ def hint2type(hint):
     for arg in args:
         params.append(hint2type(arg))
     return PyGeneric(body, *params)
+
+
+def widen_const(typ: PyType):
+    if isinstance(typ, PyConst):
+        return typ.typ
+    return typ

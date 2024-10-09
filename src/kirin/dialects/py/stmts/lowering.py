@@ -168,3 +168,15 @@ class PythonLowering(FromPythonAST):
             raise DialectLoweringError("unhandled store operation")
         else:  # Del
             raise DialectLoweringError("unhandled del operation")
+
+    def lower_Slice(self, ctx: LoweringState, node: ast.Slice) -> Result:
+        def value_or_none(expr: ast.expr | None) -> SSAValue:
+            if expr is not None:
+                return ctx.visit(expr).expect_one()
+            else:
+                return ctx.append_stmt(py.Constant(None)).result
+
+        lower = value_or_none(node.lower)
+        upper = value_or_none(node.upper)
+        step = value_or_none(node.step)
+        return Result(ctx.append_stmt(py.Slice(start=lower, stop=upper, step=step)))

@@ -245,9 +245,9 @@ class TypeInfer(DialectInterpreter):
                         obj.vararg.typ,
                     )
                 )
-            elif data.stop < len(obj.vars):
+            elif data.stop is None or data.stop < len(obj.vars):
                 return ResultValue(
-                    types.PyUnion(*obj.vars[slice(data.start, data.stop, data.step)])
+                    types.Tuple[*obj.vars[slice(data.start, data.stop, data.step)]]
                 )
             else:  # out of bounds
                 return ResultValue(types.Bottom)
@@ -298,3 +298,17 @@ class TypeInfer(DialectInterpreter):
         for typ in values[1:]:
             elem = elem.join(typ)  # type: ignore
         return ResultValue(types.List[elem])  # type: ignore
+
+    @impl(py.Slice)
+    def slice(self, interp, stmt: py.Slice, values: tuple) -> ResultValue:
+        start, stop, step = values
+        if (
+            isinstance(start, types.PyConst)
+            and isinstance(stop, types.PyConst)
+            and isinstance(step, types.PyConst)
+        ):
+            return ResultValue(
+                types.PyConst(slice(start.data, stop.data, step.data), stmt.result.type)
+            )
+
+        return ResultValue(stmt.result)

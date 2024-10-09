@@ -34,6 +34,7 @@ from .constant import Constant as Constant
 from .getattr import GetAttr as GetAttr
 from .getitem import GetItem as GetItem, SetItem as SetItem
 from .list import Append as Append, Len as Len, NewList as NewList
+from .slice import Slice as Slice
 from .tuple import NewTuple as NewTuple
 from .unary import (
     Invert as Invert,
