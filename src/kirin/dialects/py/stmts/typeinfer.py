@@ -321,6 +321,9 @@ class TypeInfer(DialectInterpreter):
     def new_list(
         self, interp, stmt, values: tuple[types.PyType, ...]
     ) -> ResultValue[types.PyType]:
+        if not values:
+            return ResultValue(types.List[types.Any])
+
         elem = values[0]
         for typ in values[1:]:
             elem = elem.join(typ)  # type: ignore
