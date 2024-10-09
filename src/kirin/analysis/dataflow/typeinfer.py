@@ -29,7 +29,7 @@ class TypeInference(ForwardDataFlowAnalysis[TypeAttribute, WorkList[Successor]])
         _args = []
         for x in args:
             if isinstance(x, types.PyConst):
-                _args.append(x)
+                _args.append(x.typ)
             elif isinstance(x, types.PyGeneric):
                 _args.append(x.body)
             else:

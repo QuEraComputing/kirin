@@ -5,7 +5,7 @@ from kirin.analysis.dataflow.typeinfer import TypeInference
 from kirin.dialects.fcf.dialect import dialect
 from kirin.dialects.fcf.stmts import Foldl, Foldr, MapList, Scan
 from kirin.dialects.py import types
-from kirin.interp import DialectInterpreter, Err, ResultValue, impl
+from kirin.interp import DialectInterpreter, ResultValue, impl
 
 
 @dialect.register(key="typeinfer")
@@ -43,10 +43,7 @@ class TypeInfer(DialectInterpreter):
                 if isinstance(ret, ResultValue):
                     ret_type: types.PyType = ret.values[0]
                     if not init.is_subseteq(ret_type):
-                        return Err(
-                            TypeError(f"Expected {init}, got {ret_type}"),
-                            interp.state.frames,
-                        )
+                        return ResultValue(types.Bottom)
                     return ResultValue(ret_type)
             elif coll.is_subseteq(types.Tuple):
                 carry = init
@@ -58,9 +55,7 @@ class TypeInfer(DialectInterpreter):
                         return carry
                 return ResultValue(carry)
 
-        return Err(
-            TypeError(f"Expected List or Tuple, got {coll}"), interp.state.frames
-        )
+        return ResultValue(types.Bottom)
 
     @impl(MapList)
     def map_list(self, interp: TypeInference, stmt: MapList, values):
@@ -75,7 +70,7 @@ class TypeInfer(DialectInterpreter):
                 return ResultValue(types.List[elem.values[0]])
             else:  # fn errors forward the error
                 return elem
-        return Err(TypeError(f"Expected List, got {coll}"), interp.state.frames)
+        return ResultValue(types.Bottom)
 
     @impl(Scan)
     def scan(self, interp: TypeInference, stmt: Scan, values: tuple[types.PyType, ...]):
@@ -93,18 +88,12 @@ class TypeInfer(DialectInterpreter):
                 ret = _ret.values[0]
                 if isinstance(ret, types.PyGeneric) and ret.is_subseteq(types.Tuple):
                     if len(ret.vars) != 2:
-                        return Err(
-                            TypeError(f"Expected Tuple of size 2, got {ret}"),
-                            interp.state.frames,
-                        )
+                        return ResultValue(types.Bottom)
                     carry: types.PyType = ret.vars[0]
                     if not carry.is_subseteq(init):
-                        return Err(
-                            TypeError(f"Expected {init}, got {carry}"),
-                            interp.state.frames,
-                        )
+                        return ResultValue(types.Bottom)
                     return ResultValue(types.Tuple[carry, types.List[ret.vars[1]]])
             else:  # fn errors forward the error
                 return _ret
 
-        return Err(TypeError(f"Expected List, got {coll}"), interp.state.frames)
+        return ResultValue(types.Bottom)

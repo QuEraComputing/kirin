@@ -42,9 +42,7 @@ class TypeInfer(DialectInterpreter):
         return ResultValue(types.Int)
 
     @impl(py.Add, types.PyClass(list), types.PyClass(list))
-    def add_list(
-        self, interp, stmt, values: tuple[types.PyType, types.PyType]
-    ) -> ResultValue:
+    def add_list(self, interp, stmt, values: tuple[types.PyType, types.PyType]):
         # TODO: solve the type param
         lhs = values[0]
         if isinstance(lhs, types.PyClass):  # add Any as type param
@@ -55,9 +53,7 @@ class TypeInfer(DialectInterpreter):
         return ResultValue(types.List)
 
     @impl(py.Add, types.PyClass(tuple), types.PyClass(tuple))
-    def add_tuple(
-        self, interp, stmt, values: tuple[types.PyType, types.PyType]
-    ) -> ResultValue:
+    def add_tuple(self, interp, stmt, values: tuple[types.PyType, types.PyType]):
         lhs = values[0]
         rhs = values[1]
         if isinstance(lhs, types.PyGeneric) and isinstance(rhs, types.PyGeneric):
