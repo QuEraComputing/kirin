@@ -24,6 +24,7 @@ from kirin.dialects.py.types.builtin import (
     List as List,
     NoneType as NoneType,
     Set as Set,
+    Slice as Slice,
     String as String,
     Tuple as Tuple,
     TypeofFunctionType as TypeofFunctionType,

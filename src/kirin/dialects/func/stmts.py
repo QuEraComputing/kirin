@@ -144,7 +144,7 @@ class Return(Statement):
 @statement(dialect=dialect, init=False)
 class Lambda(Statement):
     name = "func.lambda"
-    traits = frozenset({Pure(), SymbolOpInterface(), FuncOpCallableInterface()})
+    traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface()})
     sym_name: data.PyAttr[str] = info.attribute(property=True)
     signature: Signature = info.attribute()
     body: Region = info.region(multi=True)

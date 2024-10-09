@@ -180,22 +180,87 @@ class TypeInfer(DialectInterpreter):
         raise NotImplementedError("np.array @ np.array not implemented")
 
     @impl(py.GetItem)
-    def getindex(
-        self, interp, stmt: py.GetItem, values: tuple[types.PyType]
+    def getitem(
+        self, interp, stmt: py.GetItem, values: tuple[types.PyType, types.PyType]
     ) -> ResultValue:
-        obj: types.PyGeneric = values[0]  # type: ignore
-        index: int = values[1]  # type: ignore
-        if obj.is_subtype(types.Tuple):
-            if obj.vararg and index >= len(obj.vars):
-                return ResultValue(obj.vararg.typ)
-            elif index < len(obj.vars):
-                return ResultValue(obj.vars[index])
+        obj: types.PyGeneric = values[0]
+        index: types.PyType = values[1]
+        # TODO: replace this when we can multiple dispatch
+        if obj.is_subseteq(types.Tuple):
+            return self.getitem_tuple(interp, stmt, obj, index)
+        elif obj.is_subseteq(types.List):
+            if index.is_subseteq(types.Int):
+                return ResultValue(obj.vars[0])
+            elif index.is_subseteq(types.Slice):
+                return ResultValue(obj)
             else:
                 return ResultValue(types.Bottom)
-        elif obj.is_subtype(types.List):
-            return ResultValue(obj.vars[0])
         else:
             return ResultValue(types.Any)
+
+    def getitem_tuple(
+        self,
+        interp,
+        stmt: py.GetItem,
+        obj: types.PyGeneric,
+        index: types.PyType,
+    ):
+        if index.is_subseteq(types.Int):
+            return self.getitem_tuple_index(interp, stmt, obj, index)
+        elif index.is_subseteq(types.Slice):
+            return self.getitem_tuple_slice(interp, stmt, obj, index)
+        else:
+            return ResultValue(types.Bottom)
+
+    def getitem_tuple_index(
+        self,
+        interp,
+        stmt: py.GetItem,
+        obj: types.PyGeneric,
+        index: types.PyType,
+    ):
+        if isinstance(index, types.PyConst):  # const
+            if obj.vararg and index.data >= len(obj.vars):
+                return ResultValue(obj.vararg.typ)
+            elif index.data < len(obj.vars):
+                return ResultValue(obj.vars[index.data])
+            else:
+                return ResultValue(types.Bottom)
+        else:
+            return ResultValue(self.getitem_tuple_union(obj))
+
+    def getitem_tuple_slice(
+        self,
+        interp,
+        stmt: py.GetItem,
+        obj: types.PyGeneric,
+        index: types.PyType,
+    ):
+        if isinstance(index, types.PyConst):
+            data: slice = index.data
+            if obj.vararg and data.stop >= len(obj.vars):
+                return ResultValue(
+                    types.PyUnion(
+                        *obj.vars[slice(data.start, len(obj.vars), data.step)],
+                        obj.vararg.typ,
+                    )
+                )
+            elif data.stop < len(obj.vars):
+                return ResultValue(
+                    types.PyUnion(*obj.vars[slice(data.start, data.stop, data.step)])
+                )
+            else:  # out of bounds
+                return ResultValue(types.Bottom)
+        else:
+            return ResultValue(
+                types.Tuple[types.PyVararg(self.getitem_tuple_union(obj))]
+            )
+
+    def getitem_tuple_union(self, obj: types.PyGeneric):
+        if obj.vararg:
+            return types.PyUnion(*obj.vars, obj.vararg.typ)
+        else:
+            return types.PyUnion(*obj.vars)
 
     @impl(py.Abs, types.Int)
     def absi(self, interp, stmt, values: tuple) -> ResultValue:

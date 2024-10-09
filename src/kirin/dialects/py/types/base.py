@@ -167,6 +167,8 @@ class PyLiteral(PyType, Generic[Type], metaclass=LiteralMeta):
             return True
         elif isinstance(other, PyTypeVar):
             return self.is_subseteq(other.bound)
+        elif isinstance(other, PyUnion):
+            return any(self.is_subseteq(a) for a in other.args)
         return self.is_equal(other)
 
     def join(self, other: Lattice[PyType]) -> Lattice[PyType]:
@@ -221,8 +223,6 @@ class PyUnion(PyType, metaclass=UnionTypeMeta):
             return True
         elif other.is_bottom():
             return False
-        elif isinstance(other, PyUnion):
-            return any(a.is_subseteq(other) for a in self.args)
         return all(a.is_subseteq(other) for a in self.args)
 
     def join(self, other: Lattice[PyType]) -> Lattice[PyType]:
@@ -285,6 +285,8 @@ class PyTypeVar(PyType):
             return False
         elif isinstance(other, PyTypeVar):
             return self.bound.is_subseteq(other.bound)
+        elif isinstance(other, PyUnion):
+            return any(self.is_subseteq(a) for a in other.args)
         return self.bound.is_subseteq(other)
 
     def is_subtype(self, other: Lattice[PyType]) -> bool:
@@ -386,11 +388,15 @@ class PyClass(PyType, Generic[Type], metaclass=PyClassMeta):
         elif isinstance(other, PyClass):
             return issubclass(self.typ, other.typ)
         elif isinstance(other, PyUnion):
-            return all(self.is_subseteq(a) for a in other.args)
+            return any(self.is_subseteq(a) for a in other.args)
         elif isinstance(other, PyGeneric):
-            # NOTE: subclass without generics is not a subtype of generic class
-            # because we treat python class as concrete type.
-            return False
+            # NOTE: subclass without generics is just generic with all any parameters
+            PyAny = PyAnyType()
+            return (
+                self.is_subseteq(other.body)
+                and all(PyAny.is_subseteq(bound) for bound in other.vars)
+                and (other.vararg is None or PyAny.is_subseteq(other.vararg.typ))
+            )
         elif isinstance(other, PyTypeVar):
             return self.is_subseteq(other.bound)
         elif isinstance(other, PyConst):
