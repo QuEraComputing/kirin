@@ -106,6 +106,8 @@ class Printer(CodeGen[None], Generic[IOType]):
                 with self.indent(self.state.result_width + 3, mark=True):
                     self.emit_Statement(stmt)
 
+        self.print_newline()
+
     def emit_Statement_fallback(self, stmt: ir.Statement) -> None:
         from kirin.decl import fields as stmt_fields
 
@@ -208,7 +210,13 @@ class Printer(CodeGen[None], Generic[IOType]):
         successors_names = [
             f"^{self.state.block_id[successor]}" for successor in successors
         ]
-        self.print_seq(successors_names, delim=", ", prefix=prefix, suffix=suffix)
+        self.print_seq(
+            successors_names,
+            emit=self.plain_print,
+            delim=", ",
+            prefix=prefix,
+            suffix=suffix,
+        )
 
     def print_dialect_path(
         self, node: ir.Attribute | ir.Statement, prefix: str = ""

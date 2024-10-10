@@ -22,5 +22,4 @@ class Constant(Statement, Generic[T]):
         super().__init__(
             properties={"value": value},
             result_types=(types.PyConst(value.data, value.type),),
-            args_slice={"value": 0},
         )
