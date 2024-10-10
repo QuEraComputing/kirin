@@ -453,7 +453,7 @@ class Statement(IRNode["Block"]):
 
         if self._results:
             with printer.rich(style="black"):
-                printer.plain_print(" -> ")
+                printer.plain_print(" : ")
                 printer.print_seq(
                     [result.type for result in self._results],
                     delim=", ",

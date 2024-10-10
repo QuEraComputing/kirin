@@ -107,7 +107,7 @@ class Call(Statement):
         printer.plain_print(")")
 
         with printer.rich(style="black"):
-            printer.plain_print(" -> ")
+            printer.plain_print(" : ")
             printer.print_seq(
                 [result.type for result in self._results],
                 delim=", ",
@@ -209,5 +209,5 @@ class GetField(Statement):
             "(", printer.state.ssa_id[self.obj], ", ", str(self.field), ")"
         )
         with printer.rich(style="black"):
-            printer.plain_print(" -> ")
+            printer.plain_print(" : ")
             printer.print(self.result.type)

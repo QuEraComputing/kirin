@@ -27,6 +27,8 @@ class Constant(Statement, Generic[T]):
 
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self)
-        printer.plain_print("<{")
-        printer.print(self.properties["value"])
-        printer.plain_print("}>")
+        printer.plain_print(" ")
+        printer.plain_print(repr(self.value))
+        with printer.rich(style=printer.color.comment):
+            printer.plain_print(" : ")
+            printer.print(self.result.type)

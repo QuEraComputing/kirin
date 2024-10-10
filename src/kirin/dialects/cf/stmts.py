@@ -38,7 +38,7 @@ class Branch(Statement):
             printer.print_name(self)
 
         printer.plain_print(" ")
-        printer.plain_print(f"^{printer.state.block_id[self.successor]}")
+        printer.plain_print(printer.state.block_id[self.successor])
         printer.print_seq(
             self.arguments,
             delim=", ",
