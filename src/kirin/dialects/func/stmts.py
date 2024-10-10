@@ -60,7 +60,7 @@ class Function(Statement):
 
 @statement(dialect=dialect, init=False)
 class Call(Statement):
-    name = "func.call"
+    name = "call"
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     kwargs: data.PyAttr[tuple[str, ...]] = info.attribute(property=True)
@@ -112,7 +112,7 @@ class Call(Statement):
 
 @statement(dialect=dialect, init=False)
 class Return(Statement):
-    name = "func.return"
+    name = "return"
     traits = frozenset({IsTerminator(), HasParent((Function,))})
 
     def __init__(self, value_or_stmt: SSAValue | Statement | None = None) -> None:
@@ -143,7 +143,7 @@ class Return(Statement):
 
 @statement(dialect=dialect, init=False)
 class Lambda(Statement):
-    name = "func.lambda"
+    name = "lambda"
     traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface()})
     sym_name: data.PyAttr[str] = info.attribute(property=True)
     signature: Signature = info.attribute()
