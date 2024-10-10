@@ -30,7 +30,7 @@ class FuncOpCallableInterface(CallableStmtInterface["Function"]):
 
 @statement(dialect=dialect)
 class Function(Statement):
-    name = "func.func"
+    name = "func"
     traits = frozenset(
         {
             IsolatedFromAbove(),
