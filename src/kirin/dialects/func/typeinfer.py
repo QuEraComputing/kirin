@@ -47,9 +47,9 @@ class TypeInfer(DialectInterpreter):
         # or runtime.
         # update the results with the narrowed types
         for arg, typ in zip(stmt.args[1:], narrow_arg_types):
-            interp.results[arg] = typ
+            interp.results[arg] = typ  # type: ignore
 
-        inferred = interp.eval(mt, narrow_arg_types).to_result()
+        inferred = interp.eval(mt, narrow_arg_types).to_result()  # type: ignore
         return inferred
 
     @impl(Lambda)
