@@ -299,6 +299,6 @@ class Block(IRNode["Region"]):
                 elif printer.state.result_width:
                     printer.plain_print(" " * printer.state.result_width, "   ")
                 with printer.indent(printer.state.result_width + 3, mark=True):
-                    stmt.print(printer)
+                    printer.print(stmt)
 
         printer.print_newline()
