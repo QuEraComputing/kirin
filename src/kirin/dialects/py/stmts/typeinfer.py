@@ -1,23 +1,12 @@
-from typing import Tuple
-
 from kirin.dialects.py import types
-from kirin.interp import DialectInterpreter, ResultValue, impl
-from kirin.interp.base import BaseInterpreter
-from kirin.interp.value import Result
-from kirin.ir.nodes.stmt import Statement
+from kirin.interp import DefaultTypeInferInterpreter, ResultValue, impl
 
 from . import _stmts as py
 from .dialect import dialect
 
 
 @dialect.register(key="typeinfer")
-class TypeInfer(DialectInterpreter):
-    @classmethod  # just failsafe
-    def fallback(
-        cls, interp: BaseInterpreter, stmt: Statement, values: Tuple
-    ) -> Result:
-        return ResultValue(*tuple(types.Any for _ in stmt.results))
-
+class TypeInfer(DefaultTypeInferInterpreter):
     # NOTE: const always contains the acutal value, so we can just return the type
     @impl(py.Constant)
     def constant(self, interp, stmt: py.Constant, values: tuple) -> ResultValue:

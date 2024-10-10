@@ -180,8 +180,11 @@ class Region(IRNode["Statement"]):
         with printer.align(result_width):
             with printer.indent(increase=2, mark=True):
                 printer.print_newline()
-                for bb in self.blocks:
+                for idx, bb in enumerate(self.blocks):
                     printer.print(bb)
+
+                    if idx != len(self.blocks) - 1:
+                        printer.print_newline()
 
         printer.print_newline()
         printer.plain_print("}")

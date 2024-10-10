@@ -33,6 +33,13 @@ class FuncLowering(FromPythonAST):
                     return stmts.Slice.from_python_call(state, node)
                 elif issubclass(global_callee, range):
                     return stmts.Range.from_python_call(state, node)
+            elif inspect.isbuiltin(global_callee):
+                if global_callee is len:
+                    return Result(
+                        state.append_stmt(
+                            stmts.Len(value=state.visit(node.args[0]).expect_one())
+                        )
+                    )
 
             # symbol exist in global, but not ir.Statement, lookup local first
             try:
