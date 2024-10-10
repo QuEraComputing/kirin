@@ -5,6 +5,7 @@ from kirin.dialects.func import (
     emit as emit,
     interp as interp,
     lower as lower,
+    print as print,
     reachibility as reachibility,
     typeinfer as typeinfer,
 )

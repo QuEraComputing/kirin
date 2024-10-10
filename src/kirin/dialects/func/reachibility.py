@@ -17,7 +17,7 @@ class ReachibilityInfer(TypeInfer):
         mt = ir.Method(
             mod=None,
             py_func=None,
-            sym_name=stmt.sym_name.data,
+            sym_name=stmt.sym_name,
             arg_names=[f.name or "" for f in stmt.args],
             dialects=interp.dialects,
             code=stmt,

@@ -145,7 +145,7 @@ class Return(Statement):
 class Lambda(Statement):
     name = "lambda"
     traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface()})
-    sym_name: data.PyAttr[str] = info.attribute(property=True)
+    sym_name: str = info.attribute(property=True)
     signature: Signature = info.attribute()
     body: Region = info.region(multi=True)
     result: ResultValue = info.result(MethodType)
@@ -174,7 +174,7 @@ class Lambda(Statement):
             printer.print_str(self.name + " ")
 
         with printer.rich(style="cyan"):
-            printer.print_str(self.sym_name.data)
+            printer.print_str(self.sym_name)
 
         printer.print_str("(")
         printer.show_list(self.args)
@@ -189,7 +189,7 @@ class Lambda(Statement):
         self.body.print_impl(printer)
 
         with printer.rich(style="black"):
-            printer.print_str(f" // func.lambda {self.sym_name.data}")
+            printer.print_str(f" // func.lambda {self.sym_name}")
 
 
 @statement(dialect=dialect)

@@ -16,6 +16,8 @@ class ColorScheme:
     dialect: str = "dark_blue"
     type: str = "dark_blue"
     comment: str = "bright_black"
+    keyword: str = "red"
+    symbol: str = "cyan"
 
 
 @dataclass
@@ -79,7 +81,7 @@ class Printer(CodeGen[None], Generic[IOType]):
                 for bb in region.blocks:
                     self.emit_Block(bb)
 
-                self.print_newline()
+        self.print_newline()
         self.plain_print("}")
 
     def emit_Block(self, block: ir.Block) -> None:
@@ -114,24 +116,28 @@ class Printer(CodeGen[None], Generic[IOType]):
         self.plain_print("(")
         for idx, (name, s) in enumerate(stmt._name_args_slice.items()):
             values = stmt.args[s]
-            if (fields := stmt_fields(self)) and not fields.args[name].print:
+            if (fields := stmt_fields(stmt)) and not fields.args[name].print:
                 pass
             else:
                 with self.rich(style="orange4"):
                     self.plain_print(name, "=")
 
-            self.plain_print(values)
+            if isinstance(values, ir.SSAValue):
+                self.print_SSAValue(values)
+            else:
+                self.print_seq(values, emit=self.print_SSAValue, delim=", ")
+
             if idx < len(stmt._name_args_slice) - 1:
                 self.plain_print(", ")
+
+        # NOTE: args are specified manually without names
+        if not stmt._name_args_slice and stmt._args:
+            self.print_seq(stmt._args, emit=self.print_SSAValue, delim=", ")
+
         self.plain_print(")")
 
         if stmt.successors:
-            self.plain_print("[")
-            successors_names = [
-                f"^{self.state.block_id[successor]}" for successor in stmt.successors
-            ]
-            self.print_seq(successors_names, delim=", ")
-            self.plain_print("]")
+            self.print_successors(stmt.successors)
 
         if stmt.properties:
             self.plain_print("<{")
@@ -195,6 +201,14 @@ class Printer(CodeGen[None], Generic[IOType]):
         if node.dialect:
             self.plain_print(".")
         self.plain_print(node.name)
+
+    def print_successors(
+        self, successors: Iterable[ir.Block], prefix: str = "[", suffix: str = "]"
+    ) -> None:
+        successors_names = [
+            f"^{self.state.block_id[successor]}" for successor in successors
+        ]
+        self.print_seq(successors_names, delim=", ", prefix=prefix, suffix=suffix)
 
     def print_dialect_path(
         self, node: ir.Attribute | ir.Statement, prefix: str = ""
