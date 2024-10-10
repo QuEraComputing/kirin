@@ -2,7 +2,9 @@ import io
 
 from rich.console import Console
 
+from kirin import ir
 from kirin.codegen.print import Printer
+from kirin.dialects import fcf, func
 from kirin.dialects.py import data, types
 from kirin.prelude import basic
 
@@ -13,6 +15,7 @@ def move_gen(start, stop):
         def moo(aod):
             return start, aod
 
+        fcf.Map(moo, aod)  # type: ignore
         return moo
 
     return foo(stop)
@@ -28,7 +31,17 @@ def unstable(x: int):  # type: ignore
     return z
 
 
+@basic
+def empty():
+    pass
+
+
 class TestBasicPrint:
+
+    def dummy_check(self, node):
+        printer = Printer(basic)
+        printer.emit(node)
+        printer.plain_print("\n")
 
     def check_print(self, node, *text: str):
         printer = Printer(basic)
@@ -73,5 +86,13 @@ class TestBasicPrint:
         )
 
         # TODO: actually test these
-        Printer(basic).emit(move_gen)
-        Printer(basic).emit(unstable)
+        self.dummy_check(move_gen)
+        self.dummy_check(unstable)
+        self.dummy_check(empty)
+        self.dummy_check(empty.code)
+        assert isinstance(empty.code, func.Function)
+        assert isinstance(empty.code.body, ir.Region)
+        region = empty.code.body
+        self.dummy_check(region.blocks[0])
+        empty.code.body.blocks[0].detach()
+        self.dummy_check(empty.code)
