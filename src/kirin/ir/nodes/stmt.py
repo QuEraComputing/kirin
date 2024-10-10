@@ -423,7 +423,13 @@ class Statement(IRNode["Block"]):
         printer.plain_print(")")
 
         if self.successors:
-            printer.print_successors(self.successors)
+            printer.print_seq(
+                (printer.state.block_id[successor] for successor in self.successors),
+                emit=printer.plain_print,
+                delim=", ",
+                prefix="[",
+                suffix="]",
+            )
 
         if self.properties:
             printer.plain_print("<{")

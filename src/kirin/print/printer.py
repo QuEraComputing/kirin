@@ -24,7 +24,9 @@ class ColorScheme:
 @dataclass
 class PrintState:
     ssa_id: IdTable["ir.SSAValue"] = field(default_factory=IdTable["ir.SSAValue"])
-    block_id: IdTable["ir.Block"] = field(default_factory=IdTable["ir.Block"])
+    block_id: IdTable["ir.Block"] = field(
+        default_factory=lambda: IdTable["ir.Block"](prefix="^")
+    )
     indent: int = 0
     result_width: int = 0
     indent_marks: list[int] = field(default_factory=list)
@@ -77,20 +79,6 @@ class Printer(Generic[IOType]):
         if node.dialect:
             self.plain_print(".")
         self.plain_print(node.name)
-
-    def print_successors(
-        self, successors: Iterable["ir.Block"], prefix: str = "[", suffix: str = "]"
-    ) -> None:
-        successors_names = [
-            f"^{self.state.block_id[successor]}" for successor in successors
-        ]
-        self.print_seq(
-            successors_names,
-            emit=self.plain_print,
-            delim=", ",
-            prefix=prefix,
-            suffix=suffix,
-        )
 
     def print_dialect_path(
         self, node: Union["ir.Attribute", "ir.Statement"], prefix: str = ""

@@ -69,7 +69,7 @@ class ConditionalBranch(Statement):
         with printer.rich(style=printer.color.keyword):
             printer.plain_print(" goto ")
 
-        printer.plain_print(f"^{printer.state.block_id[self.then_successor]}")
+        printer.plain_print(printer.state.block_id[self.then_successor])
         printer.plain_print("(")
         printer.print_seq(self.then_arguments, delim=", ")
         printer.plain_print(")")
@@ -77,7 +77,7 @@ class ConditionalBranch(Statement):
         with printer.rich(style=printer.color.keyword):
             printer.plain_print(" else ")
 
-        printer.plain_print(f"^{printer.state.block_id[self.else_successor]}")
+        printer.plain_print(printer.state.block_id[self.else_successor])
         printer.plain_print("(")
         printer.print_seq(self.else_arguments, delim=", ")
         printer.plain_print(")")
