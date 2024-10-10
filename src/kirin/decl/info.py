@@ -18,7 +18,7 @@ class Field:
     __class_getitem__ = classmethod(GenericAlias)
 
     @abstractmethod
-    def has_no_default(self): ...
+    def has_no_default(self) -> bool: ...
 
 
 @dataclass

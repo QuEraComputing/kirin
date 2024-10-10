@@ -10,27 +10,27 @@ from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
 @cf.dialect.register
 class CfLowering(FromPythonAST):
 
-    def lower_Pass(self, ctx: LoweringState, node: ast.Pass) -> Result:
-        next = ctx.current_frame.next_block
+    def lower_Pass(self, state: LoweringState, node: ast.Pass) -> Result:
+        next = state.current_frame.next_block
         if next is None:
             raise DialectLoweringError("code block is not exiting")
-        ctx.append_stmt(cf.Branch(arguments=(), successor=next))
+        state.append_stmt(cf.Branch(arguments=(), successor=next))
         return Result()
 
-    def lower_Assert(self, ctx: LoweringState, node: ast.Assert) -> Result:
-        cond = ctx.visit(node.test).expect_one()
+    def lower_Assert(self, state: LoweringState, node: ast.Assert) -> Result:
+        cond = state.visit(node.test).expect_one()
         if node.msg:
-            message = ctx.visit(node.msg).expect_one()
-            ctx.append_stmt(cf.Assert(condition=cond, message=message))
+            message = state.visit(node.msg).expect_one()
+            state.append_stmt(cf.Assert(condition=cond, message=message))
         else:
-            message_stmt = ctx.append_stmt(stmts.Constant(""))
-            ctx.append_stmt(cf.Assert(condition=cond, message=message_stmt.result))
+            message_stmt = state.append_stmt(stmts.Constant(""))
+            state.append_stmt(cf.Assert(condition=cond, message=message_stmt.result))
         return Result()
 
-    def lower_If(self, ctx: LoweringState, node: ast.If) -> Result:
-        cond = ctx.visit(node.test).expect_one()
+    def lower_If(self, state: LoweringState, node: ast.If) -> Result:
+        cond = state.visit(node.test).expect_one()
 
-        frame = ctx.current_frame
+        frame = state.current_frame
         before_block = frame.current_block
         if frame.next_block is None:
             raise DialectLoweringError("code block is not exiting")
@@ -45,9 +45,9 @@ class CfLowering(FromPythonAST):
         if frame.stream.has_next():
             frame.next_block = ir.Block()  # don't push this yet
 
-        frame_if = self.frame_if(ctx, frame, node)
-        frame_else = self.frame_else(ctx, frame, node)
-        self.frame_after_ifelse(ctx, frame, frame_if, frame_else, before_block_next)
+        frame_if = self.frame_if(state, frame, node)
+        frame_else = self.frame_else(state, frame, node)
+        self.frame_after_ifelse(state, frame, frame_if, frame_else, before_block_next)
 
         # insert branches to the last block of "if body" if no terminator
         if (

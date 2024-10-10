@@ -13,36 +13,36 @@ from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
 @dialect.register
 class FuncLowering(FromPythonAST):
 
-    def lower_Call(self, ctx: LoweringState, node: ast.Call) -> Result:
+    def lower_Call(self, state: LoweringState, node: ast.Call) -> Result:
         # 1. try to lookup global statement object
         # 2. lookup local values
-        global_callee_result = ctx.get_global_nothrow(node.func)
+        global_callee_result = state.get_global_nothrow(node.func)
         if global_callee_result is None:  # not found in globals, has to be local
             return_type = types.Any
-            callee = ctx.visit(node.func).expect_one()
+            callee = state.visit(node.func).expect_one()
         else:
             global_callee = global_callee_result.unwrap()
             if inspect.isclass(global_callee):
                 if issubclass(global_callee, ir.Statement):
-                    if global_callee.dialect not in ctx.dialects.data:
+                    if global_callee.dialect not in state.dialects.data:
                         raise DialectLoweringError(
                             f"unsupported dialect `{global_callee.dialect.name}`"  # type: ignore
                         )
-                    return global_callee.from_python_call(ctx, node)
+                    return global_callee.from_python_call(state, node)
                 elif issubclass(global_callee, slice):
-                    return stmts.Slice.from_python_call(ctx, node)
+                    return stmts.Slice.from_python_call(state, node)
                 elif issubclass(global_callee, range):
-                    return stmts.Range.from_python_call(ctx, node)
+                    return stmts.Range.from_python_call(state, node)
 
             # symbol exist in global, but not ir.Statement, lookup local first
             try:
                 return_type = types.Any
-                callee = ctx.visit(node.func).expect_one()
+                callee = state.visit(node.func).expect_one()
             except DialectLoweringError:  # not found in locals
                 if isinstance(global_callee, ir.Method):  # global method
                     # return type is Any if not inferred yet
                     return_type = global_callee.return_type or types.Any
-                    callee = ctx.append_stmt(stmts.Constant(global_callee)).result
+                    callee = state.append_stmt(stmts.Constant(global_callee)).result
                 elif inspect.isfunction(global_callee) or inspect.isbuiltin(
                     global_callee
                 ):
@@ -60,15 +60,15 @@ class FuncLowering(FromPythonAST):
             if isinstance(arg, ast.Starred):  # TODO: support *args
                 raise DialectLoweringError("starred arguments are not supported")
             else:
-                args.append(ctx.visit(arg).expect_one())
+                args.append(state.visit(arg).expect_one())
 
         keywords = []
         for kw in node.keywords:
             keywords.append(kw.arg)
-            args.append(ctx.visit(kw.value).expect_one())
+            args.append(state.visit(kw.value).expect_one())
 
         return Result(
-            ctx.append_stmt(
+            state.append_stmt(
                 Call(callee, args, tuple(keywords), return_types=[return_type])
             )
         )

@@ -46,21 +46,21 @@ class PythonLowering(FromPythonAST):
                             raise DialectLoweringError(f"unsupported target {target}")
         return Result()  # python assign does not have value
 
-    def lower_Constant(self, ctx: LoweringState, node: ast.Constant) -> Result:
-        return Result(ctx.append_stmt(py.Constant(node.value)))
+    def lower_Constant(self, state: LoweringState, node: ast.Constant) -> Result:
+        return Result(state.append_stmt(py.Constant(node.value)))
 
-    def lower_BinOp(self, ctx: LoweringState, node: ast.BinOp) -> Result:
-        lhs = ctx.visit(node.left).expect_one()
-        rhs = ctx.visit(node.right).expect_one()
+    def lower_BinOp(self, state: LoweringState, node: ast.BinOp) -> Result:
+        lhs = state.visit(node.left).expect_one()
+        rhs = state.visit(node.right).expect_one()
 
         if op := getattr(py.binop, node.op.__class__.__name__, None):
             stmt = op(lhs=lhs, rhs=rhs)
         else:
             raise DialectLoweringError(f"unsupported binop {node.op}")
-        return Result(ctx.append_stmt(stmt))
+        return Result(state.append_stmt(stmt))
 
-    def lower_BoolOp(self, ctx: LoweringState, node: ast.BoolOp) -> Result:
-        lhs = ctx.visit(node.values[0]).expect_one()
+    def lower_BoolOp(self, state: LoweringState, node: ast.BoolOp) -> Result:
+        lhs = state.visit(node.values[0]).expect_one()
         match node.op:
             case ast.And():
                 boolop = py.And
@@ -70,26 +70,26 @@ class PythonLowering(FromPythonAST):
                 raise DialectLoweringError(f"unsupported boolop {node.op}")
 
         for value in node.values[1:]:
-            lhs = ctx.append_stmt(
-                boolop(lhs=lhs, rhs=ctx.visit(value).expect_one())
+            lhs = state.append_stmt(
+                boolop(lhs=lhs, rhs=state.visit(value).expect_one())
             ).result
         return Result(lhs)
 
-    def lower_UnaryOp(self, ctx: LoweringState, node: ast.UnaryOp) -> Result:
+    def lower_UnaryOp(self, state: LoweringState, node: ast.UnaryOp) -> Result:
         if op := getattr(py.unary, node.op.__class__.__name__, None):
-            return Result(ctx.append_stmt(op(ctx.visit(node.operand).expect_one())))
+            return Result(state.append_stmt(op(state.visit(node.operand).expect_one())))
         else:
             raise DialectLoweringError(f"unsupported unary operator {node.op}")
 
-    def lower_Compare(self, ctx: LoweringState, node: ast.Compare) -> Result:
+    def lower_Compare(self, state: LoweringState, node: ast.Compare) -> Result:
         # NOTE: a key difference here is we need to lower
         # the multi-argument comparison operators into binary operators
         # since low-level comparision operators are binary + we need a static
         # number of arguments in each instruction
-        lhs = ctx.visit(node.left).expect_one()
+        lhs = state.visit(node.left).expect_one()
 
         comparators = [
-            ctx.visit(comparator).expect_one() for comparator in node.comparators
+            state.visit(comparator).expect_one() for comparator in node.comparators
         ]
 
         cmp_results: list[SSAValue] = []
@@ -98,7 +98,7 @@ class PythonLowering(FromPythonAST):
                 stmt = op(lhs=lhs, rhs=rhs)
             else:
                 raise DialectLoweringError(f"unsupported compare operator {op}")
-            ctx.append_stmt(stmt)
+            state.append_stmt(stmt)
             cmp_results.append(Result(stmt).expect_one())
             lhs = rhs
 
@@ -108,32 +108,32 @@ class PythonLowering(FromPythonAST):
         lhs = cmp_results[0]
         for op in cmp_results[1:]:
             stmt = py.And(lhs=lhs, rhs=op)
-            ctx.append_stmt(stmt)
+            state.append_stmt(stmt)
             lhs = stmt.result
 
         return Result(lhs)
 
-    def lower_Tuple(self, ctx: LoweringState, node: ast.Tuple) -> Result:
+    def lower_Tuple(self, state: LoweringState, node: ast.Tuple) -> Result:
         return Result(
-            ctx.append_stmt(
+            state.append_stmt(
                 stmt=py.NewTuple(
-                    tuple(ctx.visit(elem).expect_one() for elem in node.elts)
+                    tuple(state.visit(elem).expect_one() for elem in node.elts)
                 )
             )
         )
 
-    def lower_Subscript(self, ctx: LoweringState, node: ast.Subscript) -> Result:
-        value = ctx.visit(node.value).expect_one()
-        slice = ctx.visit(node.slice).expect_one()
+    def lower_Subscript(self, state: LoweringState, node: ast.Subscript) -> Result:
+        value = state.visit(node.value).expect_one()
+        slice = state.visit(node.slice).expect_one()
         if isinstance(node.ctx, ast.Load):
             stmt = py.GetItem(obj=value, index=slice)
         else:
             raise DialectLoweringError(f"unsupported subscript context {node.ctx}")
-        ctx.append_stmt(stmt)
+        state.append_stmt(stmt)
         return Result(stmt)
 
-    def lower_List(self, ctx: LoweringState, node: ast.List) -> Result:
-        elts = tuple(ctx.visit(each).expect_one() for each in node.elts)
+    def lower_List(self, state: LoweringState, node: ast.List) -> Result:
+        elts = tuple(state.visit(each).expect_one() for each in node.elts)
 
         if len(elts):
             typ: Lattice[types.PyType] = elts[0].type
@@ -143,24 +143,24 @@ class PythonLowering(FromPythonAST):
             typ = types.Any
 
         stmt = py.NewList(typ, values=tuple(elts))  # type: ignore
-        ctx.append_stmt(stmt)
+        state.append_stmt(stmt)
         return Result(stmt)
 
-    def lower_Attribute(self, ctx: LoweringState, node: ast.Attribute) -> Result:
+    def lower_Attribute(self, state: LoweringState, node: ast.Attribute) -> Result:
         if not isinstance(node.ctx, ast.Load):
             raise DialectLoweringError(f"unsupported attribute context {node.ctx}")
-        value = ctx.visit(node.value).expect_one()
+        value = state.visit(node.value).expect_one()
         stmt = py.GetAttr(obj=value, attrname=node.attr)
-        ctx.append_stmt(stmt)
+        state.append_stmt(stmt)
         return Result(stmt)
 
-    def lower_Expr(self, ctx: LoweringState, node: ast.Expr) -> Result:
-        return ctx.visit(node.value)
+    def lower_Expr(self, state: LoweringState, node: ast.Expr) -> Result:
+        return state.visit(node.value)
 
-    def lower_Name(self, ctx: LoweringState, node: ast.Name) -> Result:
+    def lower_Name(self, state: LoweringState, node: ast.Name) -> Result:
         name = node.id
         if isinstance(node.ctx, ast.Load):
-            value = ctx.current_frame.get(name)
+            value = state.current_frame.get(name)
             if value is None:
                 raise DialectLoweringError(f"{name} is not defined")
             return Result(value)
@@ -169,14 +169,14 @@ class PythonLowering(FromPythonAST):
         else:  # Del
             raise DialectLoweringError("unhandled del operation")
 
-    def lower_Slice(self, ctx: LoweringState, node: ast.Slice) -> Result:
+    def lower_Slice(self, state: LoweringState, node: ast.Slice) -> Result:
         def value_or_none(expr: ast.expr | None) -> SSAValue:
             if expr is not None:
-                return ctx.visit(expr).expect_one()
+                return state.visit(expr).expect_one()
             else:
-                return ctx.append_stmt(py.Constant(None)).result
+                return state.append_stmt(py.Constant(None)).result
 
         lower = value_or_none(node.lower)
         upper = value_or_none(node.upper)
         step = value_or_none(node.step)
-        return Result(ctx.append_stmt(py.Slice(start=lower, stop=upper, step=step)))
+        return Result(state.append_stmt(py.Slice(start=lower, stop=upper, step=step)))
