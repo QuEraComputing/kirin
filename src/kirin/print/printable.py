@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
@@ -17,16 +16,12 @@ class Printable:
 
             printer = Printer()
         self.print_impl(printer)
-        printer.print_str("\n")  # add a new line in the end
-        # printer.flush()
+        printer.plain_print("\n")  # add a new line in the end
 
     def print_str(self, printer: Printer) -> str:
-        stream = io.StringIO()
-        printer = printer.similar(stream)
-        self.print(printer)
-        ret = stream.getvalue()
-        stream.close()
-        return ret
+        with printer.string_io() as stream:
+            self.print(printer)
+            return stream.getvalue()
 
     @abstractmethod
     def print_impl(self, printer: Printer) -> None:

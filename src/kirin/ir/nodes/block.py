@@ -279,12 +279,26 @@ class Block(IRNode["Region"]):
             yield from stmt.walk(reverse=reverse, region_first=region_first)
 
     def print_impl(self, printer: Printer) -> None:
-        printer.newline()
-        printer.print(printer.block.get_name(self))
-        printer.print_str("(")
-        printer.show_list(
-            [printer.ssa.get_name(arg) for arg in self.args], printer.print
+        printer.plain_print(printer.state.block_id[self])
+        printer.print_seq(
+            [printer.state.ssa_id[arg] for arg in self.args],
+            delim=", ",
+            prefix="(",
+            suffix="):",
+            emit=printer.plain_print,
         )
-        printer.print_str(")")
-        printer.print_str(":")
-        printer.show_stmts(self.stmts)
+
+        with printer.indent(increase=2, mark=False):
+            for stmt in self.stmts:
+                printer.print_newline()
+                if stmt._results:
+                    result_str = printer.result_str(stmt._results)
+                    printer.plain_print(
+                        result_str.rjust(printer.state.result_width), " = "
+                    )
+                elif printer.state.result_width:
+                    printer.plain_print(" " * printer.state.result_width, "   ")
+                with printer.indent(printer.state.result_width + 3, mark=True):
+                    stmt.print(printer)
+
+        printer.print_newline()

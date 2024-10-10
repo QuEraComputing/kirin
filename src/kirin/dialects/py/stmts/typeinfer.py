@@ -203,7 +203,7 @@ class TypeInfer(DialectInterpreter):
     def getitem(
         self, interp, stmt: py.GetItem, values: tuple[types.PyType, types.PyType]
     ) -> ResultValue:
-        obj: types.PyGeneric = values[0]
+        obj: types.PyGeneric = values[0]  # type: ignore
         index: types.PyType = values[1]
         # TODO: replace this when we can multiple dispatch
         if obj.is_subseteq(types.Tuple):
@@ -338,7 +338,7 @@ class TypeInfer(DialectInterpreter):
             and isinstance(step, types.PyConst)
         ):
             return ResultValue(
-                types.PyConst(slice(start.data, stop.data, step.data), stmt.result.type)
+                types.PyConst(slice(start.data, stop.data, step.data), stmt.result.type)  # type: ignore
             )
 
         return ResultValue(stmt.result)

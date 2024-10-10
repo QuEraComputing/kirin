@@ -16,10 +16,12 @@ class Alias(Statement):
     result: ResultValue = info.result(T)
 
     def print_impl(self, printer: Printer) -> None:
-        printer.show_name(self)
-        printer.print_str(" ")
-        with printer.rich(style="yellow"):
-            printer.print_str(self.target.data)
-        with printer.rich(style="red"):
-            printer.print_str(" = ")
-        self.value.print_impl(printer)
+        printer.print_name(self)
+        printer.plain_print(" ")
+        with printer.rich(style=printer.color.symbol):
+            printer.plain_print(self.target.data)
+
+        with printer.rich(style=printer.color.keyword):
+            printer.plain_print(" = ")
+
+        printer.print(self.value)

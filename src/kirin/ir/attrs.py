@@ -53,10 +53,26 @@ class StructAttribute(Attribute, ABC):
         return ret
 
     def print_impl(self, printer: Printer) -> None:
-        printer.show_name(self, prefix="!")
-        printer.print_str("<")
-        printer.show_list(self.parameters)
-        printer.print_str(">")
+        printer.print_name(self)
+        printer.plain_print("(")
+        values = {}
+        for f in fields(self):
+            value = getattr(self, f.name)
+            if isinstance(value, Attribute):
+                values[f.name] = value
+            elif isinstance(value, tuple) and all(
+                isinstance(v, Attribute) for v in value
+            ):
+                values[f.name] = value
+
+        def _emit_attr(attr: tuple[Attribute, ...] | Attribute):
+            if isinstance(attr, tuple):
+                printer.print_seq(attr, delim=", ", prefix="(", suffix=")")
+            else:
+                printer.print(attr)
+
+        printer.print_mapping(values, emit=_emit_attr, delim=", ")
+        printer.plain_print(")")
 
 
 @dataclass
@@ -98,7 +114,7 @@ class TypeAttribute(Attribute, Lattice[TypeLatticeElem], metaclass=TypeAttribute
         return self.is_subseteq(other)
 
     def print_impl(self, printer: Printer) -> None:
-        printer.show_name(self, prefix="!")
+        printer.print_name(self, prefix="!")
 
 
 class AnyType(TypeAttribute[TypeLatticeElem], metaclass=SingletonTypeMeta):

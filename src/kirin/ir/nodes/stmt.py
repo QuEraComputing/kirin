@@ -40,9 +40,7 @@ class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable)
         self.field = new_args
 
     def print_impl(self, printer: Printer) -> None:
-        printer.print_str("[")
-        printer.show_list(self.field, printer.print)
-        printer.print_str("]")
+        printer.print_seq(self.field, delim=", ", prefix="[", suffix="]")
 
 
 @dataclass
@@ -400,58 +398,60 @@ class Statement(IRNode["Block"]):
     def print_impl(self, printer: Printer) -> None:
         from kirin.decl import fields as stmt_fields
 
-        printer.show_name(self)
+        printer.print_name(self)
+        printer.plain_print("(")
+        for idx, (name, s) in enumerate(self._name_args_slice.items()):
+            values = self.args[s]
+            if (fields := stmt_fields(self)) and not fields.args[name].print:
+                pass
+            else:
+                with printer.rich(style="orange4"):
+                    printer.plain_print(name, "=")
 
-        if self.args:
-            printer.print("(")
-            for idx, (name, s) in enumerate(self._name_args_slice.items()):
-                values = self.args[s]
-                if (fields := stmt_fields(self)) and not fields.args[name].print:
-                    pass
-                else:
-                    with printer.rich(style="orange4"):
-                        printer.print_str(name)
-                        printer.print_str("=")
-
+            if isinstance(values, SSAValue):
                 printer.print(values)
-                if idx < len(self._name_args_slice) - 1:
-                    printer.print_str(", ")
-            printer.print(")")
+            else:
+                printer.print_seq(values, delim=", ")
+
+            if idx < len(self._name_args_slice) - 1:
+                printer.plain_print(", ")
+
+        # NOTE: args are specified manually without names
+        if not self._name_args_slice and self._args:
+            printer.print_seq(self._args, delim=", ")
+
+        printer.plain_print(")")
 
         if self.successors:
-            printer.print("[")
-            successors_names = [
-                printer.block.get_name(successor) for successor in self.successors
-            ]
-            printer.show_list(successors_names, printer.print_str, delim=", ")
-            printer.print("]")
+            printer.print_successors(self.successors)
 
         if self.properties:
-            printer.print("<{")
+            printer.plain_print("<{")
             with printer.rich(highlight=True):
-                printer.show_dict(self.properties, printer.print, delim=", ")
-            printer.print("}>")
+                printer.print_mapping(self.properties, delim=", ")
+            printer.plain_print("}>")
 
         if self.regions:
-            with printer.indent(
-                printer._result_width + 3 if printer._result_width else 0
-            ):
-                printer.print(" (")
-                printer.show_list(self.regions, printer.print, delim=" ")
-                printer.print(")")
+            printer.print_seq(
+                self.regions,
+                delim=" ",
+                prefix=" (",
+                suffix=")",
+            )
 
         if self.attributes:
-            printer.print("{")
+            printer.plain_print("{")
             with printer.rich(highlight=True):
-                printer.show_dict(self.attributes, printer.print, delim=", ")
-            printer.print("}")
+                printer.print_mapping(self.attributes, delim=", ")
+            printer.plain_print("}")
 
-        with printer.rich(style="black"):
-            printer.print_str(" : ")
-            printer.show_function_types(
-                [arg.type for arg in self.args],
-                [result.type for result in self._results],
-            )
+        if self._results:
+            with printer.rich(style="black"):
+                printer.plain_print(" -> ")
+                printer.print_seq(
+                    [result.type for result in self._results],
+                    delim=", ",
+                )
 
     def get_attr_or_prop(self, key: str) -> Attribute | None:
         return self.attributes.get(key, self.properties.get(key))

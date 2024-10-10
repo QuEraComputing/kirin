@@ -2,7 +2,6 @@ from kirin.decl import info, statement
 from kirin.dialects.py import types
 from kirin.dialects.py.stmts.dialect import dialect
 from kirin.ir import Pure, ResultValue, SSAValue, Statement
-from kirin.print.printer import Printer
 
 
 @statement(dialect=dialect)
@@ -18,13 +17,3 @@ class NewTuple(Statement):
                 result_type,
             ],
         )
-
-    def print_impl(self, printer: Printer) -> None:
-        printer.show_name(self)
-        printer.print_str("(")
-        printer.show_list(self.args, delim=", ")
-        printer.print_str(")")
-
-        with printer.rich(style="black"):
-            printer.print_str(" -> ")
-            printer.print(self.result.type)

@@ -6,6 +6,8 @@ from kirin.exceptions import InterpreterError
 from kirin.ir.attrs import TypeAttribute
 from kirin.ir.nodes.stmt import Statement
 from kirin.ir.traits import CallableStmtInterface
+from kirin.print.printable import Printable
+from kirin.print.printer import Printer
 
 if TYPE_CHECKING:
     from kirin.ir.group import DialectGroup
@@ -15,7 +17,7 @@ RetType = TypeVar("RetType")
 
 
 @dataclass
-class Method(Generic[Param, RetType]):
+class Method(Printable, Generic[Param, RetType]):
     mod: ModuleType | None  # ref
     py_func: Callable[Param, RetType] | None  # ref
     sym_name: str | None
@@ -56,3 +58,6 @@ class Method(Generic[Param, RetType]):
 
     def __repr__(self) -> str:
         return f'Method("{self.sym_name}")'
+
+    def print_impl(self, printer: Printer) -> None:
+        return printer.print(self.code)

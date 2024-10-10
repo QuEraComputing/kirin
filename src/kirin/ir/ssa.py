@@ -68,7 +68,7 @@ class SSAValue(ABC, Printable):
         self.replace_by(DeletedSSAValue(self))
 
     def print_impl(self, printer: Printer) -> None:
-        return printer.print_str(printer.ssa.get_name(self))
+        printer.plain_print(printer.state.ssa_id[self])
 
 
 @derive(id_hash=True)
@@ -129,8 +129,8 @@ class BlockArgument(SSAValue):
     def print_impl(self, printer: Printer) -> None:
         super().print_impl(printer)
         if not isinstance(self.type, AnyType):
-            with printer.rich(style="black"):
-                printer.print_str(" : ")
+            with printer.rich(style=printer.color.comment):
+                printer.plain_print(" : ")
                 printer.print(self.type)
 
 

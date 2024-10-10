@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
+from kirin.dialects.func.dialect import dialect
 from kirin.dialects.py import types
 from kirin.ir import Attribute, Method, TypeAttribute
 from kirin.print.printer import Printer
@@ -12,6 +13,7 @@ MethodType = types.PyGeneric(
 TypeLatticeElem = TypeVar("TypeLatticeElem", bound="TypeAttribute")
 
 
+@dialect.register
 @dataclass
 class Signature(Generic[TypeLatticeElem], Attribute):
     """function body signature.
@@ -32,4 +34,6 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         return hash((self.inputs, self.output))
 
     def print_impl(self, printer: Printer) -> None:
-        printer.show_function_types(self.inputs, [self.output])
+        printer.print_seq(self.inputs, delim=", ", prefix="(", suffix=")")
+        printer.plain_print(" -> ")
+        printer.print(self.output)

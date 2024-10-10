@@ -64,6 +64,11 @@ class PyAnyType(AnyType[PyType], PyType):
     def __hash__(self) -> int:
         return id(self)
 
+    def print_impl(self, printer: Printer) -> None:
+        printer.plain_print("!")
+        printer.plain_print("py", style=printer.color.dialect)
+        printer.plain_print(".Any")
+
 
 @dialect.register
 @dataclass
@@ -75,6 +80,11 @@ class PyBottomType(BottomType, PyType):
 
     def is_subseteq(self, other: Lattice) -> bool:
         return True
+
+    def print_impl(self, printer: Printer) -> None:
+        printer.plain_print("!")
+        printer.plain_print("py", style=printer.color.dialect)
+        printer.plain_print(".Bottom")
 
 
 class LiteralMeta(TypeAttributeMeta):
@@ -146,7 +156,10 @@ class PyConst(PyType, Generic[Type]):
         return f"Const({self.data})"
 
     def print_impl(self, printer: Printer) -> None:
-        printer.print("Const(", repr(self.data), ", ", self.typ, ")")
+        printer.print_name(self, prefix="!")
+        printer.plain_print("(", self.data, ", ")
+        printer.print(self.typ)
+        printer.plain_print(")")
 
 
 @dialect.register
@@ -183,7 +196,7 @@ class PyLiteral(PyType, Generic[Type], metaclass=LiteralMeta):
         return "Literal(" + repr(self.data) + ")"
 
     def print_impl(self, printer: Printer) -> None:
-        printer.print(repr(self.data))
+        printer.plain_print(repr(self.data))
 
 
 @dialect.register
@@ -238,8 +251,8 @@ class PyUnion(PyType, metaclass=UnionTypeMeta):
         return f"PyUnion[{', '.join(map(repr, self.args))}]"
 
     def print_impl(self, printer: Printer) -> None:
-        printer.show_name(self, prefix="!")
-        printer.show_list(self.args, delim=", ", prefix="[", suffix="]")
+        printer.print_name(self, prefix="!")
+        printer.print_seq(self.args, delim=", ", prefix="[", suffix="]")
 
 
 @dialect.register
@@ -297,10 +310,10 @@ class PyTypeVar(PyType):
         return PyBottomType()
 
     def print_impl(self, printer: Printer) -> None:
-        printer.print_str(f"~{self.varname}")
+        printer.plain_print(f"~{self.varname}")
         if not self.bound.is_top():
-            printer.print_str(" : ")
-            self.bound.print_impl(printer)
+            printer.plain_print(" : ")
+            printer.print(self.bound)
 
 
 @dialect.register
@@ -319,8 +332,8 @@ class PyVararg(Attribute):
         return f"Vararg[{self.typ}]"
 
     def print_impl(self, printer: Printer) -> None:
-        printer.print_str("*")
-        self.typ.print_impl(printer)
+        printer.plain_print("*")
+        printer.print(self.typ)
 
 
 PyTypeVarValue = Union[PyType, PyVararg]
@@ -403,7 +416,9 @@ class PyClass(PyType, Generic[Type], metaclass=PyClassMeta):
         return hash((PyClass, self.typ))
 
     def print_impl(self, printer: Printer) -> None:
-        printer.show_dialect_path(self, "class." + self.typ.__name__, prefix="!")
+        printer.plain_print("!")
+        printer.plain_print("py", style=printer.color.dialect)
+        printer.plain_print(".", self.name, ".", self.typ.__name__)
 
 
 @dialect.register
@@ -487,14 +502,15 @@ class PyGeneric(PyType, Generic[Type]):
 
     def print_impl(self, printer: Printer) -> None:
         printer.print(self.body)
-        printer.print_str("[")
+        printer.plain_print("[")
         if self.vars:
-            printer.show_list(self.vars, delim=", ")
+            printer.print_seq(self.vars)
         if self.vararg is not None:
             if self.vars:
-                printer.print_str(", ")
-            self.vararg.print_impl(printer)
-        printer.print_str("]")
+                printer.plain_print(", ")
+            printer.print(self.vararg.typ)
+            printer.plain_print(", ...")
+        printer.plain_print("]")
 
     def __getitem__(
         self, typ: PyTypeVarValue | tuple[PyTypeVarValue, ...]

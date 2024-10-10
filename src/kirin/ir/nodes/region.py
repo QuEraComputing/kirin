@@ -166,15 +166,22 @@ class Region(IRNode["Statement"]):
             yield from block.walk(reverse=reverse, region_first=region_first)
 
     def print_impl(self, printer: Printer) -> None:
-        printer.print_str("{")
+        printer.plain_print("{")
         if len(self.blocks) == 0:
-            printer.newline()
-            printer.print_str("}")
+            printer.print_newline()
+            printer.plain_print("}")
             return
 
-        with printer.indent(mark=True):
-            for bb in self.blocks:
-                bb.print_impl(printer)
+        result_width = 0
+        for bb in self.blocks:
+            for stmt in bb.stmts:
+                result_width = max(result_width, len(printer.result_str(stmt._results)))
 
-        printer.newline()
-        printer.print_str("}")
+        with printer.align(result_width):
+            with printer.indent(increase=2, mark=True):
+                printer.print_newline()
+                for bb in self.blocks:
+                    printer.print(bb)
+
+        printer.print_newline()
+        printer.plain_print("}")

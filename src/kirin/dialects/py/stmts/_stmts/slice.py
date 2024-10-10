@@ -22,9 +22,9 @@ class Slice(Statement):
             if stop.type.is_subtype(types.NoneType):
                 result_type = types.Bottom
             else:
-                result_type = types.Slice[types.widen_const(stop.type)]
+                result_type = types.Slice[types.widen_const(stop.type)]  # type: ignore
         else:
-            result_type = types.Slice[types.widen_const(start.type)]
+            result_type = types.Slice[types.widen_const(start.type)]  # type: ignore
 
         super().__init__(
             args=(start, stop, step),

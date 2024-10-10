@@ -23,3 +23,9 @@ class Constant(Statement, Generic[T]):
             properties={"value": value},
             result_types=(types.PyConst(value.data, value.type),),
         )
+
+    def print_impl(self, printer: data.OldPrinter) -> None:
+        printer.print_name(self)
+        printer.plain_print("<{")
+        printer.print(self.properties["value"])
+        printer.plain_print("}>")

@@ -13,6 +13,17 @@ class Assert(Statement):
     condition: SSAValue
     message: SSAValue = info.argument(String)
 
+    def print_impl(self, printer: Printer) -> None:
+        with printer.rich(style=printer.color.keyword):
+            printer.print_name(self)
+
+        printer.plain_print(" ")
+        printer.print(self.condition)
+
+        if self.message:
+            printer.plain_print(", ")
+            printer.print(self.message)
+
 
 @statement(dialect=dialect)
 class Branch(Statement):
@@ -23,13 +34,17 @@ class Branch(Statement):
     successor: Block = info.block()
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style="red"):
-            printer.print_str(self.name)
-        printer.print_str(" ")
-        printer.print_str(printer.block.get_name(self.successor))
-        printer.print_str("(")
-        printer.show_list(self.arguments)
-        printer.print_str(")")
+        with printer.rich(style=printer.color.keyword):
+            printer.print_name(self)
+
+        printer.plain_print(" ")
+        printer.plain_print(f"^{printer.state.block_id[self.successor]}")
+        printer.print_seq(
+            self.arguments,
+            delim=", ",
+            prefix="(",
+            suffix=")",
+        )
 
 
 @statement(dialect=dialect)
@@ -45,21 +60,24 @@ class ConditionalBranch(Statement):
     else_successor: Block = info.block()
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style="red"):
-            printer.print_str(self.name)
-        printer.print_str(" ")
-        self.cond.print_impl(printer)
+        with printer.rich(style=printer.color.keyword):
+            printer.print_name(self)
 
-        with printer.rich(style="black"):
-            printer.print_str(" goto ")
+        printer.plain_print(" ")
+        printer.print(self.cond)
 
-        printer.print_str(printer.block.get_name(self.then_successor))
-        printer.print_str("(")
-        printer.show_list(self.then_arguments)
-        printer.print_str(")")
-        with printer.rich(style="black"):
-            printer.print_str(" else ")
-        printer.print_str(printer.block.get_name(self.else_successor))
-        printer.print_str("(")
-        printer.show_list(self.else_arguments)
-        printer.print_str(")")
+        with printer.rich(style=printer.color.keyword):
+            printer.plain_print(" goto ")
+
+        printer.plain_print(f"^{printer.state.block_id[self.then_successor]}")
+        printer.plain_print("(")
+        printer.print_seq(self.then_arguments, delim=", ")
+        printer.plain_print(")")
+
+        with printer.rich(style=printer.color.keyword):
+            printer.plain_print(" else ")
+
+        printer.plain_print(f"^{printer.state.block_id[self.else_successor]}")
+        printer.plain_print("(")
+        printer.print_seq(self.else_arguments, delim=", ")
+        printer.plain_print(")")

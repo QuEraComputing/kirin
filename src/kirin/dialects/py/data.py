@@ -31,9 +31,10 @@ class PyAttr(Generic[T], Attribute):
         return hash(self.data)
 
     def print_impl(self, printer: OldPrinter) -> None:
-        printer.print_str(repr(self.data))
-        printer.print_str(" : ")
-        self.type.print_impl(printer)
+        printer.plain_print(repr(self.data))
+        with printer.rich(style=printer.color.comment):
+            printer.plain_print(" : ")
+            printer.print(self.type)
 
 
 @dialect.register(key="dict")
