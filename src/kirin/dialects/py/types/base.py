@@ -5,12 +5,8 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Generic, Iterable, NoReturn, TypeVar, Union
 
-from beartype.door import (
-    ClassTypeHint,
-    TupleVariableTypeHint,
-    TypeHint,
-    TypeVarTypeHint,
-)
+from beartype.door import TupleVariableTypeHint  # type: ignore
+from beartype.door import ClassTypeHint, TypeHint, TypeVarTypeHint
 from typing_extensions import Never
 
 from kirin.ir import (

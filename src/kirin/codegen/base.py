@@ -15,7 +15,6 @@ class CodeGen(ABC, Generic[Target]):
     keys: ClassVar[list[str]]
     dialects: ir.DialectGroup
     registry: dict["Signature", "StatementImpl"] = field(init=False, repr=False)
-    _root: Target | None = None
 
     def __init__(self, dialects: ir.DialectGroup | Iterable[ir.Dialect]):
         if not isinstance(dialects, ir.DialectGroup):
@@ -23,18 +22,21 @@ class CodeGen(ABC, Generic[Target]):
         self.dialects = dialects
         self.registry = dialects.registry.codegen(self.keys)
 
-    def emit(self, mt: ir.Method):
-        self.emit_Method(mt)
-        return self.root
-
-    @property
-    def root(self) -> Target:
-        if self._root is None:
-            self._root = self.init_root()
-        return self._root
-
-    @abstractmethod
-    def init_root(self) -> Target: ...
+    def emit(self, node) -> Target:
+        if isinstance(node, ir.Statement):
+            return self.emit_Statement(node)
+        elif isinstance(node, ir.Method):
+            return self.emit_Method(node)
+        elif isinstance(node, ir.Region):
+            return self.emit_Region(node)
+        elif isinstance(node, ir.Block):
+            return self.emit_Block(node)
+        elif isinstance(node, ir.Attribute):
+            return self.emit_Attribute(node)
+        else:
+            raise NotImplementedError(
+                f"Emit for {node.__class__.__name__} not implemented"
+            )
 
     def emit_Statement(self, stmt: ir.Statement) -> Target:
         sig = self.build_signature(stmt)
@@ -44,13 +46,13 @@ class CodeGen(ABC, Generic[Target]):
             return self.registry[stmt.__class__](self, stmt)
         return self.emit_Statement_fallback(stmt)
 
-    def emit_Attribute(self, stmt: ir.Attribute) -> Target:
-        if stmt.__class__ in self.registry:
-            return self.registry[stmt.__class__](self, stmt)
-        return self.emit_Attribute_fallback(stmt)
+    def emit_Attribute(self, attr: ir.Attribute) -> Target:
+        if attr.__class__ in self.registry:
+            return self.registry[attr.__class__](self, attr)
+        return self.emit_Attribute_fallback(attr)
 
-    def emit_Attribute_fallback(self, stmt: ir.Attribute) -> Target:
-        raise NotImplementedError(f"Emit for {stmt.__class__.__name__} not implemented")
+    def emit_Attribute_fallback(self, attr: ir.Attribute) -> Target:
+        raise NotImplementedError(f"Emit for {attr.__class__.__name__} not implemented")
 
     def emit_Statement_fallback(self, stmt: ir.Statement) -> Target:
         raise NotImplementedError(f"Emit for {stmt.__class__.__name__} not implemented")

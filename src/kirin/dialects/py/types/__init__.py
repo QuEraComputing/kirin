@@ -1,4 +1,4 @@
-from kirin.dialects.py.types import emit as emit
+from kirin.dialects.py.types import emit as emit, print as print
 from kirin.dialects.py.types.base import (
     PyAnyType as PyAnyType,
     PyBottomType as PyBottomType,

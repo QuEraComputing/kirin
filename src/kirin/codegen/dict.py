@@ -11,23 +11,22 @@ from .ssa import IdTable
 @dataclass(init=False)
 class DictGen(CodeGen[dict]):
     keys = ["dict", "str"]
-    ssa_id: IdTable[ir.SSAValue] = field(default_factory=IdTable)
-    block_id: IdTable[ir.Block] = field(default_factory=IdTable)
+    root: dict = field(init=False)
+    ssa_id: IdTable[ir.SSAValue] = field(default_factory=IdTable[ir.SSAValue])
+    block_id: IdTable[ir.Block] = field(default_factory=IdTable[ir.Block])
 
     def __init__(self, dialects: ir.DialectGroup | Iterable[ir.Dialect]):
         super().__init__(dialects)
         self.ssa_id = IdTable()
         self.block_id = IdTable()
 
-    def init_root(self) -> dict:
-        return {
+    def emit(self, mt: ir.Method):
+        self.root = {
             "globals": {},
             "methods": {},
+            "entry": mt.sym_name,
         }
-
-    def emit(self, mt: ir.Method):
-        self.root["entry"] = mt.sym_name
-        self.root["methods"][mt.sym_name] = self.emit_Method(mt)
+        self.root[mt.sym_name] = self.emit_Method(mt)
         return self.root
 
     def emit_Method(self, mt: ir.Method):

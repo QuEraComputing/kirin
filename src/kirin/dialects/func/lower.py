@@ -26,7 +26,7 @@ class FuncLowering(FromPythonAST):
                 if issubclass(global_callee, ir.Statement):
                     if global_callee.dialect not in ctx.dialects.data:
                         raise DialectLoweringError(
-                            f"unsupported dialect `{global_callee.dialect.name}`"
+                            f"unsupported dialect `{global_callee.dialect.name}`"  # type: ignore
                         )
                     return global_callee.from_python_call(ctx, node)
                 elif issubclass(global_callee, slice):
