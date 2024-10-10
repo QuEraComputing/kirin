@@ -1,13 +1,15 @@
 import io
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import IO, Callable, Generic, Iterable, TypeVar
+from typing import IO, TYPE_CHECKING, Callable, Generic, Iterable, TypeVar, Union
 
 from rich.console import Console
 
-from kirin import ir
 from kirin.idtable import IdTable
 from kirin.print.printable import Printable
+
+if TYPE_CHECKING:
+    from kirin import ir
 
 
 @dataclass
@@ -21,8 +23,8 @@ class ColorScheme:
 
 @dataclass
 class PrintState:
-    ssa_id: IdTable[ir.SSAValue] = field(default_factory=IdTable[ir.SSAValue])
-    block_id: IdTable[ir.Block] = field(default_factory=IdTable[ir.Block])
+    ssa_id: IdTable["ir.SSAValue"] = field(default_factory=IdTable["ir.SSAValue"])
+    block_id: IdTable["ir.Block"] = field(default_factory=IdTable["ir.Block"])
     indent: int = 0
     result_width: int = 0
     indent_marks: list[int] = field(default_factory=list)
@@ -68,14 +70,16 @@ class Printer(Generic[IOType]):
                 )
             fn(object)
 
-    def print_name(self, node: ir.Attribute | ir.Statement, prefix: str = "") -> None:
+    def print_name(
+        self, node: Union["ir.Attribute", "ir.Statement"], prefix: str = ""
+    ) -> None:
         self.print_dialect_path(node, prefix=prefix)
         if node.dialect:
             self.plain_print(".")
         self.plain_print(node.name)
 
     def print_successors(
-        self, successors: Iterable[ir.Block], prefix: str = "[", suffix: str = "]"
+        self, successors: Iterable["ir.Block"], prefix: str = "[", suffix: str = "]"
     ) -> None:
         successors_names = [
             f"^{self.state.block_id[successor]}" for successor in successors
@@ -89,7 +93,7 @@ class Printer(Generic[IOType]):
         )
 
     def print_dialect_path(
-        self, node: ir.Attribute | ir.Statement, prefix: str = ""
+        self, node: Union["ir.Attribute", "ir.Statement"], prefix: str = ""
     ) -> None:
         if node.dialect:  # not None
             self.plain_print(prefix)
@@ -212,7 +216,7 @@ class Printer(Generic[IOType]):
             self.console.file = old_file
             stream.close()
 
-    def result_str(self, results: list[ir.ResultValue]) -> str:
+    def result_str(self, results: list["ir.ResultValue"]) -> str:
         with self.string_io() as stream:
             self.print_seq(results, delim=", ")
             result_str = stream.getvalue()

@@ -3,10 +3,10 @@ import io
 from rich.console import Console
 
 from kirin import ir
-from kirin.codegen.print import Printer
 from kirin.dialects import fcf, func
 from kirin.dialects.py import data, types
 from kirin.prelude import basic
+from kirin.print import Printer
 
 
 @basic
@@ -39,14 +39,14 @@ def empty():
 class TestBasicPrint:
 
     def dummy_check(self, node):
-        printer = Printer(basic)
-        printer.emit(node)
+        printer = Printer()
+        printer.print(node)
         printer.plain_print("\n")
 
     def check_print(self, node, *text: str):
-        printer = Printer(basic)
+        printer = Printer()
         with printer.string_io() as stream:
-            printer.emit(node)
+            printer.print(node)
             answer = stream.getvalue()
             for txt in text:
                 assert self.rich_str(txt) in answer
