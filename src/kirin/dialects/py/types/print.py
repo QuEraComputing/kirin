@@ -19,16 +19,21 @@ class Print(DialectEmit):
 
     @impl(PyClass)
     def print_class(self, printer: Printer, stmt: PyClass):
-        printer.plain_print("!py.", style=printer.color.dialect)
-        printer.plain_print(stmt.name, ".", stmt.typ.__name__)
+        printer.plain_print("!")
+        printer.plain_print("py", style=printer.color.dialect)
+        printer.plain_print(".", stmt.name, ".", stmt.typ.__name__)
 
     @impl(PyAnyType)
     def print_anytype(self, printer: Printer, stmt: PyAnyType):
-        printer.plain_print("!py.Any", style=printer.color.dialect)
+        printer.plain_print("!")
+        printer.plain_print("py", style=printer.color.dialect)
+        printer.plain_print(".Any")
 
     @impl(PyBottomType)
     def print_bottomtype(self, printer: Printer, stmt: PyBottomType):
-        printer.plain_print("!py.Bottom", style=printer.color.dialect)
+        printer.plain_print("!")
+        printer.plain_print("py", style=printer.color.dialect)
+        printer.plain_print(".Bottom")
 
     @impl(PyGeneric)
     def print_generic(self, printer: Printer, stmt: PyGeneric):
@@ -61,7 +66,7 @@ class Print(DialectEmit):
 
     @impl(PyConst)
     def print_const(self, printer: Printer, stmt: PyConst):
-        printer.print_name(stmt)
+        printer.print_name(stmt, prefix="!")
         printer.plain_print("(", stmt.data, ", ")
         printer.emit_Attribute(stmt.typ)
         printer.plain_print(")")

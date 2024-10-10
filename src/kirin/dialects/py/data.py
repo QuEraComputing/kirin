@@ -55,6 +55,6 @@ class Print(DialectEmit):
     @impl(PyAttr)
     def print_PyAttr(self, printer: Printer, stmt: PyAttr):
         printer.plain_print(repr(stmt.data))
-        with printer.rich(style="black"):
+        with printer.rich(style=printer.color.comment):
             printer.plain_print(" : ")
             printer.emit_Attribute(stmt.type)

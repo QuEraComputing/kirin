@@ -60,7 +60,7 @@ class Print(DialectEmit):
     def print_lambda(self, printer: Printer, stmt: Lambda):
         with printer.rich(style=printer.color.keyword):
             printer.print_name(stmt)
-            printer.plain_print(" ")
+        printer.plain_print(" ")
 
         with printer.rich(style=printer.color.symbol):
             printer.plain_print(stmt.sym_name)

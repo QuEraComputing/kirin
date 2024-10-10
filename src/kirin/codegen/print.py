@@ -30,7 +30,7 @@ class PrintState:
     result_width: int = 0
     "SSA-value column width in printing"
     rich_style: str | None = None
-    rich_highlight: bool | None = None
+    rich_highlight: bool | None = False
     messages: list[str] = field(default_factory=list)
 
 
