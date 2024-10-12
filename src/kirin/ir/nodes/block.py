@@ -300,3 +300,8 @@ class Block(IRNode["Region"]):
                     printer.plain_print(" " * printer.state.result_width, "   ")
                 with printer.indent(printer.state.result_width + 3, mark=True):
                     printer.print(stmt)
+
+    def validate(self) -> None:
+        self.assert_parent(Region, self.parent)
+        for stmt in self.stmts:
+            stmt.validate()

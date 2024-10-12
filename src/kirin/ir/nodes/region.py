@@ -188,3 +188,8 @@ class Region(IRNode["Statement"]):
 
         printer.print_newline()
         printer.plain_print("}")
+
+    def validate(self) -> None:
+        self.assert_parent(Statement, self.parent_node)
+        for block in self.blocks:
+            block.validate()
