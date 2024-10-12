@@ -1,4 +1,5 @@
 import inspect
+import textwrap
 
 from beartype.door import is_subhint
 
@@ -55,7 +56,10 @@ class Verify(BaseModifier):
 
                 if is_subhint(f.annotation, ir.ResultValue):
                     raise ValueError(
-                        f"{f.name!r} is an argument field but has an invalid type annotation {f.annotation}"
+                        textwrap.dedent(
+                            f"{f.name!r} is an argument field but has an invalid type annotation {f.annotation}"
+                            " (did you mean to use `info.result` instead?)"
+                        )
                     )
 
             if isinstance(f, ResultField) and not is_subhint(
