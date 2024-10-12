@@ -1,4 +1,5 @@
 import inspect
+import textwrap
 
 from beartype.door import is_subhint
 
@@ -9,6 +10,23 @@ from .info import ArgumentField, Field, ResultField
 
 
 class Verify(BaseModifier):
+    RESERVED_NAMES = {
+        "name",
+        "traits",
+        "dialect",
+        "args",
+        "parent",
+        "parent_node",
+        "parent_region",
+        "parent_block",
+        "next_stmt",
+        "prev_stmt",
+        "results",
+        "regions",
+        "successors",
+        "attributes",
+        "properties",
+    }
 
     def verify_mro(self):
         if not issubclass(self.cls, ir.Statement):
@@ -21,26 +39,32 @@ class Verify(BaseModifier):
         cls_annotations = inspect.get_annotations(self.cls)
         for name, value in self.cls.__dict__.items():
             if isinstance(value, Field) and name not in cls_annotations:
-                raise TypeError(f"{name!r} is a field but has no type annotation")
+                raise ValueError(f"{name!r} is a field but has no type annotation")
 
         for f in self.fields:
+            if f.name in self.RESERVED_NAMES:
+                raise ValueError(f"{f.name!r} is a reserved name")
+
             if isinstance(f, ArgumentField):
                 if not (
                     is_subhint(f.annotation, ir.SSAValue)
                     or is_subhint(f.annotation, tuple[ir.SSAValue, ...])
                 ):
-                    raise TypeError(
+                    raise ValueError(
                         f"{f.name!r} is an argument field but has an invalid type annotation"
                     )
 
                 if is_subhint(f.annotation, ir.ResultValue):
-                    raise TypeError(
-                        f"{f.name!r} is an argument field but has an invalid type annotation {f.annotation}"
+                    raise ValueError(
+                        textwrap.dedent(
+                            f"{f.name!r} is an argument field but has an invalid type annotation {f.annotation}"
+                            " (did you mean to use `info.result` instead?)"
+                        )
                     )
 
             if isinstance(f, ResultField) and not is_subhint(
                 f.annotation, ir.ResultValue
             ):
-                raise TypeError(
+                raise ValueError(
                     f"{f.name!r} is a result field but has an invalid type annotation"
                 )
