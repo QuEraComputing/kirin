@@ -18,7 +18,12 @@ def basic(self):
     fold_pass = Fold(self)
     typeinfer_pass = TypeInfer(self)
 
-    def run_pass(mt: Method, *, typeinfer: bool = False, fold: bool = True) -> None:
+    def run_pass(
+        mt: Method, *, verify: bool = True, typeinfer: bool = False, fold: bool = True
+    ) -> None:
+        if verify:
+            mt.verify()
+
         if fold:
             fold_pass(mt)
 

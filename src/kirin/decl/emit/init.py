@@ -169,7 +169,7 @@ class EmitInit(BaseModifier):
 
     def _result_type_value(self, f: info.ResultField):
         name = f"_result_type_{f.name}"
-        self.globals[name] = f.type
+        self._init_locals[name] = f.type
         return name
 
     def _attribute_seq(self):
@@ -191,7 +191,7 @@ class EmitInit(BaseModifier):
             # no default factory
             if f.init:
                 if f.default is not MISSING:
-                    self.globals[default_name] = f.default
+                    self._init_locals[default_name] = f.default
                 value: str = f.name  # type: ignore
             else:  # no default factory, no init, no default
                 raise ValueError(
@@ -202,7 +202,7 @@ class EmitInit(BaseModifier):
         # convert the value to types.PyAttr
         if f.pytype:
             attr_type = f"_kirin_attr_type_{f.name}"
-            self.globals[attr_type] = f.type
+            self._init_locals[attr_type] = f.type
             value = (
                 f"{self._KIRIN_PYATTR}({value}, {attr_type}) "
                 f"if not isinstance({value}, {self._KIRIN_PYATTR}) "
@@ -272,14 +272,14 @@ class EmitInit(BaseModifier):
     ):
         # block always has default_factory
         if init:
-            self.globals[factory_name] = default_factory
+            self._init_locals[factory_name] = default_factory
             value = (
                 f"{factory_name}() "
                 f"if {name} is _HAS_DEFAULT_FACTORY "
                 f"else {name}"
             )
         else:
-            self.globals[factory_name] = default_factory
+            self._init_locals[factory_name] = default_factory
             value = f"{factory_name}()"
         return value
 

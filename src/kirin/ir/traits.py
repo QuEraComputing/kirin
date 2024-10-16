@@ -60,11 +60,11 @@ class SymbolOpInterface(StmtTrait):
         return sym_name
 
     def verify(self, stmt: Statement):
-        from kirin.dialects.py import types
+        from kirin.dialects.py import data, types
 
         sym_name = self.get_sym_name(stmt)
         if not (
-            isinstance(sym_name, PyAttr) and sym_name.type.is_subtype(types.String)
+            isinstance(sym_name, data.PyAttr) and sym_name.type.is_subtype(types.String)
         ):
             raise ValueError(f"Symbol name {sym_name} is not a string attribute")
 
@@ -117,12 +117,14 @@ class SymbolTable(StmtTrait):
     def verify(self, stmt: Statement):
         if len(stmt.regions) != 1:
             raise VerificationError(
-                f"Statement {stmt.name} with SymbolTable trait must have exactly one region"
+                stmt,
+                f"Statement {stmt.name} with SymbolTable trait must have exactly one region",
             )
 
         if len(stmt.regions[0].blocks) != 1:
             raise VerificationError(
-                f"Statement {stmt.name} with SymbolTable trait must have exactly one block"
+                stmt,
+                f"Statement {stmt.name} with SymbolTable trait must have exactly one block",
             )
 
         # TODO: check uniqueness of symbol names

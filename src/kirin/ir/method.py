@@ -35,6 +35,9 @@ class Method(Printable, Generic[Param, RetType]):
     inferred: bool = False
     """if typeinfer has been run on this method
     """
+    verified: bool = False
+    """if `code.verify` has been run on this method
+    """
 
     def __call__(self, *args: Param.args, **kwargs: Param.kwargs) -> RetType:
         from kirin.interp.concrete import Interpreter
@@ -61,3 +64,9 @@ class Method(Printable, Generic[Param, RetType]):
 
     def print_impl(self, printer: Printer) -> None:
         return printer.print(self.code)
+
+    def verify(self) -> None:
+        """verify the method body."""
+        self.code.verify()
+        self.verified = True
+        return None

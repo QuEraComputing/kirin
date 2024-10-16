@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from kirin.ir.nodes.base import IRNode
     from kirin.lowering import LoweringState
 
 
@@ -69,7 +70,9 @@ class CompilerError(Exception):
 
 
 class VerificationError(Exception):
-    pass
+    def __init__(self, node: "IRNode", *messages: str) -> None:
+        super().__init__(*messages)
+        self.node = node
 
 
 class DuplicatedDefinitionError(Exception):

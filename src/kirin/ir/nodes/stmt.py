@@ -485,5 +485,13 @@ class Statement(IRNode["Block"]):
             raise ValueError(f"expected one result, got {len(self._results)}")
         return self._results[0]
 
-    def validate(self) -> None:
+    # NOTE: statement should implement typecheck
+    # this is done automatically via @statement, but
+    # in the case manualy implementation is needed,
+    # it should be implemented here.
+    # NOTE: not an @abstractmethod to make linter happy
+    def typecheck(self) -> None:
+        raise NotImplementedError
+
+    def verify(self) -> None:
         return

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Iterable, Iterator
 
 from typing_extensions import Self
 
+from kirin.exceptions import VerificationError
 from kirin.ir.derive import derive, field
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.block import Block
@@ -189,9 +190,17 @@ class Region(IRNode["Statement"]):
         printer.print_newline()
         printer.plain_print("}")
 
-    def validate(self) -> None:
+    def typecheck(self) -> None:
+        for block in self.blocks:
+            block.typecheck()
+
+    def verify(self) -> None:
         from kirin.ir.nodes.stmt import Statement
 
-        self.assert_parent(Statement, self.parent_node)
+        if not isinstance(self.parent_node, Statement):
+            raise VerificationError(
+                self, "expect Region to have a parent of type Statement"
+            )
+
         for block in self.blocks:
-            block.validate()
+            block.verify()
