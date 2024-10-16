@@ -90,5 +90,5 @@ class IRNode(Generic[ParentType], ABC, Printable):
     @abstractmethod
     def print_impl(self, printer: Printer) -> None: ...
 
-    def validate(self) -> None:
-        raise NotImplementedError
+    @abstractmethod
+    def validate(self) -> None: ...

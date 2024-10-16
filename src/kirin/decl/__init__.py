@@ -11,6 +11,7 @@ from kirin.decl.emit.name import EmitName
 from kirin.decl.emit.property import EmitProperty
 from kirin.decl.emit.repr import EmitRepr
 from kirin.decl.emit.traits import EmitTraits
+from kirin.decl.emit.validate import EmitValidate
 from kirin.decl.scan_fields import ScanFields
 from kirin.decl.verify import Verify
 from kirin.ir import Statement
@@ -25,6 +26,7 @@ class StatementDecl(
     EmitName,
     EmitRepr,
     EmitTraits,
+    EmitValidate,
     EmitFromPythonCall,
 ):
     pass

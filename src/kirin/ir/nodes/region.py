@@ -190,6 +190,8 @@ class Region(IRNode["Statement"]):
         printer.plain_print("}")
 
     def validate(self) -> None:
+        from kirin.ir.nodes.stmt import Statement
+
         self.assert_parent(Statement, self.parent_node)
         for block in self.blocks:
             block.validate()

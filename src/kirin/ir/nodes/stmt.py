@@ -484,3 +484,6 @@ class Statement(IRNode["Block"]):
         if len(self._results) != 1:
             raise ValueError(f"expected one result, got {len(self._results)}")
         return self._results[0]
+
+    def validate(self) -> None:
+        return

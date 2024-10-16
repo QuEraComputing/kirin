@@ -65,8 +65,14 @@ def attribute(
 @dataclass
 class ArgumentField(Field):
     type: TypeAttribute
+    """type of the argument, will be used in validation.
+    """
     print: bool = True
+    """if `True`, this argument name is printed in the signature.
+    """
     group: bool = False  # NOTE: this cannot be set by user
+    """if `True`, this argument is annotated with Tuple[SSAValue, ...]
+    """
 
     def has_no_default(self):
         return True
@@ -189,12 +195,19 @@ def block(
 @dataclass
 class StatementFields:
     std_args: dict[str, ArgumentField] = field(default_factory=dict)
+    """standard arguments of the statement."""
     kw_args: dict[str, ArgumentField] = field(default_factory=dict)
+    """keyword-only arguments of the statement."""
     results: dict[str, ResultField] = field(default_factory=dict)
+    """results of the statement."""
     regions: dict[str, RegionField] = field(default_factory=dict)
+    """regions of the statement."""
     blocks: dict[str, BlockField] = field(default_factory=dict)
+    """blocks of the statement."""
     attributes: dict[str, AttributeField] = field(default_factory=dict)
+    """attributes of the statement."""
     properties: dict[str, AttributeField] = field(default_factory=dict)
+    """properties of the statement."""
 
     class Args:
         def __init__(self, fields: "StatementFields"):
@@ -233,6 +246,7 @@ class StatementFields:
 
     @property
     def args(self):
+        """iterable of all argument fields."""
         return self.Args(self)
 
     @classmethod
@@ -294,6 +308,7 @@ class StatementFields:
 
     @cached_property
     def required_names(self):
+        """set of all fields that do not have a default value."""
         return set(
             list(self.args.keys())
             + [name for name, f in self.attributes.items() if f.has_no_default()]
