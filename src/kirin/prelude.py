@@ -19,10 +19,10 @@ def basic(self):
     typeinfer_pass = TypeInfer(self)
 
     def run_pass(mt: Method, *, typeinfer: bool = False, fold: bool = True) -> None:
-        if typeinfer:
-            typeinfer_pass(mt)
-
         if fold:
             fold_pass(mt)
+
+        if typeinfer:
+            typeinfer_pass(mt)
 
     return run_pass
