@@ -68,15 +68,16 @@ class Registry:
             for key in keys:
                 if key in dialect.interps:
                     dialect_interp = dialect.interps[key]
-                    break
+                    if dialect not in fallback:  # use the first fallback
+                        fallback[dialect] = dialect_interp.fallback
 
-            if dialect_interp is None:  # not found, use default
+                    for sig, func in dialect_interp.table.items():
+                        if sig not in ret:
+                            ret[sig] = MethodImpl(dialect_interp, func)
+
+            if dialect not in fallback:
                 msg = ",".join(keys)
                 raise KeyError(f"Interpreter of {dialect.name} not found for {msg}")
-
-            for key, func in dialect_interp.table.items():
-                ret[key] = MethodImpl(dialect_interp, func)
-            fallback[dialect] = dialect_interp.fallback
         return ret, fallback
 
     def codegen(self, keys: Iterable[str]):
