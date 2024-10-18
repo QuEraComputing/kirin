@@ -1,8 +1,10 @@
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
+
+from typing_extensions import dataclass_transform
 
 from kirin.exceptions import InterpreterError
 from kirin.interp.frame import Frame
@@ -49,8 +51,22 @@ class InterpResult(Generic[ValueType]):
             return ResultValue(self.value)
 
 
-@dataclass
-class BaseInterpreter(ABC, Generic[ValueType]):
+@dataclass_transform(field_specifiers=(field,))
+class InterpreterMeta(ABCMeta):
+    def __new__(
+        mcls: type,
+        name: str,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
+        /,
+        init: bool = False,
+        **kwargs: Any,
+    ):
+        cls = super().__new__(mcls, name, bases, namespace, **kwargs)  # type: ignore
+        return dataclass(init=init)(cls)
+
+
+class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
     """A base class for interpreters."""
 
     keys: ClassVar[list[str]]

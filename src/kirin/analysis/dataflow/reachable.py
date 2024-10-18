@@ -30,7 +30,6 @@ class CFGWorkList(WorkList[Successor]):
         super().push(item)
 
 
-@dataclass(init=False)
 class ReachableAnalysis(AbstractInterpreter[EmptyLattice, CFGWorkList]):
     keys = [
         "reachibility",

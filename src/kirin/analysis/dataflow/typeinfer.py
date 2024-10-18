@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from kirin import ir
 from kirin.analysis.dataflow.forward import ForwardDataFlowAnalysis
 from kirin.dialects.py import types
@@ -12,7 +10,6 @@ from kirin.ir.nodes.stmt import Statement
 from kirin.worklist import WorkList
 
 
-@dataclass(init=False)
 class TypeInference(ForwardDataFlowAnalysis[TypeAttribute, WorkList[Successor]]):
     keys = ["typeinfer", "typeinfer.default"]
 

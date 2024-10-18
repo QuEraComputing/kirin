@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import field
 from typing import Iterable, TypeVar
 
 from kirin.interp import AbstractInterpreter, Successor
@@ -12,11 +12,10 @@ ResultType = TypeVar("ResultType", bound=Lattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
 
 
-@dataclass(init=False)
 class ForwardDataFlowAnalysis(AbstractInterpreter[ResultType, WorkListType]):
     """Abstract interpreter but record results for each SSA value."""
 
-    results: dict[SSAValue, ResultType] = field(default_factory=dict)
+    results: dict[SSAValue, ResultType] = field(init=False, default_factory=dict)
 
     def __init__(
         self, dialects: DialectGroup | Iterable[Dialect], *, fuel: int | None = None

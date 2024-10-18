@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import field
 from typing import Generic, Iterable, TypeVar
 
 from kirin.interp.base import BaseInterpreter, InterpResult
@@ -16,12 +16,11 @@ WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
 # currently we may end up in infinite loop
 
 
-@dataclass(init=False)
 class AbstractInterpreter(
     Generic[ResultType, WorkListType], BaseInterpreter[ResultType]
 ):
-    bottom: ResultType = field(kw_only=True, repr=False)
-    worklist: WorkListType = field(kw_only=True, repr=False)
+    bottom: ResultType = field(init=False, kw_only=True, repr=False)
+    worklist: WorkListType = field(init=False, kw_only=True, repr=False)
 
     def __init__(
         self, dialects: DialectGroup | Iterable[Dialect], *, fuel: int | None = None
