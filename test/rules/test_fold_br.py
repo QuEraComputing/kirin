@@ -1,4 +1,4 @@
-from kirin.analysis.dataflow.constprop import ConstProp, NotConst
+from kirin.analysis.dataflow.constprop import ConstProp, ConstPropBottom
 from kirin.analysis.dataflow.reachable import ReachableAnalysis
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
@@ -22,7 +22,7 @@ def branch(x):
 def test_branch_elim():
     assert branch(1) == 4
     const_prop = ConstProp(branch.dialects)
-    const_prop.eval(branch, tuple(NotConst() for _ in branch.args))
+    const_prop.eval(branch, tuple(ConstPropBottom() for _ in branch.args))
     fold = ConstantFold(const_prop.results)
     branch.code.print()
     Fixpoint(Walk(fold)).rewrite(branch.code)

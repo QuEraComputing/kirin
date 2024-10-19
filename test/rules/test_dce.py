@@ -1,4 +1,4 @@
-from kirin.analysis.dataflow.constprop import ConstProp, NotConst
+from kirin.analysis.dataflow.constprop import ConstProp, ConstPropBottom
 from kirin.analysis.dataflow.reachable import ReachableAnalysis
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
@@ -18,7 +18,7 @@ def foldable(x: int) -> int:
 def test_dce():
     before = foldable(1)
     const_prop = ConstProp(foldable.dialects)
-    const_prop.eval(foldable, tuple(NotConst() for _ in foldable.args))
+    const_prop.eval(foldable, tuple(ConstPropBottom() for _ in foldable.args))
     fold = ConstantFold(const_prop.results)
     Fixpoint(Walk(fold)).rewrite(foldable.code)
 

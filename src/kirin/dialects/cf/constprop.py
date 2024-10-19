@@ -1,9 +1,4 @@
-from kirin.analysis.dataflow.constprop import (
-    Const,
-    ConstProp,
-    ConstPropLattice,
-    NotConst,
-)
+from kirin.analysis.dataflow.constprop import Const, ConstProp, ConstPropLattice
 from kirin.dialects.cf.dialect import dialect
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.interp import DialectInterpreter, ResultValue, Successor, impl
@@ -14,11 +9,10 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Assert)
     def assert_stmt(self, interp: ConstProp, stmt: Assert, values):
-        return ResultValue(NotConst())
+        return ResultValue()
 
     @impl(Branch)
     def branch(self, interp: ConstProp, stmt: Branch, values: tuple):
-        print(values)
         interp.worklist.push(Successor(stmt.successor, *values))
         return ResultValue()
 

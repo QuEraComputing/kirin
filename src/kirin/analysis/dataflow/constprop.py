@@ -19,25 +19,25 @@ class ConstPropLattice(Lattice["ConstPropLattice"]):
 
     @classmethod
     def top(cls) -> Any:
-        return AnyConst()
+        return NotConst()
 
     @classmethod
     def bottom(cls) -> Any:
-        return NotConst()
+        return ConstPropBottom()
 
     def join(self, other: "ConstPropLattice") -> "ConstPropLattice":
         if other.is_subseteq(self):
             return self
         elif self.is_subseteq(other):
             return other
-        return AnyConst()
+        return NotConst()
 
     def meet(self, other: "ConstPropLattice") -> "ConstPropLattice":
         if self.is_subseteq(other):
             return self
         elif other.is_subseteq(self):
             return other
-        return NotConst()
+        return ConstPropBottom()
 
 
 @dataclass
@@ -52,7 +52,7 @@ class Const(ConstPropLattice):
     def is_subseteq(self, other: ConstPropLattice) -> bool:
         if isinstance(other, Const):
             return self.data == other.data
-        elif isinstance(other, AnyConst):
+        elif isinstance(other, NotConst):
             return True
         return False
 
@@ -79,7 +79,7 @@ class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
             return PartialTuple(
                 tuple(x.join(Const(y)) for x, y in zip(self.data, other.data))
             )
-        return AnyConst()
+        return NotConst()
 
     def meet(self, other: ConstPropLattice) -> ConstPropLattice:
         if self.is_subseteq(other):
@@ -92,7 +92,7 @@ class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
             return PartialTuple(
                 tuple(x.meet(Const(y)) for x, y in zip(self.data, other.data))
             )
-        return NotConst()
+        return ConstPropBottom()
 
     def is_equal(self, other: ConstPropLattice) -> bool:
         if isinstance(other, PartialTuple):
@@ -106,13 +106,13 @@ class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
             return all(x.is_subseteq(y) for x, y in zip(self.data, other.data))
         elif isinstance(other, Const) and isinstance(other.data, tuple):
             return all(x.is_subseteq(Const(y)) for x, y in zip(self.data, other.data))
-        elif isinstance(other, AnyConst):
+        elif isinstance(other, NotConst):
             return True
         return False
 
 
 @dataclass
-class NotConst(ConstPropLattice, metaclass=SingletonMeta):
+class ConstPropBottom(ConstPropLattice, metaclass=SingletonMeta):
 
     def is_equal(self, other: ConstPropLattice) -> bool:
         return self is other
@@ -122,7 +122,7 @@ class NotConst(ConstPropLattice, metaclass=SingletonMeta):
 
 
 @dataclass
-class AnyConst(ConstPropLattice, metaclass=SingletonMeta):
+class NotConst(ConstPropLattice, metaclass=SingletonMeta):
 
     def is_equal(self, other: ConstPropLattice) -> bool:
         return self is other
@@ -160,7 +160,7 @@ class ConstProp(
 
     @classmethod
     def bottom_value(cls) -> ConstPropLattice:
-        return NotConst()
+        return ConstPropBottom()
 
     @classmethod
     def default_worklist(cls) -> WorkList[interp_value.Successor]:
@@ -191,8 +191,8 @@ class ConstProp(
         frame = self.state.current_frame()
         for result in stmt.results:
             # NOTE: multiple results hit here, terminate early
-            if result in frame.entries and isinstance(frame.entries[result], AnyConst):
-                return interp_value.ResultValue(AnyConst())
+            if result in frame.entries and isinstance(frame.entries[result], NotConst):
+                return interp_value.ResultValue(NotConst())
 
         if stmt.has_trait(ir.ConstantLike) or (
             stmt.has_trait(ir.Pure) and all(isinstance(x, Const) for x in args)
