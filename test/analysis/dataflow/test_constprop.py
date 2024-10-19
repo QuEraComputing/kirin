@@ -15,24 +15,42 @@ class TestLattice:
         assert AnyConst().meet(AnyConst()) == AnyConst()
         assert AnyConst().meet(NotConst()) == NotConst()
         assert AnyConst().meet(Const(1)) == Const(1)
+        assert AnyConst().meet(PartialTuple((Const(1), NotConst()))) == PartialTuple(
+            (Const(1), NotConst())
+        )
         assert NotConst().meet(AnyConst()) == NotConst()
         assert NotConst().meet(NotConst()) == NotConst()
         assert NotConst().meet(Const(1)) == NotConst()
+        assert NotConst().meet(PartialTuple((Const(1), NotConst()))) == NotConst()
         assert Const(1).meet(AnyConst()) == Const(1)
         assert Const(1).meet(NotConst()) == NotConst()
         assert Const(1).meet(Const(1)) == Const(1)
+        assert Const(1).meet(PartialTuple((Const(1), NotConst()))) == NotConst()
+        assert PartialTuple((Const(1), NotConst())).meet(AnyConst()) == PartialTuple(
+            (Const(1), NotConst())
+        )
+        assert PartialTuple((Const(1), NotConst())).meet(NotConst()) == NotConst()
+        assert PartialTuple((Const(1), NotConst())).meet(Const(1)) == NotConst()
+        assert PartialTuple((Const(1), NotConst())).meet(
+            PartialTuple((Const(1), NotConst()))
+        ) == PartialTuple((Const(1), NotConst()))
 
     def test_join(self):
         assert AnyConst().join(AnyConst()) == AnyConst()
         assert AnyConst().join(NotConst()) == AnyConst()
         assert AnyConst().join(Const(1)) == AnyConst()
+        assert AnyConst().join(PartialTuple((Const(1), NotConst()))) == AnyConst()
         assert NotConst().join(AnyConst()) == AnyConst()
         assert NotConst().join(NotConst()) == NotConst()
         assert NotConst().join(Const(1)) == Const(1)
+        assert NotConst().join(PartialTuple((Const(1), NotConst()))) == PartialTuple(
+            (Const(1), NotConst())
+        )
         assert Const(1).join(AnyConst()) == AnyConst()
         assert Const(1).join(NotConst()) == Const(1)
         assert Const(1).join(Const(1)) == Const(1)
         assert Const(1).join(Const(2)) == AnyConst()
+        assert Const(1).join(PartialTuple((Const(1), NotConst()))) == AnyConst()
 
     def test_is_equal(self):
         assert AnyConst().is_equal(AnyConst())
@@ -42,6 +60,12 @@ class TestLattice:
         assert not NotConst().is_equal(Const(1))
         assert Const(1).is_equal(Const(1))
         assert not Const(1).is_equal(Const(2))
+        assert PartialTuple((Const(1), NotConst())).is_equal(
+            PartialTuple((Const(1), NotConst()))
+        )
+        assert not PartialTuple((Const(1), NotConst())).is_equal(
+            PartialTuple((Const(1), Const(2)))
+        )
 
     def test_partial_tuple(self):
         pt1 = PartialTuple((Const(1), NotConst()))
