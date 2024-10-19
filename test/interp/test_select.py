@@ -5,13 +5,16 @@ import pytest
 from kirin.analysis.dataflow.forward import ForwardDataFlowAnalysis
 from kirin.dialects.py import stmts
 from kirin.interp import DialectInterpreter, ResultValue, impl
+from kirin.interp.base import InterpResult
+from kirin.ir.method import Method
+from kirin.ir.nodes.region import Region
 from kirin.lattice import EmptyLattice
 from kirin.prelude import basic
 from kirin.worklist import WorkList
 
 
 @dataclass(init=False)
-class Interpreter(ForwardDataFlowAnalysis[EmptyLattice, WorkList]):
+class DummyInterpreter(ForwardDataFlowAnalysis[EmptyLattice, WorkList]):
     keys = ["test_interp", "main", "empty"]
 
     @classmethod
@@ -22,13 +25,18 @@ class Interpreter(ForwardDataFlowAnalysis[EmptyLattice, WorkList]):
     def default_worklist(cls) -> WorkList:
         return WorkList()
 
+    def run_method_region(
+        self, mt: Method, body: Region, args: tuple[EmptyLattice, ...]
+    ) -> InterpResult[EmptyLattice]:
+        return self.run_ssacfg_region(body, (EmptyLattice(),) + args)
+
 
 @stmts.dialect.register(key="test_interp")
 class DialectInterp(DialectInterpreter):
 
     @impl(stmts.NewTuple)
     def new_tuple(
-        self, interp: Interpreter, stmt: stmts.NewTuple, values: tuple
+        self, interp: DummyInterpreter, stmt: stmts.NewTuple, values: tuple
     ) -> ResultValue:
         return ResultValue(EmptyLattice())
 
@@ -39,6 +47,6 @@ def main(x):
 
 
 def test_interp():
-    interp = Interpreter(basic)
+    interp = DummyInterpreter(basic)
     with pytest.raises(AttributeError):
         interp.eval(main, (EmptyLattice(),))

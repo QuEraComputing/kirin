@@ -1,5 +1,10 @@
 from kirin import ir
-from kirin.analysis.dataflow.constprop import Const, ConstProp, NotConst
+from kirin.analysis.dataflow.constprop import (
+    Const,
+    ConstProp,
+    ConstPropLattice,
+    NotConst,
+)
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import Call, GetField, Lambda, Return
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
@@ -16,7 +21,7 @@ class DialectConstProp(DialectInterpreter):
             return ReturnValue(*values)
 
     @impl(Call)
-    def call(self, interp: ConstProp, stmt: Call, values: tuple):
+    def call(self, interp: ConstProp, stmt: Call, values: tuple[ConstPropLattice, ...]):
         # NOTE: support kwargs after Call stmt stores the key names
         n_total = len(values)
         if stmt.kwargs.data:
@@ -33,7 +38,9 @@ class DialectConstProp(DialectInterpreter):
         mt: ir.Method = values[0].data
         args = values[1 : n_total - len(stmt.kwargs.data)]
         args = interp.get_args(mt.arg_names[len(args) + 1 :], args, kwargs)
-        return interp.eval(mt, args).to_result()
+        if len(interp.state.frames) < interp.max_depth:
+            return interp.eval(mt, args).to_result()
+        return ResultValue(NotConst())
 
     @impl(Lambda)
     def lambda_(self, interp: ConstProp, stmt: Lambda, values: tuple):

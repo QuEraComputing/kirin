@@ -1,5 +1,5 @@
+from kirin.analysis.dataflow.constprop import ConstProp, NotConst
 from kirin.analysis.dataflow.reachable import ReachableAnalysis
-from kirin.interp import Interpreter
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
 from kirin.rules.dce import DeadCodeElimination
@@ -21,7 +21,9 @@ def branch(x):
 
 def test_branch_elim():
     assert branch(1) == 4
-    fold = ConstantFold(Interpreter(branch.dialects))
+    const_prop = ConstProp(branch.dialects)
+    const_prop.eval(branch, tuple(NotConst() for _ in branch.args))
+    fold = ConstantFold(const_prop.results)
     branch.code.print()
     Fixpoint(Walk(fold)).rewrite(branch.code)
     branch.code.print()
@@ -31,4 +33,4 @@ def test_branch_elim():
     # interp.worklist.visited
     Walk(DeadCodeElimination(interp.worklist.visited)).rewrite(branch.code)
     branch.code.print()
-    assert len(branch.code.body.blocks) == 4
+    assert len(branch.code.body.blocks) == 4  # type: ignore

@@ -5,7 +5,8 @@ from kirin import ir
 from kirin.analysis.dataflow.forward import ForwardDataFlowAnalysis
 from kirin.exceptions import InterpreterError
 from kirin.interp import Interpreter, value as interp_value
-from kirin.lattice import Lattice, SingletonMeta
+from kirin.interp.base import InterpResult
+from kirin.lattice import Lattice, LatticeMeta, SingletonMeta
 from kirin.worklist import WorkList
 
 
@@ -56,6 +57,48 @@ class Const(ConstPropLattice):
         return False
 
 
+class PartialTupleMeta(LatticeMeta):
+    def __call__(cls, data: tuple[ConstPropLattice, ...]):
+        if all(isinstance(x, Const) for x in data):
+            return Const(tuple(x.data for x in data))  # type: ignore
+        return super().__call__(data)
+
+
+@dataclass
+class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
+    data: tuple[ConstPropLattice, ...]
+
+    def join(self, other: ConstPropLattice) -> ConstPropLattice:
+        if other.is_subseteq(self):
+            return self
+        elif self.is_subseteq(other):
+            return other
+        elif isinstance(other, PartialTuple):
+            return PartialTuple(tuple(x.join(y) for x, y in zip(self.data, other.data)))
+        return AnyConst()
+
+    def meet(self, other: ConstPropLattice) -> ConstPropLattice:
+        if self.is_subseteq(other):
+            return self
+        elif other.is_subseteq(self):
+            return other
+        elif isinstance(other, PartialTuple):
+            return PartialTuple(tuple(x.meet(y) for x, y in zip(self.data, other.data)))
+        return NotConst()
+
+    def is_equal(self, other: ConstPropLattice) -> bool:
+        if isinstance(other, PartialTuple):
+            return all(x.is_equal(y) for x, y in zip(self.data, other.data))
+        return False
+
+    def is_subseteq(self, other: ConstPropLattice) -> bool:
+        if isinstance(other, PartialTuple):
+            return all(x.is_subseteq(y) for x, y in zip(self.data, other.data))
+        elif isinstance(other, AnyConst):
+            return True
+        return False
+
+
 @dataclass
 class NotConst(ConstPropLattice, metaclass=SingletonMeta):
 
@@ -87,9 +130,21 @@ class ConstProp(
         dialects: ir.DialectGroup | Iterable[ir.Dialect],
         *,
         fuel: int | None = None,
+        max_depth: int = 128,
+        max_python_recursion_depth: int = 8192,
     ):
-        super().__init__(dialects, fuel=fuel)
-        self.interp = Interpreter(dialects)
+        super().__init__(
+            dialects,
+            fuel=fuel,
+            max_depth=max_depth,
+            max_python_recursion_depth=max_python_recursion_depth,
+        )
+        self.interp = Interpreter(
+            dialects,
+            fuel=fuel,
+            max_depth=max_depth,
+            max_python_recursion_depth=max_python_recursion_depth,
+        )
 
     @classmethod
     def bottom_value(cls) -> ConstPropLattice:
@@ -121,6 +176,12 @@ class ConstProp(
     def eval_stmt(
         self, stmt: ir.Statement, args: tuple
     ) -> interp_value.Result[ConstPropLattice]:
+        frame = self.state.current_frame()
+        for result in stmt.results:
+            # NOTE: multiple results hit here, terminate early
+            if result in frame.entries and isinstance(frame.entries[result], AnyConst):
+                return interp_value.ResultValue(AnyConst())
+
         if stmt.has_trait(ir.ConstantLike) or (
             stmt.has_trait(ir.Pure) and all(isinstance(x, Const) for x in args)
         ):
@@ -133,3 +194,8 @@ class ConstProp(
             return self.registry[stmt.__class__](self, stmt, args)
         # there is only one fallback
         return interp_value.ResultValue(NotConst())
+
+    def run_method_region(
+        self, mt: ir.Method, body: ir.Region, args: tuple[ConstPropLattice, ...]
+    ) -> InterpResult[ConstPropLattice]:
+        return self.run_ssacfg_region(body, (Const(mt),) + args)

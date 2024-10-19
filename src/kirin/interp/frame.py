@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Generic, Iterable, TypeVar
 
-from kirin.exceptions import InterpreterError
 from kirin.ir import Method, SSAValue, Statement
+
+ValueType = TypeVar("ValueType")
 
 
 @dataclass
-class Frame:
+class Frame(Generic[ValueType]):
     method: Method
     """method being interpreted.
     """
@@ -23,7 +24,7 @@ class Frame:
     # this is because we are validating e.g SSA value pointing
     # to other blocks separately. This avoids the need
     # to have a separate frame for each block.
-    entries: dict[SSAValue, Any] = field(default_factory=dict)
+    entries: dict[SSAValue, ValueType] = field(default_factory=dict)
     """SSA values and their corresponding values.
     """
 
@@ -32,10 +33,7 @@ class Frame:
         return cls(method=method)
 
     def get_values(self, keys: Iterable[SSAValue]) -> tuple:
-        try:
-            return tuple(self.entries[key] for key in keys)
-        except KeyError as e:
-            raise InterpreterError(f"SSA value {e} not found in frame")
+        return tuple(self.entries[key] for key in keys)
 
     def set_values(self, pairs: Iterable[tuple[SSAValue, Any]]):
         for key, value in pairs:

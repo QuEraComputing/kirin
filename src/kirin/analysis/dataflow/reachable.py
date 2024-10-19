@@ -2,10 +2,12 @@ from dataclasses import dataclass, field
 from typing import Iterable
 
 from kirin.interp import AbstractInterpreter
+from kirin.interp.base import InterpResult
 from kirin.interp.frame import Frame
 from kirin.interp.value import Successor
 from kirin.ir import Block, CallableStmtInterface, Dialect, IsTerminator, Method
 from kirin.ir.group import DialectGroup
+from kirin.ir.nodes.region import Region
 from kirin.lattice import EmptyLattice
 from kirin.worklist import WorkList
 
@@ -56,6 +58,11 @@ class ReachableAnalysis(AbstractInterpreter[EmptyLattice, CFGWorkList]):
     def prehook_succ(self, frame: Frame, succ: Successor):
         self.worklist.current = succ.block
         self.worklist.visited.setdefault(succ.block, set())
+
+    def run_method_region(
+        self, mt: Method, body: Region, args: tuple[EmptyLattice, ...]
+    ) -> InterpResult[EmptyLattice]:
+        return self.run_ssacfg_region(body, (EmptyLattice(),) + args)
 
     def run_block(self, frame: Frame, succ: Successor) -> EmptyLattice:
         last_stmt = succ.block.last_stmt

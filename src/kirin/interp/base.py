@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -79,15 +80,22 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
     """A mapping of statement signature to their implementation.
     """
     fallbacks: dict[Dialect, "StatementImpl"] = field(init=False, repr=False)
-    state: InterpreterState = field(init=False, repr=False)
+    state: InterpreterState[ValueType] = field(init=False, repr=False)
     """The interpreter state.
     """
     fuel: int | None = field(default=None, init=False, kw_only=True)
     """The fuel limit.
     """
+    max_depth: int = field(default=128, init=False, kw_only=True)
+    max_python_recursion_depth: int = field(default=8192, init=False, kw_only=True)
 
     def __init__(
-        self, dialects: DialectGroup | Iterable[Dialect], *, fuel: int | None = None
+        self,
+        dialects: DialectGroup | Iterable[Dialect],
+        *,
+        fuel: int | None = None,
+        max_depth: int = 128,
+        max_python_recursion_depth: int = 8192,
     ):
         if not isinstance(dialects, DialectGroup):
             dialects = DialectGroup(dialects)
@@ -98,6 +106,8 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
         )
         self.state = InterpreterState()
         self.fuel = fuel
+        self.max_depth = max_depth
+        self.max_python_recursion_depth = max_python_recursion_depth
 
     def eval(
         self,
@@ -106,9 +116,14 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
         kwargs: dict[str, ValueType] | None = None,
     ) -> InterpResult[ValueType]:
         """Evaluate a method."""
+        current_recursion_limit = sys.getrecursionlimit()
+        sys.setrecursionlimit(self.max_python_recursion_depth)
         interface = mt.code.get_trait(traits.CallableStmtInterface)
         if interface is None:
             raise InterpreterError(f"compiled method {mt} is not callable")
+
+        if len(self.state.frames) >= self.max_depth:
+            raise InterpreterError("maximum recursion depth exceeded")
 
         self.state.push_frame(Frame.from_method(mt))
         body = interface.get_callable_region(mt.code)
@@ -119,16 +134,26 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
         # number of args is correct here
         # NOTE: Method is used as if it is a singleton type, but it is not recognized by mypy
         results = self.run_method_region(mt, body, args)
-        self.state.pop_frame()
+        self.postprocess_frame(self.state.pop_frame())
+        sys.setrecursionlimit(current_recursion_limit)
         return results
 
+    @abstractmethod
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[ValueType, ...]
-    ) -> InterpResult[ValueType]:
-        return self.run_ssacfg_region(body, (mt,) + args)  # type: ignore
+    ) -> InterpResult[ValueType]: ...
+
+    def postprocess_frame(self, frame: Frame[ValueType]) -> None:
+        """Postprocess a frame after it is popped from the stack. This is
+        called after a method is evaluated and the frame is popped. Default
+        implementation does nothing.
+        """
+        return
 
     @staticmethod
-    def get_args(left_arg_names, args: tuple, kwargs: dict | None) -> tuple:
+    def get_args(
+        left_arg_names, args: tuple[ValueType, ...], kwargs: dict[str, ValueType] | None
+    ) -> tuple[ValueType, ...]:
         if kwargs:
             # NOTE: #self# is not user input so it is not
             # in the args, +1 is for self

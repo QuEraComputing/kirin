@@ -1,4 +1,4 @@
-from kirin.interp import Interpreter
+from kirin.analysis.dataflow.constprop import ConstProp, NotConst
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
 from kirin.rules.fold import ConstantFold
@@ -15,7 +15,9 @@ def foldable(x: int) -> int:
 
 def test_const_fold():
     before = foldable(1)
-    fold = ConstantFold(Interpreter(foldable.dialects))
+    const_prop = ConstProp(foldable.dialects)
+    const_prop.eval(foldable, tuple(NotConst() for _ in foldable.args))
+    fold = ConstantFold(const_prop.results)
     Fixpoint(Walk(fold)).rewrite(foldable.code)
     after = foldable(1)
 

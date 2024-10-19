@@ -6,7 +6,7 @@ from kirin.ir import Method
 from kirin.passes.abc import Pass
 from kirin.rewrite import Fixpoint, Walk
 from kirin.rules.dce import DeadCodeElimination
-from kirin.rules.fold2 import ConstantFold
+from kirin.rules.fold import ConstantFold
 
 
 @dataclass

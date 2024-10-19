@@ -1,72 +1,57 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from kirin.dialects import cf
+from kirin import ir
+from kirin.analysis.dataflow.constprop import Const, ConstPropLattice
+from kirin.dialects import cf, func
 from kirin.dialects.py import stmts
-from kirin.exceptions import InterpreterError
-from kirin.interp import Interpreter
-from kirin.ir import ConstantLike, Pure, ResultValue, Statement
 from kirin.rewrite import RewriteResult, RewriteRule
 
 
-@dataclass(init=False)
+@dataclass
 class ConstantFold(RewriteRule):
-    interpreter: Interpreter
+    results: dict[ir.SSAValue, ConstPropLattice] = field(default_factory=dict)
 
-    def __init__(self, interpreter: Interpreter):
-        self.interpreter = interpreter
-
-    def rewrite_Statement(self, node: Statement) -> RewriteResult:
-        if isinstance(node, cf.ConditionalBranch):
+    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
+        if node.has_trait(ir.ConstantLike):
+            return RewriteResult()
+        elif isinstance(node, cf.ConditionalBranch):
             return self.rewrite_cf_ConditionalBranch(node)
 
-        if not node.has_trait(Pure):
-            return RewriteResult()
+        all_constants = True
+        has_done_something = False
+        for old_result in node.results:
+            if isinstance(value := self.results.get(old_result, None), Const):
+                stmt = stmts.Constant(value.data)
+                stmt.insert_before(node)
+                old_result.replace_by(stmt.result)
+                if old_result.name:
+                    stmt.result.name = old_result.name
+                has_done_something = True
+            else:
+                all_constants = False
 
-        if not all(
-            isinstance(arg, ResultValue) and arg.stmt.has_trait(ConstantLike)
-            for arg in node.args
-        ):
-            return RewriteResult()
+        # TODO: generalize func.Call to anything similar to call
+        # NOTE: if we find call prop a const, depsite it is pure or not
+        # the constant call only executes a pure branch of the code
+        # thus it is safe to delete the call
+        if all_constants and (node.has_trait(ir.Pure) or isinstance(node, func.Call)):
+            node.delete()
+        return RewriteResult(has_done_something=has_done_something)
 
-        try:
-            values = tuple(
-                self.interpreter.run_stmt(arg.stmt, ()).values[0] for arg in node.args  # type: ignore
-            )
-            results: tuple = self.interpreter.run_stmt(node, values).values  # type: ignore
-        except InterpreterError:
-            return RewriteResult()
-
-        new_stmts: list[stmts.Constant] = [stmts.Constant(result) for result in results]
-        for old_result, stmt in zip(node._results, new_stmts):
-            stmt.insert_before(node)
-            old_result.replace_by(stmt.result)
-            if old_result.name:
-                stmt.result.name = old_result.name
-
-        node.delete()
-        return RewriteResult(has_done_something=True)
-
-    def rewrite_cf_ConditionalBranch(self, node: cf.ConditionalBranch):  # noqa: F811
-        if isinstance(node.cond, ResultValue) and node.cond.stmt.has_trait(
-            ConstantLike
-        ):
-            try:
-                value = self.interpreter.run_stmt(node.cond.stmt, ()).values[0]  # type: ignore
-                if value:
-                    cf.Branch(
-                        arguments=node.then_arguments,
-                        successor=node.then_successor,
-                    ).insert_before(node)
-                    node.delete()
-                    return RewriteResult(has_done_something=True)
-                else:
-                    cf.Branch(
-                        arguments=node.else_arguments,
-                        successor=node.else_successor,
-                    ).insert_before(node)
-                    node.delete()
-                    return RewriteResult(has_done_something=True)
-            except InterpreterError:
-                pass
-
+    def rewrite_cf_ConditionalBranch(self, node: cf.ConditionalBranch):
+        if isinstance(value := self.results.get(node.cond, None), Const):
+            if value.data is True:
+                cf.Branch(
+                    arguments=node.then_arguments,
+                    successor=node.then_successor,
+                ).insert_before(node)
+            elif value.data is False:
+                cf.Branch(
+                    arguments=node.else_arguments,
+                    successor=node.else_successor,
+                ).insert_before(node)
+            else:
+                raise ValueError(f"Invalid constant value for branch: {value.data}")
+            node.delete()
+            return RewriteResult(has_done_something=True)
         return RewriteResult()

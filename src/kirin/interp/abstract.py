@@ -23,9 +23,19 @@ class AbstractInterpreter(
     worklist: WorkListType = field(init=False, kw_only=True, repr=False)
 
     def __init__(
-        self, dialects: DialectGroup | Iterable[Dialect], *, fuel: int | None = None
+        self,
+        dialects: DialectGroup | Iterable[Dialect],
+        *,
+        fuel: int | None = None,
+        max_depth: int = 128,
+        max_python_recursion_depth: int = 8192,
     ):
-        super().__init__(dialects, fuel=fuel)
+        super().__init__(
+            dialects,
+            fuel=fuel,
+            max_depth=max_depth,
+            max_python_recursion_depth=max_python_recursion_depth,
+        )
         self.bottom = self.bottom_value()
         self.worklist = self.default_worklist()
 
@@ -48,10 +58,13 @@ class AbstractInterpreter(
     def should_exec_stmt(self, stmt: Statement):
         return True
 
-    def join_results(
-        self, values: Iterable[SSAValue], stmt_results: Iterable[ResultType]
-    ) -> None:
-        return
+    def set_values(
+        self,
+        frame: Frame[ResultType],
+        ssa: Iterable[SSAValue],
+        results: Iterable[ResultType],
+    ):
+        frame.set_values(zip(ssa, results))
 
     def run_ssacfg_region(
         self, region: Region, args: tuple[ResultType, ...]
@@ -69,8 +82,7 @@ class AbstractInterpreter(
         return InterpResult(result)
 
     def run_block(self, frame: Frame, succ: Successor) -> ResultType:
-        self.join_results(succ.block.args, succ.block_args)
-        frame.set_values(zip(succ.block.args, succ.block_args))
+        self.set_values(frame, succ.block.args, succ.block_args)
 
         stmt = succ.block.first_stmt
         while stmt is not None:
@@ -82,8 +94,7 @@ class AbstractInterpreter(
             stmt_results = self.run_stmt(stmt, inputs)
             match stmt_results:
                 case ResultValue(values):
-                    self.join_results(stmt._results, values)
-                    frame.set_values(zip(stmt._results, values))
+                    self.set_values(frame, stmt._results, values)
                 case ReturnValue(result):  # this must be last stmt in block
                     return result
                 case _:  # just ignore other cases

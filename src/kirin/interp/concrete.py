@@ -4,15 +4,31 @@ from kirin.exceptions import FuelExhaustedError
 from kirin.interp.base import BaseInterpreter, InterpResult
 from kirin.interp.value import Err, NoReturn, ResultValue, ReturnValue, Successor
 from kirin.ir import Block, Dialect, DialectGroup, Region
+from kirin.ir.method import Method
 
 
 class Interpreter(BaseInterpreter[Any]):
     keys = ["main", "empty"]
 
     def __init__(
-        self, dialects: DialectGroup | Iterable[Dialect], *, fuel: int | None = None
+        self,
+        dialects: DialectGroup | Iterable[Dialect],
+        *,
+        fuel: int | None = None,
+        max_depth: int = 128,
+        max_python_recursion_depth: int = 8192,
     ):
-        super().__init__(dialects, fuel=fuel)
+        super().__init__(
+            dialects,
+            fuel=fuel,
+            max_depth=max_depth,
+            max_python_recursion_depth=max_python_recursion_depth,
+        )
+
+    def run_method_region(
+        self, mt: Method, body: Region, args: tuple[Any, ...]
+    ) -> InterpResult[Any]:
+        return self.run_ssacfg_region(body, (mt,) + args)
 
     def run_ssacfg_region(
         self, region: Region, args: tuple[Any, ...]
