@@ -31,6 +31,9 @@ class TestLattice:
         )
         assert PartialTuple((Const(1), NotConst())).meet(NotConst()) == NotConst()
         assert PartialTuple((Const(1), NotConst())).meet(Const(1)) == NotConst()
+        assert PartialTuple((Const(1), NotConst())).meet(Const((1, 2))) == PartialTuple(
+            (Const(1), NotConst())
+        )
         assert PartialTuple((Const(1), NotConst())).meet(
             PartialTuple((Const(1), NotConst()))
         ) == PartialTuple((Const(1), NotConst()))
@@ -45,6 +48,9 @@ class TestLattice:
         assert NotConst().join(Const(1)) == Const(1)
         assert NotConst().join(PartialTuple((Const(1), NotConst()))) == PartialTuple(
             (Const(1), NotConst())
+        )
+        assert PartialTuple((Const(1), NotConst())).join(Const((1, 2))) == PartialTuple(
+            (Const(1), Const(2))
         )
         assert Const(1).join(AnyConst()) == AnyConst()
         assert Const(1).join(NotConst()) == Const(1)
