@@ -1,5 +1,11 @@
 from kirin import ir
-from kirin.analysis.dataflow.constprop import Const, ConstProp, NotConst, PartialTuple
+from kirin.analysis.dataflow.constprop import (
+    AnyConst,
+    Const,
+    ConstProp,
+    NotConst,
+    PartialTuple,
+)
 from kirin.prelude import basic_no_opt
 
 
@@ -23,6 +29,18 @@ def bar(x):
     return goo(x)[0]
 
 
+@basic_no_opt
+def ntuple(len: int):
+    if len == 0:
+        return ()
+    return (0,) + ntuple(len - 1)
+
+
+@basic_no_opt
+def recurse():
+    return ntuple(3)
+
+
 def test_constprop():
     infer = ConstProp(basic_no_opt)
     assert infer.eval(main, tuple(NotConst() for _ in main.args)).expect() == Const(
@@ -42,3 +60,11 @@ def test_constprop():
     )
 
     assert infer.eval(bar, tuple(NotConst() for _ in bar.args)).expect() == Const(3)
+
+    assert (
+        infer.eval(ntuple, tuple(NotConst() for _ in ntuple.args)).expect()
+        == AnyConst()
+    )
+    assert infer.eval(
+        recurse, tuple(NotConst() for _ in recurse.args)
+    ).expect() == Const((0, 0, 0))
