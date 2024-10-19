@@ -1,0 +1,135 @@
+from dataclasses import dataclass
+from typing import Any, Iterable
+
+from kirin import ir
+from kirin.analysis.dataflow.forward import ForwardDataFlowAnalysis
+from kirin.exceptions import InterpreterError
+from kirin.interp import Interpreter, value as interp_value
+from kirin.lattice import Lattice, SingletonMeta
+from kirin.worklist import WorkList
+
+
+@dataclass
+class ConstPropLattice(Lattice["ConstPropLattice"]):
+
+    @property
+    def parent_type(self) -> type["ConstPropLattice"]:
+        return ConstPropLattice
+
+    @classmethod
+    def top(cls) -> Any:
+        return AnyConst()
+
+    @classmethod
+    def bottom(cls) -> Any:
+        return NotConst()
+
+    def join(self, other: "ConstPropLattice") -> "ConstPropLattice":
+        if other.is_subseteq(self):
+            return self
+        elif self.is_subseteq(other):
+            return other
+        return AnyConst()
+
+    def meet(self, other: "ConstPropLattice") -> "ConstPropLattice":
+        if self.is_subseteq(other):
+            return self
+        elif other.is_subseteq(self):
+            return other
+        return NotConst()
+
+
+@dataclass
+class Const(ConstPropLattice):
+    data: Any
+
+    def is_equal(self, other: ConstPropLattice) -> bool:
+        if isinstance(other, Const):
+            return self.data == other.data
+        return False
+
+    def is_subseteq(self, other: ConstPropLattice) -> bool:
+        if isinstance(other, Const):
+            return self.data == other.data
+        elif isinstance(other, AnyConst):
+            return True
+        return False
+
+
+@dataclass
+class NotConst(ConstPropLattice, metaclass=SingletonMeta):
+
+    def is_equal(self, other: ConstPropLattice) -> bool:
+        return self is other
+
+    def is_subseteq(self, other: ConstPropLattice) -> bool:
+        return True
+
+
+@dataclass
+class AnyConst(ConstPropLattice, metaclass=SingletonMeta):
+
+    def is_equal(self, other: ConstPropLattice) -> bool:
+        return self is other
+
+    def is_subseteq(self, other: ConstPropLattice) -> bool:
+        return self.is_equal(other)
+
+
+class ConstProp(
+    ForwardDataFlowAnalysis[ConstPropLattice, WorkList[interp_value.Successor]]
+):
+    keys = ["constprop", "empty"]
+    interp: Interpreter
+
+    def __init__(
+        self,
+        dialects: ir.DialectGroup | Iterable[ir.Dialect],
+        *,
+        fuel: int | None = None,
+    ):
+        super().__init__(dialects, fuel=fuel)
+        self.interp = Interpreter(dialects)
+
+    @classmethod
+    def bottom_value(cls) -> ConstPropLattice:
+        return NotConst()
+
+    @classmethod
+    def default_worklist(cls) -> WorkList[interp_value.Successor]:
+        return WorkList()
+
+    def try_eval_const(
+        self, stmt: ir.Statement, args: tuple[Const, ...]
+    ) -> interp_value.Result[ConstPropLattice]:
+        try:
+            value = self.interp.eval_stmt(stmt, tuple(x.data for x in args))
+            if isinstance(value, interp_value.ResultValue):
+                return interp_value.ResultValue(
+                    *tuple(Const(each) for each in value.values)
+                )
+            elif isinstance(value, interp_value.ReturnValue):
+                return interp_value.ReturnValue(Const(value.result))
+            elif isinstance(value, interp_value.Successor):
+                return interp_value.Successor(
+                    value.block, *tuple(Const(each) for each in value.block_args)
+                )
+        except InterpreterError:
+            pass
+        return interp_value.ResultValue(NotConst())
+
+    def eval_stmt(
+        self, stmt: ir.Statement, args: tuple
+    ) -> interp_value.Result[ConstPropLattice]:
+        if stmt.has_trait(ir.ConstantLike) or (
+            stmt.has_trait(ir.Pure) and all(isinstance(x, Const) for x in args)
+        ):
+            return self.try_eval_const(stmt, args)
+
+        sig = self.build_signature(stmt, args)
+        if sig in self.registry:
+            return self.registry[sig](self, stmt, args)
+        elif stmt.__class__ in self.registry:
+            return self.registry[stmt.__class__](self, stmt, args)
+        # there is only one fallback
+        return interp_value.ResultValue(NotConst())

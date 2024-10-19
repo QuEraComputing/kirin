@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
 from kirin.dialects.func import Signature
-from kirin.dialects.py import types
 from kirin.ir import (
     Block,
     CallableStmtInterface,
@@ -19,10 +18,10 @@ class ApplyType(RewriteRule):
     results: dict[SSAValue, TypeAttribute]
 
     def get_type(self, value: SSAValue) -> TypeAttribute:
-        typ = self.results[value]
-        if isinstance(typ, types.PyConst):
-            return typ.typ
-        return typ
+        return self.results[value]
+        # if isinstance(typ, types.PyConst):
+        #     return typ.typ
+        # return typ
 
     def rewrite_Block(self, node: Block) -> RewriteResult:
         has_done_something = False

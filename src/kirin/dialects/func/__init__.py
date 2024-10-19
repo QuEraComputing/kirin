@@ -2,6 +2,7 @@
 """
 
 from kirin.dialects.func import (
+    constprop as constprop,
     emit as emit,
     interp as interp,
     lower as lower,

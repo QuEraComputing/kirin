@@ -1,15 +1,18 @@
-from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
 from kirin.exceptions import FuelExhaustedError
 from kirin.interp.base import BaseInterpreter, InterpResult
 from kirin.interp.value import Err, NoReturn, ResultValue, ReturnValue, Successor
-from kirin.ir import Block, Region
+from kirin.ir import Block, Dialect, DialectGroup, Region
 
 
-@dataclass(init=False)
 class Interpreter(BaseInterpreter[Any]):
     keys = ["main", "empty"]
+
+    def __init__(
+        self, dialects: DialectGroup | Iterable[Dialect], *, fuel: int | None = None
+    ):
+        super().__init__(dialects, fuel=fuel)
 
     def run_ssacfg_region(
         self, region: Region, args: tuple[Any, ...]
