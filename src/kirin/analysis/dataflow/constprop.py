@@ -75,6 +75,10 @@ class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
             return other
         elif isinstance(other, PartialTuple):
             return PartialTuple(tuple(x.join(y) for x, y in zip(self.data, other.data)))
+        elif isinstance(other, Const) and isinstance(other.data, tuple):
+            return PartialTuple(
+                tuple(x.join(Const(y)) for x, y in zip(self.data, other.data))
+            )
         return AnyConst()
 
     def meet(self, other: ConstPropLattice) -> ConstPropLattice:
@@ -84,16 +88,24 @@ class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
             return other
         elif isinstance(other, PartialTuple):
             return PartialTuple(tuple(x.meet(y) for x, y in zip(self.data, other.data)))
+        elif isinstance(other, Const) and isinstance(other.data, tuple):
+            return PartialTuple(
+                tuple(x.meet(Const(y)) for x, y in zip(self.data, other.data))
+            )
         return NotConst()
 
     def is_equal(self, other: ConstPropLattice) -> bool:
         if isinstance(other, PartialTuple):
             return all(x.is_equal(y) for x, y in zip(self.data, other.data))
+        elif isinstance(other, Const) and isinstance(other.data, tuple):
+            return all(x.is_equal(Const(y)) for x, y in zip(self.data, other.data))
         return False
 
     def is_subseteq(self, other: ConstPropLattice) -> bool:
         if isinstance(other, PartialTuple):
             return all(x.is_subseteq(y) for x, y in zip(self.data, other.data))
+        elif isinstance(other, Const) and isinstance(other.data, tuple):
+            return all(x.is_subseteq(Const(y)) for x, y in zip(self.data, other.data))
         elif isinstance(other, AnyConst):
             return True
         return False

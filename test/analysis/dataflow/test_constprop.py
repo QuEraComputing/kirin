@@ -9,6 +9,64 @@ from kirin.analysis.dataflow.constprop import (
 from kirin.prelude import basic_no_opt
 
 
+class TestLattice:
+
+    def test_meet(self):
+        assert AnyConst().meet(AnyConst()) == AnyConst()
+        assert AnyConst().meet(NotConst()) == NotConst()
+        assert AnyConst().meet(Const(1)) == Const(1)
+        assert NotConst().meet(AnyConst()) == NotConst()
+        assert NotConst().meet(NotConst()) == NotConst()
+        assert NotConst().meet(Const(1)) == NotConst()
+        assert Const(1).meet(AnyConst()) == Const(1)
+        assert Const(1).meet(NotConst()) == NotConst()
+        assert Const(1).meet(Const(1)) == Const(1)
+
+    def test_join(self):
+        assert AnyConst().join(AnyConst()) == AnyConst()
+        assert AnyConst().join(NotConst()) == AnyConst()
+        assert AnyConst().join(Const(1)) == AnyConst()
+        assert NotConst().join(AnyConst()) == AnyConst()
+        assert NotConst().join(NotConst()) == NotConst()
+        assert NotConst().join(Const(1)) == Const(1)
+        assert Const(1).join(AnyConst()) == AnyConst()
+        assert Const(1).join(NotConst()) == Const(1)
+        assert Const(1).join(Const(1)) == Const(1)
+        assert Const(1).join(Const(2)) == AnyConst()
+
+    def test_is_equal(self):
+        assert AnyConst().is_equal(AnyConst())
+        assert not AnyConst().is_equal(NotConst())
+        assert not AnyConst().is_equal(Const(1))
+        assert NotConst().is_equal(NotConst())
+        assert not NotConst().is_equal(Const(1))
+        assert Const(1).is_equal(Const(1))
+        assert not Const(1).is_equal(Const(2))
+
+    def test_partial_tuple(self):
+        pt1 = PartialTuple((Const(1), NotConst()))
+        pt2 = PartialTuple((Const(1), NotConst()))
+        assert pt1.is_equal(pt2)
+        assert pt1.is_subseteq(pt2)
+        assert pt1.join(pt2) == pt1
+        assert pt1.meet(pt2) == pt1
+        pt2 = PartialTuple((Const(1), Const(2)))
+        assert not pt1.is_equal(pt2)
+        assert pt1.is_subseteq(pt2)
+        assert pt1.join(pt2) == PartialTuple((Const(1), Const(2)))
+        assert pt1.meet(pt2) == PartialTuple((Const(1), NotConst()))
+        pt2 = PartialTuple((Const(1), NotConst()))
+        assert pt1.is_equal(pt2)
+        assert pt1.is_subseteq(pt2)
+        assert pt1.join(pt2) == pt1
+        assert pt1.meet(pt2) == pt1
+        pt2 = PartialTuple((Const(1), AnyConst()))
+        assert not pt1.is_equal(pt2)
+        assert pt1.is_subseteq(pt2)
+        assert pt1.join(pt2) == pt2
+        assert pt1.meet(pt2) == pt1
+
+
 @basic_no_opt
 def foo(x):
     return x + 1
