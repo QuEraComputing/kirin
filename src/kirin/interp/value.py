@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Generic, Tuple, TypeVar
 
 from kirin.interp.frame import Frame
-from kirin.ir import AnyType, Block, CallableStmtInterface, SymbolOpInterface
+from kirin.ir import Block, CallableStmtInterface, SymbolOpInterface
 
 ValueType = TypeVar("ValueType")
 
@@ -90,11 +90,7 @@ class Err(Result[ValueType]):
         )
         args = ",".join(
             [
-                (
-                    f"{arg.name}"
-                    if isinstance(arg.type, AnyType)
-                    else f"{arg.name}:{arg.type}"
-                )
+                (f"{arg.name}" if arg.type.is_top() else f"{arg.name}:{arg.type}")
                 for arg in region.blocks[0].args[1:]
             ]
         )

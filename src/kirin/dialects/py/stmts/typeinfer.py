@@ -10,7 +10,8 @@ class TypeInfer(DefaultTypeInferInterpreter):
     # NOTE: const always contains the acutal value, so we can just return the type
     @impl(py.Constant)
     def constant(self, interp, stmt: py.Constant, values: tuple) -> ResultValue:
-        return ResultValue(stmt.result.type)
+        # NOTE: stmt.result.type should be verified by typecheck
+        return ResultValue(types.PyConst(stmt.value, stmt.result.type))  # type: ignore
 
     @impl(py.Alias)
     def alias(self, interp, stmt, values: tuple) -> ResultValue:
@@ -192,7 +193,7 @@ class TypeInfer(DefaultTypeInferInterpreter):
     def getitem(
         self, interp, stmt: py.GetItem, values: tuple[types.PyType, types.PyType]
     ) -> ResultValue:
-        obj = values[0]  # type: ignore
+        obj = values[0]
         if isinstance(obj, types.PyConst):  # unwrap const
             obj = obj.typ
         index: types.PyType = values[1]
@@ -312,15 +313,18 @@ class TypeInfer(DefaultTypeInferInterpreter):
 
     @impl(py.NewList)
     def new_list(
-        self, interp, stmt, values: tuple[types.PyType, ...]
-    ) -> ResultValue[types.PyType]:
+        self, interp, stmt: py.NewList, values: tuple[types.PyType, ...]
+    ) -> ResultValue:
         if not values:
             return ResultValue(types.List[types.Any])
 
         elem = values[0]
         for typ in values[1:]:
-            elem = elem.join(typ)  # type: ignore
-        return ResultValue(types.List[elem])  # type: ignore
+            elem = elem.join(typ)
+
+        if isinstance(elem, types.PyType):
+            return ResultValue(types.List[elem])
+        return ResultValue(stmt.result.type)
 
     @impl(py.Slice)
     def slice(self, interp, stmt: py.Slice, values: tuple) -> ResultValue:
@@ -329,9 +333,10 @@ class TypeInfer(DefaultTypeInferInterpreter):
             isinstance(start, types.PyConst)
             and isinstance(stop, types.PyConst)
             and isinstance(step, types.PyConst)
+            and isinstance(stmt.result.type, types.PyType)
         ):
             return ResultValue(
-                types.PyConst(slice(start.data, stop.data, step.data), stmt.result.type)  # type: ignore
+                types.PyConst(slice(start.data, stop.data, step.data), stmt.result.type)
             )
 
         return ResultValue(stmt.result)

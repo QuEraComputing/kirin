@@ -70,17 +70,19 @@ class Call(Statement):
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     kwargs: data.PyAttr[tuple[str, ...]] = info.attribute(property=True)
+    result: ResultValue = info.result()
 
     def __init__(
         self,
         callee: SSAValue,
         args: Sequence[SSAValue],
+        *,
         kwargs: Sequence[str] = (),
-        return_types: Sequence[TypeAttribute] = (),
+        return_type: TypeAttribute,
     ) -> None:
         super().__init__(
             args=[callee, *args],
-            result_types=return_types,
+            result_types=(return_type,),
             properties={"kwargs": data.PyAttr(tuple(kwargs))},
             args_slice={"callee": 0},
         )

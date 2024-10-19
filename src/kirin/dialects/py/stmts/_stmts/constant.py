@@ -3,6 +3,7 @@ from typing import Generic, TypeVar
 from kirin.decl import info, statement
 from kirin.dialects.py import data, types
 from kirin.dialects.py.stmts.dialect import dialect
+from kirin.exceptions import VerificationError
 from kirin.ir import ConstantLike, Pure, ResultValue, Statement
 from kirin.print import Printer
 
@@ -32,3 +33,9 @@ class Constant(Statement, Generic[T]):
         with printer.rich(style=printer.color.comment):
             printer.plain_print(" : ")
             printer.print(self.result.type)
+
+    def typecheck(self) -> None:
+        if not isinstance(self.result.type, types.PyType):
+            raise VerificationError(
+                self, f"Expected result type to be PyType, got {self.result.type}"
+            )

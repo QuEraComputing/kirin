@@ -1,14 +1,5 @@
 import pytest
 
-from kirin.dialects.py.types.base import (
-    PyAnyType,
-    PyBottomType,
-    PyClass,
-    PyLiteral,
-    PyTypeVar,
-    PyUnion,
-    PyVararg,
-)
 from kirin.dialects.py.types.builtin import (
     Bool,
     Dict,
@@ -20,6 +11,16 @@ from kirin.dialects.py.types.builtin import (
     String,
     Tuple,
 )
+from kirin.dialects.py.types.elem import (
+    PyAnyType,
+    PyBottomType,
+    PyClass,
+    PyLiteral,
+    PyTypeVar,
+    PyUnion,
+    PyVararg,
+)
+from kirin.ir import TypeAttribute
 
 
 class Base:
@@ -116,3 +117,11 @@ def test_generic_is_subtype():
 
     with pytest.raises(ValueError):
         PyTypeVar("T").is_subtype(PyTypeVar("T"))
+
+
+def test_generic_topbottom():
+    t = PyUnion(Int, Float)
+    assert t.join(TypeAttribute.bottom()).is_subseteq(t)
+    assert t.meet(TypeAttribute.bottom()).is_subseteq(TypeAttribute.bottom())
+    assert t.join(TypeAttribute.top()).is_equal(TypeAttribute.top())
+    assert t.meet(TypeAttribute.top()).is_equal(t)

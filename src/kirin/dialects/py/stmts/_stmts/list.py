@@ -4,10 +4,12 @@ from kirin.dialects.py.stmts.dialect import dialect
 from kirin.ir import Pure, ResultValue, SSAValue, Statement
 
 
-@statement(dialect=dialect)
+@statement(dialect=dialect, init=False)
 class NewList(Statement):
     name = "list"
     traits = frozenset({Pure()})
+    values: tuple[SSAValue, ...] = info.argument(types.Any)
+    result: ResultValue = info.result()
 
     def __init__(self, type: types.PyType, values: tuple[SSAValue, ...]) -> None:
         super().__init__(
@@ -15,6 +17,7 @@ class NewList(Statement):
             result_types=[
                 types.List[type],
             ],
+            args_slice={"values": slice(0, len(values))},
         )
 
 

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from kirin.ir.dialect import Dialect
 
 
-TypeLatticeElem = TypeVar("TypeLatticeElem", bound="TypeAttribute", covariant=True)
+TypeLatticeParent = TypeVar("TypeLatticeParent", bound="TypeAttribute")
 
 
 class AttributeMeta(ABCMeta):
@@ -31,7 +31,7 @@ class UnionTypeMeta(TypeAttributeMeta, UnionMeta):
     pass
 
 
-@dataclass
+@dataclass(eq=False)
 class Attribute(ABC, Printable, metaclass=AttributeMeta):
     dialect: ClassVar[Dialect | None] = field(default=None, init=False, repr=False)
     name: ClassVar[str] = field(init=False, repr=False)
@@ -75,27 +75,22 @@ class StructAttribute(Attribute, ABC):
         printer.plain_print(")")
 
 
-@dataclass
-class TypeAttribute(Attribute, Lattice[TypeLatticeElem], metaclass=TypeAttributeMeta):
+@dataclass(eq=False)
+class TypeAttribute(Attribute, Lattice["TypeAttribute"], metaclass=TypeAttributeMeta):
 
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, TypeAttribute) and self.is_equal(other)
+    @property
+    def parent_type(self) -> type[TypeAttribute]:
+        return TypeAttribute
 
-    def __or__(self, other: Lattice[TypeLatticeElem]):
+    def __or__(self, other: TypeAttribute):
         return self.join(other)
 
-    @abstractmethod
-    def join(self, other: Lattice[TypeLatticeElem]) -> Lattice[TypeLatticeElem]: ...
-
-    @abstractmethod
-    def meet(self, other: Lattice[TypeLatticeElem]) -> Lattice[TypeLatticeElem]: ...
-
     @classmethod
-    def top(cls) -> Lattice[TypeLatticeElem]:
+    def top(cls) -> AnyType:
         return AnyType()
 
     @classmethod
-    def bottom(cls) -> Lattice[TypeLatticeElem]:
+    def bottom(cls) -> BottomType:
         return BottomType()
 
     def is_top(self):
@@ -104,63 +99,49 @@ class TypeAttribute(Attribute, Lattice[TypeLatticeElem], metaclass=TypeAttribute
     def is_bottom(self):
         return isinstance(self, BottomType)
 
-    @abstractmethod
-    def __hash__(self) -> int: ...
-
-    @abstractmethod
-    def is_subseteq(self, other: Lattice[TypeLatticeElem]) -> bool: ...
-
-    def is_subtype(self, other: Lattice[TypeLatticeElem]) -> bool:
+    def is_subtype(self, other: TypeAttribute) -> bool:
         return self.is_subseteq(other)
 
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self, prefix="!")
 
 
-class AnyType(TypeAttribute[TypeLatticeElem], metaclass=SingletonTypeMeta):
+class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
     """Top of any type lattice."""
 
     name = "Any"
 
-    def join(
-        self: Lattice[TypeLatticeElem], other: Lattice[TypeLatticeElem]
-    ) -> Lattice[TypeLatticeElem]:
+    def join(self: TypeAttribute, other: TypeAttribute) -> TypeAttribute:
         return self
 
-    def meet(
-        self: Lattice[TypeLatticeElem], other: Lattice[TypeLatticeElem]
-    ) -> Lattice[TypeLatticeElem]:
+    def meet(self: TypeAttribute, other: TypeAttribute) -> TypeAttribute:
         return other
 
-    def is_subseteq(self, other: Lattice[TypeLatticeElem]) -> bool:
+    def is_subseteq(self, other: TypeAttribute) -> bool:
         return isinstance(other, AnyType)  # allow subclassing
 
-    def is_equal(self, other: Lattice[TypeLatticeElem]) -> bool:
-        return isinstance(other, AnyType)  # allow subclassing
+    def is_equal(self, other: TypeAttribute) -> bool:
+        return other.is_top()
 
     def __hash__(self):
         return id(self)
 
 
-class BottomType(TypeAttribute[TypeLatticeElem], metaclass=SingletonTypeMeta):
+class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
     """Bottom of any type lattice."""
 
     name = "Bottom"
 
-    def join(
-        self: Lattice[TypeLatticeElem], other: Lattice[TypeLatticeElem]
-    ) -> Lattice[TypeLatticeElem]:
+    def join(self: TypeAttribute, other: TypeAttribute) -> TypeAttribute:
         return other
 
-    def meet(
-        self: Lattice[TypeLatticeElem], other: Lattice[TypeLatticeElem]
-    ) -> Lattice[TypeLatticeElem]:
+    def meet(self: TypeAttribute, other: TypeAttribute) -> TypeAttribute:
         return self
 
-    def is_equal(self, other: Lattice[TypeLatticeElem]) -> bool:
-        return isinstance(other, BottomType)  # allow subclassing
+    def is_equal(self, other: TypeAttribute) -> bool:
+        return other.is_bottom()
 
-    def is_subseteq(self, other: Lattice[TypeLatticeElem]) -> bool:
+    def is_subseteq(self, other: TypeAttribute) -> bool:
         return True
 
     def __hash__(self):

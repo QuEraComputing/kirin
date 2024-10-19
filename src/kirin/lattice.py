@@ -3,20 +3,24 @@ from __future__ import annotations
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Generic, Iterable, TypeVar
 
-LatticeElem = TypeVar("LatticeElem", bound="Lattice", covariant=True)
+LatticeParent = TypeVar("LatticeParent", bound="Lattice")
 
 
 class LatticeMeta(ABCMeta):
     pass
 
 
-class Lattice(ABC, Generic[LatticeElem], metaclass=LatticeMeta):
+class Lattice(ABC, Generic[LatticeParent], metaclass=LatticeMeta):
+
+    @property
+    @abstractmethod
+    def parent_type(self) -> type[LatticeParent]: ...
 
     @abstractmethod
-    def join(self, other: Lattice[LatticeElem]) -> Lattice[LatticeElem]: ...
+    def join(self, other: LatticeParent) -> LatticeParent: ...
 
     @abstractmethod
-    def meet(self, other: Lattice[LatticeElem]) -> Lattice[LatticeElem]: ...
+    def meet(self, other: LatticeParent) -> LatticeParent: ...
 
     def is_bottom(self):
         return self is self.bottom()
@@ -25,15 +29,15 @@ class Lattice(ABC, Generic[LatticeElem], metaclass=LatticeMeta):
         return self is self.top()
 
     @abstractmethod
-    def is_subseteq(self, other: Lattice[LatticeElem]) -> bool: ...
+    def is_subseteq(self, other: LatticeParent) -> bool: ...
 
-    def is_subset(self, other: Lattice[LatticeElem]) -> bool:
+    def is_subset(self, other: LatticeParent) -> bool:
         return self.is_subseteq(other) and not other.is_subseteq(self)
 
     def __eq__(self, value: object) -> bool:
-        return isinstance(value, Lattice) and self.is_equal(value)
+        return isinstance(value, self.parent_type) and self.is_equal(value)
 
-    def is_equal(self, other: Lattice[LatticeElem]) -> bool:
+    def is_equal(self, other: LatticeParent) -> bool:
         if self is other:
             return True
         else:
@@ -41,11 +45,11 @@ class Lattice(ABC, Generic[LatticeElem], metaclass=LatticeMeta):
 
     @classmethod
     @abstractmethod
-    def bottom(cls) -> LatticeElem: ...
+    def bottom(cls) -> LatticeParent: ...
 
     @classmethod
     @abstractmethod
-    def top(cls) -> LatticeElem: ...
+    def top(cls) -> LatticeParent: ...
 
     @abstractmethod
     def __hash__(self) -> int: ...
@@ -69,11 +73,11 @@ class UnionMeta(LatticeMeta):
 
     def __call__(
         self,
-        typ: Iterable[Lattice[LatticeElem]] | Lattice[LatticeElem],
-        *others: Lattice[LatticeElem],
+        typ: Iterable[LatticeParent] | LatticeParent,
+        *others: LatticeParent,
     ):
         if isinstance(typ, Lattice):
-            typs: Iterable[Lattice[LatticeElem]] = (typ, *others)
+            typs: Iterable[LatticeParent] = (typ, *others)
         elif not others:
             typs = typ
         else:
@@ -82,7 +86,7 @@ class UnionMeta(LatticeMeta):
             )
 
         # try if the union can be simplified
-        params: list[Lattice[LatticeElem]] = []
+        params: list[LatticeParent] = []
         for typ in typs:
             contains = False
             for idx, other in enumerate(params):
@@ -105,10 +109,14 @@ class UnionMeta(LatticeMeta):
 
 class EmptyLattice(Lattice["EmptyLattice"], metaclass=SingletonMeta):
 
-    def join(self, other: Lattice[EmptyLattice]) -> Lattice[EmptyLattice]:
+    @property
+    def parent_type(self) -> type[EmptyLattice]:
+        return EmptyLattice
+
+    def join(self, other: EmptyLattice) -> EmptyLattice:
         return self
 
-    def meet(self, other: Lattice[EmptyLattice]) -> Lattice[EmptyLattice]:
+    def meet(self, other: EmptyLattice) -> EmptyLattice:
         return self
 
     def is_bottom(self):
@@ -128,5 +136,5 @@ class EmptyLattice(Lattice["EmptyLattice"], metaclass=SingletonMeta):
     def __hash__(self) -> int:
         return id(self)
 
-    def is_subseteq(self, other: Lattice[EmptyLattice]) -> bool:
+    def is_subseteq(self, other: EmptyLattice) -> bool:
         return True

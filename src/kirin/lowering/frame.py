@@ -101,7 +101,7 @@ class Frame:
                 it = iter(value)
                 typ = next(it).type
                 for v in it:
-                    typ: TypeAttribute = v.type.join(typ)  # type: ignore
+                    typ: TypeAttribute = v.type.join(typ)
                 ret = self.current_block.args.append_from(typ, name)
                 self.defs[name] = ret
                 return ret

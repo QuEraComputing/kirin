@@ -76,18 +76,18 @@ class FuncLowering(FromPythonAST):
 
         return Result(
             state.append_stmt(
-                Call(callee, args, tuple(keywords), return_types=[return_type])
+                Call(callee, args, kwargs=tuple(keywords), return_type=return_type)
             )
         )
 
-    def lower_Return(self, ctx: LoweringState, node: ast.Return) -> Result:
+    def lower_Return(self, state: LoweringState, node: ast.Return) -> Result:
         if node.value is None:
             stmt = Return()
-            ctx.append_stmt(stmt)
+            state.append_stmt(stmt)
         else:
-            result = ctx.visit(node.value).expect_one()
+            result = state.visit(node.value).expect_one()
             stmt = Return(result)
-            ctx.append_stmt(stmt)
+            state.append_stmt(stmt)
         return Result(stmt)
 
     def lower_FunctionDef(self, state: LoweringState, node: ast.FunctionDef) -> Result:

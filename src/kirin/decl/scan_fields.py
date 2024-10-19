@@ -59,7 +59,7 @@ class ScanFields(BaseModifier):
 
         for f in cls_fields:
             name: str = f.name  # type: ignore # name has been set
-            self.fields[name] = f  # type: ignore # name has been set
+            self.fields[name] = f
             if hasattr(self.cls, name):
                 # remove the field from the class
                 # unlike dataclass, we don't actually
@@ -110,7 +110,7 @@ class ScanFields(BaseModifier):
                 guess, ir.Attribute
             ):  # not specified, and using python type
                 if f.type is types.Any:  # not set or too generic
-                    f.type = types.hint2type(guess)  # type: ignore
+                    f.type = types.hint2type(guess)
                 f.pytype = True
 
     @staticmethod

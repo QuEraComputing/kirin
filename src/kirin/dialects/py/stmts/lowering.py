@@ -3,7 +3,6 @@ import ast
 from kirin.dialects.py import data, types
 from kirin.exceptions import DialectLoweringError
 from kirin.ir import SSAValue
-from kirin.lattice import Lattice
 from kirin.lowering import FromPythonAST, LoweringState, Result
 
 from . import _stmts as py
@@ -136,13 +135,16 @@ class PythonLowering(FromPythonAST):
         elts = tuple(state.visit(each).expect_one() for each in node.elts)
 
         if len(elts):
-            typ: Lattice[types.PyType] = elts[0].type
+            typ = elts[0].type
             for each in elts:
                 typ = typ.join(each.type)
         else:
             typ = types.Any
 
-        stmt = py.NewList(typ, values=tuple(elts))  # type: ignore
+        if not isinstance(typ, types.PyType):
+            typ = types.Any
+
+        stmt = py.NewList(typ, values=tuple(elts))
         state.append_stmt(stmt)
         return Result(stmt)
 

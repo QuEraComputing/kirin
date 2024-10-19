@@ -10,7 +10,9 @@ class NewTuple(Statement):
     result: ResultValue = info.result()
 
     def __init__(self, values: tuple[SSAValue, ...]) -> None:
-        result_type = types.PyGeneric(tuple, *tuple(value.type for value in values))  # type: ignore
+        result_type = types.PyGeneric(
+            tuple, *tuple(types.to_pytype(value.type) for value in values)
+        )
         super().__init__(
             args=values,
             result_types=[

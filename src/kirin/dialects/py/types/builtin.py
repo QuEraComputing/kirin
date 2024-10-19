@@ -3,7 +3,7 @@
 They should be equivalent directly construct PyClass.
 """
 
-from kirin.dialects.py.types.base import (
+from kirin.dialects.py.types.elem import (
     PyAnyType,
     PyBottomType,
     PyClass,

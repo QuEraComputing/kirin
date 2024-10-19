@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 from kirin.codegen import CodeGen, DialectEmit, impl
-from kirin.dialects.py.types.base import PyClass, PyType
+from kirin.dialects.py.types.elem import PyClass, PyType
 from kirin.ir.attrs import Attribute
 from kirin.ir.dialect import Dialect
 from kirin.print.printer import Printer

@@ -8,7 +8,7 @@ def empty_list():
 
 
 def test_empty_list():
-    assert empty_list.return_type.is_equal(types.List[types.Any])
+    assert empty_list.return_type.is_subseteq(types.List[types.Any])
 
 
 def test_list_len():

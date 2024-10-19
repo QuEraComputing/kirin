@@ -31,7 +31,7 @@ class TypeInfer(DialectInterpreter):
 
         # give up on dynamic method calls
         if not isinstance(values[0], types.PyConst):
-            return ResultValue(types.Any)
+            return ResultValue(stmt.result.type)
 
         mt: ir.Method = values[0].data
         if mt.inferred:  # so we don't end up in infinite loop
@@ -47,9 +47,9 @@ class TypeInfer(DialectInterpreter):
         # or runtime.
         # update the results with the narrowed types
         for arg, typ in zip(stmt.args[1:], narrow_arg_types):
-            interp.results[arg] = typ  # type: ignore
+            interp.results[arg] = typ
 
-        inferred = interp.eval(mt, narrow_arg_types).to_result()  # type: ignore
+        inferred = interp.eval(mt, narrow_arg_types).to_result()
         return inferred
 
     @impl(Lambda)

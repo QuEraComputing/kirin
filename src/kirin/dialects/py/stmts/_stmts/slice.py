@@ -18,13 +18,17 @@ class Slice(Statement):
     result: ResultValue = info.result(types.Slice)
 
     def __init__(self, start: SSAValue, stop: SSAValue, step: SSAValue) -> None:
-        if start.type.is_subtype(types.NoneType):
+        if not (
+            isinstance(stop.type, types.PyType) and isinstance(start.type, types.PyType)
+        ):
+            result_type = types.Bottom
+        elif start.type.is_subtype(types.NoneType):
             if stop.type.is_subtype(types.NoneType):
                 result_type = types.Bottom
             else:
-                result_type = types.Slice[types.widen_const(stop.type)]  # type: ignore
+                result_type = types.Slice[types.widen_const(stop.type)]
         else:
-            result_type = types.Slice[types.widen_const(start.type)]  # type: ignore
+            result_type = types.Slice[types.widen_const(start.type)]
 
         super().__init__(
             args=(start, stop, step),

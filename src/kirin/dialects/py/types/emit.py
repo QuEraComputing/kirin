@@ -1,7 +1,7 @@
 from kirin.codegen import CodeGen, DialectEmit, impl
 
-from .base import PyAnyType, PyBottomType, PyClass, PyGeneric, PyLiteral
 from .dialect import dialect
+from .elem import PyAnyType, PyBottomType, PyClass, PyGeneric, PyLiteral
 
 
 @dialect.register(key="dict")
