@@ -1,3 +1,5 @@
+import pytest
+
 from kirin.dialects.py import stmts
 from kirin.ir import Block
 
@@ -23,3 +25,9 @@ def test_stmt():
     a.delete()
     a.insert_after(x)
     bb1.stmts.at(1) == a  # type: ignore
+
+    with pytest.raises(ValueError):
+        a.insert_after(x)
+
+    with pytest.raises(ValueError):
+        a.insert_before(x)

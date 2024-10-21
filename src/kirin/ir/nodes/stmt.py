@@ -128,6 +128,11 @@ class Statement(IRNode["Block"]):
         )
 
     def insert_after(self, stmt: Statement) -> None:
+        if self._next_stmt is not None and self._prev_stmt is not None:
+            raise ValueError(
+                "Cannot insert before a statement that is already in a block"
+            )
+
         if stmt._next_stmt is not None:
             stmt._next_stmt._prev_stmt = self
 
@@ -144,6 +149,11 @@ class Statement(IRNode["Block"]):
                 self.parent._last_stmt = self
 
     def insert_before(self, stmt: Statement) -> None:
+        if self._next_stmt is not None and self._prev_stmt is not None:
+            raise ValueError(
+                "Cannot insert before a statement that is already in a block"
+            )
+
         if stmt._prev_stmt is not None:
             stmt._prev_stmt._next_stmt = self
 
