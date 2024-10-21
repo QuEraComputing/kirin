@@ -472,16 +472,18 @@ class Statement(IRNode["Block"]):
     def get_attr_or_prop(self, key: str) -> Attribute | None:
         return self.attributes.get(key, self.properties.get(key))
 
-    def has_trait(self, trait_type: type[StmtTrait]) -> bool:
-        for trait in self.traits:
+    @classmethod
+    def has_trait(cls, trait_type: type[StmtTrait]) -> bool:
+        for trait in cls.traits:
             if isinstance(trait, trait_type):
                 return True
         return False
 
     TraitType = TypeVar("TraitType", bound=StmtTrait)
 
-    def get_trait(self, trait: type[TraitType]) -> TraitType | None:
-        for t in self.traits:
+    @classmethod
+    def get_trait(cls, trait: type[TraitType]) -> TraitType | None:
+        for t in cls.traits:
             if isinstance(t, trait):
                 return t
         return None

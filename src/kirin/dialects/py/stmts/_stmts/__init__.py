@@ -32,7 +32,12 @@ from .cmp import (
 )
 from .constant import Constant as Constant
 from .getattr import GetAttr as GetAttr
-from .getitem import GetItem as GetItem, SetItem as SetItem
+from .getitem import (
+    GetItem as GetItem,
+    GetItemLike as GetItemLike,
+    PyGetItemLike as PyGetItemLike,
+    SetItem as SetItem,
+)
 from .list import Append as Append, Len as Len, NewList as NewList
 from .range import Range as Range
 from .slice import Slice as Slice

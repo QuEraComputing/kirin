@@ -108,14 +108,40 @@ class BlockStmts(View["Block", "Statement"]):
         """This is similar to __getitem__ but due to the nature of the linked list,
         it is less efficient than __getitem__.
         """
-        if index < 0 or index >= len(self):
+        if index >= len(self):
             raise IndexError("Index out of range")
 
-        # NOTE: we checked the length, so we are sure
-        # that first_stmt is not None
-        stmt: Statement = self.node.first_stmt  # type: ignore
+        if index < 0:
+            return self._at_reverse(-index - 1)
+
+        return self._at_forward(index)
+
+    def _at_forward(self, index: int) -> Statement:
+        if self.node.first_stmt is None:
+            raise IndexError("Index out of range")
+
+        stmt = self.node.first_stmt
         for _ in range(index):
-            stmt = stmt.next_stmt  # type: ignore
+            if stmt is None:
+                raise IndexError("Index out of range")
+            stmt = stmt.next_stmt
+
+        if stmt is None:
+            raise IndexError("Index out of range")
+        return stmt
+
+    def _at_reverse(self, index: int) -> Statement:
+        if self.node.last_stmt is None:
+            raise IndexError("Index out of range")
+
+        stmt = self.node.last_stmt
+        for _ in range(index):
+            if stmt is None:
+                raise IndexError("Index out of range")
+            stmt = stmt.prev_stmt
+
+        if stmt is None:
+            raise IndexError("Index out of range")
         return stmt
 
     def append(self, value: Statement) -> None:
