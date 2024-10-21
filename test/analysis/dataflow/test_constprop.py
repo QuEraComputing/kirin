@@ -170,3 +170,35 @@ def test_constprop():
     assert infer.eval(
         recurse, tuple(NotConst() for _ in recurse.args)
     ).expect() == Const((0, 0, 0))
+
+
+@basic_no_opt
+def myfunc(x1: int) -> int:
+    return x1 * 2
+
+
+@basic_no_opt
+def _for_loop_test_constp(
+    cntr: int,
+    x: tuple,
+    n_range: int,
+):
+    if cntr < n_range:
+        pos = myfunc(cntr)
+        x = x + (cntr, pos)
+        return _for_loop_test_constp(
+            cntr=cntr + 1,
+            x=x,
+            n_range=n_range,
+        )
+    else:
+        return x
+
+
+def test_issue_40():
+    constprop = ConstProp(basic_no_opt)
+    result = constprop.eval(
+        _for_loop_test_constp, (Const(0), Const(()), Const(5))
+    ).expect()
+    assert isinstance(result, Const)
+    assert result.data == _for_loop_test_constp(cntr=0, x=(), n_range=5)
