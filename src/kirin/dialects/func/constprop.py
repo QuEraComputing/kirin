@@ -40,7 +40,7 @@ class DialectConstProp(DialectInterpreter):
         args = interp.get_args(mt.arg_names[len(args) + 1 :], args, kwargs)
         if len(interp.state.frames) < interp.max_depth:
             return interp.eval(mt, args).to_result()
-        return ResultValue(NotConst())
+        return ResultValue(interp.bottom)
 
     @impl(Lambda)
     def lambda_(self, interp: ConstProp, stmt: Lambda, values: tuple):
