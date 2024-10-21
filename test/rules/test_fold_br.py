@@ -31,6 +31,6 @@ def test_branch_elim():
     interp.run_analysis(branch)
     # TODO: also check the generated CFG
     # interp.worklist.visited
-    Walk(DeadCodeElimination(interp.worklist.visited)).rewrite(branch.code)
+    Walk(DeadCodeElimination(interp.visited)).rewrite(branch.code)
     branch.code.print()
     assert len(branch.code.body.blocks) == 4  # type: ignore

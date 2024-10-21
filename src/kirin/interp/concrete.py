@@ -2,12 +2,13 @@ from typing import Any, Iterable
 
 from kirin.exceptions import FuelExhaustedError
 from kirin.interp.base import BaseInterpreter, InterpResult
+from kirin.interp.frame import Frame
 from kirin.interp.value import Err, NoReturn, ResultValue, ReturnValue, Successor
 from kirin.ir import Block, Dialect, DialectGroup, Region
 from kirin.ir.method import Method
 
 
-class Interpreter(BaseInterpreter[Any]):
+class Interpreter(BaseInterpreter[Frame[Any], Any]):
     keys = ["main", "empty"]
 
     def __init__(
@@ -24,6 +25,9 @@ class Interpreter(BaseInterpreter[Any]):
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
+
+    def new_method_frame(self, mt: Method) -> Frame[Any]:
+        return Frame.from_method(mt)
 
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[Any, ...]
@@ -42,7 +46,7 @@ class Interpreter(BaseInterpreter[Any]):
         stmt_idx = 0
         block: Block | None = region.blocks[0]
         while block is not None:
-            frame.set_values(zip(block.args, args))
+            frame.set_values(block.args, args)
             stmt = block.first_stmt
 
             # TODO: make this more precise
@@ -64,7 +68,7 @@ class Interpreter(BaseInterpreter[Any]):
                     case Err(_):
                         return InterpResult(stmt_results)
                     case ResultValue(values):
-                        frame.set_values(zip(stmt._results, values))
+                        frame.set_values(stmt._results, values)
                     case ReturnValue(result):
                         break
                     case Successor(block, block_args):

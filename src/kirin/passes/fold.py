@@ -19,5 +19,5 @@ class Fold(Pass):
 
         reachability = ReachableAnalysis(self.dialects)
         reachability.eval(mt, tuple(EmptyLattice() for _ in mt.args))
-        dce = DeadCodeElimination(cfg=reachability.worklist.visited)
+        dce = DeadCodeElimination(cfg=reachability.visited)
         Walk(dce).rewrite(mt.code)

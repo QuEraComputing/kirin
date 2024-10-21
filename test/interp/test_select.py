@@ -14,7 +14,7 @@ from kirin.worklist import WorkList
 
 
 @dataclass(init=False)
-class DummyInterpreter(ForwardDataFlowAnalysis[EmptyLattice, WorkList]):
+class DummyInterpreter(ForwardDataFlowAnalysis[EmptyLattice]):
     keys = ["test_interp", "main", "empty"]
 
     @classmethod

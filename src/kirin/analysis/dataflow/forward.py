@@ -1,22 +1,21 @@
-from abc import abstractmethod
 from dataclasses import field
 from typing import Iterable, TypeVar
 
-from kirin.interp import AbstractInterpreter, Successor
-from kirin.interp.frame import Frame
+from kirin.interp import AbstractFrame, AbstractInterpreter
 from kirin.ir import Dialect, SSAValue
 from kirin.ir.group import DialectGroup
+from kirin.ir.method import Method
 from kirin.lattice import Lattice
-from kirin.worklist import WorkList
 
-ResultType = TypeVar("ResultType", bound=Lattice)
-WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
+LatticeElemType = TypeVar("LatticeElemType", bound=Lattice)
 
 
-class ForwardDataFlowAnalysis(AbstractInterpreter[ResultType, WorkListType]):
+class ForwardDataFlowAnalysis(
+    AbstractInterpreter[AbstractFrame[LatticeElemType], LatticeElemType]
+):
     """Abstract interpreter but record results for each SSA value."""
 
-    results: dict[SSAValue, ResultType] = field(init=False, default_factory=dict)
+    results: dict[SSAValue, LatticeElemType] = field(init=False, default_factory=dict)
 
     def __init__(
         self,
@@ -34,21 +33,11 @@ class ForwardDataFlowAnalysis(AbstractInterpreter[ResultType, WorkListType]):
         )
         self.results = {}
 
-    @classmethod
-    @abstractmethod
-    def bottom_value(cls) -> ResultType:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def default_worklist(cls) -> WorkListType:
-        pass
-
     def set_values(
         self,
-        frame: Frame[ResultType],
+        frame: AbstractFrame[LatticeElemType],
         ssa: Iterable[SSAValue],
-        results: Iterable[ResultType],
+        results: Iterable[LatticeElemType],
     ):
         for ssa_value, result in zip(ssa, results):
             if ssa_value in frame.entries:
@@ -56,5 +45,8 @@ class ForwardDataFlowAnalysis(AbstractInterpreter[ResultType, WorkListType]):
             else:
                 frame.entries[ssa_value] = result
 
-    def postprocess_frame(self, frame: Frame[ResultType]) -> None:
+    def postprocess_frame(self, frame: AbstractFrame[LatticeElemType]) -> None:
         self.results = frame.entries
+
+    def new_method_frame(self, mt: Method) -> AbstractFrame[LatticeElemType]:
+        return AbstractFrame.from_method(mt)

@@ -25,7 +25,7 @@ def test_dce():
     foldable.code.print()
     analysis = ReachableAnalysis(foldable.dialects)
     analysis.run_analysis(foldable)
-    dce = DeadCodeElimination(analysis.worklist.visited)
+    dce = DeadCodeElimination(analysis.visited)
     Fixpoint(Walk(dce)).rewrite(foldable.code)
     foldable.code.print()
 

@@ -7,7 +7,6 @@ from kirin.exceptions import InterpreterError
 from kirin.interp import Interpreter, value as interp_value
 from kirin.interp.base import InterpResult
 from kirin.lattice import Lattice, LatticeMeta, SingletonMeta
-from kirin.worklist import WorkList
 
 
 @dataclass
@@ -131,9 +130,7 @@ class NotConst(ConstPropLattice, metaclass=SingletonMeta):
         return self.is_equal(other)
 
 
-class ConstProp(
-    ForwardDataFlowAnalysis[ConstPropLattice, WorkList[interp_value.Successor]]
-):
+class ConstProp(ForwardDataFlowAnalysis[ConstPropLattice]):
     keys = ["constprop", "empty"]
     interp: Interpreter
 
@@ -161,10 +158,6 @@ class ConstProp(
     @classmethod
     def bottom_value(cls) -> ConstPropLattice:
         return ConstPropBottom()
-
-    @classmethod
-    def default_worklist(cls) -> WorkList[interp_value.Successor]:
-        return WorkList()
 
     def try_eval_const(
         self, stmt: ir.Statement, args: tuple[Const, ...]

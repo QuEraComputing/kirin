@@ -1,4 +1,7 @@
-from kirin.interp.abstract import AbstractInterpreter as AbstractInterpreter
+from kirin.interp.abstract import (
+    AbstractFrame as AbstractFrame,
+    AbstractInterpreter as AbstractInterpreter,
+)
 from kirin.interp.base import BaseInterpreter as BaseInterpreter
 from kirin.interp.concrete import Interpreter as Interpreter
 from kirin.interp.dialect import (

@@ -1,28 +1,28 @@
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
-from kirin.interp.frame import Frame
+from kirin.interp.frame import FrameABC
 
-ValueType = TypeVar("ValueType")
+FrameType = TypeVar("FrameType", bound=FrameABC)
 
 
 @dataclass
-class InterpreterState(Generic[ValueType]):
-    frames: list[Frame[ValueType]] = field(default_factory=list)
+class InterpreterState(Generic[FrameType]):
+    frames: list[FrameType] = field(default_factory=list)
 
-    def push_frame(self, frame: Frame[ValueType]):
+    def push_frame(self, frame: FrameType):
         self.frames.append(frame)
         return frame
 
-    def pop_frame(self) -> Frame[ValueType]:
+    def pop_frame(self) -> FrameType:
         return self.frames.pop()
 
-    def current_frame(self) -> Frame[ValueType]:
+    def current_frame(self) -> FrameType:
         if not self.frames:
             raise ValueError(
                 "unable to retrieve the current frame because no frames were pushed"
             )
         return self.frames[-1]
 
-    def stacktrace(self) -> list[Frame[ValueType]]:
+    def stacktrace(self) -> list[FrameType]:
         return self.frames

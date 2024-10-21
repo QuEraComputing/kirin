@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 from typing_extensions import dataclass_transform
 
 from kirin.exceptions import InterpreterError
-from kirin.interp.frame import Frame
+from kirin.interp.frame import FrameABC
 from kirin.interp.state import InterpreterState
 from kirin.interp.value import Err, NoReturn, Result, ResultValue
 from kirin.ir import Dialect, DialectGroup, Region, Statement, traits
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from kirin.interp.impl import Signature, StatementImpl
 
 ValueType = TypeVar("ValueType")
+FrameType = TypeVar("FrameType", bound=FrameABC)
 
 
 @dataclass(init=False)
@@ -67,7 +68,7 @@ class InterpreterMeta(ABCMeta):
         return dataclass(init=init)(cls)
 
 
-class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
+class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterMeta):
     """A base class for interpreters."""
 
     keys: ClassVar[list[str]]
@@ -80,7 +81,7 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
     """A mapping of statement signature to their implementation.
     """
     fallbacks: dict[Dialect, "StatementImpl"] = field(init=False, repr=False)
-    state: InterpreterState[ValueType] = field(init=False, repr=False)
+    state: InterpreterState[FrameType] = field(init=False, repr=False)
     """The interpreter state.
     """
     fuel: int | None = field(default=None, init=False, kw_only=True)
@@ -109,6 +110,11 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
         self.max_depth = max_depth
         self.max_python_recursion_depth = max_python_recursion_depth
 
+    @abstractmethod
+    def new_method_frame(self, mt: Method) -> FrameType:
+        """Create a new frame for the given method."""
+        ...
+
     def eval(
         self,
         mt: Method,
@@ -125,7 +131,7 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
         if len(self.state.frames) >= self.max_depth:
             raise InterpreterError("maximum recursion depth exceeded")
 
-        self.state.push_frame(Frame.from_method(mt))
+        self.state.push_frame(self.new_method_frame(mt))
         body = interface.get_callable_region(mt.code)
         # NOTE: #self# is not user input so it is not
         # in the args, +1 is for self
@@ -143,7 +149,7 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
         self, mt: Method, body: Region, args: tuple[ValueType, ...]
     ) -> InterpResult[ValueType]: ...
 
-    def postprocess_frame(self, frame: Frame[ValueType]) -> None:
+    def postprocess_frame(self, frame: FrameType) -> None:
         """Postprocess a frame after it is popped from the stack. This is
         called after a method is evaluated and the frame is popped. Default
         implementation does nothing.
@@ -167,9 +173,7 @@ class BaseInterpreter(ABC, Generic[ValueType], metaclass=InterpreterMeta):
             # NOTE: if run_stmt is called directly,
             # there is no frame being pushed, we only
             # push a frame when we call a method
-            frame = self.state.current_frame()
-            frame.stmt = stmt
-
+            self.state.current_frame().set_stmt(stmt)
         return self.eval_stmt(stmt, args)
 
     def eval_stmt(self, stmt: Statement, args: tuple) -> Result[ValueType]:

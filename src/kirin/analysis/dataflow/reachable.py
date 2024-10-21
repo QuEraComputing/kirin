@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Iterable
 
-from kirin.interp import AbstractInterpreter
+from kirin.interp import AbstractFrame, AbstractInterpreter
 from kirin.interp.base import InterpResult
-from kirin.interp.frame import Frame
 from kirin.interp.value import Successor
 from kirin.ir import Block, CallableStmtInterface, Dialect, IsTerminator, Method
 from kirin.ir.group import DialectGroup
@@ -32,17 +31,26 @@ class CFGWorkList(WorkList[Successor]):
         super().push(item)
 
 
-class ReachableAnalysis(AbstractInterpreter[EmptyLattice, CFGWorkList]):
+@dataclass
+class ReachabilityFrame(AbstractFrame[EmptyLattice]):
+    worklist: CFGWorkList = field(default_factory=CFGWorkList)
+
+
+class ReachableAnalysis(AbstractInterpreter[ReachabilityFrame, EmptyLattice]):
     keys = [
         "reachibility",
         "typeinfer",
         "typeinfer.default",
     ]  # use typeinfer interpreters
+    visited: dict[Block, set[Block]] = field(default_factory=dict)
 
     def __init__(
         self, dialects: DialectGroup | Iterable[Dialect], *, fuel: int | None = None
     ):
         super().__init__(dialects, fuel=fuel)
+
+    def new_method_frame(self, mt: Method) -> ReachabilityFrame:
+        return ReachabilityFrame.from_method(mt)
 
     def run_analysis(self, mt: Method):
         self.eval(mt, tuple(EmptyLattice() for _ in mt.args))
@@ -51,20 +59,19 @@ class ReachableAnalysis(AbstractInterpreter[EmptyLattice, CFGWorkList]):
     def bottom_value(cls) -> EmptyLattice:
         return EmptyLattice()
 
-    @classmethod
-    def default_worklist(cls) -> CFGWorkList:
-        return CFGWorkList()
+    def prehook_succ(self, frame: ReachabilityFrame, succ: Successor):
+        frame.worklist.current = succ.block
+        frame.worklist.visited.setdefault(succ.block, set())
 
-    def prehook_succ(self, frame: Frame, succ: Successor):
-        self.worklist.current = succ.block
-        self.worklist.visited.setdefault(succ.block, set())
+    def postprocess_frame(self, frame: ReachabilityFrame) -> None:
+        self.visited = frame.worklist.visited
 
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[EmptyLattice, ...]
     ) -> InterpResult[EmptyLattice]:
         return self.run_ssacfg_region(body, (EmptyLattice(),) + args)
 
-    def run_block(self, frame: Frame, succ: Successor) -> EmptyLattice:
+    def run_block(self, frame: ReachabilityFrame, succ: Successor) -> EmptyLattice:
         last_stmt = succ.block.last_stmt
         # NOTE: don't error here, that validator's job
         if last_stmt is None or not last_stmt.has_trait(IsTerminator):

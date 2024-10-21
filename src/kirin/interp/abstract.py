@@ -1,26 +1,35 @@
 from abc import abstractmethod
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Generic, Iterable, TypeVar
 
 from kirin.interp.base import BaseInterpreter, InterpResult
 from kirin.interp.frame import Frame
 from kirin.interp.value import ResultValue, ReturnValue, Successor
 from kirin.ir import Dialect, DialectGroup, Region, SSAValue, Statement
+from kirin.ir.method import Method
 from kirin.lattice import Lattice
 from kirin.worklist import WorkList
 
 ResultType = TypeVar("ResultType", bound=Lattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
 
+
+@dataclass
+class AbstractFrame(Frame[ResultType]):
+    worklist: WorkList[Successor] = field(default_factory=WorkList)
+
+
+AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
+
 # TODO: support custom loop termination heurestics, e.g. max iteration, etc.
 # currently we may end up in infinite loop
 
 
 class AbstractInterpreter(
-    Generic[ResultType, WorkListType], BaseInterpreter[ResultType]
+    Generic[AbstractFrameType, ResultType],
+    BaseInterpreter[AbstractFrameType, ResultType],
 ):
     bottom: ResultType = field(init=False, kw_only=True, repr=False)
-    worklist: WorkListType = field(init=False, kw_only=True, repr=False)
 
     def __init__(
         self,
@@ -37,22 +46,19 @@ class AbstractInterpreter(
             max_python_recursion_depth=max_python_recursion_depth,
         )
         self.bottom = self.bottom_value()
-        self.worklist = self.default_worklist()
+
+    @abstractmethod
+    def new_method_frame(self, mt: Method) -> AbstractFrameType: ...
 
     @classmethod
     @abstractmethod
     def bottom_value(cls) -> ResultType:
         pass
 
-    @classmethod
-    @abstractmethod
-    def default_worklist(cls) -> WorkListType:
-        pass
-
-    def prehook_succ(self, frame: Frame, succ: Successor):
+    def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
         return
 
-    def posthook_succ(self, frame: Frame, succ: Successor):
+    def posthook_succ(self, frame: AbstractFrameType, succ: Successor):
         return
 
     def should_exec_stmt(self, stmt: Statement):
@@ -60,11 +66,11 @@ class AbstractInterpreter(
 
     def set_values(
         self,
-        frame: Frame[ResultType],
+        frame: AbstractFrameType,
         ssa: Iterable[SSAValue],
         results: Iterable[ResultType],
     ):
-        frame.set_values(zip(ssa, results))
+        frame.set_values(ssa, results)
 
     def run_ssacfg_region(
         self, region: Region, args: tuple[ResultType, ...]
@@ -74,14 +80,14 @@ class AbstractInterpreter(
         if not region.blocks:
             return InterpResult(result)
 
-        self.worklist.push(Successor(region.blocks[0], *args))
-        while (succ := self.worklist.pop()) is not None:
+        frame.worklist.push(Successor(region.blocks[0], *args))
+        while (succ := frame.worklist.pop()) is not None:
             self.prehook_succ(frame, succ)
             result = self.run_block(frame, succ).join(result)
             self.posthook_succ(frame, succ)
         return InterpResult(result)
 
-    def run_block(self, frame: Frame, succ: Successor) -> ResultType:
+    def run_block(self, frame: AbstractFrameType, succ: Successor) -> ResultType:
         self.set_values(frame, succ.block.args, succ.block_args)
 
         stmt = succ.block.first_stmt

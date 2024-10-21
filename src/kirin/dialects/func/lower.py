@@ -172,7 +172,12 @@ class FuncLowering(FromPythonAST):
             raise DialectLoweringError("empty function body")
 
         captured = [value for value in func_frame.captures.values()]
-        lambda_stmt = Lambda(node.name, signature, captured, func_frame.current_region)
+        lambda_stmt = Lambda(
+            tuple(captured),
+            sym_name=node.name,
+            signature=signature,
+            body=func_frame.current_region,
+        )
         lambda_stmt.result.name = node.name
         # NOTE: Python automatically assigns the lambda to the name
         frame.defs[node.name] = frame.append_stmt(lambda_stmt).result

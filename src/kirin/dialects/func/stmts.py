@@ -69,6 +69,7 @@ class Call(Statement):
     name = "call"
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
+    inputs: tuple[SSAValue, ...] = info.argument()
     kwargs: data.PyAttr[tuple[str, ...]] = info.attribute(property=True)
     result: ResultValue = info.result()
 
@@ -84,7 +85,7 @@ class Call(Statement):
             args=[callee, *args],
             result_types=(return_type,),
             properties={"kwargs": data.PyAttr(tuple(kwargs))},
-            args_slice={"callee": 0},
+            args_slice={"callee": 0, "inputs": slice(1, None)},
         )
 
     def print_impl(self, printer: Printer) -> None:
@@ -93,13 +94,12 @@ class Call(Statement):
         printer.plain_print(" ")
 
         n_total = len(self.args)
-        callee = self.args[0]
-        printer.print(callee)
+        callee = self.callee
+        printer.plain_print(printer.state.ssa_id[callee])
 
-        positional = self.args[1 : n_total - len(self.kwargs.data)]
-        kwargs = dict(
-            zip(self.kwargs.data, self.args[n_total - len(self.kwargs.data) :])
-        )
+        inputs = self.inputs
+        positional = inputs[: n_total - len(self.kwargs.data)]
+        kwargs = dict(zip(self.kwargs.data, inputs[n_total - len(self.kwargs.data) :]))
 
         printer.plain_print("(")
         printer.print_seq(positional)
@@ -147,33 +147,15 @@ class Return(Statement):
             printer.print_seq(self.args, delim=", ")
 
 
-@statement(dialect=dialect, init=False)
+@statement(dialect=dialect)
 class Lambda(Statement):
     name = "lambda"
     traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface()})
     sym_name: str = info.attribute(property=True)
     signature: Signature = info.attribute()
+    captured: tuple[SSAValue, ...] = info.argument()
     body: Region = info.region(multi=True)
     result: ResultValue = info.result(MethodType)
-
-    def __init__(
-        self,
-        name: str,
-        signature: Signature,
-        captured: Sequence[SSAValue],
-        code: Region,
-    ):
-        super().__init__(
-            args=captured,
-            regions=(code,),
-            properties={
-                "sym_name": data.PyAttr(name),
-            },
-            attributes={
-                "signature": signature,
-            },
-            result_types=[MethodType],
-        )
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style=printer.color.keyword):
@@ -183,7 +165,7 @@ class Lambda(Statement):
         with printer.rich(style=printer.color.symbol):
             printer.plain_print(self.sym_name)
 
-        printer.print_seq(self.args, prefix="(", suffix=")", delim=", ")
+        printer.print_seq(self.captured, prefix="(", suffix=")", delim=", ")
 
         with printer.rich(style="bright_black"):
             printer.plain_print(" -> ")

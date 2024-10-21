@@ -14,4 +14,4 @@ def deadblock(x):
 def test_reachable():
     dba = ReachableAnalysis(deadblock.dialects)
     dba.eval(deadblock, tuple(EmptyLattice() for _ in deadblock.args))
-    assert deadblock.code.body.blocks[-1] not in dba.worklist.visited  # type: ignore
+    assert deadblock.code.body.blocks[-1] not in dba.visited  # type: ignore
