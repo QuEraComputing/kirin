@@ -21,12 +21,13 @@ class FromPythonAST(ABC):
     def names(self) -> list[str]:  # show the name without lower_
         return [name[6:] for name in dir(self) if name.startswith("lower_")]
 
-    def lower(self, ctx: LoweringState, node: ast.AST) -> Result:
+    def lower(self, state: LoweringState, node: ast.AST) -> Result:
         """Entry point of dialect specific lowering."""
-        lower = getattr(self, f"lower_{node.__class__.__name__}", self.unreachable)
-        return lower(ctx, node)
+        return getattr(self, f"lower_{node.__class__.__name__}", self.unreachable)(
+            state, node
+        )
 
-    def unreachable(self, ctx: LoweringState, node: ast.AST) -> Result:
+    def unreachable(self, state: LoweringState, node: ast.AST) -> Result:
         raise DialectLoweringError(f"unreachable reached for {node.__class__.__name__}")
 
 

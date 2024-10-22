@@ -182,3 +182,14 @@ class PythonLowering(FromPythonAST):
         upper = value_or_none(node.upper)
         step = value_or_none(node.step)
         return Result(state.append_stmt(py.Slice(start=lower, stop=upper, step=step)))
+
+    def lower_Call_slice(self, state: LoweringState, node: ast.Call) -> Result:
+        return py.Slice.from_python_call(state, node)
+
+    def lower_Call_range(self, state: LoweringState, node: ast.Call) -> Result:
+        return py.Range.from_python_call(state, node)
+
+    def lower_Call_len(self, state: LoweringState, node: ast.Call) -> Result:
+        return Result(
+            state.append_stmt(py.Len(value=state.visit(node.args[0]).expect_one()))
+        )

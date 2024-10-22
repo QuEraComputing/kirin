@@ -1,10 +1,11 @@
 import ast
 import builtins
+import inspect
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from kirin.exceptions import DialectLoweringError
-from kirin.ir import DialectGroup, SSAValue, Statement
+from kirin.ir import DialectGroup, Method, SSAValue, Statement
 from kirin.lowering.dialect import FromPythonAST
 from kirin.lowering.frame import Frame
 from kirin.lowering.result import Result
@@ -103,10 +104,86 @@ class LoweringState(ast.NodeVisitor):
         name = node.__class__.__name__
         if name in self.registry:
             return self.registry[name].lower(self, node)
+        elif isinstance(node, ast.Call):
+            # NOTE: if lower_Call is implemented,
+            # it will be called first before __dispatch_Call
+            # because "Call" exists in self.registry
+            return self.__dispatch_Call(node)
         return super().visit(node)
 
     def generic_visit(self, node: ast.AST):
         raise DialectLoweringError(f"unsupported ast node {type(node)}:")
+
+    def __dispatch_Call(self, node: ast.Call):
+        # 1. try to lookup global statement object
+        # 2. lookup local values
+        global_callee_result = self.get_global_nothrow(node.func)
+        if global_callee_result is None:  # not found in globals, has to be local
+            return self.__lower_Call_local(node)
+
+        global_callee = global_callee_result.unwrap()
+        if isinstance(global_callee, Method):
+            callee = self.visit(ast.Constant(global_callee)).expect_one()
+            if "Call_global_method" in self.registry:
+                return self.registry["Call_global_method"].lower_Call_global_method(
+                    self, global_callee, callee, node
+                )
+            raise DialectLoweringError("`lower_Call_global_method` not implemented")
+        elif inspect.isclass(global_callee):
+            if issubclass(global_callee, Statement):
+                if global_callee.dialect is not None:
+                    if global_callee.dialect not in self.dialects.data:
+                        raise DialectLoweringError(
+                            f"unsupported dialect `{global_callee.dialect.name}`"
+                        )
+                    return global_callee.from_python_call(self, node)
+                else:
+                    raise DialectLoweringError(
+                        f"unsupported dialect `None` for {global_callee.name}"
+                    )
+            elif issubclass(global_callee, slice):
+                if "Call_slice" in self.registry:
+                    return self.registry["Call_slice"].lower_Call_slice(self, node)
+                raise DialectLoweringError("`lower_Call_slice` not implemented")
+            elif issubclass(global_callee, range):
+                if "Call_range" in self.registry:
+                    return self.registry["Call_range"].lower_Call_range(self, node)
+                raise DialectLoweringError("`lower_Call_range` not implemented")
+        elif inspect.isbuiltin(global_callee):
+            name = f"Call_{global_callee.__name__}"
+            if "Call_builtins" in self.registry:
+                dialect_lowering = self.registry["Call_builtins"]
+                return dialect_lowering.lower_Call_builtins(self, node)
+            elif name in self.registry:
+                dialect_lowering = self.registry[name]
+                return getattr(dialect_lowering, f"lower_{name}")(self, node)
+            else:
+                raise DialectLoweringError(
+                    f"`lower_{name}` is not implemented for builtin function `{global_callee.__name__}`."
+                )
+
+        # symbol exist in global, but not ir.Statement, it may refer to a
+        # local value that shadows the global value
+        try:
+            return self.__lower_Call_local(node)
+        except DialectLoweringError:
+            # symbol exist in global, but not ir.Statement, not found in locals either
+            # this means the symbol is referring to an external uncallable object
+            if inspect.isfunction(global_callee):
+                raise DialectLoweringError(
+                    f"unsupported callee: {type(global_callee)}."
+                    "Are you trying to call a python function? This is not supported."
+                )
+            else:  # well not much we can do, can't hint
+                raise DialectLoweringError(
+                    f"unsupported callee type: {type(global_callee)}"
+                )
+
+    def __lower_Call_local(self, node: ast.Call) -> Result:
+        callee = self.visit(node.func).expect_one()
+        if "Call_local" in self.registry:
+            return self.registry["Call_local"].lower_Call_local(self, callee, node)
+        raise DialectLoweringError("`lower_Call_local` not implemented")
 
     ValueT = TypeVar("ValueT", bound=SSAValue)
 

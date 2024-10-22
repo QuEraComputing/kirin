@@ -1,11 +1,10 @@
 import ast
-import inspect
 
 from kirin import ir
 from kirin.dialects.func.attrs import Signature
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import Call, Function, GetField, Lambda, Return
-from kirin.dialects.py import stmts, types
+from kirin.dialects.py import types
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
 
@@ -13,55 +12,30 @@ from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
 @dialect.register
 class FuncLowering(FromPythonAST):
 
-    def lower_Call(self, state: LoweringState, node: ast.Call) -> Result:
-        # 1. try to lookup global statement object
-        # 2. lookup local values
-        global_callee_result = state.get_global_nothrow(node.func)
-        if global_callee_result is None:  # not found in globals, has to be local
-            return_type = types.Any
-            callee = state.visit(node.func).expect_one()
-        else:
-            global_callee = global_callee_result.unwrap()
-            if inspect.isclass(global_callee):
-                if issubclass(global_callee, ir.Statement):
-                    if global_callee.dialect not in state.dialects.data:
-                        raise DialectLoweringError(
-                            f"unsupported dialect `{global_callee.dialect.name}`"  # type: ignore
-                        )
-                    return global_callee.from_python_call(state, node)
-                elif issubclass(global_callee, slice):
-                    return stmts.Slice.from_python_call(state, node)
-                elif issubclass(global_callee, range):
-                    return stmts.Range.from_python_call(state, node)
-            elif inspect.isbuiltin(global_callee):
-                if global_callee is len:
-                    return Result(
-                        state.append_stmt(
-                            stmts.Len(value=state.visit(node.args[0]).expect_one())
-                        )
-                    )
+    def lower_Call_local(
+        self, state: LoweringState, callee: ir.SSAValue, node: ast.Call
+    ) -> Result:
+        return self.__lower_Call_with_callee_return_type(state, callee, types.Any, node)
 
-            # symbol exist in global, but not ir.Statement, lookup local first
-            try:
-                return_type = types.Any
-                callee = state.visit(node.func).expect_one()
-            except DialectLoweringError:  # not found in locals
-                if isinstance(global_callee, ir.Method):  # global method
-                    # return type is Any if not inferred yet
-                    return_type = global_callee.return_type or types.Any
-                    callee = state.append_stmt(stmts.Constant(global_callee)).result
-                elif inspect.isfunction(global_callee) or inspect.isbuiltin(
-                    global_callee
-                ):
-                    # TODO: allow custom lowering python builtin
-                    raise DialectLoweringError(
-                        f"unsupported callee: {type(global_callee)}, are you trying to call a python function?"
-                    )
-                else:
-                    raise DialectLoweringError(
-                        f"unsupported callee type: {type(global_callee)}"
-                    )
+    def lower_Call_global_method(
+        self,
+        state: LoweringState,
+        method: ir.Method,
+        callee: ir.SSAValue,
+        node: ast.Call,
+    ) -> Result:
+        return_type = method.return_type or types.Any
+        return self.__lower_Call_with_callee_return_type(
+            state, callee, return_type, node
+        )
 
+    def __lower_Call_with_callee_return_type(
+        self,
+        state: LoweringState,
+        callee: ir.SSAValue,
+        return_type: ir.TypeAttribute,
+        node: ast.Call,
+    ) -> Result:
         args = []
         for arg in node.args:
             if isinstance(arg, ast.Starred):  # TODO: support *args

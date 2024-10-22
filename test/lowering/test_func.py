@@ -63,7 +63,7 @@ def test_invalid_func_call():
 
     with pytest.raises(
         DialectLoweringError,
-        match="unsupported callee: <class 'builtin_function_or_method'>, are you trying to call a python function?",
+        match="`lower_Call_print` is not implemented for builtin function `print`.",
     ):
         lowering.run(calling_python)
 
