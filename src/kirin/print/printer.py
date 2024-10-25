@@ -1,7 +1,7 @@
 import io
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import IO, TYPE_CHECKING, Callable, Generic, Iterable, TypeVar, Union
+from typing import IO, TYPE_CHECKING, Any, Callable, Generic, Iterable, TypeVar, Union
 
 from rich.console import Console
 
@@ -19,6 +19,7 @@ class ColorScheme:
     comment: str = "bright_black"
     keyword: str = "red"
     symbol: str = "cyan"
+    warning: str = "yellow"
 
 
 @dataclass
@@ -43,6 +44,7 @@ IOType = TypeVar("IOType", bound=IO)
 @dataclass(init=False)
 class Printer(Generic[IOType]):
     stream: IOType | None = None
+    analysis: dict["ir.SSAValue", Any] | None = None
     console: Console = field(default_factory=Console)
     state: PrintState = field(default_factory=PrintState)
     color: ColorScheme = field(default_factory=ColorScheme)
@@ -52,9 +54,11 @@ class Printer(Generic[IOType]):
     def __init__(
         self,
         stream: IOType | None = None,
+        analysis: dict["ir.SSAValue", Printable] | None = None,
         show_indent_mark: bool = True,
     ):
         self.stream = stream
+        self.analysis = analysis
         self.console = Console(file=self.stream, highlight=False)
         self.state = PrintState()
         self.color = ColorScheme()
