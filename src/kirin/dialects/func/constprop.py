@@ -4,6 +4,7 @@ from kirin.analysis.dataflow.constprop import (
     ConstProp,
     ConstPropLattice,
     NotConst,
+    NotPure,
 )
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import Call, GetField, Lambda, Return
@@ -39,7 +40,11 @@ class DialectConstProp(DialectInterpreter):
         args = values[1 : n_total - len(stmt.kwargs.data)]
         args = interp.get_args(mt.arg_names[len(args) + 1 :], args, kwargs)
         if len(interp.state.frames) < interp.max_depth:
-            return interp.eval(mt, args).to_result()
+            result = interp.eval(mt, args).expect()
+            if isinstance(result, NotPure):
+                return ReturnValue(result)
+            else:
+                return ResultValue(result)
         return ResultValue(interp.bottom)
 
     @impl(Lambda)

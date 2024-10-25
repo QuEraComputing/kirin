@@ -4,8 +4,10 @@ from kirin.analysis.dataflow.constprop import (
     ConstProp,
     ConstPropBottom,
     NotConst,
+    NotPure,
     PartialTuple,
 )
+from kirin.decl import statement
 from kirin.prelude import basic_no_opt
 
 
@@ -202,3 +204,26 @@ def test_issue_40():
     ).expect()
     assert isinstance(result, Const)
     assert result.data == _for_loop_test_constp(cntr=0, x=(), n_range=5)
+
+
+def test_intraprocedure_side_effect():
+    dummy_dialect = ir.Dialect("dummy")
+
+    @statement(dialect=dummy_dialect)
+    class DummyStatement(ir.Statement):
+        name = "dummy"
+
+    @basic_no_opt.add(dummy_dialect)
+    def side_effect_return_none():
+        DummyStatement()
+
+    @basic_no_opt.add(dummy_dialect)
+    def side_effect_intraprocedure():
+        side_effect_return_none()
+
+    constprop = ConstProp(basic_no_opt.add(dummy_dialect))
+    result = constprop.eval(
+        side_effect_intraprocedure,
+        tuple(NotConst() for _ in side_effect_intraprocedure.args),
+    ).expect()
+    assert isinstance(result, NotPure)

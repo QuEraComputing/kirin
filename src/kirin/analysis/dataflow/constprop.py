@@ -39,6 +39,17 @@ class ConstPropLattice(Lattice["ConstPropLattice"]):
         return ConstPropBottom()
 
 
+class NotPure(ConstPropLattice, metaclass=SingletonMeta):
+
+    def is_equal(self, other: ConstPropLattice) -> bool:
+        return self is other
+
+    def is_subseteq(self, other: ConstPropLattice) -> bool:
+        if isinstance(other, (NotConst, NotPure)):
+            return True
+        return False
+
+
 @dataclass
 class Const(ConstPropLattice):
     data: Any
@@ -51,7 +62,7 @@ class Const(ConstPropLattice):
     def is_subseteq(self, other: ConstPropLattice) -> bool:
         if isinstance(other, Const):
             return self.data == other.data
-        elif isinstance(other, NotConst):
+        elif isinstance(other, (NotConst, NotPure)):
             return True
         return False
 
@@ -181,12 +192,6 @@ class ConstProp(ForwardDataFlowAnalysis[ConstPropLattice]):
     def eval_stmt(
         self, stmt: ir.Statement, args: tuple
     ) -> interp_value.Result[ConstPropLattice]:
-        frame = self.state.current_frame()
-        for result in stmt.results:
-            # NOTE: multiple results hit here, terminate early
-            if result in frame.entries and isinstance(frame.entries[result], NotConst):
-                return interp_value.ResultValue(NotConst())
-
         if stmt.has_trait(ir.ConstantLike) or (
             stmt.has_trait(ir.Pure) and all(isinstance(x, Const) for x in args)
         ):
@@ -197,8 +202,11 @@ class ConstProp(ForwardDataFlowAnalysis[ConstPropLattice]):
             return self.registry[sig](self, stmt, args)
         elif stmt.__class__ in self.registry:
             return self.registry[stmt.__class__](self, stmt, args)
-        # there is only one fallback
-        return interp_value.ResultValue(NotConst())
+        elif not stmt.has_trait(ir.Pure):  # not specified and not pure
+            return interp_value.ReturnValue(NotPure())
+        else:
+            # fallback to NotConst for other pure statements
+            return interp_value.ResultValue(NotConst())
 
     def run_method_region(
         self, mt: ir.Method, body: ir.Region, args: tuple[ConstPropLattice, ...]
