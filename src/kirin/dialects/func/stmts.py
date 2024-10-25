@@ -6,6 +6,7 @@ from kirin.dialects.func.dialect import dialect
 from kirin.dialects.py import data
 from kirin.ir import (
     CallableStmtInterface,
+    CallLike,
     ConstantLike,
     HasParent,
     HasSignature,
@@ -40,7 +41,7 @@ class ConstantMethod(Statement):
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self)
         printer.plain_print(" ")
-        printer.print(self.value)
+        printer.plain_print(repr(self.value))
 
 
 @statement(dialect=dialect)
@@ -82,6 +83,7 @@ class Function(Statement):
 @statement(dialect=dialect, init=False)
 class Call(Statement):
     name = "call"
+    traits = frozenset({CallLike()})
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     inputs: tuple[SSAValue, ...] = info.argument()

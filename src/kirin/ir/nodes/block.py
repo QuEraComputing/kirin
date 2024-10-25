@@ -327,6 +327,17 @@ class Block(IRNode["Region"]):
                     printer.plain_print(" " * printer.state.result_width, "   ")
                 with printer.indent(printer.state.result_width + 3, mark=True):
                     printer.print(stmt)
+                    if printer.analysis and any(
+                        result in printer.analysis for result in stmt._results
+                    ):
+                        with printer.rich(style=printer.color.warning):
+                            printer.plain_print(" # ---> ")
+                            printer.plain_print(
+                                ", ".join(
+                                    repr(printer.analysis[result])
+                                    for result in stmt._results
+                                )
+                            )
 
     def typecheck(self) -> None:
         for stmt in self.stmts:

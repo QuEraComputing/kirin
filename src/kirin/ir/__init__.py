@@ -26,6 +26,7 @@ from kirin.ir.ssa import (
 )
 from kirin.ir.traits import (
     CallableStmtInterface as CallableStmtInterface,
+    CallLike as CallLike,
     ConstantLike as ConstantLike,
     HasParent as HasParent,
     HasSignature as HasSignature,

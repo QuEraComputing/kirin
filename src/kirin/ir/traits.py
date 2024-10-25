@@ -30,6 +30,11 @@ class ConstantLike(StmtTrait):
 
 
 @derive(init=True, repr=True, frozen=True)
+class CallLike(StmtTrait):
+    pass
+
+
+@derive(init=True, repr=True, frozen=True)
 class IsTerminator(StmtTrait):
     pass
 
