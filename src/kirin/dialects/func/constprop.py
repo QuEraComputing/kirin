@@ -42,6 +42,9 @@ class DialectConstProp(DialectInterpreter):
         if len(interp.state.frames) < interp.max_depth:
             result = interp.eval(mt, args).expect()
             if isinstance(result, NotPure):
+                frame = interp.state.current_frame()
+                for _result in stmt.results:
+                    frame.entries[_result] = NotPure()
                 return ReturnValue(result)
             else:
                 return ResultValue(result)

@@ -25,19 +25,29 @@ class DialectConstProp(DialectInterpreter):
     ):
         frame = interp.state.current_frame()
         cond = values[0]
-        else_successor = Successor(
-            stmt.else_successor, *frame.get_values(stmt.else_arguments)
-        )
-        then_successor = Successor(
-            stmt.then_successor, *frame.get_values(stmt.then_arguments)
-        )
-        frame = interp.state.current_frame()
         if isinstance(cond, Const):
+            else_successor = Successor(
+                stmt.else_successor, *frame.get_values(stmt.else_arguments)
+            )
+            then_successor = Successor(
+                stmt.then_successor, *frame.get_values(stmt.then_arguments)
+            )
             if cond.data:
                 frame.worklist.push(then_successor)
             else:
                 frame.worklist.push(else_successor)
         else:
-            frame.worklist.push(else_successor)
+            frame.entries[stmt.cond] = Const(True)
+            then_successor = Successor(
+                stmt.then_successor, *frame.get_values(stmt.then_arguments)
+            )
             frame.worklist.push(then_successor)
+
+            frame.entries[stmt.cond] = Const(False)
+            else_successor = Successor(
+                stmt.else_successor, *frame.get_values(stmt.else_arguments)
+            )
+            frame.worklist.push(else_successor)
+
+            frame.entries[stmt.cond] = cond
         return ResultValue()

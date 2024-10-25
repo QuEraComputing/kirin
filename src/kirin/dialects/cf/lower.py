@@ -45,8 +45,8 @@ class CfLowering(FromPythonAST):
         if frame.stream.has_next():
             frame.next_block = ir.Block()  # don't push this yet
 
-        frame_if = self.frame_if(state, frame, node)
-        frame_else = self.frame_else(state, frame, node)
+        frame_if = self.frame_if(state, frame, cond, node)
+        frame_else = self.frame_else(state, frame, cond, node)
         self.frame_after_ifelse(state, frame, frame_if, frame_else, before_block_next)
 
         # insert branches to the last block of "if body" if no terminator
@@ -54,25 +54,22 @@ class CfLowering(FromPythonAST):
             frame_if.current_block.last_stmt is None
             or not frame_if.current_block.last_stmt.has_trait(ir.IsTerminator)
         ):
-            if_args: list[ir.SSAValue] = []
-            for arg in frame.next_block.args:
-                if arg.name and (value := frame_if.get(arg.name)) is not None:
-                    if_args.append(value)
-                else:
-                    raise DialectLoweringError(
-                        f"unexpected argument without name: {arg}"
-                    )
             frame_if.current_block.stmts.append(
-                cf.Branch(arguments=tuple(if_args), successor=frame.next_block)
+                cf.Branch(
+                    arguments=self.lookup_block_args(frame_if, frame.next_block),
+                    successor=frame.next_block,
+                )
             )
 
         if frame_else:
             before_block.stmts.append(
                 cf.ConditionalBranch(
                     cond=cond,
-                    then_arguments=(),
+                    then_arguments=self.lookup_block_args(frame, frame_if.entry_block),
                     then_successor=frame_if.entry_block,
-                    else_arguments=(),
+                    else_arguments=self.lookup_block_args(
+                        frame, frame_else.entry_block
+                    ),
                     else_successor=frame_else.entry_block,
                 )
             )
@@ -81,16 +78,11 @@ class CfLowering(FromPythonAST):
                 frame_else.current_block.last_stmt is None
                 or not frame_else.current_block.last_stmt.has_trait(ir.IsTerminator)
             ) and frame.next_block is not None:
-                else_args: list[ir.SSAValue] = []
-                for arg in frame.next_block.args:
-                    if arg.name and (value := frame_else.get(arg.name)) is not None:
-                        else_args.append(value)
-                    else:
-                        raise DialectLoweringError(
-                            f"unexpected argument without name: {arg}"
-                        )
                 frame_else.current_block.stmts.append(
-                    cf.Branch(arguments=tuple(else_args), successor=frame.next_block)
+                    cf.Branch(
+                        arguments=self.lookup_block_args(frame_else, frame.next_block),
+                        successor=frame.next_block,
+                    )
                 )
         else:
             # no else body, when cond is false,
@@ -100,9 +92,9 @@ class CfLowering(FromPythonAST):
             before_block.stmts.append(
                 cf.ConditionalBranch(
                     cond=cond,
-                    then_arguments=(),
+                    then_arguments=self.lookup_block_args(frame, frame_if.entry_block),
                     then_successor=frame_if.entry_block,
-                    else_arguments=(),
+                    else_arguments=self.lookup_block_args(frame, frame.next_block),
                     else_successor=frame.next_block,
                 )
             )
@@ -111,7 +103,9 @@ class CfLowering(FromPythonAST):
         frame.next_block = before_block_next
         return Result()
 
-    def frame_if(self, state: LoweringState, frame: Frame, node: ast.If):
+    def frame_if(
+        self, state: LoweringState, frame: Frame, cond: ir.SSAValue, node: ast.If
+    ):
         frame_if = state.push_frame(
             Frame.from_stmts(
                 node.body,
@@ -120,13 +114,16 @@ class CfLowering(FromPythonAST):
                 globals=frame.globals,
             )
         )
+        frame_if.defs[cond.name] = set([cond])  # type: ignore
         frame_if.next_block = frame.next_block
         frame.current_block = frame_if.current_block
         state.exhaust(frame_if)
         state.pop_frame()
         return frame_if
 
-    def frame_else(self, state: LoweringState, frame: Frame, node: ast.If):
+    def frame_else(
+        self, state: LoweringState, frame: Frame, cond: ir.SSAValue, node: ast.If
+    ):
         if not node.orelse:
             return
 
@@ -138,6 +135,7 @@ class CfLowering(FromPythonAST):
                 globals=frame.globals,
             )
         )
+        frame_else.defs[cond.name] = set([cond])  # type: ignore
         frame_else.next_block = frame.next_block
         frame.current_block = frame_else.current_block
         state.exhaust(frame_else)
@@ -186,3 +184,13 @@ class CfLowering(FromPythonAST):
         state.exhaust(frame_after)
         state.pop_frame()
         return frame_after
+
+    @staticmethod
+    def lookup_block_args(frame: Frame, block: ir.Block):
+        args: list[ir.SSAValue] = []
+        for arg in block.args:
+            if arg.name and (value := frame.get(arg.name)) is not None:
+                args.append(value)
+            else:
+                raise DialectLoweringError(f"unexpected argument without name: {arg}")
+        return tuple(args)

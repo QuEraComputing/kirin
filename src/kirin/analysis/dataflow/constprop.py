@@ -203,6 +203,11 @@ class ConstProp(ForwardDataFlowAnalysis[ConstPropLattice]):
         elif stmt.__class__ in self.registry:
             return self.registry[stmt.__class__](self, stmt, args)
         elif not stmt.has_trait(ir.Pure):  # not specified and not pure
+            # NOTE: this will return so result value is not assigned
+            # assign manually here.
+            frame = self.state.current_frame()
+            for result in stmt.results:
+                frame.entries[result] = NotPure()
             return interp_value.ReturnValue(NotPure())
         else:
             # fallback to NotConst for other pure statements
