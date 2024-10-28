@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from kirin.analysis.dataflow.forward import ForwardDataFlowAnalysis
+from kirin.analysis.dataflow.forward import ForwardExtra
 from kirin.dialects.py import stmts
 from kirin.interp import DialectInterpreter, ResultValue, impl
 from kirin.interp.base import InterpResult
@@ -14,7 +14,7 @@ from kirin.worklist import WorkList
 
 
 @dataclass(init=False)
-class DummyInterpreter(ForwardDataFlowAnalysis[EmptyLattice, None]):
+class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
     keys = ["test_interp", "main", "empty"]
 
     @classmethod

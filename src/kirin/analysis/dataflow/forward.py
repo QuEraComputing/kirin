@@ -1,6 +1,8 @@
 from dataclasses import field
 from typing import Generic, Iterable, TypeVar
 
+from typing_extensions import deprecated
+
 from kirin.interp import AbstractFrame, AbstractInterpreter
 from kirin.ir import Dialect, SSAValue
 from kirin.ir.group import DialectGroup
@@ -11,16 +13,12 @@ ExtraType = TypeVar("ExtraType")
 LatticeElemType = TypeVar("LatticeElemType", bound=Lattice)
 
 
-class DataFlowAnalysisFrame(
-    AbstractFrame[LatticeElemType], Generic[LatticeElemType, ExtraType]
-):
+class ForwardFrame(AbstractFrame[LatticeElemType], Generic[LatticeElemType, ExtraType]):
     extra: ExtraType | None = None
 
 
-class ForwardDataFlowAnalysis(
-    AbstractInterpreter[
-        DataFlowAnalysisFrame[LatticeElemType, ExtraType], LatticeElemType
-    ],
+class ForwardExtra(
+    AbstractInterpreter[ForwardFrame[LatticeElemType, ExtraType], LatticeElemType],
     Generic[LatticeElemType, ExtraType],
 ):
     """Abstract interpreter but record results for each SSA value."""
@@ -56,11 +54,18 @@ class ForwardDataFlowAnalysis(
                 frame.entries[ssa_value] = result
 
     def postprocess_frame(
-        self, frame: DataFlowAnalysisFrame[LatticeElemType, ExtraType]
+        self, frame: ForwardFrame[LatticeElemType, ExtraType]
     ) -> None:
         self.results = frame.entries
 
-    def new_method_frame(
-        self, mt: Method
-    ) -> DataFlowAnalysisFrame[LatticeElemType, ExtraType]:
-        return DataFlowAnalysisFrame.from_method(mt)
+    def new_method_frame(self, mt: Method) -> ForwardFrame[LatticeElemType, ExtraType]:
+        return ForwardFrame.from_method(mt)
+
+
+@deprecated("use Forward instead")
+class ForwardDataFlowAnalysis(ForwardExtra[LatticeElemType, None]):
+    pass
+
+
+class Forward(ForwardExtra[LatticeElemType, None]):
+    pass

@@ -1,5 +1,5 @@
 from kirin import ir
-from kirin.analysis.dataflow.forward import ForwardDataFlowAnalysis
+from kirin.analysis.dataflow.forward import Forward
 from kirin.dialects.py import types
 from kirin.interp.base import InterpResult
 from kirin.ir import BottomType, TypeAttribute
@@ -8,7 +8,7 @@ from kirin.ir.nodes.region import Region
 from kirin.ir.nodes.stmt import Statement
 
 
-class TypeInference(ForwardDataFlowAnalysis[TypeAttribute, None]):
+class TypeInference(Forward[TypeAttribute]):
     keys = ["typeinfer", "typeinfer.default"]
 
     @classmethod

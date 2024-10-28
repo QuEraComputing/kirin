@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from kirin import ir
-from kirin.analysis.dataflow.forward import ForwardDataFlowAnalysis
+from kirin.analysis.dataflow.forward import ForwardExtra
 from kirin.exceptions import InterpreterError
 from kirin.interp import Interpreter, value as interp_value
 from kirin.interp.base import InterpResult
@@ -146,7 +146,7 @@ class ConstPropFrameInfo:
     not_pure: bool = False
 
 
-class ConstProp(ForwardDataFlowAnalysis[ConstPropLattice, ConstPropFrameInfo]):
+class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
     keys = ["constprop", "empty"]
     interp: Interpreter
 
