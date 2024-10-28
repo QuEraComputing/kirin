@@ -4,6 +4,7 @@ from kirin.decl import info, statement
 from kirin.dialects.func.attrs import MethodType, Signature
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.py import data
+from kirin.exceptions import VerificationError
 from kirin.ir import (
     CallableStmtInterface,
     CallLike,
@@ -16,6 +17,7 @@ from kirin.ir import (
     Pure,
     Region,
     ResultValue,
+    SSACFGRegion,
     Statement,
     SymbolOpInterface,
 )
@@ -53,6 +55,7 @@ class Function(Statement):
             SymbolOpInterface(),
             HasSignature(),
             FuncOpCallableInterface(),
+            SSACFGRegion(),
         }
     )
     sym_name: str = info.attribute(property=True)
@@ -167,12 +170,16 @@ class Return(Statement):
 @statement(dialect=dialect)
 class Lambda(Statement):
     name = "lambda"
-    traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface()})
+    traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface(), SSACFGRegion()})
     sym_name: str = info.attribute(property=True)
     signature: Signature = info.attribute()
     captured: tuple[SSAValue, ...] = info.argument()
     body: Region = info.region(multi=True)
     result: ResultValue = info.result(MethodType)
+
+    def verify(self) -> None:
+        if self.body.blocks.isempty():
+            raise VerificationError(self, "lambda body must not be empty")
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style=printer.color.keyword):

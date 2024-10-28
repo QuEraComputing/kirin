@@ -6,7 +6,6 @@ from kirin.dialects.func import (
     emit as emit,
     interp as interp,
     lower as lower,
-    reachibility as reachibility,
     typeinfer as typeinfer,
 )
 from kirin.dialects.func.attrs import MethodType as MethodType, Signature as Signature

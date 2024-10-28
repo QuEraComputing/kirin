@@ -34,6 +34,8 @@ from kirin.ir.traits import (
     IsTerminator as IsTerminator,
     NoTerminator as NoTerminator,
     Pure as Pure,
+    RegionTrait as RegionTrait,
+    SSACFGRegion as SSACFGRegion,
     StmtTrait as StmtTrait,
     SymbolOpInterface as SymbolOpInterface,
     SymbolTable as SymbolTable,

@@ -1,5 +1,4 @@
 from kirin.analysis.dataflow.constprop import ConstProp, ConstPropBottom
-from kirin.analysis.dataflow.reachable import ReachableAnalysis
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
 from kirin.rules.dce import DeadCodeElimination
@@ -23,9 +22,7 @@ def test_dce():
     Fixpoint(Walk(fold)).rewrite(foldable.code)
 
     foldable.code.print()
-    analysis = ReachableAnalysis(foldable.dialects)
-    analysis.run_analysis(foldable)
-    dce = DeadCodeElimination(analysis.visited)
+    dce = DeadCodeElimination()
     Fixpoint(Walk(dce)).rewrite(foldable.code)
     foldable.code.print()
 

@@ -154,11 +154,11 @@ class BlockStmts(View["Block", "Statement"]):
             value.attach(self.node)
             self.node._first_stmt = value
             self.node._last_stmt = value
+            self.node._stmt_len += 1
         elif self.node._last_stmt:
             value.insert_after(self.node._last_stmt)
         else:
             raise ValueError("Invalid block, last_stmt is None")
-        self.node._stmt_len += 1
 
 
 @derive(id_hash=True)

@@ -31,3 +31,11 @@ def test_stmt():
 
     with pytest.raises(ValueError):
         a.insert_before(x)
+
+
+def test_block_append():
+    block = Block()
+    block.stmts.append(stmts.Constant(1))
+    block.stmts.append(stmts.Constant(1))
+    block.print()
+    assert len(block.stmts) == 2

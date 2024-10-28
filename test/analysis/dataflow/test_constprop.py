@@ -218,11 +218,26 @@ def test_intraprocedure_side_effect():
         DummyStatement()
 
     @basic_no_opt.add(dummy_dialect)
+    def side_effect_maybe_return_none(cond: bool):
+        if cond:
+            return
+        else:
+            DummyStatement()
+            return
+
+    @basic_no_opt.add(dummy_dialect)
     def side_effect_intraprocedure(cond: bool):
         if cond:
             return side_effect_return_none()
         else:
             return
+
+    @basic_no_opt.add(dummy_dialect)
+    def side_effect_true_branch_const(cond: bool):
+        if cond:
+            return side_effect_maybe_return_none(cond)
+        else:
+            return cond
 
     constprop = ConstProp(basic_no_opt.add(dummy_dialect))
     result = constprop.eval(
@@ -230,3 +245,11 @@ def test_intraprocedure_side_effect():
         tuple(NotConst() for _ in side_effect_intraprocedure.args),
     ).expect()
     assert isinstance(result, NotPure)
+
+    result = constprop.eval(
+        side_effect_true_branch_const,
+        tuple(NotConst() for _ in side_effect_true_branch_const.args),
+    ).expect()
+    assert isinstance(result, NotConst)  # instead of NotPure
+    true_branch = side_effect_true_branch_const.callable_region.blocks[1]
+    assert constprop.results[true_branch.stmts.at(1).results[0]] == Const(None)

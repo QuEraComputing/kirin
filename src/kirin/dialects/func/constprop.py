@@ -52,7 +52,9 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Lambda)
     def lambda_(self, interp: ConstProp, stmt: Lambda, values: tuple):
-        if all(isinstance(each, Const) for each in values):
+        if not stmt.body.blocks.isempty() and all(
+            isinstance(each, Const) for each in values
+        ):
             return ResultValue(
                 Const(
                     ir.Method(

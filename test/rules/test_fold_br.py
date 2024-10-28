@@ -1,7 +1,8 @@
+from kirin.analysis.cfg import CFG
 from kirin.analysis.dataflow.constprop import ConstProp, ConstPropBottom
-from kirin.analysis.dataflow.reachable import ReachableAnalysis
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
+from kirin.rules.cfg_compatify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.fold import ConstantFold
 
@@ -27,10 +28,10 @@ def test_branch_elim():
     branch.code.print()
     Fixpoint(Walk(fold)).rewrite(branch.code)
     branch.code.print()
-    interp = ReachableAnalysis(branch.dialects)
-    interp.run_analysis(branch)
+    cfg = CFG(branch.callable_region)
     # TODO: also check the generated CFG
     # interp.worklist.visited
-    Walk(DeadCodeElimination(interp.visited)).rewrite(branch.code)
+    Fixpoint(CFGCompactify(cfg)).rewrite(branch.code)
+    Walk(DeadCodeElimination()).rewrite(branch.code)
     branch.code.print()
     assert len(branch.code.body.blocks) == 4  # type: ignore

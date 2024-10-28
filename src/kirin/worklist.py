@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generic, List, TypeVar
+from typing import Generic, Iterable, TypeVar
 
 ElemType = TypeVar("ElemType")
 
@@ -14,7 +14,7 @@ class WorkList(Generic[ElemType]):
     """
 
     # this is from XDSL
-    _stack: List[ElemType | None] = field(default_factory=list, init=False)
+    _stack: list[ElemType | None] = field(default_factory=list, init=False)
     _map: dict[ElemType, int] = field(default_factory=dict, init=False)
     # allow O(1) removal from the stack via storage of the index
 
@@ -34,6 +34,10 @@ class WorkList(Generic[ElemType]):
         if item not in self._map:
             self._map[item] = len(self._stack)
             self._stack.append(item)
+
+    def append(self, items: Iterable[ElemType]) -> None:
+        for item in items:
+            self.push(item)
 
     def pop(self) -> ElemType | None:
         while self._stack:

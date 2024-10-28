@@ -49,15 +49,18 @@ class Method(Printable, Generic[Param, RetType]):
 
     @property
     def args(self):
-        trait = self.code.get_trait(CallableStmtInterface)
-        if trait is None:
-            raise ValueError("Method body must implement CallableStmtInterface")
-        body = trait.get_callable_region(self.code)
-        return tuple(arg for arg in body.blocks[0].args[1:])
+        return tuple(arg for arg in self.callable_region.blocks[0].args[1:])
 
     @property
     def arg_types(self):
         return tuple(arg.type for arg in self.args)
+
+    @property
+    def callable_region(self):
+        trait = self.code.get_trait(CallableStmtInterface)
+        if trait is None:
+            raise ValueError("Method body must implement CallableStmtInterface")
+        return trait.get_callable_region(self.code)
 
     def __repr__(self) -> str:
         return f'Method("{self.sym_name}")'

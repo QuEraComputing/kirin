@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from kirin.exceptions import VerificationError
@@ -9,7 +9,8 @@ from kirin.ir.derive import derive
 if TYPE_CHECKING:
     from kirin.dialects.func.attrs import Signature
     from kirin.dialects.py.data import PyAttr
-    from kirin.ir import Region, Statement
+    from kirin.graph import Graph
+    from kirin.ir import Block, Region, Statement
 
 
 @derive(init=True, repr=True, frozen=True)
@@ -32,6 +33,25 @@ class ConstantLike(StmtTrait):
 @derive(init=True, repr=True, frozen=True)
 class CallLike(StmtTrait):
     pass
+
+
+GraphType = TypeVar("GraphType", bound="Graph[Block]")
+
+
+@derive(init=True, repr=True, frozen=True)
+class RegionTrait(StmtTrait, Generic[GraphType]):
+
+    @abstractmethod
+    def get_graph(self, region: Region) -> GraphType: ...
+
+
+@derive(init=True, repr=True, frozen=True)
+class SSACFGRegion(RegionTrait):
+
+    def get_graph(self, region: Region):
+        from kirin.analysis.cfg import CFG
+
+        return CFG(region)
 
 
 @derive(init=True, repr=True, frozen=True)
@@ -81,9 +101,10 @@ StmtType = TypeVar("StmtType", bound="Statement")
 class CallableStmtInterface(StmtTrait, Generic[StmtType]):
 
     @classmethod
-    def get_callable_region(cls, stmt: "StmtType") -> Region:  # type: ignore
+    @abstractmethod
+    def get_callable_region(cls, stmt: "StmtType") -> Region:
         """Returns the body of the callable region"""
-        raise NotImplementedError
+        ...
 
 
 @derive(init=True, repr=True, frozen=True)
