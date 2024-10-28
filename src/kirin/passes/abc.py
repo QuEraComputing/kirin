@@ -10,5 +10,9 @@ class Pass(ABC):
     name: ClassVar[str]
     dialects: DialectGroup
 
+    def __call__(self, mt: Method) -> None:
+        self.unsafe_run(mt)
+        mt.code.verify()
+
     @abstractmethod
-    def __call__(self, mt: Method) -> None: ...
+    def unsafe_run(self, mt: Method) -> None: ...

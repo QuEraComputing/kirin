@@ -13,7 +13,7 @@ from kirin.rules.getitem import InlineGetItem
 @dataclass
 class Fold(Pass):
 
-    def __call__(self, mt: Method) -> None:
+    def unsafe_run(self, mt: Method) -> None:
         constprop = ConstProp(self.dialects)
         constprop.eval(mt, tuple(NotConst() for _ in mt.args))
         Fixpoint(

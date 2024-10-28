@@ -13,7 +13,7 @@ class TypeInfer(Pass):
     def __post_init__(self):
         self.infer = TypeInference(self.dialects)
 
-    def __call__(self, mt: Method) -> None:
+    def unsafe_run(self, mt: Method) -> None:
         return_type = self.infer.eval(mt, mt.arg_types).expect()
         mt.return_type = return_type
         mt.inferred = True
