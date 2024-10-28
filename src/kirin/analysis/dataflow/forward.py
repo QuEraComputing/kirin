@@ -1,5 +1,5 @@
 from dataclasses import field
-from typing import Iterable, TypeVar
+from typing import Generic, Iterable, TypeVar
 
 from kirin.interp import AbstractFrame, AbstractInterpreter
 from kirin.ir import Dialect, SSAValue
@@ -7,11 +7,21 @@ from kirin.ir.group import DialectGroup
 from kirin.ir.method import Method
 from kirin.lattice import Lattice
 
+ExtraType = TypeVar("ExtraType")
 LatticeElemType = TypeVar("LatticeElemType", bound=Lattice)
 
 
+class DataFlowAnalysisFrame(
+    AbstractFrame[LatticeElemType], Generic[LatticeElemType, ExtraType]
+):
+    extra: ExtraType | None = None
+
+
 class ForwardDataFlowAnalysis(
-    AbstractInterpreter[AbstractFrame[LatticeElemType], LatticeElemType]
+    AbstractInterpreter[
+        DataFlowAnalysisFrame[LatticeElemType, ExtraType], LatticeElemType
+    ],
+    Generic[LatticeElemType, ExtraType],
 ):
     """Abstract interpreter but record results for each SSA value."""
 
@@ -45,8 +55,12 @@ class ForwardDataFlowAnalysis(
             else:
                 frame.entries[ssa_value] = result
 
-    def postprocess_frame(self, frame: AbstractFrame[LatticeElemType]) -> None:
+    def postprocess_frame(
+        self, frame: DataFlowAnalysisFrame[LatticeElemType, ExtraType]
+    ) -> None:
         self.results = frame.entries
 
-    def new_method_frame(self, mt: Method) -> AbstractFrame[LatticeElemType]:
-        return AbstractFrame.from_method(mt)
+    def new_method_frame(
+        self, mt: Method
+    ) -> DataFlowAnalysisFrame[LatticeElemType, ExtraType]:
+        return DataFlowAnalysisFrame.from_method(mt)

@@ -16,6 +16,11 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Return)
     def return_(self, interp: ConstProp, stmt: Return, values: tuple) -> ReturnValue:
+        frame = interp.state.current_frame()
+        # we executed a non-pure statement, cannot return const
+        if frame.extra is not None and frame.extra.not_pure:
+            return ReturnValue(NotPure())
+
         if not values:
             return ReturnValue(Const(None))
         else:

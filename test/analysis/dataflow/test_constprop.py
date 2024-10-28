@@ -230,7 +230,8 @@ def test_intraprocedure_side_effect():
         if cond:
             return side_effect_return_none()
         else:
-            return
+            x = (1, 2, 3)
+            return x
 
     @basic_no_opt.add(dummy_dialect)
     def side_effect_true_branch_const(cond: bool):
@@ -244,7 +245,11 @@ def test_intraprocedure_side_effect():
         side_effect_intraprocedure,
         tuple(NotConst() for _ in side_effect_intraprocedure.args),
     ).expect()
+    new_tuple = (
+        side_effect_intraprocedure.callable_region.blocks[2].stmts.at(3).results[0]
+    )
     assert isinstance(result, NotPure)
+    assert constprop.results[new_tuple] == Const((1, 2, 3))
 
     result = constprop.eval(
         side_effect_true_branch_const,

@@ -8,7 +8,7 @@ from kirin.ir.nodes.region import Region
 from kirin.ir.nodes.stmt import Statement
 
 
-class TypeInference(ForwardDataFlowAnalysis[TypeAttribute]):
+class TypeInference(ForwardDataFlowAnalysis[TypeAttribute, None]):
     keys = ["typeinfer", "typeinfer.default"]
 
     @classmethod
