@@ -12,7 +12,6 @@ from kirin.dialects.func.attrs import MethodType as MethodType, Signature as Sig
 from kirin.dialects.func.dialect import dialect as dialect
 from kirin.dialects.func.stmts import (
     Call as Call,
-    ConstantMethod as ConstantMethod,
     Function as Function,
     GetField as GetField,
     Invoke as Invoke,

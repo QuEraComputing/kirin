@@ -174,6 +174,12 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         """Permute the arguments according to the method signature and
         the given keyword arguments, where the keyword argument names
         refer to the last n arguments in the values tuple.
+
+        Args
+
+        mt: the method
+        values: the values tuple (should not contain method itself)
+        kwarg_names: the keyword argument names
         """
         n_total = len(values)
         if kwarg_names:
@@ -181,7 +187,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         else:
             kwargs = None
 
-        positionals = values[1 : n_total - len(kwarg_names)]
+        positionals = values[: n_total - len(kwarg_names)]
         args = BaseInterpreter.get_args(
             mt.arg_names[len(positionals) + 1 :], positionals, kwargs
         )

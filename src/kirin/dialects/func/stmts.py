@@ -1,13 +1,11 @@
-from typing import Sequence
+from typing import Union
 
 from kirin.decl import info, statement
 from kirin.dialects.func.attrs import MethodType, Signature
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.py import data
 from kirin.exceptions import VerificationError
 from kirin.ir import (
     CallableStmtInterface,
-    ConstantLike,
     HasParent,
     HasSignature,
     IsolatedFromAbove,
@@ -20,9 +18,46 @@ from kirin.ir import (
     Statement,
     SymbolOpInterface,
 )
-from kirin.ir.attrs import TypeAttribute
 from kirin.ir.ssa import SSAValue
 from kirin.print.printer import Printer
+
+
+def _print_invoke_or_call(
+    invoke_or_call: Union["Invoke", "Call"], printer: Printer
+) -> None:
+    with printer.rich(style="red"):
+        printer.print_name(invoke_or_call)
+    printer.plain_print(" ")
+
+    n_total = len(invoke_or_call.args)
+    callee = invoke_or_call.callee
+    if isinstance(callee, SSAValue):
+        printer.plain_print(printer.state.ssa_id[callee])
+    else:
+        printer.plain_print(callee.sym_name)
+
+    inputs = invoke_or_call.inputs
+    positional = inputs[: n_total - len(invoke_or_call.kwargs)]
+    kwargs = dict(
+        zip(
+            invoke_or_call.kwargs,
+            inputs[n_total - len(invoke_or_call.kwargs) :],
+        )
+    )
+
+    printer.plain_print("(")
+    printer.print_seq(positional)
+    if kwargs:
+        printer.plain_print(", ")
+    printer.print_mapping(kwargs, delim=", ")
+    printer.plain_print(")")
+
+    with printer.rich(style="black"):
+        printer.plain_print(" : ")
+        printer.print_seq(
+            [result.type for result in invoke_or_call._results],
+            delim=", ",
+        )
 
 
 class FuncOpCallableInterface(CallableStmtInterface["Function"]):
@@ -30,19 +65,6 @@ class FuncOpCallableInterface(CallableStmtInterface["Function"]):
     @classmethod
     def get_callable_region(cls, stmt: "Function") -> Region:
         return stmt.body
-
-
-@statement(dialect=dialect)
-class ConstantMethod(Statement):
-    name = "constant"
-    traits = frozenset({Pure(), ConstantLike()})
-    value: Method = info.attribute(property=True)
-    result: ResultValue = info.result(MethodType)
-
-    def print_impl(self, printer: Printer) -> None:
-        printer.print_name(self)
-        printer.plain_print(" ")
-        printer.plain_print(repr(self.value))
 
 
 @statement(dialect=dialect)
@@ -82,56 +104,17 @@ class Function(Statement):
             printer.plain_print(f" // func.func {self.sym_name}")
 
 
-@statement(dialect=dialect, init=False)
+@statement(dialect=dialect)
 class Call(Statement):
     name = "call"
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     inputs: tuple[SSAValue, ...] = info.argument()
-    kwargs: data.PyAttr[tuple[str, ...]] = info.attribute(property=True)
+    kwargs: tuple[str, ...] = info.attribute(property=True)
     result: ResultValue = info.result()
 
-    def __init__(
-        self,
-        callee: SSAValue,
-        args: Sequence[SSAValue],
-        *,
-        kwargs: Sequence[str] = (),
-        return_type: TypeAttribute,
-    ) -> None:
-        super().__init__(
-            args=[callee, *args],
-            result_types=(return_type,),
-            properties={"kwargs": data.PyAttr(tuple(kwargs))},
-            args_slice={"callee": 0, "inputs": slice(1, None)},
-        )
-
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style="red"):
-            printer.print_name(self)
-        printer.plain_print(" ")
-
-        n_total = len(self.args)
-        callee = self.callee
-        printer.plain_print(printer.state.ssa_id[callee])
-
-        inputs = self.inputs
-        positional = inputs[: n_total - len(self.kwargs.data)]
-        kwargs = dict(zip(self.kwargs.data, inputs[n_total - len(self.kwargs.data) :]))
-
-        printer.plain_print("(")
-        printer.print_seq(positional)
-        if kwargs:
-            printer.plain_print(", ")
-        printer.print_mapping(kwargs, delim=", ")
-        printer.plain_print(")")
-
-        with printer.rich(style="black"):
-            printer.plain_print(" : ")
-            printer.print_seq(
-                [result.type for result in self._results],
-                delim=", ",
-            )
+        _print_invoke_or_call(self, printer)
 
 
 @statement(dialect=dialect, init=False)
@@ -224,15 +207,22 @@ class Invoke(Statement):
     name = "invoke"
     callee: Method = info.attribute(property=True)
     inputs: tuple[SSAValue, ...] = info.argument()
+    kwargs: tuple[str, ...] = info.attribute(property=True)
     result: ResultValue = info.result()
 
     def print_impl(self, printer: Printer) -> None:
-        printer.print_name(self)
-        printer.plain_print(" ")
-        printer.plain_print(self.callee.sym_name)
-        printer.plain_print("(")
-        printer.print_seq(self.inputs)
-        printer.plain_print(")")
-        with printer.rich(style="black"):
-            printer.plain_print(" : ")
-            printer.print(self.result.type)
+        _print_invoke_or_call(self, printer)
+
+    def verify(self) -> None:
+        if self.kwargs:
+            for name in self.kwargs:
+                if name not in self.callee.arg_names:
+                    raise VerificationError(
+                        self,
+                        f"method {self.callee.sym_name} does not have argument {name}",
+                    )
+        elif len(self.callee.arg_names) - 1 != len(self.args):
+            raise VerificationError(
+                self,
+                f"expected {len(self.callee.arg_names)} arguments, got {len(self.args)}",
+            )

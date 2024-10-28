@@ -150,16 +150,16 @@ def test_constprop():
     assert infer.eval(main, tuple(NotConst() for _ in main.args)).expect() == Const(
         (3, 4)
     )
-    assert len(infer.results) == 4
+    assert len(infer.results) == 3
 
     assert infer.eval(
         goo, tuple(NotConst() for _ in goo.args)
     ).expect() == PartialTuple((Const(3), NotConst()))
-    assert len(infer.results) == 8
+    assert len(infer.results) == 6
     block: ir.Block = goo.code.body.blocks[0]  # type: ignore
-    assert infer.results[block.stmts.at(2).results[0]] == Const(3)
-    assert infer.results[block.stmts.at(4).results[0]] == NotConst()
-    assert infer.results[block.stmts.at(5).results[0]] == PartialTuple(
+    assert infer.results[block.stmts.at(1).results[0]] == Const(3)
+    assert infer.results[block.stmts.at(2).results[0]] == NotConst()
+    assert infer.results[block.stmts.at(3).results[0]] == PartialTuple(
         (Const(3), NotConst())
     )
 
@@ -206,24 +206,19 @@ def test_issue_40():
     assert result.data == _for_loop_test_constp(cntr=0, x=(), n_range=5)
 
 
-def test_intraprocedure_side_effect():
-    dummy_dialect = ir.Dialect("dummy")
+dummy_dialect = ir.Dialect("dummy")
 
-    @statement(dialect=dummy_dialect)
-    class DummyStatement(ir.Statement):
-        name = "dummy"
+
+@statement(dialect=dummy_dialect)
+class DummyStatement(ir.Statement):
+    name = "dummy"
+
+
+def test_intraprocedure_side_effect():
 
     @basic_no_opt.add(dummy_dialect)
     def side_effect_return_none():
         DummyStatement()
-
-    @basic_no_opt.add(dummy_dialect)
-    def side_effect_maybe_return_none(cond: bool):
-        if cond:
-            return
-        else:
-            DummyStatement()
-            return
 
     @basic_no_opt.add(dummy_dialect)
     def side_effect_intraprocedure(cond: bool):
@@ -232,13 +227,6 @@ def test_intraprocedure_side_effect():
         else:
             x = (1, 2, 3)
             return x
-
-    @basic_no_opt.add(dummy_dialect)
-    def side_effect_true_branch_const(cond: bool):
-        if cond:
-            return side_effect_maybe_return_none(cond)
-        else:
-            return cond
 
     constprop = ConstProp(basic_no_opt.add(dummy_dialect))
     result = constprop.eval(
@@ -251,10 +239,28 @@ def test_intraprocedure_side_effect():
     assert isinstance(result, NotPure)
     assert constprop.results[new_tuple] == Const((1, 2, 3))
 
+
+def test_interprocedure_true_branch():
+    @basic_no_opt.add(dummy_dialect)
+    def side_effect_maybe_return_none(cond: bool):
+        if cond:
+            return
+        else:
+            DummyStatement()
+            return
+
+    @basic_no_opt.add(dummy_dialect)
+    def side_effect_true_branch_const(cond: bool):
+        if cond:
+            return side_effect_maybe_return_none(cond)
+        else:
+            return cond
+
+    constprop = ConstProp(basic_no_opt.add(dummy_dialect))
     result = constprop.eval(
         side_effect_true_branch_const,
         tuple(NotConst() for _ in side_effect_true_branch_const.args),
     ).expect()
     assert isinstance(result, NotConst)  # instead of NotPure
     true_branch = side_effect_true_branch_const.callable_region.blocks[1]
-    assert constprop.results[true_branch.stmts.at(1).results[0]] == Const(None)
+    assert constprop.results[true_branch.stmts.at(0).results[0]] == Const(None)

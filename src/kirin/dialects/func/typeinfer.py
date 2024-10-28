@@ -3,14 +3,7 @@ from typing import Iterable
 from kirin import ir
 from kirin.analysis.dataflow.typeinfer import TypeInference
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.func.stmts import (
-    Call,
-    ConstantMethod,
-    GetField,
-    Invoke,
-    Lambda,
-    Return,
-)
+from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
 from kirin.dialects.py import types
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 
@@ -18,12 +11,6 @@ from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 # NOTE: a lot of the type infer rules are same as the builtin dialect
 @dialect.register(key="typeinfer")
 class TypeInfer(DialectInterpreter):
-
-    @impl(ConstantMethod)
-    def constant(
-        self, interp: TypeInference, stmt: ConstantMethod, values: tuple
-    ) -> ResultValue:
-        return ResultValue(types.PyConst(stmt.value))
 
     @impl(Return)
     def return_(
@@ -45,12 +32,17 @@ class TypeInfer(DialectInterpreter):
             interp,
             mt,
             stmt.args[1:],
-            interp.permute_values(mt, values, stmt.kwargs.data),
+            interp.permute_values(mt, values[1:], stmt.kwargs),
         )
 
     @impl(Invoke)
     def invoke(self, interp: TypeInference, stmt: Invoke, values: tuple):
-        return self._invoke_method(interp, stmt.callee, stmt.args, values)
+        return self._invoke_method(
+            interp,
+            stmt.callee,
+            stmt.args[1:],
+            interp.permute_values(stmt.callee, values, stmt.kwargs),
+        )
 
     def _invoke_method(
         self,

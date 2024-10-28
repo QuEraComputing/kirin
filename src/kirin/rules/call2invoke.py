@@ -22,7 +22,7 @@ class Call2Invoke(RewriteRule):
         if not isinstance(mt, Const):
             return RewriteResult()
 
-        stmt = Invoke(inputs=node.inputs, callee=mt.data)
+        stmt = Invoke(inputs=node.inputs, callee=mt.data, kwargs=node.kwargs)
         stmt.result.name = node.result.name
         stmt.result.type = node.result.type
         node.replace_by(stmt)

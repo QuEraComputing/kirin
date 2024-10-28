@@ -3,14 +3,7 @@ import ast
 from kirin import ir
 from kirin.dialects.func.attrs import Signature
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.func.stmts import (
-    Call,
-    ConstantMethod,
-    Function,
-    GetField,
-    Lambda,
-    Return,
-)
+from kirin.dialects.func.stmts import Call, Function, GetField, Invoke, Lambda, Return
 from kirin.dialects.py import types
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
@@ -22,7 +15,9 @@ class FuncLowering(FromPythonAST):
     def lower_Call_local(
         self, state: LoweringState, callee: ir.SSAValue, node: ast.Call
     ) -> Result:
-        return self.__lower_Call_with_callee_return_type(state, callee, types.Any, node)
+        args, keywords = self.__lower_Call_args_kwargs(state, node)
+        stmt = Call(callee, args, kwargs=keywords)
+        return Result(state.append_stmt(stmt))
 
     def lower_Call_global_method(
         self,
@@ -30,22 +25,17 @@ class FuncLowering(FromPythonAST):
         method: ir.Method,
         node: ast.Call,
     ) -> Result:
-        return_type = method.return_type or types.Any
-        return self.__lower_Call_with_callee_return_type(
-            state,
-            state.append_stmt(ConstantMethod(value=method)).result,
-            return_type,
-            node,
-        )
+        args, keywords = self.__lower_Call_args_kwargs(state, node)
+        stmt = Invoke(args, callee=method, kwargs=keywords)
+        stmt.result.type = method.return_type or types.Any
+        return Result(state.append_stmt(stmt))
 
-    def __lower_Call_with_callee_return_type(
+    def __lower_Call_args_kwargs(
         self,
         state: LoweringState,
-        callee: ir.SSAValue,
-        return_type: ir.TypeAttribute,
         node: ast.Call,
-    ) -> Result:
-        args = []
+    ):
+        args: list[ir.SSAValue] = []
         for arg in node.args:
             if isinstance(arg, ast.Starred):  # TODO: support *args
                 raise DialectLoweringError("starred arguments are not supported")
@@ -57,11 +47,7 @@ class FuncLowering(FromPythonAST):
             keywords.append(kw.arg)
             args.append(state.visit(kw.value).expect_one())
 
-        return Result(
-            state.append_stmt(
-                Call(callee, args, kwargs=tuple(keywords), return_type=return_type)
-            )
-        )
+        return tuple(args), tuple(keywords)
 
     def lower_Return(self, state: LoweringState, node: ast.Return) -> Result:
         if node.value is None:
