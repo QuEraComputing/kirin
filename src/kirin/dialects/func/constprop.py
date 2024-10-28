@@ -9,7 +9,7 @@ from kirin.analysis.dataflow.constprop import (
     NotPure,
 )
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
+from kirin.dialects.func.stmts import Call, GetField, Lambda, Return
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 
 
@@ -42,11 +42,12 @@ class DialectConstProp(DialectInterpreter):
             stmt.results,
         )
 
-    @impl(Invoke)
-    def invoke(
-        self, interp: ConstProp, stmt: Invoke, values: tuple[ConstPropLattice, ...]
-    ):
-        return self._invoke_method(interp, stmt.callee, values, stmt.results)
+    # NOTE: Invoke appears after constprop
+    # @impl(Invoke)
+    # def invoke(
+    #     self, interp: ConstProp, stmt: Invoke, values: tuple[ConstPropLattice, ...]
+    # ):
+    #     return self._invoke_method(interp, stmt.callee, values, stmt.results)
 
     def _invoke_method(
         self,
