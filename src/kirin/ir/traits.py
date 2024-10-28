@@ -30,11 +30,6 @@ class ConstantLike(StmtTrait):
     pass
 
 
-@derive(init=True, repr=True, frozen=True)
-class CallLike(StmtTrait):
-    pass
-
-
 GraphType = TypeVar("GraphType", bound="Graph[Block]")
 
 

@@ -32,8 +32,8 @@ class SSAValue(ABC, Printable):
         return self._name
 
     @name.setter
-    def name(self, name: str) -> None:
-        if not self.name_pattern.fullmatch(name):
+    def name(self, name: str | None) -> None:
+        if name and not self.name_pattern.fullmatch(name):
             raise ValueError(f"Invalid name: {name}")
         self._name = name
 

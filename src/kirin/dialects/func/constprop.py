@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from kirin import ir
 from kirin.analysis.dataflow.constprop import (
     Const,
@@ -7,7 +9,7 @@ from kirin.analysis.dataflow.constprop import (
     NotPure,
 )
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.func.stmts import Call, GetField, Lambda, Return
+from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 
 
@@ -28,27 +30,36 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Call)
     def call(self, interp: ConstProp, stmt: Call, values: tuple[ConstPropLattice, ...]):
-        # NOTE: support kwargs after Call stmt stores the key names
-        n_total = len(values)
-        if stmt.kwargs.data:
-            kwargs = dict(
-                zip(stmt.kwargs.data, values[n_total - len(stmt.kwargs.data) :])
-            )
-        else:
-            kwargs = None
-
         # give up on dynamic method calls
         if not isinstance(values[0], Const):
             return ResultValue(NotConst())
 
         mt: ir.Method = values[0].data
-        args = values[1 : n_total - len(stmt.kwargs.data)]
-        args = interp.get_args(mt.arg_names[len(args) + 1 :], args, kwargs)
+        return self._invoke_method(
+            interp,
+            mt,
+            interp.permute_values(mt, values, stmt.kwargs.data),
+            stmt.results,
+        )
+
+    @impl(Invoke)
+    def invoke(
+        self, interp: ConstProp, stmt: Invoke, values: tuple[ConstPropLattice, ...]
+    ):
+        return self._invoke_method(interp, stmt.callee, values, stmt.results)
+
+    def _invoke_method(
+        self,
+        interp: ConstProp,
+        mt: ir.Method,
+        values: tuple[ConstPropLattice, ...],
+        results: Iterable[ir.ResultValue],
+    ):
         if len(interp.state.frames) < interp.max_depth:
-            result = interp.eval(mt, args).expect()
+            result = interp.eval(mt, values).expect()
             if isinstance(result, NotPure):
                 frame = interp.state.current_frame()
-                for _result in stmt.results:
+                for _result in results:
                     frame.entries[_result] = NotPure()
                 return ReturnValue(result)
             else:

@@ -15,6 +15,7 @@ from kirin.dialects.func.stmts import (
     ConstantMethod as ConstantMethod,
     Function as Function,
     GetField as GetField,
+    Invoke as Invoke,
     Lambda as Lambda,
     Return as Return,
 )

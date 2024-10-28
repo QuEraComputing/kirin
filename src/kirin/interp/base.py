@@ -167,6 +167,23 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
                 args += (kwargs[name],)
         return args
 
+    def permute_values(
+        self, mt: Method, values: tuple[ValueType, ...], kwarg_names: tuple[str, ...]
+    ) -> tuple[ValueType, ...]:
+        """Permute the arguments according to the method signature and
+        the given keyword arguments, where the keyword argument names
+        refer to the last n arguments in the values tuple.
+        """
+        n_total = len(values)
+        if kwarg_names:
+            kwargs = dict(zip(kwarg_names, values[n_total - len(kwarg_names) :]))
+        else:
+            kwargs = None
+
+        positionals = values[1 : n_total - len(kwarg_names)]
+        args = self.get_args(mt.arg_names[len(positionals) + 1 :], positionals, kwargs)
+        return args
+
     def run_stmt(self, stmt: Statement, args: tuple) -> Result[ValueType]:
         "run a statement within the current frame"
         if self.state.frames:

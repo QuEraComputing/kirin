@@ -7,7 +7,6 @@ from kirin.dialects.py import data
 from kirin.exceptions import VerificationError
 from kirin.ir import (
     CallableStmtInterface,
-    CallLike,
     ConstantLike,
     HasParent,
     HasSignature,
@@ -86,7 +85,6 @@ class Function(Statement):
 @statement(dialect=dialect, init=False)
 class Call(Statement):
     name = "call"
-    traits = frozenset({CallLike()})
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     inputs: tuple[SSAValue, ...] = info.argument()
@@ -216,6 +214,25 @@ class GetField(Statement):
         printer.plain_print(
             "(", printer.state.ssa_id[self.obj], ", ", str(self.field), ")"
         )
+        with printer.rich(style="black"):
+            printer.plain_print(" : ")
+            printer.print(self.result.type)
+
+
+@statement(dialect=dialect)
+class Invoke(Statement):
+    name = "invoke"
+    callee: Method = info.attribute(property=True)
+    inputs: tuple[SSAValue, ...] = info.argument()
+    result: ResultValue = info.result()
+
+    def print_impl(self, printer: Printer) -> None:
+        printer.print_name(self)
+        printer.plain_print(" ")
+        printer.plain_print(self.callee.sym_name)
+        printer.plain_print("(")
+        printer.print_seq(self.inputs)
+        printer.plain_print(")")
         with printer.rich(style="black"):
             printer.plain_print(" : ")
             printer.print(self.result.type)

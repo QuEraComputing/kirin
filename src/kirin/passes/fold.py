@@ -4,6 +4,7 @@ from kirin.analysis.dataflow.constprop import ConstProp, NotConst
 from kirin.ir import Method, SSACFGRegion
 from kirin.passes.abc import Pass
 from kirin.rewrite import Chain, Fixpoint, Walk
+from kirin.rules.call2invoke import Call2Invoke
 from kirin.rules.cfg_compatify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.fold import ConstantFold
@@ -19,7 +20,11 @@ class Fold(Pass):
         Fixpoint(
             Walk(
                 Chain(
-                    [ConstantFold(constprop.results), InlineGetItem(constprop.results)]
+                    [
+                        ConstantFold(constprop.results),
+                        InlineGetItem(constprop.results),
+                        Call2Invoke(constprop.results),
+                    ]
                 )
             )
         ).rewrite(mt.code)
