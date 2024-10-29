@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from kirin.ir.dialect import Dialect
     from kirin.ir.nodes.block import Block
     from kirin.ir.nodes.region import Region
+    from kirin.ir.source import SourceInfo
     from kirin.lowering import LoweringState, Result
 
 
@@ -79,6 +80,7 @@ class Statement(IRNode["Block"]):
     _name_args_slice: dict[str, int | slice] = field(
         init=False, repr=False, default_factory=dict
     )
+    source: SourceInfo | None = field(default=None, init=False, repr=False)
 
     @property
     def parent_stmt(self) -> Statement | None:
@@ -269,12 +271,14 @@ class Statement(IRNode["Block"]):
         results: Sequence[ResultValue] = (),
         result_types: Sequence[TypeAttribute] = (),
         args_slice: Mapping[str, int | slice] = {},
+        source: SourceInfo | None = None,
     ) -> None:
         super().__init__()
 
         self._args = ()
         self._regions = []
         self._name_args_slice = dict(args_slice)
+        self.source = source
         self.args = args
 
         if results:
