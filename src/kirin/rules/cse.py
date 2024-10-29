@@ -17,8 +17,14 @@ class CommonSubexpressionElimination(RewriteRule):
             if stmt.regions:
                 continue
 
-            # the result of a statement only depends on its arguments now
-            hash_value = hash((type(stmt),) + tuple(stmt.args))
+            hash_value = hash(
+                (type(stmt),)
+                + tuple(stmt.args)
+                + tuple(stmt.attributes.values())
+                + tuple(stmt.properties.values())
+                + tuple(stmt.successors)
+                + tuple(stmt.regions)
+            )
             if hash_value in seen:
                 old_stmt = seen[hash_value]
                 for result in stmt._results:
