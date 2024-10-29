@@ -1,3 +1,4 @@
+from copy import copy
 from dataclasses import dataclass
 
 from kirin import ir
@@ -50,9 +51,15 @@ class CFGCompactify(RewriteRule):
             if node.last_stmt and isinstance(node.last_stmt, cf.Branch):
                 terminator = node.last_stmt
                 successor = list(successors)[0]
+
                 # not single edge in CFG
                 if len(self.cfg.predecessors[successor]) > 1:
                     return RewriteResult()
+
+                # search input, and replace with arguements.
+                for i, blk_args in enumerate(successor.args.field[1:]):
+                    for use in copy(blk_args.uses):
+                        use.stmt.args[use.index] = node.last_stmt.arguments[i]
 
                 stmt = successor.first_stmt
                 while stmt is not None:
