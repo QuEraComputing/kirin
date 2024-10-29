@@ -20,7 +20,7 @@ class CommonSubexpressionElimination(RewriteRule):
 
             # the result of a statement only depends on its arguments now
             if isinstance(stmt, py_stmts.Constant):
-                hash_value = hash((type(stmt),) + (stmt.value,))
+                hash_value = hash((type(stmt), stmt.value))
             else:
                 hash_value = hash((type(stmt),) + tuple(stmt.args))
 
