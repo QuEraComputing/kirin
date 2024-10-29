@@ -21,27 +21,13 @@ class Inline(RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if isinstance(node, func.Call):
             return self.rewrite_func_Call(node)
+        elif isinstance(node, func.Invoke):
+            return self.rewrite_func_Invoke(node)
         else:
             return RewriteResult()
 
-    def rewrite_func_Call(self, node: func.Call) -> RewriteResult:
+    def _rewrite_method(self, mt: ir.Method, node: ir.Statement) -> RewriteResult:
         has_done_something = False
-        callee = node.callee
-        if not (
-            isinstance(callee, ir.ResultValue)
-            and callee.stmt.has_trait(ir.ConstantLike)
-        ):
-            return RewriteResult()
-
-        try:
-            result = self.interp.run_stmt(callee.stmt, ())
-            if isinstance(result, ResultValue):
-                mt = result.values[0]
-            else:
-                return RewriteResult()
-        except InterpreterError:
-            return RewriteResult()
-
         if (
             isinstance(mt, ir.Method)
             and self.heuristic(mt.code)
@@ -52,6 +38,29 @@ class Inline(RewriteRule):
             has_done_something = True
 
         return RewriteResult(has_done_something=has_done_something)
+
+    def rewrite_func_Invoke(self, node: func.Invoke) -> RewriteResult:
+        mt: ir.Method = node.callee
+
+        return self._rewrite_method(mt, node)
+
+    def rewrite_func_Call(self, node: func.Call) -> RewriteResult:
+        callee = node.callee
+        if not (
+            isinstance(callee, ir.ResultValue)
+            and callee.stmt.has_trait(ir.ConstantLike)
+        ):
+            return RewriteResult()
+        try:
+            result = self.interp.run_stmt(callee.stmt, ())
+            if isinstance(result, ResultValue):
+                mt = result.values[0]
+            else:
+                return RewriteResult()
+        except InterpreterError:
+            return RewriteResult()
+
+        return self._rewrite_method(mt, node)
 
     def inline_callee(self, call: func.Call, region: ir.Region):
         # <stmt>
