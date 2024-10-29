@@ -12,6 +12,5 @@ class InlineAlias(RewriteRule):
         if not isinstance(node, stmts.Alias):
             return RewriteResult()
 
-
         node.result.replace_by(node.value)
         return RewriteResult(has_done_something=True)
