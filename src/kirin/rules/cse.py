@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from kirin.dialects.py import stmts as py_stmts
 from kirin.ir import Block, Pure, Statement
 from kirin.rewrite import RewriteResult, RewriteRule
 
@@ -18,7 +19,11 @@ class CommonSubexpressionElimination(RewriteRule):
                 continue
 
             # the result of a statement only depends on its arguments now
-            hash_value = hash((type(stmt),) + tuple(stmt.args))
+            if isinstance(stmt, py_stmts.Constant):
+                hash_value = hash((type(stmt),) + (stmt.value,))
+            else:
+                hash_value = hash((type(stmt),) + tuple(stmt.args))
+
             if hash_value in seen:
                 old_stmt = seen[hash_value]
                 for result in stmt._results:
