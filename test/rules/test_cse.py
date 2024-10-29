@@ -19,3 +19,20 @@ def test_cse():
     after = badprogram(1, 2)
 
     assert before == after
+
+
+@basic_no_opt
+def ker_with_const():
+    x = 0
+    y = 0
+    z = 1
+    return (x, y, z + x)
+
+
+def test_cse_const():
+    before = ker_with_const()
+    cse = CommonSubexpressionElimination()
+    Fixpoint(Walk(cse)).rewrite(ker_with_const.code)
+    after = ker_with_const()
+
+    assert before == after
