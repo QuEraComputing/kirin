@@ -3,8 +3,9 @@ from typing import Callable
 
 from kirin import ir
 from kirin.dialects import cf, func
-from kirin.exceptions import InterpreterError
-from kirin.interp import BaseInterpreter, ResultValue
+
+# TODO: use func.Constant instead of kirin.dialects.py.stmts.Constant
+from kirin.dialects.py import stmts
 from kirin.rewrite import RewriteResult, RewriteRule
 
 # NOTE: this only inlines func dialect
@@ -12,48 +13,33 @@ from kirin.rewrite import RewriteResult, RewriteRule
 
 @dataclass
 class Inline(RewriteRule):
-    interp: BaseInterpreter
-
     heuristic: Callable[[ir.IRNode], bool]
     """inline heuristic that determines whether a function should be inlined
     """
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if isinstance(node, func.Call):
-            return self.rewrite_func_Call(node)
+        if isinstance(node, func.Invoke):
+            return self.rewrite_func_Invoke(node)
         else:
             return RewriteResult()
 
-    def rewrite_func_Call(self, node: func.Call) -> RewriteResult:
+    def rewrite_func_Invoke(self, node: func.Invoke) -> RewriteResult:
         has_done_something = False
         callee = node.callee
-        if not (
-            isinstance(callee, ir.ResultValue)
-            and callee.stmt.has_trait(ir.ConstantLike)
-        ):
-            return RewriteResult()
-
-        try:
-            result = self.interp.run_stmt(callee.stmt, ())
-            if isinstance(result, ResultValue):
-                mt = result.values[0]
-            else:
-                return RewriteResult()
-        except InterpreterError:
-            return RewriteResult()
 
         if (
-            isinstance(mt, ir.Method)
-            and self.heuristic(mt.code)
-            and (call_trait := mt.code.get_trait(ir.CallableStmtInterface)) is not None
+            isinstance(callee, ir.Method)
+            and self.heuristic(callee.code)
+            and (call_trait := callee.code.get_trait(ir.CallableStmtInterface))
+            is not None
         ):
-            region = call_trait.get_callable_region(mt.code)
+            region = call_trait.get_callable_region(callee.code)
             self.inline_callee(node, region)
             has_done_something = True
 
         return RewriteResult(has_done_something=has_done_something)
 
-    def inline_callee(self, call: func.Call, region: ir.Region):
+    def inline_callee(self, call: func.Invoke, region: ir.Region):
         # <stmt>
         # <stmt>
         # <br (a, b, c)>
@@ -110,8 +96,13 @@ class Inline(RewriteRule):
             parent_region.blocks.insert(parent_block_idx + idx + 2, block.clone())
 
         parent_region.blocks.append(after_block)
+
+        func_self = stmts.Constant(call.callee)
+        func_self.result.name = call.callee.sym_name
+        func_self.insert_before(call)
         cf.Branch(
-            arguments=tuple(arg for arg in call.args), successor=entry_block
+            arguments=(func_self.result,) + tuple(arg for arg in call.args),
+            successor=entry_block,
         ).insert_before(call)
         call.delete()
         return

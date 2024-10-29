@@ -151,7 +151,9 @@ class Return(Statement):
 @statement(dialect=dialect)
 class Lambda(Statement):
     name = "lambda"
-    traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface(), SSACFGRegion()})
+    traits = frozenset(
+        {Pure(), SymbolOpInterface(), FuncOpCallableInterface(), SSACFGRegion()}
+    )
     sym_name: str = info.attribute(property=True)
     signature: Signature = info.attribute()
     captured: tuple[SSAValue, ...] = info.argument()
