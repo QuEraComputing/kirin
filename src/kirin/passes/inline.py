@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Callable
 
 from kirin import ir
 from kirin.passes import Pass
@@ -8,12 +9,17 @@ from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.inline import Inline
 
 
+def aggresive(x: ir.IRNode) -> bool:
+    return True
+
+
 @dataclass
 class InlinePass(Pass):
+    herustic: Callable[[ir.IRNode], bool] = field(default=aggresive)
 
     def unsafe_run(self, mt: ir.Method) -> None:
 
-        Walk(Inline(heuristic=lambda x: True)).rewrite(mt.code)
+        Walk(Inline(heuristic=self.herustic)).rewrite(mt.code)
 
         if (trait := mt.code.get_trait(ir.SSACFGRegion)) is not None:
             compactify = Fixpoint(CFGCompactify(trait.get_graph(mt.callable_region)))
