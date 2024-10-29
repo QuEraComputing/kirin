@@ -3,7 +3,9 @@ from typing import Callable
 
 from kirin import ir
 from kirin.dialects import cf, func
-from kirin.interp import BaseInterpreter
+
+# TODO: use func.Constant instead of kirin.dialects.py.stmts.Constant
+from kirin.dialects.py import stmts
 from kirin.rewrite import RewriteResult, RewriteRule
 
 # NOTE: this only inlines func dialect
@@ -11,8 +13,6 @@ from kirin.rewrite import RewriteResult, RewriteRule
 
 @dataclass
 class Inline(RewriteRule):
-    interp: BaseInterpreter
-
     heuristic: Callable[[ir.IRNode], bool]
     """inline heuristic that determines whether a function should be inlined
     """
@@ -96,8 +96,13 @@ class Inline(RewriteRule):
             parent_region.blocks.insert(parent_block_idx + idx + 2, block.clone())
 
         parent_region.blocks.append(after_block)
+
+        func_self = stmts.Constant(call.callee)
+        func_self.result.name = call.callee.sym_name
+        func_self.insert_before(call)
         cf.Branch(
-            arguments=tuple(arg for arg in call.args), successor=entry_block
+            arguments=(func_self.result,) + tuple(arg for arg in call.args),
+            successor=entry_block,
         ).insert_before(call)
         call.delete()
         return

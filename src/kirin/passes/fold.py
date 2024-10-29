@@ -24,12 +24,11 @@ class Fold(Pass):
                         ConstantFold(constprop.results),
                         InlineGetItem(constprop.results),
                         Call2Invoke(constprop.results),
+                        DeadCodeElimination(),
                     ]
                 )
             )
         ).rewrite(mt.code)
-        dce = DeadCodeElimination()
-        Fixpoint(Walk(dce)).rewrite(mt.code)
 
         if (trait := mt.code.get_trait(SSACFGRegion)) is not None:
             compactify = Fixpoint(CFGCompactify(trait.get_graph(mt.callable_region)))

@@ -49,7 +49,7 @@ class CFGCompactify(RewriteRule):
             # terminator will be the successor's terminator
             if node.last_stmt and isinstance(node.last_stmt, cf.Branch):
                 terminator = node.last_stmt
-                successor = list(successors)[0]
+                successor = terminator.successor
                 # not single edge in CFG
                 if len(self.cfg.predecessors[successor]) > 1:
                     return RewriteResult()
@@ -60,6 +60,9 @@ class CFGCompactify(RewriteRule):
                     stmt = stmt.next_stmt
                     curr.detach()
                     node.stmts.append(curr)
+
+                for arg, input in zip(successor.args, terminator.arguments):
+                    arg.replace_by(input)
                 terminator.delete()
                 successor.delete()
         else:
