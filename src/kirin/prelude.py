@@ -21,8 +21,8 @@ def basic(self):
     def run_pass(
         mt: Method, *, verify: bool = True, typeinfer: bool = False, fold: bool = True
     ) -> None:
-        if verify and not mt.verify():
-            return
+        if verify:
+            mt.verify()
 
         if fold:
             fold_pass(mt)

@@ -1,4 +1,3 @@
-import sys
 from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, Callable, Generic, ParamSpec, TypeVar
@@ -69,7 +68,7 @@ class Method(Printable, Generic[Param, RetType]):
     def print_impl(self, printer: Printer) -> None:
         return printer.print(self.code)
 
-    def verify(self) -> bool:
+    def verify(self) -> None:
         """verify the method body."""
         try:
             self.code.verify()
@@ -81,7 +80,6 @@ class Method(Printable, Generic[Param, RetType]):
                 msg += f", in {e.node.name}"
 
             msg += f":\n    Verification failed for {self.sym_name}: {e.args[0]}"
-            print(msg, file=sys.stderr)
-            return False
+            raise Exception(msg) from e
         self.verified = True
-        return True
+        return
