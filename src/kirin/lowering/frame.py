@@ -126,6 +126,7 @@ class Frame:
 
     def append_stmt(self, stmt: StmtType) -> StmtType:
         self.current_block.stmts.append(stmt)
+        stmt.source = self.state.source
         return stmt
 
     def append_block(self, block: Block | None = None):

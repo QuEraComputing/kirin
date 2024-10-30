@@ -20,8 +20,8 @@ if TYPE_CHECKING:
     from kirin.ir.dialect import Dialect
     from kirin.ir.nodes.block import Block
     from kirin.ir.nodes.region import Region
-    from kirin.ir.source import SourceInfo
     from kirin.lowering import LoweringState, Result
+    from kirin.source import SourceInfo
 
 
 @dataclass

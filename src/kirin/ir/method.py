@@ -1,8 +1,9 @@
+import sys
 from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, Callable, Generic, ParamSpec, TypeVar
 
-from kirin.exceptions import InterpreterError
+from kirin.exceptions import InterpreterError, VerificationError
 from kirin.ir.attrs import TypeAttribute
 from kirin.ir.nodes.stmt import Statement
 from kirin.ir.traits import CallableStmtInterface
@@ -26,7 +27,7 @@ class Method(Printable, Generic[Param, RetType]):
     code: Statement  # own, the corresponding IR, a func.func usually
     # values contained if closure
     fields: tuple = field(default_factory=tuple)  # own
-    source: str = ""
+    file: str = ""
     lineno: list[tuple[int, int]] = field(default_factory=list)
     """(<line>, <col>) at the start of the statement call.
     """
@@ -68,8 +69,19 @@ class Method(Printable, Generic[Param, RetType]):
     def print_impl(self, printer: Printer) -> None:
         return printer.print(self.code)
 
-    def verify(self) -> None:
+    def verify(self) -> bool:
         """verify the method body."""
-        self.code.verify()
+        try:
+            self.code.verify()
+        except VerificationError as e:
+            msg = f'File "{self.file}"'
+            if isinstance(e.node, Statement):
+                if e.node.source:
+                    msg += f", line {e.node.source.lineno}"
+                msg += f", in {e.node.name}"
+
+            msg += f":\n    Verification failed for {self.sym_name}: {e.args[0]}"
+            print(msg, file=sys.stderr)
+            return False
         self.verified = True
-        return None
+        return True

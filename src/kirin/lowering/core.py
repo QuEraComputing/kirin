@@ -42,6 +42,8 @@ class Lowering(ast.NodeVisitor):
         stmt: ast.stmt | Callable,
         source: str | None = None,
         globals: dict[str, Any] | None = None,
+        lineno_offset: int = 0,
+        col_offset: int = 0,
     ):
         if isinstance(stmt, Callable):
             source = source or textwrap.dedent(inspect.getsource(stmt))
@@ -53,7 +55,9 @@ class Lowering(ast.NodeVisitor):
             globals.update(nonlocals)
             stmt = ast.parse(source).body[0]
 
-        state = LoweringState.from_stmt(self, stmt, source, globals)
+        state = LoweringState.from_stmt(
+            self, stmt, source, globals, self.max_lines, lineno_offset, col_offset
+        )
         try:
             state.visit(stmt)
         except DialectLoweringError as e:

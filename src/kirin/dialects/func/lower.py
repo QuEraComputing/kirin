@@ -87,6 +87,7 @@ class FuncLowering(FromPythonAST):
             if value.name:
                 stmt.result.name = value.name
             stmt.result.type = value.type
+            stmt.source = state.source
             if first_stmt:
                 stmt.insert_before(first_stmt)
             else:
@@ -109,13 +110,16 @@ class FuncLowering(FromPythonAST):
         # so other control flows knows where to exit...
         # this can be a dead block if there is a return statement, but it's fine
         none_const = stmts.Constant(None)
-        func_frame.next_block = ir.Block([none_const, Return(none_const.result)])
+        return_none = Return(none_const.result)
+        none_const.source = state.source
+        return_none.source = state.source
+        func_frame.next_block = ir.Block([none_const, return_none])
         state.exhaust(func_frame)
         if (
             func_frame.current_block.last_stmt
             and not func_frame.current_block.last_stmt.has_trait(ir.IsTerminator)
         ):
-            func_frame.current_block.stmts.append(
+            func_frame.append_stmt(
                 Return(func_frame.append_stmt(stmts.Constant(None)).result)
             )
 

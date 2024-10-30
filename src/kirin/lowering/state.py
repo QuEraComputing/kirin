@@ -9,6 +9,7 @@ from kirin.ir import DialectGroup, Method, SSAValue, Statement
 from kirin.lowering.dialect import FromPythonAST
 from kirin.lowering.frame import Frame
 from kirin.lowering.result import Result
+from kirin.source import SourceInfo
 
 if TYPE_CHECKING:
     from kirin.lowering.core import Lowering
@@ -22,8 +23,14 @@ class LoweringState(ast.NodeVisitor):
 
     # debug info
     lines: list[str]
-    line_range: tuple[int, int]  # current (<start>, <end>)
-    col_range: tuple[int, int]  # current (<start>, <end>)
+    lineno_offset: int
+    "lineno offset at the beginning of the source"
+    col_offset: int
+    "column offset at the beginning of the source"
+    source: SourceInfo
+    "source info of the current node"
+    # line_range: tuple[int, int]  # current (<start>, <end>)
+    # col_range: tuple[int, int]  # current (<start>, <end>)
     max_lines: int = 3
     _current_frame: Frame | None = None
 
@@ -35,6 +42,8 @@ class LoweringState(ast.NodeVisitor):
         source: str | None = None,
         globals: dict[str, Any] | None = None,
         max_lines: int = 3,
+        lineno_offset: int = 0,
+        col_offset: int = 0,
     ):
         if not isinstance(stmt, ast.stmt):
             raise ValueError(f"Expected ast.stmt, got {type(stmt)}")
@@ -46,8 +55,9 @@ class LoweringState(ast.NodeVisitor):
             dialects=lowering.dialects,
             registry=lowering.registry,
             lines=source.splitlines(),
-            line_range=(stmt.lineno, stmt.end_lineno or stmt.lineno),
-            col_range=(stmt.col_offset, stmt.end_col_offset or stmt.col_offset),
+            lineno_offset=lineno_offset,
+            col_offset=col_offset,
+            source=SourceInfo.from_ast(stmt, lineno_offset, col_offset),
             max_lines=max_lines,
         )
 
@@ -87,14 +97,7 @@ class LoweringState(ast.NodeVisitor):
         return frame
 
     def update_lineno(self, node):
-        if not isinstance(node, (ast.stmt, ast.expr)):
-            return  # has no lineno
-
-        if hasattr(node, "lineno"):
-            self.line_range = (node.lineno, node.end_lineno or node.lineno)
-
-        if hasattr(node, "col_offset"):
-            self.col_range = (node.col_offset, node.end_col_offset or node.col_offset)
+        self.source = SourceInfo.from_ast(node, self.lineno_offset, self.col_offset)
 
     def __repr__(self) -> str:
         return f"LoweringState({self.current_frame})"
@@ -200,17 +203,17 @@ class LoweringState(ast.NodeVisitor):
         return current_frame
 
     def error_hint(self) -> str:
-        begin = max(0, self.line_range[0] - self.max_lines)
-        end = max(self.line_range[0] + self.max_lines, self.line_range[1])
+        begin = max(0, self.source.lineno - self.max_lines)
+        end = max(self.source.lineno + self.max_lines, self.source.end_lineno or 0)
         end = min(len(self.lines), end)  # make sure end is within bounds
         lines = self.lines[begin:end]
-        code_indent = min(map(self.__get_indent, lines))
+        code_indent = min(map(self.__get_indent, lines), default=0)
         lines.append("")  # in case the last line errors
 
         snippet_lines = []
         for lineno, line in enumerate(lines, begin):
-            if lineno == self.line_range[0]:
-                snippet_lines.append(("-" * (self.col_range[0])) + "^")
+            if lineno == self.source.lineno:
+                snippet_lines.append(("-" * (self.source.col_offset)) + "^")
 
             snippet_lines.append(line[code_indent:])
 

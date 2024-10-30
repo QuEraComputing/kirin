@@ -185,17 +185,19 @@ class DialectGroup(Generic[PassParams]):
             if py_func.__name__ == "<lambda>":
                 raise ValueError("Cannot compile lambda functions")
 
+            lineno_offset, file = 0, ""
             frame = inspect.currentframe()
-            if (
-                frame
-                and frame.f_back is not None
-                and frame.f_back.f_back is not None
-                and py_func.__name__ in frame.f_back.f_back.f_locals
-            ):
-                raise CompilerError(
-                    f"overwriting function definition of `{py_func.__name__}`"
-                )
-            code = emit_ir.run(py_func)
+            if frame and frame.f_back is not None and frame.f_back.f_back is not None:
+                call_site_frame = frame.f_back.f_back
+                if py_func.__name__ in call_site_frame.f_locals:
+                    raise CompilerError(
+                        f"overwriting function definition of `{py_func.__name__}`"
+                    )
+
+                lineno_offset = call_site_frame.f_lineno - 1
+                file = call_site_frame.f_code.co_filename
+
+            code = emit_ir.run(py_func, lineno_offset=lineno_offset)
             mt = Method(
                 mod=inspect.getmodule(py_func),
                 py_func=py_func,
@@ -203,6 +205,7 @@ class DialectGroup(Generic[PassParams]):
                 arg_names=["#self#"] + inspect.getfullargspec(py_func).args,
                 dialects=self,
                 code=code,
+                file=file,
             )
             if doc := inspect.getdoc(py_func):
                 mt.__doc__ = doc
