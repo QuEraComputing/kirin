@@ -3,7 +3,7 @@ from kirin.prelude import basic_no_opt
 
 
 @basic_no_opt
-def testfunc2(x: int):
+def inline_func(x: int):
     return x - 1
 
 
@@ -11,7 +11,7 @@ def test_inline_pass():
 
     @basic_no_opt
     def main_inline_pass(x: int):
-        y = testfunc2(x)
+        y = inline_func(x)
         return y + 1
 
     inline = InlinePass(main_inline_pass.dialects)
@@ -28,7 +28,7 @@ def test_inline_pass_custom_heru():
 
     @basic_no_opt
     def main_inline_pass2(x: int):
-        y = testfunc2(x)
+        y = inline_func(x)
         return y + 1
 
     inline = InlinePass(main_inline_pass2.dialects, herustic=lambda x: False)

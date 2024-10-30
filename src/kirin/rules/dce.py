@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from kirin import ir
 from kirin.analysis.dataflow.constprop import ConstPropLattice, NotPure
@@ -8,7 +8,7 @@ from kirin.rewrite import RewriteResult, RewriteRule
 
 @dataclass
 class DeadCodeElimination(RewriteRule):
-    results: dict[ir.SSAValue, ConstPropLattice]
+    results: dict[ir.SSAValue, ConstPropLattice] = field(default_factory=dict)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if self.is_pure(node):
