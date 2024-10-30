@@ -19,3 +19,23 @@ def test_cse():
     after = badprogram(1, 2)
 
     assert before == after
+
+
+@basic_no_opt
+def cse_constant():
+    x = 1
+    y = 2
+    z = 1
+    return x + y + z
+
+
+def test_cse_constant():
+    # NOTE: issue #61
+    before = cse_constant()
+    cse_constant.print()
+    cse = CommonSubexpressionElimination()
+    Fixpoint(Walk(cse)).rewrite(cse_constant.code)
+    after = cse_constant()
+    cse_constant.print()
+    assert before == after
+    assert len(cse_constant.callable_region.blocks[0].stmts) == 5

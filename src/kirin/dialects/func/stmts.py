@@ -121,6 +121,7 @@ class Call(Statement):
 class Return(Statement):
     name = "return"
     traits = frozenset({IsTerminator(), HasParent((Function,))})
+    value: SSAValue = info.argument()
 
     def __init__(self, value_or_stmt: SSAValue | Statement | None = None) -> None:
         if isinstance(value_or_stmt, SSAValue):
@@ -137,7 +138,7 @@ class Return(Statement):
         else:
             raise ValueError(f"expected SSAValue or Statement, got {value_or_stmt}")
 
-        super().__init__(args=args)
+        super().__init__(args=args, args_slice={"value": 0})
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style=printer.color.keyword):
@@ -147,11 +148,26 @@ class Return(Statement):
             printer.plain_print(" ")
             printer.print_seq(self.args, delim=", ")
 
+    def verify(self) -> None:
+        if not self.args:
+            raise VerificationError(
+                self, "return statement must have at least one value"
+            )
+
+        if len(self.args) > 1:
+            raise VerificationError(
+                self,
+                "return statement must have at most one value"
+                ", wrap multiple values in a tuple",
+            )
+
 
 @statement(dialect=dialect)
 class Lambda(Statement):
     name = "lambda"
-    traits = frozenset({SymbolOpInterface(), FuncOpCallableInterface(), SSACFGRegion()})
+    traits = frozenset(
+        {Pure(), SymbolOpInterface(), FuncOpCallableInterface(), SSACFGRegion()}
+    )
     sym_name: str = info.attribute(property=True)
     signature: Signature = info.attribute()
     captured: tuple[SSAValue, ...] = info.argument()

@@ -62,6 +62,7 @@ class SSAValue(ABC, Printable):
 
         assert len(self.uses) == 0, "Uses not empty"
 
+    # TODO: also delete BlockArgument from arglist
     def delete(self, safe: bool = True) -> None:
         if safe and len(self.uses) > 0:
             raise ValueError("Cannot delete SSA value with uses")

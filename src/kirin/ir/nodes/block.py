@@ -222,33 +222,6 @@ class Block(IRNode["Region"]):
     def stmts(self) -> BlockStmts:
         return BlockStmts(self)
 
-    def clone(self) -> Block:
-        ret = Block()
-        ssamap: dict[SSAValue, SSAValue] = {}
-        for arg in self.args:
-            new_arg = ret.args.append_from(arg.type, arg.name)
-            ssamap[arg] = new_arg
-
-        # NOTE: arg is always in ssamap, otherwise this implementation is incorrect
-        stmt = self.first_stmt
-        while stmt is not None:
-            # leave the successors if there are any, cuz we may just change that later
-            new_stmt = stmt.from_stmt(
-                stmt,
-                args=[ssamap.get(arg, arg) for arg in stmt.args],
-                attributes=stmt.attributes.copy(),  # copy so that we owns it
-                regions=[
-                    region.clone() for region in stmt.regions
-                ],  # clone the regions, because stmt owns it
-            )
-            ret.stmts.append(new_stmt)
-            for result, new_result in zip(stmt.results, new_stmt.results):
-                ssamap[result] = new_result
-
-            stmt = stmt.next_stmt
-
-        return ret
-
     def drop_all_references(self) -> None:
         self.parent = None
         for stmt in self.stmts:

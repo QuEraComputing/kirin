@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 @derive(init=True, repr=True)
-class RegionBlocks(MutableSequenceView[list, "Region", Block]):
+class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
 
     def __setitem__(
         self, idx: int | slice, block_or_blocks: Block | Iterable[Block]
@@ -76,19 +76,35 @@ class Region(IRNode["Statement"]):
             raise ValueError("Block does not belong to the region")
         return self._block_idx[block]
 
-    def clone(self):
+    def clone(self, ssamap: dict[SSAValue, SSAValue] | None = None) -> Region:
+        """Clone a region. This will clone all blocks and statements in the region.
+        `SSAValue` defined outside the region will not be cloned unless provided in `ssamap`.
+        """
         ret = Region()
         successor_map: dict[Block, Block] = {}
+        _ssamap = ssamap or {}
         for block in self.blocks:
-            new_block = block.clone()
-            successor_map[block] = new_block
+            new_block = Block()
             ret.blocks.append(new_block)
+            successor_map[block] = new_block
+            for arg in block.args:
+                new_arg = new_block.args.append_from(arg.type, arg.name)
+                _ssamap[arg] = new_arg
 
-        for block in ret.blocks:
-            if block.last_stmt is not None:
-                block.last_stmt.successors = [
-                    successor_map[successor] for successor in block.last_stmt.successors
-                ]
+        # update statements
+        for block in self.blocks:
+            for stmt in block.stmts:
+                new_stmt = stmt.from_stmt(
+                    stmt,
+                    args=[_ssamap[arg] for arg in stmt.args],
+                    regions=[region.clone(_ssamap) for region in stmt.regions],
+                    successors=[
+                        successor_map[successor] for successor in stmt.successors
+                    ],
+                )
+                successor_map[block].stmts.append(new_stmt)
+                for result, new_result in zip(stmt.results, new_stmt.results):
+                    _ssamap[result] = new_result
 
         return ret
 
@@ -167,6 +183,10 @@ class Region(IRNode["Statement"]):
             yield from block.walk(reverse=reverse, region_first=region_first)
 
     def print_impl(self, printer: Printer) -> None:
+        # populate block ids
+        for block in self.blocks:
+            printer.state.block_id[block]
+
         printer.plain_print("{")
         if len(self.blocks) == 0:
             printer.print_newline()

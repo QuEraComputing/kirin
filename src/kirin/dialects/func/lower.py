@@ -4,7 +4,7 @@ from kirin import ir
 from kirin.dialects.func.attrs import Signature
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import Call, Function, GetField, Invoke, Lambda, Return
-from kirin.dialects.py import types
+from kirin.dialects.py import stmts, types
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
 
@@ -51,7 +51,7 @@ class FuncLowering(FromPythonAST):
 
     def lower_Return(self, state: LoweringState, node: ast.Return) -> Result:
         if node.value is None:
-            stmt = Return()
+            stmt = Return(state.append_stmt(stmts.Constant(None)).result)
             state.append_stmt(stmt)
         else:
             result = state.visit(node.value).expect_one()
@@ -108,13 +108,16 @@ class FuncLowering(FromPythonAST):
         # this is annoying, so we add a return statement at the end
         # so other control flows knows where to exit...
         # this can be a dead block if there is a return statement, but it's fine
-        func_frame.next_block = ir.Block([Return()])
+        none_const = stmts.Constant(None)
+        func_frame.next_block = ir.Block([none_const, Return(none_const.result)])
         state.exhaust(func_frame)
         if (
             func_frame.current_block.last_stmt
             and not func_frame.current_block.last_stmt.has_trait(ir.IsTerminator)
         ):
-            func_frame.current_block.stmts.append(Return())
+            func_frame.current_block.stmts.append(
+                Return(func_frame.append_stmt(stmts.Constant(None)).result)
+            )
 
         func_frame.append_block(func_frame.next_block)
         state.pop_frame()

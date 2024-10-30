@@ -171,3 +171,13 @@ class PyInterpreter(DialectInterpreter):
     @impl(py.Range)
     def _range(self, interp, stmt: py.Range, values: tuple) -> ResultValue:
         return ResultValue(range(*values))
+
+    @impl(py.Slice)
+    def _slice(self, interp, stmt: py.Slice, values: tuple) -> ResultValue:
+        start, stop, step = values
+        if start is None and step is None:
+            return ResultValue(slice(stop))
+        elif step is None:
+            return ResultValue(slice(start, stop))
+        else:
+            return ResultValue(slice(start, stop, step))

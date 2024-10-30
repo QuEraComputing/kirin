@@ -34,7 +34,7 @@ class ConstantFold(RewriteRule):
         # NOTE: if we find call prop a const, depsite it is pure or not
         # the constant call only executes a pure branch of the code
         # thus it is safe to delete the call
-        if all_constants and (node.has_trait(ir.Pure) or isinstance(node, func.Call)):
+        if all_constants and (node.has_trait(ir.Pure) or isinstance(node, func.Invoke)):
             node.delete()
         return RewriteResult(has_done_something=has_done_something)
 

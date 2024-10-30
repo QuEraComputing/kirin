@@ -14,7 +14,6 @@ def test_pass():
     assert isinstance(code.body.blocks[0].last_stmt, cf.Branch)
     assert code.body.blocks[0].last_stmt.successor is code.body.blocks[1]
     assert isinstance(code.body.blocks[1].last_stmt, func.Return)
-    assert code.body.blocks[1].last_stmt.args.isempty()
 
     def branch_pass():
         if True:
@@ -32,7 +31,6 @@ def test_pass():
     assert isinstance(code.body.blocks[2].last_stmt, cf.Branch)
     assert code.body.blocks[2].last_stmt.successor is code.body.blocks[3]
     assert isinstance(code.body.blocks[3].last_stmt, func.Return)
-    assert code.body.blocks[3].last_stmt.args.isempty()
 
 
 def test_basic_ifelse():
@@ -68,7 +66,6 @@ def test_basic_ifelse():
     assert code.body.blocks[1].last_stmt.successor is code.body.blocks[3]
     assert isinstance(code.body.blocks[2].last_stmt, func.Return)
     assert isinstance(code.body.blocks[3].last_stmt, func.Return)
-    assert code.body.blocks[3].last_stmt.args.isempty()
 
     def single_3(n):
         if n == 0:
@@ -87,7 +84,6 @@ def test_basic_ifelse():
     assert isinstance(code.body.blocks[2].last_stmt, cf.Branch)
     assert code.body.blocks[2].last_stmt.successor is code.body.blocks[3]
     assert isinstance(code.body.blocks[3].last_stmt, func.Return)
-    assert code.body.blocks[3].last_stmt.args.isempty()
 
     def single_4(n):
         if n == 0:
@@ -102,7 +98,6 @@ def test_basic_ifelse():
     assert isinstance(code.body.blocks[1].last_stmt, cf.Branch)
     assert code.body.blocks[1].last_stmt.successor is code.body.blocks[2]
     assert isinstance(code.body.blocks[2].last_stmt, func.Return)
-    assert code.body.blocks[2].last_stmt.args.isempty()
 
 
 def test_recursive_ifelse():
@@ -129,4 +124,3 @@ def test_recursive_ifelse():
     assert code.body.blocks[3].last_stmt.successor is code.body.blocks[5]
     assert isinstance(code.body.blocks[4].last_stmt, func.Return)
     assert isinstance(code.body.blocks[5].last_stmt, func.Return)
-    assert code.body.blocks[5].last_stmt.args.isempty()

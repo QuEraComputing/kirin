@@ -20,7 +20,6 @@ def test_basic_func():
     # NOTE: this is expected behavior, tho this is a dead code
     # this is for matching python behavior, it will be removed after DCE
     assert isinstance(code.body.blocks[1].last_stmt, func.Return)
-    assert code.body.blocks[1].last_stmt.args.isempty()
 
     def single_2(n):
         return n + 1, n + 2
@@ -31,7 +30,6 @@ def test_basic_func():
     assert isinstance(code.body.blocks[0].last_stmt, func.Return)
     assert code.body.blocks[0].last_stmt.args[0].type.is_subseteq(types.Tuple)
     assert isinstance(code.body.blocks[1].last_stmt, func.Return)
-    assert code.body.blocks[1].last_stmt.args.isempty()
 
 
 def test_recursive_func():
