@@ -67,9 +67,12 @@ class Inline(RewriteRule):
         if not call.parent_region:
             return
 
+        # NOTE: we cannot change region because it may be used elsewhere
+        inline_region: ir.Region = region.clone()
         parent_block: ir.Block = call.parent_block
         parent_region: ir.Region = call.parent_region
 
+        # wrap what's after invoke into a block
         after_block = ir.Block()
         stmt = call.next_stmt
         while stmt is not None:
@@ -82,18 +85,21 @@ class Inline(RewriteRule):
             result.replace_by(block_arg)
 
         parent_block_idx = parent_region._block_idx[parent_block]
-        # NOTE: we cannot change region because it may be used elsewhere
-        entry_block = region.blocks[0].clone()
-        parent_region.blocks.insert(parent_block_idx + 1, entry_block)
-        if entry_block.last_stmt and isinstance(entry_block.last_stmt, func.Return):
-            entry_block.last_stmt.replace_by(
-                cf.Branch(
-                    arguments=tuple(arg for arg in entry_block.last_stmt.args),
-                    successor=after_block,
+        idx, block = 0, inline_region.blocks.pop(0)
+        entry_block = block
+        while inline_region.blocks:
+            idx += 1
+
+            if block.last_stmt and isinstance(block.last_stmt, func.Return):
+                block.last_stmt.replace_by(
+                    cf.Branch(
+                        arguments=(block.last_stmt.value,),
+                        successor=after_block,
+                    )
                 )
-            )
-        for idx, block in enumerate(region.blocks[1:]):
-            parent_region.blocks.insert(parent_block_idx + idx + 2, block.clone())
+
+            parent_region.blocks.insert(parent_block_idx + idx, block)
+            block = inline_region.blocks.pop(0)
 
         parent_region.blocks.append(after_block)
 

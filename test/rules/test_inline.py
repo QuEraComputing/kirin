@@ -1,4 +1,4 @@
-from kirin.analysis import ConstProp
+from kirin.analysis import ConstProp, NotConst
 from kirin.analysis.cfg import CFG
 from kirin.dialects.py import stmts
 from kirin.prelude import basic_no_opt
@@ -7,6 +7,7 @@ from kirin.rules.call2invoke import Call2Invoke
 from kirin.rules.cfg_compatify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.fold import ConstantFold
+from kirin.rules.getitem import InlineGetItem
 from kirin.rules.inline import Inline
 
 
@@ -55,7 +56,7 @@ def test_inline_closure():
                 [
                     ConstantFold(constprop.results),
                     Call2Invoke(constprop.results),
-                    DeadCodeElimination(),
+                    DeadCodeElimination(constprop.results),
                 ]
             )
         )
@@ -64,8 +65,63 @@ def test_inline_closure():
     cfg = CFG(inline_closure.callable_region)
     compactify = CFGCompactify(cfg)
     Fixpoint(compactify).rewrite(inline_closure.code)
-    Fixpoint(Walk(DeadCodeElimination())).rewrite(inline_closure.code)
+    Fixpoint(Walk(DeadCodeElimination(constprop.results))).rewrite(inline_closure.code)
     inline_closure.code.print()
     stmt = inline_closure.callable_region.blocks[0].stmts.at(0)
     assert isinstance(stmt, stmts.Constant)
     assert inline_closure() == 40
+
+
+@basic_no_opt
+def add(x, y):
+    return x + y
+
+
+@basic_no_opt
+def foldl(f, acc, xs: tuple):
+    if not xs:
+        return acc
+    ret = foldl(f, acc, xs[1:])
+    return f(ret, xs[0])
+
+
+@basic_no_opt
+def inline_foldl(x):
+    return foldl(add, 0, (x, x, x))
+
+
+def test_inline_constprop():
+    def fold():
+        constprop = ConstProp(inline_foldl.dialects)
+        constprop.eval(inline_foldl, tuple(NotConst() for _ in inline_foldl.args))
+        Fixpoint(
+            Walk(
+                Chain(
+                    [
+                        ConstantFold(constprop.results),
+                        InlineGetItem(constprop.results),
+                        Call2Invoke(constprop.results),
+                        DeadCodeElimination(constprop.results),
+                    ]
+                )
+            )
+        ).rewrite(inline_foldl.code)
+        compactify = Fixpoint(CFGCompactify(CFG(inline_foldl.callable_region)))
+        compactify.rewrite(inline_foldl.code)
+        Fixpoint(Walk(DeadCodeElimination(constprop.results))).rewrite(
+            inline_foldl.code
+        )
+
+    Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
+    fold()
+    Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
+    fold()
+    Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
+    fold()
+    Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
+    fold()
+    Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
+    fold()
+    assert len(inline_foldl.callable_region.blocks) == 1
+    assert inline_foldl(2) == 6
+    inline_foldl.print()

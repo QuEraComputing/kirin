@@ -1,8 +1,8 @@
 from kirin.dialects.py import stmts, types
-from kirin.prelude import basic
+from kirin.prelude import basic_no_opt
 
 
-@basic
+@basic_no_opt
 def explicit_slice():
     x = slice(1, 2, 3)
     y = slice(1, 2)
@@ -10,7 +10,7 @@ def explicit_slice():
     return x, y, z
 
 
-@basic
+@basic_no_opt
 def wrong_slice():
     x = slice(None, None, None)
     y = slice(None, None, 1)

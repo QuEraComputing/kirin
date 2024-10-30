@@ -115,3 +115,8 @@ class MutableSequenceView(SequenceView[FieldType, NodeType, ElemType]):
 
     def insert(self, idx: int, value: ElemType) -> None:
         raise NotImplementedError
+
+    def pop(self, idx: int = -1) -> ElemType:
+        item = self.field[idx]
+        del self[idx]
+        return item

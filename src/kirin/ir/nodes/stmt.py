@@ -8,6 +8,7 @@ from typing_extensions import Self
 
 from kirin.ir.attrs import Attribute, TypeAttribute
 from kirin.ir.nodes.base import IRNode
+from kirin.ir.nodes.block import Block
 from kirin.ir.nodes.region import Region
 from kirin.ir.nodes.view import MutableSequenceView
 from kirin.ir.ssa import ResultValue, SSAValue
@@ -310,7 +311,7 @@ class Statement(IRNode["Block"]):
         regions: list[Region] | None = None,
         successors: list[Block] | None = None,
         attributes: dict[str, Attribute] | None = None,
-    ) -> Statement:
+    ) -> Self:
         """Create a similar Statement with new `ResultValue` and without
         attaching to any parent block. This still references to the old successor
         and regions.
@@ -327,14 +328,6 @@ class Statement(IRNode["Block"]):
             args_slice=other._name_args_slice,
         )
         return obj
-
-    def clone(
-        self,
-    ) -> Statement:
-        """Clone a Statement. With new `ResultValue` in `self.results`,
-        without attaching to any parent block.
-        """
-        return self.from_stmt(self)
 
     def walk(
         self,

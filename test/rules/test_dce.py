@@ -22,7 +22,7 @@ def test_dce():
     Fixpoint(Walk(fold)).rewrite(foldable.code)
 
     foldable.code.print()
-    dce = DeadCodeElimination()
+    dce = DeadCodeElimination(const_prop.results)
     Fixpoint(Walk(dce)).rewrite(foldable.code)
     foldable.code.print()
 

@@ -58,9 +58,6 @@ class IRNode(Generic[ParentType], ABC, Printable):
         self.parent_node = parent
 
     @abstractmethod
-    def clone(self) -> Self: ...
-
-    @abstractmethod
     def detach(self) -> None: ...
 
     @abstractmethod

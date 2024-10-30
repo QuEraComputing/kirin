@@ -19,9 +19,9 @@ def test_getitem():
         tuple(analysis.NotConst() for _ in main_simplify_getitem.args),
     )
     inline_getitem = InlineGetItem(constprop.results)
-    Fixpoint(Walk(Chain([inline_getitem, DeadCodeElimination()]))).rewrite(
-        main_simplify_getitem.code
-    )
+    Fixpoint(
+        Walk(Chain([inline_getitem, DeadCodeElimination(constprop.results)]))
+    ).rewrite(main_simplify_getitem.code)
     main_simplify_getitem.code.print()
     after = main_simplify_getitem(1)
     assert before == after

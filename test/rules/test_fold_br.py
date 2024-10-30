@@ -32,6 +32,6 @@ def test_branch_elim():
     # TODO: also check the generated CFG
     # interp.worklist.visited
     Fixpoint(CFGCompactify(cfg)).rewrite(branch.code)
-    Walk(DeadCodeElimination()).rewrite(branch.code)
+    Walk(DeadCodeElimination(const_prop.results)).rewrite(branch.code)
     branch.code.print()
     assert len(branch.code.body.blocks) == 4  # type: ignore
