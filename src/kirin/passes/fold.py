@@ -34,5 +34,4 @@ class Fold(Pass):
             compactify = Fixpoint(CFGCompactify(trait.get_graph(mt.callable_region)))
             compactify.rewrite(mt.code)
 
-        print(constprop.results)
         Fixpoint(Walk(DeadCodeElimination(constprop.results))).rewrite(mt.code)
