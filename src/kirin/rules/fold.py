@@ -23,10 +23,14 @@ class ConstantFold(RewriteRule):
             if isinstance(value := self.results.get(old_result, None), Const):
                 stmt = stmts.Constant(value.data)
                 stmt.insert_before(node)
+                # update the constprop results
+                self.results.update({stmt.result: Const(data=value.data)})
+
                 old_result.replace_by(stmt.result)
                 if old_result.name:
                     stmt.result.name = old_result.name
                 has_done_something = True
+
             else:
                 all_constants = False
 
@@ -34,7 +38,11 @@ class ConstantFold(RewriteRule):
         # NOTE: if we find call prop a const, depsite it is pure or not
         # the constant call only executes a pure branch of the code
         # thus it is safe to delete the call
-        if all_constants and (node.has_trait(ir.Pure) or isinstance(node, func.Invoke)):
+        if all_constants and (
+            node.has_trait(ir.Pure)
+            or isinstance(node, func.Invoke)
+            or isinstance(node, func.Call)
+        ):
             node.delete()
         return RewriteResult(has_done_something=has_done_something)
 
