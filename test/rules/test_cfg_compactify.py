@@ -98,10 +98,16 @@ def test_compactify_single_branch_block():
     mul = stmts.Mult(x, z)
     region.blocks[3].stmts.append(mul)
     region.blocks[3].stmts.append(func.Return(mul.result))
+    region.print()
     cfg = CFG(region)
     compactify = CFGCompactify(cfg)
-    compactify.rewrite(region)
+    Walk(compactify).rewrite(region)
+    region.print()
+
     assert len(region.blocks) == 3
     stmt = region.blocks[0].last_stmt
     assert isinstance(stmt, cf.ConditionalBranch)
     assert stmt.then_successor is region.blocks[2]
+
+
+test_compactify_single_branch_block()
