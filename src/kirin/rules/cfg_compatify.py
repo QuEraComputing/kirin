@@ -41,7 +41,8 @@ class CFGCompactify(RewriteRule):
             node.delete()
             return RewriteResult(has_done_something=True)
 
-        if len(node.stmts) == 1:
+        # need to guard the case where the block has only one stmt, and that stmt is a cf.Branch
+        if len(node.stmts) == 1 and not isinstance(node.last_stmt, cf.Branch):
             return self._merge_single_stmt_block(node)
 
         successors = self.cfg.successors[node]
@@ -86,6 +87,7 @@ class CFGCompactify(RewriteRule):
     def _merge_single_Branch_block(
         self, block: ir.Block, branch: cf.Branch
     ) -> RewriteResult:
+
         if block not in self.cfg.predecessors:
             return RewriteResult()
 
