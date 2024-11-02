@@ -16,6 +16,11 @@ class Call2Invoke(RewriteRule):
         if not isinstance(node, Call):
             return RewriteResult()
 
+        # if call get eliminated by constant folding,
+        # we don't want it to enter this rewrite so DCE can sucessfully remove it.
+        if node.parent is None:
+            return RewriteResult()
+
         if (mt := self.results.get(node.callee)) is None:
             return RewriteResult()
 

@@ -28,7 +28,9 @@ def test_fold_pass():
         return x(3)
 
     my_call.code.print()
-    len(my_call.callable_region.blocks[0].stmts)
+    assert len(my_call.callable_region.blocks[0].stmts) == 2
+    x = my_call()
+    assert x == ("x", "x", "x")
 
 
 test_fold_pass()

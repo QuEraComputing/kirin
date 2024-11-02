@@ -23,12 +23,13 @@ class ConstantFold(RewriteRule):
             if isinstance(value := self.results.get(old_result, None), Const):
                 stmt = stmts.Constant(value.data)
                 stmt.insert_before(node)
+
                 # update the constprop results
                 self.results.update({stmt.result: Const(data=value.data)})
-
                 old_result.replace_by(stmt.result)
                 if old_result.name:
                     stmt.result.name = old_result.name
+
                 has_done_something = True
 
             else:
@@ -39,11 +40,14 @@ class ConstantFold(RewriteRule):
         # the constant call only executes a pure branch of the code
         # thus it is safe to delete the call
         if all_constants and (
-            node.has_trait(ir.Pure)
+            node.has_trait(
+                ir.Pure
+            )  # do we really need this? because it can fold meaning it should always be pure right?
             or isinstance(node, func.Invoke)
             or isinstance(node, func.Call)
         ):
             node.delete()
+
         return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_cf_ConditionalBranch(self, node: cf.ConditionalBranch):
