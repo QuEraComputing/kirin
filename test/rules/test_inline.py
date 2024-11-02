@@ -122,6 +122,10 @@ def test_inline_constprop():
     fold()
     Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
     fold()
+    Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
+    fold()
+    inline_foldl.code.print()
+
     assert len(inline_foldl.callable_region.blocks) == 1
     assert inline_foldl(2) == 6
     inline_foldl.print()

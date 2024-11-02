@@ -29,7 +29,6 @@ class ConstantFold(RewriteRule):
                 old_result.replace_by(stmt.result)
                 if old_result.name:
                     stmt.result.name = old_result.name
-
                 has_done_something = True
 
             else:
@@ -40,9 +39,7 @@ class ConstantFold(RewriteRule):
         # the constant call only executes a pure branch of the code
         # thus it is safe to delete the call
         if all_constants and (
-            node.has_trait(
-                ir.Pure
-            )  # do we really need this? because it can fold meaning it should always be pure right?
+            node.has_trait(ir.Pure)
             or isinstance(node, func.Invoke)
             or isinstance(node, func.Call)
         ):

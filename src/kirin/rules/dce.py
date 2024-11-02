@@ -12,7 +12,6 @@ class DeadCodeElimination(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if self.is_pure(node):
-
             for result in node._results:
                 if result.uses:
                     return RewriteResult()
@@ -23,7 +22,6 @@ class DeadCodeElimination(RewriteRule):
         return RewriteResult()
 
     def is_pure(self, node: ir.Statement):
-
         if node.has_trait(ir.Pure):
             return True
 
