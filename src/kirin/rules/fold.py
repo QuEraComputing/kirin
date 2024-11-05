@@ -24,6 +24,7 @@ class ConstantFold(RewriteRule):
                 stmt = stmts.Constant(value.data)
                 stmt.insert_before(node)
                 old_result.replace_by(stmt.result)
+                self.results[stmt.result] = value
                 if old_result.name:
                     stmt.result.name = old_result.name
                 has_done_something = True
@@ -36,6 +37,8 @@ class ConstantFold(RewriteRule):
         # thus it is safe to delete the call
         if all_constants and (node.has_trait(ir.Pure) or isinstance(node, func.Invoke)):
             node.delete()
+            for result in node.results:
+                self.results.pop(result, None)
         return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_cf_ConditionalBranch(self, node: cf.ConditionalBranch):
