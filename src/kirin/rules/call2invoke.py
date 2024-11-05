@@ -23,7 +23,11 @@ class Call2Invoke(RewriteRule):
             return RewriteResult()
 
         stmt = Invoke(inputs=node.inputs, callee=mt.data, kwargs=node.kwargs)
-        stmt.result.name = node.result.name
-        stmt.result.type = node.result.type
+        for result, new_result in zip(node.results, stmt.results):
+            new_result.name = result.name
+            new_result.type = result.type
+            if result in self.results:
+                self.results[new_result] = self.results.pop(result)
+
         node.replace_by(stmt)
         return RewriteResult(has_done_something=True)
