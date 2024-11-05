@@ -86,8 +86,10 @@ class CFGCompactify(RewriteRule):
     def _merge_single_Branch_block(
         self, block: ir.Block, branch: cf.Branch
     ) -> RewriteResult:
+        # NOTE: has no predecessors, but not deadblock
+        # must be entry block
         if block not in self.cfg.predecessors:
-            return RewriteResult()
+            return self._merge_single_Branch_entry_block(block, branch)
 
         has_other_predecessors = False
         has_done_something = False
@@ -134,6 +136,13 @@ class CFGCompactify(RewriteRule):
             block.delete()
             return RewriteResult(has_done_something=True)
         return RewriteResult(has_done_something=has_done_something)
+
+    def _merge_single_Branch_entry_block(self, block: ir.Block, stmt: cf.Branch):
+        for arg in block.args:
+            new_arg = stmt.successor.args.append_from(arg.type, arg.name)
+            arg.replace_by(new_arg)
+        block.delete()
+        return RewriteResult(has_done_something=True)
 
     @staticmethod
     def _record_block_inputs(block: ir.Block, arguments: tuple[ir.SSAValue, ...]):

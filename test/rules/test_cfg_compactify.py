@@ -98,6 +98,7 @@ def test_compactify_single_branch_block():
     mul = stmts.Mult(x, z)
     region.blocks[3].stmts.append(mul)
     region.blocks[3].stmts.append(func.Return(mul.result))
+    region.print()
     cfg = CFG(region)
     compactify = CFGCompactify(cfg)
     compactify.rewrite(region)
@@ -105,3 +106,30 @@ def test_compactify_single_branch_block():
     stmt = region.blocks[0].last_stmt
     assert isinstance(stmt, cf.ConditionalBranch)
     assert stmt.then_successor is region.blocks[2]
+
+
+def test_compactify_entry_block_single_branch():
+    region = ir.Region()
+    region.blocks.append(ir.Block())
+    region.blocks.append(ir.Block())
+    region.blocks[0].args.append_from(types.Any, "self")
+    x = region.blocks[0].args.append_from(types.Any, "x")
+    region.blocks[0].stmts.append(cf.Branch(arguments=(), successor=region.blocks[1]))
+    x_1 = stmts.Constant(0)
+    x_2 = stmts.Add(x, x_1.result)
+    region.blocks[1].stmts.append(x_1)
+    region.blocks[1].stmts.append(x_2)
+    region.blocks[1].stmts.append(func.Return(x_2.result))
+    cfg = CFG(region)
+    compactify = CFGCompactify(cfg)
+    compactify.rewrite(region)
+
+    target = ir.Region(ir.Block())
+    target.blocks[0].args.append_from(types.Any, "self")
+    x = target.blocks[0].args.append_from(types.Any, "x")
+    x0 = stmts.Constant(0)
+    target.blocks[0].stmts.append(x0)
+    x1 = stmts.Add(x, x0.result)
+    target.blocks[0].stmts.append(x1)
+    target.blocks[0].stmts.append(func.Return(x1.result))
+    assert region.is_structurally_equal(target)
