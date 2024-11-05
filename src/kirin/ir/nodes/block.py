@@ -288,6 +288,18 @@ class Block(IRNode["Region"]):
             emit=printer.plain_print,
         )
 
+        with printer.indent(increase=4, mark=False):
+            if printer.analysis is not None:
+                for arg in self.args:
+                    printer.print_newline()
+
+                    if arg not in printer.analysis:
+                        continue
+
+                    with printer.rich(style=printer.color.warning):
+                        printer.plain_print(printer.state.ssa_id[arg], " = ")
+                        printer.plain_print(repr(printer.analysis[arg]))
+
         with printer.indent(increase=2, mark=False):
             for stmt in self.stmts:
                 printer.print_newline()

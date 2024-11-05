@@ -18,11 +18,6 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Return)
     def return_(self, interp: ConstProp, stmt: Return, values: tuple) -> ReturnValue:
-        frame = interp.state.current_frame()
-        # we executed a non-pure statement, cannot return const
-        if frame.extra is not None and frame.extra.not_pure:
-            return ReturnValue(NotPure())
-
         if not values:
             return ReturnValue(Const(None))
         else:
@@ -60,15 +55,13 @@ class DialectConstProp(DialectInterpreter):
         values: tuple[ConstPropLattice, ...],
         results: Iterable[ir.ResultValue],
     ):
+        frame = interp.state.current_frame()
         if len(interp.state.frames) < interp.max_depth:
             result = interp.eval(mt, values).expect()
             if isinstance(result, NotPure):
-                frame = interp.state.current_frame()
                 for _result in results:
                     frame.entries[_result] = NotPure()
-                return ReturnValue(result)
-            else:
-                return ResultValue(result)
+            return ResultValue(result)
         return ResultValue(interp.bottom)
 
     @impl(Lambda)

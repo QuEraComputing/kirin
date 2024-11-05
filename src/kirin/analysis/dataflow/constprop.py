@@ -223,4 +223,8 @@ class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
     def run_method_region(
         self, mt: ir.Method, body: ir.Region, args: tuple[ConstPropLattice, ...]
     ) -> InterpResult[ConstPropLattice]:
-        return self.run_ssacfg_region(body, (Const(mt),) + args)
+        result = self.run_ssacfg_region(body, (Const(mt),) + args)
+        extra = self.state.current_frame().extra
+        if extra is not None and extra.not_pure:
+            return InterpResult(NotPure())
+        return result
