@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from kirin.exceptions import VerificationError
-from kirin.ir.derive import derive
 
 if TYPE_CHECKING:
     from kirin.dialects.func.attrs import Signature
@@ -13,19 +13,19 @@ if TYPE_CHECKING:
     from kirin.ir import Block, Region, Statement
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class StmtTrait(ABC):
 
     def verify(self, stmt: Statement):
         pass
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class Pure(StmtTrait):
     pass
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class ConstantLike(StmtTrait):
     pass
 
@@ -33,14 +33,14 @@ class ConstantLike(StmtTrait):
 GraphType = TypeVar("GraphType", bound="Graph[Block]")
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class RegionTrait(StmtTrait, Generic[GraphType]):
 
     @abstractmethod
     def get_graph(self, region: Region) -> GraphType: ...
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class SSACFGRegion(RegionTrait):
 
     def get_graph(self, region: Region):
@@ -49,27 +49,27 @@ class SSACFGRegion(RegionTrait):
         return CFG(region)
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class IsTerminator(StmtTrait):
     pass
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class NoTerminator(StmtTrait):
     pass
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class IsolatedFromAbove(StmtTrait):
     pass
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class HasParent(StmtTrait):
     parents: tuple[type[Statement]]
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class SymbolOpInterface(StmtTrait):
 
     def get_sym_name(self, stmt: Statement) -> PyAttr[str]:
@@ -92,7 +92,7 @@ class SymbolOpInterface(StmtTrait):
 StmtType = TypeVar("StmtType", bound="Statement")
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class CallableStmtInterface(StmtTrait, Generic[StmtType]):
 
     @classmethod
@@ -102,7 +102,7 @@ class CallableStmtInterface(StmtTrait, Generic[StmtType]):
         ...
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class HasSignature(StmtTrait, ABC):
 
     @classmethod
@@ -125,7 +125,7 @@ class HasSignature(StmtTrait, ABC):
             raise ValueError(f"{signature} is not a Signature attribute")
 
 
-@derive(init=True, repr=True, frozen=True)
+@dataclass(frozen=True)
 class SymbolTable(StmtTrait):
     """
     Statement with SymbolTable trait can only have one region with one block.

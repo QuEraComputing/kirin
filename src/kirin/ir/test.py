@@ -1,8 +1,9 @@
+from dataclasses import dataclass
+
 from kirin.ir import AnyType, SSAValue, TypeAttribute
-from kirin.ir.derive import derive
 
 
-@derive(id_hash=True)
+@dataclass
 class TestValue(SSAValue):
 
     def __init__(self, type: TypeAttribute | None = None) -> None:
@@ -12,3 +13,6 @@ class TestValue(SSAValue):
     @property
     def owner(self):
         raise NotImplementedError
+
+    def __hash__(self) -> int:
+        return id(self)

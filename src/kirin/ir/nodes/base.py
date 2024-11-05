@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, Iterator, TypeVar
 
 from typing_extensions import Self
 
-from kirin.ir.derive import derive
 from kirin.ir.ssa import SSAValue
 from kirin.print import Printable, Printer
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 ParentType = TypeVar("ParentType", bound="IRNode")
 
 
-@derive(id_hash=True)
+@dataclass
 class IRNode(Generic[ParentType], ABC, Printable):
     def assert_parent(self, type_: type[IRNode], parent) -> None:
         assert (

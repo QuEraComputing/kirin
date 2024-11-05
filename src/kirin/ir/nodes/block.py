@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
 
 from typing_extensions import Self
 
 from kirin.exceptions import VerificationError
 from kirin.ir.attrs import TypeAttribute
-from kirin.ir.derive import derive, field
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import MutableSequenceView, View
 from kirin.ir.ssa import BlockArgument, SSAValue
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from kirin.ir.nodes.stmt import Statement
 
 
-@derive(init=True, repr=True)
+@dataclass
 class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
 
     def append_from(self, typ: TypeAttribute, name: str | None = None) -> BlockArgument:
@@ -57,7 +57,7 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
         self.delete(self.field[idx])
 
 
-@derive(init=True, repr=True)
+@dataclass
 class BlockStmtIterator:
     next_stmt: Statement | None
 
@@ -72,7 +72,7 @@ class BlockStmtIterator:
         return stmt
 
 
-@derive(init=True, repr=True)
+@dataclass
 class BlockStmtsReverseIterator:
     next_stmt: Statement | None
 
@@ -87,7 +87,7 @@ class BlockStmtsReverseIterator:
         return stmt
 
 
-@derive(init=True, repr=True)
+@dataclass
 class BlockStmts(View["Block", "Statement"]):
     def __iter__(self) -> Iterator[Statement]:
         return BlockStmtIterator(self.node.first_stmt)
@@ -161,7 +161,7 @@ class BlockStmts(View["Block", "Statement"]):
             raise ValueError("Invalid block, last_stmt is None")
 
 
-@derive(id_hash=True)
+@dataclass
 class Block(IRNode["Region"]):
     _args: tuple[BlockArgument, ...]
 

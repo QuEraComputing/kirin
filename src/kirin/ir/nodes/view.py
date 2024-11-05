@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Generic, Iterator, Sequence, TypeVar, overload
 
 from typing_extensions import Self
 
-from kirin.ir.derive import derive
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.ssa import SSAValue
 
@@ -12,7 +12,7 @@ FieldType = TypeVar("FieldType", bound=Sequence)
 NodeType = TypeVar("NodeType", bound=IRNode | SSAValue)
 
 
-@derive(init=True, repr=True)
+@dataclass
 class View(ABC, Generic[NodeType, ElemType]):
     node: NodeType
 
@@ -36,7 +36,7 @@ class View(ABC, Generic[NodeType, ElemType]):
         raise NotImplementedError
 
 
-@derive(init=True, repr=True)
+@dataclass
 class SequenceView(Generic[FieldType, NodeType, ElemType], View[NodeType, ElemType]):
     field: FieldType
 
@@ -74,7 +74,7 @@ class SequenceView(Generic[FieldType, NodeType, ElemType], View[NodeType, ElemTy
             return self.field[idx]
 
 
-@derive(init=True, repr=True)
+@dataclass
 class MutableSequenceView(SequenceView[FieldType, NodeType, ElemType]):
     @overload
     def __setitem__(self, idx: int, value: ElemType) -> None: ...

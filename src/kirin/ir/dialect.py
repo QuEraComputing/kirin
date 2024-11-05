@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import dataclass_transform
 
 from kirin.ir.attrs import Attribute
-from kirin.ir.derive import derive, field
 from kirin.ir.nodes import Statement
 
 T = TypeVar("T")
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 # TODO: add an option to generate default lowering at dialect construction
-@derive(init=True)
+@dataclass
 class Dialect:
     name: str
     stmts: list[type[Statement]] = field(default_factory=list, init=True)
