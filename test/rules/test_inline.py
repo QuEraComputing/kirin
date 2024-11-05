@@ -125,3 +125,37 @@ def test_inline_constprop():
     assert len(inline_foldl.callable_region.blocks) == 1
     assert inline_foldl(2) == 6
     inline_foldl.print()
+
+
+from kirin import ir
+from kirin.prelude import basic, basic_no_opt
+
+
+@basic
+def _recursive_invoke(mt: ir.Method, idx: int, coll, res: tuple):
+    if idx == len(coll):
+        return res
+    res = res + (mt(coll[idx]),)
+    return _recursive_invoke(mt, idx + 1, coll, res)
+
+
+@basic
+def fcf_map(fn: ir.Method, coll):
+    return _recursive_invoke(fn, 0, coll, ())
+
+
+@basic_no_opt
+def fcfmap_flat():
+    # x = [1,2,3,4,5]
+
+    def _flat(i: int):
+        return i
+
+    tmp = fcf_map(fn=_flat, coll=range(5))
+
+    return tmp
+
+
+fcfmap_flat.code.print()
+Walk(Inline(heuristic=lambda x: True)).rewrite(fcfmap_flat.code)
+fcfmap_flat.code.print()

@@ -264,3 +264,22 @@ def test_interprocedure_true_branch():
     assert isinstance(result, NotConst)  # instead of NotPure
     true_branch = side_effect_true_branch_const.callable_region.blocks[1]
     assert constprop.results[true_branch.stmts.at(0).results[0]] == Const(None)
+<<<<<<< Updated upstream
+=======
+
+
+def test_non_pure_recursion():
+    @basic_no_opt
+    def for_loop_append(cntr: int, x: list, n_range: int):
+        if cntr < n_range:
+            stmts.Append(x, cntr)  # type: ignore
+            for_loop_append(cntr + 1, x, n_range)
+
+        return x
+
+    constprop = ConstProp(basic_no_opt)
+    constprop.eval(for_loop_append, tuple(NotConst() for _ in for_loop_append.args))
+    for_loop_append.print(analysis=constprop.results)
+    stmt = for_loop_append.callable_region.blocks[1].stmts.at(3)
+    assert isinstance(constprop.results[stmt.results[0]], NotPure)
+>>>>>>> Stashed changes
