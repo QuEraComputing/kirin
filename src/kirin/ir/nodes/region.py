@@ -76,6 +76,9 @@ class Region(IRNode["Statement"]):
             raise ValueError("Block does not belong to the region")
         return self._block_idx[block]
 
+    def __hash__(self) -> int:
+        return id(self)
+
     def clone(self, ssamap: dict[SSAValue, SSAValue] | None = None) -> Region:
         """Clone a region. This will clone all blocks and statements in the region.
         `SSAValue` defined outside the region will not be cloned unless provided in `ssamap`.

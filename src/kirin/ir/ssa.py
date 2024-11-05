@@ -95,6 +95,9 @@ class ResultValue(SSAValue):
     def owner(self) -> Statement:
         return self.stmt
 
+    def __hash__(self) -> int:
+        return id(self)
+
     def __repr__(self) -> str:
         if self.type.is_top():
             type_str = ""
@@ -125,6 +128,9 @@ class BlockArgument(SSAValue):
     def owner(self) -> Block:
         return self.block
 
+    def __hash__(self) -> int:
+        return id(self)
+
     def __repr__(self) -> str:
         if self.name:
             return f"<{type(self).__name__}[{self.type}] {self.name}, uses: {len(self.uses)}>"
@@ -147,6 +153,9 @@ class DeletedSSAValue(SSAValue):
         self.value = value
         self.type = value.type
 
+    def __hash__(self) -> int:
+        return id(self)
+
     def __repr__(self) -> str:
         return f"<{type(self).__name__}[{self.type}] value: {self.value}, uses: {len(self.uses)}>"
 
@@ -162,6 +171,9 @@ class TestValue(SSAValue):
     def __init__(self, type: TypeAttribute = AnyType()) -> None:
         super().__init__()
         self.type = type
+
+    def __hash__(self) -> int:
+        return id(self)
 
     @property
     def owner(self) -> Statement | Block:
