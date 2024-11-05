@@ -461,7 +461,11 @@
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
-<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span> <span class="nc">Call2Invoke</span><span class="p">(</span><span class="n">RewriteRule</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Rewrite a `Call` statement to an `Invoke` statement.&quot;&quot;&quot;</span>
 
@@ -478,8 +482,12 @@
             <span class="k">return</span> <span class="n">RewriteResult</span><span class="p">()</span>
 
         <span class="n">stmt</span> <span class="o">=</span> <span class="n">Invoke</span><span class="p">(</span><span class="n">inputs</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">inputs</span><span class="p">,</span> <span class="n">callee</span><span class="o">=</span><span class="n">mt</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">stmt</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">name</span>
-        <span class="n">stmt</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">type</span>
+        <span class="k">for</span> <span class="n">result</span><span class="p">,</span> <span class="n">new_result</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">results</span><span class="p">,</span> <span class="n">stmt</span><span class="o">.</span><span class="n">results</span><span class="p">):</span>
+            <span class="n">new_result</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">name</span>
+            <span class="n">new_result</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">type</span>
+            <span class="k">if</span> <span class="n">result</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="n">new_result</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
         <span class="n">node</span><span class="o">.</span><span class="n">replace_by</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">RewriteResult</span><span class="p">(</span><span class="n">has_done_something</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
