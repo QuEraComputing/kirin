@@ -1,0 +1,52 @@
+name: Documentation (preview)
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  documentation:
+    name: Deploy preview documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up rye
+        uses: eifinger/setup-rye@v3
+      - name: Setup JFrog credentials
+        run: |
+          rye self update
+          CfgPATH=$(rye config --show-path)
+          cat << EOF > $CfgPATH
+          [[sources]]
+          name = "default"
+          url = "https://${{ secrets.JFROG_USER}}:${{ secrets.JFROG_TOKEN }}@quera.jfrog.io/artifactory/api/pypi/quera-pypi-algo/simple/"
+          EOF
+          cat $CfgPATH
+      - name: Sync dependencies using rye
+        run: |
+          rye config --set-bool behavior.use-uv=true
+          rye pin 3.12
+          rye sync
+      - name: Set up build cache
+        uses: actions/cache@v4
+        id: cache
+        with:
+          key: mkdocs-material-${{ github.ref }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-
+      - name: Depoly documentation
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          rye run mkdocs build
+      - name: Deploy preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: ./site

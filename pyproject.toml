@@ -33,6 +33,10 @@ dev-dependencies = [
     "numpy>=1.26.4",
     "mypy>=1.11.2",
     "pyright>=1.1.380",
+    "mkdocs-material>=9.5.27",
+    "mkdocstrings[python]>=0.25.1",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.1",
 ]
 
 [tool.rye.scripts]
@@ -49,6 +53,9 @@ release = "python scripts/release.py"
     "coverage:report",
 ] }
 "test:all" = "pytest test"
+"doc:serve" = "mkdocs serve"
+"doc:build" = "mkdocs build"
+
 
 [tool.hatch.metadata]
 allow-direct-references = true
