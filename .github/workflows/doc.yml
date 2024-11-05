@@ -18,20 +18,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set up rye
         uses: eifinger/setup-rye@v3
-      - name: Setup JFrog credentials
+      - name: Update Rye
         run: |
           rye self update
-          CfgPATH=$(rye config --show-path)
-          cat << EOF > $CfgPATH
-          [[sources]]
-          name = "default"
-          url = "https://${{ secrets.JFROG_USER}}:${{ secrets.JFROG_TOKEN }}@quera.jfrog.io/artifactory/api/pypi/quera-pypi-algo/simple/"
-          EOF
-          cat $CfgPATH
       - name: Sync dependencies using rye
         run: |
           rye config --set-bool behavior.use-uv=true
-          rye pin 3.12
+          rye pin 3.10
           rye sync
       - name: Set up build cache
         uses: actions/cache@v4

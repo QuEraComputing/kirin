@@ -7,7 +7,7 @@ repo_url: https://github.com/QuEraComputing/kirin
 nav:
   - Home:
     - index.md
-  - API Reference: reference/kirin
+  #- API Reference: reference/kirin
 
 
 theme:
