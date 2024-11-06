@@ -276,6 +276,7 @@ class Statement(IRNode["Block"]):
 
     @regions.setter
     def regions(self, regions: list[Region]) -> None:
+        """Set the regions of the Statement."""
         for region in self._regions:
             region._parent = None
         for region in regions:
@@ -283,6 +284,7 @@ class Statement(IRNode["Block"]):
         self._regions = regions
 
     def drop_all_references(self) -> None:
+        """Remove all the dependency that reference/uses this Statement."""
         self.parent = None
         for idx, arg in enumerate(self._args):
             arg.remove_use(Use(self, idx))
@@ -290,6 +292,14 @@ class Statement(IRNode["Block"]):
             region.drop_all_references()
 
     def delete(self, safe: bool = True) -> None:
+        """Delete the Statement completely from the IR graph.
+
+        Note:
+            This method will detach + remove references of the Statement.
+
+        Args:
+            safe (bool, optional): If True, raise error if there is anything that still reference components in the Statement. Defaults to True.
+        """
         self.detach()
         self.drop_all_references()
         for result in self._results:
