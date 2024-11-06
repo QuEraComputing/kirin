@@ -58,9 +58,16 @@ class DialectConstProp(DialectInterpreter):
         callee: PartialLambda,
         args: tuple[ConstPropLattice, ...],
     ):
-        if (trait := callee.code.get_trait(ir.CallableStmtInterface)) is not None:
-            region = trait.get_callable_region(callee.code)
-        return interp.run_ssacfg_region(region, (callee, *args)).expect()
+        mt = ir.Method(
+            mod=None,
+            py_func=None,
+            sym_name=None,
+            arg_names=callee.argnames,
+            dialects=interp.dialects,
+            code=callee.code,
+            fields=callee.captured,
+        )
+        return interp.eval(mt, args).expect()
 
     @impl(Invoke)
     def invoke(
@@ -99,7 +106,7 @@ class DialectConstProp(DialectInterpreter):
                     ir.Method(
                         mod=None,
                         py_func=None,
-                        sym_name=stmt.name,
+                        sym_name=stmt.sym_name,
                         arg_names=arg_names,
                         dialects=interp.dialects,
                         code=stmt,
