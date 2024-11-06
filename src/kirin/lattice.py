@@ -56,7 +56,11 @@ class Lattice(ABC, Generic[LatticeParent], metaclass=LatticeMeta):
 
 
 class SingletonMeta(LatticeMeta):
-    """See https://stackoverflow.com/questions/674304/why-is-init-always-called-after-new/8665179#8665179"""
+    """
+    Singleton metaclass for lattices. It ensures that only one instance of a lattice is created.
+
+    See https://stackoverflow.com/questions/674304/why-is-init-always-called-after-new/8665179#8665179
+    """
 
     def __init__(cls, name, bases, attrs):
         super().__init__(name, bases, attrs)

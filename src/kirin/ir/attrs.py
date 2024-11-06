@@ -16,14 +16,27 @@ TypeLatticeParent = TypeVar("TypeLatticeParent", bound="TypeAttribute")
 
 
 class AttributeMeta(ABCMeta):
+    """Metaclass for attributes."""
+
     pass
 
 
 class TypeAttributeMeta(AttributeMeta, LatticeMeta):
+    """Metaclass for type attributes."""
+
     pass
 
 
 class SingletonTypeMeta(TypeAttributeMeta, SingletonMeta):
+    """Metaclass for singleton type attributes.
+
+    Singleton type attributes are attributes that have only one instance.
+
+    Examples:
+    - `AnyType`
+    - `BottomType`
+    """
+
     pass
 
 
