@@ -31,7 +31,7 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
         """Replace/Set the Blocks of the Region.
 
         Args:
-            idx (int | slice): The index or slice to replace the Blocks.
+            idx (int | slice): The index or slice to replace the [`Blocks`](ir.Block).
             block_or_blocks (Block | Iterable[Block]): The Block or Blocks to replace the Blocks.
 
         """
@@ -100,8 +100,8 @@ class Region(IRNode["Statement"]):
         """Initialize a Region object.
 
         Args:
-            blocks (Block | Iterable[Block], optional): A single Block object or an iterable of Block objects. Defaults to ().
-            parent (Statement | None, optional): The parent Statement object. Defaults to None.
+            blocks (Block | Iterable[Block], optional): A single [`Block`](ir.Block) object or an iterable of Block objects. Defaults to ().
+            parent (Statement | None, optional): The parent [`Statement`](ir.Statement) object. Defaults to None.
         """
         self._blocks = []
         self._block_idx = {}
