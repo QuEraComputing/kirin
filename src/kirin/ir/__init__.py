@@ -1,3 +1,8 @@
+"""IR module for kirin.
+
+This module contains the intermediate representation (IR) for kirin.
+"""
+
 from kirin.ir.attrs import (
     AnyType as AnyType,
     Attribute as Attribute,

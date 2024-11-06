@@ -50,14 +50,16 @@ class Registry:
                 ret[name] = from_ast
         return ret
 
-    def interpreter(self, keys: Iterable[str]):
+    def interpreter(
+        self, keys: Iterable[str]
+    ) -> tuple[dict["Signature", "InterpImpl"], dict["Dialect", "InterpImpl"]]:
         """select the dialect interpreter for the given key.
 
-        ### Args
-        - `keys: Iterable[str]` the keys to search for in the dialects
+        Args:
+            keys (Iterable[str]): the keys to search for in the dialects
 
-        ### Returns
-        - `dict["Signature", "ImplFunction"]` a map of dialects to their interpreters
+        Returns:
+            a map of dialects to their interpreters
         """
         from kirin.interp.impl import MethodImpl
 

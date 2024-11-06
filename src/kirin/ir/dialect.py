@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 # TODO: add an option to generate default lowering at dialect construction
 @dataclass
 class Dialect:
+    """Dialect is a collection of statements, attributes, interpreters, lowerings, and codegen."""
+
     name: str
     stmts: list[type[Statement]] = field(default_factory=list, init=True)
     attrs: list[type[Attribute]] = field(default_factory=list, init=True)
@@ -63,6 +65,15 @@ codegen=[{codegen}]\
 
     @dataclass_transform()
     def register(self, node: type | None = None, key: str | None = None):
+        """register is a decorator to register a node to the dialect.
+
+        Args:
+            node (type | None): The node to register. Defaults to None.
+            key (str | None): The key to register the node to. Defaults to None.
+
+        Raises:
+            ValueError: If the node is not a subclass of Statement, Attribute, DialectInterpreter, FromPythonAST, or DialectEmit.
+        """
         from kirin.codegen.dialect import DialectEmit
         from kirin.interp.dialect import DialectInterpreter
         from kirin.lowering.dialect import FromPythonAST
