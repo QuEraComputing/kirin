@@ -54,7 +54,6 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
         """Delete the Block at the specified index.
 
         Note:
-            [FIXME] [KHW] Is this correct???
             This only detach the Block from the Region. It does not remove uses that reference the Block.
 
         Args:
@@ -230,7 +229,7 @@ class Region(IRNode["Statement"]):
             This method will detach + remove references of the Region.
 
         Args:
-            safe (bool, optional): [FIXME] If True, raise error if there is anything that still reference components in the Region. Defaults to True.
+            safe (bool, optional): If True, raise error if there is anything that still reference components in the Region. Defaults to True.
         """
         self.detach()
         self.drop_all_references()
@@ -244,7 +243,7 @@ class Region(IRNode["Statement"]):
 
         Args:
             other (Self): The other Region to compare with.
-            context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): [FIXME]. Defaults to None.
+            context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.
 
         Returns:
             bool: True if the Region is structurally equal to the other Region.
@@ -273,7 +272,7 @@ class Region(IRNode["Statement"]):
 
         Args:
             reverse (bool, optional): If walk in the reversed manner. Defaults to False.
-            region_first (bool, optional): [FIXME]. Defaults to False.
+            region_first (bool, optional): If the walk should go through the Statement first or the Region of a Statement first. Defaults to False.
 
         Yields:
             Iterator[Statement]: An iterator that yield Statements of Blocks in the Region, in the specified order.
