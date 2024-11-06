@@ -4,16 +4,6 @@ Kirin is the *K*ernel *I*ntermediate *R*epresentation *In*frastructure. It is a 
 infrastructure for building compilers for domain-specific languages (DSLs) that target
 scientific computing kernels.
 
-## Getting Started
-
-To get started with Kirin, you can install it using `pip`:
-
-```bash
-pip install kirin-toolchain
-```
-
-Kirin supports Python 3.9 or later. The Kirin module is We recommend using Python 3.10 for the best experience.
-
 ## Features
 
 - MLIR-like dialects as composable python packages
@@ -22,6 +12,7 @@ Kirin supports Python 3.9 or later. The Kirin module is We recommend using Pytho
 - Julia-like abstract interpretation framework
 - Builtin support for interpretation
 - Builtin support Python type system and type inference
+- Type hinted via modern Python type hints
 
 ## Kirin's mission
 
