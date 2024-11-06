@@ -28,6 +28,13 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
     def __setitem__(
         self, idx: int | slice, block_or_blocks: Block | Iterable[Block]
     ) -> None:
+        """Replace/Set the Blocks of the Region.
+
+        Args:
+            idx (int | slice): The index or slice to replace the Blocks.
+            block_or_blocks (Block | Iterable[Block]): The Block or Blocks to replace the Blocks.
+
+        """
         if isinstance(idx, int) and isinstance(block_or_blocks, Block):
             self.field[idx].detach()
             block_or_blocks.attach(self.node)
@@ -44,15 +51,35 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
             raise ValueError("Invalid assignment")
 
     def __delitem__(self, idx: int) -> None:
+        """Delete the Block at the specified index.
+
+        Note:
+            [FIXME] [KHW] Is this correct???
+            This only detach the Block from the Region. It does not remove uses that reference the Block.
+
+        Args:
+            idx (int): The index of the Block to delete.
+        """
         self.field[idx].detach()
 
     def insert(self, idx: int, value: Block) -> None:
+        """Inserts a Block at the specified index.
+
+        Args:
+            idx (int): The index at which to insert the block.
+            value (Block): The block to be inserted.
+        """
         value.attach(self.node)
         self.field.insert(idx, value)
         for i, value in enumerate(self.field[idx:], idx):
             self.node._block_idx[value] = i
 
     def append(self, value: Block) -> None:
+        """Append a Block to the Region.
+
+        Args:
+            value (Block): The block to be appended.
+        """
         value.attach(self.node)
         self.node._block_idx[value] = len(self.field)
         self.field.append(value)
