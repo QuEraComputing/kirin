@@ -302,6 +302,17 @@ def test_closure_prop():
         return inner
 
     @basic_no_opt.add(dialect)
+    def non_pure(x: int, y: int):
+        def inner():
+            if False:
+                return x + y
+            else:
+                DummyStmt2(1)  # type: ignore
+                return 2
+
+        return inner
+
+    @basic_no_opt.add(dialect)
     def main():
         x = DummyStmt2(1)  # type: ignore
         x = non_const_closure(x, x)  # type: ignore
@@ -314,3 +325,16 @@ def test_closure_prop():
     call_result = constprop.results[stmt.results[0]]
     assert isinstance(call_result, Const)
     assert call_result.data == 2
+
+    @basic_no_opt.add(dialect)
+    def main2():
+        x = DummyStmt2(1)  # type: ignore
+        x = non_pure(x, x)  # type: ignore
+        return x()
+
+    constprop = ConstProp(basic_no_opt.add(dialect))
+    constprop.eval(main2, ())
+    main2.print(analysis=constprop.results)
+    stmt = main2.callable_region.blocks[0].stmts.at(3)
+    call_result = constprop.results[stmt.results[0]]
+    assert isinstance(call_result, NotPure)
