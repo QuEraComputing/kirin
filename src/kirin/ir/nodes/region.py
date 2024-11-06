@@ -38,7 +38,7 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
             raise ValueError("Invalid assignment")
 
     def __delitem__(self, idx: int) -> None:
-        self.field[idx].detach()
+        self.field[idx].delete()
 
     def insert(self, idx: int, value: Block) -> None:
         value.attach(self.node)
