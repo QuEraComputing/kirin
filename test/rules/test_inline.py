@@ -7,7 +7,7 @@ from kirin.dialects.py import data, stmts, types
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Chain, Fixpoint, Walk
 from kirin.rules.call2invoke import Call2Invoke
-from kirin.rules.cfg_compatify import CFGCompactify
+from kirin.rules.cfg_compactify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.fold import ConstantFold
 from kirin.rules.getitem import InlineGetItem

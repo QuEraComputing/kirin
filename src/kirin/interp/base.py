@@ -3,7 +3,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Sequence, TypeVar
 
 from typing_extensions import dataclass_transform
 
@@ -169,7 +169,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
     @staticmethod
     def permute_values(
-        mt: Method, values: tuple[ValueType, ...], kwarg_names: tuple[str, ...]
+        arg_names: Sequence[str],
+        values: tuple[ValueType, ...],
+        kwarg_names: tuple[str, ...],
     ) -> tuple[ValueType, ...]:
         """Permute the arguments according to the method signature and
         the given keyword arguments, where the keyword argument names
@@ -189,7 +191,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
         positionals = values[: n_total - len(kwarg_names)]
         args = BaseInterpreter.get_args(
-            mt.arg_names[len(positionals) + 1 :], positionals, kwargs
+            arg_names[len(positionals) + 1 :], positionals, kwargs
         )
         return args
 

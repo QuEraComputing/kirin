@@ -3,6 +3,8 @@ from kirin.analysis.dataflow.constprop import (
     ConstProp as ConstProp,
     NotConst as NotConst,
     NotPure as NotPure,
+    PartialLambda as PartialLambda,
+    PartialTuple as PartialTuple,
 )
 from kirin.analysis.dataflow.forward import (
     Forward as Forward,

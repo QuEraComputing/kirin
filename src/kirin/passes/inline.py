@@ -4,7 +4,7 @@ from typing import Callable
 from kirin import ir
 from kirin.passes import Pass
 from kirin.rewrite import Fixpoint, Walk
-from kirin.rules.cfg_compatify import CFGCompactify
+from kirin.rules.cfg_compactify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.inline import Inline
 

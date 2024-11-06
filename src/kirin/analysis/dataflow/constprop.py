@@ -122,6 +122,60 @@ class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
 
 
 @dataclass
+class PartialLambda(ConstPropLattice):
+    argnames: list[str]
+    code: ir.Statement
+    captured: tuple[ConstPropLattice, ...]
+
+    def is_subseteq(self, other: ConstPropLattice) -> bool:
+        if not isinstance(other, PartialLambda):
+            return NotConst().is_subseteq(other)  # widen self
+
+        if self.code is not other.code:
+            return False
+
+        if len(self.captured) != len(other.captured):
+            return False
+
+        return all(x.is_subseteq(y) for x, y in zip(self.captured, other.captured))
+
+    def join(self, other: ConstPropLattice) -> ConstPropLattice:
+        if other.is_bottom():
+            return self
+
+        if not isinstance(other, PartialLambda):
+            return NotConst().join(other)  # widen self
+
+        if self.code is not other.code:
+            return NotConst()  # lambda stmt is pure
+
+        if len(self.captured) != len(other.captured):
+            return ConstPropBottom()  # err
+
+        return PartialLambda(
+            self.argnames,
+            self.code,
+            tuple(x.join(y) for x, y in zip(self.captured, other.captured)),
+        )
+
+    def meet(self, other: ConstPropLattice) -> ConstPropLattice:
+        if not isinstance(other, PartialLambda):
+            return NotConst().meet(other)
+
+        if self.code is not other.code:
+            return ConstPropBottom()
+
+        if len(self.captured) != len(other.captured):
+            return NotConst()
+
+        return PartialLambda(
+            self.argnames,
+            self.code,
+            tuple(x.meet(y) for x, y in zip(self.captured, other.captured)),
+        )
+
+
+@dataclass
 class ConstPropBottom(ConstPropLattice, metaclass=SingletonMeta):
 
     def is_equal(self, other: ConstPropLattice) -> bool:
