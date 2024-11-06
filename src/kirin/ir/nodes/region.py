@@ -18,6 +18,12 @@ if TYPE_CHECKING:
 
 @dataclass
 class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
+    """A View object that contains a list of Blocks of a Region.
+
+    Description:
+        This is a proxy object that provide safe API to manipulate the Blocks of a Region.
+
+    """
 
     def __setitem__(
         self, idx: int | slice, block_or_blocks: Block | Iterable[Block]
@@ -54,6 +60,8 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
 
 @dataclass
 class Region(IRNode["Statement"]):
+    """Region consist of a list of Blocks"""
+
     _blocks: list[Block] = field(default_factory=list, repr=False)
     _block_idx: dict[Block, int] = field(default_factory=dict, repr=False)
     _parent: Statement | None = field(default=None, repr=False)
@@ -63,6 +71,12 @@ class Region(IRNode["Statement"]):
         blocks: Block | Iterable[Block] = (),
         parent: Statement | None = None,
     ):
+        """Initialize a Region object.
+
+        Args:
+            blocks (Block | Iterable[Block], optional): A single Block object or an iterable of Block objects. Defaults to ().
+            parent (Statement | None, optional): The parent Statement object. Defaults to None.
+        """
         self._blocks = []
         self._block_idx = {}
         self.parent_node = parent
@@ -72,6 +86,17 @@ class Region(IRNode["Statement"]):
             self.blocks.append(block)
 
     def __getitem__(self, block: Block) -> int:
+        """Get the index of a block within the region.
+
+        Args:
+            block (Block): The block to get the index of.
+
+        Raises:
+            ValueError: If the block does not belong to the region.
+
+        Returns:
+            int: The index of the block within the region.
+        """
         if block.parent is not self:
             raise ValueError("Block does not belong to the region")
         return self._block_idx[block]
@@ -113,10 +138,12 @@ class Region(IRNode["Statement"]):
 
     @property
     def parent_node(self) -> Statement | None:
+        """Get the parent statement of the region."""
         return self._parent
 
     @parent_node.setter
     def parent_node(self, parent: Statement | None) -> None:
+        """Set the parent statement of the region."""
         from kirin.ir.nodes.stmt import Statement
 
         self.assert_parent(Statement, parent)
@@ -124,10 +151,20 @@ class Region(IRNode["Statement"]):
 
     @property
     def blocks(self) -> RegionBlocks:
+        """Get the Blocks in the region.
+
+        Returns:
+            RegionBlocks: The blocks View object of the region.
+        """
         return RegionBlocks(self, self._blocks)
 
     @property
     def region_index(self) -> int:
+        """Get the index of the region within the parent scope.
+
+        Returns:
+            int: The index of the region within the parent scope.
+        """
         if self.parent_node is None:
             raise ValueError("Region has no parent")
         for idx, region in enumerate(self.parent_node.regions):
@@ -136,6 +173,11 @@ class Region(IRNode["Statement"]):
         raise ValueError("Region not found in parent")
 
     def detach(self, index: int | None = None) -> None:
+        """Detach this Region from the IR tree graph.
+
+        Note:
+            Detach only detach the Region from the IR graph. It does not remove uses that reference the Region.
+        """
         # already detached
         if self.parent_node is None:
             return
@@ -149,11 +191,20 @@ class Region(IRNode["Statement"]):
         self.parent_node = None
 
     def drop_all_references(self) -> None:
+        """Remove all the dependency that reference/uses this Region."""
         self.parent_node = None
         for block in self._blocks:
             block.drop_all_references()
 
     def delete(self, safe: bool = True) -> None:
+        """Delete the Region completely from the IR graph.
+
+        Note:
+            This method will detach + remove references of the Region.
+
+        Args:
+            safe (bool, optional): [FIXME] If True, raise error if there is anything that still reference components in the Region. Defaults to True.
+        """
         self.detach()
         self.drop_all_references()
 
@@ -162,6 +213,15 @@ class Region(IRNode["Statement"]):
         other: Self,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
+        """Check if the Region is structurally equal to another Region.
+
+        Args:
+            other (Self): The other Region to compare with.
+            context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): [FIXME]. Defaults to None.
+
+        Returns:
+            bool: True if the Region is structurally equal to the other Region.
+        """
         if context is None:
             context = {}
 
@@ -182,6 +242,15 @@ class Region(IRNode["Statement"]):
     def walk(
         self, *, reverse: bool = False, region_first: bool = False
     ) -> Iterator[Statement]:
+        """Traversal the Statements of Blocks in the Region.
+
+        Args:
+            reverse (bool, optional): If walk in the reversed manner. Defaults to False.
+            region_first (bool, optional): [FIXME]. Defaults to False.
+
+        Yields:
+            Iterator[Statement]: An iterator that yield Statements of Blocks in the Region, in the specified order.
+        """
         for block in reversed(self.blocks) if reverse else self.blocks:
             yield from block.walk(reverse=reverse, region_first=region_first)
 
@@ -214,10 +283,16 @@ class Region(IRNode["Statement"]):
         printer.plain_print("}")
 
     def typecheck(self) -> None:
+        """Checking the types of the Statments of Blocks in the Region."""
         for block in self.blocks:
             block.typecheck()
 
     def verify(self) -> None:
+        """Verify the correctness of the Region.
+
+        Raises:
+            VerificationError: If the Region is not correct.
+        """
         from kirin.ir.nodes.stmt import Statement
 
         if not isinstance(self.parent_node, Statement):
