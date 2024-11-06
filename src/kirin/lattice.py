@@ -7,10 +7,13 @@ LatticeParent = TypeVar("LatticeParent", bound="Lattice")
 
 
 class LatticeMeta(ABCMeta):
+    """Metaclass for lattices."""
+
     pass
 
 
 class Lattice(ABC, Generic[LatticeParent], metaclass=LatticeMeta):
+    """Abstract base class for lattices."""
 
     @property
     @abstractmethod
@@ -112,6 +115,7 @@ class UnionMeta(LatticeMeta):
 
 
 class EmptyLattice(Lattice["EmptyLattice"], metaclass=SingletonMeta):
+    """Empty lattice."""
 
     @property
     def parent_type(self) -> type[EmptyLattice]:
