@@ -20,8 +20,29 @@ if TYPE_CHECKING:
 
 @dataclass
 class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
+    """A View object that contains a list of BlockArgument.
+
+    Description:
+        This is a proxy object that provide safe API to manipulate the arguments of a Block.
+
+
+    """
 
     def append_from(self, typ: TypeAttribute, name: str | None = None) -> BlockArgument:
+        """Append a new argument to the Block that this View reference to.
+
+        Description:
+            This method will create a new [`BlockArgument`](kirin.ir.BlockArgument) and append it to the argument list
+            of the reference `Block`.
+
+        Args:
+            typ (TypeAttribute): The type of the argument.
+            name (str | None, optional): name of the argument. Defaults to `None`.
+
+        Returns:
+            BlockArgument: The newly created [`BlockArgument`](kirin.ir.BlockArgument).
+
+        """
         new_arg = BlockArgument(self.node, len(self.node._args), typ)
         if name:
             new_arg.name = name
@@ -32,6 +53,20 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
     def insert_from(
         self, idx: int, typ: TypeAttribute, name: str | None = None
     ) -> BlockArgument:
+        """Insert a new argument to the Block that this View reference to.
+
+        Description:
+            This method will create a new `BlockArgument` and insert it to the argument list
+            of the reference Block at the specified index
+
+        Args:
+            idx (int): Insert location index.
+            typ (TypeAttribute): The type of the argument.
+            name (str | None, optional): Name of the argument. Defaults to `None`.
+
+        Returns:
+            BlockArgument: The newly created BlockArgument.
+        """
         if idx < 0 or idx > len(self.node._args):
             raise ValueError("Invalid index")
 
@@ -45,6 +80,16 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
         return new_arg
 
     def delete(self, arg: BlockArgument, safe: bool = True) -> None:
+        """Delete a BlockArgument from the Block that this View reference to.
+
+
+        Args:
+            arg (BlockArgument): _description_
+            safe (bool, optional): If True, error will be raised if the BlockArgument has any Use by others.  Defaults to True.
+
+        Raises:
+            ValueError: If the argument does not belong to the reference block.
+        """
         if arg.block is not self.node:
             raise ValueError("Attempt to delete an argument that is not in the block")
 
@@ -89,6 +134,12 @@ class BlockStmtsReverseIterator:
 
 @dataclass
 class BlockStmts(View["Block", "Statement"]):
+    """A View object that contains a list of Statements.
+
+    Description:
+        This is a proxy object that provide safe API to manipulate the statements of a Block.
+    """
+
     def __iter__(self) -> Iterator[Statement]:
         return BlockStmtIterator(self.node.first_stmt)
 
@@ -145,6 +196,11 @@ class BlockStmts(View["Block", "Statement"]):
         return stmt
 
     def append(self, value: Statement) -> None:
+        """Append a Statement to the reference Block.
+
+        Args:
+            value (Statement): A Statement to be appended.
+        """
         from kirin.ir.nodes.stmt import Statement
 
         if not isinstance(value, Statement):
@@ -163,6 +219,8 @@ class BlockStmts(View["Block", "Statement"]):
 
 @dataclass
 class Block(IRNode["Region"]):
+    """Block consist of a list of Statements and optionally input arguments."""
+
     _args: tuple[BlockArgument, ...]
 
     # NOTE: we need linked list since stmts are inserted frequently
@@ -177,6 +235,11 @@ class Block(IRNode["Region"]):
         stmts: Sequence[Statement] = (),
         argtypes: Iterable[TypeAttribute] = (),
     ):
+        """
+        Args:
+            stmts (Sequence[Statement], optional): A list of statements. Defaults to ().
+            argtypes (Iterable[TypeAttribute], optional): The type of the block arguments. Defaults to ().
+        """
         super().__init__()
         self._args = tuple(
             BlockArgument(self, i, argtype) for i, argtype in enumerate(argtypes)
@@ -191,16 +254,19 @@ class Block(IRNode["Region"]):
 
     @property
     def parent_stmt(self) -> Statement | None:
+        """parent statement of the Block."""
         if self.parent is None:
             return None
         return self.parent.parent_node
 
     @property
     def parent_node(self) -> Region | None:
+        """Get parent Region of the Block."""
         return self.parent
 
     @parent_node.setter
     def parent_node(self, parent: Region | None) -> None:
+        """Set the parent Region of the Block."""
         from kirin.ir.nodes.region import Region
 
         self.assert_parent(Region, parent)
@@ -208,26 +274,53 @@ class Block(IRNode["Region"]):
 
     @property
     def args(self) -> BlockArguments:
+        """Get the  arguments of the Block.
+
+        Returns:
+            BlockArguments: The arguments view of the Block.
+        """
         return BlockArguments(self, self._args)
 
     @property
     def first_stmt(self) -> Statement | None:
+        """Get the first Statement of the Block.
+
+        Returns:
+            Statement | None: The first Statement of the Block.
+        """
         return self._first_stmt
 
     @property
     def last_stmt(self) -> Statement | None:
+        """Get the last Statement of the Block.
+
+        Returns:
+            Statement | None: The last Statement of the Block.
+
+        """
         return self._last_stmt
 
     @property
     def stmts(self) -> BlockStmts:
+        """Get the list of Statements of the Block.
+
+        Returns:
+            BlockStmts: The Statements of the Block.
+        """
         return BlockStmts(self)
 
     def drop_all_references(self) -> None:
+        """Remove all the dependency that reference/uses this Block."""
         self.parent = None
         for stmt in self.stmts:
             stmt.drop_all_references()
 
     def detach(self) -> None:
+        """Detach this Block from the IR.
+
+        Note:
+            Detach only detach the Block from the IR graph. It does not remove uses that reference the Block.
+        """
         if self.parent is None:
             return
 
@@ -239,6 +332,14 @@ class Block(IRNode["Region"]):
         self.parent = None
 
     def delete(self, safe: bool = True) -> None:
+        """Delete the Block completely from the IR.
+
+        Note:
+            This method will detach + remove references of the block.
+
+        Args:
+            safe (bool, optional): If True, raise error if there is anything that still reference components in the block. Defaults to True.
+        """
         self.detach()
         self.drop_all_references()
         for stmt in self.stmts:
@@ -249,6 +350,15 @@ class Block(IRNode["Region"]):
         other: Self,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
+        """Check if the Block is structurally equal to another Block.
+
+        Args:
+            other (Self): The other Block to compare with.
+            context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.
+
+        Returns:
+            bool: True if the Block is structurally equal to the other Block.
+        """
         if context is None:
             context = {}
 
@@ -275,6 +385,15 @@ class Block(IRNode["Region"]):
     def walk(
         self, *, reverse: bool = False, region_first: bool = False
     ) -> Iterator[Statement]:
+        """Traversal the Statements in a Block.
+
+        Args:
+            reverse (bool, optional): If walk in the reversed manner. Defaults to False.
+            region_first (bool, optional): If the walk should go through the Statement first or the Region of a Statement first. Defaults to False.
+
+        Yields:
+            Iterator[Statement]: An iterator that yield Statements in the Block in the specified order.
+        """
         for stmt in reversed(self.stmts) if reverse else self.stmts:
             yield from stmt.walk(reverse=reverse, region_first=region_first)
 
@@ -325,10 +444,16 @@ class Block(IRNode["Region"]):
                             )
 
     def typecheck(self) -> None:
+        """Checking the types of the Statments in the Block."""
         for stmt in self.stmts:
             stmt.typecheck()
 
     def verify(self) -> None:
+        """Verify the correctness of the Block.
+
+        Raises:
+            VerificationError: If the Block is not correct.
+        """
         from kirin.ir.nodes.stmt import Region
 
         if not isinstance(self.parent, Region):
