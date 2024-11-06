@@ -60,6 +60,8 @@ class ResultList(MutableSequenceView[list, "Statement", ResultValue]):
 
 @dataclass(repr=False)
 class Statement(IRNode["Block"]):
+    """The Statment is an instruction in the IR"""
+
     name: ClassVar[str]
     dialect: ClassVar[Dialect | None] = field(default=None, init=False, repr=False)
     traits: ClassVar[frozenset[StmtTrait]]
@@ -85,16 +87,27 @@ class Statement(IRNode["Block"]):
 
     @property
     def parent_stmt(self) -> Statement | None:
+        """Get the parent statement.
+
+        Returns:
+            Statement | None: The parent statement.
+        """
         if not self.parent_node:
             return None
         return self.parent_node.parent_stmt
 
     @property
     def parent_node(self) -> Block | None:
+        """Get the parent node. [FIXME] [KHW] whats the different btwn parent_node and parent_block?
+
+        Returns:
+            Block | None: The parent node.
+        """
         return self.parent
 
     @parent_node.setter
     def parent_node(self, parent: Block | None) -> None:
+        """Set the parent Block."""
         from kirin.ir.nodes.block import Block
 
         self.assert_parent(Block, parent)
@@ -102,35 +115,64 @@ class Statement(IRNode["Block"]):
 
     @property
     def parent_region(self) -> Region | None:
+        """Get the parent Region.
+        Returns:
+            Region | None: The parent Region.
+        """
         if (p := self.parent_node) is not None:
             return p.parent_node
         return None
 
     @property
     def parent_block(self) -> Block | None:
+        """Get the parent Block. [FIXME] [KHW] whats the different btwn parent_node and parent_block?
+
+        Returns:
+            Block | None: The parent Block.
+        """
         return self.parent_node
 
     @property
     def next_stmt(self) -> Statement | None:
+        """Get the next statement."""
         return self._next_stmt
 
     @next_stmt.setter
     def next_stmt(self, stmt: Statement) -> None:
+        """Set the next statement.
+
+        Note:
+            Do not directly call this API. use `stmt.insert_after(self)` instead.
+
+        """
         raise ValueError(
             "Cannot set next_stmt directly, use stmt.insert_after(self) or stmt.insert_before(self)"
         )
 
     @property
     def prev_stmt(self) -> Statement | None:
+        """Get the previous statement."""
         return self._prev_stmt
 
     @prev_stmt.setter
     def prev_stmt(self, stmt: Statement) -> None:
+        """Set the previous statement.
+
+        Note:
+            Do not directly call this API. use `stmt.insert_before(self)` instead
+
+        """
         raise ValueError(
             "Cannot set prev_stmt directly, use stmt.insert_after(self) or stmt.insert_before(self)"
         )
 
     def insert_after(self, stmt: Statement) -> None:
+        """Insert the current Statement after the input Statement.
+
+        Args:
+            stmt (Statement): Input Statement.
+
+        """
         if self._next_stmt is not None and self._prev_stmt is not None:
             raise ValueError(
                 f"Cannot insert before a statement that is already in a block: {self.name}"
@@ -152,6 +194,12 @@ class Statement(IRNode["Block"]):
                 self.parent._last_stmt = self
 
     def insert_before(self, stmt: Statement) -> None:
+        """Insert the current Statement before the input Statement.
+
+        Args:
+            stmt (Statement): Input Statement.
+
+        """
         if self._next_stmt is not None and self._prev_stmt is not None:
             raise ValueError(
                 f"Cannot insert before a statement that is already in a block: {self.name}"
@@ -173,6 +221,11 @@ class Statement(IRNode["Block"]):
                 self.parent._first_stmt = self
 
     def replace_by(self, stmt: Statement) -> None:
+        """Replace the current Statement by the input Statement.
+
+        Args:
+            stmt (Statement): Input Statement.
+        """
         stmt.insert_before(self)
         for result, old_result in zip(stmt._results, self._results):
             old_result.replace_by(result)
@@ -182,10 +235,20 @@ class Statement(IRNode["Block"]):
 
     @property
     def args(self) -> ArgumentList:
+        """Get the arguments of the Statement.
+
+        Returns:
+            ArgumentList: The arguments View of the Statement.
+        """
         return ArgumentList(self, self._args)
 
     @args.setter
     def args(self, args: Sequence[SSAValue]) -> None:
+        """Set the arguments of the Statement.
+
+        Args:
+            args (Sequence[SSAValue]): The arguments to set.
+        """
         new = tuple(args)
         for idx, arg in enumerate(self._args):
             arg.remove_use(Use(self, idx))
@@ -195,10 +258,20 @@ class Statement(IRNode["Block"]):
 
     @property
     def results(self) -> ResultList:
+        """Get the result values of the Statement.
+
+        Returns:
+            ResultList: The result values View of the Statement.
+        """
         return ResultList(self, self._results)
 
     @property
     def regions(self) -> list[Region]:
+        """Get a list of regions of the Statement.
+
+        Returns:
+            list[Region]: The list of regions of the Statement.
+        """
         return self._regions
 
     @regions.setter
