@@ -40,6 +40,11 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
     def __delitem__(self, idx: int) -> None:
         self.field[idx].delete()
 
+    def pop(self, idx: int = -1) -> Block:
+        item = self.field[idx]
+        self[idx].detach()
+        return item
+
     def insert(self, idx: int, value: Block) -> None:
         value.attach(self.node)
         self.field.insert(idx, value)
