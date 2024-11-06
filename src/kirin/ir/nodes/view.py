@@ -120,3 +120,23 @@ class MutableSequenceView(SequenceView[FieldType, NodeType, ElemType]):
         item = self.field[idx]
         del self[idx]
         return item
+
+    def poplast(self) -> ElemType | None:
+        """Pop the last element from the view.
+
+        Returns:
+            The last element in the view.
+        """
+        if self:
+            return self.pop(-1)
+        return None
+
+    def popfirst(self) -> ElemType | None:
+        """Pop the first element from the view.
+
+        Returns:
+            The first element in the view.
+        """
+        if self:
+            return self.pop(0)
+        return None

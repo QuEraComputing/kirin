@@ -1,6 +1,9 @@
+# type: ignore
+from kirin import ir
 from kirin.analysis import ConstProp, NotConst
 from kirin.analysis.cfg import CFG
-from kirin.dialects.py import stmts
+from kirin.decl import info, statement
+from kirin.dialects.py import data, stmts, types
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Chain, Fixpoint, Walk
 from kirin.rules.call2invoke import Call2Invoke
@@ -125,3 +128,41 @@ def test_inline_constprop():
     assert len(inline_foldl.callable_region.blocks) == 1
     assert inline_foldl(2) == 6
     inline_foldl.print()
+
+
+def test_inline_single_entry():
+    dialect = ir.Dialect("dummy2")
+
+    @statement(dialect=dialect)
+    class DummyStmtWithSiteEffect(ir.Statement):
+        name = "dummy2"
+        value: ir.SSAValue = info.argument(types.Int)
+        option: data.PyAttr[str] = info.attribute()
+        # result: ir.ResultValue = info.result(types.Int)
+
+    @basic_no_opt.add(dialect)
+    def inline_npure(x: int, y: int):
+        DummyStmtWithSiteEffect(x, option="attr")
+        DummyStmtWithSiteEffect(y, option="attr2")
+
+    @basic_no_opt.add(dialect)
+    def inline_non_pure():
+        DummyStmtWithSiteEffect(3, option="attr0")
+        inline_npure(1, 2)
+
+    inline_non_pure.code.print()
+    inline = Inline(heuristic=lambda x: True)
+    Walk(inline).rewrite(inline_non_pure.code)
+    Fixpoint(CFGCompactify(CFG(inline_non_pure.callable_region))).rewrite(
+        inline_non_pure.code
+    )
+    inline_non_pure.code.print()
+    assert isinstance(
+        inline_non_pure.callable_region.blocks[0].stmts.at(1), DummyStmtWithSiteEffect
+    )
+    assert isinstance(
+        inline_non_pure.callable_region.blocks[0].stmts.at(5), DummyStmtWithSiteEffect
+    )
+    assert isinstance(
+        inline_non_pure.callable_region.blocks[0].stmts.at(6), DummyStmtWithSiteEffect
+    )

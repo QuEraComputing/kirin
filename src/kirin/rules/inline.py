@@ -85,9 +85,9 @@ class Inline(RewriteRule):
             result.replace_by(block_arg)
 
         parent_block_idx = parent_region._block_idx[parent_block]
-        idx, block = 0, inline_region.blocks.pop(0)
-        entry_block = block
-        while inline_region.blocks:
+        entry_block = inline_region.blocks.popfirst()
+        idx, block = 0, entry_block
+        while block is not None:
             idx += 1
 
             if block.last_stmt and isinstance(block.last_stmt, func.Return):
@@ -99,16 +99,17 @@ class Inline(RewriteRule):
                 )
 
             parent_region.blocks.insert(parent_block_idx + idx, block)
-            block = inline_region.blocks.pop(0)
+            block = inline_region.blocks.popfirst()
 
         parent_region.blocks.append(after_block)
 
-        func_self = stmts.Constant(call.callee)
-        func_self.result.name = call.callee.sym_name
-        func_self.insert_before(call)
-        cf.Branch(
-            arguments=(func_self.result,) + tuple(arg for arg in call.args),
-            successor=entry_block,
-        ).insert_before(call)
+        if entry_block:
+            func_self = stmts.Constant(call.callee)
+            func_self.result.name = call.callee.sym_name
+            func_self.insert_before(call)
+            cf.Branch(
+                arguments=(func_self.result,) + tuple(arg for arg in call.args),
+                successor=entry_block,
+            ).insert_before(call)
         call.delete()
         return
