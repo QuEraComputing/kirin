@@ -58,6 +58,10 @@ class DialectConstProp(DialectInterpreter):
         callee: PartialLambda,
         args: tuple[ConstPropLattice, ...],
     ):
+        # NOTE: we still use PartialLambda because
+        # we want to gurantee what we receive here in captured
+        # values are all lattice elements and not just obtain via
+        # Const(Method(...)) which is Any.
         mt = ir.Method(
             mod=None,
             py_func=None,
