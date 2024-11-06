@@ -8,6 +8,8 @@ nav:
   - Home:
       - index.md
       - Installation: install.md
+      - Declarations: def.md
+      - Compiler 101: 101.md
   - API Reference:
     - IR:
       - reference/kirin/ir/index.md
