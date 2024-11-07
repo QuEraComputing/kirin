@@ -1,6 +1,7 @@
 import inspect
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import update_wrapper
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -227,6 +228,7 @@ def dialect_group(dialects: Iterable[Union["Dialect", ModuleType]]):
         transform: RunPassGen[PassParams],
     ) -> DialectGroup[PassParams]:
         ret = DialectGroup(dialects, run_pass=transform)
+        update_wrapper(ret, transform)
         return ret
 
     return wrapper

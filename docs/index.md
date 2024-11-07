@@ -28,7 +28,7 @@ In this example, we will mutate python's semantics to
 support a small eDSL (embedded domain-specific language) called `beer`.
 It describes the process of brewing beer and get drunk.
 
-First, let's define the [dialect](/def/#dialects) object, which is a registry for all
+First, let's define the [dialect](def.md#dialects) object, which is a registry for all
 the objects modeling the semantics.
 
 ```python
@@ -48,7 +48,7 @@ class Beer:
     brand: str
 ```
 
-Now, we can define the `beer` language's [statements](/def/#statements).
+Now, we can define the `beer` language's [statements](def.md#statements).
 
 ```python
 from kirin.decl import statement, info
@@ -66,7 +66,7 @@ the `NewBeer` statement creates a new beer object with a given brand. Thus
 it takes a string as an argument and returns a `Beer` object. The `name` field
 specifies the name of the statement in the IR text format (e.g printing). The
 `traits` field specifies the statement's traits, in this case, it is a [pure
-function](/101/#what-is-purity) because each brand name uniquely identifies a
+function](101.md/#what-is-purity) because each brand name uniquely identifies a
 beer object.
 
 ```python
