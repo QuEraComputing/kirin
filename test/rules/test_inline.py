@@ -10,6 +10,7 @@ from kirin.rules.call2invoke import Call2Invoke
 from kirin.rules.cfg_compactify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.fold import ConstantFold
+from kirin.rules.getfield import InlineGetField
 from kirin.rules.getitem import InlineGetItem
 from kirin.rules.inline import Inline
 
@@ -166,3 +167,55 @@ def test_inline_single_entry():
     assert isinstance(
         inline_non_pure.callable_region.blocks[0].stmts.at(6), DummyStmtWithSiteEffect
     )
+
+
+def test_inline_non_foldable_closure():
+    dialect = ir.Dialect("dummy2")
+
+    @statement(dialect=dialect)
+    class DummyStmt2(ir.Statement):
+        name = "dummy2"
+        value: ir.SSAValue = info.argument(types.Int)
+        option: data.PyAttr[str] = info.attribute()
+        result: ir.ResultValue = info.result(types.Int)
+
+    @basic_no_opt.add(dialect)
+    def unfolable(x: int, y: int):
+        def inner():
+            DummyStmt2(x, option="hello")
+            DummyStmt2(y, option="hello")
+
+        return inner
+
+    @basic_no_opt.add(dialect)
+    def main():
+        x = DummyStmt2(1, option="hello")
+        x = unfolable(x, x)
+        return x()
+
+    main.print()
+    inline = Walk(Inline(lambda _: True))
+    inline.rewrite(main.code)
+    constprop = ConstProp(basic_no_opt)
+    constprop.eval(main, ())
+    ConstantFold(constprop.results).rewrite(main.code)
+    compact = Fixpoint(CFGCompactify(CFG(main.callable_region)))
+    compact.rewrite(main.code)
+    inline.rewrite(main.code)
+    compact = Fixpoint(CFGCompactify(CFG(main.callable_region)))
+    compact.rewrite(main.code)
+    Fixpoint(Walk(InlineGetField())).rewrite(main.code)
+    constprop = ConstProp(basic_no_opt)
+    constprop.eval(main, ())
+    Walk(DeadCodeElimination(constprop.results)).rewrite(main.code)
+    main.print(analysis=constprop.results)
+
+    @basic_no_opt.add(dialect)
+    def target():
+        x = DummyStmt2(1, option="hello")
+        DummyStmt2(x, option="hello")
+        DummyStmt2(x, option="hello")
+        return
+
+    CFGCompactify(CFG(target.callable_region)).rewrite(target.code)
+    assert target.callable_region.is_structurally_equal(main.callable_region)

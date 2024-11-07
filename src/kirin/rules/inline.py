@@ -20,8 +20,18 @@ class Inline(RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if isinstance(node, func.Invoke):
             return self.rewrite_func_Invoke(node)
+        elif isinstance(node, func.Call):
+            return self.rewrite_func_Call(node)
         else:
             return RewriteResult()
+
+    def rewrite_func_Call(self, node: func.Call) -> RewriteResult:
+        if not isinstance(lambda_stmt := node.callee.owner, func.Lambda):
+            return RewriteResult()
+
+        # NOTE: a lambda statement is defined and used in the same scope
+        self.inline_call_like(node, tuple(node.args), lambda_stmt.body)
+        return RewriteResult(has_done_something=True)
 
     def rewrite_func_Invoke(self, node: func.Invoke) -> RewriteResult:
         has_done_something = False
@@ -34,12 +44,30 @@ class Inline(RewriteRule):
             is not None
         ):
             region = call_trait.get_callable_region(callee.code)
-            self.inline_callee(node, region)
+            func_self = stmts.Constant(node.callee)
+            func_self.result.name = node.callee.sym_name
+            func_self.insert_before(node)
+            self.inline_call_like(
+                node, (func_self.result,) + tuple(arg for arg in node.args), region
+            )
             has_done_something = True
 
         return RewriteResult(has_done_something=has_done_something)
 
-    def inline_callee(self, call: func.Invoke, region: ir.Region):
+    def inline_call_like(
+        self,
+        call_like: ir.Statement,
+        args: tuple[ir.SSAValue, ...],
+        region: ir.Region,
+    ):
+        """
+        Inline a function call-like statement
+
+        Args:
+            call_like (ir.Statement): the call-like statement
+            args (tuple[ir.SSAValue, ...]): the arguments of the call (first one is the callee)
+            region (ir.Region): the region of the callee
+        """
         # <stmt>
         # <stmt>
         # <br (a, b, c)>
@@ -61,26 +89,26 @@ class Inline(RewriteRule):
         #     split the current block into two, and replace the return with
         #     the branch instruction
         # 4. remove the call
-        if not call.parent_block:
+        if not call_like.parent_block:
             return
 
-        if not call.parent_region:
+        if not call_like.parent_region:
             return
 
         # NOTE: we cannot change region because it may be used elsewhere
         inline_region: ir.Region = region.clone()
-        parent_block: ir.Block = call.parent_block
-        parent_region: ir.Region = call.parent_region
+        parent_block: ir.Block = call_like.parent_block
+        parent_region: ir.Region = call_like.parent_region
 
         # wrap what's after invoke into a block
         after_block = ir.Block()
-        stmt = call.next_stmt
+        stmt = call_like.next_stmt
         while stmt is not None:
             stmt.detach()
             after_block.stmts.append(stmt)
-            stmt = call.next_stmt
+            stmt = call_like.next_stmt
 
-        for result in call.results:
+        for result in call_like.results:
             block_arg = after_block.args.append_from(result.type, result.name)
             result.replace_by(block_arg)
 
@@ -103,13 +131,13 @@ class Inline(RewriteRule):
 
         parent_region.blocks.append(after_block)
 
+        # NOTE: we expect always to have an entry block
+        # but we still check for it cuz we are not gonna
+        # error for empty regions here.
         if entry_block:
-            func_self = stmts.Constant(call.callee)
-            func_self.result.name = call.callee.sym_name
-            func_self.insert_before(call)
             cf.Branch(
-                arguments=(func_self.result,) + tuple(arg for arg in call.args),
+                arguments=args,
                 successor=entry_block,
-            ).insert_before(call)
-        call.delete()
+            ).insert_before(call_like)
+        call_like.delete()
         return
