@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from kirin.analysis.dataflow.constprop import ConstProp, NotConst
 from kirin.ir import Method, SSACFGRegion
 from kirin.passes.abc import Pass
-from kirin.rewrite import Chain, Fixpoint, Walk
+from kirin.rewrite import Chain, Fixpoint, RewriteResult, Walk
 from kirin.rules.call2invoke import Call2Invoke
 from kirin.rules.cfg_compactify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
@@ -14,10 +14,10 @@ from kirin.rules.getitem import InlineGetItem
 @dataclass
 class Fold(Pass):
 
-    def unsafe_run(self, mt: Method) -> None:
+    def unsafe_run(self, mt: Method) -> RewriteResult:
         constprop = ConstProp(self.dialects)
         constprop.eval(mt, tuple(NotConst() for _ in mt.args))
-        Fixpoint(
+        result = Fixpoint(
             Walk(
                 Chain(
                     [
@@ -32,6 +32,10 @@ class Fold(Pass):
 
         if (trait := mt.code.get_trait(SSACFGRegion)) is not None:
             compactify = Fixpoint(CFGCompactify(trait.get_graph(mt.callable_region)))
-            compactify.rewrite(mt.code)
+            result = compactify.rewrite(mt.code).join(result)
 
-        Fixpoint(Walk(DeadCodeElimination(constprop.results))).rewrite(mt.code)
+        return (
+            Fixpoint(Walk(DeadCodeElimination(constprop.results)))
+            .rewrite(mt.code)
+            .join(result)
+        )

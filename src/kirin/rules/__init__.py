@@ -1,0 +1,9 @@
+from .alias import InlineAlias as InlineAlias
+from .apply_type import ApplyType as ApplyType
+from .call2invoke import Call2Invoke as Call2Invoke
+from .cfg_compactify import CFGCompactify as CFGCompactify
+from .dce import DeadCodeElimination as DeadCodeElimination
+from .fold import ConstantFold as ConstantFold
+from .getfield import InlineGetField as InlineGetField
+from .getitem import InlineGetItem as InlineGetItem
+from .inline import Inline as Inline
