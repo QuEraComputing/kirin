@@ -358,7 +358,19 @@ class Statement(IRNode["Block"]):
         source: SourceInfo | None = None,
     ) -> None:
         super().__init__()
+        """Initialize the Statement.
 
+        Args:
+            arsg (Sequence[SSAValue], optional): The arguments of the Statement. Defaults to ().
+            regions (Sequence[Region], optional): The regions where the Statement belong to. Defaults to ().
+            successors (Sequence[Block], optional): The successors of the Statement. Defaults to ().
+            attributes (Mapping[str, Attribute], optional): The attributes of the Statement. Defaults to {}.
+            results (Sequence[ResultValue], optional): The result values of the Statement. Defaults to ().
+            result_types (Sequence[TypeAttribute], optional): The result types of the Statement. Defaults to ().
+            args_slice (Mapping[str, int | slice], optional): The arguments slice of the Statement. Defaults to {}.
+            source (SourceInfo | None, optional): The source information of the Statement for debugging/stacktracing. Defaults to None.
+
+        """
         self._args = ()
         self._regions = []
         self._name_args_slice = dict(args_slice)
@@ -423,6 +435,16 @@ class Statement(IRNode["Block"]):
         region_first: bool = False,
         include_self: bool = True,
     ) -> Iterator[Statement]:
+        """Traversal the Statements of Regions.
+
+        Args:
+            reverse (bool, optional): If walk in the reversed manner. Defaults to False.
+            region_first (bool, optional): If the walk should go through the Statement first or the Region of a Statement first. Defaults to False.
+            include_self (bool, optional): If the walk should include the Statement itself. Defaults to True.
+
+        Yields:
+            Iterator[Statement]: An iterator that yield Statements of Blocks in the Region, in the specified order.
+        """
         if include_self and not region_first:
             yield self
 
@@ -437,6 +459,15 @@ class Statement(IRNode["Block"]):
         other: Self,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
+        """Check if the Statement is structurally equal to another Statement.
+
+        Args:
+            other (Self): The other Statelemt to compare with.
+            context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.
+
+        Returns:
+            bool: True if the IRNode is structurally equal to the other.
+        """
         if context is None:
             context = {}
 
@@ -550,10 +581,26 @@ class Statement(IRNode["Block"]):
                 )
 
     def get_attr_or_prop(self, key: str) -> Attribute | None:
+        """Get the attribute or property of the Statement.
+
+        Args:
+            key (str): The key of the attribute or property.
+
+        Returns:
+            Attribute | None: The attribute or property of the Statement.
+        """
         return self.attributes.get(key, self.properties.get(key))
 
     @classmethod
     def has_trait(cls, trait_type: type[StmtTrait]) -> bool:
+        """Check if the Statement has a specific trait.
+
+        Args:
+            trait_type (type[StmtTrait]): The type of trait to check for.
+
+        Returns:
+            bool: True if the class has the specified trait, False otherwise.
+        """
         for trait in cls.traits:
             if isinstance(trait, trait_type):
                 return True
@@ -563,6 +610,7 @@ class Statement(IRNode["Block"]):
 
     @classmethod
     def get_trait(cls, trait: type[TraitType]) -> TraitType | None:
+        """Get the trait of the Statement."""
         for t in cls.traits:
             if isinstance(t, trait):
                 return t
@@ -570,9 +618,22 @@ class Statement(IRNode["Block"]):
 
     @classmethod
     def from_python_call(cls, state: LoweringState, node: ast.Call) -> Result:
+        """Converts a Python call expression to a Kirin IR node.
+
+        Args:
+            state (LoweringState): The current state of the lowering process.
+            node (ast.Call): The Python call expression to be converted.
+
+        Raises:
+            NotImplementedError: If the conversion is not implemented for the given call expression.
+
+        Returns:
+            Result: The converted Kirin IR node.
+        """
         raise NotImplementedError
 
     def expect_one_result(self) -> ResultValue:
+        """Check if the statement contain only one result, and return it"""
         if len(self._results) != 1:
             raise ValueError(f"expected one result, got {len(self._results)}")
         return self._results[0]
@@ -583,6 +644,14 @@ class Statement(IRNode["Block"]):
     # it should be implemented here.
     # NOTE: not an @abstractmethod to make linter happy
     def typecheck(self) -> None:
+        """check the type of the statement.
+
+        Note:
+            Statement should implement typecheck.
+            this is done automatically via @statement, but
+            in the case manualy implementation is needed,
+            it should be implemented here.
+        """
         raise NotImplementedError
 
     def verify(self) -> None:
