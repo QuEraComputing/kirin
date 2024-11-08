@@ -81,6 +81,12 @@ def impl(
     Callable[["ImplFunction"], AttributeEmitDef]
     | Callable[[Union["ImplFunction", ImplDef]], ImplDef]
 ):
+    """Decorator to define an [`Codegen`][kirin.codegen.base.Codegen] implementation for a statement or attribute.
+
+    Args:
+        stmt (_type_): The statement or attribute to define the implementation for.
+
+    """
     if issubclass(stmt, Attribute) and args:
         raise ValueError("Attributes do not have arguments")
 

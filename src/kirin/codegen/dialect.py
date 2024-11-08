@@ -13,6 +13,20 @@ if TYPE_CHECKING:
 
 @dataclass
 class DialectEmit(ABC):
+    """Base class to define lookup tables for emitting code for different IR nodes.
+
+    Note:
+        The lookup table can be defined by decorating a class method with [`@impl`][kirin.codegen.impl.impl].
+
+    Example:
+        ```python
+        class MyEmit(DialectEmit):
+            @impl(MyStatement)
+            def emit_Statement(self, codegen: CodeGen, stmt: MyStatement) -> Target:
+                ...
+        ```
+    """
+
     table: ClassVar[dict["Signature", "ImplFunction"]]
 
     @classmethod

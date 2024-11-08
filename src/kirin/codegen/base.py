@@ -12,11 +12,18 @@ Target = TypeVar("Target")
 
 @dataclass(init=False)
 class CodeGen(ABC, Generic[Target]):
+    """CodeGen framework for generating code from IR."""
+
     keys: ClassVar[list[str]]
     dialects: ir.DialectGroup
     registry: dict["Signature", "StatementImpl"] = field(init=False, repr=False)
 
     def __init__(self, dialects: ir.DialectGroup | Iterable[ir.Dialect]):
+        """Init method for CodeGen.
+
+        Args:
+            dialects (ir.DialectGroup | Iterable[ir.Dialect]): The dialects to be used for code generation.
+        """
         if not isinstance(dialects, ir.DialectGroup):
             dialects = ir.DialectGroup(dialects)
         self.dialects = dialects
@@ -27,6 +34,14 @@ class CodeGen(ABC, Generic[Target]):
         return self.emit_Method(mt)
 
     def emit_Statement(self, stmt: ir.Statement) -> Target:
+        """Emit a Statement.
+
+        Args:
+            stmt (ir.Statement): The Statement to be emitted.
+
+        Returns:
+            Target: The target code generated.
+        """
         sig = self.build_signature(stmt)
         if sig in self.registry:
             return self.registry[sig](self, stmt)
