@@ -202,6 +202,15 @@ class Statement(IRNode["Block"]):
         Args:
             stmt (Statement): Input Statement.
 
+        Example:
+            The following example demonstrates how to insert a Statement after another Statement.
+            After `insert_after` is called, `stmt1` will be inserted after `stmt2`, which appears in IR in the order (stmt2 -> stmt1)
+            ```python
+            stmt1 = Statement()
+            stmt2 = Statement()
+            stmt1.insert_after(stmt2)
+            ```
+
         """
         if self._next_stmt is not None and self._prev_stmt is not None:
             raise ValueError(
@@ -228,6 +237,15 @@ class Statement(IRNode["Block"]):
 
         Args:
             stmt (Statement): Input Statement.
+
+        Example:
+            The following example demonstrates how to insert a Statement before another Statement.
+            After `insert_before` is called, `stmt1` will be inserted before `stmt2`, which appears in IR in the order (stmt1 -> stmt2)
+            ```python
+            stmt1 = Statement()
+            stmt2 = Statement()
+            stmt1.insert_before(stmt2)
+            ```
 
         """
         if self._next_stmt is not None and self._prev_stmt is not None:
