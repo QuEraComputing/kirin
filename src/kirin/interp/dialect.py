@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 @dataclass
 class DialectInterpreter(ABC):
+    """Base class to define lookup tables for interpreting code for IR nodes in a dialect."""
+
     table: ClassVar[dict["Signature", "ImplFunction"]]
 
     @classmethod
