@@ -210,7 +210,6 @@ class Statement(IRNode["Block"]):
             stmt2 = Statement()
             stmt1.insert_after(stmt2)
             ```
-
         """
         if self._next_stmt is not None and self._prev_stmt is not None:
             raise ValueError(
@@ -246,7 +245,6 @@ class Statement(IRNode["Block"]):
             stmt2 = Statement()
             stmt1.insert_before(stmt2)
             ```
-
         """
         if self._next_stmt is not None and self._prev_stmt is not None:
             raise ValueError(

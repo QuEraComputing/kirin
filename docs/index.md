@@ -12,7 +12,7 @@ scientific computing kernels.
 - Julia-like abstract interpretation framework
 - Builtin support for interpretation
 - Builtin support Python type system and type inference
-- Type hinted via modern Python type hints
+- Type hinted via modern Python type hints (you get all the auto-completes as you expect!)
 
 ## Kirin's mission
 
@@ -229,3 +229,71 @@ This will be different when we implement interpretation for a terminator:
 The `random_branch` implementation randomly chooses one of the branches to execute. The return value
 is a [`Successor`][kirin.interp.Successor] object that specifies the next block to execute and the arguments
 to pass to the block.
+
+### Rewrite Python `if else` statement to `RandomBranch`
+
+Now we can define a rewrite pass that rewrites Python `if else` statement to `RandomBranch` statement.
+This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.RewriteRule] and implementing the
+`rewrite_Statement` method. The `RewriteRule` class is a standard Python visitor on Kirin's IR.
+
+Here, we only need to implement the `rewrite_Statement` method to rewrite the `if else` statement to `RandomBranch`.
+
+```python
+from kirin.dialects import cf # (1)!
+from kirin.rewrite import RewriteResult, RewriteRule # (2)!
+
+@dataclass
+class RewriteToRandomBranch(RewriteRule):
+
+    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult: # (3)!
+        if not isinstance(node, cf.ConditionalBranch): # (4)!
+            return RewriteResult()
+        node.replace_by(
+            RandomBranch(
+                cond=node.cond,
+                then_arguments=node.then_arguments,
+                then_successor=node.then_successor,
+                else_arguments=node.else_arguments,
+                else_successor=node.else_successor,
+            )
+        )
+        return RewriteResult(has_done_something=True) # (5)!
+```
+
+1. Import the control flow dialect `cf` which is what Python `if else` statement compiles to by default in the `basic` dialect group.
+2. Import the `RewriteRule` class from the `rewrite` module.
+3. This is the signature of `rewrite_Statement` method. Your IDE should hint you the type signature so you can auto-complete it.
+4. Check if the statement is a `ConditionalBranch` statement. If it is not, return an empty `RewriteResult`.
+5. Replace the `ConditionalBranch` statement with a `RandomBranch` statement and return a `RewriteResult` that indicates the rewrite has been done. Every statement has a [`replace_by`][kirin.ir.Statement.replace_by] method that replaces the statement with another statement.
+
+### Putting everything together
+
+Now we can put everything together and finally create the `beer` decorator, and
+you do not need to figure out the complicated type hinting and decorator implementation
+because Kirin will do it for you!
+
+```python
+from kirin.ir import dialect_group
+from kirin.prelude import basic_no_opt
+from kirin.rewrite import Fixpoint, Walk
+
+@dialect_group(basic_no_opt.add(dialect)) # (1)!
+def beer(self): # (2)!
+    # some initialization if you need it
+    def run_pass(mt): # (3)!
+        Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code) # (4)!
+
+    return run_pass # (5)!
+```
+
+1. The [`dialect_group`][kirin.ir.group.dialect_group] decorator specifies the dialect group that the `beer` dialect belongs to. In this case, instead of rebuilding the whole dialect group, we just add our `dialect` object to the [`basic_no_opt`][kirin.prelude.basic_no_opt] dialect group which provides all the basic Python semantics, such as math, function, closure, control flows, etc.
+2. The `beer` function is the decorator that will be used to decorate the `main` function.
+3. The `run_pass` function wraps all the passes that need to run on the input method. It optionally can take some arguments or keyword arguments that will be passed to the `beer` decorator.
+4. Inside the `run_pass` function, we will traverse the entire IR and rewrite all the `ConditionalBranch` statements to `RandomBranch` statements until no more rewrites can be done.
+5. Remember to return the `run_pass` function at the end of the `beer` function.
+
+This is it!
+
+## License
+
+Apache License 2.0
