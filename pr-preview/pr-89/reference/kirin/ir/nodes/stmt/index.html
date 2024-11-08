@@ -737,7 +737,7 @@
             <span class=n>result</span><span class=o>.</span><span class=n>name</span> <span class=o>=</span> <span class=n>old_result</span><span class=o>.</span><span class=n>name</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>delete</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.typecheck class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">typecheck</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>typecheck</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>check the type of the statement.</p> <details class=note open> <summary>Note</summary> <p>Statement should implement typecheck. this is done automatically via @statement, but in the case manualy implementation is needed, it should be implemented here.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>694</span>
+</code></pre></div> <div class="doc doc-contents "> <p>check the type of the statement.</p> <details class=note open> <summary>Note</summary> <ol> <li>Statement should implement typecheck. this is done automatically via @statement, but in the case manualy implementation is needed, it should be implemented here.</li> <li>This API should be called after all the types are figured out (by typeinfer)</li> </ol> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>694</span>
 <span class=normal>695</span>
 <span class=normal>696</span>
 <span class=normal>697</span>
@@ -746,19 +746,23 @@
 <span class=normal>700</span>
 <span class=normal>701</span>
 <span class=normal>702</span>
-<span class=normal>703</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>typecheck</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>703</span>
+<span class=normal>704</span>
+<span class=normal>705</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>typecheck</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;check the type of the statement.</span>
 
 <span class=sd>    Note:</span>
-<span class=sd>        Statement should implement typecheck.</span>
+<span class=sd>        1. Statement should implement typecheck.</span>
 <span class=sd>        this is done automatically via @statement, but</span>
 <span class=sd>        in the case manualy implementation is needed,</span>
 <span class=sd>        it should be implemented here.</span>
+<span class=sd>        2. This API should be called after all the types are figured out (by typeinfer)</span>
+
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=k>raise</span> <span class=ne>NotImplementedError</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>705</span>
-<span class=normal>706</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>707</span>
+<span class=normal>708</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=k>return</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.walk class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">walk</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>walk</span><span class=p>(</span>
     <span class=o>*</span><span class=p>,</span>
