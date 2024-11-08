@@ -11,6 +11,7 @@ nav:
       - Declarations: def.md
       - Compiler 101: 101.md
   - API Reference:
+    - Prelude: reference/kirin/prelude.md
     - IR:
       - reference/kirin/ir/index.md
       - Nodes: reference/kirin/ir/nodes/
@@ -40,7 +41,6 @@ nav:
       - IdTable: reference/kirin/idtable.md
       - Source: reference/kirin/source.md
       - WorkList: reference/kirin/worklist.md
-    - Prelude: reference/kirin/prelude.md
 
 theme:
   name: material
@@ -60,6 +60,7 @@ theme:
   features:
     - announce.dismiss
     - content.action.view
+    - content.action.edit
     - content.code.annotate
     - content.code.copy
     # - content.tabs.link
@@ -87,6 +88,12 @@ plugins:
             show_if_no_docstring: false
             separate_signature: true
             merge_init_into_class: true
+            extensions:
+            - griffe_inherited_docstrings
+            show_inheritance_diagram: true
+            show_signature_annotations: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
             docstring_options:
               ignore_init_summary: true
   - search:

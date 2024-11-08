@@ -18,10 +18,16 @@ if TYPE_CHECKING:
 
 @dataclass
 class SSAValue(ABC, Printable):
+    """Base class for all SSA values in the IR."""
+
     type: TypeAttribute = field(default_factory=AnyType, init=False, repr=True)
+    """The type of this SSA value."""
     uses: set[Use] = field(init=False, default_factory=set, repr=False)
+    """The uses of this SSA value."""
     _name: str | None = field(init=False, default=None, repr=True)
+    """The name of this SSA value."""
     name_pattern: ClassVar[re.Pattern[str]] = re.compile(r"([A-Za-z_$.-][\w$.-]*)")
+    """The pattern that the name of this SSA value must match."""
 
     @property
     @abstractmethod
@@ -29,6 +35,7 @@ class SSAValue(ABC, Printable):
 
     @property
     def name(self) -> str | None:
+        """The name of this SSA value."""
         return self._name
 
     @name.setter
@@ -46,10 +53,12 @@ class SSAValue(ABC, Printable):
         return id(self)
 
     def add_use(self, use: Use) -> Self:
+        """Add a use to this SSA value."""
         self.uses.add(use)
         return self
 
     def remove_use(self, use: Use) -> Self:
+        """Remove a use from this SSA value."""
         # print(use)
         # assert use in self.uses, "Use not found"
         if use in self.uses:
@@ -57,6 +66,7 @@ class SSAValue(ABC, Printable):
         return self
 
     def replace_by(self, other: SSAValue) -> None:
+        """Replace this SSA value with another SSA value. Update all uses."""
         for use in self.uses.copy():
             use.stmt.args[use.index] = other
 
@@ -67,6 +77,7 @@ class SSAValue(ABC, Printable):
 
     # TODO: also delete BlockArgument from arglist
     def delete(self, safe: bool = True) -> None:
+        """Delete this SSA value. If `safe` is `True`, raise an error if there are uses."""
         if safe and len(self.uses) > 0:
             raise ValueError("Cannot delete SSA value with uses")
         self.replace_by(DeletedSSAValue(self))
@@ -77,8 +88,12 @@ class SSAValue(ABC, Printable):
 
 @dataclass
 class ResultValue(SSAValue):
+    """SSAValue that is a result of a [`Statement`][kirin.ir.nodes.stmt.Statement]."""
+
     stmt: Statement = field(init=False)
+    """The statement that this value is a result of."""
     index: int = field(init=False)
+    """The index of this value in the statement's result list."""
 
     # NOTE: we will assign AnyType unless specified.
     #       when SSAValue is a ResultValue, the type is inferred
@@ -113,8 +128,12 @@ class ResultValue(SSAValue):
 
 @dataclass
 class BlockArgument(SSAValue):
+    """SSAValue that is an argument to a [`Block`][kirin.ir.Block]."""
+
     block: Block = field(init=False)
+    """The block that this argument belongs to."""
     index: int = field(init=False)
+    """The index of this argument in the block's argument list."""
 
     def __init__(
         self, block: Block, index: int, type: TypeAttribute = AnyType()

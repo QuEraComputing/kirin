@@ -9,15 +9,16 @@ class Interpreter(DialectInterpreter):
 
     @impl(Call)
     def call(self, interp: concrete.Interpreter, stmt: Call, values: tuple):
-        mt = values[0]
+        mt: Method = values[0]
         return interp.eval(
-            mt, interp.permute_values(mt, values[1:], stmt.kwargs)
+            mt, interp.permute_values(mt.arg_names, values[1:], stmt.kwargs)
         ).to_result()
 
     @impl(Invoke)
     def invoke(self, interp: concrete.Interpreter, stmt: Invoke, values: tuple):
         return interp.eval(
-            stmt.callee, interp.permute_values(stmt.callee, values, stmt.kwargs)
+            stmt.callee,
+            interp.permute_values(stmt.callee.arg_names, values, stmt.kwargs),
         ).to_result()
 
     @impl(Return)

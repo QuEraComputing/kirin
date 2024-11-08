@@ -5,7 +5,7 @@ from kirin.dialects.func import Lambda
 from kirin.dialects.py import stmts, types
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
-from kirin.rules.cfg_compatify import CFGCompactify
+from kirin.rules.cfg_compactify import CFGCompactify
 from kirin.rules.inline import Inline
 
 

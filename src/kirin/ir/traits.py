@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class StmtTrait(ABC):
+    """Base class for all statement traits."""
 
     def verify(self, stmt: Statement):
         pass

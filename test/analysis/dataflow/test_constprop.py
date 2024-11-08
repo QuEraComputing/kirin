@@ -7,8 +7,8 @@ from kirin.analysis.dataflow.constprop import (
     NotPure,
     PartialTuple,
 )
-from kirin.decl import statement
-from kirin.dialects.py import stmts
+from kirin.decl import info, statement
+from kirin.dialects.py import stmts, types
 from kirin.prelude import basic_no_opt
 
 
@@ -280,3 +280,61 @@ def test_non_pure_recursion():
     constprop.eval(for_loop_append, tuple(NotConst() for _ in for_loop_append.args))
     stmt = for_loop_append.callable_region.blocks[1].stmts.at(3)
     assert isinstance(constprop.results[stmt.results[0]], NotPure)
+
+
+def test_closure_prop():
+    dialect = ir.Dialect("dummy2")
+
+    @statement(dialect=dialect)
+    class DummyStmt2(ir.Statement):
+        name = "dummy2"
+        value: ir.SSAValue = info.argument(types.Int)
+        result: ir.ResultValue = info.result(types.Int)
+
+    @basic_no_opt.add(dialect)
+    def non_const_closure(x: int, y: int):
+        def inner():
+            if False:
+                return x + y
+            else:
+                return 2
+
+        return inner
+
+    @basic_no_opt.add(dialect)
+    def non_pure(x: int, y: int):
+        def inner():
+            if False:
+                return x + y
+            else:
+                DummyStmt2(1)  # type: ignore
+                return 2
+
+        return inner
+
+    @basic_no_opt.add(dialect)
+    def main():
+        x = DummyStmt2(1)  # type: ignore
+        x = non_const_closure(x, x)  # type: ignore
+        return x()
+
+    constprop = ConstProp(basic_no_opt.add(dialect))
+    constprop.eval(main, ())
+    main.print(analysis=constprop.results)
+    stmt = main.callable_region.blocks[0].stmts.at(3)
+    call_result = constprop.results[stmt.results[0]]
+    assert isinstance(call_result, Const)
+    assert call_result.data == 2
+
+    @basic_no_opt.add(dialect)
+    def main2():
+        x = DummyStmt2(1)  # type: ignore
+        x = non_pure(x, x)  # type: ignore
+        return x()
+
+    constprop = ConstProp(basic_no_opt.add(dialect))
+    constprop.eval(main2, ())
+    main2.print(analysis=constprop.results)
+    stmt = main2.callable_region.blocks[0].stmts.at(3)
+    call_result = constprop.results[stmt.results[0]]
+    assert isinstance(call_result, NotPure)

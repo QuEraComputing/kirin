@@ -38,6 +38,7 @@ dev-dependencies = [
     "mkdocs-gen-files>=0.5.0",
     "mkdocs-literate-nav>=0.6.1",
     "mkdocs-minify-plugin>=0.8.0",
+    "griffe-inherited-docstrings>=1.1.1",
 ]
 
 [tool.rye.scripts]

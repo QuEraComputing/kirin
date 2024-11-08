@@ -51,15 +51,12 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
             raise ValueError("Invalid assignment")
 
     def __delitem__(self, idx: int) -> None:
-        """Delete the Block at the specified index.
+        self.field[idx].delete()
 
-        Note:
-            This only detach the Block from the Region. It does not remove uses that reference the Block.
-
-        Args:
-            idx (int): The index of the Block to delete.
-        """
-        self.field[idx].detach()
+    def pop(self, idx: int = -1) -> Block:
+        item = self.field[idx]
+        self[idx].detach()
+        return item
 
     def insert(self, idx: int, value: Block) -> None:
         """Inserts a Block at the specified index.

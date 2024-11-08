@@ -32,7 +32,7 @@ class TypeInfer(DialectInterpreter):
             interp,
             mt,
             stmt.args[1:],
-            interp.permute_values(mt, values[1:], stmt.kwargs),
+            interp.permute_values(mt.arg_names, values[1:], stmt.kwargs),
         )
 
     @impl(Invoke)
@@ -41,7 +41,7 @@ class TypeInfer(DialectInterpreter):
             interp,
             stmt.callee,
             stmt.args[1:],
-            interp.permute_values(stmt.callee, values, stmt.kwargs),
+            interp.permute_values(stmt.callee.arg_names, values, stmt.kwargs),
         )
 
     def _invoke_method(

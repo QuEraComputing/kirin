@@ -1,5 +1,7 @@
 # Understanding Kirin IR Declarations
 
+## SSA Values
+
 ## Dialects
 
 ## Statements
