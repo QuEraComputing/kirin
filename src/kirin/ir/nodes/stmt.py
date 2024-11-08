@@ -98,7 +98,7 @@ class Statement(IRNode["Block"]):
 
     @property
     def parent_node(self) -> Block | None:
-        """Get the parent node. [FIXME] [KHW] whats the different btwn parent_node and parent_block?
+        """Get the parent node.
 
         Returns:
             Block | None: The parent node.
@@ -125,7 +125,7 @@ class Statement(IRNode["Block"]):
 
     @property
     def parent_block(self) -> Block | None:
-        """Get the parent Block. [FIXME] [KHW] whats the different btwn parent_node and parent_block?
+        """Get the parent Block.
 
         Returns:
             Block | None: The parent Block.
