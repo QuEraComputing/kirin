@@ -26,7 +26,20 @@ if TYPE_CHECKING:
 
 @dataclass
 class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable):
+    """A View object that contains a list of Arguemnts of a Statement.
+
+    Description:
+        This is a proxy object that provide safe API to manipulate the arguemnts of a statement.
+
+    """
+
     def set_item(self, idx: int, value: SSAValue) -> None:
+        """Set the argument SSAVAlue at the specified index.
+
+        Args:
+            idx (int): The index of the item to set.
+            value (SSAValue): The value to set.
+        """
         args = self.field
         args[idx].remove_use(Use(self.node, idx))
         value.add_use(Use(self.node, idx))
@@ -35,6 +48,12 @@ class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable)
         self.field = new_args
 
     def insert(self, idx: int, value: SSAValue) -> None:
+        """Insert the argument SSAValue at the specified index.
+
+        Args:
+            idx (int): The index to insert the value.
+            value (SSAValue): The value to insert.
+        """
         args = self.field
         value.add_use(Use(self.node, idx))
         new_args = (*args[:idx], value, *args[idx:])
@@ -47,6 +66,12 @@ class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable)
 
 @dataclass
 class ResultList(MutableSequenceView[list, "Statement", ResultValue]):
+    """A View object that contains a list of ResultValue of a Statement.
+
+    Description:
+        This is a proxy object that provide safe API to manipulate the result values of a statement
+
+    """
 
     def __setitem__(
         self, idx: int | slice, value: ResultValue | Sequence[ResultValue]
@@ -55,6 +80,11 @@ class ResultList(MutableSequenceView[list, "Statement", ResultValue]):
 
     @property
     def types(self) -> Sequence[TypeAttribute]:
+        """Get the result types of the Statement.
+
+        Returns:
+            Sequence[TypeAttribute]: type of each result value.
+        """
         return [result.type for result in self.field]
 
 
