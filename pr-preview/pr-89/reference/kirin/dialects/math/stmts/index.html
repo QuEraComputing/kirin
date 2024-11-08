@@ -10,37 +10,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>acos statement, wrapping the math.acos function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>acos statement, wrapping the math.acos function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -66,7 +36,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -135,37 +135,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>asin statement, wrapping the math.asin function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>asin statement, wrapping the math.asin function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -191,7 +161,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -260,37 +260,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>asinh statement, wrapping the math.asinh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>asinh statement, wrapping the math.asinh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -316,7 +286,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -385,37 +385,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>atan statement, wrapping the math.atan function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>atan statement, wrapping the math.atan function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -441,7 +411,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -510,37 +510,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>atan2 statement, wrapping the math.atan2 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>atan2 statement, wrapping the math.atan2 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -566,7 +536,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -635,37 +635,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>atanh statement, wrapping the math.atanh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>atanh statement, wrapping the math.atanh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -691,7 +661,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -760,37 +760,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>ceil statement, wrapping the math.ceil function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>ceil statement, wrapping the math.ceil function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -816,7 +786,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -885,37 +885,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>copysign statement, wrapping the math.copysign function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>copysign statement, wrapping the math.copysign function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -941,7 +911,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1010,37 +1010,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>cos statement, wrapping the math.cos function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>cos statement, wrapping the math.cos function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1066,7 +1036,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1135,37 +1135,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>cosh statement, wrapping the math.cosh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>cosh statement, wrapping the math.cosh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1191,7 +1161,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1260,37 +1260,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>degrees statement, wrapping the math.degrees function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>degrees statement, wrapping the math.degrees function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1316,7 +1286,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1385,37 +1385,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>erf statement, wrapping the math.erf function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>erf statement, wrapping the math.erf function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1441,7 +1411,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1510,37 +1510,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>erfc statement, wrapping the math.erfc function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>erfc statement, wrapping the math.erfc function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1566,7 +1536,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1635,37 +1635,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>exp statement, wrapping the math.exp function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>exp statement, wrapping the math.exp function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1691,7 +1661,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1760,37 +1760,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>expm1 statement, wrapping the math.expm1 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>expm1 statement, wrapping the math.expm1 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1816,7 +1786,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -1885,37 +1885,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>fabs statement, wrapping the math.fabs function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>fabs statement, wrapping the math.fabs function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -1941,7 +1911,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2010,37 +2010,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>floor statement, wrapping the math.floor function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>floor statement, wrapping the math.floor function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2066,7 +2036,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2135,37 +2135,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>fmod statement, wrapping the math.fmod function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>fmod statement, wrapping the math.fmod function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2191,7 +2161,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2260,37 +2260,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>gamma statement, wrapping the math.gamma function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>gamma statement, wrapping the math.gamma function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2316,7 +2286,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2385,37 +2385,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>isfinite statement, wrapping the math.isfinite function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>isfinite statement, wrapping the math.isfinite function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2441,7 +2411,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2510,37 +2510,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>isinf statement, wrapping the math.isinf function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>isinf statement, wrapping the math.isinf function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2566,7 +2536,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2635,37 +2635,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>isnan statement, wrapping the math.isnan function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>isnan statement, wrapping the math.isnan function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2691,7 +2661,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2760,37 +2760,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>lgamma statement, wrapping the math.lgamma function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>lgamma statement, wrapping the math.lgamma function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2816,7 +2786,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -2885,37 +2885,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>log10 statement, wrapping the math.log10 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>log10 statement, wrapping the math.log10 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -2941,7 +2911,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3010,37 +3010,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>log1p statement, wrapping the math.log1p function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>log1p statement, wrapping the math.log1p function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3066,7 +3036,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3135,37 +3135,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>log2 statement, wrapping the math.log2 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>log2 statement, wrapping the math.log2 function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3191,7 +3161,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3260,37 +3260,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>pow statement, wrapping the math.pow function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>pow statement, wrapping the math.pow function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3316,7 +3286,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3385,37 +3385,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>radians statement, wrapping the math.radians function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>radians statement, wrapping the math.radians function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3441,7 +3411,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3510,37 +3510,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>remainder statement, wrapping the math.remainder function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>remainder statement, wrapping the math.remainder function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3566,7 +3536,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3635,37 +3635,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>sin statement, wrapping the math.sin function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>sin statement, wrapping the math.sin function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3691,7 +3661,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3760,37 +3760,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>sinh statement, wrapping the math.sinh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>sinh statement, wrapping the math.sinh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3816,7 +3786,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -3885,37 +3885,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>sqrt statement, wrapping the math.sqrt function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>sqrt statement, wrapping the math.sqrt function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -3941,7 +3911,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -4010,37 +4010,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>tan statement, wrapping the math.tan function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>tan statement, wrapping the math.tan function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -4066,7 +4036,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -4135,37 +4135,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>tanh statement, wrapping the math.tanh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>tanh statement, wrapping the math.tanh function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -4191,7 +4161,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -4260,37 +4260,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>trunc statement, wrapping the math.trunc function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>trunc statement, wrapping the math.trunc function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -4316,7 +4286,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -4385,37 +4385,7 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>ulp statement, wrapping the math.ulp function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
-<span class=normal>350</span>
-<span class=normal>351</span>
-<span class=normal>352</span>
-<span class=normal>353</span>
-<span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span>
-<span class=normal>357</span>
-<span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span>
-<span class=normal>363</span>
-<span class=normal>364</span>
-<span class=normal>365</span>
-<span class=normal>366</span>
-<span class=normal>367</span>
-<span class=normal>368</span>
-<span class=normal>369</span>
-<span class=normal>370</span>
-<span class=normal>371</span>
-<span class=normal>372</span>
-<span class=normal>373</span>
-<span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span>
-<span class=normal>377</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>ulp statement, wrapping the math.ulp function</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
 <span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
@@ -4441,7 +4411,37 @@
 <span class=normal>400</span>
 <span class=normal>401</span>
 <span class=normal>402</span>
-<span class=normal>403</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>403</span>
+<span class=normal>404</span>
+<span class=normal>405</span>
+<span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
+<span class=normal>409</span>
+<span class=normal>410</span>
+<span class=normal>411</span>
+<span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
+<span class=normal>418</span>
+<span class=normal>419</span>
+<span class=normal>420</span>
+<span class=normal>421</span>
+<span class=normal>422</span>
+<span class=normal>423</span>
+<span class=normal>424</span>
+<span class=normal>425</span>
+<span class=normal>426</span>
+<span class=normal>427</span>
+<span class=normal>428</span>
+<span class=normal>429</span>
+<span class=normal>430</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
