@@ -695,10 +695,12 @@ class Statement(IRNode["Block"]):
         """check the type of the statement.
 
         Note:
-            Statement should implement typecheck.
+            1. Statement should implement typecheck.
             this is done automatically via @statement, but
             in the case manualy implementation is needed,
             it should be implemented here.
+            2. This API should be called after all the types are figured out (by typeinfer)
+
         """
         raise NotImplementedError
 
