@@ -44,8 +44,6 @@ class MethodImpl:
 
 
 class impl:
-    """Decorator to define an Interpreter implementation for a statement."""
-
     # TODO: validate only concrete types are allowed here
 
     def __init__(self, stmt: Type[Statement], *args: TypeAttribute) -> None:
