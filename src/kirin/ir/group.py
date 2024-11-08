@@ -1,6 +1,7 @@
 import inspect
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import update_wrapper
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -28,9 +29,20 @@ if TYPE_CHECKING:
 
 @dataclass
 class Registry:
-    parent: "DialectGroup"
+    """Proxy class to build different registries from a dialect group."""
 
-    def lowering(self, keys: Iterable[str]):
+    parent: "DialectGroup"
+    """The parent dialect group."""
+
+    def lowering(self, keys: Iterable[str]) -> dict[str, "FromPythonAST"]:
+        """select the dialect lowering interpreters for the given key.
+
+        Args:
+            keys (Iterable[str]): the keys to search for in the dialects
+
+        Returns:
+            a map of dialects to their lowering interpreters
+        """
         ret: dict[str, "FromPythonAST"] = {}
         from_ast = None
         for dialect in self.parent.data:
@@ -59,7 +71,8 @@ class Registry:
             keys (Iterable[str]): the keys to search for in the dialects
 
         Returns:
-            a map of dialects to their interpreters
+            a map of statement signatures to their interpretation functions,
+            and a map of dialects to their fallback interpreters.
         """
         from kirin.interp.impl import MethodImpl
 
@@ -82,7 +95,15 @@ class Registry:
                 raise KeyError(f"Interpreter of {dialect.name} not found for {msg}")
         return ret, fallback
 
-    def codegen(self, keys: Iterable[str]):
+    def codegen(self, keys: Iterable[str]) -> dict["CodegenSignature", "CodegenImpl"]:
+        """select the dialect codegen for the given key.
+
+        Args:
+            keys (Iterable[str]): the keys to search for in the dialects
+
+        Returns:
+            a map of dialects to their codegen.
+        """
         from kirin.codegen.impl import MethodImpl
 
         ret: dict["CodegenSignature", "CodegenImpl"] = {}
@@ -115,9 +136,16 @@ class DialectGroup(Generic[PassParams]):
     MethodTransform = Callable[[Callable[Param, RetType]], Method[Param, RetType]]
 
     data: frozenset["Dialect"]
+    """The set of dialects in the group."""
     # NOTE: this is used to create new dialect groups from existing one
     run_pass_gen: RunPassGen[PassParams] | None = None
+    """the function that generates the `run_pass` function.
+
+    This is used to create new dialect groups from existing ones, while
+    keeping the same `run_pass` function.
+    """
     run_pass: RunPass[PassParams] | None = None
+    """the function that runs the passes on the method."""
 
     def __init__(
         self,
@@ -140,21 +168,49 @@ class DialectGroup(Generic[PassParams]):
 
     @staticmethod
     def map_module(dialect):
+        """map the module to the dialect if it is a module.
+        It assumes that the module has a `dialect` attribute
+        that is an instance of [`Dialect`][kirin.ir.Dialect].
+        """
         if isinstance(dialect, ModuleType):
             return getattr(dialect, "dialect")
         return dialect
 
     def add(self, dialect: Union["Dialect", ModuleType]) -> "DialectGroup":
+        """add a dialect to the group.
+
+        Args:
+            dialect (Union[Dialect, ModuleType]): the dialect to add
+
+        Returns:
+            DialectGroup: the new dialect group with the added
+        """
         return self.union([dialect])
 
     def union(self, dialect: Iterable[Union["Dialect", ModuleType]]) -> "DialectGroup":
+        """union a set of dialects to the group.
+
+        Args:
+            dialect (Iterable[Union[Dialect, ModuleType]]): the dialects to union
+
+        Returns:
+            DialectGroup: the new dialect group with the union.
+        """
         return DialectGroup(
             dialects=self.data.union(frozenset(self.map_module(d) for d in dialect)),
             run_pass=self.run_pass_gen,  # pass the run_pass_gen function
         )
 
     @property
-    def registry(self):
+    def registry(self) -> Registry:
+        """return the registry for the dialect group. This
+        returns a proxy object that can be used to select
+        the lowering interpreters, interpreters, and codegen
+        for the dialects in the group.
+
+        Returns:
+            Registry: the registry object.
+        """
         return Registry(self)
 
     @overload
@@ -179,6 +235,16 @@ class DialectGroup(Generic[PassParams]):
         *args: PassParams.args,
         **options: PassParams.kwargs,
     ) -> Method[Param, RetType] | MethodTransform[Param, RetType]:
+        """create a method from the python function.
+
+        Args:
+            py_func (Callable): the python function to create the method from.
+            args (PassParams.args): the arguments to pass to the run_pass function.
+            options (PassParams.kwargs): the keyword arguments to pass to the run_pass function.
+
+        Returns:
+            Method: the method created from the python function.
+        """
         from kirin.lowering import Lowering
 
         emit_ir = Lowering(self)
@@ -222,11 +288,37 @@ class DialectGroup(Generic[PassParams]):
 
 
 def dialect_group(dialects: Iterable[Union["Dialect", ModuleType]]):
+    """Create a dialect group from the given dialects based on the
+    definition of `run_pass` function.
+
+    Args:
+        dialects (Iterable[Union[Dialect, ModuleType]]): the dialects to include in the group.
+
+    Returns:
+        Callable[[RunPassGen[PassParams]], DialectGroup[PassParams]]: the dialect group.
+
+    Example:
+
+    ```python
+    from kirin.dialects import cf, fcf, func, math
+
+    @dialect_group([cf, fcf, func, math])
+    def basic_no_opt(self):
+        # initializations
+        def run_pass(mt: Method) -> None:
+            # how passes are applied to the method
+            pass
+
+        return run_pass
+    ```
+    """
+
     # NOTE: do not alias the annotation below
     def wrapper(
         transform: RunPassGen[PassParams],
     ) -> DialectGroup[PassParams]:
         ret = DialectGroup(dialects, run_pass=transform)
+        update_wrapper(ret, transform)
         return ret
 
     return wrapper

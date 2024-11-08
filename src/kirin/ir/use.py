@@ -9,5 +9,9 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class Use:
+    """A use of an SSA value in a statement."""
+
     stmt: Statement
+    """The statement that uses the SSA value."""
     index: int
+    """The index of the use in the statement."""

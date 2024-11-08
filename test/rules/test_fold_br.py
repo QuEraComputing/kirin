@@ -2,7 +2,7 @@ from kirin.analysis.cfg import CFG
 from kirin.analysis.dataflow.constprop import ConstProp, ConstPropBottom
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
-from kirin.rules.cfg_compatify import CFGCompactify
+from kirin.rules.cfg_compactify import CFGCompactify
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.fold import ConstantFold
 

@@ -32,7 +32,7 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
         """Append a new argument to the Block that this View reference to.
 
         Description:
-            This method will create a new [`BlockArgument`](kirin.ir.BlockArgument) and append it to the argument list
+            This method will create a new [`BlockArgument`][kirin.ir.BlockArgument] and append it to the argument list
             of the reference `Block`.
 
         Args:
@@ -40,7 +40,7 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
             name (str | None, optional): name of the argument. Defaults to `None`.
 
         Returns:
-            BlockArgument: The newly created [`BlockArgument`](kirin.ir.BlockArgument).
+            BlockArgument: The newly created [`BlockArgument`][kirin.ir.BlockArgument].
 
         """
         new_arg = BlockArgument(self.node, len(self.node._args), typ)
