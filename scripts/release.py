@@ -86,9 +86,9 @@ def fail_and_revert(msg):
 if subprocess.run(["git", "push"]).returncode != 0:
     fail_and_revert("Failed to push")
 
-# 1. build the package via rye
-print("rye build -c")
-if subprocess.run(["rye", "build", "-c"]).returncode != 0:
+# 1. build the package via uv
+print("uv build -c")
+if subprocess.run(["uv", "build", "-c"]).returncode != 0:
     fail_and_revert("Failed to build the package")
 
 # 2. create a new release
