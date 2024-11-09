@@ -16,16 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up rye
-        uses: eifinger/setup-rye@v3
-      - name: Update Rye
-        run: |
-          rye self update
-      - name: Sync dependencies using rye
-        run: |
-          rye config --set-bool behavior.use-uv=true
-          rye pin 3.10
-          rye sync
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          # Install a specific version of uv.
+          version: "0.5.1"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - name: Set up build cache
         uses: actions/cache@v4
         id: cache
@@ -38,7 +35,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          rye run mkdocs build
+          uv run mkdocs build
       - name: Deploy preview
         uses: rossjrw/pr-preview-action@v1
         with:
