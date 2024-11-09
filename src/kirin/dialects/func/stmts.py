@@ -3,9 +3,11 @@ from typing import Union
 from kirin.decl import info, statement
 from kirin.dialects.func.attrs import MethodType, Signature
 from kirin.dialects.func.dialect import dialect
+from kirin.dialects.py import types
 from kirin.exceptions import VerificationError
 from kirin.ir import (
     CallableStmtInterface,
+    ConstantLike,
     HasParent,
     HasSignature,
     IsolatedFromAbove,
@@ -115,6 +117,19 @@ class Call(Statement):
 
     def print_impl(self, printer: Printer) -> None:
         _print_invoke_or_call(self, printer)
+
+
+@statement(dialect=dialect)
+class ConstantNone(Statement):
+    """A constant None value.
+
+    This is mainly used to represent the None return value of a function
+    to match Python semantics.
+    """
+
+    name = "const.none"
+    traits = frozenset({Pure(), ConstantLike()})
+    result: ResultValue = info.result(types.NoneType)
 
 
 @statement(dialect=dialect, init=False)

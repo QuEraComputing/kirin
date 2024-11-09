@@ -3,7 +3,14 @@ from typing import Iterable
 from kirin import ir
 from kirin.analysis.dataflow.typeinfer import TypeInference
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
+from kirin.dialects.func.stmts import (
+    Call,
+    ConstantNone,
+    GetField,
+    Invoke,
+    Lambda,
+    Return,
+)
 from kirin.dialects.py import types
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 
@@ -12,14 +19,15 @@ from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 @dialect.register(key="typeinfer")
 class TypeInfer(DialectInterpreter):
 
+    @impl(ConstantNone)
+    def const_none(self, interp: TypeInference, stmt: ConstantNone, values: tuple[()]):
+        return ResultValue(types.NoneType)
+
     @impl(Return)
     def return_(
         self, interp: TypeInference, stmt: Return, values: tuple
     ) -> ReturnValue:
-        if not values:
-            return ReturnValue(types.NoneType)
-        else:
-            return ReturnValue(*values)
+        return ReturnValue(*values)
 
     @impl(Call)
     def call(self, interp: TypeInference, stmt: Call, values: tuple):

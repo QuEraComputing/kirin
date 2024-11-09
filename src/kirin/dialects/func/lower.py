@@ -3,8 +3,16 @@ import ast
 from kirin import ir
 from kirin.dialects.func.attrs import Signature
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.func.stmts import Call, Function, GetField, Invoke, Lambda, Return
-from kirin.dialects.py import stmts, types
+from kirin.dialects.func.stmts import (
+    Call,
+    ConstantNone,
+    Function,
+    GetField,
+    Invoke,
+    Lambda,
+    Return,
+)
+from kirin.dialects.py import types
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
 
@@ -51,7 +59,7 @@ class FuncLowering(FromPythonAST):
 
     def lower_Return(self, state: LoweringState, node: ast.Return) -> Result:
         if node.value is None:
-            stmt = Return(state.append_stmt(stmts.Constant(None)).result)
+            stmt = Return(state.append_stmt(ConstantNone()).result)
             state.append_stmt(stmt)
         else:
             result = state.visit(node.value).expect_one()
@@ -109,7 +117,7 @@ class FuncLowering(FromPythonAST):
         # this is annoying, so we add a return statement at the end
         # so other control flows knows where to exit...
         # this can be a dead block if there is a return statement, but it's fine
-        none_const = stmts.Constant(None)
+        none_const = ConstantNone()
         return_none = Return(none_const.result)
         none_const.source = state.source
         return_none.source = state.source
@@ -120,7 +128,7 @@ class FuncLowering(FromPythonAST):
             and not func_frame.current_block.last_stmt.has_trait(ir.IsTerminator)
         ):
             func_frame.append_stmt(
-                Return(func_frame.append_stmt(stmts.Constant(None)).result)
+                Return(func_frame.append_stmt(ConstantNone()).result)
             )
 
         func_frame.append_block(func_frame.next_block)

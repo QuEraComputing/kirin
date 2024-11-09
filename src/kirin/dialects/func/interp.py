@@ -1,5 +1,12 @@
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
+from kirin.dialects.func.stmts import (
+    Call,
+    ConstantNone,
+    GetField,
+    Invoke,
+    Lambda,
+    Return,
+)
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, concrete, impl
 from kirin.ir import Method
 
@@ -24,6 +31,12 @@ class Interpreter(DialectInterpreter):
     @impl(Return)
     def return_(self, interp: concrete.Interpreter, stmt: Return, values: tuple):
         return ReturnValue(values[0])
+
+    @impl(ConstantNone)
+    def const_none(
+        self, interp: concrete.Interpreter, stmt: ConstantNone, values: tuple[()]
+    ):
+        return ResultValue(None)
 
     @impl(GetField)
     def getfield(self, interp: concrete.Interpreter, stmt: GetField, values: tuple):
