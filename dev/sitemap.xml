@@ -2,622 +2,642 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/101/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/contrib/</loc>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/def/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/install/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/mission/</loc>
+         <lastmod>2024-11-10</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/blog/</loc>
+         <lastmod>2024-11-10</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/blog/2024/11/11/kirins-mission/</loc>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/exceptions/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/graph/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/idtable/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lattice/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/prelude/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/source/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/worklist/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/analysis/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/analysis/cfg/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/analysis/dataflow/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/analysis/dataflow/constprop/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/analysis/dataflow/forward/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/analysis/dataflow/typeinfer/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/codegen/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/codegen/base/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/codegen/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/codegen/dict/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/codegen/impl/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/codegen/ssa/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/base/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/camel2snake/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/info/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/scan_fields/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/verify/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/from_python_call/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/init/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/name/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/property/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/repr/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/traits/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/typecheck/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/decl/emit/verify/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/cf/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/cf/constprop/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/cf/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/cf/interp/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/cf/lower/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/cf/stmts/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/cf/typeinfer/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/fcf/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/fcf/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/fcf/interp/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/fcf/stmts/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/fcf/typeinfer/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/attrs/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/constprop/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/emit/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/interp/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/lower/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/stmts/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/typeinfer/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/math/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/math/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/math/interp/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/math/stmts/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/data/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/rules/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/rules/getitem/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/constprop/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/interp/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/lowering/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/typeinfer/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/assign/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/binop/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/boolean/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/builtin/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/cmp/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/constant/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/getattr/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/getitem/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/list/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/range/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/slice/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/tuple/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/stmts/_stmts/unary/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/types/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/types/base/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/types/builtin/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/types/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/types/elem/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/types/emit/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/abstract/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/base/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/concrete/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/frame/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/impl/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/state/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/interp/value/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/attrs/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/group/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/method/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/ssa/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/traits/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/use/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/nodes/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/nodes/base/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/nodes/block/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/nodes/region/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/nodes/stmt/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/nodes/view/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lowering/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lowering/core/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lowering/dialect/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lowering/frame/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lowering/result/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lowering/state/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/lowering/stream/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/passes/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/passes/abc/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/passes/fold/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/passes/inline/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/passes/typeinfer/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/passes/aggressive/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/passes/aggressive/fold/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/print/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/print/printable/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/print/printer/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/abc/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/chain/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/fixpoint/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/result/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/walk/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/alias/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/apply_type/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/call2invoke/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/cfg_compactify/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/cse/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/dce/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/fold/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/getfield/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/getitem/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/inline/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/aggressive/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/aggressive/fold/</loc>
-         <lastmod>2024-11-09</lastmod>
+         <lastmod>2024-11-10</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/blog/archive/2024/</loc>
+         <lastmod>2024-11-10</lastmod>
     </url>
 </urlset>
