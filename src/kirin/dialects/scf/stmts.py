@@ -4,7 +4,7 @@ from kirin.dialects.scf.dialect import dialect
 
 @statement(dialect=dialect)
 class Iter(ir.Statement):
-    name = "scf.iter"
+    name = "iter"
     value: ir.SSAValue = info.argument()
     result: ir.ResultValue = info.result()
 
@@ -22,7 +22,7 @@ class Iter(ir.Statement):
 # }
 @statement(dialect=dialect)
 class For(ir.Statement):
-    name = "scf.for"
+    name = "for"
     iter: ir.SSAValue = info.argument()
     body: ir.Region = info.region()
     result: ir.ResultValue = info.result()
@@ -30,6 +30,6 @@ class For(ir.Statement):
 
 @statement(dialect=dialect)
 class Yield(ir.Statement):
-    name = "scf.yield"
+    name = "yield"
     traits = frozenset({ir.IsTerminator()})
     values: tuple[ir.SSAValue, ...] = info.argument()
