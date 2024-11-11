@@ -42,15 +42,25 @@ class Lowering(lowering.FromPythonAST):
             )
         )
         loop_frame.defs.update(defs)
-
+        yield_block = ir.Block()
+        loop_frame.next_block = yield_block
         state.exhaust(loop_frame)
-        state.pop_frame()
+        loop_frame.append_block(loop_frame.next_block)
 
-        assigned: list[ir.SSAValue] = []
+        _loop_variables: list[ir.SSAValue] = []
         for name in loop_frame.captures.keys():
             if (value := loop_frame.get_local(name)) is not None:
-                assigned.append(value)
-        loop_frame.current_region.blocks[-1].stmts.append(stmts.Yield(tuple(assigned)))
+                _loop_variables.append(value)
+        loop_variables = tuple(_loop_variables)
+        yield_block.stmts.append(stmts.Yield(loop_variables))
+
+        state.pop_frame()
+        for block in loop_frame.current_region.blocks:
+            if block.last_stmt is None or not block.last_stmt.has_trait(
+                ir.IsTerminator
+            ):
+                block.stmts.append(stmts.Yield(loop_variables))
+
         result_for = state.append_stmt(
             stmts.For(iterator, body=loop_frame.current_region)
         ).result
@@ -62,7 +72,7 @@ class Lowering(lowering.FromPythonAST):
             target_value.name = node.target.id
             state.current_frame.defs[node.target.id] = target_value
 
-        for idx, value in enumerate(assigned):
+        for idx, value in enumerate(loop_variables):
             assert value.name is not None, "Expected value to have a name"
             new_acc = state.append_stmt(
                 pystmts.GetItem(
