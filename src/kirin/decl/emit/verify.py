@@ -21,7 +21,7 @@ class EmitVerify(BaseModifier):
         for name, f in self.fields.regions.items():
             body.append(f"{self._self_name}.{name}.verify()")
             if not f.multi:
-                body.append(f"if len({self._self_name}.{name}.blocks) != 1:")
+                body.append(f"if len({self._self_name}.{name}.blocks) > 1:")
                 body.append(
                     f"    raise {self._VERIFICATION_ERROR}({self._self_name},"
                     f" 'Invalid number of blocks for {name}')"
