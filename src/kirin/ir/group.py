@@ -115,7 +115,9 @@ class Registry:
             for key in keys:
                 if key in dialect.codegen:
                     dialect_codegen = dialect.codegen[key]
-                    if dialect not in fallback:  # use the first fallback
+                    if dialect not in fallback and hasattr(
+                        dialect_codegen, "fallback"
+                    ):  # use the first fallback
                         fallback[dialect] = dialect_codegen.fallback
                     break
 
@@ -126,9 +128,6 @@ class Registry:
             for key, func in dialect_codegen.table.items():
                 ret[key] = MethodImpl(dialect_codegen, func)
 
-            if dialect not in fallback:
-                msg = ",".join(keys)
-                raise KeyError(f"CodeGen of {dialect.name} not found for {msg}")
         return ret, fallback
 
 
