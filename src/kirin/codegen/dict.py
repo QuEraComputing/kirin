@@ -3,9 +3,9 @@ from typing import Iterable
 
 from kirin import ir
 from kirin.exceptions import CodeGenError
+from kirin.idtable import IdTable
 
 from .base import CodeGen
-from .ssa import IdTable
 
 
 @dataclass(init=False)
@@ -20,7 +20,7 @@ class DictGen(CodeGen[dict]):
         self.ssa_id = IdTable()
         self.block_id = IdTable()
 
-    def emit(self, mt: ir.Method):
+    def emit_entry(self, mt: ir.Method):
         self.root = {
             "globals": {},
             "methods": {},
@@ -61,8 +61,8 @@ class DictGen(CodeGen[dict]):
         return {
             "dialect": stmt.dialect.name,
             "type": stmt.__class__.__name__,
-            "args": [self.ssa_id[a] for a in stmt.args],
-            "results": [self.ssa_id[r] for r in stmt.results],
+            "args": [self.emit_SSAValue(a) for a in stmt.args],
+            "results": [self.emit_SSAValue(r) for r in stmt.results],
             "successors": [self.block_id[b] for b in stmt.successors],
             "regions": [self.emit_Region(r) for r in stmt.regions],
             "properties": {
@@ -73,4 +73,10 @@ class DictGen(CodeGen[dict]):
                 name: self.emit_Attribute(attr)
                 for name, attr in stmt.attributes.items()
             },
+        }
+
+    def emit_SSAValue(self, value: ir.SSAValue) -> dict:
+        return {
+            "name": self.ssa_id[value],
+            "type": self.emit_Attribute(value.type),
         }

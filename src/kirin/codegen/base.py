@@ -74,6 +74,9 @@ class CodeGen(ABC, Generic[Target]):
         """build signature for querying the statement implementation."""
         return (stmt.__class__, tuple(arg.type for arg in stmt.args))
 
+    def emit_entry(self, mt: ir.Method) -> Target:
+        return self.emit_Method(mt)
+
     @abstractmethod
     def emit_Method(self, mt: ir.Method) -> Target: ...
 
@@ -82,3 +85,6 @@ class CodeGen(ABC, Generic[Target]):
 
     @abstractmethod
     def emit_Block(self, block: ir.Block) -> Target: ...
+
+    @abstractmethod
+    def emit_SSAValue(self, value: ir.SSAValue) -> Target: ...

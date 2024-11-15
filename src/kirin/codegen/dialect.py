@@ -1,7 +1,7 @@
 import inspect
 from abc import ABC
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 from kirin.codegen.impl import AttributeEmitDef, ImplDef
 
@@ -11,8 +11,12 @@ if TYPE_CHECKING:
     from kirin.codegen.impl import ImplFunction, Signature
 
 
+CodeGenType = TypeVar("CodeGenType", bound="CodeGen")
+Target = TypeVar("Target")
+
+
 @dataclass
-class DialectEmit(ABC):
+class DialectEmit(ABC, Generic[CodeGenType, Target]):
     """Base class to define lookup tables for emitting code for different IR nodes.
 
     Note:
@@ -30,7 +34,7 @@ class DialectEmit(ABC):
     table: ClassVar[dict["Signature", "ImplFunction"]]
 
     @classmethod
-    def fallback(cls, codegen: "CodeGen", stmt: "ir.Statement") -> None:
+    def fallback(cls, codegen: CodeGenType, stmt: "ir.Statement") -> Target:
         raise NotImplementedError(f"Emit for {stmt.__class__} not implemented")
 
     def __init_subclass__(cls) -> None:
