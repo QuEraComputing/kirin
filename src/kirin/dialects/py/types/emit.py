@@ -1,11 +1,19 @@
 from kirin.codegen import CodeGen, DialectEmit, impl
 
 from .dialect import dialect
-from .elem import PyAnyType, PyBottomType, PyClass, PyGeneric, PyLiteral
+from .elem import (
+    PyAnyType,
+    PyBottomType,
+    PyClass,
+    PyGeneric,
+    PyLiteral,
+    PyTypeVar,
+    PyVararg,
+)
 
 
 @dialect.register(key="dict")
-class EmitDict(DialectEmit):
+class EmitDict(DialectEmit[CodeGen[dict], dict]):
 
     @impl(PyClass)
     def emit_class(self, emit: CodeGen[dict], stmt: PyClass):
@@ -31,3 +39,11 @@ class EmitDict(DialectEmit):
     @impl(PyLiteral)
     def emit_literal(self, emit: CodeGen[dict], stmt: PyLiteral):
         return {"name": stmt.data}
+
+    @impl(PyTypeVar)
+    def emit_typevar(self, emit: CodeGen[dict], stmt: PyTypeVar):
+        return {"name": stmt.name, "bound": emit.emit_Attribute(stmt.bound)}
+
+    @impl(PyVararg)
+    def emit_vararg(self, emit: CodeGen[dict], stmt: PyVararg):
+        return {"name": "PyVararg", "type": emit.emit_Attribute(stmt.typ)}

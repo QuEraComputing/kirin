@@ -5,7 +5,7 @@ from .dialect import dialect
 
 
 @dialect.register(key="dict")
-class EmitDict(DialectEmit):
+class EmitDict(DialectEmit[CodeGen[dict], dict]):
 
     @impl(Signature)
     def emit_signature(self, emit: CodeGen[dict], stmt: Signature):
