@@ -95,7 +95,9 @@ class Registry:
                 raise KeyError(f"Interpreter of {dialect.name} not found for {msg}")
         return ret, fallback
 
-    def codegen(self, keys: Iterable[str]) -> dict["CodegenSignature", "CodegenImpl"]:
+    def codegen(
+        self, keys: Iterable[str]
+    ) -> tuple[dict["CodegenSignature", "CodegenImpl"], dict["Dialect", "CodegenImpl"]]:
         """select the dialect codegen for the given key.
 
         Args:
@@ -107,11 +109,14 @@ class Registry:
         from kirin.codegen.impl import MethodImpl
 
         ret: dict["CodegenSignature", "CodegenImpl"] = {}
+        fallback: dict["Dialect", "CodegenImpl"] = {}
         for dialect in self.parent.data:
             dialect_codegen = None
             for key in keys:
                 if key in dialect.codegen:
                     dialect_codegen = dialect.codegen[key]
+                    if dialect not in fallback:  # use the first fallback
+                        fallback[dialect] = dialect_codegen.fallback
                     break
 
             # not found, just skip
@@ -120,7 +125,11 @@ class Registry:
 
             for key, func in dialect_codegen.table.items():
                 ret[key] = MethodImpl(dialect_codegen, func)
-        return ret
+
+            if dialect not in fallback:
+                msg = ",".join(keys)
+                raise KeyError(f"CodeGen of {dialect.name} not found for {msg}")
+        return ret, fallback
 
 
 PassParams = ParamSpec("PassParams")

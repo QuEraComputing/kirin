@@ -17,6 +17,7 @@ class CodeGen(ABC, Generic[Target]):
     keys: ClassVar[list[str]]
     dialects: ir.DialectGroup
     registry: dict["Signature", "StatementImpl"] = field(init=False, repr=False)
+    fallbacks: dict[ir.Dialect, "StatementImpl"] = field(init=False, repr=False)
 
     def __init__(self, dialects: ir.DialectGroup | Iterable[ir.Dialect]):
         """Init method for CodeGen.
@@ -27,7 +28,7 @@ class CodeGen(ABC, Generic[Target]):
         if not isinstance(dialects, ir.DialectGroup):
             dialects = ir.DialectGroup(dialects)
         self.dialects = dialects
-        self.registry = dialects.registry.codegen(self.keys)
+        self.registry, self.fallbacks = dialects.registry.codegen(self.keys)
 
     def emit(self, node) -> Target:
         """top-level entry point for code generation."""
@@ -57,6 +58,8 @@ class CodeGen(ABC, Generic[Target]):
             return self.registry[sig](self, stmt)
         elif stmt.__class__ in self.registry:
             return self.registry[stmt.__class__](self, stmt)
+        elif stmt.dialect in self.fallbacks:
+            return self.fallbacks[stmt.dialect](self, stmt)
         return self.emit_Statement_fallback(stmt)
 
     def emit_Attribute(self, attr: ir.Attribute) -> Target:
