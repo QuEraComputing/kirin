@@ -1,5 +1,6 @@
 * [kirin](kirin/index.md)
     * [analysis](kirin/analysis/index.md)
+        * [callgraph](kirin/analysis/callgraph.md)
         * [cfg](kirin/analysis/cfg.md)
         * [dataflow](kirin/analysis/dataflow/index.md)
             * [constprop](kirin/analysis/dataflow/constprop.md)
