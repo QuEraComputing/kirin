@@ -39,7 +39,7 @@ jobs:
         # For example, using `pytest`
         run: uv run just coverage
       - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: coverage.xml # optional
           fail_ci_if_error: true # optional (default = false)
