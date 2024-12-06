@@ -5,14 +5,7 @@
     <span class=n>max_depth</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>128</span><span class=p>,</span>
     <span class=n>max_python_recursion_depth</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>8192</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.analysis.dataflow.forward.ForwardExtra" href="../forward/#kirin.analysis.dataflow.forward.ForwardExtra">ForwardExtra</a>[<span title="kirin.analysis.dataflow.constprop.ConstPropLattice">ConstPropLattice</span>, <span title="kirin.analysis.dataflow.constprop.ConstPropFrameInfo">ConstPropFrameInfo</span>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/constprop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>207</span>
-<span class=normal>208</span>
-<span class=normal>209</span>
-<span class=normal>210</span>
-<span class=normal>211</span>
-<span class=normal>212</span>
-<span class=normal>213</span>
-<span class=normal>214</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.analysis.dataflow.forward.ForwardExtra" href="../forward/#kirin.analysis.dataflow.forward.ForwardExtra">ForwardExtra</a>[<span title="kirin.analysis.dataflow.constprop.ConstPropLattice">ConstPropLattice</span>, <span title="kirin.analysis.dataflow.constprop.ConstPropFrameInfo">ConstPropFrameInfo</span>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/constprop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>214</span>
 <span class=normal>215</span>
 <span class=normal>216</span>
 <span class=normal>217</span>
@@ -24,7 +17,14 @@
 <span class=normal>223</span>
 <span class=normal>224</span>
 <span class=normal>225</span>
-<span class=normal>226</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>226</span>
+<span class=normal>227</span>
+<span class=normal>228</span>
+<span class=normal>229</span>
+<span class=normal>230</span>
+<span class=normal>231</span>
+<span class=normal>232</span>
+<span class=normal>233</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>DialectGroup</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Dialect</span><span class=p>],</span>
     <span class=o>*</span><span class=p>,</span>
@@ -48,14 +48,7 @@
 </code></pre></div> <div class="doc doc-contents "> <p>The name of the interpreter to select from dialects by order.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.dataflow.constprop.ConstProp.eval_stmt class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eval_stmt</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>eval_stmt</span><span class=p>(</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp_value</span><span class=o>.</span><span class=n>Result</span><span class=p>[</span><span class=n>ConstPropLattice</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>simply evaluate a statement</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/constprop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>251</span>
-<span class=normal>252</span>
-<span class=normal>253</span>
-<span class=normal>254</span>
-<span class=normal>255</span>
-<span class=normal>256</span>
-<span class=normal>257</span>
-<span class=normal>258</span>
+</code></pre></div> <div class="doc doc-contents "> <p>simply evaluate a statement</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/constprop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>258</span>
 <span class=normal>259</span>
 <span class=normal>260</span>
 <span class=normal>261</span>
@@ -72,7 +65,14 @@
 <span class=normal>272</span>
 <span class=normal>273</span>
 <span class=normal>274</span>
-<span class=normal>275</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
+<span class=normal>275</span>
+<span class=normal>276</span>
+<span class=normal>277</span>
+<span class=normal>278</span>
+<span class=normal>279</span>
+<span class=normal>280</span>
+<span class=normal>281</span>
+<span class=normal>282</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp_value</span><span class=o>.</span><span class=n>Result</span><span class=p>[</span><span class=n>ConstPropLattice</span><span class=p>]:</span>
     <span class=k>if</span> <span class=n>stmt</span><span class=o>.</span><span class=n>has_trait</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>ConstantLike</span><span class=p>)</span> <span class=ow>or</span> <span class=p>(</span>
