@@ -91,10 +91,6 @@ class StructAttribute(Attribute, ABC):
 @dataclass(eq=False)
 class TypeAttribute(Attribute, Lattice["TypeAttribute"], metaclass=TypeAttributeMeta):
 
-    @property
-    def parent_type(self) -> type[TypeAttribute]:
-        return TypeAttribute
-
     def __or__(self, other: TypeAttribute):
         return self.join(other)
 
@@ -105,12 +101,6 @@ class TypeAttribute(Attribute, Lattice["TypeAttribute"], metaclass=TypeAttribute
     @classmethod
     def bottom(cls) -> BottomType:
         return BottomType()
-
-    def is_top(self):
-        return isinstance(self, AnyType)
-
-    def is_bottom(self):
-        return isinstance(self, BottomType)
 
     def is_subtype(self, other: TypeAttribute) -> bool:
         return self.is_subseteq(other)
@@ -134,7 +124,7 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
         return isinstance(other, AnyType)  # allow subclassing
 
     def is_equal(self, other: TypeAttribute) -> bool:
-        return other.is_top()
+        return other is self.top()
 
     def __hash__(self):
         return id(self)
@@ -152,7 +142,7 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
         return self
 
     def is_equal(self, other: TypeAttribute) -> bool:
-        return other.is_bottom()
+        return other is other.bottom()
 
     def is_subseteq(self, other: TypeAttribute) -> bool:
         return True

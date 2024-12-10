@@ -12,10 +12,6 @@ from kirin.lattice import Lattice, LatticeMeta, SingletonMeta
 @dataclass
 class ConstPropLattice(Lattice["ConstPropLattice"]):
 
-    @property
-    def parent_type(self) -> type["ConstPropLattice"]:
-        return ConstPropLattice
-
     @classmethod
     def top(cls) -> Any:
         return NotConst()
@@ -145,7 +141,7 @@ class PartialLambda(ConstPropLattice):
         return all(x.is_subseteq(y) for x, y in zip(self.captured, other.captured))
 
     def join(self, other: ConstPropLattice) -> ConstPropLattice:
-        if other.is_bottom():
+        if other is other.bottom():
             return self
 
         if not isinstance(other, PartialLambda):
@@ -209,7 +205,7 @@ class ConstPropFrameInfo:
 
 class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
     keys = ["constprop", "empty"]
-    interp: Interpreter
+    lattice = ConstPropLattice
 
     def __init__(
         self,
@@ -231,10 +227,6 @@ class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
-
-    @classmethod
-    def bottom_value(cls) -> ConstPropLattice:
-        return ConstPropBottom()
 
     def try_eval_const(
         self, stmt: ir.Statement, args: tuple[Const, ...]

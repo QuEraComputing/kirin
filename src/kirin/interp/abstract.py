@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Generic, Iterable, TypeVar
+from typing import Iterable, TypeVar
 
 from kirin.interp.base import BaseInterpreter, InterpResult
 from kirin.interp.frame import Frame
@@ -26,10 +26,11 @@ AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
 
 
 class AbstractInterpreter(
-    Generic[AbstractFrameType, ResultType],
     BaseInterpreter[AbstractFrameType, ResultType],
 ):
-    bottom: ResultType = field(init=False, kw_only=True, repr=False)
+    lattice: type[Lattice]
+    """lattice type for the abstract interpreter.
+    """
 
     def __init__(
         self,
@@ -39,21 +40,18 @@ class AbstractInterpreter(
         max_depth: int = 128,
         max_python_recursion_depth: int = 8192,
     ):
+        if not hasattr(self, "lattice"):
+            raise TypeError(f"lattice is not defined for {self.__class__.__name__}")
         super().__init__(
             dialects,
             fuel=fuel,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
-        self.bottom = self.bottom_value()
+        self.bottom: ResultType = self.lattice.bottom()
 
     @abstractmethod
     def new_method_frame(self, mt: Method) -> AbstractFrameType: ...
-
-    @classmethod
-    @abstractmethod
-    def bottom_value(cls) -> ResultType:
-        pass
 
     def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
         return

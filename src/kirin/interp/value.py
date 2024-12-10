@@ -102,7 +102,11 @@ class Err(Result[ValueType]):
         )
         args = ",".join(
             [
-                (f"{arg.name}" if arg.type.is_top() else f"{arg.name}:{arg.type}")
+                (
+                    f"{arg.name}"
+                    if arg.type is arg.type.top()
+                    else f"{arg.name}:{arg.type}"
+                )
                 for arg in region.blocks[0].args[1:]
             ]
         )

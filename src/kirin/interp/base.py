@@ -1,11 +1,9 @@
 import sys
 from abc import ABC, ABCMeta, abstractmethod
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Sequence, TypeVar
-
-from typing_extensions import dataclass_transform
+from typing import TYPE_CHECKING, Generic, Sequence, TypeVar
 
 from kirin.exceptions import InterpreterError
 from kirin.interp.frame import FrameABC
@@ -15,7 +13,7 @@ from kirin.ir import Dialect, DialectGroup, Region, Statement, traits
 from kirin.ir.method import Method
 
 if TYPE_CHECKING:
-    from kirin.interp.impl import Signature, StatementImpl
+    from kirin.interp.impl import Signature
 
 ValueType = TypeVar("ValueType")
 FrameType = TypeVar("FrameType", bound=FrameABC)
@@ -53,42 +51,16 @@ class InterpResult(Generic[ValueType]):
             return ResultValue(self.value)
 
 
-@dataclass_transform(field_specifiers=(field,))
 class InterpreterMeta(ABCMeta):
-    def __new__(
-        mcls: type,
-        name: str,
-        bases: tuple[type, ...],
-        namespace: dict[str, Any],
-        /,
-        init: bool = False,
-        **kwargs: Any,
-    ):
-        cls = super().__new__(mcls, name, bases, namespace, **kwargs)  # type: ignore
-        return dataclass(init=init)(cls)
+    pass
 
 
 class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterMeta):
     """A base class for interpreters."""
 
-    keys: ClassVar[list[str]]
+    keys: list[str]
     """The name of the interpreter to select from dialects by order.
     """
-    dialects: DialectGroup
-    """The dialects to interpret."""
-
-    registry: dict["Signature", "StatementImpl"] = field(init=False, repr=False)
-    """A mapping of statement signature to their implementation.
-    """
-    fallbacks: dict[Dialect, "StatementImpl"] = field(init=False, repr=False)
-    state: InterpreterState[FrameType] = field(init=False, repr=False)
-    """The interpreter state.
-    """
-    fuel: int | None = field(default=None, init=False, kw_only=True)
-    """The fuel limit.
-    """
-    max_depth: int = field(default=128, init=False, kw_only=True)
-    max_python_recursion_depth: int = field(default=8192, init=False, kw_only=True)
 
     def __init__(
         self,

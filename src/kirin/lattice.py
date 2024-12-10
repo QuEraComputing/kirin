@@ -15,21 +15,11 @@ class LatticeMeta(ABCMeta):
 class Lattice(ABC, Generic[LatticeParent], metaclass=LatticeMeta):
     """Abstract base class for lattices."""
 
-    @property
-    @abstractmethod
-    def parent_type(self) -> type[LatticeParent]: ...
-
     @abstractmethod
     def join(self, other: LatticeParent) -> LatticeParent: ...
 
     @abstractmethod
     def meet(self, other: LatticeParent) -> LatticeParent: ...
-
-    def is_bottom(self):
-        return self is self.bottom()
-
-    def is_top(self):
-        return self is self.top()
 
     @abstractmethod
     def is_subseteq(self, other: LatticeParent) -> bool: ...
@@ -38,9 +28,12 @@ class Lattice(ABC, Generic[LatticeParent], metaclass=LatticeMeta):
         return self.is_subseteq(other) and not other.is_subseteq(self)
 
     def __eq__(self, value: object) -> bool:
-        return isinstance(value, self.parent_type) and self.is_equal(value)
+        raise NotImplementedError(
+            "Equality is not implemented for lattices, use is_equal instead"
+        )
 
     def is_equal(self, other: LatticeParent) -> bool:
+        """Check if two lattices are equal."""
         if self is other:
             return True
         else:
@@ -54,8 +47,8 @@ class Lattice(ABC, Generic[LatticeParent], metaclass=LatticeMeta):
     @abstractmethod
     def top(cls) -> LatticeParent: ...
 
-    @abstractmethod
-    def __hash__(self) -> int: ...
+    def __hash__(self) -> int:
+        raise NotImplementedError("Hash is not implemented for lattices")
 
 
 class SingletonMeta(LatticeMeta):
@@ -117,21 +110,11 @@ class UnionMeta(LatticeMeta):
 class EmptyLattice(Lattice["EmptyLattice"], metaclass=SingletonMeta):
     """Empty lattice."""
 
-    @property
-    def parent_type(self) -> type[EmptyLattice]:
-        return EmptyLattice
-
     def join(self, other: EmptyLattice) -> EmptyLattice:
         return self
 
     def meet(self, other: EmptyLattice) -> EmptyLattice:
         return self
-
-    def is_bottom(self):
-        return True
-
-    def is_top(self):
-        return True
 
     @classmethod
     def bottom(cls):

@@ -2,7 +2,7 @@ from kirin import ir
 from kirin.analysis.dataflow.forward import Forward
 from kirin.dialects.py import types
 from kirin.interp.base import InterpResult
-from kirin.ir import BottomType, TypeAttribute
+from kirin.ir import TypeAttribute
 from kirin.ir.method import Method
 from kirin.ir.nodes.region import Region
 from kirin.ir.nodes.stmt import Statement
@@ -10,10 +10,7 @@ from kirin.ir.nodes.stmt import Statement
 
 class TypeInference(Forward[TypeAttribute]):
     keys = ["typeinfer", "typeinfer.default"]
-
-    @classmethod
-    def bottom_value(cls) -> TypeAttribute:
-        return BottomType()
+    lattice = TypeAttribute
 
     def build_signature(self, stmt: Statement, args: tuple):
         """we use value here as signature as they will be types"""

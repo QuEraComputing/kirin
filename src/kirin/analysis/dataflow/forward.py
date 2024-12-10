@@ -1,7 +1,4 @@
-from dataclasses import field
 from typing import Generic, Iterable, TypeVar
-
-from typing_extensions import deprecated
 
 from kirin.interp import AbstractFrame, AbstractInterpreter
 from kirin.ir import Dialect, SSAValue
@@ -19,7 +16,6 @@ class ForwardFrame(AbstractFrame[LatticeElemType], Generic[LatticeElemType, Extr
 
 class ForwardExtra(
     AbstractInterpreter[ForwardFrame[LatticeElemType, ExtraType], LatticeElemType],
-    Generic[LatticeElemType, ExtraType],
 ):
     """Abstract interpreter but record results for each SSA value.
 
@@ -27,8 +23,6 @@ class ForwardExtra(
         LatticeElemType: The lattice element type.
         ExtraType: The type of extra information to be stored in the frame.
     """
-
-    results: dict[SSAValue, LatticeElemType] = field(init=False, default_factory=dict)
 
     def __init__(
         self,
@@ -65,11 +59,6 @@ class ForwardExtra(
 
     def new_method_frame(self, mt: Method) -> ForwardFrame[LatticeElemType, ExtraType]:
         return ForwardFrame.from_method(mt)
-
-
-@deprecated("use Forward instead")
-class ForwardDataFlowAnalysis(ForwardExtra[LatticeElemType, None]):
-    pass
 
 
 class Forward(ForwardExtra[LatticeElemType, None]):

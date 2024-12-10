@@ -16,10 +16,7 @@ from kirin.worklist import WorkList
 @dataclass(init=False)
 class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
     keys = ["test_interp", "main", "empty"]
-
-    @classmethod
-    def bottom_value(cls) -> EmptyLattice:
-        return EmptyLattice()
+    lattice = EmptyLattice
 
     @classmethod
     def default_worklist(cls) -> WorkList:

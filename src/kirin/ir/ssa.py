@@ -114,7 +114,7 @@ class ResultValue(SSAValue):
         return id(self)
 
     def __repr__(self) -> str:
-        if self.type.is_top():
+        if self.type is self.type.top():
             type_str = ""
         else:
             type_str = f"[{self.type}]"

@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, NoReturn, TypeGuard, TypeVar, Union
+from typing import Any, Generic, Iterable, NoReturn, TypeGuard, TypeVar, Union, final
 
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import ClassTypeHint, TypeHint, TypeVarTypeHint
@@ -57,9 +57,9 @@ class PyType(_PyType):
         return PyBottomType()
 
     def is_subseteq(self, other: TypeAttribute) -> bool:
-        if other.is_top():
+        if other is self.top():
             return True
-        elif other.is_bottom():
+        elif other is self.bottom():
             return False
         elif isinstance(other, PyType):
             method = getattr(
@@ -79,6 +79,7 @@ class PyType(_PyType):
 
 
 @dialect.register
+@final
 @dataclass
 class PyAnyType(PyType, AnyType):
     name = "Any"
@@ -96,6 +97,7 @@ class PyAnyType(PyType, AnyType):
 
 
 @dialect.register
+@final
 @dataclass
 class PyBottomType(PyType, BottomType):
     name = "Bottom"
@@ -130,6 +132,7 @@ class LiteralMeta(TypeAttributeMeta):
 
 
 @dialect.register
+@final
 @dataclass(init=False)
 class PyConst(PyType, Generic[Type]):
     """This will not appear in user-space. It is used to
@@ -173,6 +176,7 @@ class PyConst(PyType, Generic[Type]):
 
 
 @dialect.register
+@final
 @dataclass
 class PyLiteral(PyType, Generic[Type], metaclass=LiteralMeta):
     name = "Literal"
@@ -201,6 +205,7 @@ class PyLiteral(PyType, Generic[Type], metaclass=LiteralMeta):
 
 
 @dialect.register
+@final
 @dataclass(init=False)
 class PyUnion(PyType, metaclass=UnionTypeMeta):
     name = "Union"
@@ -229,9 +234,9 @@ class PyUnion(PyType, metaclass=UnionTypeMeta):
         return isinstance(other, PyUnion) and self.args == other.args
 
     def is_subseteq(self, other: TypeAttribute) -> bool:
-        if other.is_top():
+        if other is other.top():
             return True
-        elif other.is_bottom():
+        elif other is other.bottom():
             return False
         return all(a.is_subseteq(other) for a in self.args)
 
@@ -269,6 +274,7 @@ class PyUnion(PyType, metaclass=UnionTypeMeta):
 
 
 @dialect.register
+@final
 @dataclass
 class PyTypeVar(PyType):
     name = "TypeVar"
@@ -294,7 +300,7 @@ class PyTypeVar(PyType):
         return hash((PyTypeVar, self.varname, self.bound))
 
     def __repr__(self) -> str:
-        if not self.bound.is_top():
+        if self.bound is not self.bound.top():
             upper = f" : {self.bound}"
         else:
             upper = ""
@@ -314,12 +320,13 @@ class PyTypeVar(PyType):
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(f"~{self.varname}")
-        if not self.bound.is_top():
+        if self.bound is not self.bound.top():
             printer.plain_print(" : ")
             printer.print(self.bound)
 
 
 @dialect.register
+@final
 @dataclass
 class PyVararg(Attribute):
     name = "Vararg"
@@ -369,6 +376,7 @@ class PyClassMeta(TypeAttributeMeta):
 
 
 @dialect.register
+@final
 @dataclass(init=False)
 class PyClass(PyType, Generic[Type], metaclass=PyClassMeta):
     name = "class"
@@ -414,6 +422,7 @@ class PyClass(PyType, Generic[Type], metaclass=PyClassMeta):
 
 
 @dialect.register
+@final
 @dataclass(init=False)
 class PyGeneric(PyType, Generic[Type]):
     name = "generic"
@@ -595,6 +604,6 @@ def widen_const(typ: PyType):
 def to_pytype(typ: TypeAttribute):
     if isinstance(typ, PyType):
         return typ
-    elif typ.is_top():
+    elif typ is typ.top():
         return PyAnyType()
     return PyBottomType()
