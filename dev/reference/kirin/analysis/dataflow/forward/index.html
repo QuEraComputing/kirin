@@ -5,7 +5,13 @@
     <span class=n>max_depth</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>128</span><span class=p>,</span>
     <span class=n>max_python_recursion_depth</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>8192</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.AbstractInterpreter" href="../../../interp/abstract/#kirin.interp.abstract.AbstractInterpreter">AbstractInterpreter</a>[<span title="kirin.analysis.dataflow.forward.ForwardFrame">ForwardFrame</span>[<span title="kirin.analysis.dataflow.forward.LatticeElemType">LatticeElemType</span>, <span title="kirin.analysis.dataflow.forward.ExtraType">ExtraType</span>], <span title="kirin.analysis.dataflow.forward.LatticeElemType">LatticeElemType</span>]</code>, <code><span title="typing.Generic">Generic</span>[<span title="kirin.analysis.dataflow.forward.LatticeElemType">LatticeElemType</span>, <span title="kirin.analysis.dataflow.forward.ExtraType">ExtraType</span>]</code></p> <p>Abstract interpreter but record results for each SSA value.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>LatticeElemType</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The lattice element type.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>ExtraType</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The type of extra information to be stored in the frame.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>33</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.AbstractInterpreter" href="../../../interp/abstract/#kirin.interp.abstract.AbstractInterpreter">AbstractInterpreter</a>[<span title="kirin.analysis.dataflow.forward.ForwardFrame">ForwardFrame</span>[<span title="kirin.analysis.dataflow.forward.LatticeElemType">LatticeElemType</span>, <span title="kirin.analysis.dataflow.forward.ExtraType">ExtraType</span>], <span title="kirin.analysis.dataflow.forward.LatticeElemType">LatticeElemType</span>]</code></p> <p>Abstract interpreter but record results for each SSA value.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>LatticeElemType</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The lattice element type.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>ExtraType</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The type of extra information to be stored in the frame.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>27</span>
+<span class=normal>28</span>
+<span class=normal>29</span>
+<span class=normal>30</span>
+<span class=normal>31</span>
+<span class=normal>32</span>
+<span class=normal>33</span>
 <span class=normal>34</span>
 <span class=normal>35</span>
 <span class=normal>36</span>
@@ -13,13 +19,7 @@
 <span class=normal>38</span>
 <span class=normal>39</span>
 <span class=normal>40</span>
-<span class=normal>41</span>
-<span class=normal>42</span>
-<span class=normal>43</span>
-<span class=normal>44</span>
-<span class=normal>45</span>
-<span class=normal>46</span>
-<span class=normal>47</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>41</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>DialectGroup</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Dialect</span><span class=p>],</span>
     <span class=o>*</span><span class=p>,</span>
@@ -37,16 +37,16 @@
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.dataflow.forward.ForwardExtra.new_method_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">new_method_frame</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>new_method_frame</span><span class=p>(</span>
     <span class=n>mt</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>,</span> <span class=n>ExtraType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>66</span>
-<span class=normal>67</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>new_method_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>mt</span><span class=p>:</span> <span class=n>Method</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>,</span> <span class=n>ExtraType</span><span class=p>]:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>60</span>
+<span class=normal>61</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>new_method_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>mt</span><span class=p>:</span> <span class=n>Method</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>,</span> <span class=n>ExtraType</span><span class=p>]:</span>
     <span class=k>return</span> <span class=n>ForwardFrame</span><span class=o>.</span><span class=n>from_method</span><span class=p>(</span><span class=n>mt</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.dataflow.forward.ForwardExtra.postprocess_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">postprocess_frame</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>postprocess_frame</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>,</span> <span class=n>ExtraType</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped. Default implementation does nothing.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>61</span>
-<span class=normal>62</span>
-<span class=normal>63</span>
-<span class=normal>64</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>postprocess_frame</span><span class=p>(</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped. Default implementation does nothing.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/dataflow/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>55</span>
+<span class=normal>56</span>
+<span class=normal>57</span>
+<span class=normal>58</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>postprocess_frame</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>,</span> <span class=n>ExtraType</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>results</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>entries</span>

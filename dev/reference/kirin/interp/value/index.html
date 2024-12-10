@@ -7,9 +7,9 @@
     <span class=bp>self</span><span class=o>.</span><span class=n>exception</span> <span class=o>=</span> <span class=n>exception</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>frames</span> <span class=o>=</span> <span class=n>frames</span><span class=o>.</span><span class=n>copy</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.value.Err.panic class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">panic</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>panic</span><span class=p>()</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Raise the error.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/value.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>119</span>
-<span class=normal>120</span>
-<span class=normal>121</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>panic</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Raise the error.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/value.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>123</span>
+<span class=normal>124</span>
+<span class=normal>125</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>panic</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Raise the error.&quot;&quot;&quot;</span>
     <span class=k>raise</span> <span class=bp>self</span><span class=o>.</span><span class=n>exception</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.value.Err.print_stack class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">print_stack</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>print_stack</span><span class=p>()</span>
@@ -39,7 +39,11 @@
 <span class=normal>114</span>
 <span class=normal>115</span>
 <span class=normal>116</span>
-<span class=normal>117</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>print_stack</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+<span class=normal>117</span>
+<span class=normal>118</span>
+<span class=normal>119</span>
+<span class=normal>120</span>
+<span class=normal>121</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>print_stack</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Print the stack trace of the error.&quot;&quot;&quot;</span>
     <span class=n>top_method_code</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>frames</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span><span class=o>.</span><span class=n>method</span><span class=o>.</span><span class=n>code</span>
     <span class=k>if</span> <span class=p>(</span><span class=n>call_trait</span> <span class=o>:=</span> <span class=n>top_method_code</span><span class=o>.</span><span class=n>get_trait</span><span class=p>(</span><span class=n>CallableStmtInterface</span><span class=p>))</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
@@ -53,7 +57,11 @@
     <span class=p>)</span>
     <span class=n>args</span> <span class=o>=</span> <span class=s2>&quot;,&quot;</span><span class=o>.</span><span class=n>join</span><span class=p>(</span>
         <span class=p>[</span>
-            <span class=p>(</span><span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>arg</span><span class=o>.</span><span class=n>name</span><span class=si>}</span><span class=s2>&quot;</span> <span class=k>if</span> <span class=n>arg</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>is_top</span><span class=p>()</span> <span class=k>else</span> <span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>arg</span><span class=o>.</span><span class=n>name</span><span class=si>}</span><span class=s2>:</span><span class=si>{</span><span class=n>arg</span><span class=o>.</span><span class=n>type</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>)</span>
+            <span class=p>(</span>
+                <span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>arg</span><span class=o>.</span><span class=n>name</span><span class=si>}</span><span class=s2>&quot;</span>
+                <span class=k>if</span> <span class=n>arg</span><span class=o>.</span><span class=n>type</span> <span class=ow>is</span> <span class=n>arg</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>top</span><span class=p>()</span>
+                <span class=k>else</span> <span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>arg</span><span class=o>.</span><span class=n>name</span><span class=si>}</span><span class=s2>:</span><span class=si>{</span><span class=n>arg</span><span class=o>.</span><span class=n>type</span><span class=si>}</span><span class=s2>&quot;</span>
+            <span class=p>)</span>
             <span class=k>for</span> <span class=n>arg</span> <span class=ow>in</span> <span class=n>region</span><span class=o>.</span><span class=n>blocks</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span><span class=o>.</span><span class=n>args</span><span class=p>[</span><span class=mi>1</span><span class=p>:]</span>
         <span class=p>]</span>
     <span class=p>)</span>
