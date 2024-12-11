@@ -33,9 +33,10 @@ class Interpreter(DialectInterpreter):
     def atanh(self, interp, stmt: stmts.atanh, values: tuple) -> ResultValue:
         return ResultValue(math.atanh(values[0]))
 
-    @impl(stmts.cbrt)
-    def cbrt(self, interp, stmt: stmts.cbrt, values: tuple) -> ResultValue:
-        return ResultValue(math.cbrt(values[0]))
+    # NOTE: 3.10 compat
+    # @impl(stmts.cbrt)
+    # def cbrt(self, interp, stmt: stmts.cbrt, values: tuple) -> ResultValue:
+    #     return ResultValue(math.cbrt(values[0]))
 
     @impl(stmts.ceil)
     def ceil(self, interp, stmt: stmts.ceil, values: tuple) -> ResultValue:
@@ -69,9 +70,10 @@ class Interpreter(DialectInterpreter):
     def exp(self, interp, stmt: stmts.exp, values: tuple) -> ResultValue:
         return ResultValue(math.exp(values[0]))
 
-    @impl(stmts.exp2)
-    def exp2(self, interp, stmt: stmts.exp2, values: tuple) -> ResultValue:
-        return ResultValue(math.exp2(values[0]))
+    # NOTE: 3.10 compat
+    # @impl(stmts.exp2)
+    # def exp2(self, interp, stmt: stmts.exp2, values: tuple) -> ResultValue:
+    #     return ResultValue(math.exp2(values[0]))
 
     @impl(stmts.expm1)
     def expm1(self, interp, stmt: stmts.expm1, values: tuple) -> ResultValue:
