@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from kirin import exceptions, interp, ir
-from kirin.analysis import ForwardExtra, TypeInference, const
+from kirin.analysis import const
+from kirin.analysis.forward import ForwardExtra
 from kirin.analysis.purity import NotPure, Pure, Purity
+from kirin.analysis.typeinfer import TypeInference
 from kirin.ir.types import TypeAttribute
 from kirin.lattice import BoundedLattice
 
