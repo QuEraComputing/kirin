@@ -42,7 +42,7 @@ nav:
       - IR declaration: reference/kirin/decl/
       - Exceptions: reference/kirin/exceptions.md
       - Data Structures:
-          - Lattice: reference/kirin/lattice.md
+          - Lattice: reference/kirin/lattice/abc.md
           - Graph: reference/kirin/graph.md
           - IdTable: reference/kirin/idtable.md
           - Source: reference/kirin/source.md
