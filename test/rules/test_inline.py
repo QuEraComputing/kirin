@@ -1,6 +1,6 @@
 # type: ignore
 from kirin import ir, types
-from kirin.analysis import ConstProp, NotConst
+from kirin.analysis import ConstProp, const
 from kirin.analysis.cfg import CFG
 from kirin.decl import info, statement
 from kirin.dialects.py import data, stmts
@@ -97,7 +97,7 @@ def inline_foldl(x):
 def test_inline_constprop():
     def fold():
         constprop = ConstProp(inline_foldl.dialects)
-        constprop.eval(inline_foldl, tuple(NotConst() for _ in inline_foldl.args))
+        constprop.eval(inline_foldl, tuple(const.NotConst() for _ in inline_foldl.args))
         Fixpoint(
             Walk(
                 Chain(

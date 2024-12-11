@@ -1,6 +1,5 @@
 from kirin import ir
 from kirin.analysis.dataflow.forward import Forward
-from kirin.interp.base import InterpResult
 from kirin.ir import types
 from kirin.ir.method import Method
 from kirin.ir.nodes.region import Region
@@ -29,7 +28,7 @@ class TypeInference(Forward[types.TypeAttribute]):
 
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[types.TypeAttribute, ...]
-    ) -> InterpResult[types.TypeAttribute]:
+    ) -> types.TypeAttribute:
         # NOTE: widen method type here
         return self.run_ssacfg_region(
             body, (types.Const(mt, types.PyClass(ir.Method)),) + args

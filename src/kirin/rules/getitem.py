@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 
 from kirin import ir
-from kirin.analysis.dataflow.constprop import Const, ConstPropLattice
+from kirin.analysis import const
 from kirin.dialects.py import stmts
 from kirin.rewrite import RewriteResult, RewriteRule
 
 
 @dataclass
 class InlineGetItem(RewriteRule):
-    results: dict[ir.SSAValue, ConstPropLattice]
+    results: dict[ir.SSAValue, const.ConstLattice]
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, stmts.GetItem):
@@ -20,7 +20,7 @@ class InlineGetItem(RewriteRule):
         if node.index not in self.results:
             return RewriteResult()
 
-        if not isinstance(index_value := self.results[node.index], Const):
+        if not isinstance(index_value := self.results[node.index], const.Const):
             return RewriteResult()
 
         stmt = node.obj.owner

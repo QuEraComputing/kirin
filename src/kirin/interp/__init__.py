@@ -2,7 +2,10 @@ from kirin.interp.abstract import (
     AbstractFrame as AbstractFrame,
     AbstractInterpreter as AbstractInterpreter,
 )
-from kirin.interp.base import BaseInterpreter as BaseInterpreter
+from kirin.interp.base import (
+    BaseInterpreter as BaseInterpreter,
+    InterpResult as InterpResult,
+)
 from kirin.interp.concrete import Interpreter as Interpreter
 from kirin.interp.dialect import (
     DefaultTypeInferInterpreter as DefaultTypeInferInterpreter,

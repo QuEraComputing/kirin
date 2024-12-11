@@ -68,14 +68,17 @@ class Lattice(ABC, Generic[LatticeType], metaclass=LatticeMeta):
         raise NotImplementedError("Hash is not implemented for lattices")
 
 
-class BoundedLattice(Lattice[LatticeType]):
+BoundedLatticeType = TypeVar("BoundedLatticeType", bound="BoundedLattice")
+
+
+class BoundedLattice(Lattice[BoundedLatticeType]):
     @classmethod
     @abstractmethod
-    def bottom(cls) -> LatticeType: ...
+    def bottom(cls) -> BoundedLatticeType: ...
 
     @classmethod
     @abstractmethod
-    def top(cls) -> LatticeType: ...
+    def top(cls) -> BoundedLatticeType: ...
 
 
 class UnionMeta(LatticeMeta):

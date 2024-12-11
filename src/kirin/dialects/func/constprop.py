@@ -1,14 +1,8 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.analysis.dataflow.constprop import (
-    Const,
-    ConstProp,
-    ConstPropBottom,
-    ConstPropLattice,
-    NotConst,
-    PartialLambda,
-)
+from kirin.analysis.dataflow.constprop import ConstProp
+from kirin.analysis.dataflow.lattice import const
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
@@ -20,17 +14,19 @@ class DialectConstProp(DialectInterpreter):
     @impl(Return)
     def return_(self, interp: ConstProp, stmt: Return, values: tuple) -> ReturnValue:
         if not values:
-            return ReturnValue(Const(None))
+            return ReturnValue(const.Const(None))
         else:
             return ReturnValue(*values)
 
     @impl(Call)
-    def call(self, interp: ConstProp, stmt: Call, values: tuple[ConstPropLattice, ...]):
+    def call(
+        self, interp: ConstProp, stmt: Call, values: tuple[const.ConstLattice, ...]
+    ):
         # give up on dynamic method calls
         if not values:  # err
-            return ResultValue(ConstPropBottom())
+            return ResultValue(const.Unknown())
 
-        if isinstance(values[0], PartialLambda):
+        if isinstance(values[0], const.PartialLambda):
             return ResultValue(
                 self._call_lambda(
                     interp,
@@ -39,8 +35,8 @@ class DialectConstProp(DialectInterpreter):
                 )
             )
 
-        if not isinstance(values[0], Const):
-            return ResultValue(NotConst())
+        if not isinstance(values[0], const.Const):
+            return ResultValue(const.NotConst())
 
         mt: ir.Method = values[0].data
         return ResultValue(
@@ -55,8 +51,8 @@ class DialectConstProp(DialectInterpreter):
     def _call_lambda(
         self,
         interp: ConstProp,
-        callee: PartialLambda,
-        args: tuple[ConstPropLattice, ...],
+        callee: const.PartialLambda,
+        args: tuple[const.ConstLattice, ...],
     ):
         # NOTE: we still use PartialLambda because
         # we want to gurantee what we receive here in captured
@@ -80,7 +76,7 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Invoke)
     def invoke(
-        self, interp: ConstProp, stmt: Invoke, values: tuple[ConstPropLattice, ...]
+        self, interp: ConstProp, stmt: Invoke, values: tuple[const.ConstLattice, ...]
     ):
         return ResultValue(
             self._invoke_method(
@@ -95,7 +91,7 @@ class DialectConstProp(DialectInterpreter):
         self,
         interp: ConstProp,
         mt: ir.Method,
-        values: tuple[ConstPropLattice, ...],
+        values: tuple[const.ConstLattice, ...],
         results: Iterable[ir.ResultValue],
     ):
         if len(interp.state.frames) < interp.max_depth:
@@ -108,10 +104,10 @@ class DialectConstProp(DialectInterpreter):
             arg.name or str(idx) for idx, arg in enumerate(stmt.body.blocks[0].args)
         ]
         if not stmt.body.blocks.isempty() and all(
-            isinstance(each, Const) for each in values
+            isinstance(each, const.Const) for each in values
         ):
             return ResultValue(
-                Const(
+                const.Const(
                     ir.Method(
                         mod=None,
                         py_func=None,
@@ -125,7 +121,7 @@ class DialectConstProp(DialectInterpreter):
             )
 
         return ResultValue(
-            PartialLambda(
+            const.PartialLambda(
                 arg_names,
                 stmt,
                 values,
@@ -135,9 +131,9 @@ class DialectConstProp(DialectInterpreter):
     @impl(GetField)
     def getfield(self, interp: ConstProp, stmt: GetField, values: tuple):
         callee_self = values[0]
-        if isinstance(callee_self, Const):
+        if isinstance(callee_self, const.Const):
             mt: ir.Method = callee_self.data
-            return ResultValue(Const(mt.fields[stmt.field]))
-        elif isinstance(callee_self, PartialLambda):
+            return ResultValue(const.Const(mt.fields[stmt.field]))
+        elif isinstance(callee_self, const.PartialLambda):
             return ResultValue(callee_self.captured[stmt.field])
-        return ResultValue(NotConst())
+        return ResultValue(const.NotConst())

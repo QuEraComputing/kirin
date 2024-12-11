@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from kirin import ir
-from kirin.analysis.dataflow.constprop import Const, ConstPropLattice
+from kirin.analysis import const
 from kirin.dialects.func import Call, Invoke
 from kirin.rewrite import RewriteResult, RewriteRule
 
@@ -10,7 +10,7 @@ from kirin.rewrite import RewriteResult, RewriteRule
 class Call2Invoke(RewriteRule):
     """Rewrite a `Call` statement to an `Invoke` statement."""
 
-    results: dict[ir.SSAValue, ConstPropLattice]
+    results: dict[ir.SSAValue, const.ConstLattice]
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, Call):
@@ -19,7 +19,7 @@ class Call2Invoke(RewriteRule):
         if (mt := self.results.get(node.callee)) is None:
             return RewriteResult()
 
-        if not isinstance(mt, Const):
+        if not isinstance(mt, const.Const):
             return RewriteResult()
 
         stmt = Invoke(inputs=node.inputs, callee=mt.data, kwargs=node.kwargs)

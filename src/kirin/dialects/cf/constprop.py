@@ -1,4 +1,4 @@
-from kirin.analysis.dataflow.constprop import Const, ConstProp, ConstPropLattice
+from kirin.analysis import ConstProp, const
 from kirin.dialects.cf.dialect import dialect
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.interp import DialectInterpreter, ResultValue, Successor, impl
@@ -21,11 +21,11 @@ class DialectConstProp(DialectInterpreter):
         self,
         interp: ConstProp,
         stmt: ConditionalBranch,
-        values: tuple[ConstPropLattice, ...],
+        values: tuple[const.ConstLattice, ...],
     ):
         frame = interp.state.current_frame()
         cond = values[0]
-        if isinstance(cond, Const):
+        if isinstance(cond, const.Const):
             else_successor = Successor(
                 stmt.else_successor, *frame.get_values(stmt.else_arguments)
             )
@@ -37,13 +37,13 @@ class DialectConstProp(DialectInterpreter):
             else:
                 frame.worklist.append(else_successor)
         else:
-            frame.entries[stmt.cond] = Const(True)
+            frame.entries[stmt.cond] = const.Const(True)
             then_successor = Successor(
                 stmt.then_successor, *frame.get_values(stmt.then_arguments)
             )
             frame.worklist.append(then_successor)
 
-            frame.entries[stmt.cond] = Const(False)
+            frame.entries[stmt.cond] = const.Const(False)
             else_successor = Successor(
                 stmt.else_successor, *frame.get_values(stmt.else_arguments)
             )

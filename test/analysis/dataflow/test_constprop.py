@@ -1,12 +1,6 @@
 from kirin import ir
-from kirin.analysis.dataflow.constprop import (
-    Const,
-    ConstProp,
-    ConstPropBottom,
-    NotConst,
-    NotPure,
-    PartialTuple,
-)
+from kirin.analysis import ConstProp
+from kirin.analysis.dataflow.lattice.const import Const, NotConst, PartialTuple, Unknown
 from kirin.decl import info, statement
 from kirin.dialects.py import stmts
 from kirin.ir import types
@@ -17,83 +11,69 @@ class TestLattice:
 
     def test_meet(self):
         assert NotConst().meet(NotConst()) == NotConst()
-        assert NotConst().meet(ConstPropBottom()) == ConstPropBottom()
+        assert NotConst().meet(Unknown()) == Unknown()
         assert NotConst().meet(Const(1)) == Const(1)
-        assert NotConst().meet(
-            PartialTuple((Const(1), ConstPropBottom()))
-        ) == PartialTuple((Const(1), ConstPropBottom()))
-        assert ConstPropBottom().meet(NotConst()) == ConstPropBottom()
-        assert ConstPropBottom().meet(ConstPropBottom()) == ConstPropBottom()
-        assert ConstPropBottom().meet(Const(1)) == ConstPropBottom()
-        assert (
-            ConstPropBottom().meet(PartialTuple((Const(1), ConstPropBottom())))
-            == ConstPropBottom()
+        assert NotConst().meet(PartialTuple((Const(1), Unknown()))) == PartialTuple(
+            (Const(1), Unknown())
         )
+        assert Unknown().meet(NotConst()) == Unknown()
+        assert Unknown().meet(Unknown()) == Unknown()
+        assert Unknown().meet(Const(1)) == Unknown()
+        assert Unknown().meet(PartialTuple((Const(1), Unknown()))) == Unknown()
         assert Const(1).meet(NotConst()) == Const(1)
-        assert Const(1).meet(ConstPropBottom()) == ConstPropBottom()
+        assert Const(1).meet(Unknown()) == Unknown()
         assert Const(1).meet(Const(1)) == Const(1)
-        assert (
-            Const(1).meet(PartialTuple((Const(1), ConstPropBottom())))
-            == ConstPropBottom()
+        assert Const(1).meet(PartialTuple((Const(1), Unknown()))) == Unknown()
+        assert PartialTuple((Const(1), Unknown())).meet(NotConst()) == PartialTuple(
+            (Const(1), Unknown())
         )
-        assert PartialTuple((Const(1), ConstPropBottom())).meet(
-            NotConst()
-        ) == PartialTuple((Const(1), ConstPropBottom()))
-        assert (
-            PartialTuple((Const(1), ConstPropBottom())).meet(ConstPropBottom())
-            == ConstPropBottom()
+        assert PartialTuple((Const(1), Unknown())).meet(Unknown()) == Unknown()
+        assert PartialTuple((Const(1), Unknown())).meet(Const(1)) == Unknown()
+        assert PartialTuple((Const(1), Unknown())).meet(Const((1, 2))) == PartialTuple(
+            (Const(1), Unknown())
         )
-        assert (
-            PartialTuple((Const(1), ConstPropBottom())).meet(Const(1))
-            == ConstPropBottom()
-        )
-        assert PartialTuple((Const(1), ConstPropBottom())).meet(
-            Const((1, 2))
-        ) == PartialTuple((Const(1), ConstPropBottom()))
-        assert PartialTuple((Const(1), ConstPropBottom())).meet(
-            PartialTuple((Const(1), ConstPropBottom()))
-        ) == PartialTuple((Const(1), ConstPropBottom()))
+        assert PartialTuple((Const(1), Unknown())).meet(
+            PartialTuple((Const(1), Unknown()))
+        ) == PartialTuple((Const(1), Unknown()))
 
     def test_join(self):
         assert NotConst().join(NotConst()) == NotConst()
-        assert NotConst().join(ConstPropBottom()) == NotConst()
+        assert NotConst().join(Unknown()) == NotConst()
         assert NotConst().join(Const(1)) == NotConst()
-        assert (
-            NotConst().join(PartialTuple((Const(1), ConstPropBottom()))) == NotConst()
+        assert NotConst().join(PartialTuple((Const(1), Unknown()))) == NotConst()
+        assert Unknown().join(NotConst()) == NotConst()
+        assert Unknown().join(Unknown()) == Unknown()
+        assert Unknown().join(Const(1)) == Const(1)
+        assert Unknown().join(PartialTuple((Const(1), Unknown()))) == PartialTuple(
+            (Const(1), Unknown())
         )
-        assert ConstPropBottom().join(NotConst()) == NotConst()
-        assert ConstPropBottom().join(ConstPropBottom()) == ConstPropBottom()
-        assert ConstPropBottom().join(Const(1)) == Const(1)
-        assert ConstPropBottom().join(
-            PartialTuple((Const(1), ConstPropBottom()))
-        ) == PartialTuple((Const(1), ConstPropBottom()))
-        assert PartialTuple((Const(1), ConstPropBottom())).join(
-            Const((1, 2))
-        ) == PartialTuple((Const(1), Const(2)))
+        assert PartialTuple((Const(1), Unknown())).join(Const((1, 2))) == PartialTuple(
+            (Const(1), Const(2))
+        )
         assert Const(1).join(NotConst()) == NotConst()
-        assert Const(1).join(ConstPropBottom()) == Const(1)
+        assert Const(1).join(Unknown()) == Const(1)
         assert Const(1).join(Const(1)) == Const(1)
         assert Const(1).join(Const(2)) == NotConst()
-        assert Const(1).join(PartialTuple((Const(1), ConstPropBottom()))) == NotConst()
+        assert Const(1).join(PartialTuple((Const(1), Unknown()))) == NotConst()
 
     def test_is_equal(self):
         assert NotConst().is_equal(NotConst())
-        assert not NotConst().is_equal(ConstPropBottom())
+        assert not NotConst().is_equal(Unknown())
         assert not NotConst().is_equal(Const(1))
-        assert ConstPropBottom().is_equal(ConstPropBottom())
-        assert not ConstPropBottom().is_equal(Const(1))
+        assert Unknown().is_equal(Unknown())
+        assert not Unknown().is_equal(Const(1))
         assert Const(1).is_equal(Const(1))
         assert not Const(1).is_equal(Const(2))
-        assert PartialTuple((Const(1), ConstPropBottom())).is_equal(
-            PartialTuple((Const(1), ConstPropBottom()))
+        assert PartialTuple((Const(1), Unknown())).is_equal(
+            PartialTuple((Const(1), Unknown()))
         )
-        assert not PartialTuple((Const(1), ConstPropBottom())).is_equal(
+        assert not PartialTuple((Const(1), Unknown())).is_equal(
             PartialTuple((Const(1), Const(2)))
         )
 
     def test_partial_tuple(self):
-        pt1 = PartialTuple((Const(1), ConstPropBottom()))
-        pt2 = PartialTuple((Const(1), ConstPropBottom()))
+        pt1 = PartialTuple((Const(1), Unknown()))
+        pt2 = PartialTuple((Const(1), Unknown()))
         assert pt1.is_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt1
@@ -102,8 +82,8 @@ class TestLattice:
         assert not pt1.is_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == PartialTuple((Const(1), Const(2)))
-        assert pt1.meet(pt2) == PartialTuple((Const(1), ConstPropBottom()))
-        pt2 = PartialTuple((Const(1), ConstPropBottom()))
+        assert pt1.meet(pt2) == PartialTuple((Const(1), Unknown()))
+        pt2 = PartialTuple((Const(1), Unknown()))
         assert pt1.is_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt1
@@ -238,7 +218,7 @@ def test_intraprocedure_side_effect():
     new_tuple = (
         side_effect_intraprocedure.callable_region.blocks[2].stmts.at(3).results[0]
     )
-    assert isinstance(result, NotPure)
+    assert isinstance(result, NotConst)
     assert constprop.results[new_tuple] == Const((1, 2, 3))
 
 
@@ -280,7 +260,7 @@ def test_non_pure_recursion():
     constprop = ConstProp(basic_no_opt)
     constprop.eval(for_loop_append, tuple(NotConst() for _ in for_loop_append.args))
     stmt = for_loop_append.callable_region.blocks[1].stmts.at(3)
-    assert isinstance(constprop.results[stmt.results[0]], NotPure)
+    assert isinstance(constprop.results[stmt.results[0]], NotConst)
 
 
 def test_closure_prop():
@@ -338,4 +318,4 @@ def test_closure_prop():
     main2.print(analysis=constprop.results)
     stmt = main2.callable_region.blocks[0].stmts.at(3)
     call_result = constprop.results[stmt.results[0]]
-    assert isinstance(call_result, NotPure)
+    assert isinstance(call_result, Const)

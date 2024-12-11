@@ -1,7 +1,7 @@
 from typing import Any, Iterable
 
 from kirin.exceptions import FuelExhaustedError
-from kirin.interp.base import BaseInterpreter, InterpResult
+from kirin.interp.base import BaseInterpreter
 from kirin.interp.frame import Frame
 from kirin.interp.value import Err, NoReturn, ResultValue, ReturnValue, Successor
 from kirin.ir import Block, Dialect, DialectGroup, Region
@@ -29,19 +29,15 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
     def new_method_frame(self, mt: Method) -> Frame[Any]:
         return Frame.from_method(mt)
 
-    def run_method_region(
-        self, mt: Method, body: Region, args: tuple[Any, ...]
-    ) -> InterpResult[Any]:
+    def run_method_region(self, mt: Method, body: Region, args: tuple[Any, ...]) -> Any:
         return self.run_ssacfg_region(body, (mt,) + args)
 
-    def run_ssacfg_region(
-        self, region: Region, args: tuple[Any, ...]
-    ) -> InterpResult[Any]:
+    def run_ssacfg_region(self, region: Region, args: tuple[Any, ...]) -> Any:
         result: Any = NoReturn()
         frame = self.state.current_frame()
         # empty body, return
         if not region.blocks:
-            return InterpResult(result)
+            return result
 
         stmt_idx = 0
         block: Block | None = region.blocks[0]
@@ -66,7 +62,7 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
 
                 match stmt_results:
                     case Err(_):
-                        return InterpResult(stmt_results)
+                        return stmt_results
                     case ResultValue(values):
                         frame.set_values(stmt._results, values)
                     case ReturnValue(result):
@@ -81,4 +77,4 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
                 stmt = stmt.next_stmt
                 stmt_idx += 1
         # end of while
-        return InterpResult(result)
+        return result

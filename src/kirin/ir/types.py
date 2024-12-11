@@ -8,7 +8,14 @@ from typing_extensions import Never
 
 from kirin.ir._types import _TypeAttribute
 from kirin.ir.attrs import Attribute, AttributeMeta
-from kirin.lattice import BoundedLattice, LatticeMeta, SingletonMeta, UnionMeta
+from kirin.lattice import (
+    BoundedLattice,
+    IsSubsetEqMixin,
+    LatticeMeta,
+    SimpleMeetMixin,
+    SingletonMeta,
+    UnionMeta,
+)
 from kirin.print import Printer
 
 
@@ -37,7 +44,11 @@ class UnionTypeMeta(TypeAttributeMeta, UnionMeta):
 
 @dataclass
 class TypeAttribute(
-    _TypeAttribute, BoundedLattice["TypeAttribute"], metaclass=TypeAttributeMeta
+    _TypeAttribute,
+    SimpleMeetMixin["TypeAttribute"],
+    IsSubsetEqMixin["TypeAttribute"],
+    BoundedLattice["TypeAttribute"],
+    metaclass=TypeAttributeMeta,
 ):
 
     @classmethod
@@ -55,29 +66,7 @@ class TypeAttribute(
             return self
         elif isinstance(other, TypeAttribute):
             return Union(self, other)
-        return BottomType()  # err
-
-    def meet(self, other: "TypeAttribute") -> "TypeAttribute":
-        if self.is_subseteq(other):
-            return self
-        elif other.is_subseteq(self):
-            return other
-        return BottomType()
-
-    def is_subseteq(self, other: "TypeAttribute") -> bool:
-        if isinstance(other, AnyType):
-            return True
-        elif isinstance(other, BottomType):
-            return False
-
-        method = getattr(
-            self,
-            "is_subseteq_" + other.__class__.__name__,
-            getattr(self, "is_subseteq_fallback", None),
-        )
-        if method is not None:
-            return method(other)
-        return False
+        return AnyType()  # don't know how to join
 
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self, prefix="!")

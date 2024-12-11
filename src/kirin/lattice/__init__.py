@@ -6,3 +6,8 @@ from kirin.lattice.abc import (
     UnionMeta as UnionMeta,
 )
 from kirin.lattice.empty import EmptyLattice as EmptyLattice
+from kirin.lattice.mixin import (
+    IsSubsetEqMixin as IsSubsetEqMixin,
+    SimpleJoinMixin as SimpleJoinMixin,
+    SimpleMeetMixin as SimpleMeetMixin,
+)

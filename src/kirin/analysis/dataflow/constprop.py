@@ -1,211 +1,14 @@
-from dataclasses import dataclass
-from typing import Any, Iterable, final
+from typing import Iterable
 
-from kirin import ir
-from kirin.analysis.dataflow.forward import ForwardExtra
-from kirin.exceptions import InterpreterError
-from kirin.interp import Interpreter, value as interp_value
-from kirin.interp.base import InterpResult
-from kirin.lattice import BoundedLattice, LatticeMeta, SingletonMeta
+from kirin import exceptions, interp, ir
+
+from .forward import Forward
+from .lattice.const import Const, ConstLattice, NotConst
 
 
-@dataclass
-class ConstPropLattice(BoundedLattice["ConstPropLattice"]):
-
-    @classmethod
-    def top(cls) -> Any:
-        return NotConst()
-
-    @classmethod
-    def bottom(cls) -> Any:
-        return ConstPropBottom()
-
-    def join(self, other: "ConstPropLattice") -> "ConstPropLattice":
-        if other.is_subseteq(self):
-            return self
-        elif self.is_subseteq(other):
-            return other
-        return NotConst()
-
-    def meet(self, other: "ConstPropLattice") -> "ConstPropLattice":
-        if self.is_subseteq(other):
-            return self
-        elif other.is_subseteq(self):
-            return other
-        return ConstPropBottom()
-
-
-@final
-class NotPure(ConstPropLattice, metaclass=SingletonMeta):
-
-    def is_equal(self, other: ConstPropLattice) -> bool:
-        return self is other
-
-    def is_subseteq(self, other: ConstPropLattice) -> bool:
-        if isinstance(other, (NotConst, NotPure)):
-            return True
-        return False
-
-
-@final
-@dataclass
-class Const(ConstPropLattice):
-    data: Any
-
-    def is_equal(self, other: ConstPropLattice) -> bool:
-        if isinstance(other, Const):
-            return self.data == other.data
-        return False
-
-    def is_subseteq(self, other: ConstPropLattice) -> bool:
-        if isinstance(other, Const):
-            return self.data == other.data
-        elif isinstance(other, (NotConst, NotPure)):
-            return True
-        return False
-
-
-@final
-class PartialTupleMeta(LatticeMeta):
-    def __call__(cls, data: tuple[ConstPropLattice, ...]):
-        if all(isinstance(x, Const) for x in data):
-            return Const(tuple(x.data for x in data))  # type: ignore
-        return super().__call__(data)
-
-
-@final
-@dataclass
-class PartialTuple(ConstPropLattice, metaclass=PartialTupleMeta):
-    data: tuple[ConstPropLattice, ...]
-
-    def join(self, other: ConstPropLattice) -> ConstPropLattice:
-        if other.is_subseteq(self):
-            return self
-        elif self.is_subseteq(other):
-            return other
-        elif isinstance(other, PartialTuple):
-            return PartialTuple(tuple(x.join(y) for x, y in zip(self.data, other.data)))
-        elif isinstance(other, Const) and isinstance(other.data, tuple):
-            return PartialTuple(
-                tuple(x.join(Const(y)) for x, y in zip(self.data, other.data))
-            )
-        return NotConst()
-
-    def meet(self, other: ConstPropLattice) -> ConstPropLattice:
-        if self.is_subseteq(other):
-            return self
-        elif other.is_subseteq(self):
-            return other
-        elif isinstance(other, PartialTuple):
-            return PartialTuple(tuple(x.meet(y) for x, y in zip(self.data, other.data)))
-        elif isinstance(other, Const) and isinstance(other.data, tuple):
-            return PartialTuple(
-                tuple(x.meet(Const(y)) for x, y in zip(self.data, other.data))
-            )
-        return ConstPropBottom()
-
-    def is_equal(self, other: ConstPropLattice) -> bool:
-        if isinstance(other, PartialTuple):
-            return all(x.is_equal(y) for x, y in zip(self.data, other.data))
-        elif isinstance(other, Const) and isinstance(other.data, tuple):
-            return all(x.is_equal(Const(y)) for x, y in zip(self.data, other.data))
-        return False
-
-    def is_subseteq(self, other: ConstPropLattice) -> bool:
-        if isinstance(other, PartialTuple):
-            return all(x.is_subseteq(y) for x, y in zip(self.data, other.data))
-        elif isinstance(other, Const) and isinstance(other.data, tuple):
-            return all(x.is_subseteq(Const(y)) for x, y in zip(self.data, other.data))
-        elif isinstance(other, NotConst):
-            return True
-        return False
-
-
-@final
-@dataclass
-class PartialLambda(ConstPropLattice):
-    argnames: list[str]
-    code: ir.Statement
-    captured: tuple[ConstPropLattice, ...]
-
-    def is_subseteq(self, other: ConstPropLattice) -> bool:
-        if not isinstance(other, PartialLambda):
-            return NotConst().is_subseteq(other)  # widen self
-
-        if self.code is not other.code:
-            return False
-
-        if len(self.captured) != len(other.captured):
-            return False
-
-        return all(x.is_subseteq(y) for x, y in zip(self.captured, other.captured))
-
-    def join(self, other: ConstPropLattice) -> ConstPropLattice:
-        if other is other.bottom():
-            return self
-
-        if not isinstance(other, PartialLambda):
-            return NotConst().join(other)  # widen self
-
-        if self.code is not other.code:
-            return NotConst()  # lambda stmt is pure
-
-        if len(self.captured) != len(other.captured):
-            return ConstPropBottom()  # err
-
-        return PartialLambda(
-            self.argnames,
-            self.code,
-            tuple(x.join(y) for x, y in zip(self.captured, other.captured)),
-        )
-
-    def meet(self, other: ConstPropLattice) -> ConstPropLattice:
-        if not isinstance(other, PartialLambda):
-            return NotConst().meet(other)
-
-        if self.code is not other.code:
-            return ConstPropBottom()
-
-        if len(self.captured) != len(other.captured):
-            return NotConst()
-
-        return PartialLambda(
-            self.argnames,
-            self.code,
-            tuple(x.meet(y) for x, y in zip(self.captured, other.captured)),
-        )
-
-
-@final
-@dataclass
-class ConstPropBottom(ConstPropLattice, metaclass=SingletonMeta):
-
-    def is_equal(self, other: ConstPropLattice) -> bool:
-        return self is other
-
-    def is_subseteq(self, other: ConstPropLattice) -> bool:
-        return True
-
-
-@final
-@dataclass
-class NotConst(ConstPropLattice, metaclass=SingletonMeta):
-
-    def is_equal(self, other: ConstPropLattice) -> bool:
-        return self is other
-
-    def is_subseteq(self, other: ConstPropLattice) -> bool:
-        return self.is_equal(other)
-
-
-@dataclass
-class ConstPropFrameInfo:
-    not_pure: bool = False
-
-
-class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
+class ConstProp(Forward[ConstLattice]):
     keys = ["constprop", "empty"]
-    lattice = ConstPropLattice
+    lattice = ConstLattice
 
     def __init__(
         self,
@@ -221,7 +24,7 @@ class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
-        self.interp = Interpreter(
+        self.interp = interp.Interpreter(
             dialects,
             fuel=fuel,
             max_depth=max_depth,
@@ -230,26 +33,22 @@ class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
 
     def try_eval_const(
         self, stmt: ir.Statement, args: tuple[Const, ...]
-    ) -> interp_value.Result[ConstPropLattice]:
+    ) -> interp.Result[ConstLattice]:
         try:
             value = self.interp.eval_stmt(stmt, tuple(x.data for x in args))
-            if isinstance(value, interp_value.ResultValue):
-                return interp_value.ResultValue(
-                    *tuple(Const(each) for each in value.values)
-                )
-            elif isinstance(value, interp_value.ReturnValue):
-                return interp_value.ReturnValue(Const(value.result))
-            elif isinstance(value, interp_value.Successor):
-                return interp_value.Successor(
+            if isinstance(value, interp.ResultValue):
+                return interp.ResultValue(*tuple(Const(each) for each in value.values))
+            elif isinstance(value, interp.ReturnValue):
+                return interp.ReturnValue(Const(value.result))
+            elif isinstance(value, interp.Successor):
+                return interp.Successor(
                     value.block, *tuple(Const(each) for each in value.block_args)
                 )
-        except InterpreterError:
+        except exceptions.InterpreterError:
             pass
-        return interp_value.ResultValue(NotConst())
+        return interp.ResultValue(NotConst())
 
-    def eval_stmt(
-        self, stmt: ir.Statement, args: tuple
-    ) -> interp_value.Result[ConstPropLattice]:
+    def eval_stmt(self, stmt: ir.Statement, args: tuple) -> interp.Result[ConstLattice]:
         if stmt.has_trait(ir.ConstantLike) or (
             stmt.has_trait(ir.Pure) and all(isinstance(x, Const) for x in args)
         ):
@@ -260,24 +59,11 @@ class ConstProp(ForwardExtra[ConstPropLattice, ConstPropFrameInfo]):
             return self.registry[sig](self, stmt, args)
         elif stmt.__class__ in self.registry:
             return self.registry[stmt.__class__](self, stmt, args)
-        elif not stmt.has_trait(ir.Pure):  # not specified and not pure
-            # NOTE: this will return so result value is not assigned
-            # assign manually here.
-            frame = self.state.current_frame()
-            for result in stmt.results:
-                frame.entries[result] = NotPure()
-
-            frame.extra = ConstPropFrameInfo(not_pure=True)
-            return interp_value.ResultValue(NotPure())
         else:
             # fallback to NotConst for other pure statements
-            return interp_value.ResultValue(NotConst())
+            return interp.ResultValue(NotConst())
 
     def run_method_region(
-        self, mt: ir.Method, body: ir.Region, args: tuple[ConstPropLattice, ...]
-    ) -> InterpResult[ConstPropLattice]:
-        result = self.run_ssacfg_region(body, (Const(mt),) + args)
-        extra = self.state.current_frame().extra
-        if extra is not None and extra.not_pure:
-            return InterpResult(NotPure())
-        return result
+        self, mt: ir.Method, body: ir.Region, args: tuple[ConstLattice, ...]
+    ) -> ConstLattice:
+        return self.run_ssacfg_region(body, (Const(mt),) + args)

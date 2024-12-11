@@ -77,7 +77,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.registry, self.fallbacks = self.dialects.registry.interpreter(
             keys=self.keys
         )
-        self.state = InterpreterState()
+        self.state: InterpreterState[FrameType] = InterpreterState()
         self.fuel = fuel
         self.max_depth = max_depth
         self.max_python_recursion_depth = max_python_recursion_depth
@@ -114,12 +114,12 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         results = self.run_method_region(mt, body, args)
         self.postprocess_frame(self.state.pop_frame())
         sys.setrecursionlimit(current_recursion_limit)
-        return results
+        return InterpResult(results)
 
     @abstractmethod
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[ValueType, ...]
-    ) -> InterpResult[ValueType]: ...
+    ) -> ValueType: ...
 
     def postprocess_frame(self, frame: FrameType) -> None:
         """Postprocess a frame after it is popped from the stack. This is
@@ -176,7 +176,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             self.state.current_frame().set_stmt(stmt)
         return self.eval_stmt(stmt, args)
 
-    def eval_stmt(self, stmt: Statement, args: tuple) -> Result[ValueType]:
+    def eval_stmt(
+        self, stmt: Statement, args: tuple[ValueType, ...]
+    ) -> Result[ValueType]:
         "simply evaluate a statement"
         sig = self.build_signature(stmt, args)
         if sig in self.registry:
@@ -194,7 +196,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     @abstractmethod
     def run_ssacfg_region(
         self, region: Region, args: tuple[ValueType, ...]
-    ) -> InterpResult[ValueType]: ...
+    ) -> ValueType: ...
 
     class FuelResult(Enum):
         Stop = 0

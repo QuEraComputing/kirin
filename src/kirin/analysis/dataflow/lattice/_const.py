@@ -1,0 +1,2 @@
+class _ConstLattice:
+    pass

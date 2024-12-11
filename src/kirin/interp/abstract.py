@@ -2,7 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Iterable, TypeVar
 
-from kirin.interp.base import BaseInterpreter, InterpResult
+from kirin.interp.base import BaseInterpreter
 from kirin.interp.frame import Frame
 from kirin.interp.value import ResultValue, ReturnValue, Successor
 from kirin.ir import Dialect, DialectGroup, Region, SSAValue, Statement
@@ -72,18 +72,19 @@ class AbstractInterpreter(
 
     def run_ssacfg_region(
         self, region: Region, args: tuple[ResultType, ...]
-    ) -> InterpResult[ResultType]:
+    ) -> ResultType:
         frame = self.state.current_frame()
         result = self.bottom
         if not region.blocks:
-            return InterpResult(result)
+            return result
 
         frame.worklist.append(Successor(region.blocks[0], *args))
         while (succ := frame.worklist.pop()) is not None:
             self.prehook_succ(frame, succ)
-            result = self.run_block(frame, succ).join(result)
+            block_result = self.run_block(frame, succ)
+            result: ResultType = block_result.join(result)
             self.posthook_succ(frame, succ)
-        return InterpResult(result)
+        return result
 
     def run_block(self, frame: AbstractFrameType, succ: Successor) -> ResultType:
         self.set_values(frame, succ.block.args, succ.block_args)
