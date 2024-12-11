@@ -7,17 +7,17 @@ from kirin.ir import (
     HasSignature,
     SSAValue,
     Statement,
-    TypeAttribute,
+    types,
 )
 from kirin.rewrite import RewriteResult, RewriteRule
 
 
 @dataclass
 class ApplyType(RewriteRule):
-    ret_type: TypeAttribute
-    results: dict[SSAValue, TypeAttribute]
+    ret_type: types.TypeAttribute
+    results: dict[SSAValue, types.TypeAttribute]
 
-    def get_type(self, value: SSAValue) -> TypeAttribute:
+    def get_type(self, value: SSAValue) -> types.TypeAttribute:
         return self.results[value]
         # if isinstance(typ, types.PyConst):
         #     return typ.typ

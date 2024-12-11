@@ -1,4 +1,4 @@
-from kirin.dialects.py import types
+from kirin import types
 from kirin.prelude import basic
 
 
@@ -8,4 +8,4 @@ def tuple_hint(xs: tuple[int, ...]):
 
 
 def test_tuple_hint():
-    assert tuple_hint.arg_types[0].is_subtype(types.Tuple[types.PyVararg(types.Int)])
+    assert tuple_hint.arg_types[0].is_subseteq(types.Tuple[types.Vararg(types.Int)])

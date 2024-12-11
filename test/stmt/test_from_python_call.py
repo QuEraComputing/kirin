@@ -2,14 +2,14 @@ from typing import Any
 
 import pytest
 
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.dialects import func
-from kirin.dialects.py import data, stmts, types
+from kirin.dialects.py import data, stmts
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering import Lowering
 
-T = types.PyTypeVar("T")
+T = types.TypeVar("T")
 
 dialect = ir.Dialect("test")
 
@@ -109,7 +109,7 @@ def no_group(
 
 def test_from_python_call():
     assert DummyStatement.dialect is dialect
-    lowering = Lowering([func, data, types, stmts, dialect])
+    lowering = Lowering([func, data, stmts, dialect])
 
     code: func.Function = lowering.run(dummy)  # type: ignore
     block = code.body.blocks[0]

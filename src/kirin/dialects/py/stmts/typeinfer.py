@@ -1,5 +1,5 @@
-from kirin.dialects.py import types
 from kirin.interp import DefaultTypeInferInterpreter, ResultValue, impl
+from kirin.ir import types
 
 from . import _stmts as py
 from .dialect import dialect
@@ -11,14 +11,16 @@ class TypeInfer(DefaultTypeInferInterpreter):
     @impl(py.Constant)
     def constant(self, interp, stmt: py.Constant, values: tuple) -> ResultValue:
         # NOTE: stmt.result.type should be verified by typecheck
-        return ResultValue(types.PyConst(stmt.value, stmt.result.type))  # type: ignore
+        return ResultValue(types.Const(stmt.value, stmt.result.type))  # type: ignore
 
     @impl(py.Alias)
     def alias(self, interp, stmt, values: tuple) -> ResultValue:
         return ResultValue(values[0])  # just forward the type
 
     @impl(py.NewTuple)
-    def new_tuple(self, interp, stmt, values: tuple[types.PyType, ...]) -> ResultValue:
+    def new_tuple(
+        self, interp, stmt, values: tuple[types.TypeAttribute, ...]
+    ) -> ResultValue:
         return ResultValue(types.Tuple.where(values))  # make 3.10 happy
 
     @impl(py.Add, types.Float, types.Float)
@@ -32,7 +34,9 @@ class TypeInfer(DefaultTypeInferInterpreter):
         return ResultValue(types.Int)
 
     @impl(py.Add, types.PyClass(list), types.PyClass(list))
-    def add_list(self, interp, stmt, values: tuple[types.PyType, types.PyType]):
+    def add_list(
+        self, interp, stmt, values: tuple[types.TypeAttribute, types.TypeAttribute]
+    ):
         # TODO: solve the type param
         lhs = values[0]
         if isinstance(lhs, types.PyClass):  # add Any as type param
@@ -43,11 +47,13 @@ class TypeInfer(DefaultTypeInferInterpreter):
         return ResultValue(types.List)
 
     @impl(py.Add, types.PyClass(tuple), types.PyClass(tuple))
-    def add_tuple(self, interp, stmt, values: tuple[types.PyType, types.PyType]):
+    def add_tuple(
+        self, interp, stmt, values: tuple[types.TypeAttribute, types.TypeAttribute]
+    ):
         lhs = values[0]
         rhs = values[1]
-        if isinstance(lhs, types.PyGeneric) and isinstance(rhs, types.PyGeneric):
-            return ResultValue(types.PyGeneric(tuple, *(lhs.vars + rhs.vars)))
+        if isinstance(lhs, types.Generic) and isinstance(rhs, types.Generic):
+            return ResultValue(types.Generic(tuple, *(lhs.vars + rhs.vars)))
         else:
             return ResultValue(types.PyClass(tuple))  # no type param, so unknown
 
@@ -191,18 +197,21 @@ class TypeInfer(DefaultTypeInferInterpreter):
 
     @impl(py.GetItem)
     def getitem(
-        self, interp, stmt: py.GetItem, values: tuple[types.PyType, types.PyType]
+        self,
+        interp,
+        stmt: py.GetItem,
+        values: tuple[types.TypeAttribute, types.TypeAttribute],
     ) -> ResultValue:
         obj = values[0]
-        if isinstance(obj, types.PyConst):  # unwrap const
+        if isinstance(obj, types.Const):  # unwrap const
             obj = obj.typ
-        index: types.PyType = values[1]
+        index: types.TypeAttribute = values[1]
         # TODO: replace this when we can multiple dispatch
         if obj.is_subseteq(types.Tuple):
             return self.getitem_tuple(interp, stmt, obj, index)
         elif isinstance(obj, types.PyClass):
             return ResultValue(types.Any)
-        elif isinstance(obj, types.PyGeneric) and obj.is_subseteq(
+        elif isinstance(obj, types.Generic) and obj.is_subseteq(
             types.List
         ):  # TODO: add type guard
             if index.is_subseteq(types.Int):
@@ -218,10 +227,10 @@ class TypeInfer(DefaultTypeInferInterpreter):
         self,
         interp,
         stmt: py.GetItem,
-        obj: types.PyType,
-        index: types.PyType,
+        obj: types.TypeAttribute,
+        index: types.TypeAttribute,
     ):
-        if isinstance(obj, types.PyGeneric):
+        if isinstance(obj, types.Generic):
             if index.is_subseteq(types.Int):
                 return self.getitem_tuple_index(interp, stmt, obj, index)
             elif index.is_subseteq(types.Slice):
@@ -237,10 +246,10 @@ class TypeInfer(DefaultTypeInferInterpreter):
         self,
         interp,
         stmt: py.GetItem,
-        obj: types.PyGeneric,
-        index: types.PyType,
+        obj: types.Generic,
+        index: types.TypeAttribute,
     ):
-        if isinstance(index, types.PyConst):  # const
+        if isinstance(index, types.Const):  # const
             if obj.vararg and index.data >= len(obj.vars):
                 return ResultValue(obj.vararg.typ)
             elif index.data < len(obj.vars):
@@ -254,14 +263,14 @@ class TypeInfer(DefaultTypeInferInterpreter):
         self,
         interp,
         stmt: py.GetItem,
-        obj: types.PyGeneric,
-        index: types.PyType,
+        obj: types.Generic,
+        index: types.TypeAttribute,
     ):
-        if isinstance(index, types.PyConst):
+        if isinstance(index, types.Const):
             data: slice = index.data
             if obj.vararg and data.stop >= len(obj.vars):
                 return ResultValue(
-                    types.PyUnion(
+                    types.Union(
                         *obj.vars[slice(data.start, len(obj.vars), data.step)],
                         obj.vararg.typ,
                     )
@@ -273,15 +282,13 @@ class TypeInfer(DefaultTypeInferInterpreter):
             else:  # out of bounds
                 return ResultValue(types.Bottom)
         else:
-            return ResultValue(
-                types.Tuple[types.PyVararg(self.getitem_tuple_union(obj))]
-            )
+            return ResultValue(types.Tuple[types.Vararg(self.getitem_tuple_union(obj))])
 
-    def getitem_tuple_union(self, obj: types.PyGeneric):
+    def getitem_tuple_union(self, obj: types.Generic):
         if obj.vararg:
-            return types.PyUnion(*obj.vars, obj.vararg.typ)
+            return types.Union(*obj.vars, obj.vararg.typ)
         else:
-            return types.PyUnion(*obj.vars)
+            return types.Union(*obj.vars)
 
     @impl(py.Abs, types.Int)
     def absi(self, interp, stmt, values: tuple) -> ResultValue:
@@ -313,7 +320,7 @@ class TypeInfer(DefaultTypeInferInterpreter):
 
     @impl(py.NewList)
     def new_list(
-        self, interp, stmt: py.NewList, values: tuple[types.PyType, ...]
+        self, interp, stmt: py.NewList, values: tuple[types.TypeAttribute, ...]
     ) -> ResultValue:
         if not values:
             return ResultValue(types.List[types.Any])
@@ -322,7 +329,7 @@ class TypeInfer(DefaultTypeInferInterpreter):
         for typ in values[1:]:
             elem = elem.join(typ)
 
-        if isinstance(elem, types.PyType):
+        if isinstance(elem, types.TypeAttribute):
             return ResultValue(types.List[elem])
         return ResultValue(stmt.result.type)
 
@@ -330,13 +337,13 @@ class TypeInfer(DefaultTypeInferInterpreter):
     def slice(self, interp, stmt: py.Slice, values: tuple) -> ResultValue:
         start, stop, step = values
         if (
-            isinstance(start, types.PyConst)
-            and isinstance(stop, types.PyConst)
-            and isinstance(step, types.PyConst)
-            and isinstance(stmt.result.type, types.PyType)
+            isinstance(start, types.Const)
+            and isinstance(stop, types.Const)
+            and isinstance(step, types.Const)
+            and isinstance(stmt.result.type, types.TypeAttribute)
         ):
             return ResultValue(
-                types.PyConst(slice(start.data, stop.data, step.data), stmt.result.type)
+                types.Const(slice(start.data, stop.data, step.data), stmt.result.type)
             )
 
         return ResultValue(stmt.result)

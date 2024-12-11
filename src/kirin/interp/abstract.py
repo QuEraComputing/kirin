@@ -7,10 +7,10 @@ from kirin.interp.frame import Frame
 from kirin.interp.value import ResultValue, ReturnValue, Successor
 from kirin.ir import Dialect, DialectGroup, Region, SSAValue, Statement
 from kirin.ir.method import Method
-from kirin.lattice import Lattice
+from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
 
-ResultType = TypeVar("ResultType", bound=Lattice)
+ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
 
 
@@ -28,7 +28,7 @@ AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
 class AbstractInterpreter(
     BaseInterpreter[AbstractFrameType, ResultType],
 ):
-    lattice: type[Lattice]
+    lattice: type[BoundedLattice[ResultType]]
     """lattice type for the abstract interpreter.
     """
 

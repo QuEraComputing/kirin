@@ -1,9 +1,9 @@
 # type: ignore
-from kirin import ir
+from kirin import ir, types
 from kirin.analysis import ConstProp, NotConst
 from kirin.analysis.cfg import CFG
 from kirin.decl import info, statement
-from kirin.dialects.py import data, stmts, types
+from kirin.dialects.py import data, stmts
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Chain, Fixpoint, Walk
 from kirin.rules.call2invoke import Call2Invoke

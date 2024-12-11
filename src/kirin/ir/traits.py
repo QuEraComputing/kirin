@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from kirin.exceptions import VerificationError
+from kirin.ir import types
 
 if TYPE_CHECKING:
     from kirin.dialects.func.attrs import Signature
@@ -81,11 +82,12 @@ class SymbolOpInterface(StmtTrait):
         return sym_name
 
     def verify(self, stmt: Statement):
-        from kirin.dialects.py import data, types
+        from kirin.dialects.py import data
 
         sym_name = self.get_sym_name(stmt)
         if not (
-            isinstance(sym_name, data.PyAttr) and sym_name.type.is_subtype(types.String)
+            isinstance(sym_name, data.PyAttr)
+            and sym_name.type.is_subseteq(types.String)
         ):
             raise ValueError(f"Symbol name {sym_name} is not a string attribute")
 

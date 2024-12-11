@@ -1,26 +1,24 @@
 import pytest
 
-from kirin.dialects.py.types.builtin import (
+from kirin.ir.types import (
+    AnyType,
     Bool,
+    BottomType,
     Dict,
     Float,
     Int,
     List,
+    Literal,
     NoneType,
+    PyClass,
     Slice,
     String,
     Tuple,
+    TypeAttribute,
+    TypeVar,
+    Union,
+    Vararg,
 )
-from kirin.dialects.py.types.elem import (
-    PyAnyType,
-    PyBottomType,
-    PyClass,
-    PyLiteral,
-    PyTypeVar,
-    PyUnion,
-    PyVararg,
-)
-from kirin.ir import TypeAttribute
 
 
 class Base:
@@ -32,95 +30,86 @@ class Derived(Base):
 
 
 def test_union():
-    assert PyClass(int) | PyClass(float) == PyUnion(PyClass(int), PyClass(float))
-    assert PyUnion(PyClass(int), PyClass(int)) == PyClass(int)
-    assert PyUnion(PyClass(int), PyClass(float)) == PyUnion(
-        PyClass(int), PyClass(float)
+    assert PyClass(int) | PyClass(float) == Union(PyClass(int), PyClass(float))
+    assert Union(PyClass(int), PyClass(int)) == PyClass(int)
+    assert Union(PyClass(int), PyClass(float)) == Union(PyClass(int), PyClass(float))
+    assert Union(Int, Float, BottomType()).is_equal(Union(Int, Float))
+    assert hash(Union(PyClass(int), PyClass(float))) == hash(
+        Union(PyClass(int), PyClass(float))
     )
-    assert PyUnion(Int, Float, PyBottomType()).is_equal(PyUnion(Int, Float))
-    assert hash(PyUnion(PyClass(int), PyClass(float))) == hash(
-        PyUnion(PyClass(int), PyClass(float))
+    assert Union(PyClass(int), PyClass(float)) == Union(PyClass(float), PyClass(int))
+    assert hash(Union(PyClass(int), PyClass(float))) == hash(
+        Union(PyClass(float), PyClass(int))
     )
-    assert PyUnion(PyClass(int), PyClass(float)) == PyUnion(
-        PyClass(float), PyClass(int)
-    )
-    assert hash(PyUnion(PyClass(int), PyClass(float))) == hash(
-        PyUnion(PyClass(float), PyClass(int))
-    )
-    assert PyUnion(PyUnion(Int, Float), PyBottomType()) == PyUnion(Int, Float)
-    assert PyUnion(PyClass(int), PyAnyType()) == PyAnyType()
-    assert PyUnion(PyAnyType(), PyClass(int)) == PyAnyType()
-    assert PyUnion(PyBottomType(), PyClass(int)) == PyClass(int)
-    assert PyUnion(PyClass(int), PyBottomType()) == PyClass(int)
-    assert PyClass(Derived).is_subtype(PyClass(Base))
-    assert PyUnion(PyClass(Derived), PyClass(Base)) == PyClass(Base)
-    assert PyAnyType() is PyAnyType()
-    assert PyBottomType() is PyBottomType()
+    assert Union(Union(Int, Float), BottomType()) == Union(Int, Float)
+    assert Union(PyClass(int), AnyType()) == AnyType()
+    assert Union(AnyType(), PyClass(int)) == AnyType()
+    assert Union(BottomType(), PyClass(int)) == PyClass(int)
+    assert Union(PyClass(int), BottomType()) == PyClass(int)
+    assert PyClass(Derived).is_subseteq(PyClass(Base))
+    assert Union(PyClass(Derived), PyClass(Base)) == PyClass(Base)
+    assert AnyType() is AnyType()
+    assert BottomType() is BottomType()
     t = Int.join(Float).join(String)
     assert t.is_subseteq(Int.join(Float).join(String))
 
 
 def test_meet():
-    assert PyClass(int).meet(PyClass(float)) == PyBottomType()
+    assert PyClass(int).meet(PyClass(float)) == BottomType()
     assert PyClass(int).meet(PyClass(int)) == PyClass(int)
-    assert PyClass(int).meet(PyAnyType()) == PyClass(int)
-    assert PyAnyType().meet(PyClass(int)) == PyClass(int)
-    assert PyBottomType().meet(PyClass(int)) == PyBottomType()
+    assert PyClass(int).meet(AnyType()) == PyClass(int)
+    assert AnyType().meet(PyClass(int)) == PyClass(int)
+    assert BottomType().meet(PyClass(int)) == BottomType()
     assert PyClass(Base).meet(PyClass(Derived)) == PyClass(Derived)
 
 
 def test_literal():
-    assert PyLiteral(Int) == Int
-    assert PyLiteral("aaa").join(PyLiteral("bbb")) == PyUnion(
-        PyLiteral("bbb"), PyLiteral("aaa")
-    )
-    assert PyLiteral("aaa").meet(PyLiteral("bbb")) == PyBottomType()
-    assert PyLiteral("aaa").meet(PyLiteral("aaa")) == PyLiteral("aaa")
-    assert PyLiteral("aaa").is_subseteq(PyLiteral("aaa") | String)
-    assert Int.is_subseteq(PyLiteral("aaa")) is False
-    assert Tuple[Int].is_subseteq(PyLiteral("aaa")) is False
+    assert Literal(Int) == Int
+    assert Literal("aaa").join(Literal("bbb")) == Union(Literal("bbb"), Literal("aaa"))
+    assert Literal("aaa").meet(Literal("bbb")) == BottomType()
+    assert Literal("aaa").meet(Literal("aaa")) == Literal("aaa")
+    assert Literal("aaa").is_subseteq(Literal("aaa") | String)
+    assert Int.is_subseteq(Literal("aaa")) is False
+    assert Tuple[Int].is_subseteq(Literal("aaa")) is False
 
 
 def test_singleton():
-    assert hash(PyAnyType()) == hash(PyAnyType())
-    assert hash(PyAnyType()) == id(PyAnyType())
-    assert hash(PyBottomType()) == hash(PyBottomType())
-    assert hash(PyBottomType()) == id(PyBottomType())
+    assert hash(AnyType()) == hash(AnyType())
+    assert hash(AnyType()) == id(AnyType())
+    assert hash(BottomType()) == hash(BottomType())
+    assert hash(BottomType()) == id(BottomType())
     assert NoneType is NoneType
     assert Int is PyClass(int)
     assert Float is PyClass(float)
     assert String is PyClass(str)
     assert Bool is PyClass(bool)
-    assert PyLiteral("aaa") is PyLiteral("aaa")
+    assert Literal("aaa") is Literal("aaa")
 
 
-def test_generic_is_subtype():
-    assert Tuple[PyLiteral("aaa")].is_subseteq(Tuple[PyLiteral("aaa")])
-    assert Tuple[PyVararg(Int)][Int, Int] == Tuple[Int, Int]
+def test_generic_is_subseteq():
+    assert Tuple[Literal("aaa")].is_subseteq(Tuple[Literal("aaa")])
+    assert Tuple[Vararg(Int)][Int, Int] == Tuple[Int, Int]
     assert hash(Tuple[Int, Int]) == hash(Tuple[Int, Int])
-    assert Tuple[Int, PyVararg(Int)][Int, Int] == Tuple[Int, Int]
+    assert Tuple[Int, Vararg(Int)][Int, Int] == Tuple[Int, Int]
     assert List[Int] == List[Int]
     assert hash(List[Int]) == hash(List[Int])
-    assert Tuple[Int, Int].is_subtype(Tuple[PyTypeVar("T"), Int])
-    assert Dict[Int, Int].is_subtype(Dict[PyTypeVar("K"), PyTypeVar("V")])
-    assert Dict[Int, Int].is_subtype(Dict)
-    assert Dict[Int, Int].is_subtype(Dict[Int])
-    assert not Dict[Int, Int].is_subtype(Dict[Float])
+    assert Tuple[Int, Int].is_subseteq(Tuple[TypeVar("T"), Int])
+    assert Dict[Int, Int].is_subseteq(Dict[TypeVar("K"), TypeVar("V")])
+    assert Dict[Int, Int].is_subseteq(Dict)
+    assert Dict[Int, Int].is_subseteq(Dict[Int])
+    assert not Dict[Int, Int].is_subseteq(Dict[Float])
     assert PyClass(slice).is_subseteq(Slice)
-    assert PyTypeVar("T", Int).is_subseteq(Int | String)
+    assert TypeVar("T", Int).is_subseteq(Int | String)
 
     with pytest.raises(TypeError):
-        Tuple[PyVararg(Int)][Int, Float]
+        Tuple[Vararg(Int)][Int, Float]
 
     with pytest.raises(TypeError):
-        Tuple[PyVararg(Int), Int]
-
-    with pytest.raises(ValueError):
-        PyTypeVar("T").is_subtype(PyTypeVar("T"))
+        Tuple[Vararg(Int), Int]
 
 
 def test_generic_topbottom():
-    t = PyUnion(Int, Float)
+    t = Union(Int, Float)
     assert t.join(TypeAttribute.bottom()).is_subseteq(t)
     assert t.meet(TypeAttribute.bottom()).is_subseteq(TypeAttribute.bottom())
     assert t.join(TypeAttribute.top()).is_equal(TypeAttribute.top())

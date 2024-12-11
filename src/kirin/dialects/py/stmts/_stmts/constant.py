@@ -1,10 +1,10 @@
 from typing import Generic, TypeVar
 
 from kirin.decl import info, statement
-from kirin.dialects.py import data, types
+from kirin.dialects.py import data
 from kirin.dialects.py.stmts.dialect import dialect
 from kirin.exceptions import VerificationError
-from kirin.ir import ConstantLike, Pure, ResultValue, Statement
+from kirin.ir import ConstantLike, Pure, ResultValue, Statement, types
 from kirin.print import Printer
 
 T = TypeVar("T", covariant=True)
@@ -23,7 +23,7 @@ class Constant(Statement, Generic[T]):
             value = data.PyAttr(value)
         super().__init__(
             properties={"value": value},
-            result_types=(types.PyConst(value.data, value.type),),
+            result_types=(types.Const(value.data, value.type),),
         )
 
     def print_impl(self, printer: Printer) -> None:
@@ -35,7 +35,7 @@ class Constant(Statement, Generic[T]):
             printer.print(self.result.type)
 
     def typecheck(self) -> None:
-        if not isinstance(self.result.type, types.PyType):
+        if not isinstance(self.result.type, types.TypeAttribute):
             raise VerificationError(
                 self, f"Expected result type to be PyType, got {self.result.type}"
             )

@@ -1,8 +1,8 @@
 from kirin.analysis.dataflow.typeinfer import TypeInference
 from kirin.dialects.cf.dialect import dialect
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
-from kirin.dialects.py import types
 from kirin.interp import DialectInterpreter, ResultValue, Successor, impl
+from kirin.ir import types
 
 
 @dialect.register(key="typeinfer")

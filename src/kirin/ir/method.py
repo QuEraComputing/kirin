@@ -3,9 +3,9 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Callable, Generic, ParamSpec, TypeVar
 
 from kirin.exceptions import InterpreterError, VerificationError
-from kirin.ir.attrs import TypeAttribute
 from kirin.ir.nodes.stmt import Statement
 from kirin.ir.traits import CallableStmtInterface
+from kirin.ir.types import TypeAttribute
 from kirin.print.printable import Printable
 from kirin.print.printer import Printer
 

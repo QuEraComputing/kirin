@@ -2,7 +2,6 @@
 # from kirin.dialects.pytypes import types as types
 # from kirin.dialects.pytypes.data import PyAttr as PyAttr
 # from kirin.dialects.pytypes.types.base import (
-#     PyAnyType as PyAnyType,
 #     PyBottomType as PyBottomType,
 #     PyClass as PyClass,
 #     PyGeneric as PyGeneric,

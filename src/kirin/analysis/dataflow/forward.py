@@ -4,10 +4,10 @@ from kirin.interp import AbstractFrame, AbstractInterpreter
 from kirin.ir import Dialect, SSAValue
 from kirin.ir.group import DialectGroup
 from kirin.ir.method import Method
-from kirin.lattice import Lattice
+from kirin.lattice import BoundedLattice
 
 ExtraType = TypeVar("ExtraType")
-LatticeElemType = TypeVar("LatticeElemType", bound=Lattice)
+LatticeElemType = TypeVar("LatticeElemType", bound=BoundedLattice)
 
 
 class ForwardFrame(AbstractFrame[LatticeElemType], Generic[LatticeElemType, ExtraType]):

@@ -1,8 +1,8 @@
 import ast
 
-from kirin.dialects.py import data, types
+from kirin.dialects.py import data
 from kirin.exceptions import DialectLoweringError
-from kirin.ir import SSAValue
+from kirin.ir import SSAValue, types
 from kirin.lowering import FromPythonAST, LoweringState, Result
 
 from . import _stmts as py
@@ -139,9 +139,6 @@ class PythonLowering(FromPythonAST):
             for each in elts:
                 typ = typ.join(each.type)
         else:
-            typ = types.Any
-
-        if not isinstance(typ, types.PyType):
             typ = types.Any
 
         stmt = py.NewList(typ, values=tuple(elts))

@@ -3,9 +3,8 @@ from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 from kirin.decl import info, statement
-from kirin.dialects.py import types
 from kirin.dialects.py.stmts.dialect import dialect
-from kirin.ir import Pure, ResultValue, SSAValue, Statement, StmtTrait
+from kirin.ir import Pure, ResultValue, SSAValue, Statement, StmtTrait, types
 
 GetItemLikeStmt = TypeVar("GetItemLikeStmt", bound=Statement)
 

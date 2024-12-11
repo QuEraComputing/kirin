@@ -1,6 +1,6 @@
 from typing import Any
 
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import fields, info, statement
 from kirin.decl.info import (
     ArgumentField,
@@ -9,9 +9,8 @@ from kirin.decl.info import (
     RegionField,
     ResultField,
 )
-from kirin.dialects.py import types
 
-T = types.PyTypeVar("T")
+T = types.TypeVar("T")
 
 
 @statement

@@ -4,8 +4,7 @@ from functools import cached_property
 from types import GenericAlias
 from typing import Any, Callable, Optional
 
-from kirin.dialects.py.types import Any as PyAny, PyAnyType
-from kirin.ir import Attribute, Block, Region, TypeAttribute
+from kirin.ir import Attribute, Block, Region, types
 
 
 @dataclass
@@ -27,7 +26,7 @@ class AttributeField(Field):
     init: bool
     repr: bool
     default_factory: Optional[Callable[[], Attribute]]
-    type: TypeAttribute
+    type: types.TypeAttribute
     property: bool
     pytype: bool = False
     "if `True`, annotation is a python type hint instead of `TypeAttribute`"
@@ -37,7 +36,7 @@ class AttributeField(Field):
 
 
 def attribute(
-    type: TypeAttribute = PyAny,
+    type: types.TypeAttribute = types.Any,
     *,
     init: bool = True,
     repr: bool = True,
@@ -64,7 +63,7 @@ def attribute(
 
 @dataclass
 class ArgumentField(Field):
-    type: TypeAttribute
+    type: types.TypeAttribute
     """type of the argument, will be used in validation.
     """
     print: bool = True
@@ -80,7 +79,7 @@ class ArgumentField(Field):
 
 # NOTE: argument must appear in init and repr
 def argument(
-    type: TypeAttribute = PyAny,
+    type: types.TypeAttribute = types.Any,
     *,
     print: bool = True,
     kw_only: bool = False,
@@ -98,14 +97,14 @@ def argument(
 class ResultField(Field):
     init: bool
     repr: bool
-    type: TypeAttribute = field(default_factory=PyAnyType)
+    type: types.TypeAttribute = field(default_factory=types.AnyType)
 
     def has_no_default(self):
         return True
 
 
 def result(
-    type: TypeAttribute = PyAny,
+    type: types.TypeAttribute = types.Any,
     *,
     # NOTE: init is false, use other hooks to set custom results
     # or just mutate the statement after creation

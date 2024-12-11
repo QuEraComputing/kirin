@@ -1,4 +1,4 @@
-from kirin.dialects.py import types
+from kirin import types
 from kirin.prelude import basic
 
 x = [1, 2, 3]

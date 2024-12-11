@@ -2,15 +2,14 @@ from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.py import types
-from kirin.ir import Attribute, Method, TypeAttribute
+from kirin.ir import Attribute, Method, types
 from kirin.print.printer import Printer
 
 TypeofMethodType = types.PyClass[Method]
-MethodType = types.PyGeneric(
-    Method, types.PyTypeVar("Params", types.Tuple), types.PyTypeVar("Ret")
+MethodType = types.Generic(
+    Method, types.TypeVar("Params", types.Tuple), types.TypeVar("Ret")
 )
-TypeLatticeElem = TypeVar("TypeLatticeElem", bound="TypeAttribute")
+TypeLatticeElem = TypeVar("TypeLatticeElem", bound="types.TypeAttribute")
 
 
 @dialect.register

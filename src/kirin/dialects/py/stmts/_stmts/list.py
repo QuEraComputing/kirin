@@ -1,7 +1,6 @@
 from kirin.decl import info, statement
-from kirin.dialects.py import types
 from kirin.dialects.py.stmts.dialect import dialect
-from kirin.ir import Pure, ResultValue, SSAValue, Statement
+from kirin.ir import Pure, ResultValue, SSAValue, Statement, types
 
 
 @statement(dialect=dialect, init=False)
@@ -11,7 +10,7 @@ class NewList(Statement):
     values: tuple[SSAValue, ...] = info.argument(types.Any)
     result: ResultValue = info.result()
 
-    def __init__(self, type: types.PyType, values: tuple[SSAValue, ...]) -> None:
+    def __init__(self, type: types.TypeAttribute, values: tuple[SSAValue, ...]) -> None:
         super().__init__(
             args=values,
             result_types=[

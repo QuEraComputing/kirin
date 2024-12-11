@@ -6,11 +6,11 @@ from kirin.analysis.dataflow.forward import ForwardExtra
 from kirin.exceptions import InterpreterError
 from kirin.interp import Interpreter, value as interp_value
 from kirin.interp.base import InterpResult
-from kirin.lattice import Lattice, LatticeMeta, SingletonMeta
+from kirin.lattice import BoundedLattice, LatticeMeta, SingletonMeta
 
 
 @dataclass
-class ConstPropLattice(Lattice["ConstPropLattice"]):
+class ConstPropLattice(BoundedLattice["ConstPropLattice"]):
 
     @classmethod
     def top(cls) -> Any:

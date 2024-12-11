@@ -2,9 +2,7 @@ from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 from kirin.codegen import CodeGen, DialectEmit, impl
-from kirin.dialects.py.types.elem import PyClass, PyType
-from kirin.ir.attrs import Attribute
-from kirin.ir.dialect import Dialect
+from kirin.ir import Attribute, Dialect, types
 from kirin.print.printer import Printer
 
 dialect = Dialect("py.data")
@@ -17,13 +15,13 @@ T = TypeVar("T", covariant=True)
 class PyAttr(Generic[T], Attribute):
     name = "PyAttr"
     data: T
-    type: PyType
+    type: types.TypeAttribute
 
-    def __init__(self, data: T, pytype: PyType | None = None):
+    def __init__(self, data: T, pytype: types.TypeAttribute | None = None):
         self.data = data
 
         if pytype is None:
-            self.type = PyClass(type(data))
+            self.type = types.PyClass(type(data))
         else:
             self.type = pytype
 

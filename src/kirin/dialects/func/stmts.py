@@ -3,7 +3,6 @@ from typing import Union
 from kirin.decl import info, statement
 from kirin.dialects.func.attrs import MethodType, Signature
 from kirin.dialects.func.dialect import dialect
-from kirin.dialects.py import types
 from kirin.exceptions import VerificationError
 from kirin.ir import (
     CallableStmtInterface,
@@ -19,6 +18,7 @@ from kirin.ir import (
     SSACFGRegion,
     Statement,
     SymbolOpInterface,
+    types,
 )
 from kirin.ir.ssa import SSAValue
 from kirin.print.printer import Printer

@@ -1,5 +1,6 @@
 from kirin.dialects import fcf
-from kirin.dialects.py import stmts, types
+from kirin.dialects.py import stmts
+from kirin.ir import types
 from kirin.prelude import basic
 
 
@@ -13,16 +14,16 @@ def new_range(a: int, b: int, c: int):
 
 def test_new_range():
     stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(2)
-    assert isinstance(stmt.start.type, types.PyConst)
+    assert isinstance(stmt.start.type, types.Const)
     assert stmt.start.type.data == 0
     assert stmt.stop.type.is_subseteq(types.Int)
-    assert isinstance(stmt.step.type, types.PyConst)
+    assert isinstance(stmt.step.type, types.Const)
     assert stmt.step.type.data == 1
 
     stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(4)
     assert stmt.start.type.is_subseteq(types.Int)
     assert stmt.stop.type.is_subseteq(types.Int)
-    assert isinstance(stmt.step.type, types.PyConst)
+    assert isinstance(stmt.step.type, types.Const)
     assert stmt.step.type.data == 1
 
     stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(5)
@@ -42,5 +43,5 @@ def map_range(x: range):
 
 
 def test_map_range():
-    assert map_range.return_type.is_subtype(types.List[types.Float])
+    assert map_range.return_type.is_subseteq(types.List[types.Float])
     assert map_range(range(10)) == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]

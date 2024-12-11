@@ -2,7 +2,7 @@
 from kirin import ir
 from kirin.decl import info, statement
 from kirin.dialects.math.dialect import dialect
-from kirin.dialects.py.types import Float
+from kirin.ir.types import Float
 
 
 @statement(dialect=dialect)
@@ -61,6 +61,16 @@ class atanh(ir.Statement):
     """atanh statement, wrapping the math.atanh function"""
 
     name = "atanh"
+    traits = frozenset({ir.Pure()})
+    x: ir.SSAValue = info.argument(Float)
+    result: ir.ResultValue = info.result(Float)
+
+
+@statement(dialect=dialect)
+class cbrt(ir.Statement):
+    """cbrt statement, wrapping the math.cbrt function"""
+
+    name = "cbrt"
     traits = frozenset({ir.Pure()})
     x: ir.SSAValue = info.argument(Float)
     result: ir.ResultValue = info.result(Float)
@@ -142,6 +152,16 @@ class exp(ir.Statement):
     """exp statement, wrapping the math.exp function"""
 
     name = "exp"
+    traits = frozenset({ir.Pure()})
+    x: ir.SSAValue = info.argument(Float)
+    result: ir.ResultValue = info.result(Float)
+
+
+@statement(dialect=dialect)
+class exp2(ir.Statement):
+    """exp2 statement, wrapping the math.exp2 function"""
+
+    name = "exp2"
     traits = frozenset({ir.Pure()})
     x: ir.SSAValue = info.argument(Float)
     result: ir.ResultValue = info.result(Float)

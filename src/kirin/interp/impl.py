@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, Type, TypeAlias, TypeVar, Union
 
 from kirin.interp.value import Result
-from kirin.ir import Statement, TypeAttribute
+from kirin.ir import Statement, types
 
 if TYPE_CHECKING:
     from kirin.interp.base import BaseInterpreter
@@ -11,9 +11,13 @@ if TYPE_CHECKING:
     Self = TypeVar("Self", bound="DialectInterpreter")
     InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
     StatementType = TypeVar("StatementType", bound=Statement)
-    ImplFunction = Callable[[Self, InterpreterType, StatementType, tuple], Result]
-    StatementImpl = Callable[[InterpreterType, StatementType, tuple], Result]
-    Signature = Type[Statement] | tuple[Type[Statement], tuple[TypeAttribute, ...]]
+    ImplFunction: TypeAlias = Callable[
+        [Self, InterpreterType, StatementType, tuple], Result
+    ]
+    StatementImpl: TypeAlias = Callable[[InterpreterType, StatementType, tuple], Result]
+    Signature: TypeAlias = (
+        Type[Statement] | tuple[Type[Statement], tuple[types.TypeAttribute, ...]]
+    )
 
 
 @dataclass
@@ -48,7 +52,7 @@ class impl:
 
     # TODO: validate only concrete types are allowed here
 
-    def __init__(self, stmt: Type[Statement], *args: TypeAttribute) -> None:
+    def __init__(self, stmt: Type[Statement], *args: types.TypeAttribute) -> None:
         self.stmt = stmt
         self.args = args
 

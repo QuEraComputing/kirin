@@ -1,10 +1,10 @@
 from kirin.decl import info, statement
-from kirin.dialects.py import data, types
+from kirin.dialects.py import data
 from kirin.dialects.py.stmts.dialect import dialect
-from kirin.ir import Pure, ResultValue, SSAValue, Statement
+from kirin.ir import Pure, ResultValue, SSAValue, Statement, types
 from kirin.print.printer import Printer
 
-T = types.PyTypeVar("T")
+T = types.TypeVar("T")
 
 
 @statement(dialect=dialect)

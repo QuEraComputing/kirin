@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from typing_extensions import Self
 
-from kirin.ir.attrs import AnyType, TypeAttribute
+from kirin.ir.types import AnyType, TypeAttribute
 from kirin.print import Printable, Printer
 
 if TYPE_CHECKING:

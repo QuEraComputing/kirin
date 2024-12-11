@@ -1,8 +1,8 @@
 # type: ignore
 
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.dialects.py import data, types
+from kirin.dialects.py import data
 from kirin.prelude import basic, basic_no_opt
 
 dialect = ir.Dialect("dummy2")

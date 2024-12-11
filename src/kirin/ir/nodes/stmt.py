@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar, Iterator, Mapping, Sequence, TypeVar
 
 from typing_extensions import Self
 
-from kirin.ir.attrs import Attribute, TypeAttribute
+from kirin.ir.attrs import Attribute
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.block import Block
 from kirin.ir.nodes.region import Region
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from kirin.ir.dialect import Dialect
     from kirin.ir.nodes.block import Block
     from kirin.ir.nodes.region import Region
+    from kirin.ir.types import TypeAttribute
     from kirin.lowering import LoweringState, Result
     from kirin.source import SourceInfo
 

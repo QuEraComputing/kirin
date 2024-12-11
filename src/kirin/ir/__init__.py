@@ -3,17 +3,8 @@
 This module contains the intermediate representation (IR) for kirin.
 """
 
-from kirin.ir.attrs import (
-    AnyType as AnyType,
-    Attribute as Attribute,
-    AttributeMeta as AttributeMeta,
-    BottomType as BottomType,
-    SingletonTypeMeta as SingletonTypeMeta,
-    StructAttribute as StructAttribute,
-    TypeAttribute as TypeAttribute,
-    TypeAttributeMeta as TypeAttributeMeta,
-    UnionTypeMeta as UnionTypeMeta,
-)
+from kirin.ir import types as types
+from kirin.ir.attrs import Attribute as Attribute, AttributeMeta as AttributeMeta
 from kirin.ir.dialect import Dialect as Dialect
 from kirin.ir.group import DialectGroup as DialectGroup, dialect_group as dialect_group
 from kirin.ir.method import Method as Method

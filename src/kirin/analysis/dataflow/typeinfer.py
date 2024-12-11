@@ -1,24 +1,23 @@
 from kirin import ir
 from kirin.analysis.dataflow.forward import Forward
-from kirin.dialects.py import types
 from kirin.interp.base import InterpResult
-from kirin.ir import TypeAttribute
+from kirin.ir import types
 from kirin.ir.method import Method
 from kirin.ir.nodes.region import Region
 from kirin.ir.nodes.stmt import Statement
 
 
-class TypeInference(Forward[TypeAttribute]):
+class TypeInference(Forward[types.TypeAttribute]):
     keys = ["typeinfer", "typeinfer.default"]
-    lattice = TypeAttribute
+    lattice = types.TypeAttribute
 
     def build_signature(self, stmt: Statement, args: tuple):
         """we use value here as signature as they will be types"""
         _args = []
         for x in args:
-            if isinstance(x, types.PyConst):
+            if isinstance(x, types.Const):
                 _args.append(x.typ)
-            elif isinstance(x, types.PyGeneric):
+            elif isinstance(x, types.Generic):
                 _args.append(x.body)
             else:
                 _args.append(x)
@@ -29,9 +28,9 @@ class TypeInference(Forward[TypeAttribute]):
         )
 
     def run_method_region(
-        self, mt: Method, body: Region, args: tuple[TypeAttribute, ...]
-    ) -> InterpResult[TypeAttribute]:
+        self, mt: Method, body: Region, args: tuple[types.TypeAttribute, ...]
+    ) -> InterpResult[types.TypeAttribute]:
         # NOTE: widen method type here
         return self.run_ssacfg_region(
-            body, (types.PyConst(mt, types.PyClass(ir.Method)),) + args
+            body, (types.Const(mt, types.PyClass(ir.Method)),) + args
         )

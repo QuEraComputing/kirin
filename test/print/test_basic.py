@@ -2,9 +2,9 @@ import io
 
 from rich.console import Console
 
-from kirin import ir
+from kirin import ir, types
 from kirin.dialects import fcf, func
-from kirin.dialects.py import data, types
+from kirin.dialects.py import data
 from kirin.prelude import basic
 from kirin.print import Printer
 
@@ -62,27 +62,25 @@ class TestBasicPrint:
             file.close()
 
     def test_pytypes(self):
-        self.check_print(types.Int, "![dark_blue]py[/dark_blue].class.int")
-        self.check_print(types.Any, "![dark_blue]py[/dark_blue].Any")
-        self.check_print(types.Tuple, "![dark_blue]py[/dark_blue].class.tuple", "~T")
+        self.check_print(types.Int, "![dark_blue]py[/dark_blue].int")
+        self.check_print(types.Any, "!Any")
+        self.check_print(types.Tuple, "![dark_blue]py[/dark_blue].tuple", "~T")
+        self.check_print(types.Vararg(types.Int), "*![dark_blue]py[/dark_blue].int")
         self.check_print(
-            types.PyVararg(types.Int), "*![dark_blue]py[/dark_blue].class.int"
+            types.Const(1),
+            "!Const(1, ![dark_blue]py[/dark_blue].int)",
         )
         self.check_print(
-            types.PyConst(1),
-            "![dark_blue]py.types[/dark_blue].Const(1, ![dark_blue]py[/dark_blue].class.int)",
-        )
-        self.check_print(
-            types.PyUnion(types.Int, types.Float),
-            "![dark_blue]py.types[/dark_blue].Union",
-            "![dark_blue]py[/dark_blue].class.int",
-            "![dark_blue]py[/dark_blue].class.float",
+            types.Union(types.Int, types.Float),
+            "!Union",
+            "![dark_blue]py[/dark_blue].int",
+            "![dark_blue]py[/dark_blue].float",
         )
 
         self.check_print(
             data.PyAttr(1),
             "1[bright_black] : [/bright_black]",
-            "[bright_black]![dark_blue]py[/dark_blue].class.int[/bright_black]",
+            "[bright_black]![dark_blue]py[/dark_blue].int[/bright_black]",
         )
 
         # TODO: actually test these

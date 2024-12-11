@@ -1,8 +1,8 @@
 # TODO: merge with impl in interp
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Generic, TypeVar, Union, overload
+from typing import TYPE_CHECKING, Callable, Generic, TypeAlias, TypeVar, Union, overload
 
-from kirin.ir import Attribute, Statement, TypeAttribute
+from kirin.ir import Attribute, Statement, types
 
 if TYPE_CHECKING:
     from kirin.codegen.base import CodeGen
@@ -12,12 +12,12 @@ Self = TypeVar("Self", bound="DialectEmit")
 CodeGenType = TypeVar("CodeGenType", bound="CodeGen")
 NodeType = TypeVar("NodeType", bound=Union[Statement, Attribute])
 ResultType = TypeVar("ResultType")
-ImplFunction = Callable[[Self, CodeGenType, NodeType], ResultType]
-StatementImpl = Callable[[CodeGenType, NodeType], ResultType]
-Signature = (
+ImplFunction: TypeAlias = Callable[[Self, CodeGenType, NodeType], ResultType]
+StatementImpl: TypeAlias = Callable[[CodeGenType, NodeType], ResultType]
+Signature: TypeAlias = (
     type[Statement]
     | type[Attribute]
-    | tuple[type[Statement], tuple[TypeAttribute, ...]]
+    | tuple[type[Statement], tuple[types.TypeAttribute, ...]]
 )
 
 
@@ -59,7 +59,7 @@ class MethodImpl(Generic[Self, CodeGenType, NodeType, ResultType]):
 
 
 @overload
-def impl(stmt: type[Statement], *args: TypeAttribute) -> Callable[
+def impl(stmt: type[Statement], *args: types.TypeAttribute) -> Callable[
     [
         ImplFunction[Self, CodeGenType, NodeType, ResultType]
         | ImplDef[Self, CodeGenType, NodeType, ResultType]
@@ -69,14 +69,14 @@ def impl(stmt: type[Statement], *args: TypeAttribute) -> Callable[
 
 
 @overload
-def impl(stmt: type[Attribute], *args: TypeAttribute) -> Callable[
+def impl(stmt: type[Attribute], *args: types.TypeAttribute) -> Callable[
     [ImplFunction[Self, CodeGenType, NodeType, ResultType]],
     AttributeEmitDef[Self, CodeGenType, NodeType, ResultType],
 ]: ...
 
 
 def impl(
-    stmt: type[Statement] | type[Attribute], *args: TypeAttribute
+    stmt: type[Statement] | type[Attribute], *args: types.TypeAttribute
 ) -> (
     Callable[["ImplFunction"], AttributeEmitDef]
     | Callable[[Union["ImplFunction", ImplDef]], ImplDef]

@@ -1,8 +1,8 @@
 from kirin.dialects import cf, func
-from kirin.dialects.py import data, stmts, types
+from kirin.dialects.py import data, stmts
 from kirin.lowering import Lowering
 
-lowering = Lowering([cf, func, data, types, stmts])
+lowering = Lowering([cf, func, data, stmts])
 
 
 def test_pass():

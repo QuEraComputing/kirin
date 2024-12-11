@@ -11,7 +11,6 @@ from kirin.dialects.func.stmts import (
     Lambda,
     Return,
 )
-from kirin.dialects.py import types
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 
 
@@ -21,7 +20,7 @@ class TypeInfer(DialectInterpreter):
 
     @impl(ConstantNone)
     def const_none(self, interp: TypeInference, stmt: ConstantNone, values: tuple[()]):
-        return ResultValue(types.NoneType)
+        return ResultValue(ir.types.NoneType)
 
     @impl(Return)
     def return_(
@@ -32,7 +31,7 @@ class TypeInfer(DialectInterpreter):
     @impl(Call)
     def call(self, interp: TypeInference, stmt: Call, values: tuple):
         # give up on dynamic method calls
-        if not isinstance(values[0], types.PyConst):
+        if not isinstance(values[0], ir.types.Const):
             return ResultValue(stmt.result.type)
 
         mt: ir.Method = values[0].data
@@ -78,11 +77,11 @@ class TypeInfer(DialectInterpreter):
             return interp.eval(mt, inputs).to_result()
 
         # max depth reached, error
-        return ResultValue(types.Bottom)
+        return ResultValue(ir.types.Bottom)
 
     @impl(Lambda)
     def lambda_(self, interp: TypeInference, stmt: Lambda, values: tuple):
-        return ResultValue(types.PyClass(ir.Method))
+        return ResultValue(ir.types.PyClass(ir.Method))
 
     @impl(GetField)
     def getfield(self, interp: TypeInference, stmt: GetField, values: tuple):

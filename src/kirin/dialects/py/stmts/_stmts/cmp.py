@@ -1,8 +1,7 @@
 from kirin.decl import info, statement
-from kirin.dialects.py import types
 from kirin.dialects.py.stmts._stmts.binop import BinOp
 from kirin.dialects.py.stmts.dialect import dialect
-from kirin.ir import Pure, ResultValue
+from kirin.ir import Pure, ResultValue, types
 
 
 @statement

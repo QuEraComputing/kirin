@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Iterable, Iterator
 from typing_extensions import Self
 
 from kirin.exceptions import VerificationError
-from kirin.ir.attrs import TypeAttribute
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import MutableSequenceView, View
 from kirin.ir.ssa import BlockArgument, SSAValue
@@ -16,6 +15,7 @@ from kirin.print import Printer
 if TYPE_CHECKING:
     from kirin.ir.nodes.region import Region
     from kirin.ir.nodes.stmt import Statement
+    from kirin.ir.types import TypeAttribute
 
 
 @dataclass

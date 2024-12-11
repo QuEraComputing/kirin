@@ -1,8 +1,8 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.analysis.cfg import CFG
 from kirin.dialects import cf, func
 from kirin.dialects.func import Lambda
-from kirin.dialects.py import stmts, types
+from kirin.dialects.py import stmts
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
 from kirin.rules.cfg_compactify import CFGCompactify

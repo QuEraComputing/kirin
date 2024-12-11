@@ -8,7 +8,8 @@ from kirin.analysis.dataflow.constprop import (
     PartialTuple,
 )
 from kirin.decl import info, statement
-from kirin.dialects.py import stmts, types
+from kirin.dialects.py import stmts
+from kirin.ir import types
 from kirin.prelude import basic_no_opt
 
 
