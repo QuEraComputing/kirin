@@ -1,4 +1,4 @@
-from kirin.analysis import ConstProp, const
+from kirin.analysis import const
 from kirin.interp import DialectInterpreter, ResultValue, impl
 
 from . import _stmts as py
@@ -11,18 +11,18 @@ class DialectConstProp(DialectInterpreter):
     @impl(py.NewTuple)
     def new_tuple(
         self,
-        interp: ConstProp,
+        interp: const.Propagate,
         stmt: py.NewTuple,
-        values: tuple[const.ConstLattice, ...],
+        values: tuple[const.Result, ...],
     ) -> ResultValue:
         return ResultValue(const.PartialTuple(values))
 
     @impl(py.Not)
     def not_(self, interp, stmt: py.Not, values: tuple) -> ResultValue:
         if isinstance(stmt.value.owner, py.NewTuple):
-            return ResultValue(const.Const(len(stmt.value.owner.args) == 0))
-        elif isinstance(values[0], const.Const):
-            return ResultValue(const.Const(not values[0].data))
+            return ResultValue(const.Value(len(stmt.value.owner.args) == 0))
+        elif isinstance(values[0], const.Value):
+            return ResultValue(const.Value(not values[0].data))
         return ResultValue(const.NotConst())
 
     @impl(py.GetItem)
@@ -30,11 +30,11 @@ class DialectConstProp(DialectInterpreter):
         self,
         interp,
         stmt: py.GetItem,
-        values: tuple[const.ConstLattice, const.ConstLattice],
+        values: tuple[const.Result, const.Result],
     ) -> ResultValue:
         obj = values[0]
         index = values[1]
-        if not isinstance(index, const.Const):
+        if not isinstance(index, const.Value):
             return ResultValue(const.NotConst())
 
         if isinstance(obj, const.PartialTuple):

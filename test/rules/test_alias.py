@@ -1,4 +1,4 @@
-from kirin.analysis import ConstProp, const
+from kirin.analysis import const
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Chain, Fixpoint, Walk
 from kirin.rules.alias import InlineAlias
@@ -14,7 +14,7 @@ def main_simplify_alias(x: int):
 
 
 def test_alias_inline():
-    constprop = ConstProp(main_simplify_alias.dialects)
+    constprop = const.Propagate(main_simplify_alias.dialects)
     constprop.eval(
         main_simplify_alias,
         tuple(const.NotConst() for _ in main_simplify_alias.args),
@@ -33,7 +33,7 @@ def simplify_alias_ref_const():
 
 
 def test_alias_inline2():
-    constprop = ConstProp(simplify_alias_ref_const.dialects)
+    constprop = const.Propagate(simplify_alias_ref_const.dialects)
     constprop.eval(
         simplify_alias_ref_const,
         tuple(const.NotConst() for _ in simplify_alias_ref_const.args),

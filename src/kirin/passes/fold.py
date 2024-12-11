@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from kirin.analysis.dataflow.constprop import ConstProp, NotConst
+from kirin.analysis import const
 from kirin.ir import Method, SSACFGRegion
 from kirin.passes.abc import Pass
 from kirin.rewrite import Chain, Fixpoint, RewriteResult, Walk
@@ -15,8 +15,8 @@ from kirin.rules.getitem import InlineGetItem
 class Fold(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
-        constprop = ConstProp(self.dialects)
-        constprop.eval(mt, tuple(NotConst() for _ in mt.args))
+        constprop = const.Propagate(self.dialects)
+        constprop.eval(mt, tuple(const.NotConst() for _ in mt.args))
         result = Fixpoint(
             Walk(
                 Chain(

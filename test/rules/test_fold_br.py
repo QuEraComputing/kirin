@@ -1,4 +1,4 @@
-from kirin.analysis import ConstProp, const
+from kirin.analysis import const
 from kirin.analysis.cfg import CFG
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Fixpoint, Walk
@@ -22,7 +22,7 @@ def branch(x):
 
 def test_branch_elim():
     assert branch(1) == 4
-    const_prop = ConstProp(branch.dialects)
+    const_prop = const.Propagate(branch.dialects)
     const_prop.eval(branch, tuple(const.NotConst() for _ in branch.args))
     fold = ConstantFold(const_prop.results)
     branch.code.print()

@@ -1,4 +1,4 @@
-from kirin.analysis import ConstProp, const
+from kirin.analysis import const
 from kirin.dialects.cf.dialect import dialect
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.interp import DialectInterpreter, ResultValue, Successor, impl
@@ -8,24 +8,24 @@ from kirin.interp import DialectInterpreter, ResultValue, Successor, impl
 class DialectConstProp(DialectInterpreter):
 
     @impl(Assert)
-    def assert_stmt(self, interp: ConstProp, stmt: Assert, values):
+    def assert_stmt(self, interp: const.Propagate, stmt: Assert, values):
         return ResultValue()
 
     @impl(Branch)
-    def branch(self, interp: ConstProp, stmt: Branch, values: tuple):
+    def branch(self, interp: const.Propagate, stmt: Branch, values: tuple):
         interp.state.current_frame().worklist.append(Successor(stmt.successor, *values))
         return ResultValue()
 
     @impl(ConditionalBranch)
     def conditional_branch(
         self,
-        interp: ConstProp,
+        interp: const.Propagate,
         stmt: ConditionalBranch,
-        values: tuple[const.ConstLattice, ...],
+        values: tuple[const.Result, ...],
     ):
         frame = interp.state.current_frame()
         cond = values[0]
-        if isinstance(cond, const.Const):
+        if isinstance(cond, const.Value):
             else_successor = Successor(
                 stmt.else_successor, *frame.get_values(stmt.else_arguments)
             )
@@ -37,13 +37,13 @@ class DialectConstProp(DialectInterpreter):
             else:
                 frame.worklist.append(else_successor)
         else:
-            frame.entries[stmt.cond] = const.Const(True)
+            frame.entries[stmt.cond] = const.Value(True)
             then_successor = Successor(
                 stmt.then_successor, *frame.get_values(stmt.then_arguments)
             )
             frame.worklist.append(then_successor)
 
-            frame.entries[stmt.cond] = const.Const(False)
+            frame.entries[stmt.cond] = const.Value(False)
             else_successor = Successor(
                 stmt.else_successor, *frame.get_values(stmt.else_arguments)
             )

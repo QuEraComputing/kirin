@@ -1,14 +1,14 @@
 from dataclasses import dataclass, field
 
 from kirin import ir
-from kirin.analysis import InferenceLattice, purity
+from kirin.analysis import JointResult, purity
 from kirin.dialects import func
 from kirin.rewrite import RewriteResult, RewriteRule
 
 
 @dataclass
 class DeadCodeElimination(RewriteRule):
-    results: dict[ir.SSAValue, InferenceLattice] = field(default_factory=dict)
+    results: dict[ir.SSAValue, JointResult] = field(default_factory=dict)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if self.is_pure(node):

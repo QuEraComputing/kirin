@@ -11,118 +11,118 @@ from kirin.lattice import (
     SingletonMeta,
 )
 
-from ._const import _ConstLattice
+from ._visitor import _ElemVisitor
 
 
 @dataclass
-class ConstLattice(
-    IsSubsetEqMixin["ConstLattice"],
-    SimpleJoinMixin["ConstLattice"],
-    SimpleMeetMixin["ConstLattice"],
-    BoundedLattice["ConstLattice"],
-    _ConstLattice,
+class Result(
+    IsSubsetEqMixin["Result"],
+    SimpleJoinMixin["Result"],
+    SimpleMeetMixin["Result"],
+    BoundedLattice["Result"],
+    _ElemVisitor,
 ):
 
     @classmethod
-    def top(cls) -> "ConstLattice":
+    def top(cls) -> "Result":
         return NotConst()
 
     @classmethod
-    def bottom(cls) -> "ConstLattice":
+    def bottom(cls) -> "Result":
         return Unknown()
 
 
 @final
 @dataclass
-class NotConst(ConstLattice, metaclass=SingletonMeta):
+class NotConst(Result, metaclass=SingletonMeta):
 
-    def is_subseteq(self, other: ConstLattice) -> bool:
+    def is_subseteq(self, other: Result) -> bool:
         return isinstance(other, NotConst)
 
 
 @final
 @dataclass
-class Unknown(ConstLattice, metaclass=SingletonMeta):
+class Unknown(Result, metaclass=SingletonMeta):
 
-    def is_subseteq(self, other: ConstLattice) -> bool:
+    def is_subseteq(self, other: Result) -> bool:
         return True
 
 
 @final
 @dataclass
-class Const(ConstLattice):
+class Value(Result):
     data: Any
 
-    def is_subseteq_Const(self, other: "Const") -> bool:
+    def is_subseteq_Value(self, other: "Value") -> bool:
         return self.data == other.data
 
-    def is_equal(self, other: ConstLattice) -> bool:
-        if isinstance(other, Const):
+    def is_equal(self, other: Result) -> bool:
+        if isinstance(other, Value):
             return self.data == other.data
         return False
 
 
 @final
 class PartialTupleMeta(LatticeMeta):
-    def __call__(cls, data: tuple[ConstLattice, ...]):
-        if all(isinstance(x, Const) for x in data):
-            return Const(tuple(x.data for x in data))  # type: ignore
+    def __call__(cls, data: tuple[Result, ...]):
+        if all(isinstance(x, Value) for x in data):
+            return Value(tuple(x.data for x in data))  # type: ignore
         return super().__call__(data)
 
 
 @final
 @dataclass
-class PartialTuple(ConstLattice, metaclass=PartialTupleMeta):
-    data: tuple[ConstLattice, ...]
+class PartialTuple(Result, metaclass=PartialTupleMeta):
+    data: tuple[Result, ...]
 
-    def join(self, other: ConstLattice) -> ConstLattice:
+    def join(self, other: Result) -> Result:
         if other.is_subseteq(self):
             return self
         elif self.is_subseteq(other):
             return other
         elif isinstance(other, PartialTuple):
             return PartialTuple(tuple(x.join(y) for x, y in zip(self.data, other.data)))
-        elif isinstance(other, Const) and isinstance(other.data, tuple):
+        elif isinstance(other, Value) and isinstance(other.data, tuple):
             return PartialTuple(
-                tuple(x.join(Const(y)) for x, y in zip(self.data, other.data))
+                tuple(x.join(Value(y)) for x, y in zip(self.data, other.data))
             )
         return NotConst()
 
-    def meet(self, other: ConstLattice) -> ConstLattice:
+    def meet(self, other: Result) -> Result:
         if self.is_subseteq(other):
             return self
         elif other.is_subseteq(self):
             return other
         elif isinstance(other, PartialTuple):
             return PartialTuple(tuple(x.meet(y) for x, y in zip(self.data, other.data)))
-        elif isinstance(other, Const) and isinstance(other.data, tuple):
+        elif isinstance(other, Value) and isinstance(other.data, tuple):
             return PartialTuple(
-                tuple(x.meet(Const(y)) for x, y in zip(self.data, other.data))
+                tuple(x.meet(Value(y)) for x, y in zip(self.data, other.data))
             )
         return self.bottom()
 
-    def is_equal(self, other: ConstLattice) -> bool:
+    def is_equal(self, other: Result) -> bool:
         if isinstance(other, PartialTuple):
             return all(x.is_equal(y) for x, y in zip(self.data, other.data))
-        elif isinstance(other, Const) and isinstance(other.data, tuple):
-            return all(x.is_equal(Const(y)) for x, y in zip(self.data, other.data))
+        elif isinstance(other, Value) and isinstance(other.data, tuple):
+            return all(x.is_equal(Value(y)) for x, y in zip(self.data, other.data))
         return False
 
     def is_subseteq_PartialTuple(self, other: "PartialTuple") -> bool:
         return all(x.is_subseteq(y) for x, y in zip(self.data, other.data))
 
-    def is_subseteq_Const(self, other: Const) -> bool:
+    def is_subseteq_Value(self, other: Value) -> bool:
         if isinstance(other.data, tuple):
-            return all(x.is_subseteq(Const(y)) for x, y in zip(self.data, other.data))
+            return all(x.is_subseteq(Value(y)) for x, y in zip(self.data, other.data))
         return False
 
 
 @final
 @dataclass
-class PartialLambda(ConstLattice):
+class PartialLambda(Result):
     argnames: list[str]
     code: ir.Statement
-    captured: tuple[ConstLattice, ...]
+    captured: tuple[Result, ...]
 
     def is_subseteq_PartialLambda(self, other: "PartialLambda") -> bool:
         if self.code is not other.code:
@@ -132,7 +132,7 @@ class PartialLambda(ConstLattice):
 
         return all(x.is_subseteq(y) for x, y in zip(self.captured, other.captured))
 
-    def join(self, other: ConstLattice) -> ConstLattice:
+    def join(self, other: Result) -> Result:
         if other is other.bottom():
             return self
 
@@ -151,7 +151,7 @@ class PartialLambda(ConstLattice):
             tuple(x.join(y) for x, y in zip(self.captured, other.captured)),
         )
 
-    def meet(self, other: ConstLattice) -> ConstLattice:
+    def meet(self, other: Result) -> Result:
         if not isinstance(other, PartialLambda):
             return NotConst().meet(other)
 

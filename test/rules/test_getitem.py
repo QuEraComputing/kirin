@@ -1,4 +1,4 @@
-from kirin import analysis
+from kirin.analysis import const
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Chain, Fixpoint, Walk
 from kirin.rules.dce import DeadCodeElimination
@@ -13,10 +13,10 @@ def main_simplify_getitem(x: int):
 
 def test_getitem():
     before = main_simplify_getitem(1)
-    constprop = analysis.ConstProp(main_simplify_getitem.dialects)
+    constprop = const.Propagate(main_simplify_getitem.dialects)
     constprop.eval(
         main_simplify_getitem,
-        tuple(analysis.const.NotConst() for _ in main_simplify_getitem.args),
+        tuple(const.NotConst() for _ in main_simplify_getitem.args),
     )
     inline_getitem = InlineGetItem(constprop.results)
     Fixpoint(

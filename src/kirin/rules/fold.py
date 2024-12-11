@@ -9,7 +9,7 @@ from kirin.rewrite import RewriteResult, RewriteRule
 
 @dataclass
 class ConstantFold(RewriteRule):
-    results: dict[ir.SSAValue, const.ConstLattice] = field(default_factory=dict)
+    results: dict[ir.SSAValue, const.Result] = field(default_factory=dict)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if node.has_trait(ir.ConstantLike):
@@ -20,7 +20,7 @@ class ConstantFold(RewriteRule):
         all_constants = True
         has_done_something = False
         for old_result in node.results:
-            if isinstance(value := self.results.get(old_result, None), const.Const):
+            if isinstance(value := self.results.get(old_result, None), const.Value):
                 stmt = stmts.Constant(value.data)
                 stmt.insert_before(node)
                 old_result.replace_by(stmt.result)
@@ -42,7 +42,7 @@ class ConstantFold(RewriteRule):
         return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_cf_ConditionalBranch(self, node: cf.ConditionalBranch):
-        if isinstance(value := self.results.get(node.cond, None), const.Const):
+        if isinstance(value := self.results.get(node.cond, None), const.Value):
             if value.data is True:
                 cf.Branch(
                     arguments=node.then_arguments,

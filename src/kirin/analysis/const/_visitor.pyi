@@ -1,13 +1,7 @@
-from kirin.analysis.dataflow.lattice.const import (
-    Const,
-    NotConst,
-    PartialLambda,
-    PartialTuple,
-    Unknown,
-)
+from .lattice import NotConst, PartialLambda, PartialTuple, Unknown, Value
 
-class _ConstLattice:
-    def is_subseteq_Const(self, other: Const) -> bool: ...
+class _ElemVisitor:
+    def is_subseteq_Value(self, other: Value) -> bool: ...
     def is_subseteq_NotConst(self, other: NotConst) -> bool: ...
     def is_subseteq_Unknown(self, other: Unknown) -> bool: ...
     def is_subseteq_PartialTuple(self, other: PartialTuple) -> bool: ...

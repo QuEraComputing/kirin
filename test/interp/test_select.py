@@ -2,10 +2,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from kirin.analysis.dataflow.forward import ForwardExtra
+from kirin.analysis.forward import ForwardExtra
 from kirin.dialects.py import stmts
 from kirin.interp import DialectInterpreter, ResultValue, impl
-from kirin.interp.base import InterpResult
 from kirin.ir.method import Method
 from kirin.ir.nodes.region import Region
 from kirin.lattice import EmptyLattice
@@ -24,7 +23,7 @@ class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
 
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[EmptyLattice, ...]
-    ) -> InterpResult[EmptyLattice]:
+    ) -> EmptyLattice:
         return self.run_ssacfg_region(body, (EmptyLattice(),) + args)
 
 

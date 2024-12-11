@@ -1,14 +1,14 @@
 from typing import Iterable
 
 from kirin import exceptions, interp, ir
+from kirin.analysis.forward import Forward
 
-from .forward import Forward
-from .lattice.const import Const, ConstLattice, NotConst
+from .lattice import Result, Value
 
 
-class ConstProp(Forward[ConstLattice]):
+class Propagate(Forward[Result]):
     keys = ["constprop", "empty"]
-    lattice = ConstLattice
+    lattice = Result
 
     def __init__(
         self,
@@ -32,25 +32,25 @@ class ConstProp(Forward[ConstLattice]):
         )
 
     def try_eval_const(
-        self, stmt: ir.Statement, args: tuple[Const, ...]
-    ) -> interp.Result[ConstLattice]:
+        self, stmt: ir.Statement, args: tuple[Value, ...]
+    ) -> interp.Result[Result]:
         try:
             value = self.interp.eval_stmt(stmt, tuple(x.data for x in args))
             if isinstance(value, interp.ResultValue):
-                return interp.ResultValue(*tuple(Const(each) for each in value.values))
+                return interp.ResultValue(*tuple(Value(each) for each in value.values))
             elif isinstance(value, interp.ReturnValue):
-                return interp.ReturnValue(Const(value.result))
+                return interp.ReturnValue(Value(value.result))
             elif isinstance(value, interp.Successor):
                 return interp.Successor(
-                    value.block, *tuple(Const(each) for each in value.block_args)
+                    value.block, *tuple(Value(each) for each in value.block_args)
                 )
         except exceptions.InterpreterError:
             pass
-        return interp.ResultValue(NotConst())
+        return interp.ResultValue(self.bottom)
 
-    def eval_stmt(self, stmt: ir.Statement, args: tuple) -> interp.Result[ConstLattice]:
+    def eval_stmt(self, stmt: ir.Statement, args: tuple) -> interp.Result[Result]:
         if stmt.has_trait(ir.ConstantLike) or (
-            stmt.has_trait(ir.Pure) and all(isinstance(x, Const) for x in args)
+            stmt.has_trait(ir.Pure) and all(isinstance(x, Value) for x in args)
         ):
             return self.try_eval_const(stmt, args)
 
@@ -61,9 +61,9 @@ class ConstProp(Forward[ConstLattice]):
             return self.registry[stmt.__class__](self, stmt, args)
         else:
             # fallback to NotConst for other pure statements
-            return interp.ResultValue(NotConst())
+            return interp.ResultValue(self.bottom.top())
 
     def run_method_region(
-        self, mt: ir.Method, body: ir.Region, args: tuple[ConstLattice, ...]
-    ) -> ConstLattice:
-        return self.run_ssacfg_region(body, (Const(mt),) + args)
+        self, mt: ir.Method, body: ir.Region, args: tuple[Result, ...]
+    ) -> Result:
+        return self.run_ssacfg_region(body, (Value(mt),) + args)

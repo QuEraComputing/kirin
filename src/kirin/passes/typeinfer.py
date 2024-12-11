@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from kirin.analysis.dataflow.typeinfer import TypeInference
+from kirin.analysis.typeinfer import TypeInference
 from kirin.ir import Method
 from kirin.passes.abc import Pass
 from kirin.rewrite import RewriteResult, Walk

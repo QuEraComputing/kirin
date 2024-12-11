@@ -1,8 +1,7 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.analysis.dataflow.constprop import ConstProp
-from kirin.analysis.dataflow.lattice import const
+from kirin.analysis import const
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
@@ -12,15 +11,17 @@ from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 class DialectConstProp(DialectInterpreter):
 
     @impl(Return)
-    def return_(self, interp: ConstProp, stmt: Return, values: tuple) -> ReturnValue:
+    def return_(
+        self, interp: const.Propagate, stmt: Return, values: tuple
+    ) -> ReturnValue:
         if not values:
-            return ReturnValue(const.Const(None))
+            return ReturnValue(const.Value(None))
         else:
             return ReturnValue(*values)
 
     @impl(Call)
     def call(
-        self, interp: ConstProp, stmt: Call, values: tuple[const.ConstLattice, ...]
+        self, interp: const.Propagate, stmt: Call, values: tuple[const.Result, ...]
     ):
         # give up on dynamic method calls
         if not values:  # err
@@ -35,7 +36,7 @@ class DialectConstProp(DialectInterpreter):
                 )
             )
 
-        if not isinstance(values[0], const.Const):
+        if not isinstance(values[0], const.Value):
             return ResultValue(const.NotConst())
 
         mt: ir.Method = values[0].data
@@ -50,9 +51,9 @@ class DialectConstProp(DialectInterpreter):
 
     def _call_lambda(
         self,
-        interp: ConstProp,
+        interp: const.Propagate,
         callee: const.PartialLambda,
-        args: tuple[const.ConstLattice, ...],
+        args: tuple[const.Result, ...],
     ):
         # NOTE: we still use PartialLambda because
         # we want to gurantee what we receive here in captured
@@ -76,7 +77,7 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Invoke)
     def invoke(
-        self, interp: ConstProp, stmt: Invoke, values: tuple[const.ConstLattice, ...]
+        self, interp: const.Propagate, stmt: Invoke, values: tuple[const.Result, ...]
     ):
         return ResultValue(
             self._invoke_method(
@@ -89,9 +90,9 @@ class DialectConstProp(DialectInterpreter):
 
     def _invoke_method(
         self,
-        interp: ConstProp,
+        interp: const.Propagate,
         mt: ir.Method,
-        values: tuple[const.ConstLattice, ...],
+        values: tuple[const.Result, ...],
         results: Iterable[ir.ResultValue],
     ):
         if len(interp.state.frames) < interp.max_depth:
@@ -99,15 +100,15 @@ class DialectConstProp(DialectInterpreter):
         return interp.bottom
 
     @impl(Lambda)
-    def lambda_(self, interp: ConstProp, stmt: Lambda, values: tuple):
+    def lambda_(self, interp: const.Propagate, stmt: Lambda, values: tuple):
         arg_names = [
             arg.name or str(idx) for idx, arg in enumerate(stmt.body.blocks[0].args)
         ]
         if not stmt.body.blocks.isempty() and all(
-            isinstance(each, const.Const) for each in values
+            isinstance(each, const.Value) for each in values
         ):
             return ResultValue(
-                const.Const(
+                const.Value(
                     ir.Method(
                         mod=None,
                         py_func=None,
@@ -129,11 +130,11 @@ class DialectConstProp(DialectInterpreter):
         )
 
     @impl(GetField)
-    def getfield(self, interp: ConstProp, stmt: GetField, values: tuple):
+    def getfield(self, interp: const.Propagate, stmt: GetField, values: tuple):
         callee_self = values[0]
-        if isinstance(callee_self, const.Const):
+        if isinstance(callee_self, const.Value):
             mt: ir.Method = callee_self.data
-            return ResultValue(const.Const(mt.fields[stmt.field]))
+            return ResultValue(const.Value(mt.fields[stmt.field]))
         elif isinstance(callee_self, const.PartialLambda):
             return ResultValue(callee_self.captured[stmt.field])
         return ResultValue(const.NotConst())

@@ -1,5 +1,5 @@
 from kirin import ir
-from kirin.analysis.dataflow.forward import Forward
+from kirin.analysis.forward import Forward
 from kirin.ir import types
 from kirin.ir.method import Method
 from kirin.ir.nodes.region import Region

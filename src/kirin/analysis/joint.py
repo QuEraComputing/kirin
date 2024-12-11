@@ -2,13 +2,46 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from kirin import exceptions, interp, ir
+from kirin.analysis import ForwardExtra, TypeInference, const
+from kirin.analysis.purity import NotPure, Pure, Purity
+from kirin.ir.types import TypeAttribute
+from kirin.lattice import BoundedLattice
 
-from .constprop import ConstProp
-from .forward import ForwardExtra
-from .lattice import InferenceLattice
-from .lattice.const import ConstLattice
-from .lattice.purity import NotPure, Pure
-from .typeinfer import TypeInference
+
+@dataclass
+class JointResult(BoundedLattice["JointResult"]):
+    typ: TypeAttribute
+    const: const.Result
+    purity: Purity
+
+    @classmethod
+    def top(cls) -> "JointResult":
+        return cls(TypeAttribute.top(), const.Result.top(), Purity.top())
+
+    @classmethod
+    def bottom(cls) -> "JointResult":
+        return cls(TypeAttribute.bottom(), const.Result.bottom(), Purity.bottom())
+
+    def is_subseteq(self, other: "JointResult") -> bool:
+        return (
+            self.typ.is_subseteq(other.typ)
+            and self.const.is_subseteq(other.const)
+            and self.purity.is_subseteq(other.purity)
+        )
+
+    def join(self, other: "JointResult") -> "JointResult":
+        return JointResult(
+            self.typ.join(other.typ),
+            self.const.join(other.const),
+            self.purity.join(other.purity),
+        )
+
+    def meet(self, other: "JointResult") -> "JointResult":
+        return JointResult(
+            self.typ.meet(other.typ),
+            self.const.meet(other.const),
+            self.purity.meet(other.purity),
+        )
 
 
 @dataclass
@@ -17,9 +50,9 @@ class ExtraFrameInfo:
 
 
 @dataclass
-class Inference(ForwardExtra[InferenceLattice, ExtraFrameInfo]):
+class JointInference(ForwardExtra[JointResult, ExtraFrameInfo]):
     keys = ["inference", "empty"]
-    lattice = InferenceLattice
+    lattice = JointResult
 
     def __init__(
         self,
@@ -35,7 +68,7 @@ class Inference(ForwardExtra[InferenceLattice, ExtraFrameInfo]):
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
-        self.constprop = ConstProp(
+        self.constprop = const.Propagate(
             dialects,
             fuel=fuel,
             max_depth=max_depth,
@@ -49,8 +82,8 @@ class Inference(ForwardExtra[InferenceLattice, ExtraFrameInfo]):
         )
 
     def eval_stmt(
-        self, stmt: ir.Statement, args: tuple[InferenceLattice, ...]
-    ) -> interp.Result[InferenceLattice]:
+        self, stmt: ir.Statement, args: tuple[JointResult, ...]
+    ) -> interp.Result[JointResult]:
         # Check if the statement has a custom implementation
         signature = self.build_signature(stmt, args)
         if signature in self.registry:
@@ -76,26 +109,26 @@ class Inference(ForwardExtra[InferenceLattice, ExtraFrameInfo]):
     def wrap_results(
         self,
         type_results: interp.Result[ir.types.TypeAttribute],
-        const_results: interp.Result[ConstLattice],
+        const_results: interp.Result[const.Result],
         purity: Pure | NotPure,
-    ) -> interp.Result[InferenceLattice]:
+    ) -> interp.Result[JointResult]:
         match const_results, type_results:
             case (interp.ResultValue(), interp.ResultValue()):
                 return interp.ResultValue(
                     *tuple(
-                        InferenceLattice(typ, const, purity)
+                        JointResult(typ, const, purity)
                         for typ, const in zip(type_results.values, const_results.values)
                     )
                 )
             case (interp.ReturnValue(), interp.ReturnValue()):
                 return interp.ReturnValue(
-                    InferenceLattice(type_results.result, const_results.result, purity)
+                    JointResult(type_results.result, const_results.result, purity)
                 )
             case (interp.Successor(), interp.Successor()):
                 return interp.Successor(
                     block=type_results.block,
                     *tuple(
-                        InferenceLattice(typ, const, purity)
+                        JointResult(typ, const, purity)
                         for typ, const in zip(
                             type_results.block_args, const_results.block_args
                         )
@@ -103,12 +136,12 @@ class Inference(ForwardExtra[InferenceLattice, ExtraFrameInfo]):
                 )
             case _:
                 raise exceptions.InterpreterError(
-                    "ConstProp and TypeInference should return the same result type"
+                    "const.Propagate and TypeInference should return the same result type"
                 )
 
     def run_method_region(
-        self, mt: ir.Method, body: ir.Region, args: tuple[InferenceLattice, ...]
-    ) -> InferenceLattice:
+        self, mt: ir.Method, body: ir.Region, args: tuple[JointResult, ...]
+    ) -> JointResult:
         const_result = self.constprop.run_method_region(
             mt, body, tuple(x.const for x in args)
         )
@@ -120,4 +153,4 @@ class Inference(ForwardExtra[InferenceLattice, ExtraFrameInfo]):
             purity = NotPure()
         else:
             purity = Pure()
-        return InferenceLattice(type_result, const_result, purity)
+        return JointResult(type_result, const_result, purity)
