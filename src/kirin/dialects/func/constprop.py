@@ -25,7 +25,7 @@ class DialectConstProp(DialectInterpreter):
     ):
         # give up on dynamic method calls
         if not values:  # err
-            return ResultValue(const.Unknown())
+            return ResultValue(const.Bottom())
 
         if isinstance(values[0], const.PartialLambda):
             return ResultValue(
@@ -37,7 +37,7 @@ class DialectConstProp(DialectInterpreter):
             )
 
         if not isinstance(values[0], const.Value):
-            return ResultValue(const.NotConst())
+            return ResultValue(const.Unknown())
 
         mt: ir.Method = values[0].data
         return ResultValue(
@@ -137,4 +137,4 @@ class DialectConstProp(DialectInterpreter):
             return ResultValue(const.Value(mt.fields[stmt.field]))
         elif isinstance(callee_self, const.PartialLambda):
             return ResultValue(callee_self.captured[stmt.field])
-        return ResultValue(const.NotConst())
+        return ResultValue(const.Unknown())

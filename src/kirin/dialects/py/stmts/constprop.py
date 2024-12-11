@@ -23,7 +23,7 @@ class DialectConstProp(DialectInterpreter):
             return ResultValue(const.Value(len(stmt.value.owner.args) == 0))
         elif isinstance(values[0], const.Value):
             return ResultValue(const.Value(not values[0].data))
-        return ResultValue(const.NotConst())
+        return ResultValue(const.Unknown())
 
     @impl(py.GetItem)
     def getitem(
@@ -35,7 +35,7 @@ class DialectConstProp(DialectInterpreter):
         obj = values[0]
         index = values[1]
         if not isinstance(index, const.Value):
-            return ResultValue(const.NotConst())
+            return ResultValue(const.Unknown())
 
         if isinstance(obj, const.PartialTuple):
             obj = obj.data
@@ -44,4 +44,4 @@ class DialectConstProp(DialectInterpreter):
             elif isinstance(index.data, slice):
                 start, stop, step = index.data.indices(len(obj))
                 return ResultValue(const.PartialTuple(obj[start:stop:step]))
-        return ResultValue(const.NotConst())
+        return ResultValue(const.Unknown())

@@ -16,7 +16,7 @@ class Fold(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
         constprop = const.Propagate(self.dialects)
-        constprop.eval(mt, tuple(const.NotConst() for _ in mt.args))
+        constprop.eval(mt, tuple(const.Unknown() for _ in mt.args))
         result = Fixpoint(
             Walk(
                 Chain(

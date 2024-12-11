@@ -16,7 +16,7 @@ def test_getitem():
     constprop = const.Propagate(main_simplify_getitem.dialects)
     constprop.eval(
         main_simplify_getitem,
-        tuple(const.NotConst() for _ in main_simplify_getitem.args),
+        tuple(const.Unknown() for _ in main_simplify_getitem.args),
     )
     inline_getitem = InlineGetItem(constprop.results)
     Fixpoint(

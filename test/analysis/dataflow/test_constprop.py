@@ -9,88 +9,88 @@ from kirin.prelude import basic_no_opt
 class TestLattice:
 
     def test_meet(self):
-        assert const.NotConst().meet(const.NotConst()) == const.NotConst()
-        assert const.NotConst().meet(const.Unknown()) == const.Unknown()
-        assert const.NotConst().meet(const.Value(1)) == const.Value(1)
-        assert const.NotConst().meet(
-            const.PartialTuple((const.Value(1), const.Unknown()))
-        ) == const.PartialTuple((const.Value(1), const.Unknown()))
-        assert const.Unknown().meet(const.NotConst()) == const.Unknown()
         assert const.Unknown().meet(const.Unknown()) == const.Unknown()
-        assert const.Unknown().meet(const.Value(1)) == const.Unknown()
+        assert const.Unknown().meet(const.Bottom()) == const.Bottom()
+        assert const.Unknown().meet(const.Value(1)) == const.Value(1)
+        assert const.Unknown().meet(
+            const.PartialTuple((const.Value(1), const.Bottom()))
+        ) == const.PartialTuple((const.Value(1), const.Bottom()))
+        assert const.Bottom().meet(const.Unknown()) == const.Bottom()
+        assert const.Bottom().meet(const.Bottom()) == const.Bottom()
+        assert const.Bottom().meet(const.Value(1)) == const.Bottom()
         assert (
-            const.Unknown().meet(const.PartialTuple((const.Value(1), const.Unknown())))
-            == const.Unknown()
+            const.Bottom().meet(const.PartialTuple((const.Value(1), const.Bottom())))
+            == const.Bottom()
         )
-        assert const.Value(1).meet(const.NotConst()) == const.Value(1)
-        assert const.Value(1).meet(const.Unknown()) == const.Unknown()
+        assert const.Value(1).meet(const.Unknown()) == const.Value(1)
+        assert const.Value(1).meet(const.Bottom()) == const.Bottom()
         assert const.Value(1).meet(const.Value(1)) == const.Value(1)
         assert (
-            const.Value(1).meet(const.PartialTuple((const.Value(1), const.Unknown())))
-            == const.Unknown()
+            const.Value(1).meet(const.PartialTuple((const.Value(1), const.Bottom())))
+            == const.Bottom()
         )
-        assert const.PartialTuple((const.Value(1), const.Unknown())).meet(
-            const.NotConst()
-        ) == const.PartialTuple((const.Value(1), const.Unknown()))
+        assert const.PartialTuple((const.Value(1), const.Bottom())).meet(
+            const.Unknown()
+        ) == const.PartialTuple((const.Value(1), const.Bottom()))
         assert (
-            const.PartialTuple((const.Value(1), const.Unknown())).meet(const.Unknown())
-            == const.Unknown()
+            const.PartialTuple((const.Value(1), const.Bottom())).meet(const.Bottom())
+            == const.Bottom()
         )
         assert (
-            const.PartialTuple((const.Value(1), const.Unknown())).meet(const.Value(1))
-            == const.Unknown()
+            const.PartialTuple((const.Value(1), const.Bottom())).meet(const.Value(1))
+            == const.Bottom()
         )
-        assert const.PartialTuple((const.Value(1), const.Unknown())).meet(
+        assert const.PartialTuple((const.Value(1), const.Bottom())).meet(
             const.Value((1, 2))
-        ) == const.PartialTuple((const.Value(1), const.Unknown()))
-        assert const.PartialTuple((const.Value(1), const.Unknown())).meet(
-            const.PartialTuple((const.Value(1), const.Unknown()))
-        ) == const.PartialTuple((const.Value(1), const.Unknown()))
+        ) == const.PartialTuple((const.Value(1), const.Bottom()))
+        assert const.PartialTuple((const.Value(1), const.Bottom())).meet(
+            const.PartialTuple((const.Value(1), const.Bottom()))
+        ) == const.PartialTuple((const.Value(1), const.Bottom()))
 
     def test_join(self):
-        assert const.NotConst().join(const.NotConst()) == const.NotConst()
-        assert const.NotConst().join(const.Unknown()) == const.NotConst()
-        assert const.NotConst().join(const.Value(1)) == const.NotConst()
-        assert (
-            const.NotConst().join(const.PartialTuple((const.Value(1), const.Unknown())))
-            == const.NotConst()
-        )
-        assert const.Unknown().join(const.NotConst()) == const.NotConst()
         assert const.Unknown().join(const.Unknown()) == const.Unknown()
-        assert const.Unknown().join(const.Value(1)) == const.Value(1)
-        assert const.Unknown().join(
-            const.PartialTuple((const.Value(1), const.Unknown()))
-        ) == const.PartialTuple((const.Value(1), const.Unknown()))
-        assert const.PartialTuple((const.Value(1), const.Unknown())).join(
+        assert const.Unknown().join(const.Bottom()) == const.Unknown()
+        assert const.Unknown().join(const.Value(1)) == const.Unknown()
+        assert (
+            const.Unknown().join(const.PartialTuple((const.Value(1), const.Bottom())))
+            == const.Unknown()
+        )
+        assert const.Bottom().join(const.Unknown()) == const.Unknown()
+        assert const.Bottom().join(const.Bottom()) == const.Bottom()
+        assert const.Bottom().join(const.Value(1)) == const.Value(1)
+        assert const.Bottom().join(
+            const.PartialTuple((const.Value(1), const.Bottom()))
+        ) == const.PartialTuple((const.Value(1), const.Bottom()))
+        assert const.PartialTuple((const.Value(1), const.Bottom())).join(
             const.Value((1, 2))
         ) == const.PartialTuple((const.Value(1), const.Value(2)))
-        assert const.Value(1).join(const.NotConst()) == const.NotConst()
-        assert const.Value(1).join(const.Unknown()) == const.Value(1)
+        assert const.Value(1).join(const.Unknown()) == const.Unknown()
+        assert const.Value(1).join(const.Bottom()) == const.Value(1)
         assert const.Value(1).join(const.Value(1)) == const.Value(1)
-        assert const.Value(1).join(const.Value(2)) == const.NotConst()
+        assert const.Value(1).join(const.Value(2)) == const.Unknown()
         assert (
-            const.Value(1).join(const.PartialTuple((const.Value(1), const.Unknown())))
-            == const.NotConst()
+            const.Value(1).join(const.PartialTuple((const.Value(1), const.Bottom())))
+            == const.Unknown()
         )
 
     def test_is_equal(self):
-        assert const.NotConst().is_equal(const.NotConst())
-        assert not const.NotConst().is_equal(const.Unknown())
-        assert not const.NotConst().is_equal(const.Value(1))
         assert const.Unknown().is_equal(const.Unknown())
+        assert not const.Unknown().is_equal(const.Bottom())
         assert not const.Unknown().is_equal(const.Value(1))
+        assert const.Bottom().is_equal(const.Bottom())
+        assert not const.Bottom().is_equal(const.Value(1))
         assert const.Value(1).is_equal(const.Value(1))
         assert not const.Value(1).is_equal(const.Value(2))
-        assert const.PartialTuple((const.Value(1), const.Unknown())).is_equal(
-            const.PartialTuple((const.Value(1), const.Unknown()))
+        assert const.PartialTuple((const.Value(1), const.Bottom())).is_equal(
+            const.PartialTuple((const.Value(1), const.Bottom()))
         )
-        assert not const.PartialTuple((const.Value(1), const.Unknown())).is_equal(
+        assert not const.PartialTuple((const.Value(1), const.Bottom())).is_equal(
             const.PartialTuple((const.Value(1), const.Value(2)))
         )
 
     def test_partial_tuple(self):
-        pt1 = const.PartialTuple((const.Value(1), const.Unknown()))
-        pt2 = const.PartialTuple((const.Value(1), const.Unknown()))
+        pt1 = const.PartialTuple((const.Value(1), const.Bottom()))
+        pt2 = const.PartialTuple((const.Value(1), const.Bottom()))
         assert pt1.is_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt1
@@ -99,13 +99,13 @@ class TestLattice:
         assert not pt1.is_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == const.PartialTuple((const.Value(1), const.Value(2)))
-        assert pt1.meet(pt2) == const.PartialTuple((const.Value(1), const.Unknown()))
-        pt2 = const.PartialTuple((const.Value(1), const.Unknown()))
+        assert pt1.meet(pt2) == const.PartialTuple((const.Value(1), const.Bottom()))
+        pt2 = const.PartialTuple((const.Value(1), const.Bottom()))
         assert pt1.is_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt1
         assert pt1.meet(pt2) == pt1
-        pt2 = const.PartialTuple((const.Value(1), const.NotConst()))
+        pt2 = const.PartialTuple((const.Value(1), const.Unknown()))
         assert not pt1.is_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt2
@@ -147,31 +147,31 @@ def recurse():
 def test_constprop():
     infer = const.Propagate(basic_no_opt)
     assert infer.eval(
-        main, tuple(const.NotConst() for _ in main.args)
+        main, tuple(const.Unknown() for _ in main.args)
     ).expect() == const.Value((3, 4))
     assert len(infer.results) == 3
 
     assert infer.eval(
-        goo, tuple(const.NotConst() for _ in goo.args)
-    ).expect() == const.PartialTuple((const.Value(3), const.NotConst()))
+        goo, tuple(const.Unknown() for _ in goo.args)
+    ).expect() == const.PartialTuple((const.Value(3), const.Unknown()))
     assert len(infer.results) == 6
     block: ir.Block = goo.code.body.blocks[0]  # type: ignore
     assert infer.results[block.stmts.at(1).results[0]] == const.Value(3)
-    assert infer.results[block.stmts.at(2).results[0]] == const.NotConst()
+    assert infer.results[block.stmts.at(2).results[0]] == const.Unknown()
     assert infer.results[block.stmts.at(3).results[0]] == const.PartialTuple(
-        (const.Value(3), const.NotConst())
+        (const.Value(3), const.Unknown())
     )
 
     assert infer.eval(
-        bar, tuple(const.NotConst() for _ in bar.args)
+        bar, tuple(const.Unknown() for _ in bar.args)
     ).expect() == const.Value(3)
 
     assert (
-        infer.eval(ntuple, tuple(const.NotConst() for _ in ntuple.args)).expect()
-        == const.NotConst()
+        infer.eval(ntuple, tuple(const.Unknown() for _ in ntuple.args)).expect()
+        == const.Unknown()
     )
     assert infer.eval(
-        recurse, tuple(const.NotConst() for _ in recurse.args)
+        recurse, tuple(const.Unknown() for _ in recurse.args)
     ).expect() == const.Value((0, 0, 0))
 
 
@@ -232,12 +232,12 @@ def test_intraprocedure_side_effect():
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
     result = constprop.eval(
         side_effect_intraprocedure,
-        tuple(const.NotConst() for _ in side_effect_intraprocedure.args),
+        tuple(const.Unknown() for _ in side_effect_intraprocedure.args),
     ).expect()
     new_tuple = (
         side_effect_intraprocedure.callable_region.blocks[2].stmts.at(3).results[0]
     )
-    assert isinstance(result, const.NotConst)
+    assert isinstance(result, const.Unknown)
     assert constprop.results[new_tuple] == const.Value((1, 2, 3))
 
 
@@ -260,9 +260,9 @@ def test_interprocedure_true_branch():
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
     result = constprop.eval(
         side_effect_true_branch_const,
-        tuple(const.NotConst() for _ in side_effect_true_branch_const.args),
+        tuple(const.Unknown() for _ in side_effect_true_branch_const.args),
     ).expect()
-    assert isinstance(result, const.NotConst)  # instead of NotPure
+    assert isinstance(result, const.Unknown)  # instead of NotPure
     true_branch = side_effect_true_branch_const.callable_region.blocks[1]
     assert constprop.results[true_branch.stmts.at(0).results[0]] == const.Value(None)
 
@@ -278,10 +278,10 @@ def test_non_pure_recursion():
 
     constprop = const.Propagate(basic_no_opt)
     constprop.eval(
-        for_loop_append, tuple(const.NotConst() for _ in for_loop_append.args)
+        for_loop_append, tuple(const.Unknown() for _ in for_loop_append.args)
     )
     stmt = for_loop_append.callable_region.blocks[1].stmts.at(3)
-    assert isinstance(constprop.results[stmt.results[0]], const.NotConst)
+    assert isinstance(constprop.results[stmt.results[0]], const.Unknown)
 
 
 def test_closure_prop():

@@ -13,5 +13,5 @@ class Fold(Pass):
     def unsafe_run(self, mt: Method) -> RewriteResult:
         cfg = CFG(mt.callable_region)
         constprop = const.Propagate(self.dialects)
-        constprop.eval(mt, tuple(const.NotConst() for _ in mt.args))
+        constprop.eval(mt, tuple(const.Unknown() for _ in mt.args))
         return aggressive.Fold(cfg, constprop.results).rewrite(mt.code)

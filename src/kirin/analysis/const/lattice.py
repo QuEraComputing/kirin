@@ -25,24 +25,24 @@ class Result(
 
     @classmethod
     def top(cls) -> "Result":
-        return NotConst()
+        return Unknown()
 
     @classmethod
     def bottom(cls) -> "Result":
-        return Unknown()
-
-
-@final
-@dataclass
-class NotConst(Result, metaclass=SingletonMeta):
-
-    def is_subseteq(self, other: Result) -> bool:
-        return isinstance(other, NotConst)
+        return Bottom()
 
 
 @final
 @dataclass
 class Unknown(Result, metaclass=SingletonMeta):
+
+    def is_subseteq(self, other: Result) -> bool:
+        return isinstance(other, Unknown)
+
+
+@final
+@dataclass
+class Bottom(Result, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Result) -> bool:
         return True
@@ -86,7 +86,7 @@ class PartialTuple(Result, metaclass=PartialTupleMeta):
             return PartialTuple(
                 tuple(x.join(Value(y)) for x, y in zip(self.data, other.data))
             )
-        return NotConst()
+        return Unknown()
 
     def meet(self, other: Result) -> Result:
         if self.is_subseteq(other):
@@ -137,10 +137,10 @@ class PartialLambda(Result):
             return self
 
         if not isinstance(other, PartialLambda):
-            return NotConst().join(other)  # widen self
+            return Unknown().join(other)  # widen self
 
         if self.code is not other.code:
-            return NotConst()  # lambda stmt is pure
+            return Unknown()  # lambda stmt is pure
 
         if len(self.captured) != len(other.captured):
             return self.bottom()  # err
@@ -153,13 +153,13 @@ class PartialLambda(Result):
 
     def meet(self, other: Result) -> Result:
         if not isinstance(other, PartialLambda):
-            return NotConst().meet(other)
+            return Unknown().meet(other)
 
         if self.code is not other.code:
             return self.bottom()
 
         if len(self.captured) != len(other.captured):
-            return NotConst()
+            return Unknown()
 
         return PartialLambda(
             self.argnames,

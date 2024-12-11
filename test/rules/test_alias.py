@@ -17,7 +17,7 @@ def test_alias_inline():
     constprop = const.Propagate(main_simplify_alias.dialects)
     constprop.eval(
         main_simplify_alias,
-        tuple(const.NotConst() for _ in main_simplify_alias.args),
+        tuple(const.Unknown() for _ in main_simplify_alias.args),
     )
     Fixpoint(
         Walk(Chain([InlineAlias(), DeadCodeElimination(constprop.results)]))
@@ -36,7 +36,7 @@ def test_alias_inline2():
     constprop = const.Propagate(simplify_alias_ref_const.dialects)
     constprop.eval(
         simplify_alias_ref_const,
-        tuple(const.NotConst() for _ in simplify_alias_ref_const.args),
+        tuple(const.Unknown() for _ in simplify_alias_ref_const.args),
     )
     Fixpoint(
         Walk(Chain([InlineAlias(), DeadCodeElimination(constprop.results)]))

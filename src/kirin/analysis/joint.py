@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Iterable
 
-from kirin import exceptions, interp, ir
+from kirin import exceptions, interp, ir, types
 from kirin.analysis import const
 from kirin.analysis.forward import ForwardExtra
 from kirin.analysis.purity import NotPure, Pure, Purity
@@ -53,7 +53,7 @@ class ExtraFrameInfo:
 
 @dataclass
 class JointInference(ForwardExtra[JointResult, ExtraFrameInfo]):
-    keys = ["inference", "empty"]
+    keys = ["joint", "empty"]
     lattice = JointResult
 
     def __init__(
@@ -98,9 +98,7 @@ class JointInference(ForwardExtra[JointResult, ExtraFrameInfo]):
         type_results = self.typeinfer.eval_stmt(stmt, tuple(x.typ for x in args))
         frame = self.state.current_frame()
 
-        if frame.extra is not None and frame.extra.frame_not_pure:
-            purity = NotPure()
-        elif stmt.has_trait(ir.Pure):
+        if stmt.has_trait(ir.Pure):
             purity = Pure()
         else:
             if frame.extra is None:
@@ -144,15 +142,8 @@ class JointInference(ForwardExtra[JointResult, ExtraFrameInfo]):
     def run_method_region(
         self, mt: ir.Method, body: ir.Region, args: tuple[JointResult, ...]
     ) -> JointResult:
-        const_result = self.constprop.run_method_region(
-            mt, body, tuple(x.const for x in args)
+        # NOTE: whoever creates the method has the effect of pure.
+        return self.run_ssacfg_region(
+            body,
+            (JointResult(types.PyClass(ir.Method), const.Value(mt), Pure()),) + args,
         )
-        type_result = self.typeinfer.run_method_region(
-            mt, body, tuple(x.typ for x in args)
-        )
-        frame = self.state.current_frame()
-        if frame.extra is not None and frame.extra.frame_not_pure:
-            purity = NotPure()
-        else:
-            purity = Pure()
-        return JointResult(type_result, const_result, purity)

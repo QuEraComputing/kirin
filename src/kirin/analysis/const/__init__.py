@@ -1,5 +1,5 @@
 from .lattice import (
-    NotConst as NotConst,
+    Bottom as Bottom,
     PartialLambda as PartialLambda,
     PartialTuple as PartialTuple,
     Result as Result,
