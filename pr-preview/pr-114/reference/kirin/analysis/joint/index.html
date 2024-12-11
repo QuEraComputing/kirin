@@ -5,9 +5,7 @@
     <span class=n>max_depth</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>128</span><span class=p>,</span>
     <span class=n>max_python_recursion_depth</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>8192</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.analysis.ForwardExtra" href="../forward/#kirin.analysis.forward.ForwardExtra">ForwardExtra</a>[<a class="autorefs autorefs-internal" title="kirin.analysis.joint.JointResult" href="#kirin.analysis.joint.JointResult">JointResult</a>, <span title="kirin.analysis.joint.ExtraFrameInfo">ExtraFrameInfo</span>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>57</span>
-<span class=normal>58</span>
-<span class=normal>59</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.analysis.forward.ForwardExtra" href="../forward/#kirin.analysis.forward.ForwardExtra">ForwardExtra</a>[<a class="autorefs autorefs-internal" title="kirin.analysis.joint.JointResult" href="#kirin.analysis.joint.JointResult">JointResult</a>, <span title="kirin.analysis.joint.ExtraFrameInfo">ExtraFrameInfo</span>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>59</span>
 <span class=normal>60</span>
 <span class=normal>61</span>
 <span class=normal>62</span>
@@ -30,7 +28,9 @@
 <span class=normal>79</span>
 <span class=normal>80</span>
 <span class=normal>81</span>
-<span class=normal>82</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>82</span>
+<span class=normal>83</span>
+<span class=normal>84</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>DialectGroup</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Dialect</span><span class=p>],</span>
     <span class=o>*</span><span class=p>,</span>
@@ -61,9 +61,7 @@
 </code></pre></div> <div class="doc doc-contents "> <p>lattice type for the abstract interpreter.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.joint.JointInference.eval_stmt class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eval_stmt</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>eval_stmt</span><span class=p>(</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>Result</span><span class=p>[</span><span class=n>JointResult</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>simply evaluate a statement</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 84</span>
-<span class=normal> 85</span>
-<span class=normal> 86</span>
+</code></pre></div> <div class="doc doc-contents "> <p>simply evaluate a statement</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 86</span>
 <span class=normal> 87</span>
 <span class=normal> 88</span>
 <span class=normal> 89</span>
@@ -84,7 +82,9 @@
 <span class=normal>104</span>
 <span class=normal>105</span>
 <span class=normal>106</span>
-<span class=normal>107</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
+<span class=normal>107</span>
+<span class=normal>108</span>
+<span class=normal>109</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>Result</span><span class=p>[</span><span class=n>JointResult</span><span class=p>]:</span>
     <span class=c1># Check if the statement has a custom implementation</span>
@@ -112,36 +112,36 @@
     <span class=n>typ</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>,</span> <span class=n>const</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>,</span> <span class=n>purity</span><span class=p>:</span> <span class=n>Purity</span>
 <span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><span title="kirin.lattice.BoundedLattice">BoundedLattice</span>[&#39;JointResult&#39;]</code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.joint.JointResult.is_subseteq class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">is_subseteq</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>JointResult</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Subseteq operation.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>25</span>
-<span class=normal>26</span>
-<span class=normal>27</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Subseteq operation.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>27</span>
 <span class=normal>28</span>
 <span class=normal>29</span>
-<span class=normal>30</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
+<span class=normal>30</span>
+<span class=normal>31</span>
+<span class=normal>32</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
     <span class=k>return</span> <span class=p>(</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>typ</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>typ</span><span class=p>)</span>
         <span class=ow>and</span> <span class=bp>self</span><span class=o>.</span><span class=n>const</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>const</span><span class=p>)</span>
         <span class=ow>and</span> <span class=bp>self</span><span class=o>.</span><span class=n>purity</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>purity</span><span class=p>)</span>
     <span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.joint.JointResult.join class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">join</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>join</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>JointResult</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>JointResult</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>32</span>
-<span class=normal>33</span>
-<span class=normal>34</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>34</span>
 <span class=normal>35</span>
 <span class=normal>36</span>
-<span class=normal>37</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>:</span>
+<span class=normal>37</span>
+<span class=normal>38</span>
+<span class=normal>39</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>:</span>
     <span class=k>return</span> <span class=n>JointResult</span><span class=p>(</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>typ</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>typ</span><span class=p>),</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>const</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>const</span><span class=p>),</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>purity</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>purity</span><span class=p>),</span>
     <span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.joint.JointResult.meet class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">meet</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>meet</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>JointResult</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>JointResult</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>39</span>
-<span class=normal>40</span>
-<span class=normal>41</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/joint.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>41</span>
 <span class=normal>42</span>
 <span class=normal>43</span>
-<span class=normal>44</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>:</span>
+<span class=normal>44</span>
+<span class=normal>45</span>
+<span class=normal>46</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;JointResult&quot;</span><span class=p>:</span>
     <span class=k>return</span> <span class=n>JointResult</span><span class=p>(</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>typ</span><span class=o>.</span><span class=n>meet</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>typ</span><span class=p>),</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>const</span><span class=o>.</span><span class=n>meet</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>const</span><span class=p>),</span>
