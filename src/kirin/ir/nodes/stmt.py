@@ -61,6 +61,20 @@ class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable)
         self.node._args = new_args
         self.field = new_args
 
+    def get_slice(self, name: str) -> slice:
+        """Get the slice of the arguments.
+
+        Args:
+            name (str): The name of the slice.
+
+        Returns:
+            slice: The slice of the arguments.
+        """
+        index = self.node._name_args_slice[name]
+        if isinstance(index, int):
+            return slice(index, index + 1)
+        return index
+
     def print_impl(self, printer: Printer) -> None:
         printer.print_seq(self.field, delim=", ", prefix="[", suffix="]")
 
