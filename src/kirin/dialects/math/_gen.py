@@ -29,6 +29,9 @@ def builtin_math_functions():
             "dist",
             "sumprod",
             "nextafter",
+            # 3.10 compat
+            "cbrt",
+            "exp2",
         ):
             continue
 
