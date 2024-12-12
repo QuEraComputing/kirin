@@ -1,5 +1,5 @@
 from kirin.ir import Method
-from kirin.interp import ResultValue, ReturnValue, DialectInterpreter, impl, concrete
+from kirin.interp import ReturnValue, DialectInterpreter, impl, concrete
 from kirin.dialects.func.stmts import (
     Call,
     Invoke,
@@ -36,16 +36,16 @@ class Interpreter(DialectInterpreter):
     def const_none(
         self, interp: concrete.Interpreter, stmt: ConstantNone, values: tuple[()]
     ):
-        return ResultValue(None)
+        return (None,)
 
     @impl(GetField)
     def getfield(self, interp: concrete.Interpreter, stmt: GetField, values: tuple):
         mt: Method = values[0]
-        return ResultValue(mt.fields[stmt.field])
+        return (mt.fields[stmt.field],)
 
     @impl(Lambda)
     def lambda_(self, interp: concrete.Interpreter, stmt: Lambda, values: tuple):
-        return ResultValue(
+        return (
             Method(
                 mod=None,
                 py_func=None,
@@ -57,5 +57,5 @@ class Interpreter(DialectInterpreter):
                 dialects=interp.dialects,
                 code=stmt,
                 fields=values,
-            )
+            ),
         )

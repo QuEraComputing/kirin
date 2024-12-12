@@ -5,7 +5,7 @@ from kirin.ir.method import Method
 from kirin.exceptions import FuelExhaustedError
 from kirin.interp.base import BaseInterpreter
 from kirin.interp.frame import Frame
-from kirin.interp.value import Err, NoReturn, Successor, ResultValue, ReturnValue
+from kirin.interp.value import Err, NoReturn, Successor, ReturnValue
 
 
 class Interpreter(BaseInterpreter[Frame[Any], Any]):
@@ -63,7 +63,7 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
                 match stmt_results:
                     case Err(_):
                         return stmt_results
-                    case ResultValue(values):
+                    case tuple(values):
                         frame.set_values(stmt._results, values)
                     case ReturnValue(result):
                         break

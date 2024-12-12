@@ -42,10 +42,8 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
     ) -> interp.Result[JointResult]:
         try:
             value = self.interp.eval_stmt(stmt, tuple(x.data for x in args))
-            if isinstance(value, interp.ResultValue):
-                return interp.ResultValue(
-                    *tuple(JointResult(Value(each), Pure()) for each in value.values)
-                )
+            if isinstance(value, tuple):
+                return tuple(JointResult(Value(each), Pure()) for each in value)
             elif isinstance(value, interp.ReturnValue):
                 return interp.ReturnValue(JointResult(Value(value.result), Pure()))
             elif isinstance(value, interp.Successor):
@@ -57,7 +55,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
                 )
         except exceptions.InterpreterError:
             pass
-        return interp.ResultValue(self.bottom)
+        return (self.bottom,)
 
     def eval_stmt(
         self, stmt: ir.Statement, args: tuple[JointResult, ...]
@@ -80,15 +78,13 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
             return ret
         elif stmt.has_trait(ir.Pure):
             # fallback to top for other statements
-            return interp.ResultValue(JointResult(Unknown(), Pure()))
+            return (JointResult(Unknown(), Pure()),)
         else:
-            return interp.ResultValue(JointResult(Unknown(), NotPure()))
+            return (JointResult(Unknown(), NotPure()),)
 
     def _set_frame_not_pure(self, result: interp.Result[JointResult]):
         frame = self.state.current_frame()
-        if isinstance(result, interp.ResultValue) and all(
-            x.purity is Pure() for x in result.values
-        ):
+        if isinstance(result, tuple) and all(x.purity is Pure() for x in result):
             return
 
         if isinstance(result, interp.ReturnValue) and result.result.purity is Pure():

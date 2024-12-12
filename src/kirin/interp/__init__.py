@@ -8,7 +8,6 @@ from kirin.interp.value import (
     Err as Err,
     Result as Result,
     Successor as Successor,
-    ResultValue as ResultValue,
     ReturnValue as ReturnValue,
 )
 from kirin.interp.dialect import (

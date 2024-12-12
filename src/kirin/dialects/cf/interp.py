@@ -1,11 +1,4 @@
-from kirin.interp import (
-    Err,
-    Successor,
-    Interpreter,
-    ResultValue,
-    DialectInterpreter,
-    impl,
-)
+from kirin.interp import Err, Successor, Interpreter, DialectInterpreter, impl
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.dialects.cf.dialect import dialect
 
@@ -16,7 +9,7 @@ class CfInterpreter(DialectInterpreter):
     @impl(Assert)
     def assert_stmt(self, interp: Interpreter, stmt: Assert, values):
         if values[0] is True:
-            return ResultValue()
+            return ()
 
         if stmt.message:
             return Err(AssertionError(values[1]), interp.state.frames)

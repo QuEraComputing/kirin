@@ -7,7 +7,7 @@ from kirin.ir import Statement
 from kirin.exceptions import DialectInterpretationError
 from kirin.interp.base import BaseInterpreter
 from kirin.interp.impl import ImplDef
-from kirin.interp.value import Result, ResultValue
+from kirin.interp.value import Result
 
 if TYPE_CHECKING:
     from kirin.interp.base import BaseInterpreter
@@ -45,7 +45,7 @@ class DefaultTypeInferInterpreter(DialectInterpreter):
     def fallback(
         cls, interp: BaseInterpreter, stmt: Statement, values: Tuple
     ) -> Result:
-        return ResultValue(*tuple(result.type for result in stmt.results))
+        return tuple(result.type for result in stmt.results)
 
 
 @dataclass

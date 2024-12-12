@@ -1,5 +1,5 @@
 from kirin import ir
-from kirin.interp import Interpreter, ResultValue, DialectInterpreter, impl
+from kirin.interp import Interpreter, DialectInterpreter, impl
 from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
 
@@ -17,11 +17,11 @@ class FCFInterpreter(DialectInterpreter):
         for elem in coll:
             # NOTE: assume fn has been type checked
             _acc = interp.eval(fn, (acc, elem)).to_result()
-            if isinstance(_acc, ResultValue):
-                acc = _acc.values[0]
+            if isinstance(_acc, tuple):
+                acc = _acc[0]
             else:
                 return _acc
-        return ResultValue(acc)
+        return (acc,)
 
     @impl(Foldr)
     def foldr(self, interp: Interpreter, stmt: Foldr, values: tuple):
@@ -33,11 +33,11 @@ class FCFInterpreter(DialectInterpreter):
         for elem in reversed(coll):
             # NOTE: assume fn has been type checked
             _acc = interp.eval(fn, (elem, acc)).to_result()
-            if isinstance(_acc, ResultValue):
-                acc = _acc.values[0]
+            if isinstance(_acc, tuple):
+                acc = _acc[0]
             else:
                 return _acc
-        return ResultValue(acc)
+        return (acc,)
 
     @impl(Map)
     def map_list(self, interp: Interpreter, stmt: Map, values: tuple):
@@ -47,11 +47,11 @@ class FCFInterpreter(DialectInterpreter):
         for elem in coll:
             # NOTE: assume fn has been type checked
             _ret = interp.eval(fn, (elem,)).to_result()
-            if isinstance(_ret, ResultValue):
-                ret.append(_ret.values[0])
+            if isinstance(_ret, tuple):
+                ret.append(_ret[0])
             else:
                 return _ret
-        return ResultValue(ret)
+        return (ret,)
 
     @impl(Scan)
     def scan(self, interp: Interpreter, stmt: Scan, values: tuple):
@@ -64,9 +64,9 @@ class FCFInterpreter(DialectInterpreter):
         for elem in coll:
             # NOTE: assume fn has been type checked
             _acc = interp.eval(fn, (carry, elem)).to_result()
-            if isinstance(_acc, ResultValue):
-                carry, y = _acc.values[0]
+            if isinstance(_acc, tuple):
+                carry, y = _acc[0]
                 ys.append(y)
             else:  # fn err or no return
                 return _acc
-        return ResultValue((carry, ys))
+        return ((carry, ys),)

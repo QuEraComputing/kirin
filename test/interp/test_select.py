@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from kirin.interp import ResultValue, DialectInterpreter, impl
+from kirin.interp import DialectInterpreter, impl
 from kirin.lattice import EmptyLattice
 from kirin.prelude import basic
 from kirin.worklist import WorkList
@@ -31,10 +31,8 @@ class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
 class DialectInterp(DialectInterpreter):
 
     @impl(stmts.NewTuple)
-    def new_tuple(
-        self, interp: DummyInterpreter, stmt: stmts.NewTuple, values: tuple
-    ) -> ResultValue:
-        return ResultValue(EmptyLattice())
+    def new_tuple(self, interp: DummyInterpreter, stmt: stmts.NewTuple, values: tuple):
+        return (EmptyLattice(),)
 
 
 @basic

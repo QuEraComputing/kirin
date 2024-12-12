@@ -16,19 +16,6 @@ class NoReturn(Generic[ValueType]):
 
 
 @dataclass(init=False)
-class ResultValue(Generic[ValueType]):
-    """Result values from a statement evaluation."""
-
-    values: Tuple[ValueType, ...]
-
-    def __init__(self, *values: ValueType):
-        self.values = tuple(values)
-
-    def __len__(self) -> int:
-        return len(self.values)
-
-
-@dataclass(init=False)
 class ReturnValue(Generic[ValueType]):
     """Return value from a statement evaluation."""
 
@@ -118,7 +105,7 @@ class Err(Generic[ValueType]):
 
 Result: TypeAlias = (
     NoReturn[ValueType]
-    | ResultValue[ValueType]
+    | tuple[ValueType, ...]
     | ReturnValue[ValueType]
     | Successor[ValueType]
     | Err[ValueType]

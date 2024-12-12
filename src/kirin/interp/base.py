@@ -10,7 +10,7 @@ from kirin.ir.method import Method
 from kirin.exceptions import InterpreterError
 from kirin.interp.frame import FrameABC
 from kirin.interp.state import InterpreterState
-from kirin.interp.value import Err, Result, NoReturn, ResultValue
+from kirin.interp.value import Err, Result, NoReturn
 
 if TYPE_CHECKING:
     from kirin.interp.impl import Signature
@@ -48,7 +48,7 @@ class InterpResult(Generic[ValueType]):
         elif isinstance(self.value, NoReturn):
             return NoReturn()
         else:
-            return ResultValue(self.value)
+            return (self.value,)
 
 
 class InterpreterMeta(ABCMeta):

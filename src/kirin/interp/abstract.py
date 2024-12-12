@@ -8,7 +8,7 @@ from kirin.worklist import WorkList
 from kirin.ir.method import Method
 from kirin.interp.base import BaseInterpreter
 from kirin.interp.frame import Frame
-from kirin.interp.value import Successor, ResultValue, ReturnValue
+from kirin.interp.value import Successor, ReturnValue
 
 ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
@@ -98,7 +98,7 @@ class AbstractInterpreter(
             inputs = frame.get_values(stmt.args)
             stmt_results = self.run_stmt(stmt, inputs)
             match stmt_results:
-                case ResultValue(values):
+                case tuple(values):
                     self.set_values(frame, stmt._results, values)
                 case ReturnValue(result):  # this must be last stmt in block
                     return result

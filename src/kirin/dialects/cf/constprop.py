@@ -1,4 +1,4 @@
-from kirin.interp import Successor, ResultValue, DialectInterpreter, impl
+from kirin.interp import Successor, DialectInterpreter, impl
 from kirin.analysis import const
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.dialects.cf.dialect import dialect
@@ -9,12 +9,12 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Assert)
     def assert_stmt(self, interp: const.Propagate, stmt: Assert, values):
-        return ResultValue()
+        return ()
 
     @impl(Branch)
     def branch(self, interp: const.Propagate, stmt: Branch, values: tuple):
         interp.state.current_frame().worklist.append(Successor(stmt.successor, *values))
-        return ResultValue()
+        return ()
 
     @impl(ConditionalBranch)
     def conditional_branch(
@@ -52,4 +52,4 @@ class DialectConstProp(DialectInterpreter):
             frame.worklist.append(else_successor)
 
             frame.entries[stmt.cond] = cond
-        return ResultValue()
+        return ()

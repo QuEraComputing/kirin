@@ -1,7 +1,7 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.interp import ResultValue, ReturnValue, DialectInterpreter, impl
+from kirin.interp import ReturnValue, DialectInterpreter, impl
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.func.stmts import (
     Call,
@@ -20,7 +20,7 @@ class TypeInfer(DialectInterpreter):
 
     @impl(ConstantNone)
     def const_none(self, interp: TypeInference, stmt: ConstantNone, values: tuple[()]):
-        return ResultValue(ir.types.NoneType)
+        return (ir.types.NoneType,)
 
     @impl(Return)
     def return_(
@@ -32,7 +32,7 @@ class TypeInfer(DialectInterpreter):
     def call(self, interp: TypeInference, stmt: Call, values: tuple):
         # give up on dynamic method calls
         if not isinstance(values[0], ir.types.Const):
-            return ResultValue(stmt.result.type)
+            return (stmt.result.type,)
 
         mt: ir.Method = values[0].data
         return self._invoke_method(
@@ -59,7 +59,7 @@ class TypeInfer(DialectInterpreter):
         values: tuple,
     ):
         if mt.inferred:  # so we don't end up in infinite loop
-            return ResultValue(mt.return_type)
+            return (mt.return_type,)
 
         # NOTE: narrowing the argument type based on method signature
         inputs = tuple(
@@ -77,8 +77,8 @@ class TypeInfer(DialectInterpreter):
 
     @impl(Lambda)
     def lambda_(self, interp: TypeInference, stmt: Lambda, values: tuple):
-        return ResultValue(ir.types.PyClass(ir.Method))
+        return (ir.types.PyClass(ir.Method),)
 
     @impl(GetField)
     def getfield(self, interp: TypeInference, stmt: GetField, values: tuple):
-        return ResultValue(stmt.result.type)
+        return (stmt.result.type,)
