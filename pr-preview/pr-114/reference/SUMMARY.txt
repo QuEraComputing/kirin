@@ -6,8 +6,6 @@
             * [lattice](kirin/analysis/const/lattice.md)
             * [prop](kirin/analysis/const/prop.md)
         * [forward](kirin/analysis/forward.md)
-        * [joint](kirin/analysis/joint.md)
-        * [purity](kirin/analysis/purity.md)
         * [typeinfer](kirin/analysis/typeinfer.md)
     * [codegen](kirin/codegen/index.md)
         * [base](kirin/codegen/base.md)
