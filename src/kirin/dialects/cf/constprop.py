@@ -21,29 +21,31 @@ class DialectConstProp(DialectInterpreter):
         self,
         interp: const.Propagate,
         stmt: ConditionalBranch,
-        values: tuple[const.Result, ...],
+        values: tuple[const.JointResult, ...],
     ):
         frame = interp.state.current_frame()
         cond = values[0]
-        if isinstance(cond, const.Value):
+        if isinstance(cond.const, const.Value):
             else_successor = Successor(
                 stmt.else_successor, *frame.get_values(stmt.else_arguments)
             )
             then_successor = Successor(
                 stmt.then_successor, *frame.get_values(stmt.then_arguments)
             )
-            if cond.data:
+            if cond.const.data:
                 frame.worklist.append(then_successor)
             else:
                 frame.worklist.append(else_successor)
         else:
-            frame.entries[stmt.cond] = const.Value(True)
+            frame.entries[stmt.cond] = const.JointResult(const.Value(True), cond.purity)
             then_successor = Successor(
                 stmt.then_successor, *frame.get_values(stmt.then_arguments)
             )
             frame.worklist.append(then_successor)
 
-            frame.entries[stmt.cond] = const.Value(False)
+            frame.entries[stmt.cond] = const.JointResult(
+                const.Value(False), cond.purity
+            )
             else_successor = Successor(
                 stmt.else_successor, *frame.get_values(stmt.else_arguments)
             )
