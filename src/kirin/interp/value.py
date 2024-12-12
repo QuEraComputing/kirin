@@ -1,4 +1,4 @@
-from typing import Tuple, Generic, TypeVar, TypeAlias
+from typing import Tuple, Generic, TypeVar, TypeAlias, final
 from dataclasses import dataclass
 
 from kirin.ir import Block, SymbolOpInterface, CallableStmtInterface
@@ -8,15 +8,22 @@ ValueType = TypeVar("ValueType")
 
 
 @dataclass(init=False)
-class NoReturn(Generic[ValueType]):
+class SpecialResult(Generic[ValueType]):
+    pass
+
+
+@final
+@dataclass(init=False)
+class NoReturn(SpecialResult[ValueType]):
     """No return value from a statement evaluation."""
 
     def __len__(self) -> int:
         return 0
 
 
+@final
 @dataclass(init=False)
-class ReturnValue(Generic[ValueType]):
+class ReturnValue(SpecialResult[ValueType]):
     """Return value from a statement evaluation."""
 
     result: ValueType
@@ -29,8 +36,9 @@ class ReturnValue(Generic[ValueType]):
         return 0
 
 
+@final
 @dataclass(init=False)
-class Successor(Generic[ValueType]):
+class Successor(SpecialResult[ValueType]):
     """Successor block from a statement evaluation."""
 
     block: Block
@@ -48,8 +56,9 @@ class Successor(Generic[ValueType]):
         return 0
 
 
+@final
 @dataclass(init=False)
-class Err(Generic[ValueType]):
+class Err(SpecialResult[ValueType]):
     """Error result from a statement evaluation."""
 
     exception: Exception
@@ -103,10 +112,4 @@ class Err(Generic[ValueType]):
         raise self.exception
 
 
-Result: TypeAlias = (
-    NoReturn[ValueType]
-    | tuple[ValueType, ...]
-    | ReturnValue[ValueType]
-    | Successor[ValueType]
-    | Err[ValueType]
-)
+Result: TypeAlias = ValueType | tuple[ValueType, ...] | SpecialResult[ValueType]
