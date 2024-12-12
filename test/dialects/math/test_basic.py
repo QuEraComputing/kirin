@@ -67,16 +67,6 @@ def test_atanh():
 
 
 @basic
-def cbrt_func(x):
-    return math.cbrt(x)
-
-
-def test_cbrt():
-    truth = pymath.cbrt(0.42)
-    assert (cbrt_func(0.42) - truth) < 1e-6
-
-
-@basic
 def ceil_func(x):
     return math.ceil(x)
 
@@ -154,16 +144,6 @@ def exp_func(x):
 def test_exp():
     truth = pymath.exp(0.42)
     assert (exp_func(0.42) - truth) < 1e-6
-
-
-@basic
-def exp2_func(x):
-    return math.exp2(x)
-
-
-def test_exp2():
-    truth = pymath.exp2(0.42)
-    assert (exp2_func(0.42) - truth) < 1e-6
 
 
 @basic

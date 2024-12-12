@@ -67,16 +67,6 @@ class atanh(ir.Statement):
 
 
 @statement(dialect=dialect)
-class cbrt(ir.Statement):
-    """cbrt statement, wrapping the math.cbrt function"""
-
-    name = "cbrt"
-    traits = frozenset({ir.Pure()})
-    x: ir.SSAValue = info.argument(Float)
-    result: ir.ResultValue = info.result(Float)
-
-
-@statement(dialect=dialect)
 class ceil(ir.Statement):
     """ceil statement, wrapping the math.ceil function"""
 
@@ -152,16 +142,6 @@ class exp(ir.Statement):
     """exp statement, wrapping the math.exp function"""
 
     name = "exp"
-    traits = frozenset({ir.Pure()})
-    x: ir.SSAValue = info.argument(Float)
-    result: ir.ResultValue = info.result(Float)
-
-
-@statement(dialect=dialect)
-class exp2(ir.Statement):
-    """exp2 statement, wrapping the math.exp2 function"""
-
-    name = "exp2"
     traits = frozenset({ir.Pure()})
     x: ir.SSAValue = info.argument(Float)
     result: ir.ResultValue = info.result(Float)
