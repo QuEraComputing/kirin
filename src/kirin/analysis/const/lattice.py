@@ -174,7 +174,7 @@ class Purity(
 
     @classmethod
     def bottom(cls) -> "Purity":
-        return PurityUnknown()
+        return PurityBottom()
 
     @classmethod
     def top(cls) -> "Purity":
@@ -193,7 +193,7 @@ class NotPure(Purity, metaclass=SingletonMeta):
         return isinstance(other, NotPure)
 
 
-class PurityUnknown(Purity, metaclass=SingletonMeta):
+class PurityBottom(Purity, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Purity) -> bool:
         return True

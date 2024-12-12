@@ -5,7 +5,7 @@ from .lattice import (
     PartialLambda as PartialLambda,
     PartialTuple as PartialTuple,
     Pure as Pure,
-    PurityUnknown as PurityUnknown,
+    PurityBottom as PurityBottom,
     Result as Result,
     Unknown as Unknown,
     Value as Value,
