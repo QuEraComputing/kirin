@@ -1,43 +1,46 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.analysis import const
+from kirin.analysis import JointInference, JointResult, const, purity
 from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import Call, GetField, Invoke, Lambda, Return
 from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
 
 
-@dialect.register(key="constprop")
-class DialectConstProp(DialectInterpreter):
+@dialect.register(key="joint")
+class Analysis(DialectInterpreter):
 
     @impl(Return)
     def return_(
-        self, interp: const.Propagate, stmt: Return, values: tuple
-    ) -> ReturnValue:
+        self, interp: JointInference, stmt: Return, values: tuple[JointResult, ...]
+    ) -> ReturnValue[JointResult]:
         if not values:
-            return ReturnValue(const.Value(None))
+            return ReturnValue(
+                JointResult(ir.types.NoneType, const.Value(None), purity.Unknown())
+            )
         else:
             return ReturnValue(*values)
 
     @impl(Call)
-    def call(
-        self, interp: const.Propagate, stmt: Call, values: tuple[const.Result, ...]
-    ):
+    def call(self, interp: JointInference, stmt: Call, values: tuple[JointResult, ...]):
         # give up on dynamic method calls
         if not values:  # err
-            return ResultValue(const.Bottom())
+            return ResultValue(JointResult.bottom())
 
-        if isinstance(values[0], const.PartialLambda):
+        if isinstance(values[0].const, const.PartialLambda):
             return ResultValue(
                 self._call_lambda(
                     interp,
-                    values[0],
-                    interp.permute_values(values[0].argnames, values[1:], stmt.kwargs),
+                    values[0].const,
+                    interp.permute_values(
+                        values[0].const.argnames, values[1:], stmt.kwargs
+                    ),
                 )
             )
 
+        # non-const method call, give up
         if not isinstance(values[0], const.Value):
-            return ResultValue(const.Unknown())
+            return ResultValue(JointResult.top())
 
         mt: ir.Method = values[0].data
         return ResultValue(
@@ -51,9 +54,9 @@ class DialectConstProp(DialectInterpreter):
 
     def _call_lambda(
         self,
-        interp: const.Propagate,
+        interp: JointInference,
         callee: const.PartialLambda,
-        args: tuple[const.Result, ...],
+        args: tuple[JointResult, ...],
     ):
         # NOTE: we still use PartialLambda because
         # we want to gurantee what we receive here in captured
@@ -77,7 +80,7 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Invoke)
     def invoke(
-        self, interp: const.Propagate, stmt: Invoke, values: tuple[const.Result, ...]
+        self, interp: JointInference, stmt: Invoke, values: tuple[JointResult, ...]
     ):
         return ResultValue(
             self._invoke_method(
@@ -90,12 +93,14 @@ class DialectConstProp(DialectInterpreter):
 
     def _invoke_method(
         self,
-        interp: const.Propagate,
+        interp: JointInference,
         mt: ir.Method,
-        values: tuple[const.Result, ...],
+        values: tuple[JointResult, ...],
         results: Iterable[ir.ResultValue],
     ):
-        return interp.eval(mt, values).expect()
+        if len(interp.state.frames) < interp.max_depth:
+            return interp.eval(mt, values).expect()
+        return interp.bottom
 
     @impl(Lambda)
     def lambda_(self, interp: const.Propagate, stmt: Lambda, values: tuple):

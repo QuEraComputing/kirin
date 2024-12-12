@@ -73,11 +73,7 @@ class TypeInfer(DialectInterpreter):
         for arg, typ in zip(args, inputs):
             interp.results[arg] = typ
 
-        if len(interp.state.frames) < interp.max_depth:
-            return interp.eval(mt, inputs).to_result()
-
-        # max depth reached, error
-        return ResultValue(ir.types.Bottom)
+        return interp.eval(mt, inputs).to_result()
 
     @impl(Lambda)
     def lambda_(self, interp: TypeInference, stmt: Lambda, values: tuple):
