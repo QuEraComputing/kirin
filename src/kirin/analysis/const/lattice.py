@@ -166,3 +166,59 @@ class PartialLambda(Result):
             self.code,
             tuple(x.meet(y) for x, y in zip(self.captured, other.captured)),
         )
+
+
+class Purity(
+    SimpleJoinMixin["Purity"], SimpleMeetMixin["Purity"], BoundedLattice["Purity"]
+):
+
+    @classmethod
+    def bottom(cls) -> "Purity":
+        return PurityUnknown()
+
+    @classmethod
+    def top(cls) -> "Purity":
+        return NotPure()
+
+
+class Pure(Purity, metaclass=SingletonMeta):
+
+    def is_subseteq(self, other: Purity) -> bool:
+        return isinstance(other, (NotPure, Pure))
+
+
+class NotPure(Purity, metaclass=SingletonMeta):
+
+    def is_subseteq(self, other: Purity) -> bool:
+        return isinstance(other, NotPure)
+
+
+class PurityUnknown(Purity, metaclass=SingletonMeta):
+
+    def is_subseteq(self, other: Purity) -> bool:
+        return True
+
+
+@dataclass
+class JointResult(BoundedLattice["JointResult"]):
+    const: Result
+    purity: Purity
+
+    @classmethod
+    def top(cls) -> "JointResult":
+        return cls(Result.top(), Purity.top())
+
+    @classmethod
+    def bottom(cls) -> "JointResult":
+        return cls(Result.bottom(), Purity.bottom())
+
+    def is_subseteq(self, other: "JointResult") -> bool:
+        return self.const.is_subseteq(other.const) and self.purity.is_subseteq(
+            other.purity
+        )
+
+    def join(self, other: "JointResult") -> "JointResult":
+        return JointResult(self.const.join(other.const), self.purity.join(other.purity))
+
+    def meet(self, other: "JointResult") -> "JointResult":
+        return JointResult(self.const.meet(other.const), self.purity.join(other.purity))

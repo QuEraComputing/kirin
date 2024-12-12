@@ -29,7 +29,9 @@ class TypeInference(Forward[types.TypeAttribute]):
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[types.TypeAttribute, ...]
     ) -> types.TypeAttribute:
-        # NOTE: widen method type here
-        return self.run_ssacfg_region(
-            body, (types.Const(mt, types.PyClass(ir.Method)),) + args
-        )
+        if len(self.state.frames) < self.max_depth:
+            # NOTE: widen method type here
+            return self.run_ssacfg_region(
+                body, (types.Const(mt, types.PyClass(ir.Method)),) + args
+            )
+        return types.Bottom
