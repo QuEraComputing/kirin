@@ -10,7 +10,7 @@ from kirin.rewrite import RewriteResult, RewriteRule
 class Call2Invoke(RewriteRule):
     """Rewrite a `Call` statement to an `Invoke` statement."""
 
-    results: dict[ir.SSAValue, const.Result]
+    results: dict[ir.SSAValue, const.JointResult]
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, Call):
@@ -19,10 +19,10 @@ class Call2Invoke(RewriteRule):
         if (mt := self.results.get(node.callee)) is None:
             return RewriteResult()
 
-        if not isinstance(mt, const.Value):
+        if not isinstance(mt.const, const.Value):
             return RewriteResult()
 
-        stmt = Invoke(inputs=node.inputs, callee=mt.data, kwargs=node.kwargs)
+        stmt = Invoke(inputs=node.inputs, callee=mt.const.data, kwargs=node.kwargs)
         for result, new_result in zip(node.results, stmt.results):
             new_result.name = result.name
             new_result.type = result.type

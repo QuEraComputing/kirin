@@ -97,7 +97,9 @@ def inline_foldl(x):
 def test_inline_constprop():
     def fold():
         constprop = const.Propagate(inline_foldl.dialects)
-        constprop.eval(inline_foldl, tuple(const.Unknown() for _ in inline_foldl.args))
+        constprop.eval(
+            inline_foldl, tuple(const.JointResult.top() for _ in inline_foldl.args)
+        )
         Fixpoint(
             Walk(
                 Chain(

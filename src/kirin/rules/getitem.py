@@ -8,7 +8,7 @@ from kirin.rewrite import RewriteResult, RewriteRule
 
 @dataclass
 class InlineGetItem(RewriteRule):
-    results: dict[ir.SSAValue, const.Result]
+    results: dict[ir.SSAValue, const.JointResult]
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, stmts.GetItem):
@@ -20,7 +20,7 @@ class InlineGetItem(RewriteRule):
         if node.index not in self.results:
             return RewriteResult()
 
-        if not isinstance(index_value := self.results[node.index], const.Value):
+        if not isinstance(index_value := self.results[node.index].const, const.Value):
             return RewriteResult()
 
         stmt = node.obj.owner

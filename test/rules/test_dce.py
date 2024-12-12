@@ -17,7 +17,7 @@ def foldable(x: int) -> int:
 def test_dce():
     before = foldable(1)
     const_prop = const.Propagate(foldable.dialects)
-    const_prop.eval(foldable, tuple(const.Unknown() for _ in foldable.args))
+    const_prop.eval(foldable, tuple(const.JointResult.top() for _ in foldable.args))
     fold = ConstantFold(const_prop.results)
     Fixpoint(Walk(fold)).rewrite(foldable.code)
 

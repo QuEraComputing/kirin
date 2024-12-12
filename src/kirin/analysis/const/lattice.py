@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, final
 
 from kirin import ir
@@ -168,7 +168,7 @@ class PartialLambda(Result):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Purity(
     SimpleJoinMixin["Purity"], SimpleMeetMixin["Purity"], BoundedLattice["Purity"]
 ):
@@ -182,21 +182,21 @@ class Purity(
         return NotPure()
 
 
-@dataclass
+@dataclass(frozen=True)
 class Pure(Purity, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Purity) -> bool:
         return isinstance(other, (NotPure, Pure))
 
 
-@dataclass
+@dataclass(frozen=True)
 class NotPure(Purity, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Purity) -> bool:
         return isinstance(other, NotPure)
 
 
-@dataclass
+@dataclass(frozen=True)
 class PurityBottom(Purity, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Purity) -> bool:
@@ -206,7 +206,11 @@ class PurityBottom(Purity, metaclass=SingletonMeta):
 @dataclass
 class JointResult(BoundedLattice["JointResult"]):
     const: Result
-    purity: Purity
+    purity: Purity = field(default_factory=Purity.top)
+
+    @classmethod
+    def from_const(cls, value: Any) -> "JointResult":
+        return cls(Value(value), Purity.top())
 
     @classmethod
     def top(cls) -> "JointResult":

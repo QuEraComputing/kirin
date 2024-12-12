@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import Iterable
 
 from kirin.ir import IRNode
 from kirin.rewrite.abc import RewriteRule
@@ -13,7 +13,16 @@ class Chain(RewriteRule):
     The chain will apply each rewrite in order until one of the rewrites terminates.
     """
 
-    rules: List[RewriteRule]
+    rules: list[RewriteRule]
+
+    def __init__(self, rule: RewriteRule | Iterable[RewriteRule], *others: RewriteRule):
+        if isinstance(rule, RewriteRule):
+            self.rules = [rule, *others]
+        else:
+            assert (
+                others == ()
+            ), "Cannot pass multiple positional arguments if the first argument is an iterable"
+            self.rules = list(rule)
 
     def rewrite(self, node: IRNode) -> RewriteResult:
         has_done_something = False

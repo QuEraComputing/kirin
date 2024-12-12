@@ -12,34 +12,36 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Return)
     def return_(
-        self, interp: const.Propagate, stmt: Return, values: tuple
+        self, interp: const.Propagate, stmt: Return, values: tuple[const.JointResult]
     ) -> ReturnValue:
         if not values:
-            return ReturnValue(const.Value(None))
+            return ReturnValue(
+                const.JointResult(const.Value(None), const.PurityBottom())
+            )
         else:
             return ReturnValue(*values)
 
     @impl(Call)
     def call(
-        self, interp: const.Propagate, stmt: Call, values: tuple[const.Result, ...]
+        self, interp: const.Propagate, stmt: Call, values: tuple[const.JointResult, ...]
     ):
         # give up on dynamic method calls
         if not values:  # err
-            return ResultValue(const.Bottom())
+            return ResultValue(const.JointResult.bottom())
 
-        if isinstance(values[0], const.PartialLambda):
+        if isinstance(callee := values[0].const, const.PartialLambda):
             return ResultValue(
                 self._call_lambda(
                     interp,
-                    values[0],
-                    interp.permute_values(values[0].argnames, values[1:], stmt.kwargs),
+                    callee,
+                    interp.permute_values(callee.argnames, values[1:], stmt.kwargs),
                 )
             )
 
-        if not isinstance(values[0], const.Value):
-            return ResultValue(const.Unknown())
+        if not isinstance(callee := values[0].const, const.Value):
+            return ResultValue(const.JointResult.bottom())
 
-        mt: ir.Method = values[0].data
+        mt: ir.Method = callee.data
         return ResultValue(
             self._invoke_method(
                 interp,
@@ -53,7 +55,7 @@ class DialectConstProp(DialectInterpreter):
         self,
         interp: const.Propagate,
         callee: const.PartialLambda,
-        args: tuple[const.Result, ...],
+        args: tuple[const.JointResult, ...],
     ):
         # NOTE: we still use PartialLambda because
         # we want to gurantee what we receive here in captured
@@ -77,7 +79,10 @@ class DialectConstProp(DialectInterpreter):
 
     @impl(Invoke)
     def invoke(
-        self, interp: const.Propagate, stmt: Invoke, values: tuple[const.Result, ...]
+        self,
+        interp: const.Propagate,
+        stmt: Invoke,
+        values: tuple[const.JointResult, ...],
     ):
         return ResultValue(
             self._invoke_method(
@@ -92,13 +97,15 @@ class DialectConstProp(DialectInterpreter):
         self,
         interp: const.Propagate,
         mt: ir.Method,
-        values: tuple[const.Result, ...],
+        values: tuple[const.JointResult, ...],
         results: Iterable[ir.ResultValue],
     ):
         return interp.eval(mt, values).expect()
 
     @impl(Lambda)
-    def lambda_(self, interp: const.Propagate, stmt: Lambda, values: tuple):
+    def lambda_(
+        self, interp: const.Propagate, stmt: Lambda, values: tuple
+    ) -> ResultValue[const.JointResult]:
         arg_names = [
             arg.name or str(idx) for idx, arg in enumerate(stmt.body.blocks[0].args)
         ]
@@ -106,24 +113,30 @@ class DialectConstProp(DialectInterpreter):
             isinstance(each, const.Value) for each in values
         ):
             return ResultValue(
-                const.Value(
-                    ir.Method(
-                        mod=None,
-                        py_func=None,
-                        sym_name=stmt.sym_name,
-                        arg_names=arg_names,
-                        dialects=interp.dialects,
-                        code=stmt,
-                        fields=tuple(each.data for each in values),
-                    )
+                const.JointResult(
+                    const.Value(
+                        ir.Method(
+                            mod=None,
+                            py_func=None,
+                            sym_name=stmt.sym_name,
+                            arg_names=arg_names,
+                            dialects=interp.dialects,
+                            code=stmt,
+                            fields=tuple(each.data for each in values),
+                        )
+                    ),
+                    const.Pure(),
                 )
             )
 
         return ResultValue(
-            const.PartialLambda(
-                arg_names,
-                stmt,
-                values,
+            const.JointResult(
+                const.PartialLambda(
+                    arg_names,
+                    stmt,
+                    values,
+                ),
+                const.Pure(),
             )
         )
 
@@ -132,7 +145,11 @@ class DialectConstProp(DialectInterpreter):
         callee_self = values[0]
         if isinstance(callee_self, const.Value):
             mt: ir.Method = callee_self.data
-            return ResultValue(const.Value(mt.fields[stmt.field]))
+            return ResultValue(
+                const.JointResult(const.Value(mt.fields[stmt.field]), const.Pure())
+            )
         elif isinstance(callee_self, const.PartialLambda):
-            return ResultValue(callee_self.captured[stmt.field])
-        return ResultValue(const.Unknown())
+            return ResultValue(
+                const.JointResult(callee_self.captured[stmt.field], const.Pure())
+            )
+        return ResultValue(const.JointResult(const.Unknown(), const.Pure()))

@@ -28,7 +28,7 @@ class NoReturn(Result[ValueType]):
 class ResultValue(Result[ValueType]):
     """Result values from a statement evaluation."""
 
-    values: Tuple
+    values: Tuple[ValueType, ...]
 
     def __init__(self, *values: ValueType):
         self.values = tuple(values)
