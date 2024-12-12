@@ -168,6 +168,7 @@ class PartialLambda(Result):
         )
 
 
+@dataclass
 class Purity(
     SimpleJoinMixin["Purity"], SimpleMeetMixin["Purity"], BoundedLattice["Purity"]
 ):
@@ -181,18 +182,21 @@ class Purity(
         return NotPure()
 
 
+@dataclass
 class Pure(Purity, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Purity) -> bool:
         return isinstance(other, (NotPure, Pure))
 
 
+@dataclass
 class NotPure(Purity, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Purity) -> bool:
         return isinstance(other, NotPure)
 
 
+@dataclass
 class PurityBottom(Purity, metaclass=SingletonMeta):
 
     def is_subseteq(self, other: Purity) -> bool:
