@@ -7,7 +7,7 @@ from kirin.analysis.forward import Forward
 
 
 class TypeInference(Forward[types.TypeAttribute]):
-    keys = ["typeinfer", "empty"]
+    keys = ["typeinfer"]
     lattice = types.TypeAttribute
 
     def build_signature(self, stmt: Statement, args: tuple):

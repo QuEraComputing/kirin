@@ -29,8 +29,3 @@ class MethodTable(ABC):
             if isinstance(value, ImplDef):
                 for sig in value.signature:
                     cls.table[sig] = value.impl
-
-
-@dataclass
-class EmptyTable(MethodTable):
-    pass

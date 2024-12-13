@@ -29,11 +29,9 @@ class Dialect:
     codegen: dict[str, DialectEmit] = field(default_factory=dict, init=True)
 
     def __post_init__(self) -> None:
-        from kirin.interp.dialect import EmptyTable
         from kirin.lowering.dialect import NoSpecialLowering
 
         self.lowering["default"] = NoSpecialLowering()
-        self.interps["empty"] = EmptyTable()
 
     def __repr__(self) -> str:
         stmts = ", ".join([stmt.__name__ for stmt in self.stmts])

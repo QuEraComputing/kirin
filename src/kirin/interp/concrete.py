@@ -9,7 +9,7 @@ from kirin.interp.value import Err, NoReturn, Successor, ReturnValue
 
 
 class Interpreter(BaseInterpreter[Frame[Any], Any]):
-    keys = ["main", "empty"]
+    keys = ["main"]
 
     def __init__(
         self,

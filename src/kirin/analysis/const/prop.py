@@ -13,7 +13,7 @@ class ExtraFrameInfo:
 
 
 class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
-    keys = ["constprop", "empty"]
+    keys = ["constprop"]
     lattice = JointResult
 
     def __init__(
