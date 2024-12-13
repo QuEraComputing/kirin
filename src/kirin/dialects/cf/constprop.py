@@ -1,11 +1,11 @@
-from kirin.interp import Successor, DialectMethodTable, impl
+from kirin.interp import Successor, MethodTable, impl
 from kirin.analysis import const
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.dialects.cf.dialect import dialect
 
 
 @dialect.register(key="constprop")
-class DialectConstProp(DialectMethodTable):
+class DialectConstProp(MethodTable):
 
     @impl(Assert)
     def assert_stmt(self, interp: const.Propagate, stmt: Assert, values):

@@ -16,7 +16,7 @@ ValueType = TypeVar("ValueType")
 
 
 @dataclass
-class DialectMethodTable(ABC):
+class MethodTable(ABC):
     """Base class to define lookup tables for interpreting code for IR nodes in a dialect."""
 
     table: ClassVar[dict["Signature", "ImplFunction"]]
@@ -32,5 +32,5 @@ class DialectMethodTable(ABC):
 
 
 @dataclass
-class EmptyTable(DialectMethodTable):
+class EmptyTable(MethodTable):
     pass

@@ -1,12 +1,12 @@
 from kirin.ir import types
-from kirin.interp import Successor, DialectMethodTable, impl
+from kirin.interp import Successor, MethodTable, impl
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.cf.dialect import dialect
 
 
 @dialect.register(key="typeinfer")
-class TypeInfer(DialectMethodTable):
+class TypeInfer(MethodTable):
 
     @impl(Assert)
     def assert_stmt(self, interp: TypeInference, stmt: Assert, values):

@@ -1,7 +1,7 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.interp import ReturnValue, DialectMethodTable, impl
+from kirin.interp import MethodTable, ReturnValue, impl
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.func.stmts import (
     Call,
@@ -16,7 +16,7 @@ from kirin.dialects.func.dialect import dialect
 
 # NOTE: a lot of the type infer rules are same as the builtin dialect
 @dialect.register(key="typeinfer")
-class TypeInfer(DialectMethodTable):
+class TypeInfer(MethodTable):
 
     @impl(ConstantNone)
     def const_none(self, interp: TypeInference, stmt: ConstantNone, values: tuple[()]):

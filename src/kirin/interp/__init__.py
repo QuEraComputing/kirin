@@ -10,10 +10,7 @@ from kirin.interp.value import (
     Successor as Successor,
     ReturnValue as ReturnValue,
 )
-from kirin.interp.dialect import (
-    EmptyTable as EmptyTable,
-    DialectMethodTable as DialectMethodTable,
-)
+from kirin.interp.dialect import EmptyTable as EmptyTable, MethodTable as MethodTable
 from kirin.interp.abstract import (
     AbstractFrame as AbstractFrame,
     AbstractInterpreter as AbstractInterpreter,

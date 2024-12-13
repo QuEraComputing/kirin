@@ -4,11 +4,11 @@ from attrs import Beer
 from stmts import Pour, Puke, Drink, NewBeer, RandomBranch
 from dialect import dialect
 
-from kirin.interp import Successor, Interpreter, DialectMethodTable, impl
+from kirin.interp import Successor, Interpreter, MethodTable, impl
 
 
 @dialect.register
-class BeerInterpreter(DialectMethodTable):
+class BeerInterpreter(MethodTable):
 
     @impl(NewBeer)
     def new_beer(self, interp: Interpreter, stmt: NewBeer, values: tuple):

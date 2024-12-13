@@ -1,14 +1,14 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.interp import Result, ReturnValue, DialectMethodTable, impl
+from kirin.interp import Result, MethodTable, ReturnValue, impl
 from kirin.analysis import const
 from kirin.dialects.func.stmts import Call, Invoke, Lambda, Return, GetField
 from kirin.dialects.func.dialect import dialect
 
 
 @dialect.register(key="constprop")
-class DialectConstProp(DialectMethodTable):
+class DialectConstProp(MethodTable):
 
     @impl(Return)
     def return_(

@@ -1,11 +1,11 @@
 from kirin import ir
-from kirin.interp import Interpreter, DialectMethodTable, impl
+from kirin.interp import Interpreter, MethodTable, impl
 from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
 
 
 @dialect.register
-class FCFInterpreter(DialectMethodTable):
+class FCFInterpreter(MethodTable):
 
     @impl(Foldl)
     def foldl(self, interp: Interpreter, stmt: Foldl, values: tuple):

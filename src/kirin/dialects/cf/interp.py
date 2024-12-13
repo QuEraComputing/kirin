@@ -1,10 +1,10 @@
-from kirin.interp import Err, Successor, Interpreter, DialectMethodTable, impl
+from kirin.interp import Err, Successor, Interpreter, MethodTable, impl
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.dialects.cf.dialect import dialect
 
 
 @dialect.register
-class CfInterpreter(DialectMethodTable):
+class CfInterpreter(MethodTable):
 
     @impl(Assert)
     def assert_stmt(self, interp: Interpreter, stmt: Assert, values):

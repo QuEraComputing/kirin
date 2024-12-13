@@ -1,13 +1,13 @@
 from typing import Any
 
-from kirin.interp import Result, DialectMethodTable, impl
+from kirin.interp import Result, MethodTable, impl
 
 from . import _stmts as py
 from .dialect import dialect
 
 
 @dialect.register
-class PyInterpreter(DialectMethodTable):
+class PyInterpreter(MethodTable):
 
     @impl(py.Alias)
     def alias(self, interp, stmt: py.Alias, values: tuple) -> Result[Any]:

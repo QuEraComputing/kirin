@@ -1,14 +1,14 @@
 from typing import Callable, Iterable
 
 from kirin import ir
-from kirin.interp import DialectMethodTable, impl
+from kirin.interp import MethodTable, impl
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
 
 
 @dialect.register(key="typeinfer")
-class TypeInfer(DialectMethodTable):
+class TypeInfer(MethodTable):
 
     @impl(Foldl)
     def foldl(

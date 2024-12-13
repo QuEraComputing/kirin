@@ -1,12 +1,12 @@
 from kirin.ir import types
-from kirin.interp import Result, DialectMethodTable, impl
+from kirin.interp import Result, MethodTable, impl
 
 from . import _stmts as py
 from .dialect import dialect
 
 
 @dialect.register(key="typeinfer")
-class TypeInfer(DialectMethodTable):
+class TypeInfer(MethodTable):
     # NOTE: const always contains the acutal value, so we can just return the type
     @impl(py.Constant)
     def constant(
