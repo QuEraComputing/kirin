@@ -11,9 +11,8 @@ from kirin.interp.value import (
     ReturnValue as ReturnValue,
 )
 from kirin.interp.dialect import (
-    DialectInterpreter as DialectInterpreter,
-    EmptyDialectInterpreter as EmptyDialectInterpreter,
-    DefaultTypeInferInterpreter as DefaultTypeInferInterpreter,
+    EmptyTable as EmptyTable,
+    DialectMethodTable as DialectMethodTable,
 )
 from kirin.interp.abstract import (
     AbstractFrame as AbstractFrame,

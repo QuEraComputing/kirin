@@ -62,9 +62,7 @@ class Registry:
                 ret[name] = from_ast
         return ret
 
-    def interpreter(
-        self, keys: Iterable[str]
-    ) -> tuple[dict["Signature", "InterpImpl"], dict["Dialect", "InterpImpl"]]:
+    def interpreter(self, keys: Iterable[str]) -> dict["Signature", "InterpImpl"]:
         """select the dialect interpreter for the given key.
 
         Args:
@@ -77,23 +75,18 @@ class Registry:
         from kirin.interp.impl import MethodImpl
 
         ret: dict["Signature", "InterpImpl"] = {}
-        fallback: dict["Dialect", "InterpImpl"] = {}
         for dialect in self.parent.data:
-            dialect_interp = None
+            dialect_table = None
             for key in keys:
-                if key in dialect.interps:
-                    dialect_interp = dialect.interps[key]
-                    if dialect not in fallback:  # use the first fallback
-                        fallback[dialect] = dialect_interp.fallback
+                if key not in dialect.interps:
+                    continue
 
-                    for sig, func in dialect_interp.table.items():
-                        if sig not in ret:
-                            ret[sig] = MethodImpl(dialect_interp, func)
+                dialect_table = dialect.interps[key]
+                for sig, func in dialect_table.table.items():
+                    if sig not in ret:
+                        ret[sig] = MethodImpl(dialect_table, func)
 
-            if dialect not in fallback:
-                msg = ",".join(keys)
-                raise KeyError(f"Interpreter of {dialect.name} not found for {msg}")
-        return ret, fallback
+        return ret
 
     def codegen(self, keys: Iterable[str]) -> dict["CodegenSignature", "CodegenImpl"]:
         """select the dialect codegen for the given key.

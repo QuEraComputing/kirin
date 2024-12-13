@@ -1,4 +1,4 @@
-from kirin import ir
+from kirin import ir, interp
 from kirin.ir import types
 from kirin.ir.method import Method
 from kirin.ir.nodes.stmt import Statement
@@ -7,7 +7,7 @@ from kirin.analysis.forward import Forward
 
 
 class TypeInference(Forward[types.TypeAttribute]):
-    keys = ["typeinfer", "typeinfer.default"]
+    keys = ["typeinfer", "empty"]
     lattice = types.TypeAttribute
 
     def build_signature(self, stmt: Statement, args: tuple):
@@ -25,6 +25,14 @@ class TypeInference(Forward[types.TypeAttribute]):
             stmt.__class__,
             tuple(_args),
         )
+
+    def eval_stmt(
+        self, stmt: Statement, args: tuple[types.TypeAttribute, ...]
+    ) -> interp.Result:
+        method = self.lookup_registry(stmt, args)
+        if method is not None:
+            return method(self, stmt, args)
+        return tuple(result.type for result in stmt.results)
 
     def run_method_region(
         self, mt: Method, body: Region, args: tuple[types.TypeAttribute, ...]

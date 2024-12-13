@@ -1,5 +1,5 @@
 from kirin.ir import Method
-from kirin.interp import ReturnValue, DialectInterpreter, impl, concrete
+from kirin.interp import ReturnValue, DialectMethodTable, impl, concrete
 from kirin.dialects.func.stmts import (
     Call,
     Invoke,
@@ -12,7 +12,7 @@ from kirin.dialects.func.dialect import dialect
 
 
 @dialect.register
-class Interpreter(DialectInterpreter):
+class Interpreter(DialectMethodTable):
 
     @impl(Call)
     def call(self, interp: concrete.Interpreter, stmt: Call, values: tuple):

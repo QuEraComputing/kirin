@@ -74,9 +74,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             dialects = DialectGroup(dialects)
         self.dialects = dialects
 
-        self.registry, self.fallbacks = self.dialects.registry.interpreter(
-            keys=self.keys
-        )
+        self.registry = self.dialects.registry.interpreter(keys=self.keys)
         self.state: InterpreterState[FrameType] = InterpreterState()
         self.fuel = fuel
         self.max_depth = max_depth
@@ -180,18 +178,22 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self, stmt: Statement, args: tuple[ValueType, ...]
     ) -> Result[ValueType]:
         "simply evaluate a statement"
-        sig = self.build_signature(stmt, args)
-        if sig in self.registry:
-            return self.registry[sig](self, stmt, args)
-        elif stmt.__class__ in self.registry:
-            return self.registry[stmt.__class__](self, stmt, args)
-        elif stmt.dialect:
-            return self.fallbacks[stmt.dialect](self, stmt, args)
+        method = self.lookup_registry(stmt, args)
+        if method is not None:
+            return method(self, stmt, args)
         raise ValueError(f"no dialect for stmt {stmt}")
 
     def build_signature(self, stmt: Statement, args: tuple) -> "Signature":
         """build signature for querying the statement implementation."""
         return (stmt.__class__, tuple(arg.type for arg in stmt.args))
+
+    def lookup_registry(self, stmt, args: tuple[ValueType, ...]):
+        sig = self.build_signature(stmt, args)
+        if sig in self.registry:
+            return self.registry[sig]
+        elif stmt.__class__ in self.registry:
+            return self.registry[stmt.__class__]
+        return
 
     @abstractmethod
     def run_ssacfg_region(

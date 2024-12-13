@@ -11,7 +11,7 @@ from kirin.ir.nodes import Statement
 T = TypeVar("T")
 
 if TYPE_CHECKING:
-    from kirin.interp.dialect import DialectInterpreter
+    from kirin.interp.dialect import DialectMethodTable
     from kirin.codegen.dialect import DialectEmit
     from kirin.lowering.dialect import FromPythonAST
 
@@ -24,20 +24,16 @@ class Dialect:
     name: str
     stmts: list[type[Statement]] = field(default_factory=list, init=True)
     attrs: list[type[Attribute]] = field(default_factory=list, init=True)
-    interps: dict[str, DialectInterpreter] = field(default_factory=dict, init=True)
+    interps: dict[str, DialectMethodTable] = field(default_factory=dict, init=True)
     lowering: dict[str, FromPythonAST] = field(default_factory=dict, init=True)
     codegen: dict[str, DialectEmit] = field(default_factory=dict, init=True)
 
     def __post_init__(self) -> None:
-        from kirin.interp.dialect import (
-            EmptyDialectInterpreter,
-            DefaultTypeInferInterpreter,
-        )
+        from kirin.interp.dialect import EmptyTable
         from kirin.lowering.dialect import NoSpecialLowering
 
         self.lowering["default"] = NoSpecialLowering()
-        self.interps["typeinfer.default"] = DefaultTypeInferInterpreter()
-        self.interps["empty"] = EmptyDialectInterpreter()
+        self.interps["empty"] = EmptyTable()
 
     def __repr__(self) -> str:
         stmts = ", ".join([stmt.__name__ for stmt in self.stmts])
@@ -74,7 +70,7 @@ codegen=[{codegen}]\
         Raises:
             ValueError: If the node is not a subclass of Statement, Attribute, DialectInterpreter, FromPythonAST, or DialectEmit.
         """
-        from kirin.interp.dialect import DialectInterpreter
+        from kirin.interp.dialect import DialectMethodTable
         from kirin.codegen.dialect import DialectEmit
         from kirin.lowering.dialect import FromPythonAST
 
@@ -91,7 +87,7 @@ codegen=[{codegen}]\
                 setattr(node, "dialect", self)
                 assert hasattr(node, "name"), f"{node} does not have a name attribute"
                 self.attrs.append(node)
-            elif issubclass(node, DialectInterpreter):
+            elif issubclass(node, DialectMethodTable):
                 if key in self.interps:
                     raise ValueError(
                         f"Cannot register {node} to Dialect, key {key} exists"

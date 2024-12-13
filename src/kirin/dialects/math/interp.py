@@ -2,13 +2,13 @@
 import math
 from typing import Any
 
-from kirin.interp import Result, DialectInterpreter, impl
+from kirin.interp import Result, DialectMethodTable, impl
 from kirin.dialects.math import stmts
 from kirin.dialects.math.dialect import dialect
 
 
 @dialect.register
-class Interpreter(DialectInterpreter):
+class Interpreter(DialectMethodTable):
 
     @impl(stmts.acos)
     def acos(self, interp, stmt: stmts.acos, values: tuple) -> Result[Any]:
