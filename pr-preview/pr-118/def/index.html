@@ -123,7 +123,7 @@
 <span class=sd>    Raises:</span>
 <span class=sd>        ValueError: If the node is not a subclass of Statement, Attribute, DialectInterpreter, FromPythonAST, or DialectEmit.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
-    <span class=kn>from</span> <span class=nn>kirin.interp.dialect</span> <span class=kn>import</span> <span class=n>DialectMethodTable</span>
+    <span class=kn>from</span> <span class=nn>kirin.interp.dialect</span> <span class=kn>import</span> <span class=n>MethodTable</span>
     <span class=kn>from</span> <span class=nn>kirin.codegen.dialect</span> <span class=kn>import</span> <span class=n>DialectEmit</span>
     <span class=kn>from</span> <span class=nn>kirin.lowering.dialect</span> <span class=kn>import</span> <span class=n>FromPythonAST</span>
 
@@ -140,7 +140,7 @@
             <span class=nb>setattr</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=s2>&quot;dialect&quot;</span><span class=p>,</span> <span class=bp>self</span><span class=p>)</span>
             <span class=k>assert</span> <span class=nb>hasattr</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=s2>&quot;name&quot;</span><span class=p>),</span> <span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>node</span><span class=si>}</span><span class=s2> does not have a name attribute&quot;</span>
             <span class=bp>self</span><span class=o>.</span><span class=n>attrs</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>node</span><span class=p>)</span>
-        <span class=k>elif</span> <span class=nb>issubclass</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>DialectMethodTable</span><span class=p>):</span>
+        <span class=k>elif</span> <span class=nb>issubclass</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>MethodTable</span><span class=p>):</span>
             <span class=k>if</span> <span class=n>key</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>interps</span><span class=p>:</span>
                 <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
                     <span class=sa>f</span><span class=s2>&quot;Cannot register </span><span class=si>{</span><span class=n>node</span><span class=si>}</span><span class=s2> to Dialect, key </span><span class=si>{</span><span class=n>key</span><span class=si>}</span><span class=s2> exists&quot;</span>
