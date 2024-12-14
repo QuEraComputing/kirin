@@ -190,8 +190,8 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         sig = self.build_signature(frame, stmt)
         if sig in self.registry:
             return self.registry[sig]
-        elif stmt.__class__ in self.registry:
-            return self.registry[stmt.__class__]
+        elif (class_sig := Signature(stmt.__class__)) in self.registry:
+            return self.registry[class_sig]
         return
 
     @abstractmethod

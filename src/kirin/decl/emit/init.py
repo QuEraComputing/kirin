@@ -6,7 +6,7 @@ from typing_extensions import Unpack
 from kirin import ir
 from kirin.decl import info
 from kirin.decl.base import BaseModifier, StatementOptions
-from kirin.dialects.py import data
+from kirin.dialects.py.data import PyAttr
 
 from ._create_fn import create_fn
 from ._set_new_attribute import set_new_attribute
@@ -40,7 +40,7 @@ class EmitInit(BaseModifier):
                 self._KIRIN_STMT: ir.Statement,
                 self._SELF_CLASS: self.cls,
                 self._RESULT_VALUE_NAME: ir.ResultValue,
-                self._KIRIN_PYATTR: data.PyAttr,
+                self._KIRIN_PYATTR: PyAttr,
             }
         )
 

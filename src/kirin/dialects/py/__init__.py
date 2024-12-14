@@ -1,4 +1,4 @@
-# from . import types as types, data as data, stmts as stmts
+# from . import data as data, stmts as stmts
 # from kirin.dialects.pytypes import types as types
 # from kirin.dialects.pytypes.data import PyAttr as PyAttr
 # from kirin.dialects.pytypes.types.base import (
