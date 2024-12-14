@@ -1,5 +1,5 @@
 from kirin.ir import Method
-from kirin.interp import MethodTable, ReturnValue, impl, concrete
+from kirin.interp import Frame, MethodTable, ReturnValue, impl, concrete
 from kirin.dialects.func.stmts import (
     Call,
     Invoke,
@@ -15,36 +15,41 @@ from kirin.dialects.func.dialect import dialect
 class Interpreter(MethodTable):
 
     @impl(Call)
-    def call(self, interp: concrete.Interpreter, stmt: Call, values: tuple):
-        mt: Method = values[0]
+    def call(self, interp: concrete.Interpreter, frame: Frame, stmt: Call):
+        mt: Method = frame.get(stmt.callee)
         return interp.eval(
-            mt, interp.permute_values(mt.arg_names, values[1:], stmt.kwargs)
+            mt,
+            interp.permute_values(
+                mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+            ),
         ).to_result()
 
     @impl(Invoke)
-    def invoke(self, interp: concrete.Interpreter, stmt: Invoke, values: tuple):
+    def invoke(self, interp: concrete.Interpreter, frame: Frame, stmt: Invoke):
         return interp.eval(
             stmt.callee,
-            interp.permute_values(stmt.callee.arg_names, values, stmt.kwargs),
+            interp.permute_values(
+                stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+            ),
         ).to_result()
 
     @impl(Return)
-    def return_(self, interp: concrete.Interpreter, stmt: Return, values: tuple):
-        return ReturnValue(values[0])
+    def return_(self, interp: concrete.Interpreter, frame: Frame, stmt: Return):
+        return ReturnValue(frame.get(stmt.value))
 
     @impl(ConstantNone)
     def const_none(
-        self, interp: concrete.Interpreter, stmt: ConstantNone, values: tuple[()]
+        self, interp: concrete.Interpreter, frame: Frame, stmt: ConstantNone
     ):
         return (None,)
 
     @impl(GetField)
-    def getfield(self, interp: concrete.Interpreter, stmt: GetField, values: tuple):
-        mt: Method = values[0]
+    def getfield(self, interp: concrete.Interpreter, frame: Frame, stmt: GetField):
+        mt: Method = frame.get(stmt.obj)
         return (mt.fields[stmt.field],)
 
     @impl(Lambda)
-    def lambda_(self, interp: concrete.Interpreter, stmt: Lambda, values: tuple):
+    def lambda_(self, interp: concrete.Interpreter, frame: Frame, stmt: Lambda):
         return (
             Method(
                 mod=None,
@@ -56,6 +61,6 @@ class Interpreter(MethodTable):
                 ],
                 dialects=interp.dialects,
                 code=stmt,
-                fields=values,
+                fields=frame.get_values(stmt.captured),
             ),
         )

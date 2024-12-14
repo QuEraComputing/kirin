@@ -7,30 +7,30 @@ from .dialect import dialect
 
 
 @dialect.register(key="constprop")
-class DialectConstProp(MethodTable):
+class ConstPropTable(MethodTable):
 
     @impl(py.NewTuple)
     def new_tuple(
         self,
-        interp: const.Propagate,
+        _: const.Propagate,
+        frame: interp.Frame[const.JointResult],
         stmt: py.NewTuple,
-        values: tuple[const.JointResult, ...],
     ) -> interp.Result[const.JointResult]:
         return (
             const.JointResult(
-                const.PartialTuple(tuple(x.const for x in values)),
+                const.PartialTuple(tuple(x.const for x in frame.get_values(stmt.args))),
                 const.Pure(),
             ),
         )
 
     @impl(py.Not)
     def not_(
-        self, interp, stmt: py.Not, values: tuple[const.JointResult, ...]
+        self, _: const.Propagate, frame: interp.Frame, stmt: py.Not
     ) -> interp.Result[const.JointResult]:
         if isinstance(stmt.value.owner, py.NewTuple):
             ret = const.Value(len(stmt.value.owner.args) == 0)
-        elif isinstance(values[0], const.Value):
-            ret = const.Value(not values[0].data)
+        elif isinstance(value := frame.get(stmt.value), const.Value):
+            ret = const.Value(not value.data)
         else:
             ret = const.Unknown()
         return (const.JointResult(ret, const.Pure()),)
@@ -38,12 +38,12 @@ class DialectConstProp(MethodTable):
     @impl(py.GetItem)
     def getitem(
         self,
-        interp,
+        _: const.Propagate,
+        frame: interp.Frame[const.JointResult],
         stmt: py.GetItem,
-        values: tuple[const.JointResult, const.JointResult],
     ) -> interp.Result[const.JointResult]:
-        obj = values[0].const
-        index = values[1].const
+        obj = frame.get(stmt.obj).const
+        index = frame.get(stmt.index).const
         if not isinstance(index, const.Value):
             return (const.JointResult(const.Unknown(), const.Pure()),)
 

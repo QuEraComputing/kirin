@@ -1,37 +1,38 @@
 from kirin import ir, interp
 from kirin.ir import types
 from kirin.ir.method import Method
+from kirin.interp.impl import Signature
 from kirin.ir.nodes.stmt import Statement
 from kirin.ir.nodes.region import Region
-from kirin.analysis.forward import Forward
+from kirin.analysis.forward import Forward, ForwardFrame
 
 
 class TypeInference(Forward[types.TypeAttribute]):
     keys = ["typeinfer"]
     lattice = types.TypeAttribute
 
-    def build_signature(self, stmt: Statement, args: tuple):
-        """we use value here as signature as they will be types"""
-        _args = []
-        for x in args:
+    # NOTE: unlike concrete interpreter, instead of using type information
+    # within the IR. Type inference will use the interpreted
+    # value (which is a type) to determine the method dispatch.
+    def build_signature(
+        self, frame: ForwardFrame[types.TypeAttribute, None], stmt: Statement
+    ) -> Signature:
+        _args = ()
+        for x in frame.get_values(stmt.args):
             if isinstance(x, types.Const):
-                _args.append(x.typ)
+                _args += (x.typ,)
             elif isinstance(x, types.Generic):
-                _args.append(x.body)
+                _args += (x.body,)
             else:
-                _args.append(x)
-
-        return (
-            stmt.__class__,
-            tuple(_args),
-        )
+                _args += (x,)
+        return Signature(stmt.__class__, _args)
 
     def eval_stmt(
-        self, stmt: Statement, args: tuple[types.TypeAttribute, ...]
-    ) -> interp.Result:
-        method = self.lookup_registry(stmt, args)
+        self, frame: ForwardFrame[types.TypeAttribute, None], stmt: Statement
+    ) -> interp.Result[types.TypeAttribute]:
+        method = self.lookup_registry(frame, stmt)
         if method is not None:
-            return method(self, stmt, args)
+            return method(self, frame, stmt)
         return tuple(result.type for result in stmt.results)
 
     def run_method_region(

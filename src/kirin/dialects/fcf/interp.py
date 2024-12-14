@@ -1,5 +1,5 @@
 from kirin import ir
-from kirin.interp import Interpreter, MethodTable, impl
+from kirin.interp import Frame, Interpreter, MethodTable, impl
 from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
 
@@ -8,10 +8,10 @@ from kirin.dialects.fcf.dialect import dialect
 class FCFInterpreter(MethodTable):
 
     @impl(Foldl)
-    def foldl(self, interp: Interpreter, stmt: Foldl, values: tuple):
-        fn: ir.Method = values[0]
-        coll = values[1]
-        init = values[2]
+    def foldl(self, interp: Interpreter, frame: Frame, stmt: Foldl):
+        fn: ir.Method = frame.get(stmt.fn)
+        coll = frame.get(stmt.coll)
+        init = frame.get(stmt.init)
 
         acc = init
         for elem in coll:
@@ -24,10 +24,10 @@ class FCFInterpreter(MethodTable):
         return (acc,)
 
     @impl(Foldr)
-    def foldr(self, interp: Interpreter, stmt: Foldr, values: tuple):
-        fn: ir.Method = values[0]
-        coll = values[1]
-        init = values[2]
+    def foldr(self, interp: Interpreter, frame: Frame, stmt: Foldr):
+        fn: ir.Method = frame.get(stmt.fn)
+        coll = frame.get(stmt.coll)
+        init = frame.get(stmt.init)
 
         acc = init
         for elem in reversed(coll):
@@ -40,9 +40,9 @@ class FCFInterpreter(MethodTable):
         return (acc,)
 
     @impl(Map)
-    def map_list(self, interp: Interpreter, stmt: Map, values: tuple):
-        fn: ir.Method = values[0]
-        coll = values[1]
+    def map_list(self, interp: Interpreter, frame: Frame, stmt: Map):
+        fn: ir.Method = frame.get(stmt.fn)
+        coll = frame.get(stmt.coll)
         ret = []
         for elem in coll:
             # NOTE: assume fn has been type checked
@@ -54,10 +54,10 @@ class FCFInterpreter(MethodTable):
         return (ret,)
 
     @impl(Scan)
-    def scan(self, interp: Interpreter, stmt: Scan, values: tuple):
-        fn: ir.Method = values[0]
-        init = values[1]
-        coll = values[2]
+    def scan(self, interp: Interpreter, frame: Frame, stmt: Scan):
+        fn: ir.Method = frame.get(stmt.fn)
+        init = frame.get(stmt.init)
+        coll = frame.get(stmt.coll)
 
         carry = init
         ys = []

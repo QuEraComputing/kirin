@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Generic, TypeVar, Sequence
 from dataclasses import dataclass
 from collections.abc import Iterable
 
+from typing_extensions import Self
+
 from kirin.ir import Region, Dialect, Statement, DialectGroup, traits
 from kirin.ir.method import Method
 from kirin.exceptions import InterpreterError
@@ -13,6 +15,7 @@ from kirin.interp.state import InterpreterState
 from kirin.interp.value import Err, Result, NoReturn
 
 if TYPE_CHECKING:
+    from kirin.registry import StatementImpl
     from kirin.interp.impl import Signature
 
 ValueType = TypeVar("ValueType")
@@ -165,30 +168,26 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         )
         return args
 
-    def run_stmt(self, stmt: Statement, args: tuple) -> Result[ValueType]:
+    def run_stmt(self, frame: FrameType, stmt: Statement) -> Result[ValueType]:
         "run a statement within the current frame"
-        if self.state.frames:
-            # NOTE: if run_stmt is called directly,
-            # there is no frame being pushed, we only
-            # push a frame when we call a method
-            self.state.current_frame().set_stmt(stmt)
-        return self.eval_stmt(stmt, args)
+        # TODO: update tracking information
+        return self.eval_stmt(frame, stmt)
 
-    def eval_stmt(
-        self, stmt: Statement, args: tuple[ValueType, ...]
-    ) -> Result[ValueType]:
+    def eval_stmt(self, frame: FrameType, stmt: Statement) -> Result[ValueType]:
         "simply evaluate a statement"
-        method = self.lookup_registry(stmt, args)
+        method = self.lookup_registry(frame, stmt)
         if method is not None:
-            return method(self, stmt, args)
+            return method(self, frame, stmt)
         raise ValueError(f"no dialect for stmt {stmt}")
 
-    def build_signature(self, stmt: Statement, args: tuple) -> "Signature":
+    def build_signature(self, frame: FrameType, stmt: Statement) -> "Signature":
         """build signature for querying the statement implementation."""
-        return (stmt.__class__, tuple(arg.type for arg in stmt.args))
+        return Signature(stmt.__class__, tuple(arg.type for arg in stmt.args))
 
-    def lookup_registry(self, stmt, args: tuple[ValueType, ...]):
-        sig = self.build_signature(stmt, args)
+    def lookup_registry(
+        self, frame: FrameType, stmt: Statement
+    ) -> StatementImpl["Self", FrameType] | None:
+        sig = self.build_signature(frame, stmt)
         if sig in self.registry:
             return self.registry[sig]
         elif stmt.__class__ in self.registry:

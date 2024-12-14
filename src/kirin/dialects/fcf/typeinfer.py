@@ -1,7 +1,7 @@
 from typing import Callable, Iterable
 
 from kirin import ir
-from kirin.interp import MethodTable, impl
+from kirin.interp import MethodTable, AbstractFrame, impl
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
@@ -14,19 +14,19 @@ class TypeInfer(MethodTable):
     def foldl(
         self,
         interp: TypeInference,
+        frame: AbstractFrame,
         stmt: Foldl,
-        values: tuple[ir.types.TypeAttribute, ...],
     ):
-        return self.fold(lambda x: x, interp, stmt, values)
+        return self.fold(lambda x: x, interp, stmt, frame.get_values(stmt.args))
 
     @impl(Foldr)
     def foldr(
         self,
         interp: TypeInference,
+        frame: AbstractFrame,
         stmt: Foldr,
-        values: tuple[ir.types.TypeAttribute, ...],
     ):
-        return self.fold(reversed, interp, stmt, values)
+        return self.fold(reversed, interp, stmt, frame.get_values(stmt.args))
 
     def fold(
         self,
@@ -34,7 +34,7 @@ class TypeInfer(MethodTable):
             [tuple[ir.types.TypeAttribute, ...]], Iterable[ir.types.TypeAttribute]
         ],
         interp: TypeInference,
-        stmt,
+        stmt: Foldl | Foldr,
         values: tuple[ir.types.TypeAttribute, ...],
     ):
         if not isinstance(values[0], ir.types.Const):
@@ -68,14 +68,15 @@ class TypeInfer(MethodTable):
     def map_list(
         self,
         interp: TypeInference,
-        stmt,
-        values: tuple[ir.types.TypeAttribute, ir.types.TypeAttribute],
+        frame: AbstractFrame,
+        stmt: Map,
     ):
-        if not isinstance(values[0], ir.types.Const):
-            return (ir.types.List,)  # give up on dynamic calls
+        fn_value = frame.get(stmt.fn)
+        if not isinstance(fn_value, ir.types.Const):
+            return (ir.types.List[ir.types.Any],)  # give up on dynamic calls
 
-        fn: ir.Method = values[0].data
-        coll: ir.types.TypeAttribute = values[1]
+        fn: ir.Method = fn_value.data
+        coll: ir.types.TypeAttribute = frame.get(stmt.coll)
         if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
             elem = interp.eval(fn, (coll.vars[0],)).to_result()
             if isinstance(elem, tuple):
@@ -88,13 +89,14 @@ class TypeInfer(MethodTable):
     def map_range(
         self,
         interp: TypeInference,
-        stmt,
-        values: tuple[ir.types.TypeAttribute, ir.types.TypeAttribute],
+        frame: AbstractFrame,
+        stmt: Map,
     ):
-        if not isinstance(values[0], ir.types.Const):
+        fn_value = frame.get(stmt.fn)
+        if not isinstance(fn_value, ir.types.Const):
             return (ir.types.List,)  # give up on dynamic calls
 
-        fn: ir.Method = values[0].data
+        fn: ir.Method = fn_value.data
         elem = interp.eval(fn, (ir.types.Int,)).to_result()
         if isinstance(elem, tuple):
             return (ir.types.List[elem[0]],)
@@ -105,16 +107,17 @@ class TypeInfer(MethodTable):
     def scan(
         self,
         interp: TypeInference,
+        frame: AbstractFrame,
         stmt: Scan,
-        values: tuple[ir.types.TypeAttribute, ...],
     ):
-        init = values[1]
-        coll = values[2]
+        fn_value = frame.get(stmt.fn)
+        init = frame.get(stmt.init)
+        coll = frame.get(stmt.coll)
 
-        if not isinstance(values[0], ir.types.Const):
-            return (ir.types.Tuple[init, ir.types.List],)
+        if not isinstance(fn_value, ir.types.Const):
+            return (ir.types.Tuple[init, ir.types.List[ir.types.Any]],)
 
-        fn: ir.Method = values[0].data
+        fn: ir.Method = fn_value.data
         if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
             _ret = interp.eval(fn, (init, coll.vars[0])).to_result()
             if isinstance(_ret, tuple) and len(_ret) == 1:

@@ -1,181 +1,181 @@
 from typing import Any
 
-from kirin.interp import Result, MethodTable, impl
+from kirin.interp import Frame, Result, MethodTable, impl
 
 from . import _stmts as py
 from .dialect import dialect
 
 
 @dialect.register
-class PyInterpreter(MethodTable):
+class PyMethodTable(MethodTable):
 
     @impl(py.Alias)
-    def alias(self, interp, stmt: py.Alias, values: tuple) -> Result[Any]:
-        return (values[0],)
+    def alias(self, interp, frame: Frame, stmt: py.Alias) -> Result[Any]:
+        return (frame.get(stmt.value),)
 
     @impl(py.Constant)
-    def constant(self, interp, stmt: py.Constant, values: tuple) -> Result[Any]:
+    def constant(self, interp, frame: Frame, stmt: py.Constant) -> Result[Any]:
         return (stmt.value,)
 
     @impl(py.NewTuple)
-    def new_tuple(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (tuple(values),)
+    def new_tuple(self, interp, frame: Frame, stmt) -> Result[Any]:
+        return (tuple(frame.get_values(stmt.args)),)
 
     @impl(py.NewList)
-    def new_list(self, interp, stmt: py.NewList, values: tuple) -> Result[Any]:
-        return (list(values),)
+    def new_list(self, interp, frame: Frame, stmt: py.NewList) -> Result[Any]:
+        return (list(frame.get_values(stmt.values)),)
 
     @impl(py.Append)
-    def append(self, interp, stmt: py.Append, values: tuple) -> Result[Any]:
-        lst: list = values[0]
-        val = values[1]
+    def append(self, interp, frame: Frame, stmt: py.Append) -> Result[Any]:
+        lst: list = frame.get(stmt.lst)
+        val = frame.get(stmt.value)
         lst.append(val)
         return ()
 
     @impl(py.Len)
-    def len(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (len(values[0]),)
+    def len(self, interp, frame: Frame, stmt: py.Len) -> Result[Any]:
+        return (len(frame.get(stmt.value)),)
 
     @impl(py.Add)
-    def add(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] + values[1],)
+    def add(self, interp, frame: Frame, stmt: py.Add) -> Result[Any]:
+        return (frame.get(stmt.lhs) + frame.get(stmt.rhs),)
 
     @impl(py.Sub)
-    def sub(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] - values[1],)
+    def sub(self, interp, frame: Frame, stmt: py.Sub) -> Result[Any]:
+        return (frame.get(stmt.lhs) - frame.get(stmt.rhs),)
 
     @impl(py.Mult)
-    def mult(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] * values[1],)
+    def mult(self, interp, frame: Frame, stmt: py.Mult) -> Result[Any]:
+        return (frame.get(stmt.lhs) * frame.get(stmt.rhs),)
 
     @impl(py.Div)
-    def div(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] / values[1],)
+    def div(self, interp, frame: Frame, stmt: py.Div) -> Result[Any]:
+        return (frame.get(stmt.lhs) / frame.get(stmt.rhs),)
 
     @impl(py.Mod)
-    def mod(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] % values[1],)
+    def mod(self, interp, frame: Frame, stmt: py.Mod) -> Result[Any]:
+        return (frame.get(stmt.lhs) % frame.get(stmt.rhs),)
 
     @impl(py.UAdd)
-    def uadd(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (+values[0],)
+    def uadd(self, interp, frame: Frame, stmt: py.UAdd) -> Result[Any]:
+        return (+frame.get(stmt.value),)
 
     @impl(py.USub)
-    def usub(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (-values[0],)
+    def usub(self, interp, frame: Frame, stmt: py.USub) -> Result[Any]:
+        return (-frame.get(stmt.value),)
 
     @impl(py.Eq)
-    def eq(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] == values[1],)
+    def eq(self, interp, frame: Frame, stmt: py.Eq) -> Result[Any]:
+        return (frame.get(stmt.lhs) == frame.get(stmt.rhs),)
 
     @impl(py.NotEq)
-    def not_eq(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] != values[1],)
+    def not_eq(self, interp, frame: Frame, stmt: py.NotEq) -> Result[Any]:
+        return (frame.get(stmt.lhs) != frame.get(stmt.rhs),)
 
     @impl(py.Lt)
-    def lt(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] < values[1],)
+    def lt(self, interp, frame: Frame, stmt: py.Lt) -> Result[Any]:
+        return (frame.get(stmt.lhs) < frame.get(stmt.rhs),)
 
     @impl(py.LtE)
-    def lt_eq(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] <= values[1],)
+    def lt_eq(self, interp, frame: Frame, stmt: py.LtE) -> Result[Any]:
+        return (frame.get(stmt.lhs) <= frame.get(stmt.rhs),)
 
     @impl(py.Gt)
-    def gt(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] > values[1],)
+    def gt(self, interp, frame: Frame, stmt: py.Gt) -> Result[Any]:
+        return (frame.get(stmt.lhs) > frame.get(stmt.rhs),)
 
     @impl(py.GtE)
-    def gt_eq(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] >= values[1],)
+    def gt_eq(self, interp, frame: Frame, stmt: py.GtE) -> Result[Any]:
+        return (frame.get(stmt.lhs) >= frame.get(stmt.rhs),)
 
     @impl(py.And)
-    def and_(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] and values[1],)
+    def and_(self, interp, frame: Frame, stmt: py.And) -> Result[Any]:
+        return (frame.get(stmt.lhs) and frame.get(stmt.rhs),)
 
     @impl(py.Or)
-    def or_(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] or values[1],)
+    def or_(self, interp, frame: Frame, stmt: py.Or) -> Result[Any]:
+        return (frame.get(stmt.lhs) or frame.get(stmt.rhs),)
 
     @impl(py.Not)
-    def not_(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (not values[0],)
+    def not_(self, interp, frame: Frame, stmt: py.Not) -> Result[Any]:
+        return (not frame.get(stmt.value),)
 
     @impl(py.BitAnd)
-    def bit_and(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] & values[1],)
+    def bit_and(self, interp, frame: Frame, stmt: py.BitAnd) -> Result[Any]:
+        return (frame.get(stmt.lhs) & frame.get(stmt.rhs),)
 
     @impl(py.BitOr)
-    def bit_or(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] | values[1],)
+    def bit_or(self, interp, frame: Frame, stmt: py.BitOr) -> Result[Any]:
+        return (frame.get(stmt.lhs) | frame.get(stmt.rhs),)
 
     @impl(py.BitXor)
-    def bit_xor(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] ^ values[1],)
+    def bit_xor(self, interp, frame: Frame, stmt: py.BitXor) -> Result[Any]:
+        return (frame.get(stmt.lhs) ^ frame.get(stmt.rhs),)
 
     @impl(py.Invert)
-    def invert(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (~values[0],)
+    def invert(self, interp, frame: Frame, stmt: py.Invert) -> Result[Any]:
+        return (~frame.get(stmt.value),)
 
     @impl(py.Abs)
-    def abs(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (abs(values[0]),)
+    def abs(self, interp, frame: Frame, stmt: py.Abs) -> Result[Any]:
+        return (abs(frame.get(stmt.value)),)
 
     @impl(py.LShift)
-    def lshift(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] << values[1],)
+    def lshift(self, interp, frame: Frame, stmt: py.LShift) -> Result[Any]:
+        return (frame.get(stmt.lhs) << frame.get(stmt.rhs),)
 
     @impl(py.RShift)
-    def rshift(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] >> values[1],)
+    def rshift(self, interp, frame: Frame, stmt: py.RShift) -> Result[Any]:
+        return (frame.get(stmt.lhs) >> frame.get(stmt.rhs),)
 
     @impl(py.FloorDiv)
-    def floor_div(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] // values[1],)
+    def floor_div(self, interp, frame: Frame, stmt: py.FloorDiv) -> Result[Any]:
+        return (frame.get(stmt.lhs) // frame.get(stmt.rhs),)
 
     @impl(py.Pow)
-    def pow(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] ** values[1],)
+    def pow(self, interp, frame: Frame, stmt: py.Pow) -> Result[Any]:
+        return (frame.get(stmt.lhs) ** frame.get(stmt.rhs),)
 
     @impl(py.MatMult)
-    def mat_mult(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] @ values[1],)
+    def mat_mult(self, interp, frame: Frame, stmt: py.MatMult) -> Result[Any]:
+        return (frame.get(stmt.lhs) @ frame.get(stmt.rhs),)
 
     @impl(py.GetItem)
-    def getindex(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0][values[1]],)
+    def getindex(self, interp, frame: Frame, stmt: py.GetItem) -> Result[Any]:
+        return (frame.get(stmt.obj)[frame.get(stmt.index)],)
 
     @impl(py.SetItem)
-    def setindex(self, interp, stmt, values: tuple) -> Result[Any]:
-        values[0][values[1]] = values[2]
+    def setindex(self, interp, frame: Frame, stmt: py.SetItem) -> Result[Any]:
+        frame.get(stmt.obj)[frame.get(stmt.index)] = frame.get(stmt.value)
         return (None,)
 
     @impl(py.Is)
-    def is_(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] is values[1],)
+    def is_(self, interp, frame: Frame, stmt: py.Is) -> Result[Any]:
+        return (frame.get(stmt.lhs) is frame.get(stmt.rhs),)
 
     @impl(py.IsNot)
-    def is_not(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] is not values[1],)
+    def is_not(self, interp, frame: Frame, stmt: py.IsNot) -> Result[Any]:
+        return (frame.get(stmt.lhs) is not frame.get(stmt.rhs),)
 
     @impl(py.In)
-    def in_(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] in values[1],)
+    def in_(self, interp, frame: Frame, stmt: py.In) -> Result[Any]:
+        return (frame.get(stmt.lhs) in frame.get(stmt.rhs),)
 
     @impl(py.NotIn)
-    def not_in(self, interp, stmt, values: tuple) -> Result[Any]:
-        return (values[0] not in values[1],)
+    def not_in(self, interp, frame: Frame, stmt: py.NotIn) -> Result[Any]:
+        return (frame.get(stmt.lhs) not in frame.get(stmt.rhs),)
 
     @impl(py.GetAttr)
-    def getattr(self, interp, stmt: py.GetAttr, values: tuple) -> Result[Any]:
-        return (getattr(values[0], stmt.attrname),)
+    def getattr(self, interp, frame: Frame, stmt: py.GetAttr) -> Result[Any]:
+        return (getattr(frame.get(stmt.obj), stmt.attrname),)
 
     @impl(py.Range)
-    def _range(self, interp, stmt: py.Range, values: tuple) -> Result[Any]:
-        return (range(*values),)
+    def _range(self, interp, frame: Frame, stmt: py.Range) -> Result[Any]:
+        return (range(*frame.get_values(stmt.args)),)
 
     @impl(py.Slice)
-    def _slice(self, interp, stmt: py.Slice, values: tuple) -> Result[Any]:
-        start, stop, step = values
+    def _slice(self, interp, frame: Frame, stmt: py.Slice) -> Result[Any]:
+        start, stop, step = frame.get_values(stmt.args)
         if start is None and step is None:
             return (slice(stop),)
         elif step is None:

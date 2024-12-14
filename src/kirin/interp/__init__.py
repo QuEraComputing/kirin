@@ -3,7 +3,7 @@ from kirin.interp.base import (
     BaseInterpreter as BaseInterpreter,
 )
 from kirin.interp.impl import ImplDef as ImplDef, impl as impl
-from kirin.interp.frame import Frame as Frame
+from kirin.interp.frame import Frame as Frame, FrameABC as FrameABC
 from kirin.interp.value import (
     Err as Err,
     Result as Result,

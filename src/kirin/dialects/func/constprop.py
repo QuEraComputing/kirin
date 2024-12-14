@@ -1,7 +1,7 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.interp import Result, MethodTable, ReturnValue, impl
+from kirin.interp import Result, FrameABC, MethodTable, ReturnValue, impl
 from kirin.analysis import const
 from kirin.dialects.func.stmts import Call, Invoke, Lambda, Return, GetField
 from kirin.dialects.func.dialect import dialect
@@ -12,33 +12,28 @@ class DialectConstProp(MethodTable):
 
     @impl(Return)
     def return_(
-        self, interp: const.Propagate, stmt: Return, values: tuple[const.JointResult]
+        self, interp: const.Propagate, frame: FrameABC, stmt: Return
     ) -> Result[const.JointResult]:
-        if not values:
-            return ReturnValue(
-                const.JointResult(const.Value(None), const.PurityBottom())
-            )
-        else:
-            return ReturnValue(*values)
+        return ReturnValue(frame.get(stmt.value))
 
     @impl(Call)
     def call(
-        self, interp: const.Propagate, stmt: Call, values: tuple[const.JointResult, ...]
+        self, interp: const.Propagate, frame: FrameABC[const.JointResult], stmt: Call
     ) -> Result[const.JointResult]:
         # give up on dynamic method calls
-        if not values:  # err
-            return (const.JointResult.bottom(),)
-
-        if isinstance(callee := values[0].const, const.PartialLambda):
+        callee = frame.get(stmt.callee).const
+        if isinstance(callee, const.PartialLambda):
             return (
                 self._call_lambda(
                     interp,
                     callee,
-                    interp.permute_values(callee.argnames, values[1:], stmt.kwargs),
+                    interp.permute_values(
+                        callee.argnames, frame.get_values(stmt.inputs), stmt.kwargs
+                    ),
                 ),
             )
 
-        if not isinstance(callee := values[0].const, const.Value):
+        if not isinstance(callee, const.Value):
             return (const.JointResult.bottom(),)
 
         mt: ir.Method = callee.data
@@ -46,7 +41,9 @@ class DialectConstProp(MethodTable):
             self._invoke_method(
                 interp,
                 mt,
-                interp.permute_values(mt.arg_names, values[1:], stmt.kwargs),
+                interp.permute_values(
+                    mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+                ),
                 stmt.results,
             ),
         )
@@ -81,14 +78,16 @@ class DialectConstProp(MethodTable):
     def invoke(
         self,
         interp: const.Propagate,
+        frame: FrameABC[const.JointResult],
         stmt: Invoke,
-        values: tuple[const.JointResult, ...],
     ) -> Result[const.JointResult]:
         return (
             self._invoke_method(
                 interp,
                 stmt.callee,
-                interp.permute_values(stmt.callee.arg_names, values, stmt.kwargs),
+                interp.permute_values(
+                    stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+                ),
                 stmt.results,
             ),
         )
@@ -104,14 +103,13 @@ class DialectConstProp(MethodTable):
 
     @impl(Lambda)
     def lambda_(
-        self, interp: const.Propagate, stmt: Lambda, values: tuple
+        self, interp: const.Propagate, frame: FrameABC[const.JointResult], stmt: Lambda
     ) -> Result[const.JointResult]:
+        captured = frame.get_values(stmt.captured)
         arg_names = [
             arg.name or str(idx) for idx, arg in enumerate(stmt.body.blocks[0].args)
         ]
-        if not stmt.body.blocks.isempty() and all(
-            isinstance(each, const.Value) for each in values
-        ):
+        if stmt.body.blocks and ir.types.is_tuple_of(captured, const.Value):
             return (
                 const.JointResult(
                     const.Value(
@@ -122,7 +120,7 @@ class DialectConstProp(MethodTable):
                             arg_names=arg_names,
                             dialects=interp.dialects,
                             code=stmt,
-                            fields=tuple(each.data for each in values),
+                            fields=tuple(each.data for each in captured),
                         )
                     ),
                     const.Pure(),
@@ -134,7 +132,7 @@ class DialectConstProp(MethodTable):
                 const.PartialLambda(
                     arg_names,
                     stmt,
-                    values,
+                    tuple(each.const for each in captured),
                 ),
                 const.Pure(),
             ),
@@ -142,9 +140,12 @@ class DialectConstProp(MethodTable):
 
     @impl(GetField)
     def getfield(
-        self, interp: const.Propagate, stmt: GetField, values: tuple
+        self,
+        interp: const.Propagate,
+        frame: FrameABC[const.JointResult],
+        stmt: GetField,
     ) -> Result[const.JointResult]:
-        callee_self = values[0]
+        callee_self = frame.get(stmt.obj).const
         if isinstance(callee_self, const.Value):
             mt: ir.Method = callee_self.data
             return (

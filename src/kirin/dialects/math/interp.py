@@ -2,154 +2,190 @@
 import math
 from typing import Any
 
-from kirin.interp import Result, MethodTable, impl
+from kirin.interp import Frame, Result, MethodTable, impl
 from kirin.dialects.math import stmts
 from kirin.dialects.math.dialect import dialect
 
 
 @dialect.register
-class Interpreter(MethodTable):
+class MathMethodTable(MethodTable):
 
     @impl(stmts.acos)
-    def acos(self, interp, stmt: stmts.acos, values: tuple) -> Result[Any]:
+    def acos(self, interp, frame: Frame, stmt: stmts.acos) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.acos(values[0]),)
 
     @impl(stmts.asin)
-    def asin(self, interp, stmt: stmts.asin, values: tuple) -> Result[Any]:
+    def asin(self, interp, frame: Frame, stmt: stmts.asin) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.asin(values[0]),)
 
     @impl(stmts.asinh)
-    def asinh(self, interp, stmt: stmts.asinh, values: tuple) -> Result[Any]:
+    def asinh(self, interp, frame: Frame, stmt: stmts.asinh) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.asinh(values[0]),)
 
     @impl(stmts.atan)
-    def atan(self, interp, stmt: stmts.atan, values: tuple) -> Result[Any]:
+    def atan(self, interp, frame: Frame, stmt: stmts.atan) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.atan(values[0]),)
 
     @impl(stmts.atan2)
-    def atan2(self, interp, stmt: stmts.atan2, values: tuple) -> Result[Any]:
+    def atan2(self, interp, frame: Frame, stmt: stmts.atan2) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.atan2(values[0], values[1]),)
 
     @impl(stmts.atanh)
-    def atanh(self, interp, stmt: stmts.atanh, values: tuple) -> Result[Any]:
+    def atanh(self, interp, frame: Frame, stmt: stmts.atanh) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.atanh(values[0]),)
 
     @impl(stmts.ceil)
-    def ceil(self, interp, stmt: stmts.ceil, values: tuple) -> Result[Any]:
+    def ceil(self, interp, frame: Frame, stmt: stmts.ceil) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.ceil(values[0]),)
 
     @impl(stmts.copysign)
-    def copysign(self, interp, stmt: stmts.copysign, values: tuple) -> Result[Any]:
+    def copysign(self, interp, frame: Frame, stmt: stmts.copysign) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.copysign(values[0], values[1]),)
 
     @impl(stmts.cos)
-    def cos(self, interp, stmt: stmts.cos, values: tuple) -> Result[Any]:
+    def cos(self, interp, frame: Frame, stmt: stmts.cos) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.cos(values[0]),)
 
     @impl(stmts.cosh)
-    def cosh(self, interp, stmt: stmts.cosh, values: tuple) -> Result[Any]:
+    def cosh(self, interp, frame: Frame, stmt: stmts.cosh) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.cosh(values[0]),)
 
     @impl(stmts.degrees)
-    def degrees(self, interp, stmt: stmts.degrees, values: tuple) -> Result[Any]:
+    def degrees(self, interp, frame: Frame, stmt: stmts.degrees) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.degrees(values[0]),)
 
     @impl(stmts.erf)
-    def erf(self, interp, stmt: stmts.erf, values: tuple) -> Result[Any]:
+    def erf(self, interp, frame: Frame, stmt: stmts.erf) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.erf(values[0]),)
 
     @impl(stmts.erfc)
-    def erfc(self, interp, stmt: stmts.erfc, values: tuple) -> Result[Any]:
+    def erfc(self, interp, frame: Frame, stmt: stmts.erfc) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.erfc(values[0]),)
 
     @impl(stmts.exp)
-    def exp(self, interp, stmt: stmts.exp, values: tuple) -> Result[Any]:
+    def exp(self, interp, frame: Frame, stmt: stmts.exp) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.exp(values[0]),)
 
     @impl(stmts.expm1)
-    def expm1(self, interp, stmt: stmts.expm1, values: tuple) -> Result[Any]:
+    def expm1(self, interp, frame: Frame, stmt: stmts.expm1) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.expm1(values[0]),)
 
     @impl(stmts.fabs)
-    def fabs(self, interp, stmt: stmts.fabs, values: tuple) -> Result[Any]:
+    def fabs(self, interp, frame: Frame, stmt: stmts.fabs) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.fabs(values[0]),)
 
     @impl(stmts.floor)
-    def floor(self, interp, stmt: stmts.floor, values: tuple) -> Result[Any]:
+    def floor(self, interp, frame: Frame, stmt: stmts.floor) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.floor(values[0]),)
 
     @impl(stmts.fmod)
-    def fmod(self, interp, stmt: stmts.fmod, values: tuple) -> Result[Any]:
+    def fmod(self, interp, frame: Frame, stmt: stmts.fmod) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.fmod(values[0], values[1]),)
 
     @impl(stmts.gamma)
-    def gamma(self, interp, stmt: stmts.gamma, values: tuple) -> Result[Any]:
+    def gamma(self, interp, frame: Frame, stmt: stmts.gamma) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.gamma(values[0]),)
 
     @impl(stmts.isfinite)
-    def isfinite(self, interp, stmt: stmts.isfinite, values: tuple) -> Result[Any]:
+    def isfinite(self, interp, frame: Frame, stmt: stmts.isfinite) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.isfinite(values[0]),)
 
     @impl(stmts.isinf)
-    def isinf(self, interp, stmt: stmts.isinf, values: tuple) -> Result[Any]:
+    def isinf(self, interp, frame: Frame, stmt: stmts.isinf) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.isinf(values[0]),)
 
     @impl(stmts.isnan)
-    def isnan(self, interp, stmt: stmts.isnan, values: tuple) -> Result[Any]:
+    def isnan(self, interp, frame: Frame, stmt: stmts.isnan) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.isnan(values[0]),)
 
     @impl(stmts.lgamma)
-    def lgamma(self, interp, stmt: stmts.lgamma, values: tuple) -> Result[Any]:
+    def lgamma(self, interp, frame: Frame, stmt: stmts.lgamma) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.lgamma(values[0]),)
 
     @impl(stmts.log10)
-    def log10(self, interp, stmt: stmts.log10, values: tuple) -> Result[Any]:
+    def log10(self, interp, frame: Frame, stmt: stmts.log10) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.log10(values[0]),)
 
     @impl(stmts.log1p)
-    def log1p(self, interp, stmt: stmts.log1p, values: tuple) -> Result[Any]:
+    def log1p(self, interp, frame: Frame, stmt: stmts.log1p) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.log1p(values[0]),)
 
     @impl(stmts.log2)
-    def log2(self, interp, stmt: stmts.log2, values: tuple) -> Result[Any]:
+    def log2(self, interp, frame: Frame, stmt: stmts.log2) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.log2(values[0]),)
 
     @impl(stmts.pow)
-    def pow(self, interp, stmt: stmts.pow, values: tuple) -> Result[Any]:
+    def pow(self, interp, frame: Frame, stmt: stmts.pow) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.pow(values[0], values[1]),)
 
     @impl(stmts.radians)
-    def radians(self, interp, stmt: stmts.radians, values: tuple) -> Result[Any]:
+    def radians(self, interp, frame: Frame, stmt: stmts.radians) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.radians(values[0]),)
 
     @impl(stmts.remainder)
-    def remainder(self, interp, stmt: stmts.remainder, values: tuple) -> Result[Any]:
+    def remainder(self, interp, frame: Frame, stmt: stmts.remainder) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.remainder(values[0], values[1]),)
 
     @impl(stmts.sin)
-    def sin(self, interp, stmt: stmts.sin, values: tuple) -> Result[Any]:
+    def sin(self, interp, frame: Frame, stmt: stmts.sin) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.sin(values[0]),)
 
     @impl(stmts.sinh)
-    def sinh(self, interp, stmt: stmts.sinh, values: tuple) -> Result[Any]:
+    def sinh(self, interp, frame: Frame, stmt: stmts.sinh) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.sinh(values[0]),)
 
     @impl(stmts.sqrt)
-    def sqrt(self, interp, stmt: stmts.sqrt, values: tuple) -> Result[Any]:
+    def sqrt(self, interp, frame: Frame, stmt: stmts.sqrt) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.sqrt(values[0]),)
 
     @impl(stmts.tan)
-    def tan(self, interp, stmt: stmts.tan, values: tuple) -> Result[Any]:
+    def tan(self, interp, frame: Frame, stmt: stmts.tan) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.tan(values[0]),)
 
     @impl(stmts.tanh)
-    def tanh(self, interp, stmt: stmts.tanh, values: tuple) -> Result[Any]:
+    def tanh(self, interp, frame: Frame, stmt: stmts.tanh) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.tanh(values[0]),)
 
     @impl(stmts.trunc)
-    def trunc(self, interp, stmt: stmts.trunc, values: tuple) -> Result[Any]:
+    def trunc(self, interp, frame: Frame, stmt: stmts.trunc) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.trunc(values[0]),)
 
     @impl(stmts.ulp)
-    def ulp(self, interp, stmt: stmts.ulp, values: tuple) -> Result[Any]:
+    def ulp(self, interp, frame: Frame, stmt: stmts.ulp) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.ulp(values[0]),)

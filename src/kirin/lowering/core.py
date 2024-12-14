@@ -32,7 +32,7 @@ class Lowering(ast.NodeVisitor):
             self.dialects = DialectGroup(dialects)
 
         self.max_lines = max_lines
-        self.registry: dict[str, FromPythonAST] = self.dialects.registry.lowering(
+        self.registry: dict[str, FromPythonAST] = self.dialects.registry.ast(
             keys=keys or ["main", "default"]
         )
         self.state = None

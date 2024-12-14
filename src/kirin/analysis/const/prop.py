@@ -2,7 +2,7 @@ from typing import Iterable
 from dataclasses import dataclass
 
 from kirin import ir, interp, exceptions
-from kirin.analysis.forward import ForwardExtra
+from kirin.analysis.forward import ForwardExtra, ForwardFrame
 
 from .lattice import Pure, Value, NotPure, Unknown, JointResult
 
@@ -38,10 +38,15 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         )
 
     def _try_eval_const_pure(
-        self, stmt: ir.Statement, args: tuple[Value, ...]
+        self,
+        frame: ForwardFrame[JointResult, ExtraFrameInfo],
+        stmt: ir.Statement,
+        values: tuple[Value, ...],
     ) -> interp.Result[JointResult]:
         try:
-            value = self.interp.eval_stmt(stmt, tuple(x.data for x in args))
+            _frame = self.interp.new_method_frame(frame.method)
+            _frame.set_values(stmt.args, tuple(x.data for x in values))
+            value = self.interp.eval_stmt(_frame, stmt)
             if isinstance(value, tuple):
                 return tuple(JointResult(Value(each), Pure()) for each in value)
             elif isinstance(value, interp.ReturnValue):
@@ -58,22 +63,18 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         return (self.bottom,)
 
     def eval_stmt(
-        self, stmt: ir.Statement, args: tuple[JointResult, ...]
+        self, frame: ForwardFrame[JointResult, ExtraFrameInfo], stmt: ir.Statement
     ) -> interp.Result[JointResult]:
         if stmt.has_trait(ir.ConstantLike):
-            return self._try_eval_const_pure(stmt, ())
+            return self._try_eval_const_pure(frame, stmt, ())
         elif stmt.has_trait(ir.Pure):
-            values = tuple(x.const for x in args)
+            values = tuple(x.const for x in frame.get_values(stmt.args))
             if ir.types.is_tuple_of(values, Value):
-                return self._try_eval_const_pure(stmt, values)
+                return self._try_eval_const_pure(frame, stmt, values)
 
-        sig = self.build_signature(stmt, args)
-        if sig in self.registry:
-            ret = self.registry[sig](self, stmt, args)
-            self._set_frame_not_pure(ret)
-            return ret
-        elif stmt.__class__ in self.registry:
-            ret = self.registry[stmt.__class__](self, stmt, args)
+        method = self.lookup_registry(frame, stmt)
+        if method is not None:
+            ret = method(self, frame, stmt)
             self._set_frame_not_pure(ret)
             return ret
         elif stmt.has_trait(ir.Pure):

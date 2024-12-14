@@ -1,7 +1,7 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.interp import MethodTable, ReturnValue, impl
+from kirin.interp import Frame, MethodTable, ReturnValue, impl
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.func.stmts import (
     Call,
@@ -19,36 +19,39 @@ from kirin.dialects.func.dialect import dialect
 class TypeInfer(MethodTable):
 
     @impl(ConstantNone)
-    def const_none(self, interp: TypeInference, stmt: ConstantNone, values: tuple[()]):
+    def const_none(self, interp: TypeInference, frame: Frame, stmt: ConstantNone):
         return (ir.types.NoneType,)
 
     @impl(Return)
-    def return_(
-        self, interp: TypeInference, stmt: Return, values: tuple
-    ) -> ReturnValue:
-        return ReturnValue(*values)
+    def return_(self, interp: TypeInference, frame: Frame, stmt: Return) -> ReturnValue:
+        return ReturnValue(frame.get(stmt.value))
 
     @impl(Call)
-    def call(self, interp: TypeInference, stmt: Call, values: tuple):
+    def call(self, interp: TypeInference, frame: Frame, stmt: Call):
         # give up on dynamic method calls
-        if not isinstance(values[0], ir.types.Const):
+        callee = frame.get(stmt.callee)
+        if not isinstance(callee, ir.types.Const):
             return (stmt.result.type,)
 
-        mt: ir.Method = values[0].data
+        mt: ir.Method = callee.data
         return self._invoke_method(
             interp,
             mt,
             stmt.args[1:],
-            interp.permute_values(mt.arg_names, values[1:], stmt.kwargs),
+            interp.permute_values(
+                mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+            ),
         )
 
     @impl(Invoke)
-    def invoke(self, interp: TypeInference, stmt: Invoke, values: tuple):
+    def invoke(self, interp: TypeInference, frame: Frame, stmt: Invoke):
         return self._invoke_method(
             interp,
             stmt.callee,
-            stmt.args[1:],
-            interp.permute_values(stmt.callee.arg_names, values, stmt.kwargs),
+            stmt.inputs,
+            interp.permute_values(
+                stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+            ),
         )
 
     def _invoke_method(
@@ -76,9 +79,9 @@ class TypeInfer(MethodTable):
         return interp.eval(mt, inputs).to_result()
 
     @impl(Lambda)
-    def lambda_(self, interp: TypeInference, stmt: Lambda, values: tuple):
+    def lambda_(self, interp: TypeInference, frame, stmt: Lambda):
         return (ir.types.PyClass(ir.Method),)
 
     @impl(GetField)
-    def getfield(self, interp: TypeInference, stmt: GetField, values: tuple):
+    def getfield(self, interp: TypeInference, frame, stmt: GetField):
         return (stmt.result.type,)

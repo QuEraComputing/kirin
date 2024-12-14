@@ -54,11 +54,10 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
                 if self.consume_fuel() == self.FuelResult.Stop:
                     raise FuelExhaustedError("fuel exhausted")
 
-                inputs = frame.get_values(stmt.args)
                 # TODO: make this more precise
                 frame.lino = stmt_idx
                 frame.stmt = stmt
-                stmt_results = self.run_stmt(stmt, inputs)
+                stmt_results = self.run_stmt(frame, stmt)
 
                 match stmt_results:
                     case Err(_):

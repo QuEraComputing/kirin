@@ -1,30 +1,39 @@
-from typing import TYPE_CHECKING, Type, Union, TypeVar, Callable, TypeAlias
+from typing import TYPE_CHECKING, Type, Union, Generic, TypeVar, Callable, TypeAlias
 from dataclasses import dataclass
 
 from kirin.ir import Statement, types
 from kirin.interp.value import Result
 
 if TYPE_CHECKING:
-    from kirin.interp.base import BaseInterpreter
+    from kirin.interp.base import FrameABC, BaseInterpreter
     from kirin.interp.dialect import MethodTable
 
-    Self = TypeVar("Self", bound="MethodTable")
+    MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
     InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
+    FrameType = TypeVar("FrameType", bound="FrameABC")
     StatementType = TypeVar("StatementType", bound=Statement)
-    ImplFunction: TypeAlias = Callable[
-        [Self, InterpreterType, StatementType, tuple], Result
+    MethodFunction: TypeAlias = Callable[
+        [MethodTableSelf, InterpreterType, FrameType, StatementType], Result
     ]
-    StatementImpl: TypeAlias = Callable[[InterpreterType, StatementType, tuple], Result]
-    Signature: TypeAlias = (
-        Type[Statement] | tuple[Type[Statement], tuple[types.TypeAttribute, ...]]
-    )
+
+
+@dataclass(frozen=True)
+class Signature:
+    stmt: Type[Statement]
+    args: tuple[types.TypeAttribute, ...] | None = None
+
+    def __repr__(self):
+        if self.args:
+            return f"{self.stmt.__name__}[{', '.join(map(repr, self.args))}]"
+        else:
+            return f"{self.stmt.__name__}[...]"
 
 
 @dataclass
 class ImplDef:
     parent: Type[Statement]
-    signature: tuple["Signature", ...]
-    impl: "ImplFunction"
+    signature: tuple[Signature, ...]
+    impl: "MethodFunction"
 
     def __repr__(self):
         if self.parent.dialect:
@@ -33,34 +42,31 @@ class ImplDef:
             return f"interp {self.parent.name}"
 
 
-@dataclass
-class MethodImpl:
-    parent: "MethodTable"
-    impl: "ImplFunction"
-
-    def __call__(
-        self, interp: "BaseInterpreter", stmt: Statement, values: tuple
-    ) -> Result:
-        return self.impl(self.parent, interp, stmt, values)
-
-    def __repr__(self) -> str:
-        return f"method impl `{self.impl.__name__}` in {repr(self.parent.__class__)}"
+StatementType = TypeVar("StatementType", bound=Statement)
 
 
-class impl:
+class impl(Generic[StatementType]):
     """Decorator to define an Interpreter implementation for a statement."""
 
     # TODO: validate only concrete types are allowed here
 
-    def __init__(self, stmt: Type[Statement], *args: types.TypeAttribute) -> None:
+    def __init__(self, stmt: Type[StatementType], *args: types.TypeAttribute) -> None:
         self.stmt = stmt
         self.args = args
 
-    def __call__(self, func: Union["ImplFunction", ImplDef]) -> ImplDef:
+    def __call__(
+        self,
+        func: Union[
+            Callable[
+                [MethodTableSelf, InterpreterType, FrameType, StatementType], Result
+            ],
+            ImplDef,
+        ],
+    ) -> ImplDef:
         if self.args:
-            sig = (self.stmt, self.args)
+            sig = Signature(self.stmt, self.args)
         else:
-            sig = self.stmt
+            sig = Signature(self.stmt)
 
         if isinstance(func, ImplDef):
             return ImplDef(self.stmt, func.signature + (sig,), func.impl)

@@ -18,103 +18,8 @@ from kirin.ir.method import Method
 from kirin.exceptions import CompilerError
 
 if TYPE_CHECKING:
+    from kirin.registry import Registry
     from kirin.ir.dialect import Dialect
-    from kirin.interp.impl import Signature, StatementImpl as InterpImpl
-    from kirin.codegen.impl import (
-        Signature as CodegenSignature,
-        StatementImpl as CodegenImpl,
-    )
-    from kirin.lowering.dialect import FromPythonAST
-
-
-@dataclass
-class Registry:
-    """Proxy class to build different registries from a dialect group."""
-
-    parent: "DialectGroup"
-    """The parent dialect group."""
-
-    def lowering(self, keys: Iterable[str]) -> dict[str, "FromPythonAST"]:
-        """select the dialect lowering interpreters for the given key.
-
-        Args:
-            keys (Iterable[str]): the keys to search for in the dialects
-
-        Returns:
-            a map of dialects to their lowering interpreters
-        """
-        ret: dict[str, "FromPythonAST"] = {}
-        from_ast = None
-        for dialect in self.parent.data:
-            for key in keys:
-                if key in dialect.lowering:
-                    from_ast = dialect.lowering[key]
-                    break
-
-            if from_ast is None:
-                msg = ",".join(keys)
-                raise KeyError(f"Lowering not found for {msg}")
-
-            for name in from_ast.names:
-                if name in ret:
-                    raise KeyError(f"Lowering {name} already exists")
-
-                ret[name] = from_ast
-        return ret
-
-    def interpreter(self, keys: Iterable[str]) -> dict["Signature", "InterpImpl"]:
-        """select the dialect interpreter for the given key.
-
-        Args:
-            keys (Iterable[str]): the keys to search for in the dialects
-
-        Returns:
-            a map of statement signatures to their interpretation functions,
-            and a map of dialects to their fallback interpreters.
-        """
-        from kirin.interp.impl import MethodImpl
-
-        ret: dict["Signature", "InterpImpl"] = {}
-        for dialect in self.parent.data:
-            dialect_table = None
-            for key in keys:
-                if key not in dialect.interps:
-                    continue
-
-                dialect_table = dialect.interps[key]
-                for sig, func in dialect_table.table.items():
-                    if sig not in ret:
-                        ret[sig] = MethodImpl(dialect_table, func)
-
-        return ret
-
-    def codegen(self, keys: Iterable[str]) -> dict["CodegenSignature", "CodegenImpl"]:
-        """select the dialect codegen for the given key.
-
-        Args:
-            keys (Iterable[str]): the keys to search for in the dialects
-
-        Returns:
-            a map of dialects to their codegen.
-        """
-        from kirin.codegen.impl import MethodImpl
-
-        ret: dict["CodegenSignature", "CodegenImpl"] = {}
-        for dialect in self.parent.data:
-            dialect_codegen = None
-            for key in keys:
-                if key in dialect.codegen:
-                    dialect_codegen = dialect.codegen[key]
-                    break
-
-            # not found, just skip
-            if dialect_codegen is None:
-                continue
-
-            for key, func in dialect_codegen.table.items():
-                ret[key] = MethodImpl(dialect_codegen, func)
-        return ret
-
 
 PassParams = ParamSpec("PassParams")
 RunPass = Callable[Concatenate[Method, PassParams], None]
@@ -204,6 +109,8 @@ class DialectGroup(Generic[PassParams]):
         Returns:
             Registry: the registry object.
         """
+        from kirin.registry import Registry
+
         return Registry(self)
 
     @overload

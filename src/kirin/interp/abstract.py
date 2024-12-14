@@ -95,8 +95,7 @@ class AbstractInterpreter(
                 stmt = stmt.next_stmt  # skip
                 continue
 
-            inputs = frame.get_values(stmt.args)
-            stmt_results = self.run_stmt(stmt, inputs)
+            stmt_results = self.run_stmt(frame, stmt)
             match stmt_results:
                 case tuple(values):
                     self.set_values(frame, stmt._results, values)

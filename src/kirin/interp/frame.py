@@ -19,9 +19,11 @@ class FrameABC(ABC, Generic[ValueType]):
         ...
 
     @abstractmethod
-    def get_values(self, keys: Iterable[SSAValue]) -> tuple:
+    def get(self, key: SSAValue) -> ValueType: ...
+
+    def get_values(self, keys: Iterable[SSAValue]) -> tuple[ValueType, ...]:
         """Get the values of the given `SSAValue` keys."""
-        ...
+        return tuple(self.get(key) for key in keys)
 
     @abstractmethod
     def set_values(self, keys: Iterable[SSAValue], values: Iterable[ValueType]) -> None:
@@ -60,8 +62,8 @@ class Frame(FrameABC[ValueType]):
     def from_method(cls, method: Method) -> Self:
         return cls(method=method)
 
-    def get_values(self, keys: Iterable[SSAValue]) -> tuple:
-        return tuple(self.entries[key] for key in keys)
+    def get(self, key: SSAValue) -> ValueType:
+        return self.entries[key]
 
     def set_values(self, keys: Iterable[SSAValue], values: Iterable[ValueType]) -> None:
         for key, value in zip(keys, values):

@@ -79,7 +79,7 @@ with open(os.path.join(os.path.dirname(__file__), "interp.py"), "w") as f:
     f.write("from typing import Any\n")
     f.write("from kirin.dialects.math.dialect import dialect\n")
     f.write("from kirin.dialects.math import stmts\n")
-    f.write("from kirin.interp import Result, DialectInterpreter, impl\n")
+    f.write("from kirin.interp import MethodTable, Frame, Result, impl\n")
     f.write("\n")
 
     implements = []
@@ -90,7 +90,8 @@ with open(os.path.join(os.path.dirname(__file__), "interp.py"), "w") as f:
         implements.append(
             f"""
     @impl(stmts.{name})
-    def {name}(self, interp, stmt: stmts.{name}, values: tuple) -> Result[Any]:
+    def {name}(self, interp, frame: Frame, stmt: stmts.{name}) -> Result[Any]:
+        values = frame.get_values(stmt.args)
         return (math.{name}({fields}),)"""
         )
 
@@ -99,7 +100,7 @@ with open(os.path.join(os.path.dirname(__file__), "interp.py"), "w") as f:
     f.write(
         f"""
 @dialect.register
-class Interpreter(DialectInterpreter):
+class MathMethodTable(MethodTable):
 {methods}
 """
     )

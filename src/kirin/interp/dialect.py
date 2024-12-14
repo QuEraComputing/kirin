@@ -8,7 +8,7 @@ from kirin.interp.impl import ImplDef
 
 if TYPE_CHECKING:
     from kirin.interp.base import BaseInterpreter
-    from kirin.interp.impl import Signature, ImplFunction
+    from kirin.interp.impl import Signature, MethodFunction
 
 
 InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
@@ -19,7 +19,7 @@ ValueType = TypeVar("ValueType")
 class MethodTable(ABC):
     """Base class to define lookup tables for interpreting code for IR nodes in a dialect."""
 
-    table: ClassVar[dict["Signature", "ImplFunction"]]
+    table: ClassVar[dict["Signature", "MethodFunction"]]
 
     def __init_subclass__(cls) -> None:
         # init the subclass first
