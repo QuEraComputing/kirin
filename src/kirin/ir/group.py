@@ -100,7 +100,7 @@ class DialectGroup(Generic[PassParams]):
         )
 
     @property
-    def registry(self) -> Registry:
+    def registry(self) -> "Registry":
         """return the registry for the dialect group. This
         returns a proxy object that can be used to select
         the lowering interpreters, interpreters, and codegen

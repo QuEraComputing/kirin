@@ -1,28 +1,20 @@
-from typing import TYPE_CHECKING, Generic, TypeVar, Iterable
+from typing import TYPE_CHECKING, Callable, Iterable
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
     from kirin.ir.group import DialectGroup
     from kirin.ir.nodes import Statement
     from kirin.lowering import FromPythonAST
-    from kirin.interp.base import FrameABC, BaseInterpreter
-    from kirin.interp.impl import Signature, MethodFunction
-    from kirin.interp.value import Result
+    from kirin.interp.impl import Signature
     from kirin.interp.dialect import MethodTable
-
-    MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
-    InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
-    FrameType = TypeVar("FrameType", bound="FrameABC")
 
 
 @dataclass
-class StatementImpl(Generic[InterpreterType, FrameType]):
-    parent: MethodTable
-    impl: MethodFunction[MethodTable, InterpreterType, FrameType, Statement]
+class StatementImpl:
+    parent: "MethodTable"
+    impl: Callable
 
-    def __call__(
-        self, interp: InterpreterType, frame: FrameType, stmt: Statement
-    ) -> Result:
+    def __call__(self, interp, frame, stmt: "Statement"):
         return self.impl(self.parent, interp, frame, stmt)
 
     def __repr__(self) -> str:

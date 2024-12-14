@@ -1,7 +1,7 @@
 import sys
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, TypeVar, Sequence
+from typing import TYPE_CHECKING, Generic, TypeVar, Optional, Sequence
 from dataclasses import dataclass
 from collections.abc import Iterable
 
@@ -10,13 +10,13 @@ from typing_extensions import Self
 from kirin.ir import Region, Dialect, Statement, DialectGroup, traits
 from kirin.ir.method import Method
 from kirin.exceptions import InterpreterError
+from kirin.interp.impl import Signature
 from kirin.interp.frame import FrameABC
 from kirin.interp.state import InterpreterState
 from kirin.interp.value import Err, Result, NoReturn
 
 if TYPE_CHECKING:
     from kirin.registry import StatementImpl
-    from kirin.interp.impl import Signature
 
 ValueType = TypeVar("ValueType")
 FrameType = TypeVar("FrameType", bound=FrameABC)
@@ -178,7 +178,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         method = self.lookup_registry(frame, stmt)
         if method is not None:
             return method(self, frame, stmt)
-        raise ValueError(f"no dialect for stmt {stmt}")
+        raise ValueError(f"no dialect for stmt {stmt} from {type(self)}")
 
     def build_signature(self, frame: FrameType, stmt: Statement) -> "Signature":
         """build signature for querying the statement implementation."""
@@ -186,7 +186,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
     def lookup_registry(
         self, frame: FrameType, stmt: Statement
-    ) -> StatementImpl["Self", FrameType] | None:
+    ) -> Optional["StatementImpl[Self, FrameType]"]:
         sig = self.build_signature(frame, stmt)
         if sig in self.registry:
             return self.registry[sig]

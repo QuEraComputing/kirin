@@ -8,13 +8,13 @@ if TYPE_CHECKING:
     from kirin.interp.base import FrameABC, BaseInterpreter
     from kirin.interp.dialect import MethodTable
 
-    MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
-    InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
-    FrameType = TypeVar("FrameType", bound="FrameABC")
-    StatementType = TypeVar("StatementType", bound=Statement)
-    MethodFunction: TypeAlias = Callable[
-        [MethodTableSelf, InterpreterType, FrameType, StatementType], Result
-    ]
+MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
+InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
+FrameType = TypeVar("FrameType", bound="FrameABC")
+StatementType = TypeVar("StatementType", bound=Statement)
+MethodFunction: TypeAlias = Callable[
+    [MethodTableSelf, InterpreterType, FrameType, StatementType], Result
+]
 
 
 @dataclass(frozen=True)
