@@ -4,33 +4,33 @@ from attrs import Beer
 from stmts import Pour, Puke, Drink, NewBeer, RandomBranch
 from dialect import dialect
 
-from kirin.interp import Successor, Interpreter, MethodTable, impl
+from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
 
 
 @dialect.register
 class BeerInterpreter(MethodTable):
 
     @impl(NewBeer)
-    def new_beer(self, interp: Interpreter, stmt: NewBeer, values: tuple):
-        return (Beer(values[0]),)
+    def new_beer(self, interp: Interpreter, frame: Frame, stmt: NewBeer):
+        return (Beer(frame.get(stmt.brand)),)
 
     @impl(Drink)
-    def drink(self, interp: Interpreter, stmt: Drink, values: tuple):
-        print(f"Drinking {values[0].brand}")
+    def drink(self, interp: Interpreter, frame: Frame, stmt: Drink):
+        print(f"Drinking {frame.get(stmt.beverage).brand}")
         return ()
 
     @impl(Pour)
-    def pour(self, interp: Interpreter, stmt: Pour, values: tuple):
-        print(f"Pouring {values[0].brand} {values[1]}")
+    def pour(self, interp: Interpreter, frame: Frame, stmt: Pour):
+        print(f"Pouring {frame.get(stmt.beverage).brand} {frame.get(stmt.amount)}")
         return ()
 
     @impl(Puke)
-    def puke(self, interp: Interpreter, stmt: Puke, values: tuple):
+    def puke(self, interp: Interpreter, frame: Frame, stmt: Puke):
         print("Puking!!!")
         return ()
 
     @impl(RandomBranch)
-    def random_branch(self, interp: Interpreter, stmt: RandomBranch, values: tuple):
+    def random_branch(self, interp: Interpreter, frame: Frame, stmt: RandomBranch):
         frame = interp.state.current_frame()
         if randint(0, 1):
             return Successor(

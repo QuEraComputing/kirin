@@ -24,20 +24,20 @@ def beer(self):
 # type: ignore
 @beer
 def main(x):
-    beer = NewBeer("budlight")  # type: ignore
-    Drink(beer)  # type: ignore
-    Pour(beer, 12)  # type: ignore
+    beer = NewBeer("budlight")
+    Drink(beer)
+    Pour(beer, 12)
     Puke()
     if x > 1:
-        Drink(NewBeer("heineken"))  # type: ignore
+        Drink(NewBeer("heineken"))
     else:
-        Drink(NewBeer("tsingdao"))  # type: ignore
+        Drink(NewBeer("tsingdao"))
     return x + 1
 
 
 main.code.print()
 main(1)  # execute the function
 
-for i in range(10):
-    print("iteration", i)
-    main(i)  # now drink a random beer!
+# for i in range(10):
+#     print("iteration", i)
+#     main(i)  # now drink a random beer!
