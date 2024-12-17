@@ -128,6 +128,7 @@
     * [print](kirin/print/index.md)
         * [printable](kirin/print/printable.md)
         * [printer](kirin/print/printer.md)
+    * [registry](kirin/registry.md)
     * [rewrite](kirin/rewrite/index.md)
         * [abc](kirin/rewrite/abc.md)
         * [chain](kirin/rewrite/chain.md)
