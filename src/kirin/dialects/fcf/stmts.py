@@ -32,3 +32,9 @@ class Scan(ir.Statement):
     init: ir.SSAValue = info.argument(ir.types.Any)
     coll: ir.SSAValue = info.argument(ir.types.List)
     result: ir.ResultValue = info.result(ir.types.Tuple[ir.types.Any, ir.types.List])
+
+
+@statement(dialect=dialect)
+class Collect(ir.Statement):
+    coll: ir.SSAValue = info.argument(ir.types.Any)
+    result: ir.ResultValue = info.result(ir.types.List)
