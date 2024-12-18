@@ -1,6 +1,6 @@
 from kirin import ir
 from kirin.interp import Frame, Interpreter, MethodTable, impl
-from kirin.dialects.fcf.stmts import Collect, Map, Scan, Foldl, Foldr
+from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr, Collect
 from kirin.dialects.fcf.dialect import dialect
 
 
@@ -74,12 +74,9 @@ class FCFInterpreter(MethodTable):
     @impl(Collect)
     def collect(self, interp: Interpreter, frame: Frame, stmt: Scan):
         coll = frame.get(stmt.coll)
-        
+
         ys = []
         for elem in coll:
             ys.append(elem)
-            
+
         return (ys,)
-            
-        
-        
