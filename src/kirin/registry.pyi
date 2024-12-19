@@ -6,7 +6,7 @@ from kirin.ir.nodes import Statement
 from kirin.lowering import FromPythonAST
 from kirin.interp.base import FrameABC, BaseInterpreter
 from kirin.interp.impl import Signature
-from kirin.interp.value import Result
+from kirin.interp.value import StatementResult
 from kirin.interp.dialect import MethodTable
 
 MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
@@ -14,7 +14,7 @@ InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
 FrameType = TypeVar("FrameType", bound="FrameABC")
 StatementType = TypeVar("StatementType", bound="Statement")
 MethodFunction: TypeAlias = Callable[
-    [MethodTableSelf, InterpreterType, FrameType, StatementType], Result
+    [MethodTableSelf, InterpreterType, FrameType, StatementType], StatementResult
 ]
 
 @dataclass
@@ -24,7 +24,7 @@ class StatementImpl(Generic[InterpreterType, FrameType]):
 
     def __call__(
         self, interp: InterpreterType, frame: FrameType, stmt: "Statement"
-    ) -> Result: ...
+    ) -> StatementResult: ...
     def __repr__(self) -> str: ...
 
 @dataclass

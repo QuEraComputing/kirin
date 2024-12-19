@@ -1,7 +1,7 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.interp import Result, FrameABC, MethodTable, ReturnValue, impl
+from kirin.interp import FrameABC, MethodTable, ReturnValue, StatementResult, impl
 from kirin.analysis import const
 from kirin.dialects.func.stmts import Call, Invoke, Lambda, Return, GetField
 from kirin.dialects.func.dialect import dialect
@@ -13,13 +13,13 @@ class DialectConstProp(MethodTable):
     @impl(Return)
     def return_(
         self, interp: const.Propagate, frame: FrameABC, stmt: Return
-    ) -> Result[const.JointResult]:
+    ) -> StatementResult[const.JointResult]:
         return ReturnValue(frame.get(stmt.value))
 
     @impl(Call)
     def call(
         self, interp: const.Propagate, frame: FrameABC[const.JointResult], stmt: Call
-    ) -> Result[const.JointResult]:
+    ) -> StatementResult[const.JointResult]:
         # give up on dynamic method calls
         callee = frame.get(stmt.callee).const
         if isinstance(callee, const.PartialLambda):
@@ -80,7 +80,7 @@ class DialectConstProp(MethodTable):
         interp: const.Propagate,
         frame: FrameABC[const.JointResult],
         stmt: Invoke,
-    ) -> Result[const.JointResult]:
+    ) -> StatementResult[const.JointResult]:
         return (
             self._invoke_method(
                 interp,
@@ -104,7 +104,7 @@ class DialectConstProp(MethodTable):
     @impl(Lambda)
     def lambda_(
         self, interp: const.Propagate, frame: FrameABC[const.JointResult], stmt: Lambda
-    ) -> Result[const.JointResult]:
+    ) -> StatementResult[const.JointResult]:
         captured = frame.get_values(stmt.captured)
         arg_names = [
             arg.name or str(idx) for idx, arg in enumerate(stmt.body.blocks[0].args)
@@ -144,7 +144,7 @@ class DialectConstProp(MethodTable):
         interp: const.Propagate,
         frame: FrameABC[const.JointResult],
         stmt: GetField,
-    ) -> Result[const.JointResult]:
+    ) -> StatementResult[const.JointResult]:
         callee_self = frame.get(stmt.obj).const
         if isinstance(callee_self, const.Value):
             mt: ir.Method = callee_self.data

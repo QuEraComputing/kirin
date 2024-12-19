@@ -1,14 +1,12 @@
-from abc import abstractmethod
 from typing import TypeVar, Iterable
 from dataclasses import field, dataclass
 
 from kirin.ir import Region, Dialect, SSAValue, Statement, DialectGroup
 from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
-from kirin.ir.method import Method
 from kirin.interp.base import BaseInterpreter
 from kirin.interp.frame import Frame
-from kirin.interp.value import Successor, ReturnValue
+from kirin.interp.value import Successor, ReturnValue, MethodResult
 
 ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
@@ -50,9 +48,6 @@ class AbstractInterpreter(
         )
         self.bottom: ResultType = self.lattice.bottom()
 
-    @abstractmethod
-    def new_method_frame(self, mt: Method) -> AbstractFrameType: ...
-
     def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
         return
 
@@ -72,7 +67,7 @@ class AbstractInterpreter(
 
     def run_ssacfg_region(
         self, region: Region, args: tuple[ResultType, ...]
-    ) -> ResultType:
+    ) -> MethodResult[ResultType]:
         frame = self.state.current_frame()
         result = self.bottom
         if not region.blocks:

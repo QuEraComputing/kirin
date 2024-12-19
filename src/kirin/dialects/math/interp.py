@@ -2,7 +2,7 @@
 import math
 from typing import Any
 
-from kirin.interp import Frame, Result, MethodTable, impl
+from kirin.interp import Frame, MethodTable, StatementResult, impl
 from kirin.dialects.math import stmts
 from kirin.dialects.math.dialect import dialect
 
@@ -11,181 +11,191 @@ from kirin.dialects.math.dialect import dialect
 class MathMethodTable(MethodTable):
 
     @impl(stmts.acos)
-    def acos(self, interp, frame: Frame, stmt: stmts.acos) -> Result[Any]:
+    def acos(self, interp, frame: Frame, stmt: stmts.acos) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.acos(values[0]),)
 
     @impl(stmts.asin)
-    def asin(self, interp, frame: Frame, stmt: stmts.asin) -> Result[Any]:
+    def asin(self, interp, frame: Frame, stmt: stmts.asin) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.asin(values[0]),)
 
     @impl(stmts.asinh)
-    def asinh(self, interp, frame: Frame, stmt: stmts.asinh) -> Result[Any]:
+    def asinh(self, interp, frame: Frame, stmt: stmts.asinh) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.asinh(values[0]),)
 
     @impl(stmts.atan)
-    def atan(self, interp, frame: Frame, stmt: stmts.atan) -> Result[Any]:
+    def atan(self, interp, frame: Frame, stmt: stmts.atan) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.atan(values[0]),)
 
     @impl(stmts.atan2)
-    def atan2(self, interp, frame: Frame, stmt: stmts.atan2) -> Result[Any]:
+    def atan2(self, interp, frame: Frame, stmt: stmts.atan2) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.atan2(values[0], values[1]),)
 
     @impl(stmts.atanh)
-    def atanh(self, interp, frame: Frame, stmt: stmts.atanh) -> Result[Any]:
+    def atanh(self, interp, frame: Frame, stmt: stmts.atanh) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.atanh(values[0]),)
 
     @impl(stmts.ceil)
-    def ceil(self, interp, frame: Frame, stmt: stmts.ceil) -> Result[Any]:
+    def ceil(self, interp, frame: Frame, stmt: stmts.ceil) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.ceil(values[0]),)
 
     @impl(stmts.copysign)
-    def copysign(self, interp, frame: Frame, stmt: stmts.copysign) -> Result[Any]:
+    def copysign(
+        self, interp, frame: Frame, stmt: stmts.copysign
+    ) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.copysign(values[0], values[1]),)
 
     @impl(stmts.cos)
-    def cos(self, interp, frame: Frame, stmt: stmts.cos) -> Result[Any]:
+    def cos(self, interp, frame: Frame, stmt: stmts.cos) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.cos(values[0]),)
 
     @impl(stmts.cosh)
-    def cosh(self, interp, frame: Frame, stmt: stmts.cosh) -> Result[Any]:
+    def cosh(self, interp, frame: Frame, stmt: stmts.cosh) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.cosh(values[0]),)
 
     @impl(stmts.degrees)
-    def degrees(self, interp, frame: Frame, stmt: stmts.degrees) -> Result[Any]:
+    def degrees(
+        self, interp, frame: Frame, stmt: stmts.degrees
+    ) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.degrees(values[0]),)
 
     @impl(stmts.erf)
-    def erf(self, interp, frame: Frame, stmt: stmts.erf) -> Result[Any]:
+    def erf(self, interp, frame: Frame, stmt: stmts.erf) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.erf(values[0]),)
 
     @impl(stmts.erfc)
-    def erfc(self, interp, frame: Frame, stmt: stmts.erfc) -> Result[Any]:
+    def erfc(self, interp, frame: Frame, stmt: stmts.erfc) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.erfc(values[0]),)
 
     @impl(stmts.exp)
-    def exp(self, interp, frame: Frame, stmt: stmts.exp) -> Result[Any]:
+    def exp(self, interp, frame: Frame, stmt: stmts.exp) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.exp(values[0]),)
 
     @impl(stmts.expm1)
-    def expm1(self, interp, frame: Frame, stmt: stmts.expm1) -> Result[Any]:
+    def expm1(self, interp, frame: Frame, stmt: stmts.expm1) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.expm1(values[0]),)
 
     @impl(stmts.fabs)
-    def fabs(self, interp, frame: Frame, stmt: stmts.fabs) -> Result[Any]:
+    def fabs(self, interp, frame: Frame, stmt: stmts.fabs) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.fabs(values[0]),)
 
     @impl(stmts.floor)
-    def floor(self, interp, frame: Frame, stmt: stmts.floor) -> Result[Any]:
+    def floor(self, interp, frame: Frame, stmt: stmts.floor) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.floor(values[0]),)
 
     @impl(stmts.fmod)
-    def fmod(self, interp, frame: Frame, stmt: stmts.fmod) -> Result[Any]:
+    def fmod(self, interp, frame: Frame, stmt: stmts.fmod) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.fmod(values[0], values[1]),)
 
     @impl(stmts.gamma)
-    def gamma(self, interp, frame: Frame, stmt: stmts.gamma) -> Result[Any]:
+    def gamma(self, interp, frame: Frame, stmt: stmts.gamma) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.gamma(values[0]),)
 
     @impl(stmts.isfinite)
-    def isfinite(self, interp, frame: Frame, stmt: stmts.isfinite) -> Result[Any]:
+    def isfinite(
+        self, interp, frame: Frame, stmt: stmts.isfinite
+    ) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.isfinite(values[0]),)
 
     @impl(stmts.isinf)
-    def isinf(self, interp, frame: Frame, stmt: stmts.isinf) -> Result[Any]:
+    def isinf(self, interp, frame: Frame, stmt: stmts.isinf) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.isinf(values[0]),)
 
     @impl(stmts.isnan)
-    def isnan(self, interp, frame: Frame, stmt: stmts.isnan) -> Result[Any]:
+    def isnan(self, interp, frame: Frame, stmt: stmts.isnan) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.isnan(values[0]),)
 
     @impl(stmts.lgamma)
-    def lgamma(self, interp, frame: Frame, stmt: stmts.lgamma) -> Result[Any]:
+    def lgamma(self, interp, frame: Frame, stmt: stmts.lgamma) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.lgamma(values[0]),)
 
     @impl(stmts.log10)
-    def log10(self, interp, frame: Frame, stmt: stmts.log10) -> Result[Any]:
+    def log10(self, interp, frame: Frame, stmt: stmts.log10) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.log10(values[0]),)
 
     @impl(stmts.log1p)
-    def log1p(self, interp, frame: Frame, stmt: stmts.log1p) -> Result[Any]:
+    def log1p(self, interp, frame: Frame, stmt: stmts.log1p) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.log1p(values[0]),)
 
     @impl(stmts.log2)
-    def log2(self, interp, frame: Frame, stmt: stmts.log2) -> Result[Any]:
+    def log2(self, interp, frame: Frame, stmt: stmts.log2) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.log2(values[0]),)
 
     @impl(stmts.pow)
-    def pow(self, interp, frame: Frame, stmt: stmts.pow) -> Result[Any]:
+    def pow(self, interp, frame: Frame, stmt: stmts.pow) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.pow(values[0], values[1]),)
 
     @impl(stmts.radians)
-    def radians(self, interp, frame: Frame, stmt: stmts.radians) -> Result[Any]:
+    def radians(
+        self, interp, frame: Frame, stmt: stmts.radians
+    ) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.radians(values[0]),)
 
     @impl(stmts.remainder)
-    def remainder(self, interp, frame: Frame, stmt: stmts.remainder) -> Result[Any]:
+    def remainder(
+        self, interp, frame: Frame, stmt: stmts.remainder
+    ) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.remainder(values[0], values[1]),)
 
     @impl(stmts.sin)
-    def sin(self, interp, frame: Frame, stmt: stmts.sin) -> Result[Any]:
+    def sin(self, interp, frame: Frame, stmt: stmts.sin) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.sin(values[0]),)
 
     @impl(stmts.sinh)
-    def sinh(self, interp, frame: Frame, stmt: stmts.sinh) -> Result[Any]:
+    def sinh(self, interp, frame: Frame, stmt: stmts.sinh) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.sinh(values[0]),)
 
     @impl(stmts.sqrt)
-    def sqrt(self, interp, frame: Frame, stmt: stmts.sqrt) -> Result[Any]:
+    def sqrt(self, interp, frame: Frame, stmt: stmts.sqrt) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.sqrt(values[0]),)
 
     @impl(stmts.tan)
-    def tan(self, interp, frame: Frame, stmt: stmts.tan) -> Result[Any]:
+    def tan(self, interp, frame: Frame, stmt: stmts.tan) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.tan(values[0]),)
 
     @impl(stmts.tanh)
-    def tanh(self, interp, frame: Frame, stmt: stmts.tanh) -> Result[Any]:
+    def tanh(self, interp, frame: Frame, stmt: stmts.tanh) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.tanh(values[0]),)
 
     @impl(stmts.trunc)
-    def trunc(self, interp, frame: Frame, stmt: stmts.trunc) -> Result[Any]:
+    def trunc(self, interp, frame: Frame, stmt: stmts.trunc) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.trunc(values[0]),)
 
     @impl(stmts.ulp)
-    def ulp(self, interp, frame: Frame, stmt: stmts.ulp) -> Result[Any]:
+    def ulp(self, interp, frame: Frame, stmt: stmts.ulp) -> StatementResult[Any]:
         values = frame.get_values(stmt.args)
         return (math.ulp(values[0]),)

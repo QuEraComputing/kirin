@@ -42,9 +42,9 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         frame: ForwardFrame[JointResult, ExtraFrameInfo],
         stmt: ir.Statement,
         values: tuple[Value, ...],
-    ) -> interp.Result[JointResult]:
+    ) -> interp.StatementResult[JointResult]:
         try:
-            _frame = self.interp.new_method_frame(frame.method)
+            _frame = self.interp.new_frame(frame.code)
             _frame.set_values(stmt.args, tuple(x.data for x in values))
             value = self.interp.eval_stmt(_frame, stmt)
             if isinstance(value, tuple):
@@ -64,7 +64,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
 
     def eval_stmt(
         self, frame: ForwardFrame[JointResult, ExtraFrameInfo], stmt: ir.Statement
-    ) -> interp.Result[JointResult]:
+    ) -> interp.StatementResult[JointResult]:
         if stmt.has_trait(ir.ConstantLike):
             return self._try_eval_const_pure(frame, stmt, ())
         elif stmt.has_trait(ir.Pure):
@@ -83,7 +83,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         else:
             return (JointResult(Unknown(), NotPure()),)
 
-    def _set_frame_not_pure(self, result: interp.Result[JointResult]):
+    def _set_frame_not_pure(self, result: interp.StatementResult[JointResult]):
         frame = self.state.current_frame()
         if isinstance(result, tuple) and all(x.purity is Pure() for x in result):
             return
@@ -99,14 +99,24 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         if frame.extra is None:
             frame.extra = ExtraFrameInfo(True)
 
-    def run_method_region(
-        self, mt: ir.Method, body: ir.Region, args: tuple[JointResult, ...]
-    ) -> JointResult:
+    def run_method(
+        self, method: ir.Method, args: tuple[JointResult, ...]
+    ) -> interp.MethodResult[JointResult]:
         if len(self.state.frames) >= self.max_depth:
             return self.bottom
+        return self.run_callable(
+            method.code, (JointResult(Value(method), NotPure()),) + args
+        )
 
-        ret = self.run_ssacfg_region(body, (JointResult(Value(mt), NotPure()),) + args)
-        frame = self.state.current_frame()
+    def finalize_results(
+        self,
+        frame: ForwardFrame[JointResult, ExtraFrameInfo],
+        results: interp.MethodResult[JointResult],
+    ) -> interp.MethodResult[JointResult]:
+        results = super().finalize_results(frame, results)
+        if isinstance(results, interp.Err):
+            return results
+
         if frame.extra is not None and frame.extra.frame_is_not_pure:
-            return JointResult(ret.const, NotPure())
-        return ret
+            return JointResult(results.const, NotPure())
+        return results

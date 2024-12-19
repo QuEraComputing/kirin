@@ -1,10 +1,8 @@
 from typing import Generic, TypeVar, Iterable
 
-from kirin.ir import Dialect, SSAValue
-from kirin.interp import AbstractFrame, AbstractInterpreter
+from kirin import ir
+from kirin.interp import MethodResult, AbstractFrame, AbstractInterpreter
 from kirin.lattice import BoundedLattice
-from kirin.ir.group import DialectGroup
-from kirin.ir.method import Method
 
 ExtraType = TypeVar("ExtraType")
 LatticeElemType = TypeVar("LatticeElemType", bound=BoundedLattice)
@@ -26,7 +24,7 @@ class ForwardExtra(
 
     def __init__(
         self,
-        dialects: DialectGroup | Iterable[Dialect],
+        dialects: ir.DialectGroup | Iterable[ir.Dialect],
         *,
         fuel: int | None = None,
         max_depth: int = 128,
@@ -43,7 +41,7 @@ class ForwardExtra(
     def set_values(
         self,
         frame: AbstractFrame[LatticeElemType],
-        ssa: Iterable[SSAValue],
+        ssa: Iterable[ir.SSAValue],
         results: Iterable[LatticeElemType],
     ):
         for ssa_value, result in zip(ssa, results):
@@ -52,13 +50,16 @@ class ForwardExtra(
             else:
                 frame.entries[ssa_value] = result
 
-    def postprocess_frame(
-        self, frame: ForwardFrame[LatticeElemType, ExtraType]
-    ) -> None:
+    def finalize_results(
+        self,
+        frame: ForwardFrame[LatticeElemType, ExtraType],
+        results: MethodResult[LatticeElemType],
+    ) -> MethodResult[LatticeElemType]:
         self.results = frame.entries
+        return results
 
-    def new_method_frame(self, mt: Method) -> ForwardFrame[LatticeElemType, ExtraType]:
-        return ForwardFrame.from_method(mt)
+    def new_frame(self, code: ir.Statement) -> ForwardFrame[LatticeElemType, ExtraType]:
+        return ForwardFrame.from_func_like(code)
 
 
 class Forward(ForwardExtra[LatticeElemType, None]):

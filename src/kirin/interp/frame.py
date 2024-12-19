@@ -4,7 +4,7 @@ from dataclasses import field, dataclass
 
 from typing_extensions import Self
 
-from kirin.ir import Method, SSAValue, Statement
+from kirin.ir import SSAValue, Statement
 
 ValueType = TypeVar("ValueType")
 
@@ -14,7 +14,7 @@ class FrameABC(ABC, Generic[ValueType]):
 
     @classmethod
     @abstractmethod
-    def from_method(cls, method: Method) -> Self:
+    def from_func_like(cls, code: Statement) -> Self:
         """Create a new frame for the given method."""
         ...
 
@@ -38,8 +38,8 @@ class FrameABC(ABC, Generic[ValueType]):
 
 @dataclass
 class Frame(FrameABC[ValueType]):
-    method: Method
-    """method being interpreted.
+    code: Statement
+    """func statement being interpreted.
     """
     lino: int = 0
     stmt: Statement | None = None
@@ -59,8 +59,8 @@ class Frame(FrameABC[ValueType]):
     """
 
     @classmethod
-    def from_method(cls, method: Method) -> Self:
-        return cls(method=method)
+    def from_func_like(cls, code: Statement) -> Self:
+        return cls(code=code)
 
     def get(self, key: SSAValue) -> ValueType:
         return self.entries[key]

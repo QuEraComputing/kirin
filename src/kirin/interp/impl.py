@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Type, Union, Generic, TypeVar, Callable, TypeA
 from dataclasses import dataclass
 
 from kirin.ir import Statement, types
-from kirin.interp.value import Result
+from kirin.interp.value import StatementResult
 
 if TYPE_CHECKING:
     from kirin.interp.base import FrameABC, BaseInterpreter
@@ -13,7 +13,7 @@ InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
 FrameType = TypeVar("FrameType", bound="FrameABC")
 StatementType = TypeVar("StatementType", bound=Statement)
 MethodFunction: TypeAlias = Callable[
-    [MethodTableSelf, InterpreterType, FrameType, StatementType], Result
+    [MethodTableSelf, InterpreterType, FrameType, StatementType], StatementResult
 ]
 
 
@@ -58,7 +58,8 @@ class impl(Generic[StatementType]):
         self,
         func: Union[
             Callable[
-                [MethodTableSelf, InterpreterType, FrameType, StatementType], Result
+                [MethodTableSelf, InterpreterType, FrameType, StatementType],
+                StatementResult,
             ],
             ImplDef,
         ],

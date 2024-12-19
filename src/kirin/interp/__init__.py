@@ -6,9 +6,10 @@ from kirin.interp.impl import ImplDef as ImplDef, Signature as Signature, impl a
 from kirin.interp.frame import Frame as Frame, FrameABC as FrameABC
 from kirin.interp.value import (
     Err as Err,
-    Result as Result,
     Successor as Successor,
     ReturnValue as ReturnValue,
+    MethodResult as MethodResult,
+    StatementResult as StatementResult,
 )
 from kirin.interp.dialect import MethodTable as MethodTable
 from kirin.interp.abstract import (

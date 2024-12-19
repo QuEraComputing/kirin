@@ -15,7 +15,7 @@ class ConstPropTable(MethodTable):
         _: const.Propagate,
         frame: interp.Frame[const.JointResult],
         stmt: py.NewTuple,
-    ) -> interp.Result[const.JointResult]:
+    ) -> interp.StatementResult[const.JointResult]:
         return (
             const.JointResult(
                 const.PartialTuple(tuple(x.const for x in frame.get_values(stmt.args))),
@@ -26,7 +26,7 @@ class ConstPropTable(MethodTable):
     @impl(py.Not)
     def not_(
         self, _: const.Propagate, frame: interp.Frame, stmt: py.Not
-    ) -> interp.Result[const.JointResult]:
+    ) -> interp.StatementResult[const.JointResult]:
         if isinstance(stmt.value.owner, py.NewTuple):
             ret = const.Value(len(stmt.value.owner.args) == 0)
         elif isinstance(value := frame.get(stmt.value), const.Value):
@@ -41,7 +41,7 @@ class ConstPropTable(MethodTable):
         _: const.Propagate,
         frame: interp.Frame[const.JointResult],
         stmt: py.GetItem,
-    ) -> interp.Result[const.JointResult]:
+    ) -> interp.StatementResult[const.JointResult]:
         obj = frame.get(stmt.obj).const
         index = frame.get(stmt.index).const
         if not isinstance(index, const.Value):

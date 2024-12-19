@@ -1,7 +1,7 @@
 from typing import Callable, Iterable
 
 from kirin import ir
-from kirin.interp import MethodTable, AbstractFrame, impl
+from kirin.interp import Err, MethodTable, AbstractFrame, impl
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
@@ -46,19 +46,18 @@ class TypeInfer(MethodTable):
 
         if isinstance(coll, ir.types.Generic):
             if coll.is_subseteq(ir.types.List):
-                ret = interp.eval(fn, (init, coll.vars[0])).to_result()
-                if isinstance(ret, tuple):
-                    ret_type = ret[0]
-                    if not init.is_subseteq(ret_type):
-                        return (ir.types.Bottom,)
-                    return (ret_type,)
+                ret = interp.eval(fn, (init, coll.vars[0])).value
+                if isinstance(ret, Err):
+                    return ret
+
+                if not init.is_subseteq(ret):
+                    return (ir.types.Bottom,)
+                return (ret,)
             elif coll.is_subseteq(ir.types.Tuple):
                 carry = init
                 for elem in order(coll.vars):
-                    carry = interp.eval(fn, (carry, elem)).to_result()
-                    if isinstance(carry, tuple):
-                        carry = carry[0]
-                    else:
+                    carry = interp.eval(fn, (carry, elem)).value
+                    if isinstance(carry, Err):
                         return carry
                 return (carry,)
 
@@ -78,11 +77,11 @@ class TypeInfer(MethodTable):
         fn: ir.Method = fn_value.data
         coll: ir.types.TypeAttribute = frame.get(stmt.coll)
         if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
-            elem = interp.eval(fn, (coll.vars[0],)).to_result()
-            if isinstance(elem, tuple):
-                return (ir.types.List[elem[0]],)
-            else:  # fn errors forward the error
+            elem = interp.eval(fn, (coll.vars[0],)).value
+            if isinstance(elem, Err):
+                # fn errors forward the error
                 return elem
+            return (ir.types.List[elem],)
         return (ir.types.Bottom,)
 
     @impl(Map, ir.types.PyClass(ir.Method), ir.types.PyClass(range))
@@ -97,11 +96,12 @@ class TypeInfer(MethodTable):
             return (ir.types.List,)  # give up on dynamic calls
 
         fn: ir.Method = fn_value.data
-        elem = interp.eval(fn, (ir.types.Int,)).to_result()
-        if isinstance(elem, tuple):
-            return (ir.types.List[elem[0]],)
-        else:  # fn errors forward the error
+        elem = interp.eval(fn, (ir.types.Int,)).value
+        # fn errors forward the error
+        if isinstance(elem, Err):
             return elem
+        else:
+            return (ir.types.List[elem],)
 
     @impl(Scan)
     def scan(
@@ -119,19 +119,16 @@ class TypeInfer(MethodTable):
 
         fn: ir.Method = fn_value.data
         if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
-            _ret = interp.eval(fn, (init, coll.vars[0])).to_result()
-            if isinstance(_ret, tuple) and len(_ret) == 1:
-                ret = _ret[0]
-                if isinstance(ret, ir.types.Generic) and ret.is_subseteq(
-                    ir.types.Tuple
-                ):
-                    if len(ret.vars) != 2:
-                        return (ir.types.Bottom,)
-                    carry: ir.types.TypeAttribute = ret.vars[0]
-                    if not carry.is_subseteq(init):
-                        return (ir.types.Bottom,)
-                    return (ir.types.Tuple[carry, ir.types.List[ret.vars[1]]],)
-            else:  # fn errors forward the error
-                return _ret
+            ret = interp.eval(fn, (init, coll.vars[0])).value
+            if isinstance(ret, Err):
+                return ret
+
+            if isinstance(ret, ir.types.Generic) and ret.is_subseteq(ir.types.Tuple):
+                if len(ret.vars) != 2:
+                    return (ir.types.Bottom,)
+                carry: ir.types.TypeAttribute = ret.vars[0]
+                if not carry.is_subseteq(init):
+                    return (ir.types.Bottom,)
+                return (ir.types.Tuple[carry, ir.types.List[ret.vars[1]]],)
 
         return (ir.types.Bottom,)

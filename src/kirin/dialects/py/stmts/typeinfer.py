@@ -1,5 +1,5 @@
 from kirin.ir import types
-from kirin.interp import Frame, Result, MethodTable, impl
+from kirin.interp import Frame, MethodTable, StatementResult, impl
 
 from . import _stmts as py
 from .dialect import dialect
@@ -11,30 +11,30 @@ class TypeInfer(MethodTable):
     @impl(py.Constant)
     def constant(
         self, interp, frame: Frame, stmt: py.Constant
-    ) -> Result[types.TypeAttribute]:
+    ) -> StatementResult[types.TypeAttribute]:
         # NOTE: stmt.result.type should be verified by typecheck
         return (stmt.result.type,)
 
     @impl(py.Alias)
     def alias(
         self, interp, frame: Frame, stmt: py.Alias
-    ) -> Result[types.TypeAttribute]:
+    ) -> StatementResult[types.TypeAttribute]:
         return (frame.get(stmt.value),)  # just forward the type
 
     @impl(py.NewTuple)
     def new_tuple(
         self, interp, frame: Frame[types.TypeAttribute], stmt: py.NewTuple
-    ) -> Result[types.TypeAttribute]:
+    ) -> StatementResult[types.TypeAttribute]:
         return (types.Tuple.where(frame.get_values(stmt.args)),)  # make 3.10 happy
 
     @impl(py.Add, types.Float, types.Float)
     @impl(py.Add, types.Float, types.Int)
     @impl(py.Add, types.Int, types.Float)
-    def addf(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def addf(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.Add, types.Int, types.Int)
-    def addi(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def addi(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.Add, types.PyClass(list), types.PyClass(list))
@@ -60,42 +60,42 @@ class TypeInfer(MethodTable):
     @impl(py.Sub, types.Float, types.Float)
     @impl(py.Sub, types.Float, types.Int)
     @impl(py.Sub, types.Int, types.Float)
-    def subf(self, *_) -> Result[types.TypeAttribute]:
+    def subf(self, *_) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.Sub, types.Int, types.Int)
-    def subi(self, *_) -> Result[types.TypeAttribute]:
+    def subi(self, *_) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.Sub, types.Float, types.Float)
     @impl(py.Sub, types.Float, types.Int)
     @impl(py.Sub, types.Int, types.Float)
-    def multf(self, *_) -> Result[types.TypeAttribute]:
+    def multf(self, *_) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.Mult, types.Int, types.Int)
-    def multi(self, *_) -> Result[types.TypeAttribute]:
+    def multi(self, *_) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.Div)
-    def divf(self, *_) -> Result[types.TypeAttribute]:
+    def divf(self, *_) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.Mod, types.Float, types.Float)
     @impl(py.Mod, types.Float, types.Int)
     @impl(py.Mod, types.Int, types.Float)
-    def modf(self, *_) -> Result[types.TypeAttribute]:
+    def modf(self, *_) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.Mod, types.Int, types.Int)
-    def modi(self, *_) -> Result[types.TypeAttribute]:
+    def modi(self, *_) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.UAdd)
     @impl(py.USub)
     def uadd(
         self, interp, frame: Frame[types.TypeAttribute], stmt: py.UnaryOp
-    ) -> Result[types.TypeAttribute]:
+    ) -> StatementResult[types.TypeAttribute]:
         return (frame.get(stmt.value),)
 
     @impl(py.Eq)
@@ -104,76 +104,78 @@ class TypeInfer(MethodTable):
     @impl(py.LtE)
     @impl(py.Gt)
     @impl(py.GtE)
-    def cmp(self, interp, frame, stmt: py.Cmp) -> Result[types.TypeAttribute]:
+    def cmp(self, interp, frame, stmt: py.Cmp) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.And)
     @impl(py.Or)
-    def boolop(self, interp, frame, stmt: py.BoolOp) -> Result[types.TypeAttribute]:
+    def boolop(
+        self, interp, frame, stmt: py.BoolOp
+    ) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.Not)
-    def not_(self, interp, frame, stmt: py.Not) -> Result[types.TypeAttribute]:
+    def not_(self, interp, frame, stmt: py.Not) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.BitAnd, types.Int, types.Int)
-    def bit_andi(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def bit_andi(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.BitAnd, types.Bool, types.Bool)
-    def bit_andb(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def bit_andb(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.BitOr, types.Int, types.Int)
-    def bit_ori(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def bit_ori(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.BitOr, types.Bool, types.Bool)
-    def bit_orb(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def bit_orb(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.BitXor, types.Int, types.Int)
-    def bit_xori(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def bit_xori(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.BitXor, types.Bool, types.Bool)
-    def bit_xorb(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def bit_xorb(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.Invert, types.Int)
-    def invert(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def invert(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.LShift, types.Int)
-    def lshift(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def lshift(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.RShift, types.Int)
-    def rshift(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def rshift(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.FloorDiv, types.Float, types.Float)
     @impl(py.FloorDiv, types.Int, types.Float)
     @impl(py.FloorDiv, types.Float, types.Int)
-    def floor_divf(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def floor_divf(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.FloorDiv, types.Int, types.Int)
-    def floor_divi(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def floor_divi(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.Pow, types.Float, types.Float)
     @impl(py.Pow, types.Float, types.Int)
     @impl(py.Pow, types.Int, types.Float)
-    def powf(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def powf(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.Pow, types.Int, types.Int)
-    def powi(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def powi(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.MatMult)
-    def mat_mult(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def mat_mult(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         raise NotImplementedError("np.array @ np.array not implemented")
 
     @impl(py.GetItem)
@@ -182,7 +184,7 @@ class TypeInfer(MethodTable):
         interp,
         frame: Frame[types.TypeAttribute],
         stmt: py.GetItem,
-    ) -> Result[types.TypeAttribute]:
+    ) -> StatementResult[types.TypeAttribute]:
         obj = frame.get(stmt.obj)
         if isinstance(obj, types.Const):  # unwrap const
             obj = obj.typ
@@ -274,37 +276,37 @@ class TypeInfer(MethodTable):
             return types.Union(*obj.vars)
 
     @impl(py.Abs, types.Int)
-    def absi(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def absi(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Int,)
 
     @impl(py.Abs, types.Float)
-    def absf(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def absf(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Float,)
 
     @impl(py.SetItem)
-    def setindex(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def setindex(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.NoneType,)
 
     @impl(py.Is)
-    def is_(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def is_(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.IsNot)
-    def is_not(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def is_not(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.In)
-    def in_(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def in_(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.NotIn)
-    def not_in(self, interp, frame, stmt) -> Result[types.TypeAttribute]:
+    def not_in(self, interp, frame, stmt) -> StatementResult[types.TypeAttribute]:
         return (types.Bool,)
 
     @impl(py.NewList)
     def new_list(
         self, interp, frame: Frame[types.TypeAttribute], stmt: py.NewList
-    ) -> Result[types.TypeAttribute]:
+    ) -> StatementResult[types.TypeAttribute]:
         values = frame.get_values(stmt.values)
         if not values:
             return (types.List[types.Any],)
@@ -320,7 +322,7 @@ class TypeInfer(MethodTable):
     @impl(py.Slice)
     def slice(
         self, interp, frame: Frame[types.TypeAttribute], stmt: py.Slice
-    ) -> Result[types.TypeAttribute]:
+    ) -> StatementResult[types.TypeAttribute]:
         start, stop, step = frame.get_values(stmt.args)
         if (
             isinstance(start, types.Const)

@@ -22,7 +22,7 @@ class Interpreter(MethodTable):
             interp.permute_values(
                 mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
             ),
-        ).to_result()
+        ).wrap_result()
 
     @impl(Invoke)
     def invoke(self, interp: concrete.Interpreter, frame: Frame, stmt: Invoke):
@@ -31,7 +31,7 @@ class Interpreter(MethodTable):
             interp.permute_values(
                 stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
             ),
-        ).to_result()
+        ).wrap_result()
 
     @impl(Return)
     def return_(self, interp: concrete.Interpreter, frame: Frame, stmt: Return):

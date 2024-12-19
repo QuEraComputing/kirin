@@ -76,7 +76,7 @@ class TypeInfer(MethodTable):
         for arg, typ in zip(args, inputs):
             interp.results[arg] = typ
 
-        return interp.eval(mt, inputs).to_result()
+        return interp.eval(mt, inputs).wrap_result()
 
     @impl(Lambda)
     def lambda_(self, interp: TypeInference, frame, stmt: Lambda):

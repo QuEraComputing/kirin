@@ -2,7 +2,6 @@ from typing import Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin.ir import Dialect, Attribute, types
-from kirin.codegen import CodeGen, DialectEmit, impl
 from kirin.print.printer import Printer
 
 dialect = Dialect("py.data")
@@ -35,13 +34,13 @@ class PyAttr(Generic[T], Attribute):
             printer.print(self.type)
 
 
-@dialect.register(key="dict")
-@dataclass
-class EmitDict(DialectEmit):
-    @impl(PyAttr)
-    def emit_PyAttr(self, emit: CodeGen, stmt: PyAttr):
-        return {
-            "name": stmt.name,
-            "data": repr(stmt.data),
-            "type": emit.emit_Attribute(stmt.type),
-        }
+# @dialect.register(key="dict")
+# @dataclass
+# class EmitDict(DialectEmit):
+#     @impl(PyAttr)
+#     def emit_PyAttr(self, emit: CodeGen, stmt: PyAttr):
+#         return {
+#             "name": stmt.name,
+#             "data": repr(stmt.data),
+#             "type": emit.emit_Attribute(stmt.type),
+#         }

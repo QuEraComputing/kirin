@@ -2,10 +2,11 @@ from typing import Any, Iterable
 
 from kirin.ir import Block, Region, Dialect, DialectGroup
 from kirin.ir.method import Method
-from kirin.exceptions import FuelExhaustedError
+from kirin.exceptions import InterpreterError, FuelExhaustedError
 from kirin.interp.base import BaseInterpreter
 from kirin.interp.frame import Frame
-from kirin.interp.value import Err, NoReturn, Successor, ReturnValue
+from kirin.interp.value import Err, Successor, ReturnValue, MethodResult
+from kirin.ir.nodes.stmt import Statement
 
 
 class Interpreter(BaseInterpreter[Frame[Any], Any]):
@@ -26,14 +27,18 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
             max_python_recursion_depth=max_python_recursion_depth,
         )
 
-    def new_method_frame(self, mt: Method) -> Frame[Any]:
-        return Frame.from_method(mt)
+    def new_frame(self, code: Statement) -> Frame[Any]:
+        return Frame.from_func_like(code)
 
-    def run_method_region(self, mt: Method, body: Region, args: tuple[Any, ...]) -> Any:
-        return self.run_ssacfg_region(body, (mt,) + args)
+    def run_method(self, method: Method, args: tuple[Any, ...]) -> MethodResult[Any]:
+        if len(self.state.frames) >= self.max_depth:
+            raise InterpreterError("maximum recursion depth exceeded")
+        return self.run_callable(method.code, (method,) + args)
 
-    def run_ssacfg_region(self, region: Region, args: tuple[Any, ...]) -> Any:
-        result: Any = NoReturn()
+    def run_ssacfg_region(
+        self, region: Region, args: tuple[Any, ...]
+    ) -> MethodResult[Any]:
+        result: Any = None
         frame = self.state.current_frame()
         # empty body, return
         if not region.blocks:
