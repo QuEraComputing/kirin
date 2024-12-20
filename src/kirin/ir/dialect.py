@@ -34,25 +34,7 @@ class Dialect:
         self.lowering["default"] = NoSpecialLowering()
 
     def __repr__(self) -> str:
-        stmts = ", ".join([stmt.__name__ for stmt in self.stmts])
-        attrs = ", ".join([attr.__name__ for attr in self.attrs])
-        interps = ", ".join(
-            [f"{key} = {type(interp).__name__}" for key, interp in self.interps.items()]
-        )
-        lowering = ", ".join(
-            [f"{key} = {type(lower).__name__}" for key, lower in self.lowering.items()]
-        )
-        codegen = ", ".join(
-            [f"{key} = {type(emit).__name__}" for key, emit in self.codegen.items()]
-        )
-        return f"""Dialect(\
-name={self.name},\
-stmts=[{stmts}], \
-attrs=[{attrs}], \
-interps=[{interps}], \
-lowering=[{lowering}]\
-codegen=[{codegen}]\
-)"""
+        return f"Dialect(name={self.name}, ...)"
 
     def __hash__(self) -> int:
         return hash(self.name)

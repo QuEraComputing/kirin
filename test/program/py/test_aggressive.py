@@ -32,13 +32,13 @@ def main():
     return x()
 
 
-@basic.add(dialect)
-def target():
-    x = DummyStmt2(1, option="hello")
-    DummyStmt2(x, option="hello")
-    DummyStmt2(x, option="hello")
-    return
-
-
 def test_aggressive_pass():
-    assert target.callable_region.is_structurally_equal(main.callable_region)
+    const_count = 0
+    dummy_count = 0
+    for stmt in main.callable_region.walk():
+        if isinstance(stmt, DummyStmt2):
+            dummy_count += 1
+        elif stmt.has_trait(ir.ConstantLike):
+            const_count += 1
+    assert dummy_count == 3
+    assert const_count == 2

@@ -22,8 +22,8 @@ class Fold(RewriteRule):
             Chain(
                 [
                     Walk(Inline(lambda _: True)),
-                    ConstantFold(results),
-                    Call2Invoke(results),
+                    Walk(ConstantFold(results)),
+                    Walk(Call2Invoke(results)),
                     Fixpoint(
                         Walk(
                             Chain(
