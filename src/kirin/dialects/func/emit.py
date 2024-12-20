@@ -1,7 +1,7 @@
 from typing import IO, TypeVar
 
 from kirin import emit
-from kirin.interp import MethodTable, impl
+from kirin.interp import Err, MethodTable, impl
 from kirin.emit.julia import EmitJulia
 
 from .stmts import Call, Invoke, Return, Function, ConstantNone
@@ -15,12 +15,12 @@ class JuliaMethodTable(MethodTable):
 
     @impl(Function)
     def emit_function(
-        self, interp: EmitJulia[IO_t], frame: emit.EmitFrame, stmt: Function
+        self, interp: EmitJulia[IO_t], frame: emit.EmitFrame[str], stmt: Function
     ):
-        args = tuple(interp.ssa_id[x] for x in stmt.body.blocks[0].args)
+        args = frame.get_values(stmt.body.blocks[0].args[1:])
         interp.write(f"function {stmt.sym_name}({', '.join(args)})")
         frame.indent += 1
-        interp.run_ssacfg_region(stmt.body, args)
+        interp.run_ssacfg_region(frame, stmt.body)
         frame.indent -= 1
         interp.newline(frame)
         interp.write("end")
@@ -40,10 +40,17 @@ class JuliaMethodTable(MethodTable):
 
     @impl(Call)
     def emit_call(self, interp: EmitJulia[IO_t], frame: emit.EmitFrame, stmt: Call):
+        if stmt.kwargs:
+            return Err(
+                ValueError("cannot emit kwargs for dyanmic calls"), interp.state.frames
+            )
         return (
             f"{frame.get(stmt.callee)}({', '.join(frame.get_values(stmt.inputs))})",
         )
 
     @impl(Invoke)
     def emit_invoke(self, interp: EmitJulia[IO_t], frame: emit.EmitFrame, stmt: Invoke):
-        return (f"{stmt.callee.sym_name}({', '.join(frame.get_values(stmt.inputs))})",)
+        args = interp.permute_values(
+            stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+        )
+        return (f"{stmt.callee.sym_name}({', '.join(args)})",)

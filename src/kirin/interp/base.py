@@ -54,6 +54,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     def __init__(
         self,
         dialects: DialectGroup | Iterable[Dialect],
+        bottom: ValueType,
         *,
         fuel: int | None = None,
         max_depth: int = 128,
@@ -62,6 +63,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         if not isinstance(dialects, DialectGroup):
             dialects = DialectGroup(dialects)
         self.dialects = dialects
+        self.bottom = bottom
 
         self.registry = self.dialects.registry.interpreter(keys=self.keys)
         self.state: InterpreterState[FrameType] = InterpreterState()
@@ -121,15 +123,29 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         frame = self.new_frame(code)
         self.state.push_frame(frame)
         body = interface.get_callable_region(code)
-        results = self.run_ssacfg_region(body, args)
-        return self.finalize_results(self.state.pop_frame(), results)
+        if not body.blocks:
+            return self.finalize(self.state.pop_frame(), self.bottom)
+        frame.set_values(body.blocks[0].args, args)
+        results = self.run_callable_region(frame, code, body)
+        return self.finalize(self.state.pop_frame(), results)
+
+    def run_callable_region(
+        self, frame: FrameType, code: Statement, region: Region
+    ) -> MethodResult[ValueType]:
+        """A hook defines how to run the callable region given
+        the interpreter context. This is experimental API, don't
+        subclass it. The current reason of having it is mainly
+        because we need to dispatch back to the MethodTable for
+        emit.
+        """
+        return self.run_ssacfg_region(frame, region)
 
     @abstractmethod
     def new_frame(self, code: Statement) -> FrameType:
         """Create a new frame for the given method."""
         ...
 
-    def finalize_results(
+    def finalize(
         self, frame: FrameType, results: MethodResult[ValueType]
     ) -> MethodResult[ValueType]:
         """Postprocess a frame after it is popped from the stack. This is
@@ -209,7 +225,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
     @abstractmethod
     def run_ssacfg_region(
-        self, region: Region, args: tuple[ValueType, ...]
+        self, frame: FrameType, region: Region
     ) -> MethodResult[ValueType]: ...
 
     class FuelResult(Enum):

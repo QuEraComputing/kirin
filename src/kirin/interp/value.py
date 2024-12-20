@@ -55,7 +55,7 @@ class Err(SpecialResult[ValueType]):
     exception: Exception
     frames: list[Frame]
 
-    def __init__(self, exception: Exception, frames: list[Frame]):
+    def __init__(self, exception: Exception, frames: list):
         super().__init__()
         self.exception = exception
         self.frames = frames.copy()

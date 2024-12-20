@@ -22,6 +22,7 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
     ):
         super().__init__(
             dialects,
+            bottom=None,
             fuel=fuel,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
@@ -35,19 +36,10 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
             raise InterpreterError("maximum recursion depth exceeded")
         return self.run_callable(method.code, (method,) + args)
 
-    def run_ssacfg_region(
-        self, region: Region, args: tuple[Any, ...]
-    ) -> MethodResult[Any]:
-        result: Any = None
-        frame = self.state.current_frame()
-        # empty body, return
-        if not region.blocks:
-            return result
-
+    def run_ssacfg_region(self, frame: Frame[Any], region: Region) -> MethodResult[Any]:
         stmt_idx = 0
         block: Block | None = region.blocks[0]
         while block is not None:
-            frame.set_values(block.args, args)
             stmt = block.first_stmt
 
             # TODO: make this more precise
@@ -73,7 +65,7 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
                         break
                     case Successor(block, block_args):
                         # block is not None, continue to next block
-                        args = block_args
+                        frame.set_values(block.args, block_args)
                         break
                     case _:
                         pass

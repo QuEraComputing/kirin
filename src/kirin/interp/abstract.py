@@ -42,11 +42,11 @@ class AbstractInterpreter(
             raise TypeError(f"lattice is not defined for {self.__class__.__name__}")
         super().__init__(
             dialects,
+            bottom=self.lattice.bottom(),
             fuel=fuel,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
-        self.bottom: ResultType = self.lattice.bottom()
 
     def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
         return
@@ -66,14 +66,12 @@ class AbstractInterpreter(
         frame.set_values(ssa, results)
 
     def run_ssacfg_region(
-        self, region: Region, args: tuple[ResultType, ...]
+        self, frame: AbstractFrameType, region: Region
     ) -> MethodResult[ResultType]:
-        frame = self.state.current_frame()
         result = self.bottom
-        if not region.blocks:
-            return result
-
-        frame.worklist.append(Successor(region.blocks[0], *args))
+        frame.worklist.append(
+            Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))
+        )
         while (succ := frame.worklist.pop()) is not None:
             self.prehook_succ(frame, succ)
             block_result = self.run_block(frame, succ)

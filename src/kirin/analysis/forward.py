@@ -50,7 +50,7 @@ class ForwardExtra(
             else:
                 frame.entries[ssa_value] = result
 
-    def finalize_results(
+    def finalize(
         self,
         frame: ForwardFrame[LatticeElemType, ExtraType],
         results: MethodResult[LatticeElemType],

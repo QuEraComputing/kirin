@@ -3,7 +3,7 @@
 This module contains the intermediate representation (IR) for kirin.
 """
 
-from kirin.ir import types as types
+from kirin.ir import types as types, traits as traits
 from kirin.ir.ssa import (
     SSAValue as SSAValue,
     TestValue as TestValue,

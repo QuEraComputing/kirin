@@ -8,7 +8,6 @@ IO_t = TypeVar("IO_t", bound=IO)
 
 
 class EmitStr(EmitABC[EmitFrame[str], str], Generic[IO_t]):
-    empty_result = ""
 
     def __init__(
         self,
@@ -22,6 +21,7 @@ class EmitStr(EmitABC[EmitFrame[str], str], Generic[IO_t]):
     ):
         super().__init__(
             dialects,
+            bottom="",
             fuel=fuel,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,

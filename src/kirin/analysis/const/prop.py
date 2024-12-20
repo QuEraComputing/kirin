@@ -108,12 +108,12 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
             method.code, (JointResult(Value(method), NotPure()),) + args
         )
 
-    def finalize_results(
+    def finalize(
         self,
         frame: ForwardFrame[JointResult, ExtraFrameInfo],
         results: interp.MethodResult[JointResult],
     ) -> interp.MethodResult[JointResult]:
-        results = super().finalize_results(frame, results)
+        results = super().finalize(frame, results)
         if isinstance(results, interp.Err):
             return results
 

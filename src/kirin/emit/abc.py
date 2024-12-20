@@ -18,32 +18,24 @@ FrameType = TypeVar("FrameType", bound=EmitFrame)
 
 
 class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
-    empty_result: ValueType
 
-    def run_callable(
-        self, code: ir.Statement, args: tuple[ValueType, ...]
+    def run_callable_region(
+        self, frame: FrameType, code: ir.Statement, region: ir.Region
     ) -> ValueType | interp.Err[ValueType]:
-        frame = self.new_frame(code)
-        self.state.push_frame(frame)
         results = self.run_stmt(frame, code)
         if isinstance(results, interp.Err):
             return results
         elif isinstance(results, tuple):
             if len(results) == 0:
-                return self.finalize_results(self.state.pop_frame(), self.empty_result)
+                return self.bottom
             elif len(results) == 1:
-                return self.finalize_results(self.state.pop_frame(), results[0])
+                return results[0]
         raise ValueError(f"Unexpected results {results}")
 
     def run_ssacfg_region(
-        self, region: ir.Region, args: tuple[ValueType, ...]
+        self, frame: FrameType, region: ir.Region
     ) -> ValueType | interp.Err[ValueType]:
-        frame = self.state.current_frame()
-        result = self.empty_result
-        if not region.blocks:
-            return result
-
-        frame.set_values(region.blocks[0].args, args)
+        result = self.bottom
         for block in region.blocks:
             block_header = self.emit_block(frame, block)
             if isinstance(block_header, interp.Err):
