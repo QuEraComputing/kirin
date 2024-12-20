@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Callable, Iterable
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
+    from kirin.ir import Attribute
     from kirin.ir.group import DialectGroup
     from kirin.ir.nodes import Statement
     from kirin.lowering import FromPythonAST
@@ -19,6 +20,24 @@ class StatementImpl:
 
     def __repr__(self) -> str:
         return f"method impl `{self.impl.__name__}` in {repr(self.parent.__class__)}"
+
+
+@dataclass
+class AttributeImpl:
+    parent: "MethodTable"
+    impl: Callable
+
+    def __call__(self, interp, attr: "Attribute"):
+        return self.impl(self.parent, interp, attr)
+
+    def __repr__(self) -> str:
+        return f"attribute impl `{self.impl.__name__}` in {repr(self.parent.__class__)}"
+
+
+@dataclass
+class InterpreterRegistry:
+    attributes: dict[type["Attribute"], "AttributeImpl"]
+    statements: dict["Signature", "StatementImpl"]
 
 
 @dataclass
@@ -56,7 +75,7 @@ class Registry:
                 ret[name] = from_ast
         return ret
 
-    def interpreter(self, keys: Iterable[str]) -> dict["Signature", "StatementImpl"]:
+    def interpreter(self, keys: Iterable[str]):
         """select the dialect interpreter for the given key.
 
         Args:
@@ -66,7 +85,8 @@ class Registry:
             a map of statement signatures to their interpretation functions,
             and a map of dialects to their fallback interpreters.
         """
-        ret: dict["Signature", "StatementImpl"] = {}
+        attributes: dict[type["Attribute"], "AttributeImpl"] = {}
+        table: dict["Signature", "StatementImpl"] = {}
         for dialect in self.dialects.data:
             dialect_table = None
             for key in keys:
@@ -74,8 +94,12 @@ class Registry:
                     continue
 
                 dialect_table = dialect.interps[key]
-                for sig, func in dialect_table.table.items():
-                    if sig not in ret:
-                        ret[sig] = StatementImpl(dialect_table, func)
+                for sig, func in dialect_table.attribute.items():
+                    if sig not in attributes:
+                        attributes[sig] = AttributeImpl(dialect_table, func)
 
-        return ret
+                for sig, func in dialect_table.table.items():
+                    if sig not in table:
+                        table[sig] = StatementImpl(dialect_table, func)
+
+        return InterpreterRegistry(attributes, table)

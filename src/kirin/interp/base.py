@@ -217,10 +217,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self, frame: FrameType, stmt: Statement
     ) -> Optional["StatementImpl[Self, FrameType]"]:
         sig = self.build_signature(frame, stmt)
-        if sig in self.registry:
-            return self.registry[sig]
-        elif (class_sig := Signature(stmt.__class__)) in self.registry:
-            return self.registry[class_sig]
+        if sig in self.registry.statements:
+            return self.registry.statements[sig]
+        elif (class_sig := Signature(stmt.__class__)) in self.registry.statements:
+            return self.registry.statements[class_sig]
         return
 
     @abstractmethod

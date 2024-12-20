@@ -1,6 +1,7 @@
 from typing import Generic, TypeVar, Callable, Iterable, TypeAlias
 from dataclasses import dataclass
 
+from kirin.ir.attrs import Attribute
 from kirin.ir.group import DialectGroup
 from kirin.ir.nodes import Statement
 from kirin.lowering import FromPythonAST
@@ -28,6 +29,19 @@ class StatementImpl(Generic[InterpreterType, FrameType]):
     def __repr__(self) -> str: ...
 
 @dataclass
+class AttributeImpl:
+    parent: "MethodTable"
+    impl: Callable
+
+    def __call__(self, interp, attr: "Attribute"): ...
+    def __repr__(self) -> str: ...
+
+@dataclass
+class InterpreterRegistry:
+    attributes: dict[type["Attribute"], "AttributeImpl"]
+    statements: dict["Signature", "StatementImpl"]
+
+@dataclass
 class Registry:
     """Proxy class to build different registries from a dialect group."""
 
@@ -35,6 +49,4 @@ class Registry:
     """The dialect group to build the registry from."""
 
     def ast(self, keys: Iterable[str]) -> dict[str, "FromPythonAST"]: ...
-    def interpreter(
-        self, keys: Iterable[str]
-    ) -> dict["Signature", "StatementImpl"]: ...
+    def interpreter(self, keys: Iterable[str]) -> InterpreterRegistry: ...

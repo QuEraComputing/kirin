@@ -1,4 +1,5 @@
 from typing import IO, Generic, TypeVar, Iterable
+from dataclasses import field, dataclass
 
 from kirin import ir, interp, idtable
 from kirin.emit.abc import EmitABC, EmitFrame
@@ -7,7 +8,13 @@ from kirin.exceptions import InterpreterError
 IO_t = TypeVar("IO_t", bound=IO)
 
 
-class EmitStr(EmitABC[EmitFrame[str], str], Generic[IO_t]):
+@dataclass
+class EmitStrFrame(EmitFrame[str]):
+    indent: int = 0
+    captured: dict[ir.SSAValue, tuple[str, ...]] = field(default_factory=dict)
+
+
+class EmitStr(EmitABC[EmitStrFrame, str], Generic[IO_t]):
 
     def __init__(
         self,
@@ -30,8 +37,8 @@ class EmitStr(EmitABC[EmitFrame[str], str], Generic[IO_t]):
         self.ssa_id = idtable.IdTable[ir.SSAValue](prefix=prefix + "var_")
         self.block_id = idtable.IdTable[ir.Block](prefix=prefix + "block_")
 
-    def new_frame(self, code: ir.Statement) -> EmitFrame[str]:
-        return EmitFrame.from_func_like(code)
+    def new_frame(self, code: ir.Statement) -> EmitStrFrame:
+        return EmitStrFrame.from_func_like(code)
 
     def run_method(
         self, method: ir.Method, args: tuple[str, ...]
@@ -44,5 +51,9 @@ class EmitStr(EmitABC[EmitFrame[str], str], Generic[IO_t]):
         for arg in args:
             self.file.write(arg)
 
-    def newline(self, frame: EmitFrame[str]):
+    def newline(self, frame: EmitStrFrame):
         self.file.write("\n" + "  " * frame.indent)
+
+    def writeln(self, frame: EmitStrFrame, *args):
+        self.newline(frame)
+        self.write(*args)

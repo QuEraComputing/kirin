@@ -1,6 +1,7 @@
 from kirin.dialects.py.stmts.dialect import dialect as dialect
 
 from . import (
+    emit as emit,
     _stmts as _stmts,
     interp as interp,
     lowering as lowering,

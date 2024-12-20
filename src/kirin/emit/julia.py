@@ -1,9 +1,8 @@
 from typing import IO, TypeVar
 
-from kirin.emit.abc import EmitFrame
 from kirin.ir.nodes.block import Block
 
-from .str import EmitStr
+from .str import EmitStr, EmitStrFrame
 
 IO_t = TypeVar("IO_t", bound=IO)
 
@@ -11,8 +10,8 @@ IO_t = TypeVar("IO_t", bound=IO)
 class EmitJulia(EmitStr[IO_t]):
     keys = ["emit.julia"]
 
-    def emit_block_header(self, frame: EmitFrame[str], block: Block) -> str:
+    def emit_block_begin(self, frame: EmitStrFrame, block: Block) -> None:
         block_id = self.block_id[block]
+        frame.block_ref[block] = block_id
         self.newline(frame)
         self.write(f"@label {block_id};")
-        return block_id

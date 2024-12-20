@@ -1,5 +1,4 @@
-from abc import abstractmethod
-from typing import TypeVar
+from typing import TypeVar, Iterable
 from dataclasses import field, dataclass
 
 from kirin import ir, interp
@@ -10,14 +9,30 @@ ValueType = TypeVar("ValueType")
 
 @dataclass
 class EmitFrame(interp.Frame[ValueType]):
-    indent: int = 0
-    block_labels: dict[ir.Block, ValueType] = field(default_factory=dict)
+    block_ref: dict[ir.Block, ValueType] = field(default_factory=dict)
 
 
 FrameType = TypeVar("FrameType", bound=EmitFrame)
 
 
 class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
+
+    def __init__(
+        self,
+        dialects: ir.DialectGroup | Iterable[ir.Dialect],
+        bottom: ValueType,
+        *,
+        fuel: int | None = None,
+        max_depth: int = 128,
+        max_python_recursion_depth: int = 8192,
+    ):
+        super().__init__(
+            dialects,
+            bottom,
+            fuel=fuel,
+            max_depth=max_depth,
+            max_python_recursion_depth=max_python_recursion_depth,
+        )
 
     def run_callable_region(
         self, frame: FrameType, code: ir.Statement, region: ir.Region
@@ -40,23 +55,39 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
             block_header = self.emit_block(frame, block)
             if isinstance(block_header, interp.Err):
                 return block_header
-            frame.block_labels[block] = block_header
+            frame.block_ref[block] = block_header
 
         return result
 
-    @abstractmethod
-    def emit_block_header(self, frame: FrameType, block: ir.Block) -> ValueType: ...
+    def emit_attribute(self, attr: ir.Attribute):
+        if (method := self.registry.attributes.get(type(attr))) is not None:
+            return method(self, attr)
+        raise NotImplementedError(f"Attribute {type(attr)} not implemented")
+
+    def emit_stmt_begin(self, frame: FrameType, stmt: ir.Statement) -> None:
+        return
+
+    def emit_stmt_end(self, frame: FrameType, stmt: ir.Statement) -> None:
+        return
+
+    def emit_block_begin(self, frame: FrameType, block: ir.Block) -> None:
+        return
+
+    def emit_block_end(self, frame: FrameType, block: ir.Block) -> None:
+        return
 
     def emit_block(
         self, frame: FrameType, block: ir.Block
     ) -> interp.MethodResult[ValueType]:
-        results = self.emit_block_header(frame, block)
+        self.emit_block_begin(frame, block)
         stmt = block.first_stmt
         while stmt is not None:
             if self.consume_fuel() == self.FuelResult.Stop:
                 raise FuelExhaustedError("fuel exhausted")
 
+            self.emit_stmt_begin(frame, stmt)
             stmt_results = self.run_stmt(frame, stmt)
+            self.emit_stmt_end(frame, stmt)
 
             match stmt_results:
                 case interp.Err(_):
@@ -70,4 +101,5 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
 
             stmt = stmt.next_stmt
 
-        return results
+        self.emit_block_end(frame, block)
+        return frame.block_ref[block]
