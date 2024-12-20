@@ -70,6 +70,7 @@
                     * [unary](kirin/dialects/py/stmts/_stmts/unary.md)
                 * [constprop](kirin/dialects/py/stmts/constprop.md)
                 * [dialect](kirin/dialects/py/stmts/dialect.md)
+                * [emit](kirin/dialects/py/stmts/emit.md)
                 * [interp](kirin/dialects/py/stmts/interp.md)
                 * [lowering](kirin/dialects/py/stmts/lowering.md)
                 * [typeinfer](kirin/dialects/py/stmts/typeinfer.md)
