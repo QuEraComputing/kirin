@@ -9,6 +9,7 @@ from kirin.interp.value import (
     Successor as Successor,
     ReturnValue as ReturnValue,
     MethodResult as MethodResult,
+    SpecialResult as SpecialResult,
     StatementResult as StatementResult,
 )
 from kirin.interp.dialect import MethodTable as MethodTable
