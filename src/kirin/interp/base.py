@@ -189,7 +189,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         method = self.lookup_registry(frame, stmt)
         if method is not None:
             return method(self, frame, stmt)
-        raise ValueError(f"no dialect for stmt {stmt} from {type(self)}")
+        raise ValueError(
+            f"no implementation for stmt {stmt.print_str(end="")} from {type(self)}"
+        )
 
     def build_signature(self, frame: FrameType, stmt: Statement) -> "Signature":
         """build signature for querying the statement implementation."""

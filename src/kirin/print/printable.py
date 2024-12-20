@@ -33,6 +33,7 @@ class Printable:
         self,
         printer: Printer | None = None,
         analysis: dict[ir.SSAValue, Any] | None = None,
+        end: str = "\n",
     ) -> None:
         """
         Entry point of the printing process.
@@ -46,11 +47,17 @@ class Printable:
         """
         printer = self.__get_printer(printer, analysis)
         self.print_impl(printer)
-        printer.plain_print("\n")  # add a new line in the end
+        printer.plain_print(end)
 
-    def print_str(self, printer: Printer) -> str:
+    def print_str(
+        self,
+        printer: Printer | None = None,
+        analysis: dict[ir.SSAValue, Any] | None = None,
+        end: str = "\n",
+    ) -> str:
+        printer = self.__get_printer(printer, analysis)
         with printer.string_io() as stream:
-            self.print(printer)
+            self.print(printer, analysis=analysis, end=end)
             return stream.getvalue()
 
     @abstractmethod
