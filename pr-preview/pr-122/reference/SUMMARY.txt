@@ -27,6 +27,7 @@
         * [cf](kirin/dialects/cf/index.md)
             * [constprop](kirin/dialects/cf/constprop.md)
             * [dialect](kirin/dialects/cf/dialect.md)
+            * [emit](kirin/dialects/cf/emit.md)
             * [interp](kirin/dialects/cf/interp.md)
             * [lower](kirin/dialects/cf/lower.md)
             * [stmts](kirin/dialects/cf/stmts.md)
