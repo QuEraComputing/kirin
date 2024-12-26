@@ -11,12 +11,20 @@ def foo(x: int, y: int):
 
 @basic_no_opt
 def main(x: int, y: int):
+    assert x == y, "x != y"
+
     def foo():
         return x
 
-    return foo
+    if True:
+        return foo()
+    else:
+        return foo
 
 
-io = io.StringIO()
-emit = EmitJulia(io, basic_no_opt)
-emit.eval(main, ("a", "b"))
+with io.StringIO() as f:
+    emit = EmitJulia(f, basic_no_opt)
+    emit.eval(main, ("a", "b"))
+    generated = f.getvalue()
+    print(generated)
+    assert "function main(a::Int, b::Int)" in generated

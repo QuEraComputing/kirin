@@ -17,7 +17,10 @@ class JuliaMethodTable(MethodTable):
     def emit_function(
         self, interp: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Function
     ):
-        args = frame.get_values(stmt.body.blocks[0].args[1:])
+        fn_args = stmt.body.blocks[0].args[1:]
+        argnames = frame.get_values(fn_args)
+        argtypes = tuple(interp.emit_attribute(x.type) for x in fn_args)
+        args = [f"{name}::{type}" for name, type in zip(argnames, argtypes)]
         interp.write(f"function {stmt.sym_name}({', '.join(args)})")
         frame.indent += 1
         interp.run_ssacfg_region(frame, stmt.body)

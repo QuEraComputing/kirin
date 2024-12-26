@@ -27,7 +27,7 @@ MethodFunction: TypeAlias = Callable[
     [MethodTableSelf, InterpreterType, FrameType, StatementType], StatementResult
 ]
 AttributeFunction: TypeAlias = Callable[
-    [MethodTableSelf, InterpreterType, AttributeType], StatementResult
+    [MethodTableSelf, InterpreterType, AttributeType], Any
 ]
 
 

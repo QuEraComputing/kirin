@@ -59,7 +59,12 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
 
         return result
 
-    def emit_attribute(self, attr: ir.Attribute):
+    def emit_attribute(self, attr: ir.Attribute) -> ValueType:
+        return getattr(
+            self, f"emit_type_{type(attr).__name__}", self.emit_attribute_fallback
+        )(attr)
+
+    def emit_attribute_fallback(self, attr: ir.Attribute) -> ValueType:
         if (method := self.registry.attributes.get(type(attr))) is not None:
             return method(self, attr)
         raise NotImplementedError(f"Attribute {type(attr)} not implemented")
