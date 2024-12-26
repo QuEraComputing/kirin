@@ -205,8 +205,14 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         method = self.lookup_registry(frame, stmt)
         if method is not None:
             return method(self, frame, stmt)
+
+        # NOTE: not using f-string here because 3.10 and 3.11 have
+        #  parser bug that doesn't allow f-string in raise statement
         raise ValueError(
-            f"no implementation for stmt {stmt.print_str(end="")} from {type(self)}"
+            "no implementation for stmt "
+            + stmt.print_str(end="")
+            + " from "
+            + str(type(self))
         )
 
     def build_signature(self, frame: FrameType, stmt: Statement) -> "Signature":
