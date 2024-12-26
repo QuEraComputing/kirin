@@ -1,30 +1,32 @@
 import io
 
+from kirin import ir
 from kirin.prelude import basic_no_opt
 from kirin.emit.julia import EmitJulia
 
 
-@basic_no_opt
-def foo(x: int, y: int):
-    return x + 1, y
+def emit(fn: ir.Method):
+    with io.StringIO() as file:
+        emit_ = EmitJulia(file, basic_no_opt)
+        emit_.eval(fn, tuple(fn.arg_names[1:]))
+        return file.getvalue()
 
 
-@basic_no_opt
-def main(x: int, y: int):
-    assert x == y, "x != y"
+def test_func():
+    @basic_no_opt
+    def emit_func(x: int, y: int):
+        def foo():
+            return x
 
-    def foo():
-        return x
-
-    if True:
-        return foo()
-    else:
         return foo
 
-
-with io.StringIO() as f:
-    emit = EmitJulia(f, basic_no_opt)
-    emit.eval(main, ("a", "b"))
-    generated = f.getvalue()
-    print(generated)
-    assert "function main(a::Int, b::Int)" in generated
+    generated = emit(emit_func)
+    assert "function emit_func(x::Int, y::Int)" in generated
+    assert "@label block_0;" in generated
+    assert "function foo()" in generated
+    assert "@label block_1;" in generated
+    assert "return x" in generated
+    assert "@label block_2;" in generated
+    assert "return nothing" in generated
+    assert "return foo" in generated
+    assert "return nothing" in generated
