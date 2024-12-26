@@ -1,5 +1,6 @@
 from typing import IO, TypeVar
 
+from kirin import ir
 from kirin.ir.types import PyClass
 from kirin.ir.nodes.block import Block
 
@@ -30,3 +31,9 @@ class EmitJulia(EmitStr[IO_t]):
 
     def emit_type_PyClass(self, attr: PyClass) -> str:
         return self.PYTYPE_MAP.get(attr.typ, "Any")
+
+    def write_assign(self, frame: EmitStrFrame, result: ir.SSAValue, *args):
+        result_sym = self.ssa_id[result]
+        frame.set(result, result_sym)
+        self.writeln(frame, result_sym, " = ", *args)
+        return result_sym

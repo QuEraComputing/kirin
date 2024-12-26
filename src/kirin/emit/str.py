@@ -25,6 +25,7 @@ class EmitStr(EmitABC[EmitStrFrame, str], Generic[IO_t]):
         max_depth: int = 128,
         max_python_recursion_depth: int = 8192,
         prefix: str = "",
+        prefix_if_none: str = "var_",
     ):
         super().__init__(
             dialects,
@@ -34,7 +35,9 @@ class EmitStr(EmitABC[EmitStrFrame, str], Generic[IO_t]):
             max_python_recursion_depth=max_python_recursion_depth,
         )
         self.file = file
-        self.ssa_id = idtable.IdTable[ir.SSAValue](prefix=prefix + "var_")
+        self.ssa_id = idtable.IdTable[ir.SSAValue](
+            prefix=prefix, prefix_if_none=prefix_if_none
+        )
         self.block_id = idtable.IdTable[ir.Block](prefix=prefix + "block_")
 
     def new_frame(self, code: ir.Statement) -> EmitStrFrame:

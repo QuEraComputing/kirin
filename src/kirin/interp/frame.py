@@ -21,14 +21,17 @@ class FrameABC(ABC, Generic[ValueType]):
     @abstractmethod
     def get(self, key: SSAValue) -> ValueType: ...
 
+    @abstractmethod
+    def set(self, key: SSAValue, value: ValueType) -> None: ...
+
     def get_values(self, keys: Iterable[SSAValue]) -> tuple[ValueType, ...]:
         """Get the values of the given `SSAValue` keys."""
         return tuple(self.get(key) for key in keys)
 
-    @abstractmethod
     def set_values(self, keys: Iterable[SSAValue], values: Iterable[ValueType]) -> None:
         """Set the values of the given `SSAValue` keys."""
-        ...
+        for key, value in zip(keys, values):
+            self.set(key, value)
 
     @abstractmethod
     def set_stmt(self, stmt: Statement) -> Self:
@@ -65,9 +68,8 @@ class Frame(FrameABC[ValueType]):
     def get(self, key: SSAValue) -> ValueType:
         return self.entries[key]
 
-    def set_values(self, keys: Iterable[SSAValue], values: Iterable[ValueType]) -> None:
-        for key, value in zip(keys, values):
-            self.entries[key] = value
+    def set(self, key: SSAValue, value: ValueType) -> None:
+        self.entries[key] = value
 
     def set_stmt(self, stmt: Statement) -> Self:
         self.stmt = stmt

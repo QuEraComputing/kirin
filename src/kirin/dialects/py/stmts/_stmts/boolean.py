@@ -1,10 +1,12 @@
-from kirin.ir import Pure, SSAValue, Statement, ResultValue, types
+from kirin.ir import Pure, SSAValue, ResultValue, types
 from kirin.decl import info, statement
 from kirin.dialects.py.stmts.dialect import dialect
 
+from .binop import BinOp
+
 
 @statement
-class BoolOp(Statement):
+class BoolOp(BinOp):
     traits = frozenset({Pure()})
     lhs: SSAValue = info.argument(print=False)
     rhs: SSAValue = info.argument(print=False)
