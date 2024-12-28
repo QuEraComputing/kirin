@@ -204,7 +204,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         "simply evaluate a statement"
         method = self.lookup_registry(frame, stmt)
         if method is not None:
-            return method(self, frame, stmt)
+            try:
+                return method(self, frame, stmt)
+            except InterpreterError as e:
+                return Err(e, self.state.frames)
 
         # NOTE: not using f-string here because 3.10 and 3.11 have
         #  parser bug that doesn't allow f-string in raise statement
