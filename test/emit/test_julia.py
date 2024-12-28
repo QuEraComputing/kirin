@@ -26,10 +26,7 @@ def test_func():
     assert "function foo()" in generated
     assert "@label block_1;" in generated
     assert "return x" in generated
-    assert "@label block_2;" in generated
-    assert "return nothing" in generated
     assert "return foo" in generated
-    assert "return nothing" in generated
 
 
 def test_py_stmts():

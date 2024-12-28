@@ -2,11 +2,13 @@ from typing import TypeVar, Iterable
 from dataclasses import field, dataclass
 
 from kirin import ir, interp
+from kirin.worklist import WorkList
 
 ValueType = TypeVar("ValueType")
 
 @dataclass
 class EmitFrame(interp.Frame[ValueType]):
+    worklist: WorkList[interp.Successor] = field(default_factory=WorkList)
     block_ref: dict[ir.Block, ValueType] = field(default_factory=dict)
 
 FrameType = TypeVar("FrameType", bound=EmitFrame)

@@ -1,7 +1,7 @@
 from typing import IO, TypeVar
 
 from kirin import emit
-from kirin.interp import MethodTable, impl
+from kirin.interp import Successor, MethodTable, impl
 from kirin.emit.julia import EmitJulia
 
 from .stmts import Assert, Branch, ConditionalBranch
@@ -27,6 +27,9 @@ class JuliaMethodTable(MethodTable):
         self, interp: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Branch
     ):
         interp.writeln(frame, f"@goto {interp.block_id[stmt.successor]};")
+        frame.worklist.append(
+            Successor(stmt.successor, frame.get_values(stmt.arguments))
+        )
         return ()
 
     @impl(ConditionalBranch)
@@ -51,4 +54,11 @@ class JuliaMethodTable(MethodTable):
         interp.writeln(frame, f"@goto {interp.block_id[stmt.else_successor]};")
         frame.indent -= 1
         interp.writeln(frame, "end")
+
+        frame.worklist.append(
+            Successor(stmt.then_successor, frame.get_values(stmt.then_arguments))
+        )
+        frame.worklist.append(
+            Successor(stmt.else_successor, frame.get_values(stmt.else_arguments))
+        )
         return ()

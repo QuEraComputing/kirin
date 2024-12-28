@@ -2,6 +2,7 @@ from typing import TypeVar, Iterable
 from dataclasses import field, dataclass
 
 from kirin import ir, interp
+from kirin.worklist import WorkList
 from kirin.exceptions import FuelExhaustedError
 
 ValueType = TypeVar("ValueType")
@@ -9,6 +10,7 @@ ValueType = TypeVar("ValueType")
 
 @dataclass
 class EmitFrame(interp.Frame[ValueType]):
+    worklist: WorkList[interp.Successor] = field(default_factory=WorkList)
     block_ref: dict[ir.Block, ValueType] = field(default_factory=dict)
 
 
@@ -51,12 +53,14 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
         self, frame: FrameType, region: ir.Region
     ) -> ValueType | interp.Err[ValueType]:
         result = self.bottom
-        for block in region.blocks:
-            block_header = self.emit_block(frame, block)
+        frame.worklist.append(
+            interp.Successor(region.blocks[0], frame.get_values(region.blocks[0].args))
+        )
+        while (succ := frame.worklist.pop()) is not None:
+            block_header = self.emit_block(frame, succ.block)
             if isinstance(block_header, interp.Err):
                 return block_header
-            frame.block_ref[block] = block_header
-
+            frame.block_ref[succ.block] = block_header
         return result
 
     def emit_attribute(self, attr: ir.Attribute) -> ValueType:
