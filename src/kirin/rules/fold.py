@@ -17,6 +17,11 @@ class ConstantFold(RewriteRule):
             return ret.const
         return None
 
+    def delete_node(self, node: ir.Statement):
+        node.delete()
+        for result in node.results:
+            self.results.pop(result, None)
+
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if node.has_trait(ir.ConstantLike):
             return RewriteResult()
@@ -41,10 +46,16 @@ class ConstantFold(RewriteRule):
         # NOTE: if we find call prop a const, depsite it is pure or not
         # the constant call only executes a pure branch of the code
         # thus it is safe to delete the call
-        if all_constants and (node.has_trait(ir.Pure) or isinstance(node, func.Invoke)):
-            node.delete()
-            for result in node.results:
-                self.results.pop(result, None)
+        if all_constants and node.has_trait(ir.Pure):
+            self.delete_node(node)
+
+        if (
+            all_constants
+            and isinstance(node, func.Invoke)
+            and (value := self.results.get(node.result, None)) is not None
+            and isinstance(value.purity, const.Pure)
+        ):
+            self.delete_node(node)
         return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_cf_ConditionalBranch(self, node: cf.ConditionalBranch):
