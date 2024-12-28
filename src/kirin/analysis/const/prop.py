@@ -21,12 +21,14 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         dialects: ir.DialectGroup | Iterable[ir.Dialect],
         *,
         fuel: int | None = None,
+        save_all_ssa: bool = False,
         max_depth: int = 128,
         max_python_recursion_depth: int = 8192,
     ):
         super().__init__(
             dialects,
             fuel=fuel,
+            save_all_ssa=save_all_ssa,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
@@ -81,6 +83,8 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
             # fallback to top for other statements
             return (JointResult(Unknown(), Pure()),)
         else:
+            if frame.extra is None:
+                frame.extra = ExtraFrameInfo(True)
             return (JointResult(Unknown(), NotPure()),)
 
     def _set_frame_not_pure(self, result: interp.StatementResult[JointResult]):
