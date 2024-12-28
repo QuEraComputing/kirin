@@ -47,9 +47,9 @@
 </code></pre></div> <div class="doc doc-contents "> <p>The name of the interpreter to select from dialects by order.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.build_signature class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">build_signature</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>build_signature</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Signature</span>
-</code></pre></div> <div class="doc doc-contents "> <p>build signature for querying the statement implementation.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>218</span>
-<span class=normal>219</span>
-<span class=normal>220</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>build_signature</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Signature&quot;</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>build signature for querying the statement implementation.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>221</span>
+<span class=normal>222</span>
+<span class=normal>223</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>build_signature</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Signature&quot;</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;build signature for querying the statement implementation.&quot;&quot;&quot;</span>
     <span class=k>return</span> <span class=n>Signature</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=vm>__class__</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>arg</span><span class=o>.</span><span class=n>type</span> <span class=k>for</span> <span class=n>arg</span> <span class=ow>in</span> <span class=n>stmt</span><span class=o>.</span><span class=n>args</span><span class=p>))</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.eval class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eval</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nb>eval</span><span class=p>(</span>
@@ -100,13 +100,19 @@
 <span class=normal>213</span>
 <span class=normal>214</span>
 <span class=normal>215</span>
-<span class=normal>216</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
+<span class=normal>216</span>
+<span class=normal>217</span>
+<span class=normal>218</span>
+<span class=normal>219</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
     <span class=s2>&quot;simply evaluate a statement&quot;</span>
     <span class=n>method</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>lookup_registry</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
     <span class=k>if</span> <span class=n>method</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
-        <span class=k>return</span> <span class=n>method</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
+        <span class=k>try</span><span class=p>:</span>
+            <span class=k>return</span> <span class=n>method</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
+        <span class=k>except</span> <span class=n>InterpreterError</span> <span class=k>as</span> <span class=n>e</span><span class=p>:</span>
+            <span class=k>return</span> <span class=n>Err</span><span class=p>(</span><span class=n>e</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>state</span><span class=o>.</span><span class=n>frames</span><span class=p>)</span>
 
     <span class=c1># NOTE: not using f-string here because 3.10 and 3.11 have</span>
     <span class=c1>#  parser bug that doesn&#39;t allow f-string in raise statement</span>
