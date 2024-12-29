@@ -1,8 +1,6 @@
 import ast
 
 from kirin import ir, lowering
-from kirin.exceptions import DialectLoweringError
-from kirin.dialects.py import stmts as pystmts, types
 
 from . import stmts
 from .dialect import dialect
@@ -116,7 +114,7 @@ class Lowering(lowering.FromPythonAST):
         iterator = state.append_stmt(stmts.Iter(iter_value)).result
         body_frame = state.push_frame(lowering.Frame.from_stmts(node.body, state))
         body_block = body_frame.current_block
-        item = body_block.args.append_from(types.Any, "item")
+        item = body_block.args.append_from(ir.types.Any, "item")
 
         if isinstance(node.target, ast.Name):
             item.name = node.target.id
