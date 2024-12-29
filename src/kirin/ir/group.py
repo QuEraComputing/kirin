@@ -1,127 +1,25 @@
 import inspect
-from collections.abc import Iterable
-from dataclasses import dataclass
-from functools import update_wrapper
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
-    Callable,
-    Concatenate,
-    Generic,
-    ParamSpec,
-    TypeVar,
     Union,
+    Generic,
+    TypeVar,
+    Callable,
+    ParamSpec,
+    Concatenate,
     overload,
 )
+from functools import update_wrapper
+from dataclasses import dataclass
+from collections.abc import Iterable
 
-from kirin.exceptions import CompilerError
 from kirin.ir.method import Method
+from kirin.exceptions import CompilerError
 
 if TYPE_CHECKING:
-    from kirin.codegen.impl import (
-        Signature as CodegenSignature,
-        StatementImpl as CodegenImpl,
-    )
-    from kirin.interp.impl import Signature, StatementImpl as InterpImpl
+    from kirin.registry import Registry
     from kirin.ir.dialect import Dialect
-    from kirin.lowering.dialect import FromPythonAST
-
-
-@dataclass
-class Registry:
-    """Proxy class to build different registries from a dialect group."""
-
-    parent: "DialectGroup"
-    """The parent dialect group."""
-
-    def lowering(self, keys: Iterable[str]) -> dict[str, "FromPythonAST"]:
-        """select the dialect lowering interpreters for the given key.
-
-        Args:
-            keys (Iterable[str]): the keys to search for in the dialects
-
-        Returns:
-            a map of dialects to their lowering interpreters
-        """
-        ret: dict[str, "FromPythonAST"] = {}
-        from_ast = None
-        for dialect in self.parent.data:
-            for key in keys:
-                if key in dialect.lowering:
-                    from_ast = dialect.lowering[key]
-                    break
-
-            if from_ast is None:
-                msg = ",".join(keys)
-                raise KeyError(f"Lowering not found for {msg}")
-
-            for name in from_ast.names:
-                if name in ret:
-                    raise KeyError(f"Lowering {name} already exists")
-
-                ret[name] = from_ast
-        return ret
-
-    def interpreter(
-        self, keys: Iterable[str]
-    ) -> tuple[dict["Signature", "InterpImpl"], dict["Dialect", "InterpImpl"]]:
-        """select the dialect interpreter for the given key.
-
-        Args:
-            keys (Iterable[str]): the keys to search for in the dialects
-
-        Returns:
-            a map of statement signatures to their interpretation functions,
-            and a map of dialects to their fallback interpreters.
-        """
-        from kirin.interp.impl import MethodImpl
-
-        ret: dict["Signature", "InterpImpl"] = {}
-        fallback: dict["Dialect", "InterpImpl"] = {}
-        for dialect in self.parent.data:
-            dialect_interp = None
-            for key in keys:
-                if key in dialect.interps:
-                    dialect_interp = dialect.interps[key]
-                    if dialect not in fallback:  # use the first fallback
-                        fallback[dialect] = dialect_interp.fallback
-
-                    for sig, func in dialect_interp.table.items():
-                        if sig not in ret:
-                            ret[sig] = MethodImpl(dialect_interp, func)
-
-            if dialect not in fallback:
-                msg = ",".join(keys)
-                raise KeyError(f"Interpreter of {dialect.name} not found for {msg}")
-        return ret, fallback
-
-    def codegen(self, keys: Iterable[str]) -> dict["CodegenSignature", "CodegenImpl"]:
-        """select the dialect codegen for the given key.
-
-        Args:
-            keys (Iterable[str]): the keys to search for in the dialects
-
-        Returns:
-            a map of dialects to their codegen.
-        """
-        from kirin.codegen.impl import MethodImpl
-
-        ret: dict["CodegenSignature", "CodegenImpl"] = {}
-        for dialect in self.parent.data:
-            dialect_codegen = None
-            for key in keys:
-                if key in dialect.codegen:
-                    dialect_codegen = dialect.codegen[key]
-                    break
-
-            # not found, just skip
-            if dialect_codegen is None:
-                continue
-
-            for key, func in dialect_codegen.table.items():
-                ret[key] = MethodImpl(dialect_codegen, func)
-        return ret
-
 
 PassParams = ParamSpec("PassParams")
 RunPass = Callable[Concatenate[Method, PassParams], None]
@@ -202,7 +100,7 @@ class DialectGroup(Generic[PassParams]):
         )
 
     @property
-    def registry(self) -> Registry:
+    def registry(self) -> "Registry":
         """return the registry for the dialect group. This
         returns a proxy object that can be used to select
         the lowering interpreters, interpreters, and codegen
@@ -211,6 +109,8 @@ class DialectGroup(Generic[PassParams]):
         Returns:
             Registry: the registry object.
         """
+        from kirin.registry import Registry
+
         return Registry(self)
 
     @overload

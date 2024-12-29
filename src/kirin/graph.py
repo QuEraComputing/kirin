@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Generic, Iterable, Optional, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Iterable, Optional, Protocol
 
 if TYPE_CHECKING:
     from kirin import ir

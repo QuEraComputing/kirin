@@ -1,12 +1,12 @@
-from dataclasses import dataclass, field
 from typing import Callable
+from dataclasses import field, dataclass
 
 from kirin import ir
 from kirin.passes import Pass
-from kirin.rewrite import Fixpoint, RewriteResult, Walk
-from kirin.rules.cfg_compactify import CFGCompactify
+from kirin.rewrite import Walk, Fixpoint, RewriteResult
 from kirin.rules.dce import DeadCodeElimination
 from kirin.rules.inline import Inline
+from kirin.rules.cfg_compactify import CFGCompactify
 
 
 def aggresive(x: ir.IRNode) -> bool:

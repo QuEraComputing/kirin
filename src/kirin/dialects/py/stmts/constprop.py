@@ -1,50 +1,61 @@
-from kirin.analysis.dataflow.constprop import (
-    Const,
-    ConstProp,
-    ConstPropLattice,
-    NotConst,
-    PartialTuple,
-)
-from kirin.interp import DialectInterpreter, ResultValue, impl
+from kirin import interp
+from kirin.interp import MethodTable, impl
+from kirin.analysis import const
 
 from . import _stmts as py
 from .dialect import dialect
 
 
 @dialect.register(key="constprop")
-class DialectConstProp(DialectInterpreter):
+class ConstPropTable(MethodTable):
 
     @impl(py.NewTuple)
     def new_tuple(
-        self, interp: ConstProp, stmt: py.NewTuple, values: tuple[ConstPropLattice, ...]
-    ) -> ResultValue:
-        return ResultValue(PartialTuple(values))
+        self,
+        _: const.Propagate,
+        frame: interp.Frame[const.JointResult],
+        stmt: py.NewTuple,
+    ) -> interp.StatementResult[const.JointResult]:
+        return (
+            const.JointResult(
+                const.PartialTuple(tuple(x.const for x in frame.get_values(stmt.args))),
+                const.Pure(),
+            ),
+        )
 
     @impl(py.Not)
-    def not_(self, interp, stmt: py.Not, values: tuple) -> ResultValue:
+    def not_(
+        self, _: const.Propagate, frame: interp.Frame, stmt: py.Not
+    ) -> interp.StatementResult[const.JointResult]:
         if isinstance(stmt.value.owner, py.NewTuple):
-            return ResultValue(Const(len(stmt.value.owner.args) == 0))
-        elif isinstance(values[0], Const):
-            return ResultValue(Const(not values[0].data))
-        return ResultValue(NotConst())
+            ret = const.Value(len(stmt.value.owner.args) == 0)
+        elif isinstance(value := frame.get(stmt.value), const.Value):
+            ret = const.Value(not value.data)
+        else:
+            ret = const.Unknown()
+        return (const.JointResult(ret, const.Pure()),)
 
     @impl(py.GetItem)
     def getitem(
         self,
-        interp,
+        _: const.Propagate,
+        frame: interp.Frame[const.JointResult],
         stmt: py.GetItem,
-        values: tuple[ConstPropLattice, ConstPropLattice],
-    ) -> ResultValue:
-        obj = values[0]
-        index = values[1]
-        if not isinstance(index, Const):
-            return ResultValue(NotConst())
+    ) -> interp.StatementResult[const.JointResult]:
+        obj = frame.get(stmt.obj).const
+        index = frame.get(stmt.index).const
+        if not isinstance(index, const.Value):
+            return (const.JointResult(const.Unknown(), const.Pure()),)
 
-        if isinstance(obj, PartialTuple):
+        if isinstance(obj, const.PartialTuple):
             obj = obj.data
             if isinstance(index.data, int) and 0 <= index.data < len(obj):
-                return ResultValue(obj[index.data])
+                return (const.JointResult(obj[index.data], const.Pure()),)
             elif isinstance(index.data, slice):
                 start, stop, step = index.data.indices(len(obj))
-                return ResultValue(PartialTuple(obj[start:stop:step]))
-        return ResultValue(NotConst())
+                return (
+                    const.JointResult(
+                        const.PartialTuple(obj[start:stop:step]), const.Pure()
+                    ),
+                )
+        return (const.JointResult(const.Unknown(), const.Pure()),)

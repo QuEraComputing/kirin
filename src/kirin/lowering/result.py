@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Iterable, Sequence, overload
+from dataclasses import field, dataclass
 
-from kirin.exceptions import DialectLoweringError
 from kirin.ir import SSAValue, Statement
+from kirin.exceptions import DialectLoweringError
 
 
 @dataclass(init=False)

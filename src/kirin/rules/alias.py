@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 from kirin import ir
+from kirin.rewrite import RewriteRule, RewriteResult
 from kirin.dialects.py import stmts
-from kirin.rewrite import RewriteResult, RewriteRule
 
 
 @dataclass

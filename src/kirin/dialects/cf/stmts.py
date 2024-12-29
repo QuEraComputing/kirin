@@ -1,8 +1,8 @@
+from kirin.ir import Block, SSAValue, Statement, IsTerminator
 from kirin.decl import info, statement
-from kirin.dialects.cf.dialect import dialect
-from kirin.dialects.py.types import Bool, String
-from kirin.ir import Block, IsTerminator, SSAValue, Statement
+from kirin.ir.types import Bool, String
 from kirin.print.printer import Printer
+from kirin.dialects.cf.dialect import dialect
 
 
 @statement(dialect=dialect)

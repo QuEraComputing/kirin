@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
+from dataclasses import field, dataclass
 
 from typing_extensions import Self
 
+from kirin.ir.ssa import SSAValue
 from kirin.exceptions import VerificationError
 from kirin.ir.nodes.base import IRNode
-from kirin.ir.nodes.block import Block
 from kirin.ir.nodes.view import MutableSequenceView
-from kirin.ir.ssa import SSAValue
+from kirin.ir.nodes.block import Block
 
 if TYPE_CHECKING:
-    from kirin.ir.nodes.stmt import Statement
     from kirin.print import Printer
+    from kirin.ir.nodes.stmt import Statement
 
 
 @dataclass

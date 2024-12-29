@@ -1,4 +1,4 @@
-from kirin.dialects.py import types
+from kirin.ir import types
 from kirin.prelude import basic
 
 

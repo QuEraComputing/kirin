@@ -1,55 +1,57 @@
 from typing import Iterable
 
 from kirin import ir
-from kirin.analysis.dataflow.typeinfer import TypeInference
-from kirin.dialects.func.dialect import dialect
+from kirin.interp import Frame, MethodTable, ReturnValue, impl
+from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.func.stmts import (
     Call,
-    ConstantNone,
-    GetField,
     Invoke,
     Lambda,
     Return,
+    GetField,
+    ConstantNone,
 )
-from kirin.dialects.py import types
-from kirin.interp import DialectInterpreter, ResultValue, ReturnValue, impl
+from kirin.dialects.func.dialect import dialect
 
 
 # NOTE: a lot of the type infer rules are same as the builtin dialect
 @dialect.register(key="typeinfer")
-class TypeInfer(DialectInterpreter):
+class TypeInfer(MethodTable):
 
     @impl(ConstantNone)
-    def const_none(self, interp: TypeInference, stmt: ConstantNone, values: tuple[()]):
-        return ResultValue(types.NoneType)
+    def const_none(self, interp: TypeInference, frame: Frame, stmt: ConstantNone):
+        return (ir.types.NoneType,)
 
     @impl(Return)
-    def return_(
-        self, interp: TypeInference, stmt: Return, values: tuple
-    ) -> ReturnValue:
-        return ReturnValue(*values)
+    def return_(self, interp: TypeInference, frame: Frame, stmt: Return) -> ReturnValue:
+        return ReturnValue(frame.get(stmt.value))
 
     @impl(Call)
-    def call(self, interp: TypeInference, stmt: Call, values: tuple):
+    def call(self, interp: TypeInference, frame: Frame, stmt: Call):
         # give up on dynamic method calls
-        if not isinstance(values[0], types.PyConst):
-            return ResultValue(stmt.result.type)
+        callee = frame.get(stmt.callee)
+        if not isinstance(callee, ir.types.Const):
+            return (stmt.result.type,)
 
-        mt: ir.Method = values[0].data
+        mt: ir.Method = callee.data
         return self._invoke_method(
             interp,
             mt,
             stmt.args[1:],
-            interp.permute_values(mt.arg_names, values[1:], stmt.kwargs),
+            interp.permute_values(
+                mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+            ),
         )
 
     @impl(Invoke)
-    def invoke(self, interp: TypeInference, stmt: Invoke, values: tuple):
+    def invoke(self, interp: TypeInference, frame: Frame, stmt: Invoke):
         return self._invoke_method(
             interp,
             stmt.callee,
-            stmt.args[1:],
-            interp.permute_values(stmt.callee.arg_names, values, stmt.kwargs),
+            stmt.inputs,
+            interp.permute_values(
+                stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
+            ),
         )
 
     def _invoke_method(
@@ -60,7 +62,7 @@ class TypeInfer(DialectInterpreter):
         values: tuple,
     ):
         if mt.inferred:  # so we don't end up in infinite loop
-            return ResultValue(mt.return_type)
+            return (mt.return_type,)
 
         # NOTE: narrowing the argument type based on method signature
         inputs = tuple(
@@ -74,16 +76,12 @@ class TypeInfer(DialectInterpreter):
         for arg, typ in zip(args, inputs):
             interp.results[arg] = typ
 
-        if len(interp.state.frames) < interp.max_depth:
-            return interp.eval(mt, inputs).to_result()
-
-        # max depth reached, error
-        return ResultValue(types.Bottom)
+        return interp.eval(mt, inputs).wrap_result()
 
     @impl(Lambda)
-    def lambda_(self, interp: TypeInference, stmt: Lambda, values: tuple):
-        return ResultValue(types.PyClass(ir.Method))
+    def lambda_(self, interp: TypeInference, frame, stmt: Lambda):
+        return (ir.types.PyClass(ir.Method),)
 
     @impl(GetField)
-    def getfield(self, interp: TypeInference, stmt: GetField, values: tuple):
-        return ResultValue(stmt.result.type)
+    def getfield(self, interp: TypeInference, frame, stmt: GetField):
+        return (stmt.result.type,)

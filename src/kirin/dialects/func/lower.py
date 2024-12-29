@@ -1,20 +1,19 @@
 import ast
 
 from kirin import ir
+from kirin.lowering import Frame, Result, FromPythonAST, LoweringState
+from kirin.exceptions import DialectLoweringError
 from kirin.dialects.func.attrs import Signature
-from kirin.dialects.func.dialect import dialect
 from kirin.dialects.func.stmts import (
     Call,
-    ConstantNone,
-    Function,
-    GetField,
     Invoke,
     Lambda,
     Return,
+    Function,
+    GetField,
+    ConstantNone,
 )
-from kirin.dialects.py import types
-from kirin.exceptions import DialectLoweringError
-from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
+from kirin.dialects.func.dialect import dialect
 
 
 @dialect.register
@@ -35,7 +34,7 @@ class FuncLowering(FromPythonAST):
     ) -> Result:
         args, keywords = self.__lower_Call_args_kwargs(state, node)
         stmt = Invoke(args, callee=method, kwargs=keywords)
-        stmt.result.type = method.return_type or types.Any
+        stmt.result.type = method.return_type or ir.types.Any
         return Result(state.append_stmt(stmt))
 
     def __lower_Call_args_kwargs(
@@ -80,8 +79,8 @@ class FuncLowering(FromPythonAST):
         entries: dict[str, ir.SSAValue] = {}
         entry_block = ir.Block()
         fn_self = entry_block.args.append_from(
-            types.PyGeneric(
-                ir.Method, types.Tuple.where(signature.inputs), signature.output
+            ir.types.Generic(
+                ir.Method, ir.types.Tuple.where(signature.inputs), signature.output
             ),
             node.name + "_self",
         )
@@ -177,10 +176,10 @@ class FuncLowering(FromPythonAST):
     @staticmethod
     def get_hint(state: LoweringState, node: ast.expr | None):
         if node is None:
-            return types.Any
+            return ir.types.Any
 
         try:
             t = state.get_global(node).unwrap()
-            return types.hint2type(t)
+            return ir.types.hint2type(t)
         except:  # noqa: E722
             raise DialectLoweringError(f"expect a type hint, got {ast.unparse(node)}")

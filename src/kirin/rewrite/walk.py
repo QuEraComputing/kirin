@@ -1,10 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, Statement
-from kirin.ir.nodes.base import IRNode
-from kirin.rewrite.abc import RewriteRule
-from kirin.rewrite.result import RewriteResult
 from kirin.worklist import WorkList
+from kirin.rewrite.abc import RewriteRule
+from kirin.ir.nodes.base import IRNode
+from kirin.rewrite.result import RewriteResult
 
 
 @dataclass

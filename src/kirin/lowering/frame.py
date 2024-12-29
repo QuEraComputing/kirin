@@ -1,12 +1,11 @@
 import ast
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Callable, Optional, Sequence
+from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, SSAValue, Statement
 from kirin.lowering.stream import StmtStream
 
 if TYPE_CHECKING:
-    from kirin.ir import TypeAttribute
     from kirin.lowering.state import LoweringState
 
 
@@ -101,7 +100,7 @@ class Frame:
                 it = iter(value)
                 typ = next(it).type
                 for v in it:
-                    typ: TypeAttribute = v.type.join(typ)
+                    typ = v.type.join(typ)
                 ret = self.current_block.args.append_from(typ, name)
                 self.defs[name] = ret
                 return ret

@@ -1,8 +1,8 @@
 import pytest
 
+from kirin.prelude import basic
 from kirin.dialects import math
 from kirin.exceptions import VerificationError
-from kirin.prelude import basic
 
 
 @basic(verify=False, typeinfer=False)

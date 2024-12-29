@@ -1,7 +1,7 @@
 import pytest
 
-from kirin.exceptions import InterpreterError
 from kirin.prelude import basic_no_opt
+from kirin.exceptions import InterpreterError
 
 
 @basic_no_opt

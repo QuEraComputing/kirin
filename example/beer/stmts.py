@@ -1,43 +1,42 @@
 from attrs import Beer
 from dialect import dialect
 
+from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.dialects.py import types
-from kirin.ir import Block, IsTerminator, Pure, ResultValue, SSAValue, Statement
 
 
 @statement(dialect=dialect)
-class NewBeer(Statement):
+class NewBeer(ir.Statement):
     name = "new_beer"
-    traits = frozenset({Pure()})
-    brand: SSAValue = info.argument(types.String)
-    result: ResultValue = info.result(types.PyClass(Beer))
+    traits = frozenset({ir.Pure()})
+    brand: ir.SSAValue = info.argument(types.String)
+    result: ir.ResultValue = info.result(types.PyClass(Beer))
 
 
 @statement(dialect=dialect)
-class Drink(Statement):
+class Drink(ir.Statement):
     name = "drink"
-    beverage: SSAValue = info.argument(types.PyClass(Beer))
+    beverage: ir.SSAValue = info.argument(types.PyClass(Beer))
 
 
 @statement(dialect=dialect)
-class Pour(Statement):
+class Pour(ir.Statement):
     name = "pour"
-    beverage: SSAValue = info.argument(types.PyClass(Beer))
-    amount: SSAValue = info.argument(types.Int)
+    beverage: ir.SSAValue = info.argument(types.PyClass(Beer))
+    amount: ir.SSAValue = info.argument(types.Int)
 
 
 @statement(dialect=dialect)
-class RandomBranch(Statement):
+class RandomBranch(ir.Statement):
     name = "random_br"
-    traits = frozenset({IsTerminator()})
-    cond: SSAValue = info.argument(types.Bool)
-    then_arguments: tuple[SSAValue, ...] = info.argument()
-    else_arguments: tuple[SSAValue, ...] = info.argument()
-    then_successor: Block = info.block()
-    else_successor: Block = info.block()
+    traits = frozenset({ir.IsTerminator()})
+    cond: ir.SSAValue = info.argument(types.Bool)
+    then_arguments: tuple[ir.SSAValue, ...] = info.argument()
+    else_arguments: tuple[ir.SSAValue, ...] = info.argument()
+    then_successor: ir.Block = info.block()
+    else_successor: ir.Block = info.block()
 
 
 @statement(dialect=dialect)
-class Puke(Statement):
+class Puke(ir.Statement):
     name = "puke"

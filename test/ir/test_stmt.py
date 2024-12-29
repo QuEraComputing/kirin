@@ -1,7 +1,7 @@
 import pytest
 
-from kirin.dialects.py import stmts
 from kirin.ir import Block
+from kirin.dialects.py import stmts
 
 
 def test_stmt():

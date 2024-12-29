@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import ClassVar
+from dataclasses import dataclass
 
-from kirin.ir import DialectGroup, Method
+from kirin.ir import Method, DialectGroup
 from kirin.rewrite.abc import RewriteResult
 
 

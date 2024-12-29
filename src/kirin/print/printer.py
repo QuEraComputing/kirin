@@ -1,7 +1,7 @@
 import io
+from typing import IO, TYPE_CHECKING, Any, Union, Generic, TypeVar, Callable, Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import IO, TYPE_CHECKING, Any, Callable, Generic, Iterable, TypeVar, Union
+from dataclasses import field, dataclass
 
 from rich.console import Console
 

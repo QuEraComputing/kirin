@@ -1,22 +1,22 @@
 from dataclasses import dataclass
 
-from kirin.analysis.dataflow.constprop import ConstProp, NotConst
 from kirin.ir import Method, SSACFGRegion
-from kirin.passes.abc import Pass
-from kirin.rewrite import Chain, Fixpoint, RewriteResult, Walk
-from kirin.rules.call2invoke import Call2Invoke
-from kirin.rules.cfg_compactify import CFGCompactify
+from kirin.rewrite import Walk, Chain, Fixpoint, RewriteResult
+from kirin.analysis import const
 from kirin.rules.dce import DeadCodeElimination
+from kirin.passes.abc import Pass
 from kirin.rules.fold import ConstantFold
 from kirin.rules.getitem import InlineGetItem
+from kirin.rules.call2invoke import Call2Invoke
+from kirin.rules.cfg_compactify import CFGCompactify
 
 
 @dataclass
 class Fold(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
-        constprop = ConstProp(self.dialects)
-        constprop.eval(mt, tuple(NotConst() for _ in mt.args))
+        constprop = const.Propagate(self.dialects)
+        constprop.eval(mt, tuple(const.JointResult.top() for _ in mt.args))
         result = Fixpoint(
             Walk(
                 Chain(

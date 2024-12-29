@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Generic, Sequence, TypeVar
+from typing import Generic, TypeVar, Sequence
+from dataclasses import field, dataclass
 
 Stmt = TypeVar("Stmt")
 

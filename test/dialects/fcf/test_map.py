@@ -1,5 +1,5 @@
-from kirin.dialects import fcf
 from kirin.prelude import basic
+from kirin.dialects import fcf
 
 
 @basic(fold=False, typeinfer=True)

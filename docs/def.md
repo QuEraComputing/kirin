@@ -18,7 +18,7 @@ In this section, we will learn about the terminology used in Kirin IR. This will
 
 ::: kirin.ir.Attribute
 
-::: kirin.ir.TypeAttribute
+::: kirin.ir.types.TypeAttribute
 
 ## Traits
 

@@ -1,10 +1,10 @@
 from typing import Any
 
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.dialects.py import data, types
+from kirin.dialects.py import data
 
-T = types.PyTypeVar("T")
+T = types.TypeVar("T")
 
 
 @statement(repr=True)

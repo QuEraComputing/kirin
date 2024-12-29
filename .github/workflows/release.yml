@@ -1,0 +1,27 @@
+name: Release on JFrog
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  documentation:
+    name: Publish package to JFrog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+        # Install a specific version of uv.
+          version: "0.5.1"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install dependencies
+        run: uv sync
+      - name: Build
+        run: uv build
+      - name: Publish
+        run: uv publish --publish-url ${{secrets.JFROG_KIRIN_URL}} --username ${{secrets.JFROG_KIRIN_USERNAME}} --password ${{secrets.JFROG_KIRIN_PASSWORD}}

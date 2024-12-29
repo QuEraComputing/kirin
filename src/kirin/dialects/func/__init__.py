@@ -2,20 +2,20 @@
 """
 
 from kirin.dialects.func import (
-    constprop as constprop,
     emit as emit,
-    interp as interp,
     lower as lower,
+    interp as interp,
+    constprop as constprop,
     typeinfer as typeinfer,
 )
-from kirin.dialects.func.attrs import MethodType as MethodType, Signature as Signature
-from kirin.dialects.func.dialect import dialect as dialect
+from kirin.dialects.func.attrs import Signature as Signature, MethodType as MethodType
 from kirin.dialects.func.stmts import (
     Call as Call,
-    ConstantNone as ConstantNone,
-    Function as Function,
-    GetField as GetField,
     Invoke as Invoke,
     Lambda as Lambda,
     Return as Return,
+    Function as Function,
+    GetField as GetField,
+    ConstantNone as ConstantNone,
 )
+from kirin.dialects.func.dialect import dialect as dialect

@@ -1,10 +1,10 @@
 import pytest
 
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.dialects.py import data, types
-from kirin.exceptions import DialectLoweringError
 from kirin.prelude import basic
+from kirin.exceptions import DialectLoweringError
+from kirin.dialects.py import data
 
 dialect = ir.Dialect("dummy")
 

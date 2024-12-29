@@ -1,13 +1,14 @@
 import ast
 
 from kirin import ir
-from kirin.dialects import cf
-from kirin.dialects.py import stmts
+from kirin.lowering import Frame, Result, FromPythonAST, LoweringState
 from kirin.exceptions import DialectLoweringError
-from kirin.lowering import Frame, FromPythonAST, LoweringState, Result
+from kirin.dialects.cf import stmts as cf
+from kirin.dialects.py import stmts
+from kirin.dialects.cf.dialect import dialect
 
 
-@cf.dialect.register
+@dialect.register
 class CfLowering(FromPythonAST):
 
     def lower_Pass(self, state: LoweringState, node: ast.Pass) -> Result:

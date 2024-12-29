@@ -1,5 +1,5 @@
-from kirin.analysis.cfg import CFG
 from kirin.prelude import basic_no_opt
+from kirin.analysis.cfg import CFG
 
 
 @basic_no_opt

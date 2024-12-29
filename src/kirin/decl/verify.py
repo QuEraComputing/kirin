@@ -6,7 +6,7 @@ from beartype.door import is_subhint
 from kirin import ir
 
 from .base import BaseModifier
-from .info import ArgumentField, Field, ResultField
+from .info import Field, ResultField, ArgumentField
 
 
 class Verify(BaseModifier):

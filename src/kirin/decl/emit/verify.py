@@ -1,7 +1,7 @@
 from typing import Any
 
-from kirin.decl.emit.init import BaseModifier
 from kirin.exceptions import VerificationError
+from kirin.decl.emit.init import BaseModifier
 
 from ._create_fn import create_fn
 from ._set_new_attribute import set_new_attribute

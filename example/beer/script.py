@@ -1,11 +1,11 @@
+from stmts import Pour, Puke, Drink, NewBeer
 from dialect import dialect
-from stmts import Drink, NewBeer, Pour, Puke
 
 from interp import BeerInterpreter as BeerInterpreter
+from rewrite import RandomWalkBranch
 from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
-from kirin.rewrite import Fixpoint, Walk
-from rewrite import RandomWalkBranch
+from kirin.rewrite import Walk, Fixpoint
 
 
 # create our own beer dialect, it runs a random walk on the branches
@@ -24,14 +24,14 @@ def beer(self):
 # type: ignore
 @beer
 def main(x):
-    beer = NewBeer("budlight")  # type: ignore
-    Drink(beer)  # type: ignore
-    Pour(beer, 12)  # type: ignore
+    beer = NewBeer("budlight")
+    Drink(beer)
+    Pour(beer, 12)
     Puke()
     if x > 1:
-        Drink(NewBeer("heineken"))  # type: ignore
+        Drink(NewBeer("heineken"))
     else:
-        Drink(NewBeer("tsingdao"))  # type: ignore
+        Drink(NewBeer("tsingdao"))
     return x + 1
 
 

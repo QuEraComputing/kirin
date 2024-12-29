@@ -1,5 +1,5 @@
-from kirin.passes.inline import InlinePass
 from kirin.prelude import basic_no_opt
+from kirin.passes.inline import InlinePass
 
 
 @basic_no_opt

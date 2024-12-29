@@ -1,9 +1,9 @@
-from dataclasses import dataclass
-from functools import cached_property
 from typing import Iterable
+from functools import cached_property
+from dataclasses import dataclass
 
 from kirin import ir
-from kirin.print import Printable, Printer
+from kirin.print import Printer, Printable
 from kirin.worklist import WorkList
 
 

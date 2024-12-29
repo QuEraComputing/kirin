@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Generic, TypeVar, Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Iterator, TypeVar
 
 from typing_extensions import Self
 
+from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue
-from kirin.print import Printable, Printer
 
 if TYPE_CHECKING:
     from kirin.ir.nodes.stmt import Statement

@@ -1,14 +1,14 @@
-from dataclasses import dataclass, field
+from dataclasses import field, dataclass
 
 from kirin import ir
-from kirin.analysis.dataflow.constprop import ConstPropLattice, NotPure
+from kirin.rewrite import RewriteRule, RewriteResult
+from kirin.analysis import const
 from kirin.dialects import func
-from kirin.rewrite import RewriteResult, RewriteRule
 
 
 @dataclass
 class DeadCodeElimination(RewriteRule):
-    results: dict[ir.SSAValue, ConstPropLattice] = field(default_factory=dict)
+    results: dict[ir.SSAValue, const.JointResult] = field(default_factory=dict)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if self.is_pure(node):
@@ -26,8 +26,13 @@ class DeadCodeElimination(RewriteRule):
             return True
 
         if isinstance(node, func.Invoke):
-            return not any(
-                isinstance(self.results.get(result, NotPure()), NotPure)
-                for result in node.results
-            )
+            for result in node.results:
+                value = self.results.get(result, None)
+                if value is None:
+                    return False
+
+                if value.purity is not const.Pure():
+                    return False
+            return True
+
         return False

@@ -1,5 +1,5 @@
 from kirin.prelude import basic_no_opt
-from kirin.rewrite import Fixpoint, Walk
+from kirin.rewrite import Walk, Fixpoint
 from kirin.rules.cse import CommonSubexpressionElimination
 
 

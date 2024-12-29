@@ -1,11 +1,10 @@
 import ast
 
+from kirin.ir import Pure, SSAValue, Statement, ResultValue, types
 from kirin.decl import info, statement
-from kirin.dialects.py import types
-from kirin.dialects.py.stmts.dialect import dialect
+from kirin.lowering import Result, LoweringState
 from kirin.exceptions import DialectLoweringError
-from kirin.ir import Pure, ResultValue, SSAValue, Statement
-from kirin.lowering import LoweringState, Result
+from kirin.dialects.py.stmts.dialect import dialect
 
 
 @statement(dialect=dialect, init=False)
@@ -19,11 +18,12 @@ class Slice(Statement):
 
     def __init__(self, start: SSAValue, stop: SSAValue, step: SSAValue) -> None:
         if not (
-            isinstance(stop.type, types.PyType) and isinstance(start.type, types.PyType)
+            isinstance(stop.type, types.TypeAttribute)
+            and isinstance(start.type, types.TypeAttribute)
         ):
             result_type = types.Bottom
-        elif start.type.is_subtype(types.NoneType):
-            if stop.type.is_subtype(types.NoneType):
+        elif start.type.is_subseteq(types.NoneType):
+            if stop.type.is_subseteq(types.NoneType):
                 result_type = types.Bottom
             else:
                 result_type = types.Slice[types.widen_const(stop.type)]

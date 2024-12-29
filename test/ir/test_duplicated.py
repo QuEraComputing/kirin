@@ -1,7 +1,7 @@
 import pytest
 
-from kirin.exceptions import CompilerError
 from kirin.prelude import basic
+from kirin.exceptions import CompilerError
 
 
 def test_main():

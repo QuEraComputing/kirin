@@ -1,7 +1,7 @@
 from typing import Any
 
-from kirin.decl.emit.init import BaseModifier
 from kirin.exceptions import VerificationError
+from kirin.decl.emit.init import BaseModifier
 
 from ._create_fn import create_fn
 from ._set_new_attribute import set_new_attribute
@@ -16,7 +16,7 @@ class EmitTypeCheck(BaseModifier):
         }
         body: list[str] = []
         for name, f in self.fields.args.items():
-            if f.type.is_top():
+            if f.type is f.type.top():
                 continue
 
             value_type = f"_args_{f.name}_type"
@@ -32,7 +32,7 @@ class EmitTypeCheck(BaseModifier):
                 body.extend(self._guard_ssa_type(f.name, value_type))
 
         for name, f in self.fields.results.items():
-            if f.type.is_top():
+            if f.type is f.type.top():
                 continue
 
             value_type = f"_results_{f.name}_type"

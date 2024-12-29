@@ -1,16 +1,14 @@
-from abc import abstractmethod
-from dataclasses import dataclass, field
-from typing import Generic, Iterable, TypeVar
+from typing import TypeVar, Iterable
+from dataclasses import field, dataclass
 
-from kirin.interp.base import BaseInterpreter, InterpResult
-from kirin.interp.frame import Frame
-from kirin.interp.value import ResultValue, ReturnValue, Successor
-from kirin.ir import Dialect, DialectGroup, Region, SSAValue, Statement
-from kirin.ir.method import Method
-from kirin.lattice import Lattice
+from kirin.ir import Region, Dialect, SSAValue, Statement, DialectGroup
+from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
+from kirin.interp.base import BaseInterpreter
+from kirin.interp.frame import Frame
+from kirin.interp.value import Successor, ReturnValue, MethodResult
 
-ResultType = TypeVar("ResultType", bound=Lattice)
+ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
 
 
@@ -26,10 +24,11 @@ AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
 
 
 class AbstractInterpreter(
-    Generic[AbstractFrameType, ResultType],
     BaseInterpreter[AbstractFrameType, ResultType],
 ):
-    bottom: ResultType = field(init=False, kw_only=True, repr=False)
+    lattice: type[BoundedLattice[ResultType]]
+    """lattice type for the abstract interpreter.
+    """
 
     def __init__(
         self,
@@ -39,21 +38,15 @@ class AbstractInterpreter(
         max_depth: int = 128,
         max_python_recursion_depth: int = 8192,
     ):
+        if not hasattr(self, "lattice"):
+            raise TypeError(f"lattice is not defined for {self.__class__.__name__}")
         super().__init__(
             dialects,
+            bottom=self.lattice.bottom(),
             fuel=fuel,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
-        self.bottom = self.bottom_value()
-
-    @abstractmethod
-    def new_method_frame(self, mt: Method) -> AbstractFrameType: ...
-
-    @classmethod
-    @abstractmethod
-    def bottom_value(cls) -> ResultType:
-        pass
 
     def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
         return
@@ -73,19 +66,18 @@ class AbstractInterpreter(
         frame.set_values(ssa, results)
 
     def run_ssacfg_region(
-        self, region: Region, args: tuple[ResultType, ...]
-    ) -> InterpResult[ResultType]:
-        frame = self.state.current_frame()
+        self, frame: AbstractFrameType, region: Region
+    ) -> MethodResult[ResultType]:
         result = self.bottom
-        if not region.blocks:
-            return InterpResult(result)
-
-        frame.worklist.append(Successor(region.blocks[0], *args))
+        frame.worklist.append(
+            Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))
+        )
         while (succ := frame.worklist.pop()) is not None:
             self.prehook_succ(frame, succ)
-            result = self.run_block(frame, succ).join(result)
+            block_result = self.run_block(frame, succ)
+            result: ResultType = block_result.join(result)
             self.posthook_succ(frame, succ)
-        return InterpResult(result)
+        return result
 
     def run_block(self, frame: AbstractFrameType, succ: Successor) -> ResultType:
         self.set_values(frame, succ.block.args, succ.block_args)
@@ -96,10 +88,9 @@ class AbstractInterpreter(
                 stmt = stmt.next_stmt  # skip
                 continue
 
-            inputs = frame.get_values(stmt.args)
-            stmt_results = self.run_stmt(stmt, inputs)
+            stmt_results = self.run_stmt(frame, stmt)
             match stmt_results:
-                case ResultValue(values):
+                case tuple(values):
                     self.set_values(frame, stmt._results, values)
                 case ReturnValue(result):  # this must be last stmt in block
                     return result

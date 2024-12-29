@@ -1,9 +1,8 @@
+from kirin.ir import Pure, SSAValue, Statement, ResultValue, types
 from kirin.decl import info, statement
-from kirin.dialects.py import types
 from kirin.dialects.py.stmts.dialect import dialect
-from kirin.ir import Pure, ResultValue, SSAValue, Statement
 
-T = types.PyTypeVar("T", bound=types.PyUnion(types.Int, types.Float))
+T = types.TypeVar("T", bound=types.Int | types.Float)
 
 
 @statement(dialect=dialect)

@@ -2,8 +2,8 @@ import ast
 import sys
 
 from kirin.ir import Method, SSAValue
-from kirin.lowering.result import Result
 from kirin.lowering.state import LoweringState
+from kirin.lowering.result import Result
 
 class FromPythonAST:
     @property

@@ -25,6 +25,7 @@ packages = ["src/kirin"]
 profile = "black"
 combine_as_imports = true
 multi_line_output = 3
+length_sort = true
 src_paths = ["src/kirin"]
 
 [tool.black]

@@ -1,9 +1,9 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.dialects.py import stmts, types
-from kirin.dialects.py.rules import RewriteGetItem
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk
+from kirin.dialects.py import stmts
+from kirin.dialects.py.rules import RewriteGetItem
 
 dummy = ir.Dialect("dummy")
 

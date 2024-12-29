@@ -1,114 +1,134 @@
 from typing import Callable, Iterable
 
 from kirin import ir
-from kirin.analysis.dataflow.typeinfer import TypeInference
+from kirin.interp import Err, MethodTable, AbstractFrame, impl
+from kirin.analysis.typeinfer import TypeInference
+from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
-from kirin.dialects.fcf.stmts import Foldl, Foldr, Map, Scan
-from kirin.dialects.py import types
-from kirin.interp import DialectInterpreter, ResultValue, impl
 
 
 @dialect.register(key="typeinfer")
-class TypeInfer(DialectInterpreter):
+class TypeInfer(MethodTable):
 
     @impl(Foldl)
     def foldl(
-        self, interp: TypeInference, stmt: Foldl, values: tuple[types.PyType, ...]
+        self,
+        interp: TypeInference,
+        frame: AbstractFrame,
+        stmt: Foldl,
     ):
-        return self.fold(lambda x: x, interp, stmt, values)
+        return self.fold(lambda x: x, interp, stmt, frame.get_values(stmt.args))
 
     @impl(Foldr)
     def foldr(
-        self, interp: TypeInference, stmt: Foldr, values: tuple[types.PyType, ...]
+        self,
+        interp: TypeInference,
+        frame: AbstractFrame,
+        stmt: Foldr,
     ):
-        return self.fold(reversed, interp, stmt, values)
+        return self.fold(reversed, interp, stmt, frame.get_values(stmt.args))
 
     def fold(
         self,
-        order: Callable[[tuple[types.PyType, ...]], Iterable[types.PyType]],
-        interp,
-        stmt,
-        values: tuple[types.PyType, ...],
+        order: Callable[
+            [tuple[ir.types.TypeAttribute, ...]], Iterable[ir.types.TypeAttribute]
+        ],
+        interp: TypeInference,
+        stmt: Foldl | Foldr,
+        values: tuple[ir.types.TypeAttribute, ...],
     ):
-        if not isinstance(values[0], types.PyConst):
-            return ResultValue(stmt.result.type)  # give up on dynamic calls
+        if not isinstance(values[0], ir.types.Const):
+            return (stmt.result.type,)  # give up on dynamic calls
 
         fn: ir.Method = values[0].data
-        coll: types.PyType = values[1]
-        init: types.PyType = values[2]
+        coll: ir.types.TypeAttribute = values[1]
+        init: ir.types.TypeAttribute = values[2]
 
-        if isinstance(coll, types.PyGeneric):
-            if coll.is_subseteq(types.List):
-                ret = interp.eval(fn, (init, coll.vars[0])).to_result()
-                if isinstance(ret, ResultValue):
-                    ret_type: types.PyType = ret.values[0]
-                    if not init.is_subseteq(ret_type):
-                        return ResultValue(types.Bottom)
-                    return ResultValue(ret_type)
-            elif coll.is_subseteq(types.Tuple):
+        if isinstance(coll, ir.types.Generic):
+            if coll.is_subseteq(ir.types.List):
+                ret = interp.eval(fn, (init, coll.vars[0])).value
+                if isinstance(ret, Err):
+                    return ret
+
+                if not init.is_subseteq(ret):
+                    return (ir.types.Bottom,)
+                return (ret,)
+            elif coll.is_subseteq(ir.types.Tuple):
                 carry = init
                 for elem in order(coll.vars):
-                    carry = interp.eval(fn, (carry, elem)).to_result()
-                    if isinstance(carry, ResultValue):
-                        carry = carry.values[0]
-                    else:
+                    carry = interp.eval(fn, (carry, elem)).value
+                    if isinstance(carry, Err):
                         return carry
-                return ResultValue(carry)
+                return (carry,)
 
-        return ResultValue(types.Bottom)
+        return (ir.types.Bottom,)
 
-    @impl(Map, types.PyClass(ir.Method), types.PyClass(list))
+    @impl(Map, ir.types.PyClass(ir.Method), ir.types.PyClass(list))
     def map_list(
-        self, interp: TypeInference, stmt, values: tuple[types.PyType, types.PyType]
+        self,
+        interp: TypeInference,
+        frame: AbstractFrame,
+        stmt: Map,
     ):
-        if not isinstance(values[0], types.PyConst):
-            return ResultValue(types.List)  # give up on dynamic calls
+        fn_value = frame.get(stmt.fn)
+        if not isinstance(fn_value, ir.types.Const):
+            return (ir.types.List[ir.types.Any],)  # give up on dynamic calls
 
-        fn: ir.Method = values[0].data
-        coll: types.PyType = values[1]
-        if isinstance(coll, types.PyGeneric) and coll.is_subseteq(types.List):
-            elem = interp.eval(fn, (coll.vars[0],)).to_result()
-            if isinstance(elem, ResultValue):
-                return ResultValue(types.List[elem.values[0]])
-            else:  # fn errors forward the error
+        fn: ir.Method = fn_value.data
+        coll: ir.types.TypeAttribute = frame.get(stmt.coll)
+        if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
+            elem = interp.eval(fn, (coll.vars[0],)).value
+            if isinstance(elem, Err):
+                # fn errors forward the error
                 return elem
-        return ResultValue(types.Bottom)
+            return (ir.types.List[elem],)
+        return (ir.types.Bottom,)
 
-    @impl(Map, types.PyClass(ir.Method), types.PyClass(range))
+    @impl(Map, ir.types.PyClass(ir.Method), ir.types.PyClass(range))
     def map_range(
-        self, interp: TypeInference, stmt, values: tuple[types.PyType, types.PyType]
+        self,
+        interp: TypeInference,
+        frame: AbstractFrame,
+        stmt: Map,
     ):
-        if not isinstance(values[0], types.PyConst):
-            return ResultValue(types.List)  # give up on dynamic calls
+        fn_value = frame.get(stmt.fn)
+        if not isinstance(fn_value, ir.types.Const):
+            return (ir.types.List,)  # give up on dynamic calls
 
-        fn: ir.Method = values[0].data
-        elem = interp.eval(fn, (types.Int,)).to_result()
-        if isinstance(elem, ResultValue):
-            return ResultValue(types.List[elem.values[0]])
-        else:  # fn errors forward the error
+        fn: ir.Method = fn_value.data
+        elem = interp.eval(fn, (ir.types.Int,)).value
+        # fn errors forward the error
+        if isinstance(elem, Err):
             return elem
+        else:
+            return (ir.types.List[elem],)
 
     @impl(Scan)
-    def scan(self, interp: TypeInference, stmt: Scan, values: tuple[types.PyType, ...]):
-        init = values[1]
-        coll = values[2]
+    def scan(
+        self,
+        interp: TypeInference,
+        frame: AbstractFrame,
+        stmt: Scan,
+    ):
+        fn_value = frame.get(stmt.fn)
+        init = frame.get(stmt.init)
+        coll = frame.get(stmt.coll)
 
-        if not isinstance(values[0], types.PyConst):
-            return ResultValue(types.Tuple[init, types.List])
+        if not isinstance(fn_value, ir.types.Const):
+            return (ir.types.Tuple[init, ir.types.List[ir.types.Any]],)
 
-        fn: ir.Method = values[0].data
-        if isinstance(coll, types.PyGeneric) and coll.is_subseteq(types.List):
-            _ret = interp.eval(fn, (init, coll.vars[0])).to_result()
-            if isinstance(_ret, ResultValue) and len(_ret.values) == 1:
-                ret = _ret.values[0]
-                if isinstance(ret, types.PyGeneric) and ret.is_subseteq(types.Tuple):
-                    if len(ret.vars) != 2:
-                        return ResultValue(types.Bottom)
-                    carry: types.PyType = ret.vars[0]
-                    if not carry.is_subseteq(init):
-                        return ResultValue(types.Bottom)
-                    return ResultValue(types.Tuple[carry, types.List[ret.vars[1]]])
-            else:  # fn errors forward the error
-                return _ret
+        fn: ir.Method = fn_value.data
+        if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
+            ret = interp.eval(fn, (init, coll.vars[0])).value
+            if isinstance(ret, Err):
+                return ret
 
-        return ResultValue(types.Bottom)
+            if isinstance(ret, ir.types.Generic) and ret.is_subseteq(ir.types.Tuple):
+                if len(ret.vars) != 2:
+                    return (ir.types.Bottom,)
+                carry: ir.types.TypeAttribute = ret.vars[0]
+                if not carry.is_subseteq(init):
+                    return (ir.types.Bottom,)
+                return (ir.types.Tuple[carry, ir.types.List[ret.vars[1]]],)
+
+        return (ir.types.Bottom,)

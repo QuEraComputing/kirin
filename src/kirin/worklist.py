@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Generic, Iterable, TypeVar
+from typing import Generic, TypeVar, Iterable
+from dataclasses import field, dataclass
 
 ElemType = TypeVar("ElemType")
 

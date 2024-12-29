@@ -1,27 +1,27 @@
 from typing import Union
 
-from kirin.decl import info, statement
-from kirin.dialects.func.attrs import MethodType, Signature
-from kirin.dialects.func.dialect import dialect
-from kirin.dialects.py import types
-from kirin.exceptions import VerificationError
 from kirin.ir import (
-    CallableStmtInterface,
-    ConstantLike,
-    HasParent,
-    HasSignature,
-    IsolatedFromAbove,
-    IsTerminator,
-    Method,
     Pure,
+    Method,
     Region,
-    ResultValue,
-    SSACFGRegion,
+    HasParent,
     Statement,
+    ResultValue,
+    ConstantLike,
+    HasSignature,
+    IsTerminator,
+    SSACFGRegion,
+    IsolatedFromAbove,
     SymbolOpInterface,
+    CallableStmtInterface,
+    types,
 )
+from kirin.decl import info, statement
 from kirin.ir.ssa import SSAValue
+from kirin.exceptions import VerificationError
 from kirin.print.printer import Printer
+from kirin.dialects.func.attrs import Signature, MethodType
+from kirin.dialects.func.dialect import dialect
 
 
 def _print_invoke_or_call(

@@ -1,10 +1,9 @@
-from dataclasses import dataclass
 from typing import Generic, TypeVar
+from dataclasses import dataclass
 
-from kirin.codegen import CodeGen, DialectEmit, impl
-from kirin.dialects.py.types.elem import PyClass, PyType
-from kirin.ir.attrs import Attribute
-from kirin.ir.dialect import Dialect
+from kirin.ir import Dialect, Attribute, types
+from kirin.interp import MethodTable, impl
+from kirin.emit.julia import EmitJulia
 from kirin.print.printer import Printer
 
 dialect = Dialect("py.data")
@@ -17,13 +16,13 @@ T = TypeVar("T", covariant=True)
 class PyAttr(Generic[T], Attribute):
     name = "PyAttr"
     data: T
-    type: PyType
+    type: types.TypeAttribute
 
-    def __init__(self, data: T, pytype: PyType | None = None):
+    def __init__(self, data: T, pytype: types.TypeAttribute | None = None):
         self.data = data
 
         if pytype is None:
-            self.type = PyClass(type(data))
+            self.type = types.PyClass(type(data))
         else:
             self.type = pytype
 
@@ -37,13 +36,14 @@ class PyAttr(Generic[T], Attribute):
             printer.print(self.type)
 
 
-@dialect.register(key="dict")
-@dataclass
-class EmitDict(DialectEmit):
+@dialect.register(key="emit.julia")
+class JuliaTable(MethodTable):
+
     @impl(PyAttr)
-    def emit_PyAttr(self, emit: CodeGen, stmt: PyAttr):
-        return {
-            "name": stmt.name,
-            "data": repr(stmt.data),
-            "type": emit.emit_Attribute(stmt.type),
-        }
+    def emit_PyAttr(self, emit: EmitJulia, attr: PyAttr):
+        if isinstance(attr.data, (int, float)):
+            return repr(attr.data)
+        elif isinstance(attr.data, str):
+            return f'"{attr.data}"'
+        else:
+            raise ValueError(f"unsupported type {type(attr.data)}")

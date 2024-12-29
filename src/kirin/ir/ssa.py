@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar
+from dataclasses import field, dataclass
 
 from typing_extensions import Self
 
-from kirin.ir.attrs import AnyType, TypeAttribute
-from kirin.print import Printable, Printer
+from kirin.print import Printer, Printable
+from kirin.ir.types import AnyType, TypeAttribute
 
 if TYPE_CHECKING:
-    from kirin.ir.nodes.block import Block
-    from kirin.ir.nodes.stmt import Statement
     from kirin.ir.use import Use
+    from kirin.ir.nodes.stmt import Statement
+    from kirin.ir.nodes.block import Block
 
 
 @dataclass
@@ -114,7 +114,7 @@ class ResultValue(SSAValue):
         return id(self)
 
     def __repr__(self) -> str:
-        if self.type.is_top():
+        if self.type is self.type.top():
             type_str = ""
         else:
             type_str = f"[{self.type}]"

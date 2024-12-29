@@ -1,32 +1,29 @@
 import inspect
 from abc import ABC
+from typing import TYPE_CHECKING, TypeVar, ClassVar
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Tuple
 
-from kirin.exceptions import DialectInterpretationError
 from kirin.interp.base import BaseInterpreter
-from kirin.interp.impl import ImplDef
-from kirin.interp.value import Result, ResultValue
-from kirin.ir import Statement
+from kirin.interp.impl import ImplDef, AttributeImplDef
 
 if TYPE_CHECKING:
+    from kirin.ir import Attribute
     from kirin.interp.base import BaseInterpreter
-    from kirin.interp.impl import ImplFunction, Signature
+    from kirin.interp.impl import Signature, MethodFunction, AttributeFunction
+
+
+InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
+ValueType = TypeVar("ValueType")
 
 
 @dataclass
-class DialectInterpreter(ABC):
+class MethodTable(ABC):
     """Base class to define lookup tables for interpreting code for IR nodes in a dialect."""
 
-    table: ClassVar[dict["Signature", "ImplFunction"]]
-
-    @classmethod
-    def fallback(
-        cls, interp: "BaseInterpreter", stmt: Statement, values: Tuple
-    ) -> Result:
-        raise DialectInterpretationError(
-            f"Interpreter for {stmt.__class__} not implemented"
-        )
+    table: ClassVar[dict["Signature", "MethodFunction"]]
+    """Lookup table for interpreting code for IR nodes in a dialect."""
+    attribute: ClassVar[dict[type["Attribute"], "AttributeFunction"]]
+    """Lookup table for interpreting code for IR attributes in a dialect."""
 
     def __init_subclass__(cls) -> None:
         # init the subclass first
@@ -37,17 +34,7 @@ class DialectInterpreter(ABC):
                 for sig in value.signature:
                     cls.table[sig] = value.impl
 
-
-@dataclass
-class DefaultTypeInferInterpreter(DialectInterpreter):
-
-    @classmethod
-    def fallback(
-        cls, interp: BaseInterpreter, stmt: Statement, values: Tuple
-    ) -> Result:
-        return ResultValue(*tuple(result.type for result in stmt.results))
-
-
-@dataclass
-class EmptyDialectInterpreter(DialectInterpreter):
-    pass
+        cls.attribute = {}
+        for _, value in inspect.getmembers(cls):
+            if isinstance(value, AttributeImplDef):
+                cls.attribute[value.signature] = value.impl

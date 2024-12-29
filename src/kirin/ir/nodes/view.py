@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
+from typing import Generic, TypeVar, Iterator, Sequence, overload
 from dataclasses import dataclass
-from typing import Generic, Iterator, Sequence, TypeVar, overload
 
 from typing_extensions import Self
 
-from kirin.ir.nodes.base import IRNode
 from kirin.ir.ssa import SSAValue
+from kirin.ir.nodes.base import IRNode
 
 ElemType = TypeVar("ElemType", bound=IRNode | SSAValue)
 FieldType = TypeVar("FieldType", bound=Sequence)

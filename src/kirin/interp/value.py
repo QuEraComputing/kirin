@@ -1,44 +1,20 @@
-from abc import ABC, abstractmethod
+from typing import Tuple, Generic, TypeVar, TypeAlias, final
 from dataclasses import dataclass
-from typing import Generic, Tuple, TypeVar
 
+from kirin.ir import Block, SymbolOpInterface, CallableStmtInterface
 from kirin.interp.frame import Frame
-from kirin.ir import Block, CallableStmtInterface, SymbolOpInterface
 
 ValueType = TypeVar("ValueType")
 
 
 @dataclass(init=False)
-class Result(ABC, Generic[ValueType]):
-    """Base class of interpretation results."""
-
-    @abstractmethod
-    def __len__(self) -> int: ...
+class SpecialResult(Generic[ValueType]):
+    pass
 
 
+@final
 @dataclass(init=False)
-class NoReturn(Result[ValueType]):
-    """No return value from a statement evaluation."""
-
-    def __len__(self) -> int:
-        return 0
-
-
-@dataclass(init=False)
-class ResultValue(Result[ValueType]):
-    """Result values from a statement evaluation."""
-
-    values: Tuple
-
-    def __init__(self, *values: ValueType):
-        self.values = tuple(values)
-
-    def __len__(self) -> int:
-        return len(self.values)
-
-
-@dataclass(init=False)
-class ReturnValue(Result[ValueType]):
+class ReturnValue(SpecialResult[ValueType]):
     """Return value from a statement evaluation."""
 
     result: ValueType
@@ -51,8 +27,9 @@ class ReturnValue(Result[ValueType]):
         return 0
 
 
+@final
 @dataclass(init=False)
-class Successor(Result[ValueType]):
+class Successor(SpecialResult[ValueType]):
     """Successor block from a statement evaluation."""
 
     block: Block
@@ -70,14 +47,15 @@ class Successor(Result[ValueType]):
         return 0
 
 
+@final
 @dataclass(init=False)
-class Err(Result[ValueType]):
+class Err(SpecialResult[ValueType]):
     """Error result from a statement evaluation."""
 
     exception: Exception
     frames: list[Frame]
 
-    def __init__(self, exception: Exception, frames: list[Frame]):
+    def __init__(self, exception: Exception, frames: list):
         super().__init__()
         self.exception = exception
         self.frames = frames.copy()
@@ -90,7 +68,7 @@ class Err(Result[ValueType]):
 
     def print_stack(self):
         """Print the stack trace of the error."""
-        top_method_code = self.frames[0].method.code
+        top_method_code = self.frames[0].code
         if (call_trait := top_method_code.get_trait(CallableStmtInterface)) is None:
             raise ValueError(f"Method code {top_method_code} is not callable")
 
@@ -102,7 +80,11 @@ class Err(Result[ValueType]):
         )
         args = ",".join(
             [
-                (f"{arg.name}" if arg.type.is_top() else f"{arg.name}:{arg.type}")
+                (
+                    f"{arg.name}"
+                    if arg.type is arg.type.top()
+                    else f"{arg.name}:{arg.type}"
+                )
                 for arg in region.blocks[0].args[1:]
             ]
         )
@@ -119,3 +101,7 @@ class Err(Result[ValueType]):
     def panic(self):
         """Raise the error."""
         raise self.exception
+
+
+StatementResult: TypeAlias = tuple[ValueType, ...] | SpecialResult[ValueType]
+MethodResult: TypeAlias = ValueType | Err[ValueType]

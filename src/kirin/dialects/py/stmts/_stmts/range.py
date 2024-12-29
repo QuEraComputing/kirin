@@ -1,11 +1,10 @@
 import ast
 
+from kirin.ir import Pure, SSAValue, Statement, ResultValue, types
 from kirin.decl import info, statement
-from kirin.dialects.py import types
-from kirin.dialects.py.stmts.dialect import dialect
+from kirin.lowering import Result, LoweringState
 from kirin.exceptions import DialectLoweringError
-from kirin.ir import Pure, ResultValue, SSAValue, Statement
-from kirin.lowering import LoweringState, Result
+from kirin.dialects.py.stmts.dialect import dialect
 
 
 @statement(dialect=dialect)

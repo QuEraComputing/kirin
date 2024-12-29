@@ -1,6 +1,6 @@
+from kirin.ir import DialectGroup
 from kirin.dialects import cf, func
 from kirin.dialects.py import data
-from kirin.ir import DialectGroup
 
 
 def test_union():

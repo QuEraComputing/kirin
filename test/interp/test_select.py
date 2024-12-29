@@ -2,43 +2,36 @@ from dataclasses import dataclass
 
 import pytest
 
-from kirin.analysis.dataflow.forward import ForwardExtra
-from kirin.dialects.py import stmts
-from kirin.interp import DialectInterpreter, ResultValue, impl
-from kirin.interp.base import InterpResult
-from kirin.ir.method import Method
-from kirin.ir.nodes.region import Region
+from kirin.interp import MethodTable, StatementResult, impl
 from kirin.lattice import EmptyLattice
 from kirin.prelude import basic
 from kirin.worklist import WorkList
+from kirin.ir.method import Method
+from kirin.dialects.py import stmts
+from kirin.analysis.forward import ForwardExtra
 
 
 @dataclass(init=False)
 class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
     keys = ["test_interp", "main", "empty"]
-
-    @classmethod
-    def bottom_value(cls) -> EmptyLattice:
-        return EmptyLattice()
+    lattice = EmptyLattice
 
     @classmethod
     def default_worklist(cls) -> WorkList:
         return WorkList()
 
-    def run_method_region(
-        self, mt: Method, body: Region, args: tuple[EmptyLattice, ...]
-    ) -> InterpResult[EmptyLattice]:
-        return self.run_ssacfg_region(body, (EmptyLattice(),) + args)
+    def run_method(
+        self, method: Method, args: tuple[EmptyLattice, ...]
+    ) -> StatementResult[EmptyLattice]:
+        return self.run_callable(method.code, (EmptyLattice(),) + args)
 
 
 @stmts.dialect.register(key="test_interp")
-class DialectInterp(DialectInterpreter):
+class DialectMethodTable(MethodTable):
 
     @impl(stmts.NewTuple)
-    def new_tuple(
-        self, interp: DummyInterpreter, stmt: stmts.NewTuple, values: tuple
-    ) -> ResultValue:
-        return ResultValue(EmptyLattice())
+    def new_tuple(self, interp: DummyInterpreter, frame, stmt: stmts.NewTuple):
+        return (EmptyLattice(),)
 
 
 @basic

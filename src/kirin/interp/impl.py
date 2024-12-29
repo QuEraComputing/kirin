@@ -1,26 +1,61 @@
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Type,
+    Union,
+    Generic,
+    TypeVar,
+    Callable,
+    TypeAlias,
+    overload,
+)
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Type, TypeVar, Union
 
-from kirin.interp.value import Result
-from kirin.ir import Statement, TypeAttribute
+from kirin.ir import Attribute, Statement, types
+from kirin.interp.value import StatementResult
 
 if TYPE_CHECKING:
-    from kirin.interp.base import BaseInterpreter
-    from kirin.interp.dialect import DialectInterpreter
+    from kirin.interp.base import FrameABC, BaseInterpreter
+    from kirin.interp.dialect import MethodTable
 
-    Self = TypeVar("Self", bound="DialectInterpreter")
-    InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
-    StatementType = TypeVar("StatementType", bound=Statement)
-    ImplFunction = Callable[[Self, InterpreterType, StatementType, tuple], Result]
-    StatementImpl = Callable[[InterpreterType, StatementType, tuple], Result]
-    Signature = Type[Statement] | tuple[Type[Statement], tuple[TypeAttribute, ...]]
+MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
+InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
+FrameType = TypeVar("FrameType", bound="FrameABC")
+StatementType = TypeVar("StatementType", bound=Statement)
+AttributeType = TypeVar("AttributeType", bound=Attribute)
+MethodFunction: TypeAlias = Callable[
+    [MethodTableSelf, InterpreterType, FrameType, StatementType], StatementResult
+]
+AttributeFunction: TypeAlias = Callable[
+    [MethodTableSelf, InterpreterType, AttributeType], Any
+]
+
+
+@dataclass(frozen=True)
+class Signature:
+    stmt: Type[Statement]
+    args: tuple[types.TypeAttribute, ...] | None = None
+
+    def __repr__(self):
+        if self.args:
+            return f"{self.stmt.__name__}[{', '.join(map(repr, self.args))}]"
+        else:
+            return f"{self.stmt.__name__}[...]"
+
+
+SigType = TypeVar("SigType")
+ImplType = TypeVar("ImplType")
 
 
 @dataclass
-class ImplDef:
+class Def(Generic[SigType, ImplType]):
+    signature: SigType
+    impl: ImplType
+
+
+@dataclass
+class ImplDef(Def[tuple[Signature, ...], "MethodFunction"]):
     parent: Type[Statement]
-    signature: tuple["Signature", ...]
-    impl: "ImplFunction"
 
     def __repr__(self):
         if self.parent.dialect:
@@ -30,35 +65,99 @@ class ImplDef:
 
 
 @dataclass
-class MethodImpl:
-    parent: "DialectInterpreter"
-    impl: "ImplFunction"
+class AttributeImplDef(Def[type[Attribute], "AttributeFunction"]):
 
-    def __call__(
-        self, interp: "BaseInterpreter", stmt: Statement, values: tuple
-    ) -> Result:
-        return self.impl(self.parent, interp, stmt, values)
-
-    def __repr__(self) -> str:
-        return f"method impl `{self.impl.__name__}` in {repr(self.parent.__class__)}"
+    def __repr__(self):
+        if self.signature.dialect:
+            return f"attribute impl {self.signature.dialect.name}.{self.signature.name}"
+        else:
+            return f"attribute impl {self.signature.name}"
 
 
-class impl:
+StatementType = TypeVar("StatementType", bound=Statement)
+HeadType = TypeVar("HeadType")
+
+
+class impl(Generic[HeadType]):
     """Decorator to define an Interpreter implementation for a statement."""
 
     # TODO: validate only concrete types are allowed here
 
-    def __init__(self, stmt: Type[Statement], *args: TypeAttribute) -> None:
-        self.stmt = stmt
+    def __init__(
+        self, stmt_or_attribute: Type[HeadType], *args: types.TypeAttribute
+    ) -> None:
+        if args and issubclass(stmt_or_attribute, Attribute):
+            raise ValueError("Attributes do not take arguments")
+        self.stmt_or_attribute: type[HeadType] = stmt_or_attribute
         self.args = args
 
-    def __call__(self, func: Union["ImplFunction", ImplDef]) -> ImplDef:
-        if self.args:
-            sig = (self.stmt, self.args)
-        else:
-            sig = self.stmt
+    @overload
+    def __call__(
+        self,
+        func: Union[
+            Callable[
+                [MethodTableSelf, InterpreterType, FrameType, StatementType],
+                StatementResult,
+            ],
+            ImplDef,
+        ],
+    ) -> ImplDef: ...
 
-        if isinstance(func, ImplDef):
-            return ImplDef(self.stmt, func.signature + (sig,), func.impl)
+    @overload
+    def __call__(
+        self,
+        func: Union[
+            Callable[
+                [MethodTableSelf, InterpreterType, AttributeType],
+                Any,
+            ],
+            AttributeImplDef,
+        ],
+    ) -> AttributeImplDef: ...
+
+    def __call__(
+        self,
+        func: Union[
+            Callable[
+                [MethodTableSelf, InterpreterType, FrameType, StatementType],
+                StatementResult,
+            ],
+            Callable[
+                [MethodTableSelf, InterpreterType, AttributeType],
+                Any,
+            ],
+            ImplDef,
+            AttributeImplDef,
+        ],
+    ) -> Def:
+        if issubclass(self.stmt_or_attribute, Statement):
+            return self._impl_statement(self.stmt_or_attribute, func)
+        elif issubclass(self.stmt_or_attribute, Attribute):
+            return self._impl_attribute(self.stmt_or_attribute, func)
         else:
-            return ImplDef(self.stmt, (sig,), func)
+            raise ValueError(f"Invalid statement type {self.stmt_or_attribute}")
+
+    def _impl_attribute(
+        self,
+        attr: Type[Attribute],
+        func: Union[Callable, Def],
+    ) -> AttributeImplDef:
+        if isinstance(func, Def):
+            return AttributeImplDef(attr, func.impl)
+        else:
+            return AttributeImplDef(attr, func)
+
+    def _impl_statement(
+        self,
+        stmt: Type[Statement],
+        func: Union[Callable, Def],
+    ) -> ImplDef:
+        if self.args:
+            sig = Signature(stmt, self.args)
+        else:
+            sig = Signature(stmt)
+
+        if isinstance(func, Def):
+            return ImplDef(func.signature + (sig,), func.impl, stmt)
+        else:
+            return ImplDef((sig,), func, stmt)

@@ -1,11 +1,11 @@
-import inspect
 import sys
+import inspect
 from typing import Any, TypedDict
 
-from typing_extensions import Optional, Unpack
+from typing_extensions import Unpack, Optional
 
-from kirin.decl.info import StatementFields
 from kirin.ir import Dialect
+from kirin.decl.info import StatementFields
 
 
 class StatementOptions(TypedDict, total=False):

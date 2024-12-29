@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
+from dataclasses import field, dataclass
+from collections.abc import Sequence
 
 from typing_extensions import Self
 
-from kirin.exceptions import VerificationError
-from kirin.ir.attrs import TypeAttribute
-from kirin.ir.nodes.base import IRNode
-from kirin.ir.nodes.view import MutableSequenceView, View
-from kirin.ir.ssa import BlockArgument, SSAValue
 from kirin.print import Printer
+from kirin.ir.ssa import SSAValue, BlockArgument
+from kirin.exceptions import VerificationError
+from kirin.ir.nodes.base import IRNode
+from kirin.ir.nodes.view import View, MutableSequenceView
 
 if TYPE_CHECKING:
-    from kirin.ir.nodes.region import Region
+    from kirin.ir.types import TypeAttribute
     from kirin.ir.nodes.stmt import Statement
+    from kirin.ir.nodes.region import Region
 
 
 @dataclass

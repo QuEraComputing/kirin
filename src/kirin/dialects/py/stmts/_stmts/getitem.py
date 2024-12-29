@@ -1,11 +1,10 @@
 from abc import abstractmethod
-from dataclasses import dataclass
 from typing import Generic, TypeVar
+from dataclasses import dataclass
 
+from kirin.ir import Pure, SSAValue, Statement, StmtTrait, ResultValue, types
 from kirin.decl import info, statement
-from kirin.dialects.py import types
 from kirin.dialects.py.stmts.dialect import dialect
-from kirin.ir import Pure, ResultValue, SSAValue, Statement, StmtTrait
 
 GetItemLikeStmt = TypeVar("GetItemLikeStmt", bound=Statement)
 

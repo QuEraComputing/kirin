@@ -1,13 +1,13 @@
-from dataclasses import dataclass, field
 from types import ModuleType
-from typing import TYPE_CHECKING, Callable, Generic, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
+from dataclasses import field, dataclass
 
-from kirin.exceptions import InterpreterError, VerificationError
-from kirin.ir.attrs import TypeAttribute
-from kirin.ir.nodes.stmt import Statement
+from kirin.ir.types import TypeAttribute
 from kirin.ir.traits import CallableStmtInterface
-from kirin.print.printable import Printable
+from kirin.exceptions import InterpreterError, VerificationError
+from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
+from kirin.print.printable import Printable
 
 if TYPE_CHECKING:
     from kirin.ir.group import DialectGroup
@@ -20,17 +20,13 @@ RetType = TypeVar("RetType")
 class Method(Printable, Generic[Param, RetType]):
     mod: ModuleType | None  # ref
     py_func: Callable[Param, RetType] | None  # ref
-    sym_name: str | None
+    sym_name: str
     arg_names: list[str]
     dialects: "DialectGroup"  # own
     code: Statement  # own, the corresponding IR, a func.func usually
     # values contained if closure
     fields: tuple = field(default_factory=tuple)  # own
     file: str = ""
-    lineno: list[tuple[int, int]] = field(default_factory=list)
-    """(<line>, <col>) at the start of the statement call.
-    """
-    backedges: list["Method"] = field(default_factory=list)  # own
     return_type: TypeAttribute | None = None
     inferred: bool = False
     """if typeinfer has been run on this method

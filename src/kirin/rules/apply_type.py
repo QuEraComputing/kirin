@@ -1,23 +1,23 @@
 from dataclasses import dataclass
 
-from kirin.dialects.func import Signature
 from kirin.ir import (
     Block,
-    CallableStmtInterface,
-    HasSignature,
     SSAValue,
     Statement,
-    TypeAttribute,
+    HasSignature,
+    CallableStmtInterface,
+    types,
 )
-from kirin.rewrite import RewriteResult, RewriteRule
+from kirin.rewrite import RewriteRule, RewriteResult
+from kirin.dialects.func import Signature
 
 
 @dataclass
 class ApplyType(RewriteRule):
-    ret_type: TypeAttribute
-    results: dict[SSAValue, TypeAttribute]
+    ret_type: types.TypeAttribute
+    results: dict[SSAValue, types.TypeAttribute]
 
-    def get_type(self, value: SSAValue) -> TypeAttribute:
+    def get_type(self, value: SSAValue) -> types.TypeAttribute:
         return self.results[value]
         # if isinstance(typ, types.PyConst):
         #     return typ.typ

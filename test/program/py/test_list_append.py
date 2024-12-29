@@ -1,6 +1,6 @@
 # type: ignore
-from kirin.dialects.py import stmts
 from kirin.prelude import basic
+from kirin.dialects.py import stmts
 
 
 def test_list_append():

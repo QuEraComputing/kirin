@@ -1,12 +1,11 @@
-from dataclasses import MISSING
 from typing import Any
+from dataclasses import MISSING
 
 from typing_extensions import Unpack
 
 from kirin import ir
 from kirin.decl import info
 from kirin.decl.base import BaseModifier, StatementOptions
-from kirin.dialects.py import data, types
 
 from ._create_fn import create_fn
 from ._set_new_attribute import set_new_attribute
@@ -30,17 +29,19 @@ class EmitInit(BaseModifier):
 
     def __init__(self, cls: type, **kwargs: Unpack[StatementOptions]) -> None:
         super().__init__(cls, **kwargs)
+        from kirin.dialects.py.data import PyAttr
+
         self._init_params: list[str] = []
         self._init_body: list[str] = []
         self._init_locals: dict[str, Any] = {}
         self.has_post_init = hasattr(self.cls, self._POST_INIT_NAME)
         self.globals.update(
             {
-                "_PY_ANY": types.Any,
+                "_PY_ANY": ir.types.Any,
                 self._KIRIN_STMT: ir.Statement,
                 self._SELF_CLASS: self.cls,
                 self._RESULT_VALUE_NAME: ir.ResultValue,
-                self._KIRIN_PYATTR: data.PyAttr,
+                self._KIRIN_PYATTR: PyAttr,
             }
         )
 
@@ -199,7 +200,7 @@ class EmitInit(BaseModifier):
                 )
 
         # declared via python type, optionally check if we can
-        # convert the value to types.PyAttr
+        # convert the value to data.PyAttr
         if f.pytype:
             attr_type = f"_kirin_attr_type_{f.name}"
             self._init_locals[attr_type] = f.type

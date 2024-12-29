@@ -1,15 +1,15 @@
 import ast
-import builtins
 import inspect
-from dataclasses import dataclass
+import builtins
 from typing import TYPE_CHECKING, Any, TypeVar
+from dataclasses import dataclass
 
+from kirin.ir import Method, SSAValue, Statement, DialectGroup
+from kirin.source import SourceInfo
 from kirin.exceptions import DialectLoweringError
-from kirin.ir import DialectGroup, Method, SSAValue, Statement
-from kirin.lowering.dialect import FromPythonAST
 from kirin.lowering.frame import Frame
 from kirin.lowering.result import Result
-from kirin.source import SourceInfo
+from kirin.lowering.dialect import FromPythonAST
 
 if TYPE_CHECKING:
     from kirin.lowering.core import Lowering
