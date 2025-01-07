@@ -21,12 +21,6 @@ class TypeInfer(MethodTable):
     ) -> StatementResult[types.TypeAttribute]:
         return (frame.get(stmt.value),)  # just forward the type
 
-    @impl(py.NewTuple)
-    def new_tuple(
-        self, interp, frame: Frame[types.TypeAttribute], stmt: py.NewTuple
-    ) -> StatementResult[types.TypeAttribute]:
-        return (types.Tuple.where(frame.get_values(stmt.args)),)  # make 3.10 happy
-
     @impl(py.Add, types.Float, types.Float)
     @impl(py.Add, types.Float, types.Int)
     @impl(py.Add, types.Int, types.Float)
