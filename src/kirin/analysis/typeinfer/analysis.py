@@ -2,6 +2,8 @@ from kirin import ir, types, interp
 from kirin.interp.impl import Signature
 from kirin.analysis.forward import Forward, ForwardFrame
 
+from .solve import TypeResolution
+
 
 class TypeInference(Forward[types.TypeAttribute]):
     keys = ["typeinfer"]
@@ -29,7 +31,11 @@ class TypeInference(Forward[types.TypeAttribute]):
         method = self.lookup_registry(frame, stmt)
         if method is not None:
             return method(self, frame, stmt)
-        return tuple(result.type for result in stmt.results)
+
+        resolve = TypeResolution()
+        for arg, value in zip(stmt.args, frame.get_values(stmt.args)):
+            resolve.solve(arg.type, value)
+        return tuple(resolve.substitute(result.type) for result in stmt.results)
 
     def run_method(
         self, method: ir.Method, args: tuple[types.TypeAttribute, ...]
