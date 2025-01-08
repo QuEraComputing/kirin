@@ -36,7 +36,7 @@ class FCFInterpreter(MethodTable):
         return (acc,)
 
     @impl(Map)
-    def map_list(self, interp: Interpreter, frame: Frame, stmt: Map):
+    def map_tuple(self, interp: Interpreter, frame: Frame, stmt: Map):
         fn: ir.Method = frame.get(stmt.fn)
         coll = frame.get(stmt.coll)
         ret = []
@@ -47,7 +47,7 @@ class FCFInterpreter(MethodTable):
                 return _ret
             else:
                 ret.append(_ret)
-        return (ret,)
+        return (tuple(ret),)
 
     @impl(Scan)
     def scan(self, interp: Interpreter, frame: Frame, stmt: Scan):

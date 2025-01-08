@@ -23,7 +23,7 @@ class Foldr(ir.Statement):
 class Map(ir.Statement):
     fn: ir.SSAValue = info.argument(ir.types.PyClass(ir.Method))
     coll: ir.SSAValue = info.argument(ir.types.Any)
-    result: ir.ResultValue = info.result(ir.types.List)
+    result: ir.ResultValue = info.result(ir.types.Tuple)
 
 
 @statement(dialect=dialect)

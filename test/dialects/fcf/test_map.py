@@ -11,4 +11,4 @@ def enumerate_kirin(arr):
 
 
 def test_enumerate_kirin():
-    assert enumerate_kirin([1, 2, 3, 4, 5]) == [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5)]
+    assert enumerate_kirin([1, 2, 3, 4, 5]) == ((0, 1), (1, 2), (2, 3), (3, 4), (4, 5))

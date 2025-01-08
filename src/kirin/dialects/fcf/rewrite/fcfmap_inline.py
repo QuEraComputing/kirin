@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from kirin import ir
 from kirin.analysis import const
 from kirin.dialects import fcf, func
-from kirin.exceptions import DialectInterpretationError
 from kirin.dialects.py import stmts as py
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.ir.nodes.stmt import Statement
@@ -13,13 +12,6 @@ from kirin.ir.nodes.stmt import Statement
 @dataclass
 class InlineFcfMap(RewriteRule):
     cp_results: Dict[ir.SSAValue, const.JointResult]
-
-    def get_const_value(self, p: ir.SSAValue):
-        tmp = self.cp_results.get(p, None)
-        if (tmp is None) or (not isinstance(tmp.const, const.Value)):
-            raise DialectInterpretationError(f"not a const value: {p}")
-
-        return tmp.const.data
 
     def rewrite_Statement(self, node: Statement) -> RewriteResult:
         match node:
@@ -30,7 +22,12 @@ class InlineFcfMap(RewriteRule):
 
     def rewrite_fcf_map(self, node: fcf.Map) -> RewriteResult:
         # TODO make this more generic without the need for the constprop results
-        coll = self.get_const_value(node.coll)
+        tmp = self.cp_results.get(node.coll, None)
+
+        if (tmp is None) or (not isinstance(tmp.const, const.Value)):
+            return RewriteResult()
+
+        coll = tmp.const.data
 
         # rewrite to directly inline:
         # get the method:

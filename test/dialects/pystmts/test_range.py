@@ -44,4 +44,4 @@ def map_range(x: range):
 
 def test_map_range():
     assert map_range.return_type.is_subseteq(types.List[types.Float])
-    assert map_range(range(10)) == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+    assert map_range(range(10)) == (1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0)

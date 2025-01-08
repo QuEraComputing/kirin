@@ -43,6 +43,6 @@ def test_fold():
     assert foldl(xs) == sum(xs)
     assert foldr(xs) == sum(xs)
     assert map_list.return_type.is_subseteq(types.List[types.Float])
-    assert map_list([1, 2, 3]) == [2.0, 3.0, 4.0]
+    assert map_list([1, 2, 3]) == (2.0, 3.0, 4.0)
     assert scan([1, 2, 3, 4, 5]) == (15, [1, 2, 3, 4, 5])
     assert scan.return_type.is_subseteq(types.Tuple[types.Int, types.List[types.Int]])
