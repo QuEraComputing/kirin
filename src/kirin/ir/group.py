@@ -200,19 +200,18 @@ def dialect_group(
         Callable[[RunPassGen[PassParams]], DialectGroup[PassParams]]: the dialect group.
 
     Example:
+        ```python
+        from kirin.dialects import cf, fcf, func, math
 
-    ```python
-    from kirin.dialects import cf, fcf, func, math
+        @dialect_group([cf, fcf, func, math])
+        def basic_no_opt(self):
+            # initializations
+            def run_pass(mt: Method) -> None:
+                # how passes are applied to the method
+                pass
 
-    @dialect_group([cf, fcf, func, math])
-    def basic_no_opt(self):
-        # initializations
-        def run_pass(mt: Method) -> None:
-            # how passes are applied to the method
-            pass
-
-        return run_pass
-    ```
+            return run_pass
+        ```
     """
 
     # NOTE: do not alias the annotation below

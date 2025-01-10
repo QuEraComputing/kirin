@@ -94,11 +94,11 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         This is defined by subclasses to describe what's the corresponding
         value of a method during the interpretation.
 
-        Args
+        Args:
             method (Method): the method to run.
             args (tuple[ValueType]): the arguments to the method, does not include self.
 
-        Returns
+        Returns:
             ValueType: the result of the method.
         """
         ...
@@ -108,12 +108,12 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     ) -> MethodResult[ValueType]:
         """Run a callable statement.
 
-        Args
+        Args:
             code (Statement): the statement to run.
             args (tuple[ValueType]): the arguments to the statement,
                 includes self if the corresponding callable region contains a self argument.
 
-        Returns
+        Returns:
             ValueType: the result of the statement.
         """
         interface = code.get_trait(traits.CallableStmtInterface)
@@ -133,10 +133,13 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self, frame: FrameType, code: Statement, region: Region
     ) -> MethodResult[ValueType]:
         """A hook defines how to run the callable region given
-        the interpreter context. This is experimental API, don't
-        subclass it. The current reason of having it is mainly
-        because we need to dispatch back to the MethodTable for
-        emit.
+        the interpreter context.
+
+        Note:
+            This is experimental API, don't
+            subclass it. The current reason of having it is mainly
+            because we need to dispatch back to the MethodTable for
+            emit.
         """
         return self.run_ssacfg_region(frame, region)
 
@@ -149,8 +152,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self, frame: FrameType, results: MethodResult[ValueType]
     ) -> MethodResult[ValueType]:
         """Postprocess a frame after it is popped from the stack. This is
-        called after a method is evaluated and the frame is popped. Default
-        implementation does nothing.
+        called after a method is evaluated and the frame is popped.
+
+        Note:
+            Default implementation does nothing.
         """
         return results
 
@@ -175,11 +180,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         the given keyword arguments, where the keyword argument names
         refer to the last n arguments in the values tuple.
 
-        Args
-
-        mt: the method
-        values: the values tuple (should not contain method itself)
-        kwarg_names: the keyword argument names
+        Args:
+            arg_names: the argument names
+            values: the values tuple (should not contain method itself)
+            kwarg_names: the keyword argument names
         """
         n_total = len(values)
         if kwarg_names:
@@ -194,7 +198,32 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         return args
 
     def run_stmt(self, frame: FrameType, stmt: Statement) -> StatementResult[ValueType]:
-        "run a statement within the current frame"
+        """Run a statement within the current frame
+
+        Args:
+            frame: the current frame
+            stmt: the statement to run
+
+        Returns:
+            StatementResult: the result of running the statement
+
+        Note:
+            In the case of implementing the fallback, subclass this method,
+            and filter the statement type you want to handle.
+
+        Example:
+            * implement an interpreter that only handles MyStmt:
+            ```python
+                class MyInterpreter(BaseInterpreter):
+                    ...
+                    def run_stmt(self, frame: FrameType, stmt: Statement) -> StatementResult[ValueType]:
+                        if isinstance(stmt, MyStmt):
+                            return self.run_my_stmt(frame, stmt)
+                        else:
+                            return ()
+            ```
+
+        """
         # TODO: update tracking information
         return self.eval_stmt(frame, stmt)
 
