@@ -19,11 +19,19 @@ class Foldr(ir.Statement):
     result: ir.ResultValue = info.result(ir.types.Any)
 
 
+InType = ir.types.TypeVar("InType")
+OutType = ir.types.TypeVar("OutType")
+
+
 @statement(dialect=dialect)
 class Map(ir.Statement):
-    fn: ir.SSAValue = info.argument(ir.types.PyClass(ir.Method))
-    coll: ir.SSAValue = info.argument(ir.types.Any)
-    result: ir.ResultValue = info.result(ir.types.List)
+    fn: ir.SSAValue = info.argument(
+        ir.types.Generic(
+            ir.Method, ir.types.Tuple[ir.types.Tuple[InType], ir.types.List[OutType]]
+        )
+    )
+    coll: ir.SSAValue = info.argument(ir.types.List[InType])
+    result: ir.ResultValue = info.result(ir.types.List[OutType])
 
 
 @statement(dialect=dialect)

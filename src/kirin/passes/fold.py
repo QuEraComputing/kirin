@@ -7,6 +7,7 @@ from kirin.rules.dce import DeadCodeElimination
 from kirin.passes.abc import Pass
 from kirin.rules.fold import ConstantFold
 from kirin.rules.getitem import InlineGetItem
+from kirin.rules.wrap_const import WrapConst
 from kirin.rules.call2invoke import Call2Invoke
 from kirin.rules.cfg_compactify import CFGCompactify
 
@@ -22,6 +23,7 @@ class Fold(Pass):
                 Chain(
                     [
                         ConstantFold(constprop.results),
+                        WrapConst(constprop.results),
                         InlineGetItem(constprop.results),
                         Call2Invoke(constprop.results),
                         DeadCodeElimination(constprop.results),

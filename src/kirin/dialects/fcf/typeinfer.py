@@ -2,6 +2,7 @@ from typing import Callable, Iterable
 
 from kirin import ir
 from kirin.interp import Err, MethodTable, AbstractFrame, impl
+from kirin.analysis import const
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.fcf.stmts import Map, Scan, Foldl, Foldr
 from kirin.dialects.fcf.dialect import dialect
@@ -37,10 +38,13 @@ class TypeInfer(MethodTable):
         stmt: Foldl | Foldr,
         values: tuple[ir.types.TypeAttribute, ...],
     ):
-        if not isinstance(values[0], ir.types.Const):
+        if not (
+            isinstance(values[0], ir.types.Annotated)
+            and isinstance(values[0].data, const.Value)
+        ):
             return (stmt.result.type,)  # give up on dynamic calls
 
-        fn: ir.Method = values[0].data
+        fn: ir.Method = values[0].data.data
         coll: ir.types.TypeAttribute = values[1]
         init: ir.types.TypeAttribute = values[2]
 
@@ -71,7 +75,7 @@ class TypeInfer(MethodTable):
         stmt: Map,
     ):
         fn_value = frame.get(stmt.fn)
-        if not isinstance(fn_value, ir.types.Const):
+        if not isinstance(fn_value, ir.types.Annotated):
             return (ir.types.List[ir.types.Any],)  # give up on dynamic calls
 
         fn: ir.Method = fn_value.data
@@ -92,10 +96,13 @@ class TypeInfer(MethodTable):
         stmt: Map,
     ):
         fn_value = frame.get(stmt.fn)
-        if not isinstance(fn_value, ir.types.Const):
+        if not (
+            isinstance(fn_value, ir.types.Annotated)
+            and isinstance(fn_value.data, const.Value)
+        ):
             return (ir.types.List,)  # give up on dynamic calls
 
-        fn: ir.Method = fn_value.data
+        fn: ir.Method = fn_value.data.data
         elem = interp.eval(fn, (ir.types.Int,)).value
         # fn errors forward the error
         if isinstance(elem, Err):
@@ -114,7 +121,7 @@ class TypeInfer(MethodTable):
         init = frame.get(stmt.init)
         coll = frame.get(stmt.coll)
 
-        if not isinstance(fn_value, ir.types.Const):
+        if not isinstance(fn_value, ir.types.Annotated):
             return (ir.types.Tuple[init, ir.types.List[ir.types.Any]],)
 
         fn: ir.Method = fn_value.data

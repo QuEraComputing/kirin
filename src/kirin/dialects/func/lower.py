@@ -178,6 +178,11 @@ class FuncLowering(FromPythonAST):
         if node is None:
             return ir.types.Any
 
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+            lhs = FuncLowering.get_hint(state, node.left)
+            rhs = FuncLowering.get_hint(state, node.right)
+            return ir.types.Union(lhs, rhs)
+
         try:
             t = state.get_global(node).unwrap()
             return ir.types.hint2type(t)

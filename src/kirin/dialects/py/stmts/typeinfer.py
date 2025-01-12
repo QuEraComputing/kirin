@@ -1,5 +1,6 @@
 from kirin.ir import types
 from kirin.interp import Frame, MethodTable, StatementResult, impl
+from kirin.analysis import const
 
 from . import _stmts as py
 from .dialect import dialect
@@ -180,7 +181,7 @@ class TypeInfer(MethodTable):
         stmt: py.GetItem,
     ) -> StatementResult[types.TypeAttribute]:
         obj = frame.get(stmt.obj)
-        if isinstance(obj, types.Const):  # unwrap const
+        if isinstance(obj, types.Annotated):  # unwrap const
             obj = obj.typ
         index: types.TypeAttribute = frame.get(stmt.index)
         # TODO: replace this when we can multiple dispatch
@@ -226,11 +227,13 @@ class TypeInfer(MethodTable):
         obj: types.Generic,
         index: types.TypeAttribute,
     ):
-        if isinstance(index, types.Const):  # const
-            if obj.vararg and index.data >= len(obj.vars):
+        if isinstance(index, types.Annotated) and isinstance(
+            index.data, const.Value
+        ):  # const
+            if obj.vararg and index.data.data >= len(obj.vars):
                 return (obj.vararg.typ,)
-            elif index.data < len(obj.vars):
-                return (obj.vars[index.data],)
+            elif index.data.data < len(obj.vars):
+                return (obj.vars[index.data.data],)
             else:
                 return (types.Bottom,)
         else:
@@ -243,8 +246,8 @@ class TypeInfer(MethodTable):
         obj: types.Generic,
         index: types.TypeAttribute,
     ):
-        if isinstance(index, types.Const):
-            data: slice = index.data
+        if isinstance(index, types.Annotated) and isinstance(index.data, const.Value):
+            data: slice = index.data.data
             if obj.vararg and data.stop >= len(obj.vars):
                 return (
                     types.Union(
@@ -319,13 +322,15 @@ class TypeInfer(MethodTable):
     ) -> StatementResult[types.TypeAttribute]:
         start, stop, step = frame.get_values(stmt.args)
         if (
-            isinstance(start, types.Const)
-            and isinstance(stop, types.Const)
-            and isinstance(step, types.Const)
+            isinstance(start, types.Annotated)
+            and isinstance(stop, types.Annotated)
+            and isinstance(step, types.Annotated)
             and isinstance(stmt.result.type, types.TypeAttribute)
         ):
             return (
-                types.Const(slice(start.data, stop.data, step.data), stmt.result.type),
+                types.Annotated(
+                    slice(start.data, stop.data, step.data), stmt.result.type
+                ),
             )
 
         return (stmt.result.type,)

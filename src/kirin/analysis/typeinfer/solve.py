@@ -43,6 +43,8 @@ class TypeResolution:
             )
         elif isinstance(typ, types.Union):
             return types.Union(self.substitute(t) for t in typ.types)
+        elif isinstance(typ, types.Annotated):
+            return types.Annotated(typ.data, self.substitute(typ.typ))
         return typ
 
     def solve(
@@ -54,6 +56,8 @@ class TypeResolution:
             return self.solve_Generic(annot, value)
         elif isinstance(annot, types.Union):
             return self.solve_Union(annot, value)
+        elif isinstance(annot, types.Annotated):
+            return self.solve(annot.typ, value)
 
         if annot.is_subseteq(value):
             return Ok

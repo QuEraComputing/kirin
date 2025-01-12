@@ -77,6 +77,8 @@ def basic(self):
             else:
                 fold_pass(mt)
 
+        # TODO: const fold pass will rewrite the IR types with Const markers
+
         if typeinfer:
             typeinfer_pass(mt)
 

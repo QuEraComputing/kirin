@@ -162,7 +162,7 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.is_subseteq(other.bound)
 
-    def is_subseteq_Const(self, other: "Const") -> bool:
+    def is_subseteq_Annotated(self, other: "Annotated") -> bool:
         return self.is_subseteq(other.typ)
 
     def __hash__(self) -> int:
@@ -446,27 +446,34 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         raise TypeError("Type arguments do not match")
 
 
-ConstType = typing.TypeVar("ConstType")
+AnnotatedData = typing.TypeVar("AnnotatedData")
 
 
 @typing.final
 @dataclass
-class Const(TypeAttribute, typing.Generic[ConstType]):
-    name = "Const"
-    data: ConstType
+class Annotated(TypeAttribute, typing.Generic[AnnotatedData]):
+    """Annotated type attribute.
+
+    This type attribute is used to represent a type with additional data.
+    The additional data is only used for specific inference purposes, or improve
+    certain type inference precision, it does not affect the type inference itself.
+    """
+
+    name = "Annotated"
+    data: AnnotatedData
     typ: TypeAttribute
 
-    def __init__(self, data: ConstType, typ: TypeAttribute | None = None):
+    def __init__(self, data: AnnotatedData, typ: TypeAttribute | None = None):
         self.data = data
-        if isinstance(typ, Const):
+        if isinstance(typ, Annotated):
             typ = widen_const(typ)
         elif typ is None:
-            typ = PyClass(type(data))
+            typ = AnyType()
         self.typ = typ
 
     def is_equal(self, other: TypeAttribute) -> bool:
         return (
-            isinstance(other, Const)
+            isinstance(other, Annotated)
             and self.data == other.data
             and self.typ.is_equal(other.typ)
         )
@@ -540,7 +547,7 @@ def hint2type(hint) -> TypeAttribute:
 
 
 def widen_const(typ: TypeAttribute) -> TypeAttribute:
-    if isinstance(typ, Const):
+    if isinstance(typ, Annotated):
         return typ.typ
     return typ
 
