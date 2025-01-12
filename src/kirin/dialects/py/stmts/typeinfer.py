@@ -1,5 +1,6 @@
 from kirin.ir import types
 from kirin.interp import Frame, MethodTable, StatementResult, impl
+from kirin.analysis.typeinfer import TypeInference
 
 from . import _stmts as py
 from .dialect import dialect
@@ -175,12 +176,12 @@ class TypeInfer(MethodTable):
     @impl(py.GetItem)
     def getitem(
         self,
-        interp,
+        interp: TypeInference,
         frame: Frame[types.TypeAttribute],
         stmt: py.GetItem,
     ) -> StatementResult[types.TypeAttribute]:
         obj = frame.get(stmt.obj)
-        if isinstance(obj, types.Hinted):  # unwrap const
+        if interp.is_const(obj):  # unwrap const
             obj = obj.type
         index: types.TypeAttribute = frame.get(stmt.index)
         # TODO: replace this when we can multiple dispatch
@@ -221,16 +222,17 @@ class TypeInfer(MethodTable):
 
     def getitem_tuple_index(
         self,
-        interp,
+        interp: TypeInference,
         stmt: py.GetItem,
         obj: types.Generic,
         index: types.TypeAttribute,
     ):
-        if isinstance(index, types.Hinted):  # const
-            if obj.vararg and index.data >= len(obj.vars):
+        if interp.is_const(index) and index.type.is_subseteq(types.Int):
+            index_: int = index.data.data
+            if obj.vararg and index_ >= len(obj.vars):
                 return (obj.vararg.typ,)
-            elif index.data < len(obj.vars):
-                return (obj.vars[index.data],)
+            elif index_ < len(obj.vars):
+                return (obj.vars[index_],)
             else:
                 return (types.Bottom,)
         else:
@@ -238,13 +240,13 @@ class TypeInfer(MethodTable):
 
     def getitem_tuple_slice(
         self,
-        interp,
+        interp: TypeInference,
         stmt: py.GetItem,
         obj: types.Generic,
         index: types.TypeAttribute,
     ):
-        if isinstance(index, types.Hinted):
-            data: slice = index.data
+        if interp.is_const(index):
+            data: slice = index.data.data
             if obj.vararg and data.stop >= len(obj.vars):
                 return (
                     types.Union(
@@ -315,17 +317,15 @@ class TypeInfer(MethodTable):
 
     @impl(py.Slice)
     def slice(
-        self, interp, frame: Frame[types.TypeAttribute], stmt: py.Slice
+        self, interp: TypeInference, frame: Frame[types.TypeAttribute], stmt: py.Slice
     ) -> StatementResult[types.TypeAttribute]:
         start, stop, step = frame.get_values(stmt.args)
-        if (
-            isinstance(start, types.Hinted)
-            and isinstance(stop, types.Hinted)
-            and isinstance(step, types.Hinted)
-            and isinstance(stmt.result.type, types.TypeAttribute)
-        ):
+        if interp.is_const(start) and interp.is_const(stop) and interp.is_const(step):
             return (
-                types.Hinted(stmt.result.type, slice(start.data, stop.data, step.data)),
+                types.Hinted(
+                    stmt.result.type,
+                    slice(start.data.data, stop.data.data, step.data.data),
+                ),
             )
 
         return (stmt.result.type,)

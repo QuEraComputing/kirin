@@ -1,4 +1,7 @@
+from typing import TypeGuard
+
 from kirin import ir, types, interp
+from kirin.analysis import const
 from kirin.interp.impl import Signature
 from kirin.analysis.forward import Forward, ForwardFrame
 
@@ -17,13 +20,15 @@ class TypeInference(Forward[types.TypeAttribute]):
     ) -> Signature:
         _args = ()
         for x in frame.get_values(stmt.args):
-            if isinstance(x, types.Hinted):
-                _args += (x.type,)
-            elif isinstance(x, types.Generic):
-                _args += (x.body,)
-            else:
-                _args += (x,)
+            _args += (self._unwrap(x),)
         return Signature(stmt.__class__, _args)
+
+    def _unwrap(self, value: types.TypeAttribute) -> types.TypeAttribute:
+        if isinstance(value, types.Hinted):
+            return self._unwrap(value.type)
+        elif isinstance(value, types.Generic):
+            return value.body
+        return value
 
     def eval_stmt(
         self, frame: ForwardFrame[types.TypeAttribute, None], stmt: ir.Statement
@@ -46,3 +51,19 @@ class TypeInference(Forward[types.TypeAttribute]):
                 method.code, (types.Hinted(types.PyClass(ir.Method), method),) + args
             )
         return types.Bottom
+
+    def is_const(
+        self, value: types.TypeAttribute
+    ) -> TypeGuard[types.Hinted[const.Value]]:
+        return isinstance(value, types.Hinted) and isinstance(value.data, const.Value)
+
+    def is_partial_const(
+        self, value: types.TypeAttribute
+    ) -> TypeGuard[
+        types.Hinted[const.Value]
+        | types.Hinted[const.PartialTuple]
+        | types.Hinted[const.PartialLambda]
+    ]:
+        return isinstance(value, types.Hinted) and isinstance(
+            value.data, (const.Value, const.PartialTuple, const.PartialLambda)
+        )

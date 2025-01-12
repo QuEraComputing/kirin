@@ -68,6 +68,9 @@ class TypeAttribute(
             return Union(self, other)
         return AnyType()  # don't know how to join
 
+    def is_subseteq_Hinted(self, other: "Hinted") -> bool:
+        return self.is_subseteq(other.type)
+
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self, prefix="!")
 
@@ -161,9 +164,6 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
 
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.is_subseteq(other.bound)
-
-    def is_subseteq_Const(self, other: "Hinted") -> bool:
-        return self.is_subseteq(other.type)
 
     def __hash__(self) -> int:
         return hash((PyClass, self.typ))

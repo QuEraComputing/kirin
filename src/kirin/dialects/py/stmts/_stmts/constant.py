@@ -23,7 +23,7 @@ class Constant(Statement, Generic[T]):
             value = data.PyAttr(value)
         super().__init__(
             properties={"value": value},
-            result_types=(types.Hinted(value.type, value.data),),
+            result_types=(value.type,),
         )
 
     def print_impl(self, printer: Printer) -> None:

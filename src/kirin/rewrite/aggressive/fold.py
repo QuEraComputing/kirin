@@ -9,6 +9,7 @@ from kirin.ir.nodes.base import IRNode
 from kirin.rewrite.inline import Inline
 from kirin.rewrite.getitem import InlineGetItem
 from kirin.rewrite.getfield import InlineGetField
+from kirin.rewrite.wrap_const import WrapConst
 from kirin.rewrite.call2invoke import Call2Invoke
 from kirin.rewrite.cfg_compactify import CFGCompactify
 
@@ -24,6 +25,7 @@ class Fold(RewriteRule):
                     Walk(Inline(lambda _: True)),
                     Walk(ConstantFold(results)),
                     Walk(Call2Invoke(results)),
+                    Walk(WrapConst(results)),
                     Fixpoint(
                         Walk(
                             Chain(

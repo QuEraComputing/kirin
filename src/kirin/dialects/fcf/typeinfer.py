@@ -37,10 +37,10 @@ class TypeInfer(MethodTable):
         stmt: Foldl | Foldr,
         values: tuple[ir.types.TypeAttribute, ...],
     ):
-        if not isinstance(values[0], ir.types.Hinted):
+        if not interp.is_const(values[0]):
             return (stmt.result.type,)  # give up on dynamic calls
 
-        fn: ir.Method = values[0].data
+        fn: ir.Method = values[0].data.data
         coll: ir.types.TypeAttribute = values[1]
         init: ir.types.TypeAttribute = values[2]
 
@@ -71,10 +71,10 @@ class TypeInfer(MethodTable):
         stmt: Map,
     ):
         fn_value = frame.get(stmt.fn)
-        if not isinstance(fn_value, ir.types.Hinted):
+        if not interp.is_const(fn_value):
             return (ir.types.List[ir.types.Any],)  # give up on dynamic calls
 
-        fn: ir.Method = fn_value.data
+        fn: ir.Method = fn_value.data.data
         coll: ir.types.TypeAttribute = frame.get(stmt.coll)
         if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
             elem = interp.eval(fn, (coll.vars[0],)).value
@@ -92,10 +92,10 @@ class TypeInfer(MethodTable):
         stmt: Map,
     ):
         fn_value = frame.get(stmt.fn)
-        if not isinstance(fn_value, ir.types.Hinted):
+        if not interp.is_const(fn_value):
             return (ir.types.List,)  # give up on dynamic calls
 
-        fn: ir.Method = fn_value.data
+        fn: ir.Method = fn_value.data.data
         elem = interp.eval(fn, (ir.types.Int,)).value
         # fn errors forward the error
         if isinstance(elem, Err):
@@ -114,10 +114,10 @@ class TypeInfer(MethodTable):
         init = frame.get(stmt.init)
         coll = frame.get(stmt.coll)
 
-        if not isinstance(fn_value, ir.types.Hinted):
+        if not interp.is_const(fn_value):
             return (ir.types.Tuple[init, ir.types.List[ir.types.Any]],)
 
-        fn: ir.Method = fn_value.data
+        fn: ir.Method = fn_value.data.data
         if isinstance(coll, ir.types.Generic) and coll.is_subseteq(ir.types.List):
             ret = interp.eval(fn, (init, coll.vars[0])).value
             if isinstance(ret, Err):

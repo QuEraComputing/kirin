@@ -7,6 +7,7 @@ from kirin.passes.abc import Pass
 from kirin.rewrite.dce import DeadCodeElimination
 from kirin.rewrite.fold import ConstantFold
 from kirin.rewrite.getitem import InlineGetItem
+from kirin.rewrite.wrap_const import WrapConst
 from kirin.rewrite.call2invoke import Call2Invoke
 from kirin.rewrite.cfg_compactify import CFGCompactify
 
@@ -22,6 +23,7 @@ class Fold(Pass):
                 Chain(
                     [
                         ConstantFold(constprop.results),
+                        WrapConst(constprop.results),
                         InlineGetItem(constprop.results),
                         Call2Invoke(constprop.results),
                         DeadCodeElimination(constprop.results),

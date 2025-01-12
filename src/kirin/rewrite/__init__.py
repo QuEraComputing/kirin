@@ -10,5 +10,6 @@ from .getitem import InlineGetItem as InlineGetItem
 from .fixpoint import Fixpoint as Fixpoint
 from .getfield import InlineGetField as InlineGetField
 from .apply_type import ApplyType as ApplyType
+from .wrap_const import WrapConst as WrapConst
 from .call2invoke import Call2Invoke as Call2Invoke
 from .cfg_compactify import CFGCompactify as CFGCompactify
