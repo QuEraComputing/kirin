@@ -32,6 +32,7 @@ from kirin.ir.traits import (
     IsTerminator as IsTerminator,
     NoTerminator as NoTerminator,
     SSACFGRegion as SSACFGRegion,
+    FromPythonCall as FromPythonCall,
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
     CallableStmtInterface as CallableStmtInterface,

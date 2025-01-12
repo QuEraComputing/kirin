@@ -11,6 +11,7 @@ ElemT = ir.types.TypeVar("ElemT")
 
 @statement(dialect=dialect)
 class Append(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
     lst: ir.SSAValue = info.argument(ir.types.List[ElemT])
     value: ir.SSAValue = info.argument(ir.types.Any)
 

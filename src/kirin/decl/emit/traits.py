@@ -11,4 +11,3 @@ class EmitTraits(BaseModifier):
             if hasattr(base, "traits"):
                 return
         set_new_attribute(self.cls, "traits", frozenset({}))
-        return

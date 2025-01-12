@@ -13,7 +13,7 @@ T = ir.types.TypeVar("T")
 @statement(dialect=dialect)
 class Alias(ir.Statement):
     name = "alias"
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(T)
     target: data.PyAttr[str] = info.attribute(property=True)
     result: ir.ResultValue = info.result(T)
@@ -33,6 +33,7 @@ class Alias(ir.Statement):
 @statement(dialect=dialect)
 class SetItem(ir.Statement):
     name = "setitem"
+    traits = frozenset({ir.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     value: ir.SSAValue = info.argument(print=False)
     index: ir.SSAValue = info.argument(print=False)

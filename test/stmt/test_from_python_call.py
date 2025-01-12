@@ -17,7 +17,7 @@ dialect = ir.Dialect("test")
 @statement(dialect=dialect, repr=True)
 class DummyStatement(ir.Statement):
     name = "dummy"
-    traits = frozenset({ir.Pure(), ir.ConstantLike()})
+    traits = frozenset({ir.Pure(), ir.ConstantLike(), ir.FromPythonCall()})
 
     # args
     noinfo: ir.SSAValue

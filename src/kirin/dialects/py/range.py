@@ -9,7 +9,7 @@ dialect = ir.Dialect("py.range")
 @statement(dialect=dialect)
 class Range(ir.Statement):
     name = "range"
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     start: ir.SSAValue = info.argument(types.Int)
     stop: ir.SSAValue = info.argument(types.Int)
     step: ir.SSAValue = info.argument(types.Int)

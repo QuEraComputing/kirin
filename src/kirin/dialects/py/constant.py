@@ -15,7 +15,7 @@ T = TypeVar("T", covariant=True)
 @statement(dialect=dialect)
 class Constant(ir.Statement, Generic[T]):
     name = "constant"
-    traits = frozenset({ir.Pure(), ir.ConstantLike()})
+    traits = frozenset({ir.Pure(), ir.ConstantLike(), ir.FromPythonCall()})
     value: T = info.attribute(property=True)
     result: ir.ResultValue = info.result()
 

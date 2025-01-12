@@ -11,7 +11,7 @@ dialect = ir.Dialect("py.slice")
 @statement(dialect=dialect, init=False)
 class Slice(ir.Statement):
     name = "slice"
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     start: ir.SSAValue = info.argument(types.Any)
     stop: ir.SSAValue = info.argument(types.Any)
     step: ir.SSAValue = info.argument(types.Any)

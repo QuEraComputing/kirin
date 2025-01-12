@@ -5,6 +5,7 @@ from kirin.dialects.fcf.dialect import dialect
 
 @statement(dialect=dialect)
 class Foldl(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
     fn: ir.SSAValue = info.argument(ir.types.PyClass(ir.Method))
     coll: ir.SSAValue = info.argument(ir.types.Any)  # TODO: make this more precise
     init: ir.SSAValue = info.argument(ir.types.Any)
@@ -13,6 +14,7 @@ class Foldl(ir.Statement):
 
 @statement(dialect=dialect)
 class Foldr(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
     fn: ir.SSAValue = info.argument(ir.types.PyClass(ir.Method))
     coll: ir.SSAValue = info.argument(ir.types.Any)
     init: ir.SSAValue = info.argument(ir.types.Any)
@@ -39,6 +41,7 @@ class Map(ir.Statement):
     ```
     """
 
+    traits = frozenset({ir.FromPythonCall()})
     fn: ir.SSAValue = info.argument(ir.types.PyClass(ir.Method))
     """The kernel function to apply. The function should have signature `fn(x: int) -> Any`."""
     coll: ir.SSAValue = info.argument(ir.types.Any)
@@ -49,6 +52,7 @@ class Map(ir.Statement):
 
 @statement(dialect=dialect)
 class Scan(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
     fn: ir.SSAValue = info.argument(ir.types.PyClass(ir.Method))
     init: ir.SSAValue = info.argument(ir.types.Any)
     coll: ir.SSAValue = info.argument(ir.types.List)

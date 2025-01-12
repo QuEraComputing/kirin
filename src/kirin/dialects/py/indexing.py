@@ -57,7 +57,7 @@ class Subscript(ir.Statement):
 @statement(dialect=dialect)
 class GetItem(Subscript):
     name = "getitem"
-    traits = frozenset({ir.Pure(), PyGetItemLike()})
+    traits = frozenset({ir.Pure(), PyGetItemLike(), ir.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     index: ir.SSAValue = info.argument(print=False)
     result: ir.ResultValue = info.result(ir.types.Any)

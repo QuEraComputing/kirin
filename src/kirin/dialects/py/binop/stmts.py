@@ -8,7 +8,7 @@ T = ir.types.TypeVar("T")
 
 @statement
 class BinOp(ir.Statement):
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     lhs: ir.SSAValue = info.argument(T, print=False)
     rhs: ir.SSAValue = info.argument(T, print=False)
     result: ir.ResultValue = info.result(T)

@@ -12,6 +12,7 @@ dialect = ir.Dialect("dummy")
 @statement(dialect=dialect)
 class DummyStmt(ir.Statement):
     name = "dummy"
+    traits = frozenset({ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Int)
     option: data.PyAttr[str] = info.attribute()
     result: ir.ResultValue = info.result(types.Int)

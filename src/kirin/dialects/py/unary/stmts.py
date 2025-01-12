@@ -8,7 +8,7 @@ T = ir.types.TypeVar("T")
 
 @statement
 class UnaryOp(ir.Statement):
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(T, print=False)
     result: ir.ResultValue = info.result(T)
 

@@ -63,5 +63,5 @@ def statement(
     return wrap(cls)
 
 
-def fields(cls) -> info.StatementFields:
+def fields(cls: type[Statement]) -> info.StatementFields:
     return getattr(cls, ScanFields._FIELDS)

@@ -10,7 +10,7 @@ dialect = ir.Dialect("py.boolop")
 
 @statement
 class BoolOp(ir.Statement):
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     lhs: ir.SSAValue = info.argument(print=False)
     rhs: ir.SSAValue = info.argument(print=False)
     result: ir.ResultValue = info.result(ir.types.Bool)

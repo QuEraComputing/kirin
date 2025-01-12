@@ -11,7 +11,7 @@ T = types.TypeVar("T", bound=types.Int | types.Float)
 @statement(dialect=dialect)
 class Abs(ir.Statement):
     name = "abs"
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(T, print=False)
     result: ir.ResultValue = info.result(T)
 
@@ -19,7 +19,7 @@ class Abs(ir.Statement):
 @statement(dialect=dialect)
 class Sum(ir.Statement):
     name = "sum"
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Any, print=False)
     result: ir.ResultValue = info.result(types.Any)
 

@@ -4,7 +4,7 @@ import builtins
 from typing import TYPE_CHECKING, Any, TypeVar
 from dataclasses import dataclass
 
-from kirin.ir import Method, SSAValue, Statement, DialectGroup
+from kirin.ir import Method, SSAValue, Statement, DialectGroup, traits
 from kirin.source import SourceInfo
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering.frame import Frame
@@ -133,12 +133,18 @@ class LoweringState(ast.NodeVisitor):
             raise DialectLoweringError("`lower_Call_global_method` not implemented")
         elif inspect.isclass(global_callee):
             if issubclass(global_callee, Statement):
+                if not global_callee.has_trait(traits.FromPythonCall):
+                    raise DialectLoweringError(
+                        f"unsupported callee {global_callee.__name__}, "
+                        "missing FromPythonAST lowering, or traits.FromPythonCall trait"
+                    )
+
                 if global_callee.dialect is not None:
                     if global_callee.dialect not in self.dialects.data:
                         raise DialectLoweringError(
                             f"unsupported dialect `{global_callee.dialect.name}`"
                         )
-                    return global_callee.from_python_call(self, node)
+                    return self.__default_stmt_Call(global_callee, node)
                 else:
                     raise DialectLoweringError(
                         f"unsupported dialect `None` for {global_callee.name}"
@@ -186,6 +192,59 @@ class LoweringState(ast.NodeVisitor):
         if "Call_local" in self.registry:
             return self.registry["Call_local"].lower_Call_local(self, callee, node)
         raise DialectLoweringError("`lower_Call_local` not implemented")
+
+    def __default_stmt_Call(self, stmt: type[Statement], node: ast.Call) -> Result:
+        from kirin.decl import fields
+        from kirin.dialects.py.data import PyAttr
+
+        fs = fields(stmt)
+        stmt_std_arg_names = fs.std_args.keys()
+        stmt_kw_args_name = fs.kw_args.keys()
+        stmt_attr_prop_names = fs.attr_or_props
+        stmt_required_names = fs.required_names
+        stmt_group_arg_names = fs.group_arg_names
+        args, kwargs = {}, {}
+        for name, value in zip(stmt_std_arg_names, node.args):
+            self._parse_arg(stmt_group_arg_names, args, name, value)
+        for kw in node.keywords:
+            if not isinstance(kw.arg, str):
+                raise DialectLoweringError("Expected string for keyword argument name")
+
+            arg: str = kw.arg
+            if arg in node.args:
+                raise DialectLoweringError(
+                    f"Keyword argument {arg} is already present in positional arguments"
+                )
+            elif arg in stmt_std_arg_names or arg in stmt_kw_args_name:
+                self._parse_arg(stmt_group_arg_names, kwargs, kw.arg, kw.value)
+            elif arg in stmt_attr_prop_names:
+                if not isinstance(kw.value, ast.Constant):
+                    raise DialectLoweringError(
+                        f"Expected constant for attribute or property {arg}"
+                    )
+                kwargs[arg] = PyAttr(kw.value.value)
+            else:
+                raise DialectLoweringError(f"Unexpected keyword argument {arg}")
+
+        for name in stmt_required_names:
+            if name not in args and name not in kwargs:
+                raise DialectLoweringError(f"Missing required argument {name}")
+
+        return Result(self.append_stmt(stmt(*args.values(), **kwargs)))
+
+    def _parse_arg(
+        self,
+        group_names: set[str],
+        target: dict,
+        name: str,
+        value: ast.AST,
+    ):
+        if name in group_names:
+            if not isinstance(value, ast.Tuple):
+                raise DialectLoweringError(f"Expected tuple for group argument {name}")
+            target[name] = tuple(self.visit(elem).expect_one() for elem in value.elts)
+        else:
+            target[name] = self.visit(value).expect_one()
 
     ValueT = TypeVar("ValueT", bound=SSAValue)
 

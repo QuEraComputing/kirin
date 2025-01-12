@@ -28,7 +28,7 @@ class Register:
 @statement(dialect=dummy)
 class New(ir.Statement):
     name = "new"
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     result: ir.ResultValue = info.result(types.PyClass(Register))
 
 

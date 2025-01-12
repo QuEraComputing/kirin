@@ -9,7 +9,7 @@ dialect = ir.Dialect("py.len")
 @statement(dialect=dialect)
 class Len(ir.Statement):
     name = "len"
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(ir.types.Any)
     result: ir.ResultValue = info.result(ir.types.Int)
 

@@ -9,6 +9,7 @@ dialect = ir.Dialect("py.attr")
 @statement(dialect=dialect)
 class GetAttr(ir.Statement):
     name = "getattr"
+    traits = frozenset({ir.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     attrname: str = info.attribute(property=True)
     result: ir.ResultValue = info.result()

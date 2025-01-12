@@ -1,5 +1,4 @@
-from kirin import ir
-from kirin.ir import Pure, ResultValue, types
+from kirin import ir, types
 from kirin.decl import info, statement
 
 from ._dialect import dialect
@@ -7,10 +6,10 @@ from ._dialect import dialect
 
 @statement
 class Cmp(ir.Statement):
-    traits = frozenset({Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     lhs: ir.SSAValue = info.argument()
     rhs: ir.SSAValue = info.argument()
-    result: ResultValue = info.result(types.Bool)
+    result: ir.ResultValue = info.result(types.Bool)
 
 
 @statement(dialect=dialect)

@@ -220,6 +220,7 @@ dummy_dialect = ir.Dialect("dummy")
 @statement(dialect=dummy_dialect)
 class DummyStatement(ir.Statement):
     name = "dummy"
+    traits = frozenset({ir.FromPythonCall()})
 
 
 def test_intraprocedure_side_effect():
@@ -299,6 +300,7 @@ def test_closure_prop():
     @statement(dialect=dialect)
     class DummyStmt2(ir.Statement):
         name = "dummy2"
+        traits = frozenset({ir.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
         result: ir.ResultValue = info.result(types.Int)
 

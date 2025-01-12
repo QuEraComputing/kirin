@@ -11,7 +11,7 @@ dialect = ir.Dialect("py.tuple")
 
 @statement(dialect=dialect)
 class New(ir.Statement):
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     result: ir.ResultValue = info.result()
 
     def __init__(self, values: tuple[ir.SSAValue, ...]) -> None:
