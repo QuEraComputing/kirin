@@ -1,8 +1,8 @@
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
 from kirin.analysis import const
-from kirin.rules.dce import DeadCodeElimination
-from kirin.rules.fold import ConstantFold
+from kirin.rewrite.dce import DeadCodeElimination
+from kirin.rewrite.fold import ConstantFold
 
 
 @basic_no_opt

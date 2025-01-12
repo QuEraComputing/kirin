@@ -3,14 +3,14 @@ from dataclasses import dataclass
 
 from kirin import ir, analysis
 from kirin.rewrite import Walk, Chain, Fixpoint, RewriteRule, RewriteResult
-from kirin.rules.dce import DeadCodeElimination
-from kirin.rules.fold import ConstantFold
-from kirin.rules.inline import Inline
+from kirin.rewrite.dce import DeadCodeElimination
+from kirin.rewrite.fold import ConstantFold
 from kirin.ir.nodes.base import IRNode
-from kirin.rules.getitem import InlineGetItem
-from kirin.rules.getfield import InlineGetField
-from kirin.rules.call2invoke import Call2Invoke
-from kirin.rules.cfg_compactify import CFGCompactify
+from kirin.rewrite.inline import Inline
+from kirin.rewrite.getitem import InlineGetItem
+from kirin.rewrite.getfield import InlineGetField
+from kirin.rewrite.call2invoke import Call2Invoke
+from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
 @dataclass

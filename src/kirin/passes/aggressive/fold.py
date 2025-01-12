@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
-from kirin.rules import aggressive
 from kirin.passes import Pass
-from kirin.rewrite import RewriteResult
+from kirin.rewrite import RewriteResult, aggressive
 from kirin.analysis import CFG, const
 from kirin.ir.method import Method
 
