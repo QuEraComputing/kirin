@@ -14,16 +14,16 @@ def new_range(a: int, b: int, c: int):
 
 def test_new_range():
     stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(2)
-    assert isinstance(stmt.start.type, types.Const)
+    assert isinstance(stmt.start.type, types.Hinted)
     assert stmt.start.type.data == 0
     assert stmt.stop.type.is_subseteq(types.Int)
-    assert isinstance(stmt.step.type, types.Const)
+    assert isinstance(stmt.step.type, types.Hinted)
     assert stmt.step.type.data == 1
 
     stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(4)
     assert stmt.start.type.is_subseteq(types.Int)
     assert stmt.stop.type.is_subseteq(types.Int)
-    assert isinstance(stmt.step.type, types.Const)
+    assert isinstance(stmt.step.type, types.Hinted)
     assert stmt.step.type.data == 1
 
     stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(5)

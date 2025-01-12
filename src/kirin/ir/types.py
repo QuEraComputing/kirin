@@ -162,8 +162,8 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.is_subseteq(other.bound)
 
-    def is_subseteq_Const(self, other: "Const") -> bool:
-        return self.is_subseteq(other.typ)
+    def is_subseteq_Const(self, other: "Hinted") -> bool:
+        return self.is_subseteq(other.type)
 
     def __hash__(self) -> int:
         return hash((PyClass, self.typ))
@@ -349,7 +349,7 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
             self.body = body
         else:
             self.body = PyClass(body)
-        self.vars, self.vararg = split_type_args(vars)
+        self.vars, self.vararg = _split_type_args(vars)
 
     def is_subseteq_Literal(self, other: Literal) -> bool:
         return False
@@ -408,7 +408,7 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         else:
             typs = (typ,)
 
-        args, vararg = split_type_args(typs)
+        args, vararg = _split_type_args(typs)
         if self.vararg is None and vararg is None:
             assert len(args) <= len(
                 self.vars
@@ -446,45 +446,52 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         raise TypeError("Type arguments do not match")
 
 
-ConstType = typing.TypeVar("ConstType")
+HintedData = typing.TypeVar("HintedData")
 
 
 @typing.final
 @dataclass
-class Const(TypeAttribute, typing.Generic[ConstType]):
-    name = "Const"
-    data: ConstType
-    typ: TypeAttribute
+class Hinted(TypeAttribute, typing.Generic[HintedData]):
+    """Type wrapped with a hint.
 
-    def __init__(self, data: ConstType, typ: TypeAttribute | None = None):
+    `Hinted` is used to represent a type with additional data that can be used as
+    a hint for type inference. The additional data is only used for specific type
+    inference purposes, or improve certain type inference precision, it does not affect the
+    order of types in the lattice.
+    """
+
+    name = "Hinted"
+    type: TypeAttribute
+    data: HintedData
+
+    def __init__(self, type: TypeAttribute, data: HintedData):
         self.data = data
-        if isinstance(typ, Const):
-            typ = widen_const(typ)
-        elif typ is None:
-            typ = PyClass(type(data))
-        self.typ = typ
+        if isinstance(type, Hinted):
+            type = type.type
+        self.type = type
 
     def is_equal(self, other: TypeAttribute) -> bool:
         return (
-            isinstance(other, Const)
+            isinstance(other, Hinted)
             and self.data == other.data
-            and self.typ.is_equal(other.typ)
+            and self.type.is_equal(other.type)
         )
 
     def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
-        return self.typ.is_subseteq(other)
+        return self.type.is_subseteq(other)
 
     def __hash__(self) -> int:
-        return hash(self.typ)
+        return hash(self.type)
 
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self, prefix="!")
-        printer.plain_print("(", self.data, ", ")
-        printer.print(self.typ)
+        printer.plain_print("(")
+        printer.print(self.type)
+        printer.plain_print(", ", self.data)
         printer.plain_print(")")
 
 
-def split_type_args(
+def _split_type_args(
     args: tuple[TypeVarValue, ...]
 ) -> tuple[tuple[TypeAttribute, ...], Vararg | None]:
     if args is None or len(args) == 0:
@@ -539,10 +546,10 @@ def hint2type(hint) -> TypeAttribute:
     return Generic(body, *params)
 
 
-def widen_const(typ: TypeAttribute) -> TypeAttribute:
-    if isinstance(typ, Const):
-        return typ.typ
-    return typ
+def unwrap_hinted(hint: TypeAttribute) -> TypeAttribute:
+    if isinstance(hint, Hinted):
+        return hint.type
+    return hint
 
 
 Any = AnyType()

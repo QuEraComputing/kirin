@@ -25,17 +25,17 @@ def test_untable_branch():
         return stmt_at(block_id, stmt_id).results
 
     assert [infer.results[result] for result in results_at(0, 0)] == [
-        types.Const(1, types.Int)
+        types.Hinted(types.Int, 1)
     ]
     assert [infer.results[result] for result in results_at(0, 1)] == [types.Int]
     assert [infer.results[result] for result in results_at(0, 2)] == [
-        types.Const(10, types.Int)
+        types.Hinted(types.Int, 10)
     ]
     assert [infer.results[result] for result in results_at(0, 3)] == [types.Bool]
 
     assert [infer.results[result] for result in results_at(1, 0)] == [types.Int]
     assert [infer.results[result] for result in results_at(2, 0)] == [
-        types.Const(1.2, types.Float)
+        types.Hinted(types.Float, 1.2)
     ]
     assert [infer.results[result] for result in results_at(2, 1)] == [types.Float]
 

@@ -17,8 +17,8 @@ class TypeInference(Forward[types.TypeAttribute]):
     ) -> Signature:
         _args = ()
         for x in frame.get_values(stmt.args):
-            if isinstance(x, types.Const):
-                _args += (x.typ,)
+            if isinstance(x, types.Hinted):
+                _args += (x.type,)
             elif isinstance(x, types.Generic):
                 _args += (x.body,)
             else:
@@ -43,6 +43,6 @@ class TypeInference(Forward[types.TypeAttribute]):
         if len(self.state.frames) < self.max_depth:
             # NOTE: widen method type here
             return self.run_callable(
-                method.code, (types.Const(method, types.PyClass(ir.Method)),) + args
+                method.code, (types.Hinted(types.PyClass(ir.Method), method),) + args
             )
         return types.Bottom

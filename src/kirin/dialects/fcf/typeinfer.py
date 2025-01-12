@@ -37,7 +37,7 @@ class TypeInfer(MethodTable):
         stmt: Foldl | Foldr,
         values: tuple[ir.types.TypeAttribute, ...],
     ):
-        if not isinstance(values[0], ir.types.Const):
+        if not isinstance(values[0], ir.types.Hinted):
             return (stmt.result.type,)  # give up on dynamic calls
 
         fn: ir.Method = values[0].data
@@ -71,7 +71,7 @@ class TypeInfer(MethodTable):
         stmt: Map,
     ):
         fn_value = frame.get(stmt.fn)
-        if not isinstance(fn_value, ir.types.Const):
+        if not isinstance(fn_value, ir.types.Hinted):
             return (ir.types.List[ir.types.Any],)  # give up on dynamic calls
 
         fn: ir.Method = fn_value.data
@@ -92,7 +92,7 @@ class TypeInfer(MethodTable):
         stmt: Map,
     ):
         fn_value = frame.get(stmt.fn)
-        if not isinstance(fn_value, ir.types.Const):
+        if not isinstance(fn_value, ir.types.Hinted):
             return (ir.types.List,)  # give up on dynamic calls
 
         fn: ir.Method = fn_value.data
@@ -114,7 +114,7 @@ class TypeInfer(MethodTable):
         init = frame.get(stmt.init)
         coll = frame.get(stmt.coll)
 
-        if not isinstance(fn_value, ir.types.Const):
+        if not isinstance(fn_value, ir.types.Hinted):
             return (ir.types.Tuple[init, ir.types.List[ir.types.Any]],)
 
         fn: ir.Method = fn_value.data

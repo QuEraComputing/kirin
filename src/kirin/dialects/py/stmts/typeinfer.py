@@ -180,8 +180,8 @@ class TypeInfer(MethodTable):
         stmt: py.GetItem,
     ) -> StatementResult[types.TypeAttribute]:
         obj = frame.get(stmt.obj)
-        if isinstance(obj, types.Const):  # unwrap const
-            obj = obj.typ
+        if isinstance(obj, types.Hinted):  # unwrap const
+            obj = obj.type
         index: types.TypeAttribute = frame.get(stmt.index)
         # TODO: replace this when we can multiple dispatch
         if obj.is_subseteq(types.Tuple):
@@ -226,7 +226,7 @@ class TypeInfer(MethodTable):
         obj: types.Generic,
         index: types.TypeAttribute,
     ):
-        if isinstance(index, types.Const):  # const
+        if isinstance(index, types.Hinted):  # const
             if obj.vararg and index.data >= len(obj.vars):
                 return (obj.vararg.typ,)
             elif index.data < len(obj.vars):
@@ -243,7 +243,7 @@ class TypeInfer(MethodTable):
         obj: types.Generic,
         index: types.TypeAttribute,
     ):
-        if isinstance(index, types.Const):
+        if isinstance(index, types.Hinted):
             data: slice = index.data
             if obj.vararg and data.stop >= len(obj.vars):
                 return (
@@ -319,13 +319,13 @@ class TypeInfer(MethodTable):
     ) -> StatementResult[types.TypeAttribute]:
         start, stop, step = frame.get_values(stmt.args)
         if (
-            isinstance(start, types.Const)
-            and isinstance(stop, types.Const)
-            and isinstance(step, types.Const)
+            isinstance(start, types.Hinted)
+            and isinstance(stop, types.Hinted)
+            and isinstance(step, types.Hinted)
             and isinstance(stmt.result.type, types.TypeAttribute)
         ):
             return (
-                types.Const(slice(start.data, stop.data, step.data), stmt.result.type),
+                types.Hinted(stmt.result.type, slice(start.data, stop.data, step.data)),
             )
 
         return (stmt.result.type,)

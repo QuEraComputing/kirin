@@ -67,8 +67,8 @@ class TestBasicPrint:
         self.check_print(types.Tuple, "![dark_blue]py[/dark_blue].tuple", "~T")
         self.check_print(types.Vararg(types.Int), "*![dark_blue]py[/dark_blue].int")
         self.check_print(
-            types.Const(1),
-            "!Const(1, ![dark_blue]py[/dark_blue].int)",
+            types.Hinted(types.Int, 1),
+            "!Hinted(![dark_blue]py[/dark_blue].int, 1)",
         )
         self.check_print(
             types.Union(types.Int, types.Float),

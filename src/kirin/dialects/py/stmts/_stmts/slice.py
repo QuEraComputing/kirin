@@ -26,9 +26,9 @@ class Slice(Statement):
             if stop.type.is_subseteq(types.NoneType):
                 result_type = types.Bottom
             else:
-                result_type = types.Slice[types.widen_const(stop.type)]
+                result_type = types.Slice[types.unwrap_hinted(stop.type)]
         else:
-            result_type = types.Slice[types.widen_const(start.type)]
+            result_type = types.Slice[types.unwrap_hinted(start.type)]
 
         super().__init__(
             args=(start, stop, step),

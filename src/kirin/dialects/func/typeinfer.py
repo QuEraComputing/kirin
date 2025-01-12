@@ -30,7 +30,7 @@ class TypeInfer(MethodTable):
     def call(self, interp: TypeInference, frame: Frame, stmt: Call):
         # give up on dynamic method calls
         callee = frame.get(stmt.callee)
-        if not isinstance(callee, ir.types.Const):
+        if not isinstance(callee, ir.types.Hinted):
             return (stmt.result.type,)
 
         mt: ir.Method = callee.data
