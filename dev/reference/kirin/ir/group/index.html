@@ -236,7 +236,7 @@
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Callable</span><span class=p>[</span>
     <span class=p>[</span><span class=n>RunPassGen</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]],</span> <span class=n>DialectGroup</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]</span>
 <span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Create a dialect group from the given dialects based on the definition of <code>run_pass</code> function.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>dialects</code> </td> <td> <code><span title="collections.abc.Iterable">Iterable</span>[<span title="typing.Union">Union</span>[<a class="autorefs autorefs-internal" title="kirin.ir.dialect.Dialect" href="../dialect/#kirin.ir.dialect.Dialect">Dialect</a>, <span title="types.ModuleType">ModuleType</span>]]</code> </td> <td> <div class=doc-md-description> <p>the dialects to include in the group.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title="typing.Callable">Callable</span>[[<span title="kirin.ir.group.RunPassGen">RunPassGen</span>[<span title="kirin.ir.group.PassParams">PassParams</span>]], <a class="autorefs autorefs-internal" title="kirin.ir.group.DialectGroup" href="#kirin.ir.group.DialectGroup">DialectGroup</a>[<span title="kirin.ir.group.PassParams">PassParams</span>]]</code> </td> <td> <div class=doc-md-description> <p>Callable[[RunPassGen[PassParams]], DialectGroup[PassParams]]: the dialect group.</p> </div> </td> </tr> </tbody> </table> <p>Example:</p> <div class=highlight><pre><span></span><code><span class=kn>from</span> <span class=nn>kirin.dialects</span> <span class=kn>import</span> <span class=n>cf</span><span class=p>,</span> <span class=n>fcf</span><span class=p>,</span> <span class=n>func</span><span class=p>,</span> <span class=n>math</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Create a dialect group from the given dialects based on the definition of <code>run_pass</code> function.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>dialects</code> </td> <td> <code><span title="collections.abc.Iterable">Iterable</span>[<span title="typing.Union">Union</span>[<a class="autorefs autorefs-internal" title="kirin.ir.dialect.Dialect" href="../dialect/#kirin.ir.dialect.Dialect">Dialect</a>, <span title="types.ModuleType">ModuleType</span>]]</code> </td> <td> <div class=doc-md-description> <p>the dialects to include in the group.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title="typing.Callable">Callable</span>[[<span title="kirin.ir.group.RunPassGen">RunPassGen</span>[<span title="kirin.ir.group.PassParams">PassParams</span>]], <a class="autorefs autorefs-internal" title="kirin.ir.group.DialectGroup" href="#kirin.ir.group.DialectGroup">DialectGroup</a>[<span title="kirin.ir.group.PassParams">PassParams</span>]]</code> </td> <td> <div class=doc-md-description> <p>Callable[[RunPassGen[PassParams]], DialectGroup[PassParams]]: the dialect group.</p> </div> </td> </tr> </tbody> </table> <details class=example open> <summary>Example</summary> <div class=highlight><pre><span></span><code><span class=kn>from</span> <span class=nn>kirin.dialects</span> <span class=kn>import</span> <span class=n>cf</span><span class=p>,</span> <span class=n>fcf</span><span class=p>,</span> <span class=n>func</span><span class=p>,</span> <span class=n>math</span>
 
 <span class=nd>@dialect_group</span><span class=p>([</span><span class=n>cf</span><span class=p>,</span> <span class=n>fcf</span><span class=p>,</span> <span class=n>func</span><span class=p>,</span> <span class=n>math</span><span class=p>])</span>
 <span class=k>def</span> <span class=nf>basic_no_opt</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
@@ -246,7 +246,7 @@
         <span class=k>pass</span>
 
     <span class=k>return</span> <span class=n>run_pass</span>
-</code></pre></div> <details class=quote> <summary>Source code in <code>src/kirin/ir/group.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>190</span>
+</code></pre></div> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/group.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>190</span>
 <span class=normal>191</span>
 <span class=normal>192</span>
 <span class=normal>193</span>
@@ -281,8 +281,7 @@
 <span class=normal>222</span>
 <span class=normal>223</span>
 <span class=normal>224</span>
-<span class=normal>225</span>
-<span class=normal>226</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>dialect_group</span><span class=p>(</span>
+<span class=normal>225</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>dialect_group</span><span class=p>(</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Union</span><span class=p>[</span><span class=s2>&quot;Dialect&quot;</span><span class=p>,</span> <span class=n>ModuleType</span><span class=p>]]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Callable</span><span class=p>[[</span><span class=n>RunPassGen</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]],</span> <span class=n>DialectGroup</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Create a dialect group from the given dialects based on the</span>
@@ -295,19 +294,18 @@
 <span class=sd>        Callable[[RunPassGen[PassParams]], DialectGroup[PassParams]]: the dialect group.</span>
 
 <span class=sd>    Example:</span>
+<span class=sd>        ```python</span>
+<span class=sd>        from kirin.dialects import cf, fcf, func, math</span>
 
-<span class=sd>    ```python</span>
-<span class=sd>    from kirin.dialects import cf, fcf, func, math</span>
+<span class=sd>        @dialect_group([cf, fcf, func, math])</span>
+<span class=sd>        def basic_no_opt(self):</span>
+<span class=sd>            # initializations</span>
+<span class=sd>            def run_pass(mt: Method) -&gt; None:</span>
+<span class=sd>                # how passes are applied to the method</span>
+<span class=sd>                pass</span>
 
-<span class=sd>    @dialect_group([cf, fcf, func, math])</span>
-<span class=sd>    def basic_no_opt(self):</span>
-<span class=sd>        # initializations</span>
-<span class=sd>        def run_pass(mt: Method) -&gt; None:</span>
-<span class=sd>            # how passes are applied to the method</span>
-<span class=sd>            pass</span>
-
-<span class=sd>        return run_pass</span>
-<span class=sd>    ```</span>
+<span class=sd>            return run_pass</span>
+<span class=sd>        ```</span>
 <span class=sd>    &quot;&quot;&quot;</span>
 
     <span class=c1># NOTE: do not alias the annotation below</span>
