@@ -577,11 +577,51 @@
          <lastmod>2025-01-12</lastmod>
     </url>
     <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/alias/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/apply_type/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/call2invoke/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/cfg_compactify/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/chain/</loc>
          <lastmod>2025-01-12</lastmod>
     </url>
     <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/cse/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/dce/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/fixpoint/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/fold/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/getfield/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/getitem/</loc>
+         <lastmod>2025-01-12</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/inline/</loc>
          <lastmod>2025-01-12</lastmod>
     </url>
     <url>
@@ -593,55 +633,11 @@
          <lastmod>2025-01-12</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/</loc>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/aggressive/</loc>
          <lastmod>2025-01-12</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/alias/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/apply_type/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/call2invoke/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/cfg_compactify/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/cse/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/dce/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/fold/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/getfield/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/getitem/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/inline/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/aggressive/</loc>
-         <lastmod>2025-01-12</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rules/aggressive/fold/</loc>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/aggressive/fold/</loc>
          <lastmod>2025-01-12</lastmod>
     </url>
     <url>
