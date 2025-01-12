@@ -65,5 +65,5 @@ class TypeInference(Forward[types.TypeAttribute]):
         | types.Hinted[const.PartialLambda]
     ]:
         return isinstance(value, types.Hinted) and isinstance(
-            value.data, (const.Value, const.PartialTuple, const.PartialLambda)
+            value.data, (const.Value, const.PartialConst)
         )
