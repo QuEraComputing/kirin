@@ -8,7 +8,7 @@ from kirin.ir import (
     CallableStmtInterface,
     types,
 )
-from kirin.rewrite import RewriteRule, RewriteResult
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.func import Signature
 
 

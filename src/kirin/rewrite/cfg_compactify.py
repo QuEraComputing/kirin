@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 from kirin import ir
-from kirin.rewrite import RewriteRule, RewriteResult
 from kirin.dialects import cf
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.analysis.cfg import CFG
 
 
