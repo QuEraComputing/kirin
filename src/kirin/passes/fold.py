@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from kirin.ir import Method, SSACFGRegion
 from kirin.rewrite import Walk, Chain, Fixpoint, RewriteResult
 from kirin.analysis import const
-from kirin.rules.dce import DeadCodeElimination
 from kirin.passes.abc import Pass
-from kirin.rules.fold import ConstantFold
-from kirin.rules.getitem import InlineGetItem
-from kirin.rules.call2invoke import Call2Invoke
-from kirin.rules.cfg_compactify import CFGCompactify
+from kirin.rewrite.dce import DeadCodeElimination
+from kirin.rewrite.fold import ConstantFold
+from kirin.rewrite.getitem import InlineGetItem
+from kirin.rewrite.call2invoke import Call2Invoke
+from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
 @dataclass

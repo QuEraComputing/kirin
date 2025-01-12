@@ -1,9 +1,9 @@
 from dataclasses import field, dataclass
 
 from kirin import ir
-from kirin.rewrite import RewriteRule, RewriteResult
 from kirin.analysis import const
 from kirin.dialects import func
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 
 @dataclass

@@ -4,15 +4,15 @@ from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Chain, Fixpoint
 from kirin.analysis import const
-from kirin.rules.dce import DeadCodeElimination
-from kirin.rules.fold import ConstantFold
 from kirin.dialects.py import data, stmts
+from kirin.rewrite.dce import DeadCodeElimination
 from kirin.analysis.cfg import CFG
-from kirin.rules.inline import Inline
-from kirin.rules.getitem import InlineGetItem
-from kirin.rules.getfield import InlineGetField
-from kirin.rules.call2invoke import Call2Invoke
-from kirin.rules.cfg_compactify import CFGCompactify
+from kirin.rewrite.fold import ConstantFold
+from kirin.rewrite.inline import Inline
+from kirin.rewrite.getitem import InlineGetItem
+from kirin.rewrite.getfield import InlineGetField
+from kirin.rewrite.call2invoke import Call2Invoke
+from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
 @basic_no_opt

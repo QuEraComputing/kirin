@@ -4,9 +4,9 @@ from kirin.rewrite import Walk, Fixpoint
 from kirin.dialects import cf, func
 from kirin.dialects.py import stmts
 from kirin.analysis.cfg import CFG
-from kirin.rules.inline import Inline
 from kirin.dialects.func import Lambda
-from kirin.rules.cfg_compactify import CFGCompactify
+from kirin.rewrite.inline import Inline
+from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
 @basic_no_opt

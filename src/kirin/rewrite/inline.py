@@ -2,11 +2,11 @@ from typing import Callable
 from dataclasses import dataclass
 
 from kirin import ir
-from kirin.rewrite import RewriteRule, RewriteResult
 from kirin.dialects import cf, func
 
 # TODO: use func.Constant instead of kirin.dialects.py.stmts.Constant
 from kirin.dialects.py import stmts
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 # NOTE: this only inlines func dialect
 

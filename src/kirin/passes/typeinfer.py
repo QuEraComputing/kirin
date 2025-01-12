@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from kirin.ir import Method
 from kirin.rewrite import Walk, RewriteResult
 from kirin.passes.abc import Pass
-from kirin.rules.apply_type import ApplyType
 from kirin.analysis.typeinfer import TypeInference
+from kirin.rewrite.apply_type import ApplyType
 
 
 @dataclass
