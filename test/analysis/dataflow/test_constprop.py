@@ -3,7 +3,7 @@ from kirin.ir import types
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.analysis import const
-from kirin.dialects.py import stmts
+from kirin.dialects.py.append import Append
 
 
 class TestLattice:
@@ -280,7 +280,7 @@ def test_non_pure_recursion():
     @basic_no_opt
     def for_loop_append(cntr: int, x: list, n_range: int):
         if cntr < n_range:
-            stmts.Append(x, cntr)  # type: ignore
+            Append(x, cntr)  # type: ignore
             for_loop_append(cntr + 1, x, n_range)
 
         return x

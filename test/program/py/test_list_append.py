@@ -1,6 +1,6 @@
 # type: ignore
 from kirin.prelude import basic
-from kirin.dialects.py import stmts
+from kirin.dialects import py
 
 
 def test_list_append():
@@ -8,8 +8,8 @@ def test_list_append():
     @basic
     def test_append():
         x = []
-        stmts.Append(x, 1)
-        stmts.Append(x, 2)
+        py.append.Append(x, 1)
+        py.append.Append(x, 2)
         return x
 
     y = test_append()
@@ -23,7 +23,7 @@ def test_recursive_append():
     @basic
     def for_loop_append(cntr: int, x: list, n_range: int):
         if cntr < n_range:
-            stmts.Append(x, cntr)
+            py.append.Append(x, cntr)
             for_loop_append(cntr + 1, x, n_range)
 
         return x

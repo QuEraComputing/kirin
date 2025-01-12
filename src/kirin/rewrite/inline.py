@@ -3,10 +3,10 @@ from dataclasses import dataclass
 
 from kirin import ir
 from kirin.dialects import cf, func
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 # TODO: use func.Constant instead of kirin.dialects.py.stmts.Constant
-from kirin.dialects.py import stmts
-from kirin.rewrite.abc import RewriteRule, RewriteResult
+from kirin.dialects.py.constant import Constant
 
 # NOTE: this only inlines func dialect
 
@@ -44,7 +44,7 @@ class Inline(RewriteRule):
             is not None
         ):
             region = call_trait.get_callable_region(callee.code)
-            func_self = stmts.Constant(node.callee)
+            func_self = Constant(node.callee)
             func_self.result.name = node.callee.sym_name
             func_self.insert_before(node)
             self.inline_call_like(

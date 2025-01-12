@@ -329,7 +329,8 @@ class Vararg(Attribute):
         printer.print(self.typ)
 
 
-TypeVarValue: typing.TypeAlias = TypeAttribute | Vararg
+TypeVarValue: typing.TypeAlias = TypeAttribute | Vararg | list
+TypeOrVararg: typing.TypeAlias = TypeAttribute | Vararg
 
 
 @typing.final
@@ -343,7 +344,7 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
     def __init__(
         self,
         body: type[PyClassType] | PyClass[PyClassType],
-        *vars: TypeAttribute | Vararg,
+        *vars: TypeAttribute | list | Vararg,
     ):
         if isinstance(body, PyClass):
             self.body = body
@@ -491,9 +492,15 @@ class Hinted(TypeAttribute, typing.Generic[HintedData]):
         printer.plain_print(")")
 
 
+def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:
+    "provides the syntax sugar [A, B, C] type Generic(tuple, A, B, C)"
+    return tuple(Generic(tuple, *arg) if isinstance(arg, list) else arg for arg in args)
+
+
 def _split_type_args(
     args: tuple[TypeVarValue, ...]
 ) -> tuple[tuple[TypeAttribute, ...], Vararg | None]:
+    args = _typeparams_list2tuple(args)
     if args is None or len(args) == 0:
         return (), None
 

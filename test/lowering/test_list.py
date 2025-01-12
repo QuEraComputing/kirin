@@ -1,9 +1,8 @@
 from kirin.ir import types
-from kirin.dialects import cf, func
+from kirin.dialects import cf, py, func
 from kirin.lowering import Lowering
-from kirin.dialects.py import data, stmts
 
-lowering = Lowering([cf, func, data, stmts])
+lowering = Lowering([cf, func, py.data, py.ilist, py.append, py.assign])
 
 
 def test_empty_list():
@@ -16,7 +15,7 @@ def test_empty_list():
 
     list_stmt = code.body.blocks[0].stmts.at(0)  # type: ignore
 
-    assert isinstance(list_stmt, stmts.NewList)
+    assert isinstance(list_stmt, py.ilist.New)
     assert len(list_stmt._results) == 1
 
     res = list_stmt._results[0]

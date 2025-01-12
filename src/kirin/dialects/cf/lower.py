@@ -4,7 +4,6 @@ from kirin import ir
 from kirin.lowering import Frame, Result, FromPythonAST, LoweringState
 from kirin.exceptions import DialectLoweringError
 from kirin.dialects.cf import stmts as cf
-from kirin.dialects.py import stmts
 from kirin.dialects.cf.dialect import dialect
 
 
@@ -19,12 +18,14 @@ class CfLowering(FromPythonAST):
         return Result()
 
     def lower_Assert(self, state: LoweringState, node: ast.Assert) -> Result:
+        from kirin.dialects.py.constant import Constant
+
         cond = state.visit(node.test).expect_one()
         if node.msg:
             message = state.visit(node.msg).expect_one()
             state.append_stmt(cf.Assert(condition=cond, message=message))
         else:
-            message_stmt = state.append_stmt(stmts.Constant(""))
+            message_stmt = state.append_stmt(Constant(""))
             state.append_stmt(cf.Assert(condition=cond, message=message_stmt.result))
         return Result()
 

@@ -1,11 +1,11 @@
 import pytest
 
+from kirin.prelude import python_no_opt
 from kirin.dialects import cf, fcf, func
 from kirin.lowering import Lowering
 from kirin.exceptions import DialectLoweringError
-from kirin.dialects.py import data, stmts
 
-lowering = Lowering([cf, func, stmts, data])
+lowering = Lowering(python_no_opt.union([cf, func]))
 
 
 def add(n):

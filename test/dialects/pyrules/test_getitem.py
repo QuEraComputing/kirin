@@ -2,13 +2,12 @@ from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk
-from kirin.dialects.py import stmts
-from kirin.dialects.py.rules import RewriteGetItem
+from kirin.dialects.py import indexing
 
 dummy = ir.Dialect("dummy")
 
 
-class RegGetItemInterface(stmts.GetItemLike["RegGetItem"]):
+class RegGetItemInterface(indexing.GetItemLike["RegGetItem"]):
 
     def get_object(self, stmt: "RegGetItem") -> ir.SSAValue:
         return stmt.reg
@@ -49,10 +48,10 @@ def main():
 
 
 def test_rewrite_getitem():
-    rule = Walk(RewriteGetItem(RegGetItem, types.PyClass(Register)))
+    rule = Walk(indexing.RewriteGetItem(RegGetItem, types.PyClass(Register)))
 
     stmt: ir.Statement = main.code.body.blocks[0].stmts.at(-2)  # type: ignore
-    assert isinstance(stmt, stmts.GetItem)
+    assert isinstance(stmt, indexing.GetItem)
     rule.rewrite(main.code)
     stmt: ir.Statement = main.code.body.blocks[0].stmts.at(-2)  # type: ignore
     assert isinstance(stmt, RegGetItem)

@@ -37,3 +37,19 @@ class EmitJulia(EmitStr[IO_t]):
         frame.set(result, result_sym)
         self.writeln(frame, result_sym, " = ", *args)
         return result_sym
+
+    def emit_binaryop(
+        self,
+        frame: EmitStrFrame,
+        sym: str,
+        lhs: ir.SSAValue,
+        rhs: ir.SSAValue,
+        result: ir.ResultValue,
+    ):
+        return (
+            self.write_assign(
+                frame,
+                result,
+                f"{frame.get(lhs)} {sym} {frame.get(rhs)}",
+            ),
+        )

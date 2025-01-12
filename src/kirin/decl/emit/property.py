@@ -111,7 +111,7 @@ class EmitProperty(BaseModifier):
         return getter, setter
 
     def _emit_attribute_property(self, f: info.AttributeField):
-        from kirin.dialects.py import data
+        from kirin.dialects.py.data import PyAttr
 
         storage = "properties" if f.property else "attributes"
         attr = f"{self._self_name}.{storage}['{f.name}']"
@@ -131,7 +131,7 @@ class EmitProperty(BaseModifier):
                     f"raise AttributeError('attribute property {f.name} is read-only')"
                 ],
                 globals=self.globals,
-                locals={"_value_hint": data.PyAttr if f.pytype else f.annotation},
+                locals={"_value_hint": PyAttr if f.pytype else f.annotation},
                 return_type=None,
             )
         else:

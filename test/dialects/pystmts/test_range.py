@@ -1,7 +1,7 @@
 from kirin.ir import types
 from kirin.prelude import basic
 from kirin.dialects import fcf
-from kirin.dialects.py import stmts
+from kirin.dialects.py.range import Range
 
 
 @basic
@@ -13,20 +13,20 @@ def new_range(a: int, b: int, c: int):
 
 
 def test_new_range():
-    stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(2)
+    stmt: Range = new_range.code.body.blocks[0].stmts.at(2)
     assert isinstance(stmt.start.type, types.Hinted)
     assert stmt.start.type.data.data == 0
     assert stmt.stop.type.is_subseteq(types.Int)
     assert isinstance(stmt.step.type, types.Hinted)
     assert stmt.step.type.data.data == 1
 
-    stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(4)
+    stmt: Range = new_range.code.body.blocks[0].stmts.at(4)
     assert stmt.start.type.is_subseteq(types.Int)
     assert stmt.stop.type.is_subseteq(types.Int)
     assert isinstance(stmt.step.type, types.Hinted)
     assert stmt.step.type.data.data == 1
 
-    stmt: stmts.Range = new_range.code.body.blocks[0].stmts.at(5)
+    stmt: Range = new_range.code.body.blocks[0].stmts.at(5)
     assert stmt.start.type.is_subseteq(types.Int)
     assert stmt.stop.type.is_subseteq(types.Int)
     assert stmt.step.type.is_subseteq(types.Int)

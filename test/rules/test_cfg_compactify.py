@@ -2,10 +2,11 @@ from kirin import ir, types
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
 from kirin.dialects import cf, func
-from kirin.dialects.py import stmts
+from kirin.dialects.py import cmp, binop
 from kirin.analysis.cfg import CFG
 from kirin.dialects.func import Lambda
 from kirin.rewrite.inline import Inline
+from kirin.dialects.py.constant import Constant
 from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
@@ -53,9 +54,9 @@ def test_compactify_replace_block_arguments():
     my_main_test_cfg.code.print()
     stmt = my_main_test_cfg.callable_region.blocks[0].stmts.at(5)
     assert isinstance(stmt, func.Lambda)
-    assert isinstance(stmt.captured[0].owner, stmts.Constant)
+    assert isinstance(stmt.captured[0].owner, Constant)
     assert stmt.captured[0].name == "x"
-    assert isinstance(stmt.captured[1].owner, stmts.Constant)
+    assert isinstance(stmt.captured[1].owner, Constant)
     assert stmt.captured[1].name == "y"
 
 
@@ -67,10 +68,10 @@ def test_compactify_single_branch_block():
     region.blocks.append(ir.Block())
     region.blocks[0].args.append_from(types.Any, "self")
     x = region.blocks[0].args.append_from(types.Any, "x")
-    const_0 = stmts.Constant(0)
-    const_n = stmts.Constant(3)
+    const_0 = Constant(0)
+    const_n = Constant(3)
     const_n.result.name = "n"
-    cond = stmts.Eq(x, const_0.result)
+    cond = cmp.Eq(x, const_0.result)
     cond.result.name = "cond"
     region.blocks[0].stmts.append(const_0)
     region.blocks[0].stmts.append(const_n)
@@ -87,15 +88,15 @@ def test_compactify_single_branch_block():
     region.blocks[1].stmts.append(
         cf.Branch(arguments=(const_n.result,), successor=region.blocks[3])
     )
-    const_1 = stmts.Constant(1)
-    sub = stmts.Sub(x, const_1.result)
+    const_1 = Constant(1)
+    sub = binop.Sub(x, const_1.result)
     region.blocks[2].stmts.append(const_1)
     region.blocks[2].stmts.append(sub)
     region.blocks[2].stmts.append(
         cf.Branch(arguments=(sub.result,), successor=region.blocks[3])
     )
     z = region.blocks[3].args.append_from(types.Any, "z")
-    mul = stmts.Mult(x, z)
+    mul = binop.Mult(x, z)
     region.blocks[3].stmts.append(mul)
     region.blocks[3].stmts.append(func.Return(mul.result))
     region.print()
@@ -115,8 +116,8 @@ def test_compactify_entry_block_single_branch():
     region.blocks[0].args.append_from(types.Any, "self")
     x = region.blocks[0].args.append_from(types.Any, "x")
     region.blocks[0].stmts.append(cf.Branch(arguments=(), successor=region.blocks[1]))
-    x_1 = stmts.Constant(0)
-    x_2 = stmts.Add(x, x_1.result)
+    x_1 = Constant(0)
+    x_2 = binop.Add(x, x_1.result)
     region.blocks[1].stmts.append(x_1)
     region.blocks[1].stmts.append(x_2)
     region.blocks[1].stmts.append(func.Return(x_2.result))
@@ -127,9 +128,9 @@ def test_compactify_entry_block_single_branch():
     target = ir.Region(ir.Block())
     target.blocks[0].args.append_from(types.Any, "self")
     x = target.blocks[0].args.append_from(types.Any, "x")
-    x0 = stmts.Constant(0)
+    x0 = Constant(0)
     target.blocks[0].stmts.append(x0)
-    x1 = stmts.Add(x, x0.result)
+    x1 = binop.Add(x, x0.result)
     target.blocks[0].stmts.append(x1)
     target.blocks[0].stmts.append(func.Return(x1.result))
     assert region.is_structurally_equal(target)

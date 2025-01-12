@@ -28,11 +28,11 @@ class EmitFromPythonCall(BaseModifier):
     _AST_CONSTANT = "_kirin_ast_Constant"
 
     def __init__(self, cls: type, **kwargs: Unpack[StatementOptions]) -> None:
-        from kirin.dialects.py import data
+        from kirin.dialects.py.data import PyAttr
 
         super().__init__(cls, **kwargs)
         self.globals[self._KIRIN_RESULT] = Result
-        self.globals[self._KIRIN_PYATTR] = data.PyAttr
+        self.globals[self._KIRIN_PYATTR] = PyAttr
         self.globals[self._KIRIN_ERROR] = DialectLoweringError
         self.globals[self._AST_TUPLE] = ast.Tuple
         self.globals[self._AST_CONSTANT] = ast.Constant

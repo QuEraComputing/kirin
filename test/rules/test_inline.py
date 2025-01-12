@@ -4,7 +4,7 @@ from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Chain, Fixpoint
 from kirin.analysis import const
-from kirin.dialects.py import data, stmts
+from kirin.dialects.py import data, constant
 from kirin.rewrite.dce import DeadCodeElimination
 from kirin.analysis.cfg import CFG
 from kirin.rewrite.fold import ConstantFold
@@ -72,7 +72,7 @@ def test_inline_closure():
     Fixpoint(Walk(DeadCodeElimination(constprop.results))).rewrite(inline_closure.code)
     inline_closure.code.print()
     stmt = inline_closure.callable_region.blocks[0].stmts.at(0)
-    assert isinstance(stmt, stmts.Constant)
+    assert isinstance(stmt, constant.Constant)
     assert inline_closure() == 40
 
 

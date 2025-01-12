@@ -4,10 +4,10 @@ import pytest
 
 from kirin import ir, types
 from kirin.decl import info, statement
+from kirin.prelude import python_no_opt
 from kirin.dialects import func
 from kirin.lowering import Lowering
 from kirin.exceptions import DialectLoweringError
-from kirin.dialects.py import data, stmts
 
 T = types.TypeVar("T")
 
@@ -109,7 +109,7 @@ def no_group(
 
 def test_from_python_call():
     assert DummyStatement.dialect is dialect
-    lowering = Lowering([func, data, stmts, dialect])
+    lowering = Lowering(python_no_opt.data.union([func, dialect]))
 
     code: func.Function = lowering.run(dummy)  # type: ignore
     block = code.body.blocks[0]

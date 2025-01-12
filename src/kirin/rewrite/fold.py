@@ -3,8 +3,8 @@ from dataclasses import field, dataclass
 from kirin import ir
 from kirin.analysis import const
 from kirin.dialects import cf, func
-from kirin.dialects.py import stmts
 from kirin.rewrite.abc import RewriteRule, RewriteResult
+from kirin.dialects.py.constant import Constant
 
 
 @dataclass
@@ -32,7 +32,7 @@ class ConstantFold(RewriteRule):
         has_done_something = False
         for old_result in node.results:
             if (value := self.get_const(old_result)) is not None:
-                stmt = stmts.Constant(value.data)
+                stmt = Constant(value.data)
                 stmt.insert_before(node)
                 old_result.replace_by(stmt.result)
                 self.results[stmt.result] = self.results[old_result]

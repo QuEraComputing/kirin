@@ -1,19 +1,19 @@
+import ast
 from typing import Generic, TypeVar
 from dataclasses import dataclass
 
-from kirin.ir import Dialect, Attribute, types
-from kirin.interp import MethodTable, impl
+from kirin import ir, types, interp, lowering, exceptions
 from kirin.emit.julia import EmitJulia
 from kirin.print.printer import Printer
 
-dialect = Dialect("py.data")
+dialect = ir.Dialect("py.data")
 
 T = TypeVar("T", covariant=True)
 
 
 @dialect.register
 @dataclass
-class PyAttr(Generic[T], Attribute):
+class PyAttr(Generic[T], ir.Attribute):
     name = "PyAttr"
     data: T
     type: types.TypeAttribute
@@ -36,10 +36,33 @@ class PyAttr(Generic[T], Attribute):
             printer.print(self.type)
 
 
-@dialect.register(key="emit.julia")
-class JuliaTable(MethodTable):
+@dialect.register
+class PythonLowering(lowering.FromPythonAST):
 
-    @impl(PyAttr)
+    def lower_Name(
+        self, state: lowering.LoweringState, node: ast.Name
+    ) -> lowering.Result:
+        name = node.id
+        if isinstance(node.ctx, ast.Load):
+            value = state.current_frame.get(name)
+            if value is None:
+                raise exceptions.DialectLoweringError(f"{name} is not defined")
+            return lowering.Result(value)
+        elif isinstance(node.ctx, ast.Store):
+            raise exceptions.DialectLoweringError("unhandled store operation")
+        else:  # Del
+            raise exceptions.DialectLoweringError("unhandled del operation")
+
+    def lower_Expr(
+        self, state: lowering.LoweringState, node: ast.Expr
+    ) -> lowering.Result:
+        return state.visit(node.value)
+
+
+@dialect.register(key="emit.julia")
+class JuliaTable(interp.MethodTable):
+
+    @interp.impl(PyAttr)
     def emit_PyAttr(self, emit: EmitJulia, attr: PyAttr):
         if isinstance(attr.data, (int, float)):
             return repr(attr.data)

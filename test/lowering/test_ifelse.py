@@ -1,8 +1,8 @@
+from kirin.prelude import python_no_opt
 from kirin.dialects import cf, func
 from kirin.lowering import Lowering
-from kirin.dialects.py import data, stmts
 
-lowering = Lowering([cf, func, data, stmts])
+lowering = Lowering(python_no_opt.data.union([cf, func]))
 
 
 def test_pass():
