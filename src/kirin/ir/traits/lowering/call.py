@@ -1,11 +1,8 @@
 import ast
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 from dataclasses import dataclass
 
-from kirin.ir import Statement
 from kirin.exceptions import DialectLoweringError
-from kirin.lowering.state import LoweringState as LoweringState
-from kirin.lowering.result import Result as Result
 
 from ..abc import PythonLoweringTrait
 
@@ -14,11 +11,14 @@ if TYPE_CHECKING:
     from kirin.lowering import Result, LoweringState
 
 
+StatementType = TypeVar("StatementType", bound="Statement")
+
+
 @dataclass(frozen=True)
-class FromPythonCall(PythonLoweringTrait["Statement", ast.Call]):
+class FromPythonCall(PythonLoweringTrait[StatementType, ast.Call]):
 
     def lower(
-        self, stmt: type[Statement], state: LoweringState, node: ast.Call
+        self, stmt: type[StatementType], state: "LoweringState", node: ast.Call
     ) -> "Result":
         from kirin.decl import fields
         from kirin.lowering import Result

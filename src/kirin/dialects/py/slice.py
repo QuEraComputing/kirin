@@ -10,12 +10,12 @@ dialect = ir.Dialect("py.slice")
 
 
 @dataclass(frozen=True)
-class SliceLowering(ir.PythonLoweringTrait["Slice", ast.Call]):
+class SliceLowering(ir.FromPythonCall["Slice"]):
 
     def lower(
         self, stmt: type["Slice"], state: lowering.LoweringState, node: ast.Call
     ) -> lowering.Result:
-        return __lower_slice(state, node)
+        return _lower_slice(state, node)
 
 
 @statement(dialect=dialect, init=False)
@@ -86,7 +86,7 @@ class Lowering(lowering.FromPythonAST):
     def lower_Call_slice(
         self, state: lowering.LoweringState, node: ast.Call
     ) -> lowering.Result:
-        return __lower_slice(state, node)
+        return _lower_slice(state, node)
 
 
 @dialect.register(key="typeinfer")
@@ -111,7 +111,7 @@ class TypeInfer(interp.MethodTable):
         return (stmt.result.type,)
 
 
-def __lower_slice(state: lowering.LoweringState, node: ast.Call) -> lowering.Result:
+def _lower_slice(state: lowering.LoweringState, node: ast.Call) -> lowering.Result:
     if len(node.args) == 1:
         start = state.visit(ast.Constant(None)).expect_one()
         stop = state.visit(node.args[0]).expect_one()

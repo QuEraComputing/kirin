@@ -146,7 +146,7 @@ class LoweringState(ast.NodeVisitor):
                 if (
                     trait := global_callee.get_trait(traits.FromPythonCall)
                 ) is not None:
-                    return trait.from_python(global_callee, self, node)
+                    return trait.lower(global_callee, self, node)
 
                 raise DialectLoweringError(
                     f"unsupported callee {global_callee.__name__}, "

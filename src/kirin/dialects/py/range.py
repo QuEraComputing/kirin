@@ -8,12 +8,12 @@ dialect = ir.Dialect("py.range")
 
 
 @dataclass(frozen=True)
-class RangeLowering(ir.PythonLoweringTrait["Range", ast.Call]):
+class RangeLowering(ir.FromPythonCall["Range"]):
 
     def lower(
         self, stmt: type["Range"], state: lowering.LoweringState, node: ast.Call
     ) -> lowering.Result:
-        return __lower_range(state, node)
+        return _lower_range(state, node)
 
 
 @statement(dialect=dialect)
@@ -32,7 +32,7 @@ class Lowering(lowering.FromPythonAST):
     def lower_Call_range(
         self, state: lowering.LoweringState, node: ast.Call
     ) -> lowering.Result:
-        return __lower_range(state, node)
+        return _lower_range(state, node)
 
 
 @dialect.register
@@ -43,7 +43,7 @@ class Concrete(interp.MethodTable):
         return (range(*frame.get_values(stmt.args)),)
 
 
-def __lower_range(state: lowering.LoweringState, node: ast.Call) -> lowering.Result:
+def _lower_range(state: lowering.LoweringState, node: ast.Call) -> lowering.Result:
     if len(node.args) == 1:
         start = state.visit(ast.Constant(0)).expect_one()
         stop = state.visit(node.args[0]).expect_one()
