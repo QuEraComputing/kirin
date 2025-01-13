@@ -18,3 +18,7 @@ from .callable import (
 )
 from .lowering.call import FromPythonCall as FromPythonCall
 from .region.ssacfg import SSACFGRegion as SSACFGRegion
+from .lowering.context import (
+    FromPythonWith as FromPythonWith,
+    FromPythonWithSingleItem as FromPythonWithSingleItem,
+)

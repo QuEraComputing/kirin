@@ -33,9 +33,11 @@ from kirin.ir.traits import (
     NoTerminator as NoTerminator,
     SSACFGRegion as SSACFGRegion,
     FromPythonCall as FromPythonCall,
+    FromPythonWith as FromPythonWith,
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
     PythonLoweringTrait as PythonLoweringTrait,
     CallableStmtInterface as CallableStmtInterface,
+    FromPythonWithSingleItem as FromPythonWithSingleItem,
 )
 from kirin.ir.dialect import Dialect as Dialect
