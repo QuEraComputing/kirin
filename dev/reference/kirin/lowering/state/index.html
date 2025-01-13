@@ -18,18 +18,18 @@
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Shorthand for appending a statement to the current block of current frame.&quot;&quot;&quot;</span>
     <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>current_frame</span><span class=o>.</span><span class=n>append_stmt</span><span class=p>(</span><span class=n>stmt</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.lowering.state.LoweringState.exhaust class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">exhaust</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>exhaust</span><span class=p>(</span><span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Exhaust given frame's stream. If not given, exhaust current frame's stream.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering/state.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>251</span>
-<span class=normal>252</span>
-<span class=normal>253</span>
-<span class=normal>254</span>
-<span class=normal>255</span>
-<span class=normal>256</span>
-<span class=normal>257</span>
-<span class=normal>258</span>
-<span class=normal>259</span>
-<span class=normal>260</span>
-<span class=normal>261</span>
-<span class=normal>262</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>exhaust</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Exhaust given frame's stream. If not given, exhaust current frame's stream.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering/state.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>215</span>
+<span class=normal>216</span>
+<span class=normal>217</span>
+<span class=normal>218</span>
+<span class=normal>219</span>
+<span class=normal>220</span>
+<span class=normal>221</span>
+<span class=normal>222</span>
+<span class=normal>223</span>
+<span class=normal>224</span>
+<span class=normal>225</span>
+<span class=normal>226</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>exhaust</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Exhaust given frame&#39;s stream. If not given, exhaust current frame&#39;s stream.&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=n>frame</span><span class=p>:</span>
         <span class=n>current_frame</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>current_frame</span>

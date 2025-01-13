@@ -10,7 +10,9 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../../def/#kirin.ir.Statement">Statement</a></code></p> <p>A constant None value.</p> <p>This is mainly used to represent the None return value of a function to match Python semantics.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>408</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../../def/#kirin.ir.Statement">Statement</a></code></p> <p>A constant None value.</p> <p>This is mainly used to represent the None return value of a function to match Python semantics.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
 <span class=normal>409</span>
 <span class=normal>410</span>
 <span class=normal>411</span>
@@ -64,9 +66,7 @@
 <span class=normal>459</span>
 <span class=normal>460</span>
 <span class=normal>461</span>
-<span class=normal>462</span>
-<span class=normal>463</span>
-<span class=normal>464</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>462</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -142,7 +142,9 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../../def/#kirin.ir.Statement">Statement</a></code></p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>408</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../../def/#kirin.ir.Statement">Statement</a></code></p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
 <span class=normal>409</span>
 <span class=normal>410</span>
 <span class=normal>411</span>
@@ -196,9 +198,7 @@
 <span class=normal>459</span>
 <span class=normal>460</span>
 <span class=normal>461</span>
-<span class=normal>462</span>
-<span class=normal>463</span>
-<span class=normal>464</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>462</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
@@ -293,7 +293,9 @@
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../../def/#kirin.ir.Statement">Statement</a></code></p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>408</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../../def/#kirin.ir.Statement">Statement</a></code></p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>406</span>
+<span class=normal>407</span>
+<span class=normal>408</span>
 <span class=normal>409</span>
 <span class=normal>410</span>
 <span class=normal>411</span>
@@ -347,9 +349,7 @@
 <span class=normal>459</span>
 <span class=normal>460</span>
 <span class=normal>461</span>
-<span class=normal>462</span>
-<span class=normal>463</span>
-<span class=normal>464</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>462</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
