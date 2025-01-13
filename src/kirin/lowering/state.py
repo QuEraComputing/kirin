@@ -112,10 +112,37 @@ class LoweringState(ast.NodeVisitor):
             # it will be called first before __dispatch_Call
             # because "Call" exists in self.registry
             return self.__dispatch_Call(node)
+        elif isinstance(node, ast.With):
+            return self.__dispatch_With(node)
         return super().visit(node)
 
     def generic_visit(self, node: ast.AST):
         raise DialectLoweringError(f"unsupported ast node {type(node)}:")
+
+    def __dispatch_With(self, node: ast.With):
+        if len(node.items) != 1:
+            raise DialectLoweringError("expected exactly one item in with statement")
+
+        item = node.items[0]
+        if not isinstance(item.context_expr, ast.Call):
+            raise DialectLoweringError("expected context expression to be a call")
+
+        global_callee_result = self.get_global_nothrow(item.context_expr.func)
+        if global_callee_result is None:
+            raise DialectLoweringError("cannot find call func in with context")
+
+        global_callee = global_callee_result.unwrap()
+        if not issubclass(global_callee, Statement):
+            raise DialectLoweringError("expected callee to be a statement")
+
+        if (
+            trait := global_callee.get_trait(traits.FromPythonWithSingleItem)
+        ) is not None:
+            return trait.lower(global_callee, self, node)
+
+        raise DialectLoweringError(
+            "unsupported callee, missing FromPythonWithSingleItem trait"
+        )
 
     def __dispatch_Call(self, node: ast.Call):
         # 1. try to lookup global statement object

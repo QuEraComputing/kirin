@@ -50,4 +50,15 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
         args, kwargs = state.default_Call_inputs(stmt, item.context_expr)
         (region_name,) = fs.regions
         kwargs[region_name] = body_frame.current_region
-        return lowering.Result(state.append_stmt(stmt(*args.values(), **kwargs)))
+        results = state.append_stmt(stmt(*args.values(), **kwargs)).results
+        if len(results) == 0:
+            return lowering.Result()
+        elif len(results) > 1:
+            raise DialectLoweringError(
+                f"Expected exactly one result or no result from statement {stmt.name}"
+            )
+
+        result = results[0]
+        if item.optional_vars is not None and isinstance(item.optional_vars, ast.Name):
+            result.name = item.optional_vars.id
+        return lowering.Result(result)
