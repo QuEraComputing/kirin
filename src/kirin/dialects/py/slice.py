@@ -1,4 +1,5 @@
 import ast
+from dataclasses import dataclass
 
 from kirin import ir, types, interp, lowering, exceptions
 from kirin.decl import info, statement
@@ -8,10 +9,19 @@ from kirin.dialects.py.constant import Constant
 dialect = ir.Dialect("py.slice")
 
 
+@dataclass(frozen=True)
+class SliceLowering(ir.PythonLoweringTrait["Slice", ast.Call]):
+
+    def lower(
+        self, stmt: type["Slice"], state: lowering.LoweringState, node: ast.Call
+    ) -> lowering.Result:
+        return __lower_slice(state, node)
+
+
 @statement(dialect=dialect, init=False)
 class Slice(ir.Statement):
     name = "slice"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), SliceLowering()})
     start: ir.SSAValue = info.argument(types.Any)
     stop: ir.SSAValue = info.argument(types.Any)
     step: ir.SSAValue = info.argument(types.Any)
@@ -38,27 +48,6 @@ class Slice(ir.Statement):
             result_types=[result_type],
             args_slice={"start": 0, "stop": 1, "step": 2},
         )
-
-    @classmethod
-    def from_python_call(
-        cls, state: lowering.LoweringState, node: ast.Call
-    ) -> lowering.Result:
-        if len(node.args) == 1:
-            start = state.visit(ast.Constant(None)).expect_one()
-            stop = state.visit(node.args[0]).expect_one()
-            step = state.visit(ast.Constant(None)).expect_one()
-        elif len(node.args) == 2:
-            start = state.visit(node.args[0]).expect_one()
-            stop = state.visit(node.args[1]).expect_one()
-            step = state.visit(ast.Constant(None)).expect_one()
-        elif len(node.args) == 3:
-            start = state.visit(node.args[0]).expect_one()
-            stop = state.visit(node.args[1]).expect_one()
-            step = state.visit(node.args[2]).expect_one()
-        else:
-            raise exceptions.DialectLoweringError("slice() takes 1-3 arguments")
-
-        return lowering.Result(state.append_stmt(cls(start, stop, step)))
 
 
 @dialect.register
@@ -97,7 +86,7 @@ class Lowering(lowering.FromPythonAST):
     def lower_Call_slice(
         self, state: lowering.LoweringState, node: ast.Call
     ) -> lowering.Result:
-        return Slice.from_python_call(state, node)
+        return __lower_slice(state, node)
 
 
 @dialect.register(key="typeinfer")
@@ -120,3 +109,22 @@ class TypeInfer(interp.MethodTable):
             )
 
         return (stmt.result.type,)
+
+
+def __lower_slice(state: lowering.LoweringState, node: ast.Call) -> lowering.Result:
+    if len(node.args) == 1:
+        start = state.visit(ast.Constant(None)).expect_one()
+        stop = state.visit(node.args[0]).expect_one()
+        step = state.visit(ast.Constant(None)).expect_one()
+    elif len(node.args) == 2:
+        start = state.visit(node.args[0]).expect_one()
+        stop = state.visit(node.args[1]).expect_one()
+        step = state.visit(ast.Constant(None)).expect_one()
+    elif len(node.args) == 3:
+        start = state.visit(node.args[0]).expect_one()
+        stop = state.visit(node.args[1]).expect_one()
+        step = state.visit(node.args[2]).expect_one()
+    else:
+        raise exceptions.DialectLoweringError("slice() takes 1-3 arguments")
+
+    return lowering.Result(state.append_stmt(Slice(start, stop, step)))

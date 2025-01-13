@@ -133,22 +133,25 @@ class LoweringState(ast.NodeVisitor):
             raise DialectLoweringError("`lower_Call_global_method` not implemented")
         elif inspect.isclass(global_callee):
             if issubclass(global_callee, Statement):
-                if not global_callee.has_trait(traits.FromPythonCall):
-                    raise DialectLoweringError(
-                        f"unsupported callee {global_callee.__name__}, "
-                        "missing FromPythonAST lowering, or traits.FromPythonCall trait"
-                    )
-
-                if global_callee.dialect is not None:
-                    if global_callee.dialect not in self.dialects.data:
-                        raise DialectLoweringError(
-                            f"unsupported dialect `{global_callee.dialect.name}`"
-                        )
-                    return self.__default_stmt_Call(global_callee, node)
-                else:
+                if global_callee.dialect is None:
                     raise DialectLoweringError(
                         f"unsupported dialect `None` for {global_callee.name}"
                     )
+
+                if global_callee.dialect not in self.dialects.data:
+                    raise DialectLoweringError(
+                        f"unsupported dialect `{global_callee.dialect.name}`"
+                    )
+
+                if (
+                    trait := global_callee.get_trait(traits.FromPythonCall)
+                ) is not None:
+                    return trait.from_python(global_callee, self, node)
+
+                raise DialectLoweringError(
+                    f"unsupported callee {global_callee.__name__}, "
+                    "missing FromPythonAST lowering, or traits.FromPythonCall trait"
+                )
             elif issubclass(global_callee, slice):
                 if "Call_slice" in self.registry:
                     return self.registry["Call_slice"].lower_Call_slice(self, node)
@@ -192,45 +195,6 @@ class LoweringState(ast.NodeVisitor):
         if "Call_local" in self.registry:
             return self.registry["Call_local"].lower_Call_local(self, callee, node)
         raise DialectLoweringError("`lower_Call_local` not implemented")
-
-    def __default_stmt_Call(self, stmt: type[Statement], node: ast.Call) -> Result:
-        from kirin.decl import fields
-        from kirin.dialects.py.data import PyAttr
-
-        fs = fields(stmt)
-        stmt_std_arg_names = fs.std_args.keys()
-        stmt_kw_args_name = fs.kw_args.keys()
-        stmt_attr_prop_names = fs.attr_or_props
-        stmt_required_names = fs.required_names
-        stmt_group_arg_names = fs.group_arg_names
-        args, kwargs = {}, {}
-        for name, value in zip(stmt_std_arg_names, node.args):
-            self._parse_arg(stmt_group_arg_names, args, name, value)
-        for kw in node.keywords:
-            if not isinstance(kw.arg, str):
-                raise DialectLoweringError("Expected string for keyword argument name")
-
-            arg: str = kw.arg
-            if arg in node.args:
-                raise DialectLoweringError(
-                    f"Keyword argument {arg} is already present in positional arguments"
-                )
-            elif arg in stmt_std_arg_names or arg in stmt_kw_args_name:
-                self._parse_arg(stmt_group_arg_names, kwargs, kw.arg, kw.value)
-            elif arg in stmt_attr_prop_names:
-                if not isinstance(kw.value, ast.Constant):
-                    raise DialectLoweringError(
-                        f"Expected constant for attribute or property {arg}"
-                    )
-                kwargs[arg] = PyAttr(kw.value.value)
-            else:
-                raise DialectLoweringError(f"Unexpected keyword argument {arg}")
-
-        for name in stmt_required_names:
-            if name not in args and name not in kwargs:
-                raise DialectLoweringError(f"Missing required argument {name}")
-
-        return Result(self.append_stmt(stmt(*args.values(), **kwargs)))
 
     def _parse_arg(
         self,

@@ -35,6 +35,7 @@ from kirin.ir.traits import (
     FromPythonCall as FromPythonCall,
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
+    PythonLoweringTrait as PythonLoweringTrait,
     CallableStmtInterface as CallableStmtInterface,
 )
 from kirin.ir.dialect import Dialect as Dialect

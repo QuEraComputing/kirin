@@ -1,4 +1,8 @@
-from .abc import StmtTrait as StmtTrait, RegionTrait as RegionTrait
+from .abc import (
+    StmtTrait as StmtTrait,
+    RegionTrait as RegionTrait,
+    PythonLoweringTrait as PythonLoweringTrait,
+)
 from .basic import (
     Pure as Pure,
     HasParent as HasParent,

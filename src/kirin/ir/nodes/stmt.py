@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 from typing import TYPE_CHECKING, Mapping, TypeVar, ClassVar, Iterator, Sequence
 from dataclasses import field, dataclass
 
@@ -19,7 +18,6 @@ from kirin.ir.nodes.region import Region
 if TYPE_CHECKING:
     from kirin.source import SourceInfo
     from kirin.ir.types import TypeAttribute
-    from kirin.lowering import Result, LoweringState
     from kirin.ir.dialect import Dialect
     from kirin.ir.nodes.block import Block
     from kirin.ir.nodes.region import Region
@@ -676,22 +674,6 @@ class Statement(IRNode["Block"]):
             if isinstance(t, trait):
                 return t
         return None
-
-    @classmethod
-    def from_python_call(cls, state: LoweringState, node: ast.Call) -> Result:
-        """Converts a Python call expression to a Kirin IR node.
-
-        Args:
-            state (LoweringState): The current state of the lowering process.
-            node (ast.Call): The Python call expression to be converted.
-
-        Raises:
-            NotImplementedError: If the conversion is not implemented for the given call expression.
-
-        Returns:
-            Result: The converted Kirin IR node.
-        """
-        raise NotImplementedError
 
     def expect_one_result(self) -> ResultValue:
         """Check if the statement contain only one result, and return it"""
