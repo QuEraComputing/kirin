@@ -1,7 +1,7 @@
 import ast
 import inspect
 import builtins
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, get_origin
 from dataclasses import dataclass
 
 from kirin.ir import Method, SSAValue, Statement, DialectGroup, traits
@@ -271,7 +271,9 @@ class LoweringState(ast.NodeVisitor):
                         f"Expected global value for attribute or property {arg}"
                     )
                 if (decl := fs.attributes.get(arg, fs.properties.get(arg))) is not None:
-                    kwargs[arg] = global_value.expect(decl.annotation)
+                    kwargs[arg] = global_value.expect(
+                        get_origin(decl.annotation) or decl.annotation
+                    )
                 else:
                     raise DialectLoweringError(
                         f"Unexpected attribute or property {arg}"

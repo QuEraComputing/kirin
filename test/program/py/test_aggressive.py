@@ -20,15 +20,15 @@ class DummyStmt2(ir.Statement):
 @basic_no_opt.add(dialect)
 def unfolable(x: int, y: int):
     def inner():
-        DummyStmt2(x, option="hello")
-        DummyStmt2(y, option="hello")
+        DummyStmt2(x, option=ir.PyAttr("hello"))
+        DummyStmt2(y, option=ir.PyAttr("hello"))
 
     return inner
 
 
 @basic.add(dialect)(fold=True, aggressive=True)
 def main():
-    x = DummyStmt2(1, option="hello")
+    x = DummyStmt2(1, option=ir.PyAttr("hello"))
     x = unfolable(x, x)
     return x()
 
