@@ -265,15 +265,25 @@ class LoweringState(ast.NodeVisitor):
             elif arg in stmt_std_arg_names or arg in stmt_kw_args_name:
                 self._parse_arg(stmt_group_arg_names, kwargs, kw.arg, kw.value)
             elif arg in stmt_attr_prop_names:
+                if (
+                    isinstance(kw.value, ast.Name)
+                    and self.current_frame.get_local(kw.value.id) is not None
+                ):
+                    raise DialectLoweringError(
+                        f"Expected global/constant value for attribute or property {arg}"
+                    )
                 global_value = self.get_global_nothrow(kw.value)
                 if global_value is None:
                     raise DialectLoweringError(
                         f"Expected global value for attribute or property {arg}"
                     )
                 if (decl := fs.attributes.get(arg, fs.properties.get(arg))) is not None:
-                    kwargs[arg] = global_value.expect(
-                        get_origin(decl.annotation) or decl.annotation
-                    )
+                    if decl.annotation is Any:
+                        kwargs[arg] = global_value.unwrap()
+                    else:
+                        kwargs[arg] = global_value.expect(
+                            get_origin(decl.annotation) or decl.annotation
+                        )
                 else:
                     raise DialectLoweringError(
                         f"Unexpected attribute or property {arg}"

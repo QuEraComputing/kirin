@@ -141,7 +141,7 @@ def test_inline_single_entry():
         name = "dummy2"
         traits = frozenset({ir.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
-        option: ir.PyAttr[str] = info.attribute()
+        option: str = info.attribute()
         # result: ir.ResultValue = info.result(types.Int)
 
     @basic_no_opt.add(dialect)
@@ -180,7 +180,7 @@ def test_inline_non_foldable_closure():
         name = "dummy2"
         traits = frozenset({ir.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
-        option: ir.PyAttr[str] = info.attribute()
+        option: str = info.attribute()
         result: ir.ResultValue = info.result(types.Int)
 
     @basic_no_opt.add(dialect)

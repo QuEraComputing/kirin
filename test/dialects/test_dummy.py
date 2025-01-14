@@ -20,7 +20,7 @@ class DummyStmt(ir.Statement):
 def test_attribute_lowering():
     @basic.add(dialect)
     def test(x: int):
-        return DummyStmt(x, option="attr")  # type: ignore
+        return DummyStmt(x, option=ir.PyAttr("attr"))  # type: ignore
 
     option = test.code.body.blocks[0].stmts.at(0).option  # type: ignore
     assert isinstance(option, ir.PyAttr) and option.data == "attr"
