@@ -1,3 +1,6 @@
+"""Traits for customizing lowering of Python `with` syntax to a statement.
+"""
+
 import ast
 from typing import TYPE_CHECKING, TypeVar
 from dataclasses import dataclass
@@ -15,11 +18,37 @@ StatementType = TypeVar("StatementType", bound="Statement")
 
 @dataclass(frozen=True)
 class FromPythonWith(PythonLoweringTrait[StatementType, ast.With]):
+    """Trait for customizing lowering of Python with statements to a statement.
+
+    Subclassing this trait allows for customizing the lowering of Python with
+    statements to the statement. The `lower` method should be implemented to parse
+    the arguments from the Python with statement and construct the statement instance.
+    """
+
     pass
 
 
 @dataclass(frozen=True)
 class FromPythonWithSingleItem(FromPythonWith[StatementType]):
+    """Trait for customizing lowering of the following Python with syntax to a statement:
+
+    ```python
+    with <stmt>[ as <name>]:
+        <body>
+    ```
+
+    where `<stmt>` is the statement being lowered, `<name>` is an optional name for the result
+    of the statement, and `<body>` is the body of the with statement. The optional `as <name>`
+    is not valid when the statement has no results.
+
+    This syntax is slightly different from the standard Python `with` statement in that
+    `<name>` refers to the result of the statement, not the context manager. Thus typically
+    one sould access `<name>` in `<body>` to use the result of the statement.
+
+    In some cases, however, `<name>` may be used as a reference of a special value `self` that
+    is passed to the `<body>` of the statement. This is useful for statements that have a similar
+    behavior to a closure.
+    """
 
     def lower(
         self, stmt: type[StatementType], state: "LoweringState", node: ast.With
@@ -61,4 +90,5 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
         result = results[0]
         if item.optional_vars is not None and isinstance(item.optional_vars, ast.Name):
             result.name = item.optional_vars.id
+            state.current_frame.defs[result.name] = result
         return lowering.Result(result)
