@@ -4,7 +4,7 @@ import builtins
 from typing import TYPE_CHECKING, Any, TypeVar
 from dataclasses import dataclass
 
-from kirin.ir import Method, PyAttr, SSAValue, Statement, DialectGroup, traits
+from kirin.ir import Method, SSAValue, Statement, DialectGroup, traits
 from kirin.source import SourceInfo
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering.frame import Frame
@@ -265,11 +265,17 @@ class LoweringState(ast.NodeVisitor):
             elif arg in stmt_std_arg_names or arg in stmt_kw_args_name:
                 self._parse_arg(stmt_group_arg_names, kwargs, kw.arg, kw.value)
             elif arg in stmt_attr_prop_names:
-                if not isinstance(kw.value, ast.Constant):
+                global_value = self.get_global_nothrow(kw.value)
+                if global_value is None:
                     raise DialectLoweringError(
-                        f"Expected constant for attribute or property {arg}"
+                        f"Expected global value for attribute or property {arg}"
                     )
-                kwargs[arg] = PyAttr(kw.value.value)
+                if (decl := fs.attributes.get(arg, fs.properties.get(arg))) is not None:
+                    kwargs[arg] = global_value.expect(decl.annotation)
+                else:
+                    raise DialectLoweringError(
+                        f"Unexpected attribute or property {arg}"
+                    )
             else:
                 raise DialectLoweringError(f"Unexpected keyword argument {arg}")
 
