@@ -29,3 +29,9 @@ class FromPythonCall(PythonLoweringTrait[StatementType, ast.Call]):
         self, stmt: type[StatementType], state: "LoweringState", node: ast.Call
     ) -> "Result":
         return state.default_Call_lower(stmt, node)
+
+    def verify(self, stmt: "Statement"):
+        assert len(stmt.regions) == 0, "FromPythonCall statements cannot have regions"
+        assert (
+            len(stmt.successors) == 0
+        ), "FromPythonCall statements cannot have successors"

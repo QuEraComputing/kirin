@@ -92,3 +92,14 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
             result.name = item.optional_vars.id
             state.current_frame.defs[result.name] = result
         return lowering.Result(result)
+
+    def verify(self, stmt: "Statement"):
+        assert (
+            len(stmt.regions) == 1
+        ), "FromPythonWithSingleItem statements must have one region"
+        assert (
+            len(stmt.successors) == 0
+        ), "FromPythonWithSingleItem statements cannot have successors"
+        assert (
+            len(stmt.results) <= 1
+        ), "FromPythonWithSingleItem statements can have at most one result"
