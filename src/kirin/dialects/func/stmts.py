@@ -112,7 +112,7 @@ class Call(Statement):
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     inputs: tuple[SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute(property=True)
+    kwargs: tuple[str, ...] = info.attribute(default_factory=lambda: (), property=True)
     result: ResultValue = info.result()
 
     def print_impl(self, printer: Printer) -> None:
