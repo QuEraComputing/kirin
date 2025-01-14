@@ -293,6 +293,10 @@
          <lastmod>2025-01-14</lastmod>
     </url>
     <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/base/</loc>
+         <lastmod>2025-01-14</lastmod>
+    </url>
+    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/boolop/</loc>
          <lastmod>2025-01-14</lastmod>
     </url>
@@ -302,10 +306,6 @@
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/constant/</loc>
-         <lastmod>2025-01-14</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/py/data/</loc>
          <lastmod>2025-01-14</lastmod>
     </url>
     <url>
@@ -477,10 +477,6 @@
          <lastmod>2025-01-14</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/attrs/</loc>
-         <lastmod>2025-01-14</lastmod>
-    </url>
-    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/dialect/</loc>
          <lastmod>2025-01-14</lastmod>
     </url>
@@ -497,11 +493,23 @@
          <lastmod>2025-01-14</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/types/</loc>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/use/</loc>
          <lastmod>2025-01-14</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/use/</loc>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/attrs/</loc>
+         <lastmod>2025-01-14</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/attrs/abc/</loc>
+         <lastmod>2025-01-14</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/attrs/py/</loc>
+         <lastmod>2025-01-14</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/ir/attrs/types/</loc>
          <lastmod>2025-01-14</lastmod>
     </url>
     <url>
