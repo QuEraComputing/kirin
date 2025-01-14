@@ -2,7 +2,8 @@ from typing import Any
 from dataclasses import dataclass
 
 from kirin import ir, analysis
-from kirin.rewrite import Walk, Chain, Fixpoint, RewriteRule, RewriteResult
+from kirin.rewrite import Walk, Chain, Fixpoint
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.rewrite.dce import DeadCodeElimination
 from kirin.rewrite.fold import ConstantFold
 from kirin.ir.nodes.base import IRNode

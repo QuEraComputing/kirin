@@ -3,10 +3,8 @@ from dataclasses import field, dataclass
 
 from kirin import ir
 from kirin.passes import Pass
-from kirin.rewrite import Walk, Fixpoint, RewriteResult
-from kirin.rewrite.dce import DeadCodeElimination
-from kirin.rewrite.inline import Inline
-from kirin.rewrite.cfg_compactify import CFGCompactify
+from kirin.rewrite import Walk, Inline, Fixpoint, CFGCompactify, DeadCodeElimination
+from kirin.rewrite.abc import RewriteResult
 
 
 def aggresive(x: ir.IRNode) -> bool:

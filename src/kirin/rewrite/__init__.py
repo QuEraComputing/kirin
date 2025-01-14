@@ -1,11 +1,9 @@
-from .abc import RewriteRule as RewriteRule
 from .dce import DeadCodeElimination as DeadCodeElimination
 from .fold import ConstantFold as ConstantFold
 from .walk import Walk as Walk
 from .alias import InlineAlias as InlineAlias
 from .chain import Chain as Chain
 from .inline import Inline as Inline
-from .result import RewriteResult as RewriteResult
 from .getitem import InlineGetItem as InlineGetItem
 from .fixpoint import Fixpoint as Fixpoint
 from .getfield import InlineGetField as InlineGetField

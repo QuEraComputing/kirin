@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
 from kirin.ir import Method
-from kirin.rewrite import Walk, RewriteResult
+from kirin.rewrite import Walk
 from kirin.passes.abc import Pass
+from kirin.rewrite.abc import RewriteResult
 from kirin.analysis.typeinfer import TypeInference
 from kirin.rewrite.apply_type import ApplyType
 
