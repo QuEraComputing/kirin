@@ -3,7 +3,7 @@
 from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.prelude import basic, basic_no_opt
-from kirin.dialects.py import data, stmts
+from kirin.dialects.py import cmp, data
 
 dialect = ir.Dialect("dummy2")
 
@@ -11,6 +11,7 @@ dialect = ir.Dialect("dummy2")
 @statement(dialect=dialect)
 class DummyStmt2(ir.Statement):
     name = "dummy2"
+    traits = frozenset({ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Int)
     option: data.PyAttr[str] = info.attribute()
     result: ir.ResultValue = info.result(types.Int)
@@ -51,4 +52,4 @@ def should_fold():
 
 def test_should_fold():
     for stmt in should_fold.callable_region.walk():
-        assert not isinstance(stmt, stmts.Lt)
+        assert not isinstance(stmt, cmp.Lt)

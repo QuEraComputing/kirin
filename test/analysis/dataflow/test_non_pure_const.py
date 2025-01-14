@@ -8,6 +8,7 @@ dialect = ir.Dialect("mwe")
 @statement(dialect=dialect)
 class SideEffect(ir.Statement):
     name = "side_effect"
+    traits = frozenset({ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Int)
 
 

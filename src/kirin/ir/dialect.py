@@ -18,13 +18,27 @@ if TYPE_CHECKING:
 # TODO: add an option to generate default lowering at dialect construction
 @dataclass
 class Dialect:
-    """Dialect is a collection of statements, attributes, interpreters, lowerings, and codegen."""
+    """Dialect is a collection of statements, attributes, interpreters, lowerings, and codegen.
+
+    Example:
+        ```python
+            from kirin import ir
+
+            my_dialect = ir.Dialect(name="my_dialect")
+
+        ```
+    """
 
     name: str
+    """The name of the dialect."""
     stmts: list[type[Statement]] = field(default_factory=list, init=True)
+    """A list of statements in the dialect."""
     attrs: list[type[Attribute]] = field(default_factory=list, init=True)
+    """A list of attributes in the dialect."""
     interps: dict[str, MethodTable] = field(default_factory=dict, init=True)
+    """A dictionary of registered method table in the dialect."""
     lowering: dict[str, FromPythonAST] = field(default_factory=dict, init=True)
+    """A dictionary of registered python lowering implmentations in the dialect."""
 
     def __post_init__(self) -> None:
         from kirin.lowering.dialect import NoSpecialLowering
@@ -47,6 +61,31 @@ class Dialect:
 
         Raises:
             ValueError: If the node is not a subclass of Statement, Attribute, DialectInterpreter, FromPythonAST, or DialectEmit.
+
+        Example:
+            * Register a method table for concrete interpreter (by default key="main") to the dialect:
+            ```python
+                from kirin import ir
+
+                my_dialect = ir.Dialect(name="my_dialect")
+
+                @my_dialect.register
+                class MyMethodTable(ir.MethodTable):
+                    ...
+            ```
+
+            * Register a method table for the interpreter specified by `key` to the dialect:
+            ```python
+                from kirin import ir
+
+                my_dialect = ir.Dialect(name="my_dialect")
+
+                @my_dialect.register(key="my_interp")
+                class MyMethodTable(ir.MethodTable):
+                    ...
+            ```
+
+
         """
         from kirin.interp.dialect import MethodTable
         from kirin.lowering.dialect import FromPythonAST

@@ -2,12 +2,12 @@ from dataclasses import dataclass
 
 import pytest
 
-from kirin.interp import MethodTable, StatementResult, impl
+from kirin import interp
 from kirin.lattice import EmptyLattice
 from kirin.prelude import basic
+from kirin.dialects import py
 from kirin.worklist import WorkList
 from kirin.ir.method import Method
-from kirin.dialects.py import stmts
 from kirin.analysis.forward import ForwardExtra
 
 
@@ -22,15 +22,15 @@ class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
 
     def run_method(
         self, method: Method, args: tuple[EmptyLattice, ...]
-    ) -> StatementResult[EmptyLattice]:
+    ) -> EmptyLattice | interp.Err[EmptyLattice]:
         return self.run_callable(method.code, (EmptyLattice(),) + args)
 
 
-@stmts.dialect.register(key="test_interp")
-class DialectMethodTable(MethodTable):
+@py.tuple.dialect.register(key="test_interp")
+class DialectMethodTable(interp.MethodTable):
 
-    @impl(stmts.NewTuple)
-    def new_tuple(self, interp: DummyInterpreter, frame, stmt: stmts.NewTuple):
+    @interp.impl(py.tuple.New)
+    def new_tuple(self, interp: DummyInterpreter, frame, stmt: py.tuple.New):
         return (EmptyLattice(),)
 
 

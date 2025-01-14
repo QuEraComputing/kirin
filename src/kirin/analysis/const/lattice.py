@@ -62,6 +62,11 @@ class Value(Result):
         return False
 
 
+@dataclass
+class PartialConst(Result):
+    pass
+
+
 @final
 class PartialTupleMeta(LatticeMeta):
     def __call__(cls, data: tuple[Result, ...]):
@@ -72,7 +77,7 @@ class PartialTupleMeta(LatticeMeta):
 
 @final
 @dataclass
-class PartialTuple(Result, metaclass=PartialTupleMeta):
+class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
     data: tuple[Result, ...]
 
     def join(self, other: Result) -> Result:
@@ -119,7 +124,7 @@ class PartialTuple(Result, metaclass=PartialTupleMeta):
 
 @final
 @dataclass
-class PartialLambda(Result):
+class PartialLambda(PartialConst):
     argnames: list[str]
     code: ir.Statement
     captured: tuple[Result, ...]

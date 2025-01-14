@@ -7,6 +7,7 @@ from .lattice import (
     NotPure as NotPure,
     Unknown as Unknown,
     JointResult as JointResult,
+    PartialConst as PartialConst,
     PartialTuple as PartialTuple,
     PurityBottom as PurityBottom,
     PartialLambda as PartialLambda,

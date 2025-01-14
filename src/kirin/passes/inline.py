@@ -4,9 +4,9 @@ from dataclasses import field, dataclass
 from kirin import ir
 from kirin.passes import Pass
 from kirin.rewrite import Walk, Fixpoint, RewriteResult
-from kirin.rules.dce import DeadCodeElimination
-from kirin.rules.inline import Inline
-from kirin.rules.cfg_compactify import CFGCompactify
+from kirin.rewrite.dce import DeadCodeElimination
+from kirin.rewrite.inline import Inline
+from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
 def aggresive(x: ir.IRNode) -> bool:

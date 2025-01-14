@@ -3,12 +3,56 @@ from typing_extensions import Doc, Annotated
 from kirin.ir import Method, dialect_group
 from kirin.passes import aggressive
 from kirin.dialects import cf, fcf, func, math
-from kirin.dialects.py import data, stmts
+from kirin.dialects.py import (
+    cmp,
+    len,
+    attr,
+    data,
+    binop,
+    ilist,
+    range,
+    slice,
+    tuple,
+    unary,
+    append,
+    assign,
+    boolop,
+    builtin,
+    constant,
+    indexing,
+)
 from kirin.passes.fold import Fold
 from kirin.passes.typeinfer import TypeInfer
 
 
-@dialect_group([cf, fcf, func, math, data, stmts])
+@dialect_group(
+    [
+        binop,
+        cmp,
+        ilist,
+        unary,
+        assign,
+        attr,
+        boolop,
+        builtin,
+        constant,
+        data,
+        indexing,
+        len,
+        append,
+        range,
+        slice,
+        tuple,
+    ]
+)
+def python_no_opt(self):
+    def run_pass(mt: Method) -> None:
+        pass
+
+    return run_pass
+
+
+@dialect_group(python_no_opt.data.union([cf, fcf, func, math]))
 def basic_no_opt(self):
     """The basic kernel without optimization passes.
 

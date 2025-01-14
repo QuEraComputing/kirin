@@ -1,14 +1,14 @@
 import pytest
 
 from kirin.ir import Block
-from kirin.dialects.py import stmts
+from kirin.dialects import py
 
 
 def test_stmt():
-    a = stmts.Constant(0)
-    x = stmts.Constant(1)
-    y = stmts.Constant(2)
-    z = stmts.Add(lhs=x.result, rhs=y.result)
+    a = py.Constant(0)
+    x = py.Constant(1)
+    y = py.Constant(2)
+    z = py.Add(lhs=x.result, rhs=y.result)
 
     bb1 = Block([a, x, y, z])
     assert bb1.first_stmt == a
@@ -35,7 +35,7 @@ def test_stmt():
 
 def test_block_append():
     block = Block()
-    block.stmts.append(stmts.Constant(1))
-    block.stmts.append(stmts.Constant(1))
+    block.stmts.append(py.Constant(1))
+    block.stmts.append(py.Constant(1))
     block.print()
     assert len(block.stmts) == 2

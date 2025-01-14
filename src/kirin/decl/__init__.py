@@ -15,7 +15,6 @@ from kirin.decl.scan_fields import ScanFields
 from kirin.decl.emit.dialect import EmitDialect
 from kirin.decl.emit.property import EmitProperty
 from kirin.decl.emit.typecheck import EmitTypeCheck
-from kirin.decl.emit.from_python_call import EmitFromPythonCall
 
 
 class StatementDecl(
@@ -29,7 +28,6 @@ class StatementDecl(
     EmitTraits,
     EmitVerify,
     EmitTypeCheck,
-    EmitFromPythonCall,
 ):
     pass
 
@@ -63,5 +61,5 @@ def statement(
     return wrap(cls)
 
 
-def fields(cls) -> info.StatementFields:
+def fields(cls: type[Statement] | Statement) -> info.StatementFields:
     return getattr(cls, ScanFields._FIELDS)
