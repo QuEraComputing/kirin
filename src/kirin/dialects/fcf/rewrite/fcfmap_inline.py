@@ -3,8 +3,7 @@ from dataclasses import dataclass
 
 from kirin import ir
 from kirin.analysis import const
-from kirin.dialects import fcf, func
-from kirin.dialects.py import stmts as py
+from kirin.dialects import py, fcf, func
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.ir.nodes.stmt import Statement
 
@@ -43,7 +42,7 @@ class InlineFcfMap(RewriteRule):
             curr = newstmt
 
         # assemble tuple:
-        tpl = py.NewTuple(values=tuple(tpl_elem))
+        tpl = py.tuple.New(values=tuple(tpl_elem))
         tpl.insert_after(curr)
         node.result.replace_by(tpl.result)
         node.delete()
