@@ -6,7 +6,6 @@ from kirin import ir, types
 from kirin.print import Printer
 from kirin.prelude import basic
 from kirin.dialects import fcf, func
-from kirin.dialects.py import data
 
 
 @basic
@@ -78,7 +77,7 @@ class TestBasicPrint:
         )
 
         self.check_print(
-            data.PyAttr(1),
+            ir.PyAttr(1),
             "1[bright_black] : [/bright_black]",
             "[bright_black]![dark_blue]py[/dark_blue].int[/bright_black]",
         )

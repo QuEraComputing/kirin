@@ -29,7 +29,7 @@ class EmitInit(BaseModifier):
 
     def __init__(self, cls: type, **kwargs: Unpack[StatementOptions]) -> None:
         super().__init__(cls, **kwargs)
-        from kirin.dialects.py.data import PyAttr
+        from kirin.ir.attrs.py import PyAttr
 
         self._init_params: list[str] = []
         self._init_body: list[str] = []

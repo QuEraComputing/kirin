@@ -2,11 +2,11 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
-from kirin.ir.types import TypeAttribute
 from kirin.ir.traits import CallableStmtInterface
 from kirin.exceptions import InterpreterError, VerificationError
 from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
+from kirin.ir.attrs.types import TypeAttribute
 from kirin.print.printable import Printable
 
 if TYPE_CHECKING:

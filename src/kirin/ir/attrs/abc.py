@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from abc import ABC, ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Optional
 from dataclasses import field, dataclass
 
 from kirin.print import Printable
@@ -18,8 +16,12 @@ class AttributeMeta(ABCMeta):
 
 @dataclass(eq=False)
 class Attribute(ABC, Printable, metaclass=AttributeMeta):
-    dialect: ClassVar[Dialect | None] = field(default=None, init=False, repr=False)
+    """ABC for compile-time values."""
+
+    dialect: ClassVar[Optional["Dialect"]] = field(default=None, init=False, repr=False)
+    """Dialect of the attribute. (default: None)"""
     name: ClassVar[str] = field(init=False, repr=False)
+    """Name of the attribute in printing and other text format."""
 
     @abstractmethod
     def __hash__(self) -> int: ...

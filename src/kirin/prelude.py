@@ -7,7 +7,7 @@ from kirin.dialects.py import (
     cmp,
     len,
     attr,
-    data,
+    base,
     binop,
     ilist,
     range,
@@ -27,6 +27,7 @@ from kirin.passes.typeinfer import TypeInfer
 
 @dialect_group(
     [
+        base,
         binop,
         cmp,
         ilist,
@@ -36,7 +37,6 @@ from kirin.passes.typeinfer import TypeInfer
         boolop,
         builtin,
         constant,
-        data,
         indexing,
         len,
         append,

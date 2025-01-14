@@ -1,7 +1,7 @@
 from kirin.ir import Block, SSAValue, Statement, IsTerminator
 from kirin.decl import info, statement
-from kirin.ir.types import Bool, String
 from kirin.print.printer import Printer
+from kirin.ir.attrs.types import Bool, String
 from kirin.dialects.cf.dialect import dialect
 
 

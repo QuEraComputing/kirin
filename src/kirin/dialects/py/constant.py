@@ -5,7 +5,6 @@ from kirin import ir, interp, lowering, exceptions
 from kirin.decl import info, statement
 from kirin.print import Printer
 from kirin.emit.julia import EmitJulia, EmitStrFrame
-from kirin.dialects.py.data import PyAttr
 
 dialect = ir.Dialect("py.constant")
 
@@ -20,9 +19,9 @@ class Constant(ir.Statement, Generic[T]):
     result: ir.ResultValue = info.result()
 
     # NOTE: we allow py.Constant take data.PyAttr too
-    def __init__(self, value: T | PyAttr[T]) -> None:
-        if not isinstance(value, PyAttr):
-            value = PyAttr(value)
+    def __init__(self, value: T | ir.PyAttr[T]) -> None:
+        if not isinstance(value, ir.PyAttr):
+            value = ir.PyAttr(value)
         super().__init__(
             properties={"value": value},
             result_types=(value.type,),
@@ -65,4 +64,4 @@ class JuliaTable(interp.MethodTable):
 
     @interp.impl(Constant)
     def emit_Constant(self, emit: EmitJulia, frame: EmitStrFrame, stmt: Constant):
-        return (emit.emit_attribute(PyAttr(stmt.value)),)
+        return (emit.emit_attribute(ir.PyAttr(stmt.value)),)

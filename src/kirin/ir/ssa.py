@@ -8,7 +8,7 @@ from dataclasses import field, dataclass
 from typing_extensions import Self
 
 from kirin.print import Printer, Printable
-from kirin.ir.types import AnyType, TypeAttribute
+from kirin.ir.attrs.types import AnyType, TypeAttribute
 
 if TYPE_CHECKING:
     from kirin.ir.use import Use

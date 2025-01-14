@@ -15,8 +15,9 @@ from kirin.lattice import (
     IsSubsetEqMixin,
     SimpleMeetMixin,
 )
-from kirin.ir.attrs import Attribute, AttributeMeta
-from kirin.ir._types import _TypeAttribute
+
+from .abc import Attribute, AttributeMeta
+from ._types import _TypeAttribute
 
 
 class TypeAttributeMeta(AttributeMeta, LatticeMeta):

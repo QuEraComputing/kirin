@@ -1,7 +1,7 @@
 from typing import IO, TypeVar
 
 from kirin import ir
-from kirin.ir.types import PyClass
+from kirin.ir.attrs.types import PyClass
 from kirin.ir.nodes.block import Block
 
 from .str import EmitStr, EmitStrFrame
@@ -53,3 +53,11 @@ class EmitJulia(EmitStr[IO_t]):
                 f"{frame.get(lhs)} {sym} {frame.get(rhs)}",
             ),
         )
+
+    def emit_type_PyAttr(self, attr: ir.PyAttr) -> str:
+        if isinstance(attr.data, (int, float)):
+            return repr(attr.data)
+        elif isinstance(attr.data, str):
+            return f'"{attr.data}"'
+        else:
+            raise ValueError(f"unsupported type {type(attr.data)}")

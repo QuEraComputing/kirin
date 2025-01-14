@@ -3,7 +3,6 @@ import ast
 from kirin import ir, interp, lowering, exceptions
 from kirin.decl import info, statement
 from kirin.print import Printer
-from kirin.dialects.py import data
 
 dialect = ir.Dialect("py.assign")
 
@@ -15,7 +14,7 @@ class Alias(ir.Statement):
     name = "alias"
     traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(T)
-    target: data.PyAttr[str] = info.attribute(property=True)
+    target: ir.PyAttr[str] = info.attribute(property=True)
     result: ir.ResultValue = info.result(T)
 
     def print_impl(self, printer: Printer) -> None:
@@ -69,7 +68,7 @@ class Lowering(lowering.FromPythonAST):
                 targets=[ast.Name(lhs_name, ast.Store())], value=ast.Name(_, ast.Load())
             ):
                 stmt = Alias(
-                    value=results[0], target=data.PyAttr(lhs_name)
+                    value=results[0], target=ir.PyAttr(lhs_name)
                 )  # NOTE: this is guaranteed to be one result
                 stmt.result.name = lhs_name
                 current_frame.defs[lhs_name] = state.append_stmt(stmt).result

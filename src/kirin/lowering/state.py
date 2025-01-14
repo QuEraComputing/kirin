@@ -4,7 +4,7 @@ import builtins
 from typing import TYPE_CHECKING, Any, TypeVar
 from dataclasses import dataclass
 
-from kirin.ir import Method, SSAValue, Statement, DialectGroup, traits
+from kirin.ir import Method, PyAttr, SSAValue, Statement, DialectGroup, traits
 from kirin.source import SourceInfo
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering.frame import Frame
@@ -243,7 +243,6 @@ class LoweringState(ast.NodeVisitor):
         self, stmt: type[Statement], node: ast.Call
     ) -> tuple[dict[str, SSAValue | tuple[SSAValue, ...]], dict[str, Any]]:
         from kirin.decl import fields
-        from kirin.dialects.py.data import PyAttr
 
         fs = fields(stmt)
         stmt_std_arg_names = fs.std_args.keys()

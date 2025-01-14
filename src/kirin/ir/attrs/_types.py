@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from kirin.ir.attrs import Attribute
+from .abc import Attribute
 
 
 @dataclass

@@ -2,11 +2,11 @@ from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
 from kirin.exceptions import VerificationError
+from kirin.ir.attrs.py import PyAttr
 from kirin.ir.traits.abc import StmtTrait
 
 if TYPE_CHECKING:
     from kirin.ir import Statement
-    from kirin.dialects.py.data import PyAttr
 
 
 @dataclass(frozen=True)
@@ -20,13 +20,10 @@ class SymbolOpInterface(StmtTrait):
         return sym_name
 
     def verify(self, stmt: "Statement"):
-        from kirin.ir.types import String
-        from kirin.dialects.py import data
+        from kirin.ir.attrs.types import String
 
         sym_name = self.get_sym_name(stmt)
-        if not (
-            isinstance(sym_name, data.PyAttr) and sym_name.type.is_subseteq(String)
-        ):
+        if not (isinstance(sym_name, PyAttr) and sym_name.type.is_subseteq(String)):
             raise ValueError(f"Symbol name {sym_name} is not a string attribute")
 
 

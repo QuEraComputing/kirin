@@ -2,7 +2,7 @@ from . import (
     cmp as cmp,
     len as len,
     attr as attr,
-    data as data,
+    base as base,
     binop as binop,
     ilist as ilist,
     range as range,
@@ -18,7 +18,6 @@ from . import (
 )
 from .len import Len as Len
 from .attr import GetAttr as GetAttr
-from .data import PyAttr as PyAttr
 from .range import Range as Range
 from .slice import Slice as Slice
 from .append import Append as Append

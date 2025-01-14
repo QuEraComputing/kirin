@@ -5,8 +5,8 @@ from dataclasses import field, dataclass
 
 from typing_extensions import dataclass_transform
 
-from kirin.ir.attrs import Attribute
 from kirin.ir.nodes import Statement
+from kirin.ir.attrs.abc import Attribute
 
 T = TypeVar("T")
 

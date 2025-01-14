@@ -1,6 +1,6 @@
 import pytest
 
-from kirin.ir.types import (
+from kirin.ir.attrs.types import (
     Int,
     Bool,
     Dict,

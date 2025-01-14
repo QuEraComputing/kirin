@@ -4,7 +4,7 @@ from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Chain, Fixpoint
 from kirin.analysis import const
-from kirin.dialects.py import data, constant
+from kirin.dialects.py import constant
 from kirin.rewrite.dce import DeadCodeElimination
 from kirin.analysis.cfg import CFG
 from kirin.rewrite.fold import ConstantFold
@@ -141,7 +141,7 @@ def test_inline_single_entry():
         name = "dummy2"
         traits = frozenset({ir.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
-        option: data.PyAttr[str] = info.attribute()
+        option: ir.PyAttr[str] = info.attribute()
         # result: ir.ResultValue = info.result(types.Int)
 
     @basic_no_opt.add(dialect)
@@ -180,7 +180,7 @@ def test_inline_non_foldable_closure():
         name = "dummy2"
         traits = frozenset({ir.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
-        option: data.PyAttr[str] = info.attribute()
+        option: ir.PyAttr[str] = info.attribute()
         result: ir.ResultValue = info.result(types.Int)
 
     @basic_no_opt.add(dialect)

@@ -8,8 +8,8 @@ from typing_extensions import Self
 from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue, ResultValue
 from kirin.ir.use import Use
-from kirin.ir.attrs import Attribute
 from kirin.ir.traits import StmtTrait
+from kirin.ir.attrs.abc import Attribute
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import MutableSequenceView
 from kirin.ir.nodes.block import Block
@@ -17,8 +17,8 @@ from kirin.ir.nodes.region import Region
 
 if TYPE_CHECKING:
     from kirin.source import SourceInfo
-    from kirin.ir.types import TypeAttribute
     from kirin.ir.dialect import Dialect
+    from kirin.ir.attrs.types import TypeAttribute
     from kirin.ir.nodes.block import Block
     from kirin.ir.nodes.region import Region
 

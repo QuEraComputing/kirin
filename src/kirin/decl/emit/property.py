@@ -111,7 +111,7 @@ class EmitProperty(BaseModifier):
         return getter, setter
 
     def _emit_attribute_property(self, f: info.AttributeField):
-        from kirin.dialects.py.data import PyAttr
+        from kirin.ir.attrs.py import PyAttr
 
         storage = "properties" if f.property else "attributes"
         attr = f"{self._self_name}.{storage}['{f.name}']"

@@ -1,15 +1,7 @@
 from dataclasses import dataclass
 
-from kirin.ir.attrs import Attribute
-from kirin.ir.types import (
-    Union,
-    Hinted,
-    Generic,
-    Literal,
-    PyClass,
-    TypeVar,
-    TypeAttribute,
-)
+from .abc import Attribute
+from .types import Union, Hinted, Generic, Literal, PyClass, TypeVar, TypeAttribute
 
 @dataclass
 class _TypeAttribute(Attribute):

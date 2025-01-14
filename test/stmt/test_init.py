@@ -2,7 +2,6 @@ from typing import Any
 
 from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.dialects.py import data
 
 T = types.TypeVar("T")
 
@@ -24,7 +23,7 @@ class DummyStatement(ir.Statement):
 
     # attributes
     xxx_property: Any = info.attribute(T, default="", property=True)
-    xxx_attribute: data.PyAttr[float] = info.attribute()
+    xxx_attribute: ir.PyAttr[float] = info.attribute()
     xxx_dict: dict[str, int] = info.attribute()
 
     # regions
@@ -45,7 +44,7 @@ def test_init():
         args[3],
         xxx_Any=args[4],
         xxx_vararg=(args[5], args[6]),
-        xxx_attribute=data.PyAttr(2),
+        xxx_attribute=ir.PyAttr(2),
         xxx_property=1,
         xxx_dict={"a": 1},
         xxx_region_noinfo=ir.Region(),
@@ -62,7 +61,7 @@ def test_init():
     assert stmt.xxx_vararg[0] is args[5]
     assert stmt.xxx_vararg[1] is args[6]
 
-    assert isinstance(stmt.xxx_attribute, data.PyAttr)
+    assert isinstance(stmt.xxx_attribute, ir.PyAttr)
     assert stmt.xxx_attribute.data == 2
     assert stmt.xxx_property == 1
     assert isinstance(stmt.xxx_dict, dict)
