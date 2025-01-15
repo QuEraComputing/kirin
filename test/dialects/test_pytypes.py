@@ -4,7 +4,6 @@ from kirin.ir.attrs.types import (
     Int,
     Bool,
     Dict,
-    List,
     Float,
     Slice,
     Tuple,
@@ -91,8 +90,6 @@ def test_generic_is_subseteq():
     assert Tuple[Vararg(Int)][Int, Int] == Tuple[Int, Int]
     assert hash(Tuple[Int, Int]) == hash(Tuple[Int, Int])
     assert Tuple[Int, Vararg(Int)][Int, Int] == Tuple[Int, Int]
-    assert List[Int] == List[Int]
-    assert hash(List[Int]) == hash(List[Int])
     assert Tuple[Int, Int].is_subseteq(Tuple[TypeVar("T"), Int])
     assert Dict[Int, Int].is_subseteq(Dict[TypeVar("K"), TypeVar("V")])
     assert Dict[Int, Int].is_subseteq(Dict)

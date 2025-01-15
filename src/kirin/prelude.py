@@ -2,19 +2,18 @@ from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group
 from kirin.passes import aggressive
-from kirin.dialects import cf, fcf, func, math
+from kirin.dialects import cf, func, math
 from kirin.dialects.py import (
     cmp,
     len,
     attr,
     base,
+    list,
     binop,
-    ilist,
     range,
     slice,
     tuple,
     unary,
-    append,
     assign,
     boolop,
     builtin,
@@ -30,7 +29,6 @@ from kirin.passes.typeinfer import TypeInfer
         base,
         binop,
         cmp,
-        ilist,
         unary,
         assign,
         attr,
@@ -39,20 +37,29 @@ from kirin.passes.typeinfer import TypeInfer
         constant,
         indexing,
         len,
-        append,
-        range,
-        slice,
         tuple,
     ]
 )
-def python_no_opt(self):
+def python_basic(self):
+    """The basic Python dialect without list, range, and slice."""
+
     def run_pass(mt: Method) -> None:
         pass
 
     return run_pass
 
 
-@dialect_group(python_no_opt.data.union([cf, fcf, func, math]))
+@dialect_group(python_basic.union([list, range, slice]))
+def python_no_opt(self):
+    """The Python dialect without optimization passes."""
+
+    def run_pass(mt: Method) -> None:
+        pass
+
+    return run_pass
+
+
+@dialect_group(python_no_opt.union([cf, func, math]))
 def basic_no_opt(self):
     """The basic kernel without optimization passes.
 

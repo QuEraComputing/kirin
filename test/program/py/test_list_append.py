@@ -8,8 +8,8 @@ def test_list_append():
     @basic
     def test_append():
         x = []
-        py.append.Append(x, 1)
-        py.append.Append(x, 2)
+        py.Append(x, 1)
+        py.Append(x, 2)
         return x
 
     y = test_append()
@@ -23,7 +23,7 @@ def test_recursive_append():
     @basic
     def for_loop_append(cntr: int, x: list, n_range: int):
         if cntr < n_range:
-            py.append.Append(x, cntr)
+            py.Append(x, cntr)
             for_loop_append(cntr + 1, x, n_range)
 
         return x

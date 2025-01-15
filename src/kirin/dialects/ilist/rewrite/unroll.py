@@ -3,10 +3,9 @@ from kirin.rewrite.abc import RewriteRule
 from kirin.rewrite.result import RewriteResult
 from kirin.dialects.py.tuple import New as TupleNew
 from kirin.dialects.func.stmts import Call
+from kirin.dialects.ilist.stmts import Map, New, Scan, Foldl, Foldr, ForEach, IListType
 from kirin.dialects.py.constant import Constant
 from kirin.dialects.py.indexing import GetItem
-
-from .stmts import Map, New, Scan, FoldL, FoldR, ForEach
 
 
 class Unroll(RewriteRule):
@@ -24,7 +23,7 @@ class Unroll(RewriteRule):
         if not isinstance(coll_type, ir.types.Generic):
             return None
 
-        if not coll_type.is_subseteq(ir.types.IList):
+        if not coll_type.is_subseteq(IListType):
             return None
 
         if not (
@@ -59,26 +58,29 @@ class Unroll(RewriteRule):
         if (coll_len := self._get_collection_len(node.collection)) is None:
             return RewriteResult()
 
+        index_0 = Constant(0)
+        index_1 = Constant(1)
+        # index_0.result.name = "idx0"
+        # index_1.result.name = "idx1"
+        index_0.insert_before(node)
+        index_1.insert_before(node)
         carry = node.init
         ys: list[ir.SSAValue] = []
         for elem_idx in range(coll_len):
             index = Constant(elem_idx)
-            index.insert_before(node)
+            # index.result.name = f"idx_{elem_idx}"
             elt = GetItem(node.collection, index.result)
-            elt.insert_before(node)
             fn_call = Call(node.fn, (carry, elt.result))
-            fn_call.insert_before(node)
-
-            index_0 = Constant(0)
-            index_1 = Constant(1)
-            index_0.insert_before(node)
-            index_1.insert_before(node)
             carry_stmt = GetItem(fn_call.result, index_0.result)
             y_stmt = GetItem(fn_call.result, index_1.result)
-            carry_stmt.insert_before(node)
-            y_stmt.insert_before(node)
             carry = carry_stmt.result
             ys.append(y_stmt.result)
+
+            index.insert_before(node)
+            elt.insert_before(node)
+            fn_call.insert_before(node)
+            carry_stmt.insert_before(node)
+            y_stmt.insert_before(node)
 
         ys_stmt = New(values=tuple(ys))
         ys_stmt.insert_before(node)
@@ -86,17 +88,13 @@ class Unroll(RewriteRule):
         node.replace_by(ret)
         return RewriteResult(has_done_something=True)
 
-    def rewrite_FoldR(self, node: FoldR) -> RewriteResult:
-        if not isinstance(node.collection.owner, New):
-            return RewriteResult()
+    def rewrite_Foldr(self, node: Foldr) -> RewriteResult:
         return self._rewrite_fold(node, True)
 
-    def rewrite_FoldL(self, node: FoldL) -> RewriteResult:
-        if not isinstance(node.collection.owner, New):
-            return RewriteResult()
+    def rewrite_Foldl(self, node: Foldl) -> RewriteResult:
         return self._rewrite_fold(node, False)
 
-    def _rewrite_fold(self, node: FoldR | FoldL, reversed: bool) -> RewriteResult:
+    def _rewrite_fold(self, node: Foldr | Foldl, reversed: bool) -> RewriteResult:
         if (coll_len := self._get_collection_len(node.collection)) is None:
             return RewriteResult()
 

@@ -106,17 +106,6 @@ class TypeInfer(interp.MethodTable):
         # TODO: replace this when we can multiple dispatch
         if obj.is_subseteq(ir.types.Tuple):
             return self.getitem_tuple(interp, stmt, obj, index)
-        elif isinstance(obj, ir.types.PyClass):
-            return (ir.types.Any,)
-        elif isinstance(obj, ir.types.Generic) and obj.is_subseteq(
-            ir.types.List
-        ):  # TODO: add type guard
-            if index.is_subseteq(ir.types.Int):
-                return (obj.vars[0],)
-            elif index.is_subseteq(ir.types.Slice):
-                return (obj,)
-            else:
-                return (ir.types.Bottom,)
         else:
             return (ir.types.Any,)
 

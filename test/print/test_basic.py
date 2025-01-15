@@ -5,7 +5,7 @@ from rich.console import Console
 from kirin import ir, types
 from kirin.print import Printer
 from kirin.prelude import basic
-from kirin.dialects import fcf, func
+from kirin.dialects import py, func
 
 
 @basic
@@ -14,7 +14,7 @@ def move_gen(start, stop):
         def moo(aod):
             return start, aod
 
-        fcf.Map(moo, aod)  # type: ignore
+        py.Map(moo, aod)  # type: ignore
         return moo
 
     return foo(stop)

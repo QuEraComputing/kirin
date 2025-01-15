@@ -3,7 +3,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 
 from beartype.door import TupleVariableTypeHint  # type: ignore
-from beartype.door import TypeHint, ClassTypeHint, TypeVarTypeHint
+from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
 from typing_extensions import Never
 
 from kirin.print import Printer
@@ -530,7 +530,9 @@ def hint2type(hint) -> TypeAttribute:
         return PyClass(type(None))
 
     bear_hint = TypeHint(hint)
-    if isinstance(bear_hint, TypeVarTypeHint):
+    if isinstance(bear_hint, LiteralTypeHint):
+        return Literal(typing.get_args(hint)[0])
+    elif isinstance(bear_hint, TypeVarTypeHint):
         return TypeVar(
             hint.__name__,
             hint2type(hint.__bound__) if hint.__bound__ else None,
@@ -567,9 +569,8 @@ Float = PyClass(float)
 String = PyClass(str)
 Bool = PyClass(bool)
 NoneType = PyClass(type(None))
-Slice = Generic(slice, TypeVar("T"))
 List = Generic(list, TypeVar("T"))
-IList = Generic(list, TypeVar("T"), TypeVar("L"))
+Slice = Generic(slice, TypeVar("T"))
 Tuple = Generic(tuple, Vararg(TypeVar("T")))
 Dict = Generic(dict, TypeVar("K"), TypeVar("V"))
 Set = Generic(set, TypeVar("T"))
