@@ -30,13 +30,9 @@ class TypeInference(Forward[types.TypeAttribute]):
             return value.body
         return value
 
-    def eval_stmt(
+    def run_stmt_fallback(
         self, frame: ForwardFrame[types.TypeAttribute, None], stmt: ir.Statement
-    ) -> interp.StatementResult[types.TypeAttribute]:
-        method = self.lookup_registry(frame, stmt)
-        if method is not None:
-            return method(self, frame, stmt)
-
+    ) -> tuple[types.TypeAttribute, ...] | interp.SpecialResult[types.TypeAttribute]:
         resolve = TypeResolution()
         for arg, value in zip(stmt.args, frame.get_values(stmt.args)):
             resolve.solve(arg.type, value)

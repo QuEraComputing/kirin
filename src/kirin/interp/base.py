@@ -198,7 +198,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         return args
 
     def run_stmt(self, frame: FrameType, stmt: Statement) -> StatementResult[ValueType]:
-        """Run a statement within the current frame
+        """Run a statement within the current frame. This is the entry
+        point of running a statement. It will look up the statement implementation
+        in the dialect registry, or optionally call a fallback implementation.
 
         Args:
             frame: the current frame
@@ -208,8 +210,11 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             StatementResult: the result of running the statement
 
         Note:
-            In the case of implementing the fallback, subclass this method,
-            and filter the statement type you want to handle.
+            Overload this method for the following reasons:
+            - to change the source tracking information
+            - to take control of how to run a statement
+            - to change the implementation lookup behavior that cannot acheive
+                by overloading [`lookup_registry`][kirin.interp.base.BaseInterpreter.lookup_registry]
 
         Example:
             * implement an interpreter that only handles MyStmt:
@@ -225,12 +230,6 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
         """
         # TODO: update tracking information
-        return self.eval_stmt(frame, stmt)
-
-    def eval_stmt(
-        self, frame: FrameType, stmt: Statement
-    ) -> StatementResult[ValueType]:
-        "simply evaluate a statement"
         method = self.lookup_registry(frame, stmt)
         if method is not None:
             try:
@@ -238,6 +237,25 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             except InterpreterError as e:
                 return Err(e, self.state.frames)
 
+        return self.run_stmt_fallback(frame, stmt)
+
+    def run_stmt_fallback(
+        self, frame: FrameType, stmt: Statement
+    ) -> StatementResult[ValueType]:
+        """The fallback implementation of statements.
+
+        This is called when no implementation is found for the statement.
+
+        Args:
+            frame: the current frame
+            stmt: the statement to run
+
+        Returns:
+            StatementResult: the result of running the statement
+
+        Note:
+            Overload this method to provide a fallback implementation for statements.
+        """
         # NOTE: not using f-string here because 3.10 and 3.11 have
         #  parser bug that doesn't allow f-string in raise statement
         raise ValueError(

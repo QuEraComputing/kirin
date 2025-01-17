@@ -48,7 +48,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         try:
             _frame = self.interp.new_frame(frame.code)
             _frame.set_values(stmt.args, tuple(x.data for x in values))
-            value = self.interp.eval_stmt(_frame, stmt)
+            value = self.interp.run_stmt(_frame, stmt)
             if isinstance(value, tuple):
                 return tuple(JointResult(Value(each), Pure()) for each in value)
             elif isinstance(value, interp.ReturnValue):
@@ -64,7 +64,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
             pass
         return (self.bottom,)
 
-    def eval_stmt(
+    def run_stmt(
         self, frame: ForwardFrame[JointResult, ExtraFrameInfo], stmt: ir.Statement
     ) -> interp.StatementResult[JointResult]:
         if stmt.has_trait(ir.ConstantLike):
