@@ -45,6 +45,7 @@
         * [ilist](kirin/dialects/ilist/index.md)
             * [interp](kirin/dialects/ilist/interp.md)
             * [lowering](kirin/dialects/ilist/lowering.md)
+            * [passes](kirin/dialects/ilist/passes.md)
             * [rewrite](kirin/dialects/ilist/rewrite/index.md)
                 * [const](kirin/dialects/ilist/rewrite/const.md)
                 * [list](kirin/dialects/ilist/rewrite/list.md)
