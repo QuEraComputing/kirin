@@ -3,7 +3,7 @@ from typing import Any, Generic, TypeVar, overload
 from dataclasses import dataclass
 
 T = TypeVar("T")
-L = TypeVar("L")
+L = TypeVar("L", default=Any)
 
 
 @dataclass
