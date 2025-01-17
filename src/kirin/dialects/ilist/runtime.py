@@ -40,9 +40,17 @@ class IList(Generic[T, L]):
         return f"IList({self.data})"
 
     def __iter__(self):
-        raise NotImplementedError("Cannot use IList outside kernel.")
+        return iter(self.data)
 
-    def __getitem__(self, index: int) -> T:
+    @overload
+    def __getitem__(self, index: slice) -> "IList[T, Any]": ...
+
+    @overload
+    def __getitem__(self, index: int) -> T: ...
+
+    def __getitem__(self, index: int | slice) -> T | "IList[T, Any]":
+        if isinstance(index, slice):
+            return IList(self.data[index])
         return self.data[index]
 
     def __eq__(self, value: object) -> bool:

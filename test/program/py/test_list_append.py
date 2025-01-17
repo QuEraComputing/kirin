@@ -1,11 +1,11 @@
 # type: ignore
-from kirin.prelude import basic
+from kirin.prelude import python_no_opt
 from kirin.dialects import py
 
 
 def test_list_append():
 
-    @basic
+    @python_no_opt
     def test_append():
         x = []
         py.Append(x, 1)
@@ -20,7 +20,7 @@ def test_list_append():
 
 
 def test_recursive_append():
-    @basic
+    @python_no_opt
     def for_loop_append(cntr: int, x: list, n_range: int):
         if cntr < n_range:
             py.Append(x, cntr)

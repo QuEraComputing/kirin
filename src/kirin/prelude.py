@@ -2,7 +2,7 @@ from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group
 from kirin.passes import aggressive
-from kirin.dialects import cf, func, math
+from kirin.dialects import cf, func, math, ilist
 from kirin.dialects.py import (
     cmp,
     len,
@@ -49,7 +49,7 @@ def python_basic(self):
     return run_pass
 
 
-@dialect_group(python_basic.union([list, range, slice]))
+@dialect_group(python_basic.union([list, range, slice, cf, func, math]))
 def python_no_opt(self):
     """The Python dialect without optimization passes."""
 
@@ -59,19 +59,27 @@ def python_no_opt(self):
     return run_pass
 
 
-@dialect_group(python_no_opt.union([cf, func, math]))
+@dialect_group(python_basic.union([ilist, range, slice, cf, func, math]))
 def basic_no_opt(self):
-    """The basic kernel without optimization passes.
+    """The basic kernel without optimization passes. This is a builtin
+    eDSL that includes the basic dialects that are commonly used in
+    Python-like eDSLs.
 
     This eDSL includes the basic dialects without any optimization passes.
     Other eDSL can usually be built on top of this eDSL by utilizing the
     `basic_no_opt.add` method to add more dialects and optimization passes.
 
+    Note that unlike Python, list in this eDSL is immutable, and the
+    `append` method is not available. Use `+` operator to concatenate lists
+    instead. Immutable list is easier to optimize and reason about.
+
     See also [`basic`][kirin.prelude.basic] for the basic kernel with optimization passes.
+    See also [`ilist`][kirin.dialects.ilist] for the immutable list dialect.
     """
+    ilist_desugar = ilist.IListDesugar(self)
 
     def run_pass(mt: Method) -> None:
-        pass
+        ilist_desugar.fixpoint(mt)
 
     return run_pass
 
@@ -99,6 +107,7 @@ def basic(self):
     ```
     """
     fold_pass = Fold(self)
+    ilist_desugar = ilist.IListDesugar(self)
     aggressive_fold_pass = aggressive.Fold(self)
     typeinfer_pass = TypeInfer(self)
 
@@ -121,6 +130,8 @@ def basic(self):
     ) -> None:
         if verify:
             mt.verify()
+
+        ilist_desugar.fixpoint(mt)
 
         if fold:
             if aggressive:

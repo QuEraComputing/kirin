@@ -19,10 +19,15 @@ class List2IList(RewriteRule):
         return RewriteResult(has_done_something=has_done_something)
 
     def _rewrite_SSAValue_type(self, value: ir.SSAValue):
-        if value.type.is_subseteq(ir.types.List):
-            if isinstance(value.type, ir.types.Generic):
-                value.type = IListType[value.type.vars[0], ir.types.Any]
-            else:
-                value.type = IListType[ir.types.Any, ir.types.Any]
+        # NOTE: cannot use issubseteq here because type can be Bottom
+        if isinstance(value.type, ir.types.Generic) and issubclass(
+            value.type.body.typ, list
+        ):
+            value.type = IListType[value.type.vars[0], ir.types.Any]
+            return True
+        elif isinstance(value.type, ir.types.PyClass) and issubclass(
+            value.type.typ, list
+        ):
+            value.type = IListType[ir.types.Any, ir.types.Any]
             return True
         return False

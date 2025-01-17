@@ -21,5 +21,6 @@ from .stmts import (
     ForEach as ForEach,
     IListType as IListType,
 )
+from .passes import IListDesugar as IListDesugar
 from .runtime import IList as IList
 from ._dialect import dialect as dialect

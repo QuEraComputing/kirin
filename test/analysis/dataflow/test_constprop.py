@@ -3,7 +3,7 @@ from kirin.ir import types
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.analysis import const
-from kirin.dialects import py
+from kirin.dialects import ilist
 
 
 class TestLattice:
@@ -279,10 +279,9 @@ def test_interprocedure_true_branch():
 
 def test_non_pure_recursion():
     @basic_no_opt
-    def for_loop_append(cntr: int, x: list, n_range: int):
+    def for_loop_append(cntr: int, x: ilist.IList, n_range: int):
         if cntr < n_range:
-            py.Append(x, cntr)  # type: ignore
-            for_loop_append(cntr + 1, x, n_range)
+            for_loop_append(cntr + 1, x + [cntr], n_range)
 
         return x
 

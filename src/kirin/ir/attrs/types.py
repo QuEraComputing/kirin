@@ -169,6 +169,9 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def __hash__(self) -> int:
         return hash((PyClass, self.typ))
 
+    def __repr__(self) -> str:
+        return self.typ.__name__
+
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("!py.", self.typ.__name__)
 
@@ -388,6 +391,12 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
 
     def __hash__(self) -> int:
         return hash((Generic, self.body, self.vars, self.vararg))
+
+    def __repr__(self) -> str:
+        if self.vararg is None:
+            return f"{self.body}[{', '.join(map(repr, self.vars))}]"
+        else:
+            return f"{self.body}[{', '.join(map(repr, self.vars))}, {self.vararg}, ...]"
 
     def print_impl(self, printer: Printer) -> None:
         printer.print(self.body)

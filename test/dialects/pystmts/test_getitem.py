@@ -1,5 +1,8 @@
+from typing import Any
+
 from kirin.ir import types
 from kirin.prelude import basic
+from kirin.dialects.ilist import IList, IListType
 
 
 @basic(typeinfer=True)
@@ -43,12 +46,12 @@ def tuple_const_err(xs: tuple[int, float, str]):
 
 
 @basic(typeinfer=True)
-def list_infer(xs: list[int], i: int):
+def list_infer(xs: IList[int, Any], i: int):
     return xs[i]
 
 
 @basic(typeinfer=True)
-def list_slice(xs: list[int], i: slice):
+def list_slice(xs: IList[int, Any], i: slice):
     return xs[i]
 
 
@@ -73,5 +76,5 @@ def test_getitem_typeinfer():
     assert tuple_err.return_type.is_equal(types.Bottom)
     assert tuple_const_err.return_type.is_equal(types.Bottom)
     assert list_infer.return_type.is_subseteq(types.Int)
-    assert list_slice.return_type.is_subseteq(types.List[types.Int])
+    assert list_slice.return_type.is_subseteq(IListType[types.Int])
     assert unknown.return_type.is_equal(types.Any)
