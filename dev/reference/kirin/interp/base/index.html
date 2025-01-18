@@ -24,7 +24,8 @@
 <span class=normal>69</span>
 <span class=normal>70</span>
 <span class=normal>71</span>
-<span class=normal>72</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>72</span>
+<span class=normal>73</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>DialectGroup</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Dialect</span><span class=p>],</span>
     <span class=n>bottom</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>,</span>
@@ -39,6 +40,7 @@
     <span class=bp>self</span><span class=o>.</span><span class=n>bottom</span> <span class=o>=</span> <span class=n>bottom</span>
 
     <span class=bp>self</span><span class=o>.</span><span class=n>registry</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>dialects</span><span class=o>.</span><span class=n>registry</span><span class=o>.</span><span class=n>interpreter</span><span class=p>(</span><span class=n>keys</span><span class=o>=</span><span class=bp>self</span><span class=o>.</span><span class=n>keys</span><span class=p>)</span>
+    <span class=bp>self</span><span class=o>.</span><span class=n>symbol_table</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Statement</span><span class=p>]</span> <span class=o>=</span> <span class=p>{}</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>state</span><span class=p>:</span> <span class=n>InterpreterState</span><span class=p>[</span><span class=n>FrameType</span><span class=p>]</span> <span class=o>=</span> <span class=n>InterpreterState</span><span class=p>()</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>fuel</span> <span class=o>=</span> <span class=n>fuel</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>max_depth</span> <span class=o>=</span> <span class=n>max_depth</span>
@@ -47,9 +49,9 @@
 </code></pre></div> <div class="doc doc-contents "> <p>The name of the interpreter to select from dialects by order.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.build_signature class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">build_signature</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>build_signature</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Signature</span>
-</code></pre></div> <div class="doc doc-contents "> <p>build signature for querying the statement implementation.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>268</span>
-<span class=normal>269</span>
-<span class=normal>270</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>build_signature</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Signature&quot;</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>build signature for querying the statement implementation.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>269</span>
+<span class=normal>270</span>
+<span class=normal>271</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>build_signature</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Signature&quot;</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;build signature for querying the statement implementation.&quot;&quot;&quot;</span>
     <span class=k>return</span> <span class=n>Signature</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=vm>__class__</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>arg</span><span class=o>.</span><span class=n>type</span> <span class=k>for</span> <span class=n>arg</span> <span class=ow>in</span> <span class=n>stmt</span><span class=o>.</span><span class=n>args</span><span class=p>))</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.eval class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eval</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nb>eval</span><span class=p>(</span>
@@ -57,8 +59,7 @@
     <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
     <span class=n>kwargs</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>ValueType</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>InterpResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Evaluate a method.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>74</span>
-<span class=normal>75</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Evaluate a method.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>75</span>
 <span class=normal>76</span>
 <span class=normal>77</span>
 <span class=normal>78</span>
@@ -69,7 +70,8 @@
 <span class=normal>83</span>
 <span class=normal>84</span>
 <span class=normal>85</span>
-<span class=normal>86</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval</span><span class=p>(</span>
+<span class=normal>86</span>
+<span class=normal>87</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>mt</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
@@ -85,8 +87,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.finalize class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">finalize</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>finalize</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>results</span><span class=p>:</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>151</span>
-<span class=normal>152</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>152</span>
 <span class=normal>153</span>
 <span class=normal>154</span>
 <span class=normal>155</span>
@@ -94,7 +95,8 @@
 <span class=normal>157</span>
 <span class=normal>158</span>
 <span class=normal>159</span>
-<span class=normal>160</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span>
+<span class=normal>160</span>
+<span class=normal>161</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>results</span><span class=p>:</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Postprocess a frame after it is popped from the stack. This is</span>
@@ -105,10 +107,10 @@
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=k>return</span> <span class=n>results</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.new_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">new_frame</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>new_frame</span><span class=p>(</span><span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>FrameType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>146</span>
-<span class=normal>147</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>147</span>
 <span class=normal>148</span>
-<span class=normal>149</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
+<span class=normal>149</span>
+<span class=normal>150</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
 <span class=k>def</span> <span class=nf>new_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>FrameType</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Create a new frame for the given method.&quot;&quot;&quot;</span>
     <span class=o>...</span>
@@ -117,8 +119,7 @@
     <span class=n>values</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
     <span class=n>kwarg_names</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Permute the arguments according to the method signature and the given keyword arguments, where the keyword argument names refer to the last n arguments in the values tuple.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>arg_names</code> </td> <td> <code><span title="typing.Sequence">Sequence</span>[str]</code> </td> <td> <div class=doc-md-description> <p>the argument names</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>values</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>, ...]</code> </td> <td> <div class=doc-md-description> <p>the values tuple (should not contain method itself)</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>kwarg_names</code> </td> <td> <code>tuple[str, ...]</code> </td> <td> <div class=doc-md-description> <p>the keyword argument names</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>173</span>
-<span class=normal>174</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Permute the arguments according to the method signature and the given keyword arguments, where the keyword argument names refer to the last n arguments in the values tuple.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>arg_names</code> </td> <td> <code><span title="typing.Sequence">Sequence</span>[str]</code> </td> <td> <div class=doc-md-description> <p>the argument names</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>values</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>, ...]</code> </td> <td> <div class=doc-md-description> <p>the values tuple (should not contain method itself)</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>kwarg_names</code> </td> <td> <code>tuple[str, ...]</code> </td> <td> <div class=doc-md-description> <p>the keyword argument names</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>174</span>
 <span class=normal>175</span>
 <span class=normal>176</span>
 <span class=normal>177</span>
@@ -142,7 +143,8 @@
 <span class=normal>195</span>
 <span class=normal>196</span>
 <span class=normal>197</span>
-<span class=normal>198</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@staticmethod</span>
+<span class=normal>198</span>
+<span class=normal>199</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@staticmethod</span>
 <span class=k>def</span> <span class=nf>permute_values</span><span class=p>(</span>
     <span class=n>arg_names</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=nb>str</span><span class=p>],</span>
     <span class=n>values</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
@@ -171,8 +173,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.run_callable class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_callable</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_callable</span><span class=p>(</span>
     <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Run a callable statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>code</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../def/#kirin.ir.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the arguments to the statement, includes self if the corresponding callable region contains a self argument.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code><span title="kirin.interp.value.MethodResult">MethodResult</span>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of the statement.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>106</span>
-<span class=normal>107</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Run a callable statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>code</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../def/#kirin.ir.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the arguments to the statement, includes self if the corresponding callable region contains a self argument.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code><span title="kirin.interp.value.MethodResult">MethodResult</span>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of the statement.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>107</span>
 <span class=normal>108</span>
 <span class=normal>109</span>
 <span class=normal>110</span>
@@ -195,7 +196,8 @@
 <span class=normal>127</span>
 <span class=normal>128</span>
 <span class=normal>129</span>
-<span class=normal>130</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_callable</span><span class=p>(</span>
+<span class=normal>130</span>
+<span class=normal>131</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_callable</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Run a callable statement.</span>
@@ -223,8 +225,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.run_callable_region class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_callable_region</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_callable_region</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>Region</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>A hook defines how to run the callable region given the interpreter context.</p> <details class=note open> <summary>Note</summary> <p>This is experimental API, don't subclass it. The current reason of having it is mainly because we need to dispatch back to the MethodTable for emit.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>132</span>
-<span class=normal>133</span>
+</code></pre></div> <div class="doc doc-contents "> <p>A hook defines how to run the callable region given the interpreter context.</p> <details class=note open> <summary>Note</summary> <p>This is experimental API, don't subclass it. The current reason of having it is mainly because we need to dispatch back to the MethodTable for emit.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>133</span>
 <span class=normal>134</span>
 <span class=normal>135</span>
 <span class=normal>136</span>
@@ -235,7 +236,8 @@
 <span class=normal>141</span>
 <span class=normal>142</span>
 <span class=normal>143</span>
-<span class=normal>144</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_callable_region</span><span class=p>(</span>
+<span class=normal>144</span>
+<span class=normal>145</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_callable_region</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>Region</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;A hook defines how to run the callable region given</span>
@@ -251,8 +253,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.run_method class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_method</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_method</span><span class=p>(</span>
     <span class=n>method</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>How to run a method.</p> <p>This is defined by subclasses to describe what's the corresponding value of a method during the interpretation.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>method</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.method.Method" href="../../ir/method/#kirin.ir.method.Method">Method</a></code> </td> <td> <div class=doc-md-description> <p>the method to run.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the arguments to the method, does not include self.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code><span title="kirin.interp.value.MethodResult">MethodResult</span>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of the method.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 88</span>
-<span class=normal> 89</span>
+</code></pre></div> <div class="doc doc-contents "> <p>How to run a method.</p> <p>This is defined by subclasses to describe what's the corresponding value of a method during the interpretation.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>method</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.method.Method" href="../../ir/method/#kirin.ir.method.Method">Method</a></code> </td> <td> <div class=doc-md-description> <p>the method to run.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the arguments to the method, does not include self.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code><span title="kirin.interp.value.MethodResult">MethodResult</span>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of the method.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 89</span>
 <span class=normal> 90</span>
 <span class=normal> 91</span>
 <span class=normal> 92</span>
@@ -267,7 +268,8 @@
 <span class=normal>101</span>
 <span class=normal>102</span>
 <span class=normal>103</span>
-<span class=normal>104</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
+<span class=normal>104</span>
+<span class=normal>105</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
 <span class=k>def</span> <span class=nf>run_method</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>method</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>MethodResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
@@ -294,8 +296,7 @@
                 <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_my_stmt</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
             <span class=k>else</span><span class=p>:</span>
                 <span class=k>return</span> <span class=p>()</span>
-</code></pre></div></li> </ul> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>200</span>
-<span class=normal>201</span>
+</code></pre></div></li> </ul> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>201</span>
 <span class=normal>202</span>
 <span class=normal>203</span>
 <span class=normal>204</span>
@@ -334,7 +335,8 @@
 <span class=normal>237</span>
 <span class=normal>238</span>
 <span class=normal>239</span>
-<span class=normal>240</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_stmt</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
+<span class=normal>240</span>
+<span class=normal>241</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_stmt</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Run a statement within the current frame. This is the entry</span>
 <span class=sd>    point of running a statement. It will look up the statement implementation</span>
 <span class=sd>    in the dialect registry, or optionally call a fallback implementation.</span>
@@ -378,8 +380,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.run_stmt_fallback class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_stmt_fallback</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_stmt_fallback</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>The fallback implementation of statements.</p> <p>This is called when no implementation is found for the statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../def/#kirin.ir.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>StatementResult</code></td> <td> <code><span title="kirin.interp.value.StatementResult">StatementResult</span>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of running the statement</p> </div> </td> </tr> </tbody> </table> <details class=note open> <summary>Note</summary> <p>Overload this method to provide a fallback implementation for statements.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>242</span>
-<span class=normal>243</span>
+</code></pre></div> <div class="doc doc-contents "> <p>The fallback implementation of statements.</p> <p>This is called when no implementation is found for the statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../../def/#kirin.ir.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>StatementResult</code></td> <td> <code><span title="kirin.interp.value.StatementResult">StatementResult</span>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of running the statement</p> </div> </td> </tr> </tbody> </table> <details class=note open> <summary>Note</summary> <p>Overload this method to provide a fallback implementation for statements.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>243</span>
 <span class=normal>244</span>
 <span class=normal>245</span>
 <span class=normal>246</span>
@@ -402,7 +403,8 @@
 <span class=normal>263</span>
 <span class=normal>264</span>
 <span class=normal>265</span>
-<span class=normal>266</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_stmt_fallback</span><span class=p>(</span>
+<span class=normal>266</span>
+<span class=normal>267</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_stmt_fallback</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;The fallback implementation of statements.</span>

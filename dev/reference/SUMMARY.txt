@@ -57,6 +57,7 @@
             * [dialect](kirin/dialects/math/dialect.md)
             * [interp](kirin/dialects/math/interp.md)
             * [stmts](kirin/dialects/math/stmts.md)
+        * [module](kirin/dialects/module.md)
         * [py](kirin/dialects/py/index.md)
             * [assign](kirin/dialects/py/assign.md)
             * [attr](kirin/dialects/py/attr.md)
@@ -177,4 +178,5 @@
         * [walk](kirin/rewrite/walk.md)
         * [wrap_const](kirin/rewrite/wrap_const.md)
     * [source](kirin/source.md)
+    * [symbol_table](kirin/symbol_table.md)
     * [worklist](kirin/worklist.md)
