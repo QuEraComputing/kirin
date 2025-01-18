@@ -1,5 +1,3 @@
-from typing import Union
-
 from kirin.ir import (
     Pure,
     Method,
@@ -23,43 +21,7 @@ from kirin.print.printer import Printer
 from kirin.dialects.func.attrs import Signature, MethodType
 from kirin.dialects.func.dialect import dialect
 
-
-def _print_invoke_or_call(
-    invoke_or_call: Union["Invoke", "Call"], printer: Printer
-) -> None:
-    with printer.rich(style="red"):
-        printer.print_name(invoke_or_call)
-    printer.plain_print(" ")
-
-    n_total = len(invoke_or_call.args)
-    callee = invoke_or_call.callee
-    if isinstance(callee, SSAValue):
-        printer.plain_print(printer.state.ssa_id[callee])
-    else:
-        printer.plain_print(callee.sym_name)
-
-    inputs = invoke_or_call.inputs
-    positional = inputs[: n_total - len(invoke_or_call.kwargs)]
-    kwargs = dict(
-        zip(
-            invoke_or_call.kwargs,
-            inputs[n_total - len(invoke_or_call.kwargs) :],
-        )
-    )
-
-    printer.plain_print("(")
-    printer.print_seq(positional)
-    if kwargs and positional:
-        printer.plain_print(", ")
-    printer.print_mapping(kwargs, delim=", ")
-    printer.plain_print(")")
-
-    with printer.rich(style="black"):
-        printer.plain_print(" : ")
-        printer.print_seq(
-            [result.type for result in invoke_or_call._results],
-            delim=", ",
-        )
+from .._pprint_helper import pprint_calllike
 
 
 class FuncOpCallableInterface(CallableStmtInterface["Function"]):
@@ -116,7 +78,7 @@ class Call(Statement):
     result: ResultValue = info.result()
 
     def print_impl(self, printer: Printer) -> None:
-        _print_invoke_or_call(self, printer)
+        pprint_calllike(self, printer.state.ssa_id[self.callee], printer)
 
 
 @statement(dialect=dialect)
@@ -242,7 +204,7 @@ class Invoke(Statement):
     result: ResultValue = info.result()
 
     def print_impl(self, printer: Printer) -> None:
-        _print_invoke_or_call(self, printer)
+        pprint_calllike(self, self.callee.sym_name, printer)
 
     def verify(self) -> None:
         if self.kwargs:

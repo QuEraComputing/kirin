@@ -66,6 +66,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.bottom = bottom
 
         self.registry = self.dialects.registry.interpreter(keys=self.keys)
+        self.symbol_table: dict[str, Statement] = {}
         self.state: InterpreterState[FrameType] = InterpreterState()
         self.fuel = fuel
         self.max_depth = max_depth
