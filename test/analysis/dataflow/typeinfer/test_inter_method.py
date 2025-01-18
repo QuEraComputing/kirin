@@ -27,4 +27,4 @@ def test_inter_method_infer():
     # NOTE: inference of moo should not update foo
     assert foo.arg_types[0] == types.Int
     assert foo.inferred is False
-    assert foo.return_type is None
+    assert foo.return_type is types.Any

@@ -2,11 +2,10 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
-from kirin.ir.traits import CallableStmtInterface
+from kirin.ir.traits import HasSignature, CallableStmtInterface
 from kirin.exceptions import InterpreterError, VerificationError
 from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
-from kirin.ir.attrs.types import TypeAttribute
 from kirin.print.printable import Printable
 
 if TYPE_CHECKING:
@@ -27,7 +26,6 @@ class Method(Printable, Generic[Param, RetType]):
     # values contained if closure
     fields: tuple = field(default_factory=tuple)  # own
     file: str = ""
-    return_type: TypeAttribute | None = None
     inferred: bool = False
     """if typeinfer has been run on this method
     """
@@ -57,6 +55,13 @@ class Method(Printable, Generic[Param, RetType]):
         if trait is None:
             raise ValueError("Method body must implement CallableStmtInterface")
         return trait.get_callable_region(self.code)
+
+    @property
+    def return_type(self):
+        trait = self.code.get_trait(HasSignature)
+        if trait is None:
+            raise ValueError("Method body must implement HasSignature")
+        return trait.get_signature(self.code).output
 
     def __repr__(self) -> str:
         return f'Method("{self.sym_name}")'

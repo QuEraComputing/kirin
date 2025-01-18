@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
-from kirin.ir import Method
+from kirin.ir import Method, HasSignature
 from kirin.rewrite import Walk
 from kirin.passes.abc import Pass
 from kirin.rewrite.abc import RewriteResult
+from kirin.dialects.func import Signature
 from kirin.analysis.typeinfer import TypeInference
 from kirin.rewrite.apply_type import ApplyType
 
@@ -16,8 +17,10 @@ class TypeInfer(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
         return_type = self.infer.eval(mt, mt.arg_types).expect()
-        mt.return_type = return_type
+        if trait := mt.code.get_trait(HasSignature):
+            trait.set_signature(mt.code, Signature(mt.arg_types, return_type))
+
+        result = Walk(ApplyType(self.infer.results)).rewrite(mt.code)
         mt.inferred = True
-        result = Walk(ApplyType(return_type, self.infer.results)).rewrite(mt.code)
         self.infer.results.clear()
         return result
