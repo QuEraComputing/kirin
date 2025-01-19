@@ -7,19 +7,13 @@
     <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span>
     <span class=n>fields</span><span class=p>:</span> <span class=nb>tuple</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(),</span>
     <span class=n>file</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>&quot;&quot;</span><span class=p>,</span>
-    <span class=n>return_type</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=n>inferred</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span><span class=p>,</span>
     <span class=n>verified</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span><span class=p>,</span>
 <span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="../../print/printable/#kirin.print.printable.Printable">Printable</a></code>, <code><span title="typing.Generic">Generic</span>[<span title="kirin.ir.method.Param">Param</span>, <span title="kirin.ir.method.RetType">RetType</span>]</code></p> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.method.Method.inferred class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">inferred</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>inferred</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 </code></pre></div> <div class="doc doc-contents "> <p>if typeinfer has been run on this method</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.method.Method.verified class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">verified</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>verified</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 </code></pre></div> <div class="doc doc-contents "> <p>if <code>code.verify</code> has been run on this method</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.method.Method.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>verify the method body.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>67</span>
-<span class=normal>68</span>
-<span class=normal>69</span>
-<span class=normal>70</span>
-<span class=normal>71</span>
-<span class=normal>72</span>
+</code></pre></div> <div class="doc doc-contents "> <p>verify the method body.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>72</span>
 <span class=normal>73</span>
 <span class=normal>74</span>
 <span class=normal>75</span>
@@ -28,7 +22,12 @@
 <span class=normal>78</span>
 <span class=normal>79</span>
 <span class=normal>80</span>
-<span class=normal>81</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>81</span>
+<span class=normal>82</span>
+<span class=normal>83</span>
+<span class=normal>84</span>
+<span class=normal>85</span>
+<span class=normal>86</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;verify the method body.&quot;&quot;&quot;</span>
     <span class=k>try</span><span class=p>:</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>code</span><span class=o>.</span><span class=n>verify</span><span class=p>()</span>
