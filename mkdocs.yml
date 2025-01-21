@@ -12,8 +12,16 @@ nav:
       - index.md
       - Installation: install.md
       - Declarations: def.md
+      - Dialects:
+        - Python: dialects/python.md
+        - Function: dialects/func.md
+        - Control Flow: dialects/cf.md
+        - Immutable List: dialects/ilist.md
       - Compiler 101: 101.md
+      - Comparison: comparison.md
       - Contributing: contrib.md
+  - Cookbook:
+    - cookbook/index.md
   - Blog:
     - blog/index.md
   - API Reference:
@@ -22,8 +30,8 @@ nav:
           - reference/kirin/ir/index.md
           - Nodes: reference/kirin/ir/nodes/
           - SSA values: reference/kirin/ir/ssa.md
-          - Attributes: reference/kirin/ir/attrs.md
-          - Traits: reference/kirin/ir/traits.md
+          - Attributes: reference/kirin/ir/attrs/
+          - Traits: reference/kirin/ir/traits/
           - Dialect: reference/kirin/ir/dialect.md
           - Dialect Group: reference/kirin/ir/group.md
           - Method: reference/kirin/ir/method.md

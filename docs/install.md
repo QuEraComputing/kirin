@@ -42,7 +42,7 @@ which is the official development environment for Kirin. You can install `uv` us
 
 Kirin also comes with a few friends that you might find useful:
 
-- `kirin-qasm`: (coming soon) A quantum assembly language (QASM 2.0) dialect for Kirin with a builtin QASM 2.0 text format parser.
+- `bloqade-qasm`: (link missing) A quantum assembly language (QASM 2.0) dialect for Kirin with a builtin QASM 2.0 text format parser.
 - `bloqade`: (available soon) QuEra's SDK for next-gen error-corrected neutral-atom quantum computers.
 
 ## Development

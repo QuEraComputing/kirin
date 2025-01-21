@@ -1,6 +1,7 @@
 """IR module for kirin.
 
-This module contains the intermediate representation (IR) for kirin.
+This module contains the data structure definition
+of the intermediate representation (IR) for kirin.
 """
 
 from kirin.ir import attrs as attrs, traits as traits

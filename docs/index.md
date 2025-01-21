@@ -1,7 +1,7 @@
 # Kirin
 
 Kirin is the **K**ernel **I**ntermediate **R**epresentation **In**frastructure. It is a compiler
-infrastructure for building compilers for domain-specific languages (DSLs) that target
+infrastructure for building compilers for embedded domain-specific languages (eDSLs) that target
 scientific computing kernels.
 
 ## Features
@@ -12,7 +12,7 @@ scientific computing kernels.
 - Julia-like abstract interpretation framework
 - Builtin support for interpretation
 - Builtin support Python type system and type inference
-- Type hinted via modern Python type hints (you get all the auto-completes as you expect!)
+- Type hinted via modern Python type hints
 
 ## Kirin's mission
 
@@ -32,7 +32,7 @@ While the mission and audience may be very different, Kirin has been deeply insp
 - [MLIR](https://mlir.llvm.org/), the concept of dialects and the way it is designed.
 - [xDSL](https://github.com/xdslproject/xdsl), about how IR data structure & interpreter should be designed in Python.
 - [Julia](https://julialang.org/), abstract interpretation, and certain design choices for scientific community.
-- [JAX](https://jax.readthedocs.io/en/latest/) and [numbda](https://numba.pydata.org/), the frontend syntax and the way it is designed.
+- [JAX](https://jax.readthedocs.io/en/latest/) and [numba](https://numba.pydata.org/), the frontend syntax and the way it is designed.
 - [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl) and its predecessors, the design of rule-based rewriter.
 
 ## Quick Example: the `beer` language

@@ -2,6 +2,17 @@
 
 Please see [Installation](install.md) for instructions on how to set up your development environment.
 
+## Pre-commit hooks
+
+We use `pre-commit` to run the linter checks before you commit your changes. The pre-commit hooks are installed as part of the development dependencies. You can setup `pre-commit` using the following command:
+
+```bash
+pre-commit install
+```
+
+This will run the linter checks before you commit your changes. If the checks fail, the commit will be
+rejected. Most of the following sections can be checked by the pre-commit hooks.
+
 ## Running the tests
 
 We use `pytest` for testing. To run the tests, simply run:
@@ -26,7 +37,7 @@ good-to-have practices:
 ### Naming
 
 - try not to use abbreviation as names, unless it's a common abbreviation like `idx` for `index`
-- try not create a lot of duplicated name prefix, e.g `ConstantInt` and `ConstantFloat`, instead use a new module to group them.
+- try not create a lot of duplicated name prefix unless the extra information is necessary when accessing the class object.
 - try to use `snake_case` for naming variables and functions, and `CamelCase` for classes.
 
 ### Comments

@@ -1,3 +1,8 @@
+"""This module contains some common eDSLs that can be used to build
+more complex eDSLs. The eDSLs in this module are built on top of the
+basic dialects provided by the `kirin.dialects` module.
+"""
+
 from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group

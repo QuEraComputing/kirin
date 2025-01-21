@@ -1,3 +1,6 @@
+!!! warning
+    This page is under construction. The content may be incomplete or incorrect.
+
 # Understanding Kirin IR Declarations
 
 In this section, we will learn about the terminology used in Kirin IR. This will help you understand the structure of the IR and how to write your own compiler using Kirin.
