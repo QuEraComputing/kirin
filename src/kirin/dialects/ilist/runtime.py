@@ -1,6 +1,7 @@
 # TODO: replace with something faster
 from typing import Any, Generic, TypeVar, overload
 from dataclasses import dataclass
+from collections.abc import Sequence
 
 T = TypeVar("T")
 L = TypeVar("L")
@@ -10,7 +11,7 @@ L = TypeVar("L")
 class IList(Generic[T, L]):
     """A simple immutable list."""
 
-    data: list[T]
+    data: Sequence[T]
 
     def __len__(self) -> int:
         return len(self.data)

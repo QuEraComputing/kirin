@@ -2,6 +2,7 @@ from kirin import ir
 from kirin.interp import Err, Frame, Interpreter, MethodTable, impl
 from kirin.dialects.py.len import Len
 from kirin.dialects.py.binop import Add
+from kirin.dialects.py.range import Range
 
 from .stmts import Map, New, Push, Scan, Foldl, Foldr, ForEach
 from .runtime import IList
@@ -10,6 +11,10 @@ from ._dialect import dialect
 
 @dialect.register
 class IListInterpreter(MethodTable):
+
+    @impl(Range)
+    def _range(self, interp, frame: Frame, stmt: Range):
+        return (IList(range(*frame.get_values(stmt.args))),)
 
     @impl(New)
     def new(self, interp, frame: Frame, stmt: New):
