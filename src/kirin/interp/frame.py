@@ -5,6 +5,7 @@ from dataclasses import field, dataclass
 from typing_extensions import Self
 
 from kirin.ir import SSAValue, Statement
+from kirin.exceptions import InterpreterError
 
 ValueType = TypeVar("ValueType")
 
@@ -66,7 +67,47 @@ class Frame(FrameABC[ValueType]):
         return cls(code=code)
 
     def get(self, key: SSAValue) -> ValueType:
-        return self.entries[key]
+        """Get the value for the given [`SSAValue`][kirin.ir.SSAValue].
+
+        Args:
+            key(SSAValue): The key to get the value for.
+
+        Returns:
+            ValueType: The value.
+
+        Raises:
+            InterpreterError: If the value is not found. This will be catched by the interpreter
+                and will be converted to an [`interp.Err`][kirin.interp.Err] in the interpretation
+                results.
+        """
+        err = InterpreterError(f"SSAValue {key} not found")
+        value = self.entries.get(key, err)
+        if isinstance(value, InterpreterError):
+            raise err
+        else:
+            return value
+
+    ExpectedType = TypeVar("ExpectedType")
+
+    def get_typed(self, key: SSAValue, type_: type[ExpectedType]) -> ExpectedType:
+        """Similar to [`get`][kirin.interp.frame.Frame.get] but also checks the type.
+
+        Args:
+            key(SSAValue): The key to get the value for.
+            type_(type): The expected type.
+
+        Returns:
+            ExpectedType: The value.
+
+        Raises:
+            InterpreterError: If the value is not of the expected type. This will be catched
+                by the interpreter and will be converted to an [`interp.Err`][kirin.interp.Err]
+                in the interpretation results.
+        """
+        value = self.get(key)
+        if not isinstance(value, type_):
+            raise InterpreterError(f"expected {type_}, got {type(value)}")
+        return value
 
     def set(self, key: SSAValue, value: ValueType) -> None:
         self.entries[key] = value
