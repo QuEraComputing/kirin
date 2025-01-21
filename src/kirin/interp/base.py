@@ -13,7 +13,7 @@ from kirin.exceptions import InterpreterError
 from kirin.interp.impl import Signature
 from kirin.interp.frame import FrameABC
 from kirin.interp.state import InterpreterState
-from kirin.interp.value import Err, MethodResult, StatementResult
+from kirin.interp.value import Err, MethodResult, SpecialResult, StatementResult
 
 if TYPE_CHECKING:
     from kirin.registry import StatementImpl
@@ -57,6 +57,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         bottom: ValueType,
         *,
         fuel: int | None = None,
+        debug: bool = False,
         max_depth: int = 128,
         max_python_recursion_depth: int = 8192,
     ):
@@ -69,6 +70,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.symbol_table: dict[str, Statement] = {}
         self.state: InterpreterState[FrameType] = InterpreterState()
         self.fuel = fuel
+        self.debug = debug
         self.max_depth = max_depth
         self.max_python_recursion_depth = max_python_recursion_depth
 
@@ -234,7 +236,13 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         method = self.lookup_registry(frame, stmt)
         if method is not None:
             try:
-                return method(self, frame, stmt)
+                results = method(self, frame, stmt)
+                if self.debug and not isinstance(results, (tuple, SpecialResult)):
+                    return Err(
+                        ValueError("method must return tuple or SpecialResult"),
+                        self.state.frames,
+                    )
+                return results
             except InterpreterError as e:
                 return Err(e, self.state.frames)
 
