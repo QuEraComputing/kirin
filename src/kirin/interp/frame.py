@@ -80,10 +80,12 @@ class Frame(FrameABC[ValueType]):
                 and will be converted to an [`interp.Err`][kirin.interp.Err] in the interpretation
                 results.
         """
-        if (value := self.entries.get(key)) is not None:
-            return value
+        err = InterpreterError(f"SSAValue {key} not found")
+        value = self.entries.get(key, err)
+        if isinstance(value, InterpreterError):
+            raise err
         else:
-            raise InterpreterError(f"SSAValue {key} not found")
+            return value
 
     ExpectedType = TypeVar("ExpectedType")
 
