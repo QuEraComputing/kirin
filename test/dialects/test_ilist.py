@@ -145,3 +145,17 @@ def test_ilist_fcf():
     assert isinstance(stmt, py.Constant)
     assert stmt.value == 0
     assert isinstance(foldr.callable_region.blocks[0].stmts.at(10), func.Call)
+
+
+def test_ilist_range():
+    @basic.add(py.range)
+    def map():
+        return ilist.Map(add1, range(0, 3))  # type: ignore
+
+    assert map() == ilist.IList([1, 2, 3])
+
+    @basic.add(py.range)
+    def const_range():
+        return range(0, 3)
+
+    assert const_range() == ilist.IList(range(0, 3))
