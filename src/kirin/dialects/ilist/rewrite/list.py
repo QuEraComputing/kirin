@@ -1,7 +1,9 @@
 from kirin import ir
+from kirin.dialects.py import constant
 from kirin.rewrite.abc import RewriteRule
 from kirin.rewrite.result import RewriteResult
 from kirin.dialects.ilist.stmts import IListType
+from kirin.dialects.ilist.runtime import IList
 
 
 class List2IList(RewriteRule):
@@ -16,6 +18,10 @@ class List2IList(RewriteRule):
         has_done_something = False
         for result in node.results:
             has_done_something = self._rewrite_SSAValue_type(result)
+
+        if has_done_something and isinstance(node, constant.Constant):
+            node.replace_by(constant.Constant(value=IList(data=node.value)))
+
         return RewriteResult(has_done_something=has_done_something)
 
     def _rewrite_SSAValue_type(self, value: ir.SSAValue):
@@ -25,6 +31,7 @@ class List2IList(RewriteRule):
         ):
             value.type = IListType[value.type.vars[0], ir.types.Any]
             return True
+
         elif isinstance(value.type, ir.types.PyClass) and issubclass(
             value.type.typ, list
         ):
