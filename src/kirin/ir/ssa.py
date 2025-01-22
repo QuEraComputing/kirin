@@ -31,7 +31,9 @@ class SSAValue(ABC, Printable):
 
     @property
     @abstractmethod
-    def owner(self) -> Statement | Block: ...
+    def owner(self) -> Statement | Block:
+        """The object that owns this SSA value."""
+        ...
 
     @property
     def name(self) -> str | None:

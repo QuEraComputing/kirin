@@ -85,6 +85,14 @@ def argument(
     kw_only: bool = False,
     alias: Optional[str] = None,
 ) -> Any:
+    """Field specifier for arguments.
+
+    Args:
+        type(TypeAttribute): type of the argument, will be used in validation.
+        print(bool): if `True`, this argument name is printed in the signature.
+        kw_only(bool): if `True`, this argument is keyword-only.
+        alias(Optional[str]): an alias for the argument name in the `__init__` method.
+    """
     return ArgumentField(
         type=type,
         print=print,
@@ -113,6 +121,15 @@ def result(
     kw_only: bool = True,
     alias: Optional[str] = None,
 ) -> Any:
+    """Field specifier for results.
+
+    Args:
+        type(TypeAttribute): type of the result.
+        init(bool): if `True`, this result field is included in the `__init__` method.
+        repr(bool): if `True`, this result field is included in the `__repr__` and pretty printing.
+        kw_only(bool): if `True`, this result field is keyword-only.
+        alias(Optional[str]): an alias for the result field name in the `__init__` method.
+    """
     if kw_only is False:  # for linting
         raise TypeError("result fields must be keyword-only")
 
@@ -148,6 +165,16 @@ def region(
     multi: bool = False,
     default_factory: Callable[[], Region] = Region,
 ) -> Any:
+    """Field specifier for regions.
+
+    Args:
+        init(bool): if `True`, this region field is included in the `__init__` method.
+        repr(bool): if `True`, this region field is included in the `__repr__` and pretty printing.
+        kw_only(bool): if `True`, this region field is keyword-only.
+        alias(Optional[str]): an alias for the region field name in the `__init__` method.
+        multi(bool): if `True`, this region can contain multiple blocks.
+        default_factory(Callable[[], Region]): a factory function to create a default region.
+    """
     if kw_only is False:
         raise TypeError("region fields must be keyword-only")
 
@@ -179,6 +206,15 @@ def block(
     alias: Optional[str] = None,
     default_factory: Callable[[], Block] = Block,
 ) -> Any:
+    """Field specifier for blocks.
+
+    Args:
+        init(bool): if `True`, this block field is included in the `__init__` method.
+        repr(bool): if `True`, this block field is included in the `__repr__` and pretty printing.
+        kw_only(bool): if `True`, this block field is keyword-only.
+        alias(Optional[str]): an alias for the block field name in the `__init__` method.
+        default_factory(Callable[[], Block]): a factory function to create a default block.
+    """
     if kw_only is False:
         raise TypeError("block fields must be keyword-only")
 

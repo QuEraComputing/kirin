@@ -48,6 +48,37 @@ def statement(
     cls=None,
     **kwargs: Unpack[StatementOptions],
 ) -> Callable[[type[StmtType]], type[StmtType]]:
+    """Declare a new statement class.
+
+    This decorator is used to declare a new statement class. It is used to
+    generate the necessary boilerplate code for the class. The class should
+    inherit from `kirin.ir.Statement`.
+
+    Args:
+        init(bool): Whether to generate an `__init__` method.
+        repr(bool): Whether to generate a `__repr__` method.
+        kw_only(bool): Whether to use keyword-only arguments in the `__init__`
+            method.
+        dialect(Optional[Dialect]): The dialect of the statement.
+        property(bool): Whether to generate property methods for attributes.
+
+    Example:
+        The following is an example of how to use the `statement` decorator.
+
+        ```python
+        # optionally register the statement with
+        # @statement(dialect=my_dialect_object)
+        @statement
+        class MyStatement(ir.Statement):
+            name = "some_name"
+            traits = frozenset({TraitA(), TraitB()})
+            some_input: ir.SSAValue = info.argument()
+            some_output: ir.ResultValue = info.result()
+            body: ir.Region = info.region()
+            successor: ir.Block = info.block()
+        ```
+    """
+
     def wrap(cls):
         decl = StatementDecl(cls, **kwargs)
         decl.scan_fields()

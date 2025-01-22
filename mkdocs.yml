@@ -12,6 +12,8 @@ nav:
       - index.md
       - Installation: install.md
       - Declarations: def.md
+      - Interpretation: interp.md
+      - Analysis: analysis.md
       - Dialects:
         - Python: dialects/python.md
         - Function: dialects/func.md

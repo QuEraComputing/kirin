@@ -12,6 +12,13 @@ class InterpreterExit(Exception):
 
 
 class InterpreterError(Exception):
+    """An error occurred during interpretation.
+
+    This is the base class for all errors that occur during interpretation. This
+    error can be catched by interpreter and converted to an `interp.Err` value that
+    records the stack trace of the error.
+    """
+
     pass
 
 
