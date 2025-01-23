@@ -9,6 +9,7 @@ from kirin.source import SourceInfo
 from kirin.exceptions import DialectLoweringError
 from kirin.lowering.frame import Frame
 from kirin.lowering.result import Result
+from kirin.lowering.binding import Binding
 from kirin.lowering.dialect import FromPythonAST
 
 if TYPE_CHECKING:
@@ -152,6 +153,9 @@ class LoweringState(ast.NodeVisitor):
             return self.__lower_Call_local(node)
 
         global_callee = global_callee_result.unwrap()
+        if isinstance(global_callee, Binding):
+            global_callee = global_callee.parent
+
         if isinstance(global_callee, Method):
             if "Call_global_method" in self.registry:
                 return self.registry["Call_global_method"].lower_Call_global_method(
