@@ -140,6 +140,7 @@
         * [empty](kirin/lattice/empty.md)
         * [mixin](kirin/lattice/mixin.md)
     * [lowering](kirin/lowering/index.md)
+        * [binding](kirin/lowering/binding.md)
         * [core](kirin/lowering/core.md)
         * [dialect](kirin/lowering/dialect.md)
         * [frame](kirin/lowering/frame.md)
