@@ -1,5 +1,5 @@
 from kirin import ir
-from kirin.interp import Err, Frame, Interpreter, MethodTable, impl
+from kirin.interp import Frame, Interpreter, MethodTable, impl
 from kirin.dialects.py.len import Len
 from kirin.dialects.py.binop import Add
 from kirin.dialects.py.range import Range
@@ -39,11 +39,7 @@ class IListInterpreter(MethodTable):
         ret = []
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            _ret = interp.eval(fn, (elem,)).value
-            if isinstance(_ret, Err):
-                return _ret
-            else:
-                ret.append(_ret)
+            ret.append(interp.run_method(fn, (elem,)))
         return (IList(ret),)
 
     @impl(Scan)
@@ -56,12 +52,8 @@ class IListInterpreter(MethodTable):
         ys = []
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            _acc = interp.eval(fn, (carry, elem)).value
-            if isinstance(_acc, Err):
-                return _acc
-            else:
-                carry, y = _acc
-                ys.append(y)
+            carry, y = interp.run_method(fn, (carry, elem))
+            ys.append(y)
         return ((carry, IList(ys)),)
 
     @impl(Foldr)
@@ -79,9 +71,7 @@ class IListInterpreter(MethodTable):
         acc = init
         for elem in coll:
             # NOTE: assume fn has been type checked
-            acc = interp.eval(fn, (acc, elem)).value
-            if isinstance(acc, Err):
-                return acc
+            acc = interp.run_method(fn, (acc, elem))
         return (acc,)
 
     @impl(ForEach)
@@ -90,7 +80,5 @@ class IListInterpreter(MethodTable):
         coll: IList = frame.get(stmt.collection)
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            _ret = interp.eval(fn, (elem,)).value
-            if isinstance(_ret, Err):
-                return _ret
+            interp.run_method(fn, (elem,))
         return (None,)

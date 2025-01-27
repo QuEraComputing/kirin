@@ -11,42 +11,11 @@ class InterpreterExit(Exception):
     pass
 
 
-class InterpreterError(Exception):
-    """An error occurred during interpretation.
-
-    This is the base class for all errors that occur during interpretation. This
-    error can be catched by interpreter and converted to an `interp.Err` value that
-    records the stack trace of the error.
-    """
-
-    pass
-
-
-class InterpreterStepError(InterpreterError):
-    pass
-
-
-class UnreachableError(InterpreterError):
-    pass
-
-
-class FuelExhaustedError(InterpreterError):
-    pass
-
-
-class CodeGenError(InterpreterError):
-    pass
-
-
 class DialectDefError(Exception):
     pass
 
 
 class DialectSyntaxError(Exception):
-    pass
-
-
-class DialectInterpretationError(InterpreterError):
     pass
 
 

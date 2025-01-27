@@ -2,11 +2,12 @@ from typing import Any
 
 from kirin.ir import Block, Region
 from kirin.ir.method import Method
-from kirin.exceptions import InterpreterError, FuelExhaustedError
-from kirin.interp.base import BaseInterpreter
-from kirin.interp.frame import Frame
-from kirin.interp.value import Err, Successor, ReturnValue, MethodResult
 from kirin.ir.nodes.stmt import Statement
+
+from .base import BaseInterpreter
+from .frame import Frame
+from .value import Successor, ReturnValue
+from .exceptions import InterpreterError, FuelExhaustedError
 
 
 class Interpreter(BaseInterpreter[Frame[Any], Any]):
@@ -16,12 +17,12 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
     def new_frame(self, code: Statement) -> Frame[Any]:
         return Frame.from_func_like(code)
 
-    def run_method(self, method: Method, args: tuple[Any, ...]) -> MethodResult[Any]:
+    def run_method(self, method: Method, args: tuple[Any, ...]) -> Any:
         if len(self.state.frames) >= self.max_depth:
             raise InterpreterError("maximum recursion depth exceeded")
         return self.run_callable(method.code, (method,) + args)
 
-    def run_ssacfg_region(self, frame: Frame[Any], region: Region) -> MethodResult[Any]:
+    def run_ssacfg_region(self, frame: Frame[Any], region: Region) -> Any:
         stmt_idx = 0
         result = self.void
         block: Block | None = region.blocks[0]
@@ -43,8 +44,6 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
                 stmt_results = self.run_stmt(frame, stmt)
 
                 match stmt_results:
-                    case Err(_):
-                        return stmt_results
                     case tuple(values):
                         frame.set_values(stmt._results, values)
                     case ReturnValue(result):

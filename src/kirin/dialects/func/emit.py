@@ -1,7 +1,7 @@
 from typing import IO, TypeVar
 
 from kirin import emit
-from kirin.interp import Err, MethodTable, impl
+from kirin.interp import MethodTable, InterpreterError, impl
 from kirin.emit.julia import EmitJulia
 
 from .stmts import Call, Invoke, Lambda, Return, Function, GetField, ConstantNone
@@ -44,9 +44,7 @@ class JuliaMethodTable(MethodTable):
     @impl(Call)
     def emit_call(self, interp: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Call):
         if stmt.kwargs:
-            return Err(
-                ValueError("cannot emit kwargs for dyanmic calls"), interp.state.frames
-            )
+            raise InterpreterError("cannot emit kwargs for dyanmic calls")
         return (
             f"{frame.get(stmt.callee)}({', '.join(frame.get_values(stmt.inputs))})",
         )

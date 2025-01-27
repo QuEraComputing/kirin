@@ -7,7 +7,7 @@ from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
 from kirin.interp.base import BaseInterpreter, InterpreterMeta
 from kirin.interp.frame import Frame
-from kirin.interp.value import Successor, ReturnValue, MethodResult
+from kirin.interp.value import Successor, ReturnValue
 
 ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
@@ -28,12 +28,13 @@ class AbstractInterpreterMeta(InterpreterMeta):
     pass
 
 
+@dataclass
 class AbstractInterpreter(
     BaseInterpreter[AbstractFrameType, ResultType],
     ABC,
     metaclass=AbstractInterpreterMeta,
 ):
-    lattice: type[BoundedLattice[ResultType]]
+    lattice: type[BoundedLattice[ResultType]] = field(init=False)
     """lattice type for the abstract interpreter.
     """
 
@@ -65,9 +66,7 @@ class AbstractInterpreter(
     ):
         frame.set_values(ssa, results)
 
-    def run_ssacfg_region(
-        self, frame: AbstractFrameType, region: Region
-    ) -> MethodResult[ResultType]:
+    def run_ssacfg_region(self, frame: AbstractFrameType, region: Region) -> ResultType:
         result = self.void
         frame.worklist.append(
             Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))

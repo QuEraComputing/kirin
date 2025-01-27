@@ -16,7 +16,7 @@ from kirin.interp.value import StatementResult
 
 if TYPE_CHECKING:
     from kirin.interp.base import FrameABC, BaseInterpreter
-    from kirin.interp.dialect import MethodTable
+    from kirin.interp.table import MethodTable
 
 MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
 InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")

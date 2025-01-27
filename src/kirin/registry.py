@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from kirin.ir.nodes import Statement
     from kirin.lowering import FromPythonAST
     from kirin.interp.impl import Signature
-    from kirin.interp.dialect import MethodTable
+    from kirin.interp.table import MethodTable
 
 
 @dataclass

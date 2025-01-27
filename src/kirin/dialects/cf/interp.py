@@ -1,4 +1,4 @@
-from kirin.interp import Err, Frame, Successor, Interpreter, MethodTable, impl
+from kirin.interp import Frame, Successor, Interpreter, MethodTable, WrapException, impl
 from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
 from kirin.dialects.cf.dialect import dialect
 
@@ -12,9 +12,9 @@ class CfInterpreter(MethodTable):
             return ()
 
         if stmt.message:
-            return Err(AssertionError(frame.get(stmt.message)), interp.state.frames)
+            raise WrapException(AssertionError(frame.get(stmt.message)))
         else:
-            return Err(AssertionError(), interp.state.frames)
+            raise WrapException(AssertionError("Assertion failed"))
 
     @impl(Branch)
     def branch(self, interp: Interpreter, frame: Frame, stmt: Branch):

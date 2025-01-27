@@ -1,5 +1,3 @@
-from typing import Iterable
-
 from kirin import ir
 from kirin.interp import FrameABC, MethodTable, ReturnValue, StatementResult, impl
 from kirin.analysis import const
@@ -38,13 +36,11 @@ class DialectConstProp(MethodTable):
 
         mt: ir.Method = callee.data
         return (
-            self._invoke_method(
-                interp,
+            interp.run_method(
                 mt,
                 interp.permute_values(
                     mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
                 ),
-                stmt.results,
             ),
         )
 
@@ -72,7 +68,7 @@ class DialectConstProp(MethodTable):
             code=callee.code,
             fields=callee.captured,
         )
-        return interp.eval(mt, args).expect()
+        return interp.run_method(mt, args)
 
     @impl(Invoke)
     def invoke(
@@ -82,24 +78,13 @@ class DialectConstProp(MethodTable):
         stmt: Invoke,
     ) -> StatementResult[const.JointResult]:
         return (
-            self._invoke_method(
-                interp,
+            interp.run_method(
                 stmt.callee,
                 interp.permute_values(
                     stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
                 ),
-                stmt.results,
             ),
         )
-
-    def _invoke_method(
-        self,
-        interp: const.Propagate,
-        mt: ir.Method,
-        values: tuple[const.JointResult, ...],
-        results: Iterable[ir.ResultValue],
-    ):
-        return interp.eval(mt, values).expect()
 
     @impl(Lambda)
     def lambda_(

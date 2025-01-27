@@ -1,7 +1,6 @@
-from typing import Iterable
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
-from kirin import ir, interp, exceptions
+from kirin import ir, interp
 from kirin.analysis.forward import ForwardExtra, ForwardFrame
 
 from .lattice import Pure, Value, NotPure, Unknown, JointResult
@@ -12,34 +11,27 @@ class ExtraFrameInfo:
     frame_is_not_pure: bool = False
 
 
+@dataclass
 class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
     keys = ["constprop"]
     lattice = JointResult
 
-    def __init__(
-        self,
-        dialects: ir.DialectGroup | Iterable[ir.Dialect],
-        *,
-        fuel: int | None = None,
-        max_depth: int = 128,
-        max_python_recursion_depth: int = 8192,
-    ):
-        super().__init__(
-            dialects,
-            fuel=fuel,
-            max_depth=max_depth,
-            max_python_recursion_depth=max_python_recursion_depth,
-        )
-        self.interp = interp.Interpreter(
+    _interp: interp.Interpreter = field(init=False)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self._interp = interp.Interpreter(
             self.dialects,
             fuel=self.fuel,
+            debug=self.debug,
             max_depth=self.max_depth,
             max_python_recursion_depth=self.max_python_recursion_depth,
         )
 
-    def initialize(self, save_all_ssa: bool = False):
-        super().initialize(save_all_ssa)
-        self.interp.initialize()
+    def initialize(self):
+        super().initialize()
+        self._interp.initialize()
+        return self
 
     def _try_eval_const_pure(
         self,
@@ -48,9 +40,9 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         values: tuple[Value, ...],
     ) -> interp.StatementResult[JointResult]:
         try:
-            _frame = self.interp.new_frame(frame.code)
+            _frame = self._interp.new_frame(frame.code)
             _frame.set_values(stmt.args, tuple(x.data for x in values))
-            value = self.interp.run_stmt(_frame, stmt)
+            value = self._interp.run_stmt(_frame, stmt)
             if isinstance(value, tuple):
                 return tuple(JointResult(Value(each), Pure()) for each in value)
             elif isinstance(value, interp.ReturnValue):
@@ -62,7 +54,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
                         JointResult(Value(each), Pure()) for each in value.block_args
                     ),
                 )
-        except exceptions.InterpreterError:
+        except interp.InterpreterError:
             pass
         return (self.void,)
 
@@ -107,7 +99,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
 
     def run_method(
         self, method: ir.Method, args: tuple[JointResult, ...]
-    ) -> interp.MethodResult[JointResult]:
+    ) -> JointResult:
         if len(self.state.frames) >= self.max_depth:
             return self.void
         return self.run_callable(
@@ -117,12 +109,9 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
     def finalize(
         self,
         frame: ForwardFrame[JointResult, ExtraFrameInfo],
-        results: interp.MethodResult[JointResult],
-    ) -> interp.MethodResult[JointResult]:
+        results: JointResult,
+    ) -> JointResult:
         results = super().finalize(frame, results)
-        if isinstance(results, interp.Err):
-            return results
-
         if frame.extra is not None and frame.extra.frame_is_not_pure:
             return JointResult(results.const, NotPure())
         return results

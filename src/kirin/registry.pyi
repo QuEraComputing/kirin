@@ -6,9 +6,9 @@ from kirin.ir.nodes import Statement
 from kirin.lowering import FromPythonAST
 from kirin.interp.base import FrameABC, BaseInterpreter
 from kirin.interp.impl import Signature
+from kirin.interp.table import MethodTable
 from kirin.interp.value import StatementResult
 from kirin.ir.attrs.abc import Attribute
-from kirin.interp.dialect import MethodTable
 
 MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")
 InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")

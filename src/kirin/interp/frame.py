@@ -5,13 +5,17 @@ from dataclasses import field, dataclass
 from typing_extensions import Self
 
 from kirin.ir import SSAValue, Statement
-from kirin.exceptions import InterpreterError
+
+from .exceptions import InterpreterError
 
 ValueType = TypeVar("ValueType")
 
 
 @dataclass
 class FrameABC(ABC, Generic[ValueType]):
+    code: Statement
+    """func statement being interpreted.
+    """
 
     @classmethod
     @abstractmethod
@@ -42,9 +46,6 @@ class FrameABC(ABC, Generic[ValueType]):
 
 @dataclass
 class Frame(FrameABC[ValueType]):
-    code: Statement
-    """func statement being interpreted.
-    """
     lino: int = 0
     stmt: Statement | None = None
     """statement being interpreted.

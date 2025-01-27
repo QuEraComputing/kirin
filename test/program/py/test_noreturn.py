@@ -1,7 +1,6 @@
 import pytest
 
 from kirin.prelude import basic_no_opt
-from kirin.exceptions import InterpreterError
 
 
 @basic_no_opt
@@ -12,7 +11,7 @@ def no_return(x):
 def test_noreturn():
     assert no_return(1) is None
 
-    with pytest.raises(InterpreterError):
+    with pytest.raises(ValueError):
         no_return()
 
 

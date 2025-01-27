@@ -22,7 +22,7 @@ class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
 
     def run_method(
         self, method: Method, args: tuple[EmptyLattice, ...]
-    ) -> EmptyLattice | interp.Err[EmptyLattice]:
+    ) -> EmptyLattice:
         return self.run_callable(method.code, (EmptyLattice(),) + args)
 
 

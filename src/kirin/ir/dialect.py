@@ -11,7 +11,7 @@ from kirin.ir.attrs.abc import Attribute
 T = TypeVar("T")
 
 if TYPE_CHECKING:
-    from kirin.interp.dialect import MethodTable
+    from kirin.interp.table import MethodTable
     from kirin.lowering.dialect import FromPythonAST
 
 
@@ -87,7 +87,7 @@ class Dialect:
 
 
         """
-        from kirin.interp.dialect import MethodTable
+        from kirin.interp.table import MethodTable
         from kirin.lowering.dialect import FromPythonAST
 
         if key is None:

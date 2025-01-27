@@ -1,20 +1,21 @@
-from kirin.interp.base import (
-    InterpResult as InterpResult,
-    BaseInterpreter as BaseInterpreter,
-)
-from kirin.interp.impl import ImplDef as ImplDef, Signature as Signature, impl as impl
-from kirin.interp.frame import Frame as Frame, FrameABC as FrameABC
-from kirin.interp.value import (
-    Err as Err,
+from . import result as result
+from .base import BaseInterpreter as BaseInterpreter
+from .impl import ImplDef as ImplDef, Signature as Signature, impl as impl
+from .frame import Frame as Frame, FrameABC as FrameABC
+from .table import MethodTable as MethodTable
+from .value import (
     Successor as Successor,
     ReturnValue as ReturnValue,
-    MethodResult as MethodResult,
-    SpecialResult as SpecialResult,
+    SpecialValue as SpecialValue,
     StatementResult as StatementResult,
 )
-from kirin.interp.dialect import MethodTable as MethodTable
-from kirin.interp.abstract import (
+from .abstract import (
     AbstractFrame as AbstractFrame,
     AbstractInterpreter as AbstractInterpreter,
 )
-from kirin.interp.concrete import Interpreter as Interpreter
+from .concrete import Interpreter as Interpreter
+from .exceptions import (
+    WrapException as WrapException,
+    InterpreterError as InterpreterError,
+    FuelExhaustedError as FuelExhaustedError,
+)

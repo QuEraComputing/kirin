@@ -1,8 +1,9 @@
 from abc import ABC
 from typing import Generic, TypeVar, Iterable
+from dataclasses import field, dataclass
 
 from kirin import ir, interp
-from kirin.interp import MethodResult, AbstractFrame, AbstractInterpreter
+from kirin.interp import AbstractFrame, AbstractInterpreter
 from kirin.lattice import BoundedLattice
 
 ExtraType = TypeVar("ExtraType")
@@ -13,6 +14,7 @@ class ForwardFrame(AbstractFrame[LatticeElemType], Generic[LatticeElemType, Extr
     extra: ExtraType | None = None
 
 
+@dataclass
 class ForwardExtra(
     AbstractInterpreter[ForwardFrame[LatticeElemType, ExtraType], LatticeElemType],
     ABC,
@@ -24,18 +26,26 @@ class ForwardExtra(
         ExtraType: The type of extra information to be stored in the frame.
     """
 
-    def initialize(self, save_all_ssa: bool = False, *args, **kwargs):
-        super().initialize()
-        self.save_all_ssa = save_all_ssa
-        self.results: dict[ir.SSAValue, LatticeElemType] = {}
+    save_all_ssa: bool = field(default=False, kw_only=True)
+    results: dict[ir.SSAValue, LatticeElemType] = field(
+        default_factory=dict, init=False, compare=False
+    )
 
-    def run(
-        self, method: ir.Method, *, save_all_ssa: bool = False, **kwargs
+    def initialize(self):
+        super().initialize()
+        self.results: dict[ir.SSAValue, LatticeElemType] = {}
+        return self
+
+    def run_analysis(
+        self,
+        method: ir.Method,
+        args: tuple[LatticeElemType, ...] | None = None,
     ) -> tuple[dict[ir.SSAValue, LatticeElemType], LatticeElemType]:
         """Run the forward dataflow analysis.
 
         Args:
             method(ir.Method): The method to analyze.
+            args(tuple[LatticeElemType]): The arguments to the method. Defaults to tuple of top values.
 
         Keyword Args:
             save_all_ssa(bool): If True, save all SSA values in the results.
@@ -44,11 +54,11 @@ class ForwardExtra(
             dict[ir.SSAValue, LatticeElemType]: The results of the analysis for each SSA value.
             LatticeElemType: The result of the analysis for the method return value.
         """
-        self.initialize(save_all_ssa=save_all_ssa)
-        result = self.eval(method, tuple(self.lattice.top() for _ in method.args))
-        if isinstance(result.value, interp.Err):
+        args = args or tuple(self.lattice.top() for _ in method.args)
+        result = self.eval(method, args)
+        if isinstance(result, interp.result.Err):
             return self.results, self.lattice.bottom()
-        return self.results, result.value
+        return self.results, result.expect()
 
     def set_values(
         self,
@@ -65,8 +75,8 @@ class ForwardExtra(
     def finalize(
         self,
         frame: ForwardFrame[LatticeElemType, ExtraType],
-        results: MethodResult[LatticeElemType],
-    ) -> MethodResult[LatticeElemType]:
+        results: LatticeElemType,
+    ) -> LatticeElemType:
         if self.save_all_ssa:
             self.results.update(frame.entries)
         else:

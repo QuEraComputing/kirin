@@ -22,16 +22,16 @@ class Fold(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
         constprop = const.Propagate(self.dialects)
-        constprop.eval(mt, tuple(const.JointResult.top() for _ in mt.args))
+        constprop_results, _ = constprop.run_analysis(mt)
         result = Fixpoint(
             Walk(
                 Chain(
                     [
-                        ConstantFold(constprop.results),
-                        WrapConst(constprop.results),
-                        InlineGetItem(constprop.results),
-                        Call2Invoke(constprop.results),
-                        DeadCodeElimination(constprop.results),
+                        ConstantFold(constprop_results),
+                        WrapConst(constprop_results),
+                        InlineGetItem(constprop_results),
+                        Call2Invoke(constprop_results),
+                        DeadCodeElimination(constprop_results),
                     ]
                 )
             )
@@ -42,7 +42,7 @@ class Fold(Pass):
             result = compactify.rewrite(mt.code).join(result)
 
         return (
-            Fixpoint(Walk(DeadCodeElimination(constprop.results)))
+            Fixpoint(Walk(DeadCodeElimination(constprop_results)))
             .rewrite(mt.code)
             .join(result)
         )

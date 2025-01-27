@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
 from kirin.ir.traits import HasSignature, CallableStmtInterface
-from kirin.exceptions import InterpreterError, VerificationError
+from kirin.exceptions import VerificationError
 from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
 from kirin.print.printable import Printable
@@ -37,9 +37,10 @@ class Method(Printable, Generic[Param, RetType]):
         from kirin.interp.concrete import Interpreter
 
         if len(args) + len(kwargs) != len(self.arg_names) - 1:
-            raise InterpreterError("Incorrect number of arguments")
+            raise ValueError("Incorrect number of arguments")
         # NOTE: multi-return values will be wrapped in a tuple for Python
-        return Interpreter(self.dialects).eval(self, args=args, kwargs=kwargs).expect()
+        interp = Interpreter(self.dialects)
+        return interp.eval(self, args=args, kwargs=kwargs).expect()
 
     @property
     def args(self):
