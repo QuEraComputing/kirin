@@ -168,6 +168,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         Returns:
             ValueType: the result of the statement.
         """
+        if len(self.state.frames) >= self.max_depth:
+            return self.eval_recursion_limit(self.state.current_frame())
+
         interface = code.get_trait(traits.CallableStmtInterface)
         if interface is None:
             raise InterpreterError(f"statement {code.name} is not callable")
@@ -322,6 +325,13 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             + " from "
             + str(type(self))
         )
+
+    def eval_recursion_limit(self, frame: FrameType) -> ValueType:
+        """Return the value of recursion exception, e.g in concrete
+        interpreter, it will raise an exception if the limit is reached;
+        in type inference, it will return a special value.
+        """
+        raise InterpreterError("maximum recursion depth exceeded")
 
     def build_signature(self, frame: FrameType, stmt: Statement) -> "Signature":
         """build signature for querying the statement implementation."""

@@ -7,7 +7,7 @@ from kirin.ir.nodes.stmt import Statement
 from .base import BaseInterpreter
 from .frame import Frame
 from .value import Successor, ReturnValue
-from .exceptions import InterpreterError, FuelExhaustedError
+from .exceptions import FuelExhaustedError
 
 
 class Interpreter(BaseInterpreter[Frame[Any], Any]):
@@ -18,8 +18,6 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
         return Frame.from_func_like(code)
 
     def run_method(self, method: Method, args: tuple[Any, ...]) -> Any:
-        if len(self.state.frames) >= self.max_depth:
-            raise InterpreterError("maximum recursion depth exceeded")
         return self.run_callable(method.code, (method,) + args)
 
     def run_ssacfg_region(self, frame: Frame[Any], region: Region) -> Any:

@@ -146,14 +146,12 @@ def recurse():
 
 def test_constprop():
     infer = const.Propagate(basic_no_opt)
-    assert infer.eval(
-        main, tuple(const.JointResult.top() for _ in main.args)
-    ).expect().const == const.Value((3, 4))
+    _, ret = infer.run_analysis(main)
+    assert ret.const == const.Value((3, 4))
     assert len(infer.results) == 3
 
-    assert infer.eval(
-        goo, tuple(const.JointResult.top() for _ in goo.args)
-    ).expect().const == const.PartialTuple((const.Value(3), const.Unknown()))
+    _, ret = infer.run_analysis(goo)
+    assert ret.const == const.PartialTuple((const.Value(3), const.Unknown()))
     assert len(infer.results) == 6
     block: ir.Block = goo.code.body.blocks[0]  # type: ignore
     assert infer.results[block.stmts.at(1).results[0]].const == const.Value(3)
@@ -162,19 +160,13 @@ def test_constprop():
         (const.Value(3), const.Unknown())
     )
 
-    assert infer.eval(
-        bar, tuple(const.JointResult.top() for _ in bar.args)
-    ).expect().const == const.Value(3)
+    _, ret = infer.run_analysis(bar)
+    assert ret.const == const.Value(3)
 
-    assert (
-        infer.eval(ntuple, tuple(const.JointResult.top() for _ in ntuple.args))
-        .expect()
-        .const
-        == const.Unknown()
-    )
-    assert infer.eval(
-        recurse, tuple(const.JointResult.top() for _ in recurse.args)
-    ).expect().const == const.Value((0, 0, 0))
+    _, ret = infer.run_analysis(foo)
+    assert ret.const == const.Unknown()
+    _, ret = infer.run_analysis(recurse)
+    assert ret.const == const.Value((0, 0, 0))
 
 
 @basic_no_opt
@@ -202,14 +194,14 @@ def _for_loop_test_constp(
 
 def test_issue_40():
     constprop = const.Propagate(basic_no_opt)
-    result = constprop.eval(
+    _, result = constprop.run_analysis(
         _for_loop_test_constp,
         (
             const.JointResult.from_const(0),
             const.JointResult.from_const(()),
             const.JointResult.from_const(5),
         ),
-    ).expect()
+    )
     assert isinstance(result.const, const.Value)
     assert result.const.data == _for_loop_test_constp(cntr=0, x=(), n_range=5)
 
@@ -238,15 +230,12 @@ def test_intraprocedure_side_effect():
             return x
 
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
-    result = constprop.eval(
-        side_effect_intraprocedure,
-        tuple(const.JointResult.top() for _ in side_effect_intraprocedure.args),
-    ).expect()
+    results, ret = constprop.run_analysis(side_effect_intraprocedure)
     new_tuple = (
         side_effect_intraprocedure.callable_region.blocks[2].stmts.at(3).results[0]
     )
-    assert isinstance(result.const, const.Unknown)
-    assert constprop.results[new_tuple].const == const.Value((1, 2, 3))
+    assert isinstance(ret.const, const.Unknown)
+    assert results[new_tuple].const == const.Value((1, 2, 3))
 
 
 def test_interprocedure_true_branch():
@@ -266,15 +255,10 @@ def test_interprocedure_true_branch():
             return cond
 
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
-    result = constprop.eval(
-        side_effect_true_branch_const,
-        tuple(const.JointResult.top() for _ in side_effect_true_branch_const.args),
-    ).expect()
-    assert isinstance(result.const, const.Unknown)  # instead of NotPure
+    results, ret = constprop.run_analysis(side_effect_true_branch_const)
+    assert isinstance(ret.const, const.Unknown)  # instead of NotPure
     true_branch = side_effect_true_branch_const.callable_region.blocks[1]
-    assert constprop.results[true_branch.stmts.at(0).results[0]].const == const.Value(
-        None
-    )
+    assert results[true_branch.stmts.at(0).results[0]].const == const.Value(None)
 
 
 def test_non_pure_recursion():
@@ -286,11 +270,9 @@ def test_non_pure_recursion():
         return x
 
     constprop = const.Propagate(basic_no_opt)
-    constprop.eval(
-        for_loop_append, tuple(const.JointResult.top() for _ in for_loop_append.args)
-    )
+    results, _ = constprop.run_analysis(for_loop_append)
     stmt = for_loop_append.callable_region.blocks[1].stmts.at(3)
-    assert isinstance(constprop.results[stmt.results[0]].const, const.Unknown)
+    assert isinstance(results[stmt.results[0]].const, const.Unknown)
 
 
 def test_closure_prop():
@@ -331,10 +313,10 @@ def test_closure_prop():
         return x()
 
     constprop = const.Propagate(basic_no_opt.add(dialect))
-    constprop.eval(main, ())
-    main.print(analysis=constprop.results)
+    results, ret = constprop.run_analysis(main)
+    main.print(analysis=results)
     stmt = main.callable_region.blocks[0].stmts.at(3)
-    call_result = constprop.results[stmt.results[0]]
+    call_result = results[stmt.results[0]]
     assert isinstance(call_result.const, const.Value)
     assert call_result.const.data == 2
 
@@ -345,8 +327,8 @@ def test_closure_prop():
         return x()
 
     constprop = const.Propagate(basic_no_opt.add(dialect))
-    constprop.eval(main2, ())
-    main2.print(analysis=constprop.results)
+    results, _ = constprop.run_analysis(main2)
+    main2.print(analysis=results)
     stmt = main2.callable_region.blocks[0].stmts.at(3)
-    call_result = constprop.results[stmt.results[0]]
+    call_result = results[stmt.results[0]]
     assert isinstance(call_result.const, const.Value)

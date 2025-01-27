@@ -42,12 +42,9 @@ class TypeInference(Forward[types.TypeAttribute]):
     def run_method(
         self, method: ir.Method, args: tuple[types.TypeAttribute, ...]
     ) -> types.TypeAttribute:
-        if len(self.state.frames) < self.max_depth:
-            # NOTE: widen method type here
-            return self.run_callable(
-                method.code, (types.Hinted(types.PyClass(ir.Method), method),) + args
-            )
-        return types.Bottom
+        return self.run_callable(
+            method.code, (types.Hinted(types.PyClass(ir.Method), method),) + args
+        )
 
     def is_const(
         self, value: types.TypeAttribute

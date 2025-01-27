@@ -66,6 +66,9 @@ class AbstractInterpreter(
     ):
         frame.set_values(ssa, results)
 
+    def eval_recursion_limit(self, frame: AbstractFrameType) -> ResultType:
+        return self.lattice.bottom()
+
     def run_ssacfg_region(self, frame: AbstractFrameType, region: Region) -> ResultType:
         result = self.void
         frame.worklist.append(

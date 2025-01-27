@@ -42,4 +42,4 @@ def main(x):
 def test_interp():
     interp = DummyInterpreter(basic)
     with pytest.raises(AttributeError):
-        interp.eval(main, (EmptyLattice(),))
+        interp.run_analysis(main)

@@ -23,8 +23,8 @@ def branch(x):
 def test_branch_elim():
     assert branch(1) == 4
     const_prop = const.Propagate(branch.dialects)
-    const_prop.eval(branch, tuple(const.JointResult.top() for _ in branch.args))
-    fold = ConstantFold(const_prop.results)
+    results, ret = const_prop.run_analysis(branch)
+    fold = ConstantFold(results)
     branch.code.print()
     Fixpoint(Walk(fold)).rewrite(branch.code)
     branch.code.print()
@@ -32,6 +32,6 @@ def test_branch_elim():
     # TODO: also check the generated CFG
     # interp.worklist.visited
     Fixpoint(CFGCompactify(cfg)).rewrite(branch.code)
-    Walk(DeadCodeElimination(const_prop.results)).rewrite(branch.code)
+    Walk(DeadCodeElimination(results)).rewrite(branch.code)
     branch.code.print()
     assert len(branch.code.body.blocks) == 4  # type: ignore

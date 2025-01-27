@@ -17,12 +17,12 @@ def foldable(x: int) -> int:
 def test_dce():
     before = foldable(1)
     const_prop = const.Propagate(foldable.dialects)
-    const_prop.eval(foldable, tuple(const.JointResult.top() for _ in foldable.args))
-    fold = ConstantFold(const_prop.results)
+    results, _ = const_prop.run_analysis(foldable)
+    fold = ConstantFold(results)
     Fixpoint(Walk(fold)).rewrite(foldable.code)
 
     foldable.code.print()
-    dce = DeadCodeElimination(const_prop.results)
+    dce = DeadCodeElimination(results)
     Fixpoint(Walk(dce)).rewrite(foldable.code)
     foldable.code.print()
 

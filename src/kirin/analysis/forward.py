@@ -55,7 +55,7 @@ class ForwardExtra(
             LatticeElemType: The result of the analysis for the method return value.
         """
         args = args or tuple(self.lattice.top() for _ in method.args)
-        result = self.eval(method, args)
+        result = self.run(method, args)
         if isinstance(result, interp.result.Err):
             return self.results, self.lattice.bottom()
         return self.results, result.expect()

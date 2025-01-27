@@ -100,8 +100,6 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
     def run_method(
         self, method: ir.Method, args: tuple[JointResult, ...]
     ) -> JointResult:
-        if len(self.state.frames) >= self.max_depth:
-            return self.void
         return self.run_callable(
             method.code, (JointResult(Value(method), NotPure()),) + args
         )
