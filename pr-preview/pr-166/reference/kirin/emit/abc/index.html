@@ -21,7 +21,7 @@
 <span class=normal>32</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_callable_region</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span><span class=p>:</span>
-    <span class=n>results</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_stmt</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>code</span><span class=p>)</span>
+    <span class=n>results</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>eval_stmt</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>code</span><span class=p>)</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>results</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>):</span>
         <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>results</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>:</span>
             <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>void</span>
