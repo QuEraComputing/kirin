@@ -95,6 +95,7 @@
                 * [typeinfer](kirin/dialects/py/unary/typeinfer.md)
     * [emit](kirin/emit/index.md)
         * [abc](kirin/emit/abc.md)
+        * [exceptions](kirin/emit/exceptions.md)
         * [julia](kirin/emit/julia.md)
         * [str](kirin/emit/str.md)
     * [exceptions](kirin/exceptions.md)

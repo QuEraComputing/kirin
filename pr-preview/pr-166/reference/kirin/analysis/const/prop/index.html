@@ -67,15 +67,15 @@
     <span class=n>frame</span><span class=p>:</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=n>ExtraFrameInfo</span><span class=p>],</span>
     <span class=n>results</span><span class=p>:</span> <span class=n>JointResult</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>JointResult</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>109</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>107</span>
+<span class=normal>108</span>
+<span class=normal>109</span>
 <span class=normal>110</span>
 <span class=normal>111</span>
 <span class=normal>112</span>
 <span class=normal>113</span>
 <span class=normal>114</span>
-<span class=normal>115</span>
-<span class=normal>116</span>
-<span class=normal>117</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span>
+<span class=normal>115</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=n>ExtraFrameInfo</span><span class=p>],</span>
     <span class=n>results</span><span class=p>:</span> <span class=n>JointResult</span><span class=p>,</span>
@@ -100,13 +100,9 @@
 <span class=normal>102</span>
 <span class=normal>103</span>
 <span class=normal>104</span>
-<span class=normal>105</span>
-<span class=normal>106</span>
-<span class=normal>107</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_method</span><span class=p>(</span>
+<span class=normal>105</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_method</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>method</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>JointResult</span><span class=p>:</span>
-    <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>state</span><span class=o>.</span><span class=n>frames</span><span class=p>)</span> <span class=o>&gt;=</span> <span class=bp>self</span><span class=o>.</span><span class=n>max_depth</span><span class=p>:</span>
-        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>void</span>
     <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_callable</span><span class=p>(</span>
         <span class=n>method</span><span class=o>.</span><span class=n>code</span><span class=p>,</span> <span class=p>(</span><span class=n>JointResult</span><span class=p>(</span><span class=n>Value</span><span class=p>(</span><span class=n>method</span><span class=p>),</span> <span class=n>NotPure</span><span class=p>()),)</span> <span class=o>+</span> <span class=n>args</span>
     <span class=p>)</span>
