@@ -41,7 +41,7 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
                 # TODO: make this more precise
                 frame.lino = stmt_idx
                 frame.stmt = stmt
-                stmt_results = self.run_stmt(frame, stmt)
+                stmt_results = self.eval_stmt(frame, stmt)
 
                 match stmt_results:
                     case tuple(values):

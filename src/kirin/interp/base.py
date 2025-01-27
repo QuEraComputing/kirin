@@ -4,7 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Generic, TypeVar, ClassVar, Optional, Sequence
 from dataclasses import field, dataclass
 
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from kirin.ir import Region, Statement, DialectGroup, traits
 from kirin.ir.method import Method
@@ -104,13 +104,22 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         if not hasattr(cls, "void"):
             raise TypeError(f"void is not defined for class {cls.__name__}")
 
+    @deprecated("use run instead")
     def eval(
         self,
         mt: Method,
         args: tuple[ValueType, ...],
         kwargs: dict[str, ValueType] | None = None,
     ) -> Result[ValueType]:
-        """Evaluate a method."""
+        return self.run(mt, args, kwargs)
+
+    def run(
+        self,
+        mt: Method,
+        args: tuple[ValueType, ...],
+        kwargs: dict[str, ValueType] | None = None,
+    ) -> Result[ValueType]:
+        """Run a method."""
         if self._eval_lock:
             raise InterpreterError(
                 "recursive eval is not allowed, use run_method instead"
@@ -238,7 +247,13 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         )
         return args
 
+    @deprecated("use eval_stmt instead")
     def run_stmt(self, frame: FrameType, stmt: Statement) -> StatementResult[ValueType]:
+        return self.eval_stmt(frame, stmt)
+
+    def eval_stmt(
+        self, frame: FrameType, stmt: Statement
+    ) -> StatementResult[ValueType]:
         """Run a statement within the current frame. This is the entry
         point of running a statement. It will look up the statement implementation
         in the dialect registry, or optionally call a fallback implementation.
@@ -262,7 +277,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             ```python
                 class MyInterpreter(BaseInterpreter):
                     ...
-                    def run_stmt(self, frame: FrameType, stmt: Statement) -> StatementResult[ValueType]:
+                    def eval_stmt(self, frame: FrameType, stmt: Statement) -> StatementResult[ValueType]:
                         if isinstance(stmt, MyStmt):
                             return self.run_my_stmt(frame, stmt)
                         else:
@@ -280,9 +295,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
                 )
             return results
 
-        return self.run_stmt_fallback(frame, stmt)
+        return self.eval_stmt_fallback(frame, stmt)
 
-    def run_stmt_fallback(
+    def eval_stmt_fallback(
         self, frame: FrameType, stmt: Statement
     ) -> StatementResult[ValueType]:
         """The fallback implementation of statements.

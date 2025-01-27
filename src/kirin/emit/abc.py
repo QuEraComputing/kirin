@@ -23,7 +23,7 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
     def run_callable_region(
         self, frame: FrameType, code: ir.Statement, region: ir.Region
     ) -> ValueType:
-        results = self.run_stmt(frame, code)
+        results = self.eval_stmt(frame, code)
         if isinstance(results, tuple):
             if len(results) == 0:
                 return self.void
@@ -71,7 +71,7 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
                 raise interp.FuelExhaustedError("fuel exhausted")
 
             self.emit_stmt_begin(frame, stmt)
-            stmt_results = self.run_stmt(frame, stmt)
+            stmt_results = self.eval_stmt(frame, stmt)
             self.emit_stmt_end(frame, stmt)
 
             match stmt_results:

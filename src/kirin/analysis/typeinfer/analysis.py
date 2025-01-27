@@ -31,7 +31,7 @@ class TypeInference(Forward[types.TypeAttribute]):
             return value.body
         return value
 
-    def run_stmt_fallback(
+    def eval_stmt_fallback(
         self, frame: ForwardFrame[types.TypeAttribute, None], stmt: ir.Statement
     ) -> tuple[types.TypeAttribute, ...] | interp.SpecialValue[types.TypeAttribute]:
         resolve = TypeResolution()
