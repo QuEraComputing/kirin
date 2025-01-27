@@ -1,4 +1,4 @@
-from typing import TypeVar, Iterable
+from typing import TypeVar
 from dataclasses import field, dataclass
 
 from kirin import ir, interp
@@ -14,15 +14,6 @@ class EmitFrame(interp.Frame[ValueType]):
 FrameType = TypeVar("FrameType", bound=EmitFrame)
 
 class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
-    def __init__(
-        self,
-        dialects: ir.DialectGroup | Iterable[ir.Dialect],
-        bottom: ValueType,
-        *,
-        fuel: int | None = None,
-        max_depth: int = 128,
-        max_python_recursion_depth: int = 8192,
-    ): ...
     def run_callable_region(
         self, frame: FrameType, code: ir.Statement, region: ir.Region
     ) -> ValueType | interp.Err[ValueType]: ...

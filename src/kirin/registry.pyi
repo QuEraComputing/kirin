@@ -1,13 +1,13 @@
 from typing import Generic, TypeVar, Callable, Iterable, TypeAlias
 from dataclasses import dataclass
 
-from kirin.ir.attrs import Attribute
 from kirin.ir.group import DialectGroup
 from kirin.ir.nodes import Statement
 from kirin.lowering import FromPythonAST
 from kirin.interp.base import FrameABC, BaseInterpreter
 from kirin.interp.impl import Signature
 from kirin.interp.value import StatementResult
+from kirin.ir.attrs.abc import Attribute
 from kirin.interp.dialect import MethodTable
 
 MethodTableSelf = TypeVar("MethodTableSelf", bound="MethodTable")

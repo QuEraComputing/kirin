@@ -1,4 +1,5 @@
-from typing import TypeVar, Iterable
+from abc import ABC
+from typing import TypeVar
 from dataclasses import field, dataclass
 
 from kirin import ir, interp
@@ -17,24 +18,7 @@ class EmitFrame(interp.Frame[ValueType]):
 FrameType = TypeVar("FrameType", bound=EmitFrame)
 
 
-class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
-
-    def __init__(
-        self,
-        dialects: ir.DialectGroup | Iterable[ir.Dialect],
-        bottom: ValueType,
-        *,
-        fuel: int | None = None,
-        max_depth: int = 128,
-        max_python_recursion_depth: int = 8192,
-    ):
-        super().__init__(
-            dialects,
-            bottom,
-            fuel=fuel,
-            max_depth=max_depth,
-            max_python_recursion_depth=max_python_recursion_depth,
-        )
+class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
 
     def run_callable_region(
         self, frame: FrameType, code: ir.Statement, region: ir.Region
@@ -44,7 +28,7 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
             return results
         elif isinstance(results, tuple):
             if len(results) == 0:
-                return self.bottom
+                return self.void
             elif len(results) == 1:
                 return results[0]
         raise ValueError(f"Unexpected results {results}")
@@ -52,7 +36,7 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
     def run_ssacfg_region(
         self, frame: FrameType, region: ir.Region
     ) -> ValueType | interp.Err[ValueType]:
-        result = self.bottom
+        result = self.void
         frame.worklist.append(
             interp.Successor(region.blocks[0], frame.get_values(region.blocks[0].args))
         )

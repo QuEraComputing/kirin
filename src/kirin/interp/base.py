@@ -45,16 +45,30 @@ class InterpreterMeta(ABCMeta):
 
 
 class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterMeta):
-    """A base class for interpreters."""
+    """A base class for interpreters.
+
+    This class defines the basic structure of an interpreter. It is
+    designed to be subclassed to provide the actual implementation of
+    the interpreter.
+
+    When subclassing, if the bases contains `ABC` no checks will be
+    performed on the subclass. If the subclass does not contain `ABC`,
+    the subclass must define the following attributes:
+
+    - `keys`: a list of strings that defines the order of dialects to select from.
+    - `void`: the value to return when the interpreter evaluates nothing.
+    """
 
     keys: list[str]
     """The name of the interpreter to select from dialects by order.
+    """
+    void: ValueType
+    """What to return when the interpreter evaluates nothing.
     """
 
     def __init__(
         self,
         dialects: DialectGroup | Iterable[Dialect],
-        bottom: ValueType,
         *,
         fuel: int | None = None,
         debug: bool = False,
@@ -64,15 +78,27 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         if not isinstance(dialects, DialectGroup):
             dialects = DialectGroup(dialects)
         self.dialects = dialects
-        self.bottom = bottom
 
         self.registry = self.dialects.registry.interpreter(keys=self.keys)
-        self.symbol_table: dict[str, Statement] = {}
-        self.state: InterpreterState[FrameType] = InterpreterState()
         self.fuel = fuel
         self.debug = debug
         self.max_depth = max_depth
         self.max_python_recursion_depth = max_python_recursion_depth
+
+    def initialize(self, *args, **kwargs):
+        """Initialize the interpreter global states."""
+        self.symbol_table: dict[str, Statement] = {}
+        self.state: InterpreterState[FrameType] = InterpreterState()
+
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        if ABC in cls.__bases__:
+            return
+
+        if not hasattr(cls, "keys"):
+            raise TypeError(f"keys is not defined for class {cls.__name__}")
+        if not hasattr(cls, "void"):
+            raise TypeError(f"void is not defined for class {cls.__name__}")
 
     def eval(
         self,
@@ -127,7 +153,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.state.push_frame(frame)
         body = interface.get_callable_region(code)
         if not body.blocks:
-            return self.finalize(self.state.pop_frame(), self.bottom)
+            return self.finalize(self.state.pop_frame(), self.void)
         frame.set_values(body.blocks[0].args, args)
         results = self.run_callable_region(frame, code, body)
         return self.finalize(self.state.pop_frame(), results)

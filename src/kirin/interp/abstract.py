@@ -1,10 +1,11 @@
+from abc import ABC
 from typing import TypeVar, Iterable
 from dataclasses import field, dataclass
 
-from kirin.ir import Region, Dialect, SSAValue, Statement, DialectGroup
+from kirin.ir import Region, SSAValue, Statement
 from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
-from kirin.interp.base import BaseInterpreter
+from kirin.interp.base import BaseInterpreter, InterpreterMeta
 from kirin.interp.frame import Frame
 from kirin.interp.value import Successor, ReturnValue, MethodResult
 
@@ -23,30 +24,29 @@ AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
 # currently we may end up in infinite loop
 
 
+class AbstractInterpreterMeta(InterpreterMeta):
+    pass
+
+
 class AbstractInterpreter(
     BaseInterpreter[AbstractFrameType, ResultType],
+    ABC,
+    metaclass=AbstractInterpreterMeta,
 ):
     lattice: type[BoundedLattice[ResultType]]
     """lattice type for the abstract interpreter.
     """
 
-    def __init__(
-        self,
-        dialects: DialectGroup | Iterable[Dialect],
-        *,
-        fuel: int | None = None,
-        max_depth: int = 128,
-        max_python_recursion_depth: int = 8192,
-    ):
-        if not hasattr(self, "lattice"):
-            raise TypeError(f"lattice is not defined for {self.__class__.__name__}")
-        super().__init__(
-            dialects,
-            bottom=self.lattice.bottom(),
-            fuel=fuel,
-            max_depth=max_depth,
-            max_python_recursion_depth=max_python_recursion_depth,
-        )
+    def __init_subclass__(cls) -> None:
+        if ABC in cls.__bases__:
+            return super().__init_subclass__()
+
+        if not hasattr(cls, "lattice"):
+            raise TypeError(
+                f"missing lattice attribute in abstract interpreter class {cls}"
+            )
+        cls.void = cls.lattice.bottom()
+        super().__init_subclass__()
 
     def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
         return
@@ -68,7 +68,7 @@ class AbstractInterpreter(
     def run_ssacfg_region(
         self, frame: AbstractFrameType, region: Region
     ) -> MethodResult[ResultType]:
-        result = self.bottom
+        result = self.void
         frame.worklist.append(
             Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))
         )
@@ -98,4 +98,4 @@ class AbstractInterpreter(
                     pass
 
             stmt = stmt.next_stmt
-        return self.bottom
+        return self.void

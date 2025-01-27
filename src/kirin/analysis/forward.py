@@ -1,6 +1,7 @@
+from abc import ABC
 from typing import Generic, TypeVar, Iterable
 
-from kirin import ir
+from kirin import ir, interp
 from kirin.interp import MethodResult, AbstractFrame, AbstractInterpreter
 from kirin.lattice import BoundedLattice
 
@@ -14,6 +15,7 @@ class ForwardFrame(AbstractFrame[LatticeElemType], Generic[LatticeElemType, Extr
 
 class ForwardExtra(
     AbstractInterpreter[ForwardFrame[LatticeElemType, ExtraType], LatticeElemType],
+    ABC,
 ):
     """Abstract interpreter but record results for each SSA value.
 
@@ -22,23 +24,31 @@ class ForwardExtra(
         ExtraType: The type of extra information to be stored in the frame.
     """
 
-    def __init__(
-        self,
-        dialects: ir.DialectGroup | Iterable[ir.Dialect],
-        *,
-        fuel: int | None = None,
-        save_all_ssa: bool = False,
-        max_depth: int = 128,
-        max_python_recursion_depth: int = 8192,
-    ):
-        super().__init__(
-            dialects,
-            fuel=fuel,
-            max_depth=max_depth,
-            max_python_recursion_depth=max_python_recursion_depth,
-        )
+    def initialize(self, save_all_ssa: bool = False, *args, **kwargs):
+        super().initialize()
         self.save_all_ssa = save_all_ssa
         self.results: dict[ir.SSAValue, LatticeElemType] = {}
+
+    def run(
+        self, method: ir.Method, *, save_all_ssa: bool = False, **kwargs
+    ) -> tuple[dict[ir.SSAValue, LatticeElemType], LatticeElemType]:
+        """Run the forward dataflow analysis.
+
+        Args:
+            method(ir.Method): The method to analyze.
+
+        Keyword Args:
+            save_all_ssa(bool): If True, save all SSA values in the results.
+
+        Returns:
+            dict[ir.SSAValue, LatticeElemType]: The results of the analysis for each SSA value.
+            LatticeElemType: The result of the analysis for the method return value.
+        """
+        self.initialize(save_all_ssa=save_all_ssa)
+        result = self.eval(method, tuple(self.lattice.top() for _ in method.args))
+        if isinstance(result.value, interp.Err):
+            return self.results, self.lattice.bottom()
+        return self.results, result.value
 
     def set_values(
         self,
@@ -67,5 +77,5 @@ class ForwardExtra(
         return ForwardFrame.from_func_like(code)
 
 
-class Forward(ForwardExtra[LatticeElemType, None]):
+class Forward(ForwardExtra[LatticeElemType, None], ABC):
     pass

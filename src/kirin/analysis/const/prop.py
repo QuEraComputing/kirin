@@ -21,23 +21,25 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         dialects: ir.DialectGroup | Iterable[ir.Dialect],
         *,
         fuel: int | None = None,
-        save_all_ssa: bool = False,
         max_depth: int = 128,
         max_python_recursion_depth: int = 8192,
     ):
         super().__init__(
             dialects,
             fuel=fuel,
-            save_all_ssa=save_all_ssa,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
         self.interp = interp.Interpreter(
-            dialects,
-            fuel=fuel,
-            max_depth=max_depth,
-            max_python_recursion_depth=max_python_recursion_depth,
+            self.dialects,
+            fuel=self.fuel,
+            max_depth=self.max_depth,
+            max_python_recursion_depth=self.max_python_recursion_depth,
         )
+
+    def initialize(self, save_all_ssa: bool = False):
+        super().initialize(save_all_ssa)
+        self.interp.initialize()
 
     def _try_eval_const_pure(
         self,
@@ -62,7 +64,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
                 )
         except exceptions.InterpreterError:
             pass
-        return (self.bottom,)
+        return (self.void,)
 
     def run_stmt(
         self, frame: ForwardFrame[JointResult, ExtraFrameInfo], stmt: ir.Statement
@@ -107,7 +109,7 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         self, method: ir.Method, args: tuple[JointResult, ...]
     ) -> interp.MethodResult[JointResult]:
         if len(self.state.frames) >= self.max_depth:
-            return self.bottom
+            return self.void
         return self.run_callable(
             method.code, (JointResult(Value(method), NotPure()),) + args
         )

@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import IO, Generic, TypeVar, Iterable
 from dataclasses import field, dataclass
 
@@ -14,7 +15,8 @@ class EmitStrFrame(EmitFrame[str]):
     captured: dict[ir.SSAValue, tuple[str, ...]] = field(default_factory=dict)
 
 
-class EmitStr(EmitABC[EmitStrFrame, str], Generic[IO_t]):
+class EmitStr(EmitABC[EmitStrFrame, str], ABC, Generic[IO_t]):
+    void = ""
 
     def __init__(
         self,
@@ -29,16 +31,20 @@ class EmitStr(EmitABC[EmitStrFrame, str], Generic[IO_t]):
     ):
         super().__init__(
             dialects,
-            bottom="",
             fuel=fuel,
             max_depth=max_depth,
             max_python_recursion_depth=max_python_recursion_depth,
         )
         self.file = file
+        self.prefix = prefix
+        self.prefix_if_none = prefix_if_none
+
+    def initialize(self):
+        super().initialize()
         self.ssa_id = idtable.IdTable[ir.SSAValue](
-            prefix=prefix, prefix_if_none=prefix_if_none
+            prefix=self.prefix, prefix_if_none=self.prefix_if_none
         )
-        self.block_id = idtable.IdTable[ir.Block](prefix=prefix + "block_")
+        self.block_id = idtable.IdTable[ir.Block](prefix=self.prefix + "block_")
 
     def new_frame(self, code: ir.Statement) -> EmitStrFrame:
         return EmitStrFrame.from_func_like(code)
