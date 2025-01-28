@@ -192,7 +192,7 @@
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=c1># NOTE: not using f-string here because 3.10 and 3.11 have</span>
     <span class=c1>#  parser bug that doesn&#39;t allow f-string in raise statement</span>
-    <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+    <span class=k>raise</span> <span class=n>InterpreterError</span><span class=p>(</span>
         <span class=s2>&quot;no implementation for stmt &quot;</span>
         <span class=o>+</span> <span class=n>stmt</span><span class=o>.</span><span class=n>print_str</span><span class=p>(</span><span class=n>end</span><span class=o>=</span><span class=s2>&quot;&quot;</span><span class=p>)</span>
         <span class=o>+</span> <span class=s2>&quot; from &quot;</span>
