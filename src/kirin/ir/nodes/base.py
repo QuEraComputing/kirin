@@ -18,6 +18,14 @@ ParentType = TypeVar("ParentType", bound="IRNode")
 
 @dataclass
 class IRNode(Generic[ParentType], ABC, Printable):
+    """Base class for all IR nodes. All IR nodes are hashable and can be compared
+    for equality. The hash of an IR node is the same as the id of the object.
+
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
+    """
+
     def assert_parent(self, type_: type[IRNode], parent) -> None:
         assert (
             isinstance(parent, type_) or parent is None
@@ -25,13 +33,16 @@ class IRNode(Generic[ParentType], ABC, Printable):
 
     @property
     @abstractmethod
-    def parent_node(self) -> ParentType | None: ...
+    def parent_node(self) -> ParentType | None:
+        """Parent node of the current node."""
+        ...
 
     @parent_node.setter
     @abstractmethod
     def parent_node(self, parent: ParentType | None) -> None: ...
 
     def is_ancestor(self, op: IRNode) -> bool:
+        """Check if the given node is an ancestor of the current node."""
         if op is self:
             return True
         if (parent := op.parent_node) is None:
@@ -39,16 +50,19 @@ class IRNode(Generic[ParentType], ABC, Printable):
         return self.is_ancestor(parent)
 
     def get_root(self) -> IRNode:
+        """Get the root node of the current node."""
         if (parent := self.parent_node) is None:
             return self
         return parent.get_root()
 
     def is_equal(self, other: IRNode, context: dict = {}) -> bool:
+        """Check if the current node is equal to the other node."""
         if not isinstance(other, type(self)):
             return False
         return self.is_structurally_equal(other, context)
 
     def attach(self, parent: ParentType) -> None:
+        """Attach the current node to the parent node."""
         assert isinstance(parent, IRNode), f"Expected IRNode, got {type(parent)}"
 
         if self.parent_node:
@@ -58,20 +72,40 @@ class IRNode(Generic[ParentType], ABC, Printable):
         self.parent_node = parent
 
     @abstractmethod
-    def detach(self) -> None: ...
+    def detach(self) -> None:
+        """Detach the current node from the parent node."""
+        ...
 
     @abstractmethod
-    def drop_all_references(self) -> None: ...
+    def drop_all_references(self) -> None:
+        """Drop all references to other nodes."""
+        ...
 
     @abstractmethod
-    def delete(self, safe: bool = True) -> None: ...
+    def delete(self, safe: bool = True) -> None:
+        """Delete the current node.
+
+        Args:
+            safe: If True, check if the node has any references before deleting.
+        """
+        ...
 
     @abstractmethod
     def is_structurally_equal(
         self,
         other: Self,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
-    ) -> bool: ...
+    ) -> bool:
+        """Check if the current node is structurally equal to the other node.
+
+        Args:
+            other: The other node to compare.
+            context: The context to store the visited nodes.
+
+        Returns:
+            True if the nodes are structurally equal, False otherwise.
+        """
+        ...
 
     def __eq__(self, other) -> bool:
         return self is other

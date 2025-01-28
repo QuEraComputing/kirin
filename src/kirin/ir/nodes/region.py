@@ -83,7 +83,12 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
 
 @dataclass
 class Region(IRNode["Statement"]):
-    """Region consist of a list of Blocks"""
+    """Region consist of a list of Blocks
+
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
+    """
 
     _blocks: list[Block] = field(default_factory=list, repr=False)
     _block_idx: dict[Block, int] = field(default_factory=dict, repr=False)

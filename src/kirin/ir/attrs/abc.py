@@ -16,7 +16,13 @@ class AttributeMeta(ABCMeta):
 
 @dataclass(eq=False)
 class Attribute(ABC, Printable, metaclass=AttributeMeta):
-    """ABC for compile-time values."""
+    """ABC for compile-time values. All attributes are hashable
+    and thus need to implement the `__hash__` method.
+
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
+    """
 
     dialect: ClassVar[Optional["Dialect"]] = field(default=None, init=False, repr=False)
     """Dialect of the attribute. (default: None)"""

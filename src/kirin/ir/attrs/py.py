@@ -11,6 +11,18 @@ T = TypeVar("T")
 
 @dataclass
 class PyAttr(Generic[T], Attribute):
+    """Python attribute for compile-time values.
+    This is a generic attribute that holds a Python value.
+
+    The constructor takes a Python value and an optional type attribute.
+    If the type attribute is not provided, the type of the value is inferred
+    as `PyClass(type(value))`.
+
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
+    """
+
     name = "PyAttr"
     data: T
     type: TypeAttribute
