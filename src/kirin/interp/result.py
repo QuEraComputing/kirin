@@ -12,6 +12,15 @@ FrameType = TypeVar("FrameType", bound=FrameABC)
 
 @dataclass
 class Result(Generic[ValueType]):
+    """Result type for the interpreter.
+
+    This is a generic result type that represents the result of interpretation.
+    The result can be either an `Ok` value or an `Err` value. The `Ok` value
+    represents a successful interpretation result, while the `Err` value
+    represents an error during interpretation with a stack trace. One can use
+    the `expect` method to extract the value from the result, which will raise
+    an exception and print the stack trace if the result is an `Err`.
+    """
 
     def expect(self) -> ValueType:
         raise NotImplementedError("unreachable")

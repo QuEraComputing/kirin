@@ -24,6 +24,8 @@ FrameType = TypeVar("FrameType", bound=FrameABC)
 
 
 class InterpreterMeta(ABCMeta):
+    """A metaclass for interpreters."""
+
     pass
 
 
@@ -350,6 +352,15 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     def lookup_registry(
         self, frame: FrameType, stmt: Statement
     ) -> Optional["StatementImpl[Self, FrameType]"]:
+        """Lookup the statement implementation in the registry.
+
+        Args:
+            frame: the current frame
+            stmt: the statement to run
+
+        Returns:
+            Optional[StatementImpl]: the statement implementation if found, None otherwise.
+        """
         sig = self.build_signature(frame, stmt)
         if sig in self.registry.statements:
             return self.registry.statements[sig]
@@ -358,7 +369,17 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         return
 
     @abstractmethod
-    def run_ssacfg_region(self, frame: FrameType, region: Region) -> ValueType: ...
+    def run_ssacfg_region(self, frame: FrameType, region: Region) -> ValueType:
+        """This implements how to run a region with MLIR SSA CFG convention.
+
+        Args:
+            frame: the current frame.
+            region: the region to run.
+
+        Returns:
+            ValueType: the result of running the region.
+        """
+        ...
 
     class FuelResult(Enum):
         Stop = 0
