@@ -14,6 +14,8 @@ def beer(self):
     def run_pass(mt):
         Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code)
 
+        # add const fold
+
     return run_pass
 
 

@@ -8,6 +8,7 @@ import lattice as latt
 from kirin import ir, interp
 from kirin.analysis import Forward
 from kirin.dialects import cf, py, func
+from kirin.dialects.py import binop
 from kirin.analysis.const import Propagate, JointResult
 
 
@@ -15,7 +16,7 @@ from kirin.analysis.const import Propagate, JointResult
 class FeeAnalysis(Forward[latt.Item]):
     keys = ["beer.fee"]
     lattice = latt.Item
-    constprop_results: dict[ir.SSAValue, JointResult] = field(default_factory=dict)
+    # constprop_results: dict[ir.SSAValue, JointResult] = field(default_factory=dict)
     item_count: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -24,9 +25,8 @@ class FeeAnalysis(Forward[latt.Item]):
     def initialize(self):
         super().initialize()
         self.item_count = 0
-        self.constprop_results = {}
+        # self.constprop_results = {}
         return self
-
 
     def should_exec_stmt(self, stmt: ir.Statement):
         return isinstance(
@@ -40,6 +40,37 @@ class FeeAnalysis(Forward[latt.Item]):
 
     def run_method(self, method: ir.Method, args: tuple[latt.Item, ...]) -> latt.Item:
         return self.run_callable(method.code, (self.lattice.bottom(),) + args)
+
+
+@func.dialect.register(key="beer.fee")
+class PyFuncMethodTable(interp.MethodTable):
+
+    @interp.impl(func.Call)
+    def call(
+        self,
+        interp: FeeAnalysis,
+        frame: interp.Frame[latt.Item],
+        stmt: func.Call,
+    ):
+        frame.get(stmt.callee)
+        return ()
+
+
+@binop.dialect.register(key="beer.fee")
+class PyBinOpMethodTable(interp.MethodTable):
+
+    @interp.impl(binop.Add)
+    def add(
+        self,
+        interp: FeeAnalysis,
+        frame: interp.Frame[latt.Item],
+        stmt: binop.Add,
+    ):
+        left: latt.ConstIntItem = frame.get(stmt.lhs)
+        right: latt.ConstIntItem = frame.get(stmt.rhs)
+
+        out = latt.ConstIntItem(data=left.value + right.value)
+        return (out,)
 
 
 @dialect.register(key="beer.fee")

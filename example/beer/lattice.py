@@ -68,3 +68,21 @@ class PourFee(Item):
 
     def is_subseteq(self, other: Item) -> bool:
         return isinstance(other, PourFee)
+
+
+@final
+@dataclass
+class AtLeastItem(Item):
+    lower_bound: int
+
+    def is_subseteq(self, other: Item) -> bool:
+        return isinstance(other, AtLeastItem) and self.lower_bound == other.lower_bound
+
+
+@final
+@dataclass
+class ConstIntItem(Item):
+    lower_bound: int
+
+    def is_subseteq(self, other: Item) -> bool:
+        return isinstance(other, AtLeastItem) and self.lower_bound == other.lower_bound
