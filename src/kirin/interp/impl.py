@@ -33,6 +33,8 @@ AttributeFunction: TypeAlias = Callable[
 
 @dataclass(frozen=True)
 class Signature:
+    """Signature of a statement."""
+
     stmt: Type[Statement]
     args: tuple[types.TypeAttribute, ...] | None = None
 
@@ -49,12 +51,16 @@ ImplType = TypeVar("ImplType")
 
 @dataclass
 class Def(Generic[SigType, ImplType]):
+    """Base class of an interpreter implementation definition."""
+
     signature: SigType
     impl: ImplType
 
 
 @dataclass
 class ImplDef(Def[tuple[Signature, ...], "MethodFunction"]):
+    """Definition of an interpreter implementation for a statement."""
+
     parent: Type[Statement]
 
     def __repr__(self):
@@ -66,6 +72,7 @@ class ImplDef(Def[tuple[Signature, ...], "MethodFunction"]):
 
 @dataclass
 class AttributeImplDef(Def[type[Attribute], "AttributeFunction"]):
+    """Definition of an interpreter implementation for an attribute."""
 
     def __repr__(self):
         if self.signature.dialect:
@@ -79,7 +86,30 @@ HeadType = TypeVar("HeadType")
 
 
 class impl(Generic[HeadType]):
-    """Decorator to define an Interpreter implementation for a statement."""
+    """Decorator to define an interpreter implementation for a statement or attribute.
+
+    !!! note
+        While the `impl` decorator accepts both statements and attributes, and optionally
+        statements with its type signature, unlike a programming language, the actual
+        dispatch behavior given an instance of a statement or attribute is defined by the
+        implementation of the interpreter
+        (via [`lookup_registry`][kirin.interp.base.BaseInterpreter.lookup_registry]).
+
+    # Example
+
+    ```python
+    @dialect.register
+    class MyMethods(interp.MethodTable):
+        @impl(Add)
+        def interp_add(
+            self,
+            interp: Interpreter,
+            frame: Frame,
+            stmt: Add,
+        ) -> StatementResult:
+            ...
+    ```
+    """
 
     # TODO: validate only concrete types are allowed here
 

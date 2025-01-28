@@ -8,6 +8,13 @@ ValueType = TypeVar("ValueType")
 
 @dataclass(init=False)
 class SpecialValue(Generic[ValueType]):
+    """Special value for statement evaluation.
+
+    This class represents a special value that can be returned from a statement
+    evaluation. It is used to represent special cases like return values and
+    successor blocks.
+    """
+
     pass
 
 
@@ -47,3 +54,4 @@ class Successor(SpecialValue[ValueType]):
 
 
 StatementResult: TypeAlias = tuple[ValueType, ...] | SpecialValue[ValueType]
+"""Type alias for the result of a statement evaluation."""

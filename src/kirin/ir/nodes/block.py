@@ -104,6 +104,8 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
 
 @dataclass
 class BlockStmtIterator:
+    """Proxy object to iterate over the Statements in a Block."""
+
     next_stmt: Statement | None
 
     def __iter__(self) -> BlockStmtIterator:
@@ -119,6 +121,8 @@ class BlockStmtIterator:
 
 @dataclass
 class BlockStmtsReverseIterator:
+    """Proxy object to iterate over the Statements in a Block in reverse order."""
+
     next_stmt: Statement | None
 
     def __iter__(self) -> BlockStmtsReverseIterator:
@@ -158,6 +162,12 @@ class BlockStmts(View["Block", "Statement"]):
     def at(self, index: int) -> Statement:
         """This is similar to __getitem__ but due to the nature of the linked list,
         it is less efficient than __getitem__.
+
+        Args:
+            index (int): Index of the Statement.
+
+        Returns:
+            Statement: The Statement at the specified index.
         """
         if index >= len(self):
             raise IndexError("Index out of range")
@@ -219,7 +229,13 @@ class BlockStmts(View["Block", "Statement"]):
 
 @dataclass
 class Block(IRNode["Region"]):
-    """Block consist of a list of Statements and optionally input arguments."""
+    """
+    Block consist of a list of Statements and optionally input arguments.
+
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
+    """
 
     _args: tuple[BlockArgument, ...]
 
@@ -229,6 +245,7 @@ class Block(IRNode["Region"]):
     _stmt_len: int = field(default=0, repr=False)
 
     parent: Region | None = field(default=None, repr=False)
+    """Parent Region of the Block."""
 
     def __init__(
         self,

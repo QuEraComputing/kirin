@@ -1,3 +1,10 @@
+"""Type resolution for type inference.
+
+This module contains the type resolution algorithm for type inference.
+A simple algorithm is used to resolve the types of the IR by comparing
+the input types with the output types.
+"""
+
 from dataclasses import field, dataclass
 
 from kirin.ir import types
@@ -5,11 +12,14 @@ from kirin.ir import types
 
 @dataclass
 class TypeResolutionResult:
+    """Base class for type resolution results."""
+
     pass
 
 
 @dataclass
 class ResolutionOk(TypeResolutionResult):
+    """Type resolution result for successful resolution."""
 
     def __bool__(self):
         return True
@@ -20,6 +30,8 @@ Ok = ResolutionOk()
 
 @dataclass
 class ResolutionError(TypeResolutionResult):
+    """Type resolution result for failed resolution."""
+
     expr: types.TypeAttribute
     value: types.TypeAttribute
 
@@ -32,9 +44,23 @@ class ResolutionError(TypeResolutionResult):
 
 @dataclass
 class TypeResolution:
+    """Type resolution algorithm for type inference."""
+
     vars: dict[types.TypeVar, types.TypeAttribute] = field(default_factory=dict)
 
     def substitute(self, typ: types.TypeAttribute) -> types.TypeAttribute:
+        """Substitute type variables in the type with their values.
+
+        This method substitutes type variables in the given type with their
+        values. If the type is a generic type, the method recursively
+        substitutes the type variables in the type arguments.
+
+        Args:
+            typ: The type to substitute.
+
+        Returns:
+            The type with the type variables substituted.
+        """
         if isinstance(typ, types.TypeVar):
             return self.vars.get(typ, typ)
         elif isinstance(typ, types.Generic):
@@ -48,6 +74,20 @@ class TypeResolution:
     def solve(
         self, annot: types.TypeAttribute, value: types.TypeAttribute
     ) -> TypeResolutionResult:
+        """Solve the type resolution problem.
+
+        This method compares the expected type `annot` with the actual
+        type `value` and returns a result indicating whether the types
+        match or not.
+
+        Args:
+            annot: The expected type.
+            value: The actual type.
+
+        Returns:
+            A `TypeResolutionResult` object indicating the result of the
+            resolution.
+        """
         if isinstance(annot, types.TypeVar):
             return self.solve_TypeVar(annot, value)
         elif isinstance(annot, types.Generic):

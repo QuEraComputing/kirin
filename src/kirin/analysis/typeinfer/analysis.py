@@ -10,6 +10,17 @@ from .solve import TypeResolution
 
 @final
 class TypeInference(Forward[types.TypeAttribute]):
+    """Type inference analysis for kirin.
+
+    This analysis uses the forward dataflow analysis framework to infer the types of
+    the IR. The analysis uses the type information within the IR to determine the
+    method dispatch.
+
+    The analysis will fallback to a type resolution algorithm if the type information
+    is not available in the IR but the type information is available in the abstract
+    values.
+    """
+
     keys = ["typeinfer"]
     lattice = types.TypeAttribute
 

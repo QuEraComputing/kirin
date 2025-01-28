@@ -9,7 +9,14 @@ from kirin.worklist import WorkList
 
 @dataclass
 class CFG(Printable):
-    """Control Flow Graph of a given IR statement."""
+    """Control Flow Graph of a given IR statement.
+
+    This class implements the [`kirin.graph.Graph`][kirin.graph.Graph] protocol.
+
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
+    """
 
     parent: ir.Region
     """Parent IR statement.

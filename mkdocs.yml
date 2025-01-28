@@ -41,8 +41,11 @@ nav:
       - Python Lowering: reference/kirin/lowering/
       - Analysis:
           - reference/kirin/analysis/index.md
-          - Dataflow: reference/kirin/analysis/dataflow/
           - CFG: reference/kirin/analysis/cfg.md
+          - Call Graph: reference/kirin/analysis/callgraph.md
+          - Forward Dataflow: reference/kirin/analysis/forward.md
+          - Type Inference: reference/kirin/analysis/typeinfer/
+          - Constant Propagation: reference/kirin/analysis/const/
       - Rewrite:
           - Generic: reference/kirin/rewrite/
           - Rules: reference/kirin/rules/

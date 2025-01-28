@@ -15,6 +15,12 @@ WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
 
 @dataclass
 class AbstractFrame(Frame[ResultType]):
+    """Interpreter frame for abstract interpreter.
+
+    This frame is used to store the state of the abstract interpreter.
+    It contains the worklist of successors to be processed.
+    """
+
     worklist: WorkList[Successor[ResultType]] = field(default_factory=WorkList)
 
 
@@ -34,6 +40,29 @@ class AbstractInterpreter(
     ABC,
     metaclass=AbstractInterpreterMeta,
 ):
+    """Abstract interpreter for the IR.
+
+    This is a base class for implementing abstract interpreters for the IR.
+    It provides a framework for implementing abstract interpreters given a
+    bounded lattice type.
+
+    The abstract interpreter is a forward dataflow analysis that computes
+    the abstract values for each SSA value in the IR. The abstract values
+    are computed by evaluating the statements in the IR using the abstract
+    lattice operations.
+
+    The abstract interpreter is implemented as a worklist algorithm. The
+    worklist contains the successors of the current block to be processed.
+    The abstract interpreter processes each successor by evaluating the
+    statements in the block and updating the abstract values in the frame.
+
+    The abstract interpreter provides hooks for customizing the behavior of
+    the interpreter.
+    The [`prehook_succ`][kirin.interp.abstract.AbstractInterpreter.prehook_succ] and
+    [`posthook_succ`][kirin.interp.abstract.AbstractInterpreter.posthook_succ] methods
+    can be used to perform custom actions before and after processing a successor.
+    """
+
     lattice: type[BoundedLattice[ResultType]] = field(init=False)
     """lattice type for the abstract interpreter.
     """
@@ -50,12 +79,46 @@ class AbstractInterpreter(
         super().__init_subclass__()
 
     def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
+        """Hook called before processing a successor.
+
+        This method can be used to perform custom actions before processing
+        a successor. It is called before evaluating the statements in the block.
+
+        Args:
+            frame: The current frame of the interpreter.
+            succ: The successor to be processed.
+        """
         return
 
     def posthook_succ(self, frame: AbstractFrameType, succ: Successor):
+        """Hook called after processing a successor.
+
+        This method can be used to perform custom actions after processing
+        a successor. It is called after evaluating the statements in the block.
+
+        Args:
+            frame: The current frame of the interpreter.
+            succ: The successor that was processed.
+        """
         return
 
-    def should_exec_stmt(self, stmt: Statement):
+    def should_exec_stmt(self, stmt: Statement) -> bool:
+        """This method can be used to control which statements are executed
+        during the abstract interpretation. By default, all statements are
+        executed.
+
+        This method is useful when one wants to skip certain statements
+        during the abstract interpretation and is certain that the skipped
+        statements do not affect the final result. This would allow saving
+        computation time and memory by not evaluating the skipped statements
+        and their results.
+
+        Args:
+            stmt: The statement to be executed.
+
+        Returns:
+            True if the statement should be executed, False otherwise.
+        """
         return True
 
     def set_values(
@@ -64,6 +127,12 @@ class AbstractInterpreter(
         ssa: Iterable[SSAValue],
         results: Iterable[ResultType],
     ):
+        """Set the abstract values for the given SSA values in the frame.
+
+        This method is used to customize how the abstract values are set in
+        the frame. By default, the abstract values are set directly in the
+        frame.
+        """
         frame.set_values(ssa, results)
 
     def eval_recursion_limit(self, frame: AbstractFrameType) -> ResultType:

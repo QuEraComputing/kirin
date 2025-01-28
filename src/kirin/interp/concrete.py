@@ -11,6 +11,13 @@ from .exceptions import FuelExhaustedError
 
 
 class Interpreter(BaseInterpreter[Frame[Any], Any]):
+    """Concrete interpreter for the IR.
+
+    This is a concrete interpreter for the IR. It evaluates the IR by
+    executing the statements in the IR using a simple stack-based
+    interpreter.
+    """
+
     keys = ["main"]
     void = None
 

@@ -24,6 +24,8 @@ FrameType = TypeVar("FrameType", bound=FrameABC)
 
 
 class InterpreterMeta(ABCMeta):
+    """A metaclass for interpreters."""
+
     pass
 
 
@@ -35,8 +37,8 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     designed to be subclassed to provide the actual implementation of
     the interpreter.
 
-    When subclassing, if the bases contains `ABC` no checks will be
-    performed on the subclass. If the subclass does not contain `ABC`,
+    ### Required Overrides
+    When subclassing, if the subclass does not contain `ABC`,
     the subclass must define the following attributes:
 
     - `keys`: a list of strings that defines the order of dialects to select from.
@@ -83,12 +85,13 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.registry = self.dialects.registry.interpreter(keys=self.keys)
 
     def initialize(self) -> Self:
-        """Initialize the interpreter global states.
-
-        This method is called before calling `eval` to initialize the
+        """Initialize the interpreter global states. This method is called before
+        calling [`run`][kirin.interp.base.BaseInterpreter.run] to initialize the
         interpreter global states.
 
-        Override this method to add custom global states.
+        !!! note "Default Implementation"
+            This method provides default behavior but may be overridden by subclasses
+            to customize or extend functionality.
         """
         self.symbol_table: dict[str, Statement] = {}
         self.state: InterpreterState[FrameType] = InterpreterState()
@@ -119,7 +122,16 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         args: tuple[ValueType, ...],
         kwargs: dict[str, ValueType] | None = None,
     ) -> Result[ValueType]:
-        """Run a method."""
+        """Run a method. This is the main entry point of the interpreter.
+
+        Args:
+            mt (Method): the method to run.
+            args (tuple[ValueType]): the arguments to the method, does not include self.
+            kwargs (dict[str, ValueType], optional): the keyword arguments to the method.
+
+        Returns:
+            Result[ValueType]: the result of the method.
+        """
         if self._eval_lock:
             raise InterpreterError(
                 "recursive eval is not allowed, use run_method instead"
@@ -340,6 +352,15 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     def lookup_registry(
         self, frame: FrameType, stmt: Statement
     ) -> Optional["StatementImpl[Self, FrameType]"]:
+        """Lookup the statement implementation in the registry.
+
+        Args:
+            frame: the current frame
+            stmt: the statement to run
+
+        Returns:
+            Optional[StatementImpl]: the statement implementation if found, None otherwise.
+        """
         sig = self.build_signature(frame, stmt)
         if sig in self.registry.statements:
             return self.registry.statements[sig]
@@ -348,7 +369,17 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         return
 
     @abstractmethod
-    def run_ssacfg_region(self, frame: FrameType, region: Region) -> ValueType: ...
+    def run_ssacfg_region(self, frame: FrameType, region: Region) -> ValueType:
+        """This implements how to run a region with MLIR SSA CFG convention.
+
+        Args:
+            frame: the current frame.
+            region: the region to run.
+
+        Returns:
+            ValueType: the result of running the region.
+        """
+        ...
 
     class FuelResult(Enum):
         Stop = 0
