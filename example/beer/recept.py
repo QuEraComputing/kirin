@@ -16,14 +16,17 @@ class FeeAnalysis(Forward[latt.Item]):
     keys = ["beer.fee"]
     lattice = latt.Item
     constprop_results: dict[ir.SSAValue, JointResult] = field(default_factory=dict)
-    item_count: int = 0
+    item_count: int = field(init=False)
 
     def __post_init__(self) -> None:
         super().__post_init__()
 
-    def clear(self):
-        self.beer_count = 0
+    def initialize(self):
+        super().initialize()
+        self.item_count = 0
         self.constprop_results = {}
+        return self
+
 
     def should_exec_stmt(self, stmt: ir.Statement):
         return isinstance(
