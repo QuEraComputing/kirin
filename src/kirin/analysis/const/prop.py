@@ -13,6 +13,22 @@ class ExtraFrameInfo:
 
 @dataclass
 class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
+    """Forward dataflow analysis for constant propagation.
+
+    This analysis is a forward dataflow analysis that propagates constant values
+    through the program. It uses the `JointResult` lattice to track the constant
+    values and purity of the values.
+
+    The analysis is implemented as a forward dataflow analysis, where the
+    `eval_stmt` method is overridden to handle the different types of statements
+    in the IR. The analysis uses the `interp.Interpreter` to evaluate the
+    statements and propagate the constant values.
+
+    When a statement is registered under the "constprop" key in the method table,
+    the analysis will call the method to evaluate the statement instead of using
+    the interpreter. This allows for custom handling of statements.
+    """
+
     keys = ["constprop"]
     lattice = JointResult
 

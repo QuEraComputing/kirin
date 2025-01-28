@@ -66,6 +66,13 @@ class ForwardExtra(
         ssa: Iterable[ir.SSAValue],
         results: Iterable[LatticeElemType],
     ):
+        """Set the abstract values for the given SSA values in the frame.
+
+        This method is used to customize how the abstract values are set in
+        the frame. By default, the abstract values are set directly in the
+        frame. This method is overridden to join the results if the SSA value
+        already exists in the frame.
+        """
         for ssa_value, result in zip(ssa, results):
             if ssa_value in frame.entries:
                 frame.entries[ssa_value] = frame.entries[ssa_value].join(result)
@@ -88,4 +95,11 @@ class ForwardExtra(
 
 
 class Forward(ForwardExtra[LatticeElemType, None], ABC):
+    """Forward dataflow analysis.
+
+    This is the base class for forward dataflow analysis. If your analysis
+    requires extra information per frame, you should subclass
+    [`ForwardExtra`][kirin.analysis.forward.ForwardExtra] instead.
+    """
+
     pass

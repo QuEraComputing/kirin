@@ -1,3 +1,6 @@
+"""Lattice for constant analysis.
+"""
+
 from typing import Any, final
 from dataclasses import field, dataclass
 
@@ -22,6 +25,7 @@ class Result(
     BoundedLattice["Result"],
     _ElemVisitor,
 ):
+    """Base class for constant analysis results."""
 
     @classmethod
     def top(cls) -> "Result":
@@ -35,6 +39,7 @@ class Result(
 @final
 @dataclass
 class Unknown(Result, metaclass=SingletonMeta):
+    """Unknown constant value. This is the top element of the lattice."""
 
     def is_subseteq(self, other: Result) -> bool:
         return isinstance(other, Unknown)
@@ -43,6 +48,7 @@ class Unknown(Result, metaclass=SingletonMeta):
 @final
 @dataclass
 class Bottom(Result, metaclass=SingletonMeta):
+    """Bottom element of the lattice."""
 
     def is_subseteq(self, other: Result) -> bool:
         return True
@@ -51,6 +57,8 @@ class Bottom(Result, metaclass=SingletonMeta):
 @final
 @dataclass
 class Value(Result):
+    """Constant value. Wraps any Python value."""
+
     data: Any
 
     def is_subseteq_Value(self, other: "Value") -> bool:
@@ -64,11 +72,19 @@ class Value(Result):
 
 @dataclass
 class PartialConst(Result):
+    """Base class for partial constant values."""
+
     pass
 
 
 @final
 class PartialTupleMeta(LatticeMeta):
+    """Metaclass for PartialTuple.
+
+    This metaclass canonicalizes PartialTuple instances with all Value elements
+    into a single Value instance.
+    """
+
     def __call__(cls, data: tuple[Result, ...]):
         if all(isinstance(x, Value) for x in data):
             return Value(tuple(x.data for x in data))  # type: ignore
@@ -78,6 +94,8 @@ class PartialTupleMeta(LatticeMeta):
 @final
 @dataclass
 class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
+    """Partial tuple constant value."""
+
     data: tuple[Result, ...]
 
     def join(self, other: Result) -> Result:
@@ -125,6 +143,11 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
 @final
 @dataclass
 class PartialLambda(PartialConst):
+    """Partial lambda constant value.
+
+    This represents a closure with captured variables.
+    """
+
     argnames: list[str]
     code: ir.Statement
     captured: tuple[Result, ...]
@@ -177,6 +200,7 @@ class PartialLambda(PartialConst):
 class Purity(
     SimpleJoinMixin["Purity"], SimpleMeetMixin["Purity"], BoundedLattice["Purity"]
 ):
+    """Base class for purity lattice."""
 
     @classmethod
     def bottom(cls) -> "Purity":
@@ -189,6 +213,7 @@ class Purity(
 
 @dataclass(frozen=True)
 class Pure(Purity, metaclass=SingletonMeta):
+    """The result is from a pure function."""
 
     def is_subseteq(self, other: Purity) -> bool:
         return isinstance(other, (NotPure, Pure))
@@ -196,6 +221,7 @@ class Pure(Purity, metaclass=SingletonMeta):
 
 @dataclass(frozen=True)
 class NotPure(Purity, metaclass=SingletonMeta):
+    """The result is from an impure function."""
 
     def is_subseteq(self, other: Purity) -> bool:
         return isinstance(other, NotPure)
@@ -203,6 +229,7 @@ class NotPure(Purity, metaclass=SingletonMeta):
 
 @dataclass(frozen=True)
 class PurityBottom(Purity, metaclass=SingletonMeta):
+    """The bottom element of the purity lattice."""
 
     def is_subseteq(self, other: Purity) -> bool:
         return True
@@ -210,8 +237,19 @@ class PurityBottom(Purity, metaclass=SingletonMeta):
 
 @dataclass
 class JointResult(BoundedLattice["JointResult"]):
+    """Joint result of constant value and purity.
+
+    This lattice is used to join the constant value and purity of a function
+    during constant propagation analysis. This allows the analysis to track
+    both the constant value and the purity of the function, so that the analysis
+    can propagate constant values through function calls even if the function
+    is only partially pure.
+    """
+
     const: Result
+    """The constant value of the result."""
     purity: Purity = field(default_factory=Purity.top)
+    """The purity of statement that produces the result."""
 
     @classmethod
     def from_const(cls, value: Any) -> "JointResult":

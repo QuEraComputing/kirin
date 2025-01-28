@@ -30,6 +30,9 @@ class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable)
     Description:
         This is a proxy object that provide safe API to manipulate the arguemnts of a statement.
 
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
     """
 
     def set_item(self, idx: int, value: SSAValue) -> None:
@@ -84,6 +87,9 @@ class ResultList(MutableSequenceView[list, "Statement", ResultValue]):
     Description:
         This is a proxy object that provide safe API to manipulate the result values of a statement
 
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
     """
 
     def __setitem__(
@@ -103,7 +109,12 @@ class ResultList(MutableSequenceView[list, "Statement", ResultValue]):
 
 @dataclass(repr=False)
 class Statement(IRNode["Block"]):
-    """The Statment is an instruction in the IR"""
+    """The Statment is an instruction in the IR
+
+    !!! note "Pretty Printing"
+        This object is pretty printable via
+        [`.print()`][kirin.print.printable.Printable.print] method.
+    """
 
     name: ClassVar[str]
     dialect: ClassVar[Dialect | None] = field(default=None, init=False, repr=False)
