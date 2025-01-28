@@ -9,7 +9,7 @@ from kirin.decl import info, statement
 class NewBeer(ir.Statement):
     name = "new_beer"
     traits = frozenset({ir.Pure(), ir.FromPythonCall()})
-    brand: ir.SSAValue = info.argument(types.String)
+    brand: str = info.attribute(types.String)
     result: ir.ResultValue = info.result(types.PyClass(Beer))
 
 

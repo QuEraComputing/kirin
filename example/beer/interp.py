@@ -12,7 +12,7 @@ class BeerMethods(MethodTable):
 
     @impl(NewBeer)
     def new_beer(self, interp: Interpreter, frame: Frame, stmt: NewBeer):
-        return (Beer(frame.get(stmt.brand)),)
+        return (Beer(stmt.brand),)
 
     @impl(Drink)
     def drink(self, interp: Interpreter, frame: Frame, stmt: Drink):
