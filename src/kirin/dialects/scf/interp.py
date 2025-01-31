@@ -24,24 +24,9 @@ class Concrete(interp.MethodTable):
     def for_loop(self, interpreter: interp.Interpreter, frame: interp.Frame, stmt: For):
         iterable = frame.get(stmt.iterable)
         loop_vars = frame.get_values(stmt.initializers)
-        block = stmt.body.blocks[0]
-        # NOTE: we have checked this is always a Yield
-        yield_stmt: Yield = block.last_stmt  # type: ignore
-
+        block_args = stmt.body.blocks[0].args
         for value in iterable:
-            frame.set_values(block.args, (value,) + loop_vars)
-
-            for each_stmt in block.stmts:
-                if isinstance(each_stmt, Yield):
-                    loop_vars = frame.get_values(yield_stmt.values)
-                    break
-
-                result = interpreter.eval_stmt(frame, each_stmt)
-                if isinstance(result, interp.ReturnValue):
-                    return result
-                elif isinstance(result, tuple):
-                    frame.set_values(each_stmt.results, result)
-                else:
-                    raise interp.InterpreterError(f"unexpected result: {result}")
+            frame.set_values(block_args, (value,) + loop_vars)
+            loop_vars = interpreter.run_ssacfg_region(frame, stmt.body)
 
         return loop_vars

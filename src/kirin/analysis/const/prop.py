@@ -62,7 +62,9 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
             if isinstance(value, tuple):
                 return tuple(JointResult(Value(each), Pure()) for each in value)
             elif isinstance(value, interp.ReturnValue):
-                return interp.ReturnValue(JointResult(Value(value.result), Pure()))
+                return interp.ReturnValue(
+                    *tuple(JointResult(Value(x), Pure()) for x in value.results)
+                )
             elif isinstance(value, interp.Successor):
                 return interp.Successor(
                     value.block,
