@@ -31,7 +31,6 @@ if TYPE_CHECKING:
             Literal["auto", "standard", "256", "truecolor", "windows"]
         ]
         force_terminal: Optional[bool]
-        force_jupyter: Optional[bool]
         force_interactive: Optional[bool]
         soft_wrap: bool
         stderr: bool
@@ -112,6 +111,8 @@ class Printer(Generic[IOType]):
         analysis: dict["ir.SSAValue", Printable] | None = None,
         show_indent_mark: bool = True,
         theme: Theme | dict | str = "dark",
+        # NOTE: turn off jupyter rendering cuz we just want text
+        force_jupyter: "Optional[bool]" = False,
         **kwargs: Unpack["RichConsole"],
     ):
         self.stream = stream
@@ -123,7 +124,13 @@ class Printer(Generic[IOType]):
         elif isinstance(theme, str):
             theme = DEFAULT_THEME[theme]
 
-        self.console = Console(file=self.stream, highlight=False, theme=theme, **kwargs)
+        self.console = Console(
+            file=self.stream,
+            highlight=False,
+            theme=theme,
+            force_jupyter=force_jupyter,
+            **kwargs,
+        )
 
     def print(self, object):
         """entry point for printing an object
