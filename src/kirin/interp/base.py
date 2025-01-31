@@ -202,13 +202,15 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         """A hook defines how to run the callable region given
         the interpreter context.
 
-        Note:
-            This is experimental API, don't
-            subclass it. The current reason of having it is mainly
-            because we need to dispatch back to the MethodTable for
-            emit.
+        A callable region is a region that can be called as a function.
+        Unlike a general region (or the MLIR convention), it always return a value
+        to be compatible with the Python convention.
         """
-        return self.run_ssacfg_region(frame, region)
+        results = self.run_ssacfg_region(frame, region)
+        if not results:
+            return self.void
+        # NOTE: it's not our job validate the IR return
+        return results[0]
 
     @abstractmethod
     def new_frame(self, code: Statement) -> FrameType:
@@ -375,7 +377,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         return
 
     @abstractmethod
-    def run_ssacfg_region(self, frame: FrameType, region: Region) -> ValueType:
+    def run_ssacfg_region(
+        self, frame: FrameType, region: Region
+    ) -> tuple[ValueType, ...]:
         """This implements how to run a region with MLIR SSA CFG convention.
 
         Args:

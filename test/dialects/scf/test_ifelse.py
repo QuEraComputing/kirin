@@ -1,7 +1,9 @@
 from kirin import ir
 from kirin.prelude import python_basic
-from kirin.dialects import py, scf, func
+from kirin.dialects import scf, func
 
+# TODO:
+# test_cons
 # cond = py.Constant(True)
 # then_body = ir.Region(ir.Block())
 # else_body = ir.Region(ir.Block())
@@ -40,3 +42,4 @@ def main(x):
 
 
 main.print()
+print(main(1))

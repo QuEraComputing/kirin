@@ -1,10 +1,10 @@
 import ast
 
 from kirin import ir, lowering
-from kirin.dialects.py.unpack import Unpack, unpackable
 from kirin.exceptions import DialectLoweringError
+from kirin.dialects.py.unpack import unpackable
 
-from .stmts import Yield, IfElse, For
+from .stmts import For, Yield, IfElse
 from ._dialect import dialect
 
 
@@ -64,35 +64,34 @@ class Lowering(lowering.FromPythonAST):
     ) -> lowering.Result:
         iter_ = state.visit(node.iter).expect_one()
 
-        init_names: list[str] = []
-        yields: list[ir.SSAValue] = []
+        yields: list[str] = []
 
         def new_block_arg_if_inside_loop(frame: lowering.Frame, capture: ir.SSAValue):
             if not capture.name:
                 raise DialectLoweringError("unexpected loop variable captured")
-            init_names.append(capture.name)
-            yields.append(capture)
+            yields.append(capture.name)
             return frame.current_block.args.append_from(capture.type, capture.name)
 
-        frame = state.current_frame
-        body_frame = state.push_frame(lowering.Frame.from_stmts(
-            node.body, state, capture_callback=new_block_arg_if_inside_loop
-        ))
+        body_frame = state.push_frame(
+            lowering.Frame.from_stmts(
+                node.body, state, capture_callback=new_block_arg_if_inside_loop
+            )
+        )
         loop_var = body_frame.current_block.args.append_from(ir.types.Any)
-        assert body_frame.parent is frame
-        assert state.current_frame is body_frame
         unpackable(state, node.target, loop_var)
-        state.push_frame(body_frame)
         state.exhaust(body_frame)
-        body_frame.append_stmt(Yield(*yields))
+        # NOTE: this frame won't have phi nodes
+        body_frame.append_stmt(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore
         state.pop_frame()
 
         initializers: list[ir.SSAValue] = []
-        for name in init_names:
+        for name in yields:
             value = state.current_frame.get(name)
             if value is None:
                 raise DialectLoweringError(f"expected value for {name}")
             initializers.append(value)
         stmt = For(iter_, body_frame.current_region, *initializers)
+        for name, result in zip(yields, stmt.results):
+            state.current_frame.defs[name] = result
         state.append_stmt(stmt)
         return lowering.Result()

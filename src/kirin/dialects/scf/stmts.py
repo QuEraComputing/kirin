@@ -1,6 +1,6 @@
 from kirin import ir
 from kirin.decl import info, statement
-from kirin.exceptions import DialectLoweringError, VerificationError
+from kirin.exceptions import VerificationError, DialectLoweringError
 from kirin.print.printer import Printer
 
 from ._dialect import dialect
@@ -149,6 +149,8 @@ class For(ir.Statement):
         printer.print_name(self)
         printer.plain_print(" ")
         printer.print(self.iterable)
+        printer.plain_print(" init ")
+        printer.print_seq(self.initializers, delim=", ")
         printer.plain_print(" ")
         printer.print(self.body)
 

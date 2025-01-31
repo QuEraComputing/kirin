@@ -213,12 +213,12 @@ class LoweringState(ast.NodeVisitor):
             # this means the symbol is referring to an external uncallable object
             if inspect.isfunction(global_callee):
                 raise DialectLoweringError(
-                    f"unsupported callee: {type(global_callee)}."
+                    f"unsupported callee: {repr(global_callee)}."
                     "Are you trying to call a python function? This is not supported."
                 )
             else:  # well not much we can do, can't hint
                 raise DialectLoweringError(
-                    f"unsupported callee type: {type(global_callee)}"
+                    f"unsupported callee type: {repr(global_callee)}"
                 )
 
     def __lower_Call_local(self, node: ast.Call) -> Result:

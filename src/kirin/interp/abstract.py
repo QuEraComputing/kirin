@@ -138,19 +138,27 @@ class AbstractInterpreter(
     def eval_recursion_limit(self, frame: AbstractFrameType) -> ResultType:
         return self.lattice.bottom()
 
-    def run_ssacfg_region(self, frame: AbstractFrameType, region: Region) -> ResultType:
-        result = self.void
+    def run_ssacfg_region(
+        self, frame: AbstractFrameType, region: Region
+    ) -> tuple[ResultType, ...]:
+        result: tuple[ResultType, ...] = ()
         frame.worklist.append(
             Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))
         )
         while (succ := frame.worklist.pop()) is not None:
             self.prehook_succ(frame, succ)
             block_result = self.run_block(frame, succ)
-            result: ResultType = block_result.join(result)
+            result = (
+                tuple(old.join(new) for old, new in zip(result, block_result))
+                if result
+                else block_result
+            )
             self.posthook_succ(frame, succ)
         return result
 
-    def run_block(self, frame: AbstractFrameType, succ: Successor) -> ResultType:
+    def run_block(
+        self, frame: AbstractFrameType, succ: Successor
+    ) -> tuple[ResultType, ...]:
         self.set_values(frame, succ.block.args, succ.block_args)
 
         stmt = succ.block.first_stmt
@@ -163,10 +171,10 @@ class AbstractInterpreter(
             match stmt_results:
                 case tuple(values):
                     self.set_values(frame, stmt._results, values)
-                case ReturnValue(result):  # this must be last stmt in block
-                    return result
+                case ReturnValue(results):  # this must be last stmt in block
+                    return results
                 case _:  # just ignore other cases
                     pass
 
             stmt = stmt.next_stmt
-        return self.void
+        return ()

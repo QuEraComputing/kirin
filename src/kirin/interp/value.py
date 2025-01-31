@@ -23,11 +23,10 @@ class SpecialValue(Generic[ValueType]):
 class ReturnValue(SpecialValue[ValueType]):
     """Return value from a statement evaluation."""
 
-    result: ValueType
+    results: tuple[ValueType, ...]
 
-    def __init__(self, result: ValueType):
-        super().__init__()
-        self.result = result
+    def __init__(self, *result: ValueType):
+        self.results = result
 
     def __len__(self) -> int:
         return 0

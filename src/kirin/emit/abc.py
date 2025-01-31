@@ -31,15 +31,16 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
                 return results[0]
         raise interp.InterpreterError(f"Unexpected results {results}")
 
-    def run_ssacfg_region(self, frame: FrameType, region: ir.Region) -> ValueType:
-        result = self.void
+    def run_ssacfg_region(
+        self, frame: FrameType, region: ir.Region
+    ) -> tuple[ValueType, ...]:
         frame.worklist.append(
             interp.Successor(region.blocks[0], frame.get_values(region.blocks[0].args))
         )
         while (succ := frame.worklist.pop()) is not None:
             block_header = self.emit_block(frame, succ.block)
             frame.block_ref[succ.block] = block_header
-        return result
+        return ()
 
     def emit_attribute(self, attr: ir.Attribute) -> ValueType:
         return getattr(
