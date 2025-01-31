@@ -7,37 +7,37 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import IO, Literal, Optional, TypedDict
 
-    from rich.style import Style
     from rich.theme import Theme
     from typing_extensions import Unpack
 
     from kirin import ir
     from kirin.print import Printer
 
-    class PrintOptions(TypedDict, total=False):
+    from .printer import RichConsoleOptions
+
+    class _PrintOptions(TypedDict, total=False):
         stream: Optional[IO[str]]
         analysis: Optional[dict["ir.SSAValue", Printable]]
         show_indent_mark: bool
-        theme: Theme | dict | str
-        color_system: Optional[
-            Literal["auto", "standard", "256", "truecolor", "windows"]
-        ]
-        force_terminal: Optional[bool]
+        theme: Theme | dict | Literal["dark", "light"]
         force_jupyter: Optional[bool]
-        force_interactive: Optional[bool]
-        soft_wrap: bool
-        stderr: bool
-        quiet: bool
-        width: Optional[int]
-        height: Optional[int]
-        style: Optional[Style | str]
-        no_color: Optional[bool]
-        record: bool
-        markup: bool
-        emoji: bool
-        log_time: bool
-        log_path: bool
-        safe_box: bool
+
+    class PrintOptions(_PrintOptions, RichConsoleOptions):
+        pass
+
+
+KEYWORD_DOC = """
+Keyword Args:
+    stream (IO[str]):
+        The stream to write the output to. If None, the output will
+        be written to stdout.
+    analysis (dict[ir.SSAValue, Printable]):
+        Analysis results to use for printing. If `None`, no analysis results
+    show_indent_mark (bool):
+        Whether to show the indentation mark.
+    theme (Theme | dict | str):
+        The theme to use for printing, defaults to "dark".
+"""
 
 
 class Printable:
@@ -71,8 +71,20 @@ class Printable:
             printer (Printer):
                 `Printer` object to use for printing.
                 If None, a new `Printer` object will be created.
+
+        Keyword Args:
+            stream (IO[str]):
+                The stream to write the output to. If None, the output will
+                be written to stdout.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
+            show_indent_mark (bool):
+                Whether to show the indentation mark.
+            theme (Theme | dict | str):
+                The theme to use for printing, defaults to "dark".
+
+        !!! note
+            This function also accepts all other `rich.console.Console` options.
         """
         printer = self.__get_printer(printer, **options)
         with printer.console.pager(styles=True, links=True):
@@ -91,8 +103,20 @@ class Printable:
             printer (Printer):
                 `Printer` object to use for printing.
                 If None, a new `Printer` object will be created.
+
+        Keyword Args:
+            stream (IO[str]):
+                The stream to write the output to. If None, the output will
+                be written to stdout.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
+            show_indent_mark (bool):
+                Whether to show the indentation mark.
+            theme (Theme | dict | str):
+                The theme to use for printing, defaults to "dark".
+
+        !!! note
+            This function also accepts all other `rich.console.Console` options.
         """
         printer = self.__get_printer(printer, **options)
         self.print_impl(printer)
@@ -110,8 +134,20 @@ class Printable:
             printer (Printer):
                 `Printer` object to use for printing.
                 If None, a new `Printer` object will be created.
+
+        Keyword Args:
+            stream (IO[str]):
+                The stream to write the output to. If None, the output will
+                be written to stdout.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
+            show_indent_mark (bool):
+                Whether to show the indentation mark.
+            theme (Theme | dict | str):
+                The theme to use for printing, defaults to "dark".
+
+        !!! note
+            This function also accepts all other `rich.console.Console` options.
         """
         printer = self.__get_printer(printer, **options)
         with printer.string_io() as stream:

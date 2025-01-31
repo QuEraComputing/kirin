@@ -1,5 +1,17 @@
 import io
-from typing import IO, TYPE_CHECKING, Any, Union, Generic, TypeVar, Callable, Iterable
+from typing import (
+    IO,
+    TYPE_CHECKING,
+    Any,
+    Union,
+    Generic,
+    Literal,
+    TypeVar,
+    Callable,
+    Iterable,
+    Optional,
+    TypedDict,
+)
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
@@ -11,13 +23,11 @@ from kirin.idtable import IdTable
 from kirin.print.printable import Printable
 
 if TYPE_CHECKING:
-    from typing import Literal, Optional, TypedDict
-
     from rich.style import Style
 
     from kirin import ir
 
-    class RichConsole(TypedDict, total=False):
+    class RichConsoleOptions(TypedDict, total=False):
         color_system: Optional[
             Literal["auto", "standard", "256", "truecolor", "windows"]
         ]
@@ -101,10 +111,10 @@ class Printer(Generic[IOType]):
         stream: IOType | None = None,
         analysis: dict["ir.SSAValue", Printable] | None = None,
         show_indent_mark: bool = True,
-        theme: Theme | dict | str = "dark",
+        theme: Theme | dict | Literal["dark", "light"] = "dark",
         # NOTE: turn off jupyter rendering cuz we just want text
         force_jupyter: "Optional[bool]" = False,
-        **kwargs: Unpack["RichConsole"],
+        **kwargs: Unpack["RichConsoleOptions"],
     ):
         self.stream = stream
         self.analysis = analysis
