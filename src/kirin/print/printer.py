@@ -1,20 +1,11 @@
 import io
-from typing import (
-    IO,
-    TYPE_CHECKING,
-    Any,
-    Union,
-    Unpack,
-    Generic,
-    TypeVar,
-    Callable,
-    Iterable,
-)
+from typing import IO, TYPE_CHECKING, Any, Union, Generic, TypeVar, Callable, Iterable
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
 from rich.theme import Theme
 from rich.console import Console
+from typing_extensions import Unpack
 
 from kirin.idtable import IdTable
 from kirin.print.printable import Printable

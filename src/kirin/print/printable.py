@@ -3,11 +3,13 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING
 
+# NOTE: we don't want to actually load rich here
 if TYPE_CHECKING:
-    from typing import IO, Unpack, Literal, Optional, TypedDict
+    from typing import IO, Literal, Optional, TypedDict
 
     from rich.style import Style
     from rich.theme import Theme
+    from typing_extensions import Unpack
 
     from kirin import ir
     from kirin.print import Printer
