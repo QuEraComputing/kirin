@@ -48,23 +48,23 @@ class Function(Statement):
     body: Region = info.region(multi=True)
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.print_name(self)
             printer.plain_print(" ")
 
-        with printer.rich(style=printer.color.symbol):
+        with printer.rich(style="symbol"):
             printer.plain_print(self.sym_name)
 
         printer.print_seq(self.signature.inputs, prefix="(", suffix=")", delim=", ")
 
-        with printer.rich(style=printer.color.comment):
+        with printer.rich(style="comment"):
             printer.plain_print(" -> ")
             printer.print(self.signature.output)
             printer.plain_print(" ")
 
         printer.print(self.body)
 
-        with printer.rich(style=printer.color.comment):
+        with printer.rich(style="comment"):
             printer.plain_print(f" // func.func {self.sym_name}")
 
 
@@ -118,7 +118,7 @@ class Return(Statement):
         super().__init__(args=args, args_slice={"value": 0})
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.print_name(self)
 
         if self.args:
@@ -156,11 +156,11 @@ class Lambda(Statement):
             raise VerificationError(self, "lambda body must not be empty")
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.print_name(self)
         printer.plain_print(" ")
 
-        with printer.rich(style=printer.color.symbol):
+        with printer.rich(style="symbol"):
             printer.plain_print(self.sym_name)
 
         printer.print_seq(self.captured, prefix="(", suffix=")", delim=", ")

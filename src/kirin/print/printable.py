@@ -1,11 +1,41 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import IO, Unpack, Literal, Optional, TypedDict
+
+    from rich.style import Style
+    from rich.theme import Theme
+
     from kirin import ir
     from kirin.print import Printer
+
+    class PrintOptions(TypedDict, total=False):
+        stream: Optional[IO[str]]
+        analysis: Optional[dict["ir.SSAValue", Printable]]
+        show_indent_mark: bool
+        theme: Theme | dict | str
+        color_system: Optional[
+            Literal["auto", "standard", "256", "truecolor", "windows"]
+        ]
+        force_terminal: Optional[bool]
+        force_jupyter: Optional[bool]
+        force_interactive: Optional[bool]
+        soft_wrap: bool
+        stderr: bool
+        quiet: bool
+        width: Optional[int]
+        height: Optional[int]
+        style: Optional[Style | str]
+        no_color: Optional[bool]
+        record: bool
+        markup: bool
+        emoji: bool
+        log_time: bool
+        log_path: bool
+        safe_box: bool
 
 
 class Printable:
@@ -19,18 +49,19 @@ class Printable:
 
     @staticmethod
     def __get_printer(
-        printer: Printer | None = None, analysis: dict[ir.SSAValue, Any] | None = None
+        printer: Printer | None = None,
+        **options: Unpack["PrintOptions"],
     ) -> Printer:
         if printer is None:
             from kirin.print import Printer
 
-            return Printer(analysis=analysis)
+            return Printer(**options)
         return printer
 
     def pager(
         self,
         printer: Printer | None = None,
-        analysis: dict[ir.SSAValue, Any] | None = None,
+        **options: Unpack["PrintOptions"],
     ) -> None:
         """Pretty print the object with a pager.
 
@@ -41,15 +72,15 @@ class Printable:
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
         """
-        printer = self.__get_printer(printer, analysis)
+        printer = self.__get_printer(printer, **options)
         with printer.console.pager(styles=True, links=True):
             self.print(printer)
 
     def print(
         self,
         printer: Printer | None = None,
-        analysis: dict[ir.SSAValue, Any] | None = None,
         end: str = "\n",
+        **options: Unpack["PrintOptions"],
     ) -> None:
         """
         Entry point of the printing process.
@@ -61,15 +92,15 @@ class Printable:
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
         """
-        printer = self.__get_printer(printer, analysis)
+        printer = self.__get_printer(printer, **options)
         self.print_impl(printer)
         printer.plain_print(end)
 
     def print_str(
         self,
         printer: Printer | None = None,
-        analysis: dict[ir.SSAValue, Any] | None = None,
         end: str = "\n",
+        **options: Unpack["PrintOptions"],
     ) -> str:
         """Print the object to a string.
 
@@ -80,9 +111,9 @@ class Printable:
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
         """
-        printer = self.__get_printer(printer, analysis)
+        printer = self.__get_printer(printer, **options)
         with printer.string_io() as stream:
-            self.print(printer, analysis=analysis, end=end)
+            self.print(printer, end=end, **options)
             return stream.getvalue()
 
     @abstractmethod
