@@ -14,6 +14,7 @@ from . import (
     builtin as builtin,
     constant as constant,
     indexing as indexing,
+    unpack as unpack,
 )
 from .len import Len as Len
 from .attr import GetAttr as GetAttr

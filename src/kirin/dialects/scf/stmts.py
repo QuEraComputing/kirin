@@ -1,6 +1,6 @@
 from kirin import ir
 from kirin.decl import info, statement
-from kirin.exceptions import DialectLoweringError
+from kirin.exceptions import DialectLoweringError, VerificationError
 from kirin.print.printer import Printer
 
 from ._dialect import dialect
@@ -94,8 +94,63 @@ class IfElse(ir.Statement):
         printer.plain_print(" ")
         printer.print(self.then_body)
         if self.else_body.blocks:
-            printer.plain_print(" else ", style=printer.color.keyword)
+            printer.plain_print(" else ", style="keyword")
             printer.print(self.else_body)
+
+
+@statement(dialect=dialect, init=False)
+class For(ir.Statement):
+    name = "for"
+    iterable: ir.SSAValue = info.argument(ir.types.Any)
+    body: ir.Region = info.region(multi=False)
+    initializers: tuple[ir.SSAValue, ...] = info.argument(ir.types.Any)
+
+    def __init__(
+        self,
+        iterable: ir.SSAValue,
+        body: ir.Region,
+        *initializers: ir.SSAValue,
+    ):
+        stmt = body.blocks[0].last_stmt
+        if stmt is None or not isinstance(stmt, Yield):
+            raise DialectLoweringError("for loop body must terminate with a yield")
+
+        if len(body.blocks) != 1:
+            raise DialectLoweringError("for loop body must have a single block")
+
+        if len(body.blocks[0].args) != len(initializers) + 1:
+            raise DialectLoweringError(
+                "for loop body must have arguments for all initializers and the loop variable"
+            )
+
+        super().__init__(
+            args=(iterable, *initializers),
+            regions=(body,),
+            result_types=tuple(value.type for value in stmt.values),
+            args_slice={"iterable": 0, "initializers": slice(1, None)},
+        )
+
+    def verify(self) -> None:
+        stmt = self.body.blocks[0].last_stmt
+        if stmt is None or not isinstance(stmt, Yield):
+            raise VerificationError(self, "for loop body must terminate with a yield")
+        if len(stmt.values) != len(self.initializers):
+            raise VerificationError(
+                self,
+                "for loop body must have the same number of results as initializers",
+            )
+        if len(self.results) != len(stmt.values):
+            raise VerificationError(
+                self,
+                "for loop must have the same number of results as the yield in the body",
+            )
+
+    def print_impl(self, printer: Printer) -> None:
+        printer.print_name(self)
+        printer.plain_print(" ")
+        printer.print(self.iterable)
+        printer.plain_print(" ")
+        printer.print(self.body)
 
 
 @statement(dialect=dialect)
