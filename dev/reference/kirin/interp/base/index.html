@@ -27,18 +27,18 @@
 </code></pre></div> <div class="doc doc-contents "> <p>What to return when the interpreter evaluates nothing.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.build_signature class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">build_signature</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>build_signature</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Signature</span>
-</code></pre></div> <div class="doc doc-contents "> <p>build signature for querying the statement implementation.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>354</span>
-<span class=normal>355</span>
-<span class=normal>356</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>build_signature</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Signature&quot;</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>build signature for querying the statement implementation.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>356</span>
+<span class=normal>357</span>
+<span class=normal>358</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>build_signature</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Signature&quot;</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;build signature for querying the statement implementation.&quot;&quot;&quot;</span>
     <span class=k>return</span> <span class=n>Signature</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=vm>__class__</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>arg</span><span class=o>.</span><span class=n>type</span> <span class=k>for</span> <span class=n>arg</span> <span class=ow>in</span> <span class=n>stmt</span><span class=o>.</span><span class=n>args</span><span class=p>))</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.eval_recursion_limit class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eval_recursion_limit</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>eval_recursion_limit</span><span class=p>(</span><span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Return the value of recursion exception, e.g in concrete interpreter, it will raise an exception if the limit is reached; in type inference, it will return a special value.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>347</span>
-<span class=normal>348</span>
-<span class=normal>349</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Return the value of recursion exception, e.g in concrete interpreter, it will raise an exception if the limit is reached; in type inference, it will return a special value.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>349</span>
 <span class=normal>350</span>
 <span class=normal>351</span>
-<span class=normal>352</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_recursion_limit</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span><span class=p>:</span>
+<span class=normal>352</span>
+<span class=normal>353</span>
+<span class=normal>354</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_recursion_limit</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Return the value of recursion exception, e.g in concrete</span>
 <span class=sd>    interpreter, it will raise an exception if the limit is reached;</span>
 <span class=sd>    in type inference, it will return a special value.</span>
@@ -54,9 +54,7 @@
                 <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_my_stmt</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
             <span class=k>else</span><span class=p>:</span>
                 <span class=k>return</span> <span class=p>()</span>
-</code></pre></div></li> </ul> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>269</span>
-<span class=normal>270</span>
-<span class=normal>271</span>
+</code></pre></div></li> </ul> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>271</span>
 <span class=normal>272</span>
 <span class=normal>273</span>
 <span class=normal>274</span>
@@ -98,7 +96,9 @@
 <span class=normal>310</span>
 <span class=normal>311</span>
 <span class=normal>312</span>
-<span class=normal>313</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
+<span class=normal>313</span>
+<span class=normal>314</span>
+<span class=normal>315</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Run a statement within the current frame. This is the entry</span>
@@ -146,9 +146,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.eval_stmt_fallback class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eval_stmt_fallback</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>eval_stmt_fallback</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>The fallback implementation of statements.</p> <p>This is called when no implementation is found for the statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>StatementResult</code></td> <td> <code><a class="autorefs autorefs-internal" title="kirin.interp.value.StatementResult" href="../value/#kirin.interp.value.StatementResult">StatementResult</a>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of running the statement</p> </div> </td> </tr> </tbody> </table> <details class=note open> <summary>Note</summary> <p>Overload this method to provide a fallback implementation for statements.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>321</span>
-<span class=normal>322</span>
-<span class=normal>323</span>
+</code></pre></div> <div class="doc doc-contents "> <p>The fallback implementation of statements.</p> <p>This is called when no implementation is found for the statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>StatementResult</code></td> <td> <code><a class="autorefs autorefs-internal" title="kirin.interp.value.StatementResult" href="../value/#kirin.interp.value.StatementResult">StatementResult</a>[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of running the statement</p> </div> </td> </tr> </tbody> </table> <details class=note open> <summary>Note</summary> <p>Overload this method to provide a fallback implementation for statements.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>323</span>
 <span class=normal>324</span>
 <span class=normal>325</span>
 <span class=normal>326</span>
@@ -170,7 +168,9 @@
 <span class=normal>342</span>
 <span class=normal>343</span>
 <span class=normal>344</span>
-<span class=normal>345</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt_fallback</span><span class=p>(</span>
+<span class=normal>345</span>
+<span class=normal>346</span>
+<span class=normal>347</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt_fallback</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>StatementResult</span><span class=p>[</span><span class=n>ValueType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;The fallback implementation of statements.</span>
@@ -196,14 +196,14 @@
         <span class=o>+</span> <span class=nb>str</span><span class=p>(</span><span class=nb>type</span><span class=p>(</span><span class=bp>self</span><span class=p>))</span>
     <span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.finalize class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">finalize</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>finalize</span><span class=p>(</span><span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>results</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>218</span>
-<span class=normal>219</span>
-<span class=normal>220</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>220</span>
 <span class=normal>221</span>
 <span class=normal>222</span>
 <span class=normal>223</span>
 <span class=normal>224</span>
-<span class=normal>225</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>results</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span><span class=p>:</span>
+<span class=normal>225</span>
+<span class=normal>226</span>
+<span class=normal>227</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>results</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Postprocess a frame after it is popped from the stack. This is</span>
 <span class=sd>    called after a method is evaluated and the frame is popped.</span>
 
@@ -238,9 +238,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.lookup_registry class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lookup_registry</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lookup_registry</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Optional</span><span class=p>[</span><span class=n>StatementImpl</span><span class=p>[</span><span class=n>Self</span><span class=p>,</span> <span class=n>FrameType</span><span class=p>]]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Lookup the statement implementation in the registry.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title="typing.Optional">Optional</span>[<span title="kirin.registry.StatementImpl">StatementImpl</span>[<span title="typing_extensions.Self">Self</span>, <span title="kirin.interp.base.FrameType">FrameType</span>]]</code> </td> <td> <div class=doc-md-description> <p>Optional[StatementImpl]: the statement implementation if found, None otherwise.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>358</span>
-<span class=normal>359</span>
-<span class=normal>360</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Lookup the statement implementation in the registry.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title="typing.Optional">Optional</span>[<span title="kirin.registry.StatementImpl">StatementImpl</span>[<span title="typing_extensions.Self">Self</span>, <span title="kirin.interp.base.FrameType">FrameType</span>]]</code> </td> <td> <div class=doc-md-description> <p>Optional[StatementImpl]: the statement implementation if found, None otherwise.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>360</span>
 <span class=normal>361</span>
 <span class=normal>362</span>
 <span class=normal>363</span>
@@ -255,7 +253,9 @@
 <span class=normal>372</span>
 <span class=normal>373</span>
 <span class=normal>374</span>
-<span class=normal>375</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lookup_registry</span><span class=p>(</span>
+<span class=normal>375</span>
+<span class=normal>376</span>
+<span class=normal>377</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lookup_registry</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Optional</span><span class=p>[</span><span class=s2>&quot;StatementImpl[Self, FrameType]&quot;</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Lookup the statement implementation in the registry.</span>
@@ -274,10 +274,10 @@
         <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>registry</span><span class=o>.</span><span class=n>statements</span><span class=p>[</span><span class=n>class_sig</span><span class=p>]</span>
     <span class=k>return</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.new_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">new_frame</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>new_frame</span><span class=p>(</span><span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>FrameType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>213</span>
-<span class=normal>214</span>
-<span class=normal>215</span>
-<span class=normal>216</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>215</span>
+<span class=normal>216</span>
+<span class=normal>217</span>
+<span class=normal>218</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
 <span class=k>def</span> <span class=nf>new_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>FrameType</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Create a new frame for the given method.&quot;&quot;&quot;</span>
     <span class=o>...</span>
@@ -286,9 +286,7 @@
     <span class=n>values</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
     <span class=n>kwarg_names</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Permute the arguments according to the method signature and the given keyword arguments, where the keyword argument names refer to the last n arguments in the values tuple.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>arg_names</code> </td> <td> <code><span title="typing.Sequence">Sequence</span>[str]</code> </td> <td> <div class=doc-md-description> <p>the argument names</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>values</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>, ...]</code> </td> <td> <div class=doc-md-description> <p>the values tuple (should not contain method itself)</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>kwarg_names</code> </td> <td> <code>tuple[str, ...]</code> </td> <td> <div class=doc-md-description> <p>the keyword argument names</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>238</span>
-<span class=normal>239</span>
-<span class=normal>240</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Permute the arguments according to the method signature and the given keyword arguments, where the keyword argument names refer to the last n arguments in the values tuple.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>arg_names</code> </td> <td> <code><span title="typing.Sequence">Sequence</span>[str]</code> </td> <td> <div class=doc-md-description> <p>the argument names</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>values</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>, ...]</code> </td> <td> <div class=doc-md-description> <p>the values tuple (should not contain method itself)</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>kwarg_names</code> </td> <td> <code>tuple[str, ...]</code> </td> <td> <div class=doc-md-description> <p>the keyword argument names</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>240</span>
 <span class=normal>241</span>
 <span class=normal>242</span>
 <span class=normal>243</span>
@@ -311,7 +309,9 @@
 <span class=normal>260</span>
 <span class=normal>261</span>
 <span class=normal>262</span>
-<span class=normal>263</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@staticmethod</span>
+<span class=normal>263</span>
+<span class=normal>264</span>
+<span class=normal>265</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@staticmethod</span>
 <span class=k>def</span> <span class=nf>permute_values</span><span class=p>(</span>
     <span class=n>arg_names</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=nb>str</span><span class=p>],</span>
     <span class=n>values</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
@@ -470,7 +470,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.run_callable_region class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_callable_region</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_callable_region</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>Region</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>A hook defines how to run the callable region given the interpreter context.</p> <details class=note open> <summary>Note</summary> <p>This is experimental API, don't subclass it. The current reason of having it is mainly because we need to dispatch back to the MethodTable for emit.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>199</span>
+</code></pre></div> <div class="doc doc-contents "> <p>A hook defines how to run the callable region given the interpreter context.</p> <p>A callable region is a region that can be called as a function. Unlike a general region (or the MLIR convention), it always return a value to be compatible with the Python convention.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>199</span>
 <span class=normal>200</span>
 <span class=normal>201</span>
 <span class=normal>202</span>
@@ -482,19 +482,23 @@
 <span class=normal>208</span>
 <span class=normal>209</span>
 <span class=normal>210</span>
-<span class=normal>211</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_callable_region</span><span class=p>(</span>
+<span class=normal>211</span>
+<span class=normal>212</span>
+<span class=normal>213</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_callable_region</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>Region</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;A hook defines how to run the callable region given</span>
 <span class=sd>    the interpreter context.</span>
 
-<span class=sd>    Note:</span>
-<span class=sd>        This is experimental API, don&#39;t</span>
-<span class=sd>        subclass it. The current reason of having it is mainly</span>
-<span class=sd>        because we need to dispatch back to the MethodTable for</span>
-<span class=sd>        emit.</span>
+<span class=sd>    A callable region is a region that can be called as a function.</span>
+<span class=sd>    Unlike a general region (or the MLIR convention), it always return a value</span>
+<span class=sd>    to be compatible with the Python convention.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
-    <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_ssacfg_region</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>region</span><span class=p>)</span>
+    <span class=n>results</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_ssacfg_region</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>region</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>results</span><span class=p>:</span>
+        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>void</span>
+    <span class=c1># NOTE: it&#39;s not our job validate the IR return</span>
+    <span class=k>return</span> <span class=n>results</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.run_method class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_method</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_method</span><span class=p>(</span>
     <span class=n>method</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span>
@@ -529,10 +533,8 @@
     <span class=o>...</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.base.BaseInterpreter.run_ssacfg_region class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_ssacfg_region</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_ssacfg_region</span><span class=p>(</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>Region</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>This implements how to run a region with MLIR SSA CFG convention.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>region</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Region" href="../../ir/nodes/region/#kirin.ir.nodes.region.Region">Region</a></code> </td> <td> <div class=doc-md-description> <p>the region to run.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code><span title="kirin.interp.base.ValueType">ValueType</span></code> </td> <td> <div class=doc-md-description> <p>the result of running the region.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
-<span class=normal>378</span>
-<span class=normal>379</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
+</code></pre></div> <div class="doc doc-contents "> <p>This implements how to run a region with MLIR SSA CFG convention.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title="kirin.interp.base.FrameType">FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>region</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.Region" href="../../ir/nodes/region/#kirin.ir.nodes.region.Region">Region</a></code> </td> <td> <div class=doc-md-description> <p>the region to run.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>, ...]</code> </td> <td> <div class=doc-md-description> <p>the result of running the region.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/base.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>379</span>
 <span class=normal>380</span>
 <span class=normal>381</span>
 <span class=normal>382</span>
@@ -541,8 +543,14 @@
 <span class=normal>385</span>
 <span class=normal>386</span>
 <span class=normal>387</span>
-<span class=normal>388</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
-<span class=k>def</span> <span class=nf>run_ssacfg_region</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>Region</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ValueType</span><span class=p>:</span>
+<span class=normal>388</span>
+<span class=normal>389</span>
+<span class=normal>390</span>
+<span class=normal>391</span>
+<span class=normal>392</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
+<span class=k>def</span> <span class=nf>run_ssacfg_region</span><span class=p>(</span>
+    <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>FrameType</span><span class=p>,</span> <span class=n>region</span><span class=p>:</span> <span class=n>Region</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;This implements how to run a region with MLIR SSA CFG convention.</span>
 
 <span class=sd>    Args:</span>
