@@ -30,8 +30,7 @@
     <span class=nb>globals</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Any</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=n>capture_callback</span><span class=p>:</span> <span class=n>Optional</span><span class=p>[</span><span class=n>CallbackFn</span><span class=p>]</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame from a list of statements or a new <code>StmtStream</code>.</p> <ul> <li><code>stmts</code>: list of statements or a <code>StmtStream</code> to be lowered.</li> <li><code>region</code>: <code>Region</code> to append the new block to, <code>None</code> to create a new one, default <code>None</code>.</li> <li><code>block</code>: <code>Block</code> to append the new statements to, <code>None</code> to create a new one, default <code>None</code>.</li> <li><code>globals</code>: global variables, default <code>None</code>.</li> </ul> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>48</span>
-<span class=normal>49</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame from a list of statements or a new <code>StmtStream</code>.</p> <ul> <li><code>stmts</code>: list of statements or a <code>StmtStream</code> to be lowered.</li> <li><code>region</code>: <code>Region</code> to append the new block to, <code>None</code> to create a new one, default <code>None</code>.</li> <li><code>block</code>: <code>Block</code> to append the new statements to, <code>None</code> to create a new one, default <code>None</code>.</li> <li><code>globals</code>: global variables, default <code>None</code>.</li> </ul> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>49</span>
 <span class=normal>50</span>
 <span class=normal>51</span>
 <span class=normal>52</span>
@@ -64,7 +63,8 @@
 <span class=normal>79</span>
 <span class=normal>80</span>
 <span class=normal>81</span>
-<span class=normal>82</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>82</span>
+<span class=normal>83</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>from_stmts</span><span class=p>(</span>
     <span class=bp>cls</span><span class=p>,</span>
     <span class=n>stmts</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>ast</span><span class=o>.</span><span class=n>stmt</span><span class=p>]</span> <span class=o>|</span> <span class=n>StmtStream</span><span class=p>[</span><span class=n>ast</span><span class=o>.</span><span class=n>stmt</span><span class=p>],</span>
