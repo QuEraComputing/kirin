@@ -2,7 +2,7 @@
     <span class=n>printer</span><span class=p>:</span> <span class=n>Printer</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=o>**</span><span class=n>options</span><span class=p>:</span> <span class=n>Unpack</span><span class=p>[</span><span class=s2>&quot;PrintOptions&quot;</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Pretty print the object with a pager.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>printer</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.print.Printer" href="../printer/#kirin.print.printer.Printer">Printer</a></code> </td> <td> <div class=doc-md-description> <p><code>Printer</code> object to use for printing. If None, a new <code>Printer</code> object will be created.</p> </div> </td> <td> <code>None</code> </td> </tr> <tr class=doc-section-item> <td> <code>analysis</code> </td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="#kirin.print.printable.Printable">Printable</a>]</code> </td> <td> <div class=doc-md-description> <p>Analysis results to use for printing. If <code>None</code>, no analysis results</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/print/printable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>63</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Pretty print the object with a pager.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>printer</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.print.Printer" href="../printer/#kirin.print.printer.Printer">Printer</a></code> </td> <td> <div class=doc-md-description> <p><code>Printer</code> object to use for printing. If None, a new <code>Printer</code> object will be created.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Other Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>stream</code></td> <td> <code><span title="typing.IO">IO</span>[str]</code> </td> <td> <div class=doc-md-description> <p>The stream to write the output to. If None, the output will be written to stdout.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>analysis</code></td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="#kirin.print.printable.Printable">Printable</a>]</code> </td> <td> <div class=doc-md-description> <p>Analysis results to use for printing. If <code>None</code>, no analysis results</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>show_indent_mark</code></td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>Whether to show the indentation mark.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>theme</code></td> <td> <code><span title="rich.theme.Theme">Theme</span> | dict | str</code> </td> <td> <div class=doc-md-description> <p>The theme to use for printing, defaults to "dark".</p> </div> </td> </tr> </tbody> </table> <div class="admonition note"> <p class=admonition-title>Note</p> <p>This function also accepts all other <code>rich.console.Console</code> options.</p> </div> <details class=quote> <summary>Source code in <code>src/kirin/print/printable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>63</span>
 <span class=normal>64</span>
 <span class=normal>65</span>
 <span class=normal>66</span>
@@ -18,7 +18,19 @@
 <span class=normal>76</span>
 <span class=normal>77</span>
 <span class=normal>78</span>
-<span class=normal>79</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>pager</span><span class=p>(</span>
+<span class=normal>79</span>
+<span class=normal>80</span>
+<span class=normal>81</span>
+<span class=normal>82</span>
+<span class=normal>83</span>
+<span class=normal>84</span>
+<span class=normal>85</span>
+<span class=normal>86</span>
+<span class=normal>87</span>
+<span class=normal>88</span>
+<span class=normal>89</span>
+<span class=normal>90</span>
+<span class=normal>91</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>pager</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>printer</span><span class=p>:</span> <span class=n>Printer</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=o>**</span><span class=n>options</span><span class=p>:</span> <span class=n>Unpack</span><span class=p>[</span><span class=s2>&quot;PrintOptions&quot;</span><span class=p>],</span>
@@ -29,8 +41,20 @@
 <span class=sd>        printer (Printer):</span>
 <span class=sd>            `Printer` object to use for printing.</span>
 <span class=sd>            If None, a new `Printer` object will be created.</span>
+
+<span class=sd>    Keyword Args:</span>
+<span class=sd>        stream (IO[str]):</span>
+<span class=sd>            The stream to write the output to. If None, the output will</span>
+<span class=sd>            be written to stdout.</span>
 <span class=sd>        analysis (dict[ir.SSAValue, Printable]):</span>
 <span class=sd>            Analysis results to use for printing. If `None`, no analysis results</span>
+<span class=sd>        show_indent_mark (bool):</span>
+<span class=sd>            Whether to show the indentation mark.</span>
+<span class=sd>        theme (Theme | dict | str):</span>
+<span class=sd>            The theme to use for printing, defaults to &quot;dark&quot;.</span>
+
+<span class=sd>    !!! note</span>
+<span class=sd>        This function also accepts all other `rich.console.Console` options.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=n>printer</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get_printer</span><span class=p>(</span><span class=n>printer</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
     <span class=k>with</span> <span class=n>printer</span><span class=o>.</span><span class=n>console</span><span class=o>.</span><span class=n>pager</span><span class=p>(</span><span class=n>styles</span><span class=o>=</span><span class=kc>True</span><span class=p>,</span> <span class=n>links</span><span class=o>=</span><span class=kc>True</span><span class=p>):</span>
@@ -40,49 +64,15 @@
     <span class=n>end</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>&quot;</span><span class=se>\n</span><span class=s2>&quot;</span><span class=p>,</span>
     <span class=o>**</span><span class=n>options</span><span class=p>:</span> <span class=n>Unpack</span><span class=p>[</span><span class=s2>&quot;PrintOptions&quot;</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Entry point of the printing process.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>printer</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.print.Printer" href="../printer/#kirin.print.printer.Printer">Printer</a></code> </td> <td> <div class=doc-md-description> <p><code>Printer</code> object to use for printing. If None, a new <code>Printer</code> object will be created.</p> </div> </td> <td> <code>None</code> </td> </tr> <tr class=doc-section-item> <td> <code>analysis</code> </td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="#kirin.print.printable.Printable">Printable</a>]</code> </td> <td> <div class=doc-md-description> <p>Analysis results to use for printing. If <code>None</code>, no analysis results</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/print/printable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>81</span>
-<span class=normal>82</span>
-<span class=normal>83</span>
-<span class=normal>84</span>
-<span class=normal>85</span>
-<span class=normal>86</span>
-<span class=normal>87</span>
-<span class=normal>88</span>
-<span class=normal>89</span>
-<span class=normal>90</span>
-<span class=normal>91</span>
-<span class=normal>92</span>
-<span class=normal>93</span>
-<span class=normal>94</span>
-<span class=normal>95</span>
-<span class=normal>96</span>
-<span class=normal>97</span>
-<span class=normal>98</span>
-<span class=normal>99</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>print</span><span class=p>(</span>
-    <span class=bp>self</span><span class=p>,</span>
-    <span class=n>printer</span><span class=p>:</span> <span class=n>Printer</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-    <span class=n>end</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>&quot;</span><span class=se>\n</span><span class=s2>&quot;</span><span class=p>,</span>
-    <span class=o>**</span><span class=n>options</span><span class=p>:</span> <span class=n>Unpack</span><span class=p>[</span><span class=s2>&quot;PrintOptions&quot;</span><span class=p>],</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-<span class=w>    </span><span class=sd>&quot;&quot;&quot;</span>
-<span class=sd>    Entry point of the printing process.</span>
-
-<span class=sd>    Args:</span>
-<span class=sd>        printer (Printer):</span>
-<span class=sd>            `Printer` object to use for printing.</span>
-<span class=sd>            If None, a new `Printer` object will be created.</span>
-<span class=sd>        analysis (dict[ir.SSAValue, Printable]):</span>
-<span class=sd>            Analysis results to use for printing. If `None`, no analysis results</span>
-<span class=sd>    &quot;&quot;&quot;</span>
-    <span class=n>printer</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get_printer</span><span class=p>(</span><span class=n>printer</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
-    <span class=bp>self</span><span class=o>.</span><span class=n>print_impl</span><span class=p>(</span><span class=n>printer</span><span class=p>)</span>
-    <span class=n>printer</span><span class=o>.</span><span class=n>plain_print</span><span class=p>(</span><span class=n>end</span><span class=p>)</span>
-</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.print.printable.Printable.print_str class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">print_str</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>print_str</span><span class=p>(</span>
-    <span class=n>printer</span><span class=p>:</span> <span class=n>Printer</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
-    <span class=n>end</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>&quot;</span><span class=se>\n</span><span class=s2>&quot;</span><span class=p>,</span>
-    <span class=o>**</span><span class=n>options</span><span class=p>:</span> <span class=n>Unpack</span><span class=p>[</span><span class=s2>&quot;PrintOptions&quot;</span><span class=p>]</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>str</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Print the object to a string.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>printer</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.print.Printer" href="../printer/#kirin.print.printer.Printer">Printer</a></code> </td> <td> <div class=doc-md-description> <p><code>Printer</code> object to use for printing. If None, a new <code>Printer</code> object will be created.</p> </div> </td> <td> <code>None</code> </td> </tr> <tr class=doc-section-item> <td> <code>analysis</code> </td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="#kirin.print.printable.Printable">Printable</a>]</code> </td> <td> <div class=doc-md-description> <p>Analysis results to use for printing. If <code>None</code>, no analysis results</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/print/printable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>101</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Entry point of the printing process.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>printer</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.print.Printer" href="../printer/#kirin.print.printer.Printer">Printer</a></code> </td> <td> <div class=doc-md-description> <p><code>Printer</code> object to use for printing. If None, a new <code>Printer</code> object will be created.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Other Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>stream</code></td> <td> <code><span title="typing.IO">IO</span>[str]</code> </td> <td> <div class=doc-md-description> <p>The stream to write the output to. If None, the output will be written to stdout.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>analysis</code></td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="#kirin.print.printable.Printable">Printable</a>]</code> </td> <td> <div class=doc-md-description> <p>Analysis results to use for printing. If <code>None</code>, no analysis results</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>show_indent_mark</code></td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>Whether to show the indentation mark.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>theme</code></td> <td> <code><span title="rich.theme.Theme">Theme</span> | dict | str</code> </td> <td> <div class=doc-md-description> <p>The theme to use for printing, defaults to "dark".</p> </div> </td> </tr> </tbody> </table> <div class="admonition note"> <p class=admonition-title>Note</p> <p>This function also accepts all other <code>rich.console.Console</code> options.</p> </div> <details class=quote> <summary>Source code in <code>src/kirin/print/printable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 93</span>
+<span class=normal> 94</span>
+<span class=normal> 95</span>
+<span class=normal> 96</span>
+<span class=normal> 97</span>
+<span class=normal> 98</span>
+<span class=normal> 99</span>
+<span class=normal>100</span>
+<span class=normal>101</span>
 <span class=normal>102</span>
 <span class=normal>103</span>
 <span class=normal>104</span>
@@ -100,7 +90,77 @@
 <span class=normal>116</span>
 <span class=normal>117</span>
 <span class=normal>118</span>
-<span class=normal>119</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>print_str</span><span class=p>(</span>
+<span class=normal>119</span>
+<span class=normal>120</span>
+<span class=normal>121</span>
+<span class=normal>122</span>
+<span class=normal>123</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>print</span><span class=p>(</span>
+    <span class=bp>self</span><span class=p>,</span>
+    <span class=n>printer</span><span class=p>:</span> <span class=n>Printer</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+    <span class=n>end</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>&quot;</span><span class=se>\n</span><span class=s2>&quot;</span><span class=p>,</span>
+    <span class=o>**</span><span class=n>options</span><span class=p>:</span> <span class=n>Unpack</span><span class=p>[</span><span class=s2>&quot;PrintOptions&quot;</span><span class=p>],</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>&quot;&quot;&quot;</span>
+<span class=sd>    Entry point of the printing process.</span>
+
+<span class=sd>    Args:</span>
+<span class=sd>        printer (Printer):</span>
+<span class=sd>            `Printer` object to use for printing.</span>
+<span class=sd>            If None, a new `Printer` object will be created.</span>
+
+<span class=sd>    Keyword Args:</span>
+<span class=sd>        stream (IO[str]):</span>
+<span class=sd>            The stream to write the output to. If None, the output will</span>
+<span class=sd>            be written to stdout.</span>
+<span class=sd>        analysis (dict[ir.SSAValue, Printable]):</span>
+<span class=sd>            Analysis results to use for printing. If `None`, no analysis results</span>
+<span class=sd>        show_indent_mark (bool):</span>
+<span class=sd>            Whether to show the indentation mark.</span>
+<span class=sd>        theme (Theme | dict | str):</span>
+<span class=sd>            The theme to use for printing, defaults to &quot;dark&quot;.</span>
+
+<span class=sd>    !!! note</span>
+<span class=sd>        This function also accepts all other `rich.console.Console` options.</span>
+<span class=sd>    &quot;&quot;&quot;</span>
+    <span class=n>printer</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get_printer</span><span class=p>(</span><span class=n>printer</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
+    <span class=bp>self</span><span class=o>.</span><span class=n>print_impl</span><span class=p>(</span><span class=n>printer</span><span class=p>)</span>
+    <span class=n>printer</span><span class=o>.</span><span class=n>plain_print</span><span class=p>(</span><span class=n>end</span><span class=p>)</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.print.printable.Printable.print_str class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">print_str</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>print_str</span><span class=p>(</span>
+    <span class=n>printer</span><span class=p>:</span> <span class=n>Printer</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+    <span class=n>end</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>&quot;</span><span class=se>\n</span><span class=s2>&quot;</span><span class=p>,</span>
+    <span class=o>**</span><span class=n>options</span><span class=p>:</span> <span class=n>Unpack</span><span class=p>[</span><span class=s2>&quot;PrintOptions&quot;</span><span class=p>]</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>str</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Print the object to a string.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>printer</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.print.Printer" href="../printer/#kirin.print.printer.Printer">Printer</a></code> </td> <td> <div class=doc-md-description> <p><code>Printer</code> object to use for printing. If None, a new <code>Printer</code> object will be created.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Other Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>stream</code></td> <td> <code><span title="typing.IO">IO</span>[str]</code> </td> <td> <div class=doc-md-description> <p>The stream to write the output to. If None, the output will be written to stdout.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>analysis</code></td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="#kirin.print.printable.Printable">Printable</a>]</code> </td> <td> <div class=doc-md-description> <p>Analysis results to use for printing. If <code>None</code>, no analysis results</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>show_indent_mark</code></td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>Whether to show the indentation mark.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>theme</code></td> <td> <code><span title="rich.theme.Theme">Theme</span> | dict | str</code> </td> <td> <div class=doc-md-description> <p>The theme to use for printing, defaults to "dark".</p> </div> </td> </tr> </tbody> </table> <div class="admonition note"> <p class=admonition-title>Note</p> <p>This function also accepts all other <code>rich.console.Console</code> options.</p> </div> <details class=quote> <summary>Source code in <code>src/kirin/print/printable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>125</span>
+<span class=normal>126</span>
+<span class=normal>127</span>
+<span class=normal>128</span>
+<span class=normal>129</span>
+<span class=normal>130</span>
+<span class=normal>131</span>
+<span class=normal>132</span>
+<span class=normal>133</span>
+<span class=normal>134</span>
+<span class=normal>135</span>
+<span class=normal>136</span>
+<span class=normal>137</span>
+<span class=normal>138</span>
+<span class=normal>139</span>
+<span class=normal>140</span>
+<span class=normal>141</span>
+<span class=normal>142</span>
+<span class=normal>143</span>
+<span class=normal>144</span>
+<span class=normal>145</span>
+<span class=normal>146</span>
+<span class=normal>147</span>
+<span class=normal>148</span>
+<span class=normal>149</span>
+<span class=normal>150</span>
+<span class=normal>151</span>
+<span class=normal>152</span>
+<span class=normal>153</span>
+<span class=normal>154</span>
+<span class=normal>155</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>print_str</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>printer</span><span class=p>:</span> <span class=n>Printer</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=n>end</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>&quot;</span><span class=se>\n</span><span class=s2>&quot;</span><span class=p>,</span>
@@ -112,8 +172,20 @@
 <span class=sd>        printer (Printer):</span>
 <span class=sd>            `Printer` object to use for printing.</span>
 <span class=sd>            If None, a new `Printer` object will be created.</span>
+
+<span class=sd>    Keyword Args:</span>
+<span class=sd>        stream (IO[str]):</span>
+<span class=sd>            The stream to write the output to. If None, the output will</span>
+<span class=sd>            be written to stdout.</span>
 <span class=sd>        analysis (dict[ir.SSAValue, Printable]):</span>
 <span class=sd>            Analysis results to use for printing. If `None`, no analysis results</span>
+<span class=sd>        show_indent_mark (bool):</span>
+<span class=sd>            Whether to show the indentation mark.</span>
+<span class=sd>        theme (Theme | dict | str):</span>
+<span class=sd>            The theme to use for printing, defaults to &quot;dark&quot;.</span>
+
+<span class=sd>    !!! note</span>
+<span class=sd>        This function also accepts all other `rich.console.Console` options.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=n>printer</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get_printer</span><span class=p>(</span><span class=n>printer</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
     <span class=k>with</span> <span class=n>printer</span><span class=o>.</span><span class=n>string_io</span><span class=p>()</span> <span class=k>as</span> <span class=n>stream</span><span class=p>:</span>
