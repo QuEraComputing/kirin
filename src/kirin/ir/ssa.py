@@ -160,7 +160,7 @@ class BlockArgument(SSAValue):
     def print_impl(self, printer: Printer) -> None:
         super().print_impl(printer)
         if not isinstance(self.type, AnyType):
-            with printer.rich(style=printer.color.comment):
+            with printer.rich(style="comment"):
                 printer.plain_print(" : ")
                 printer.print(self.type)
 

@@ -1,25 +1,75 @@
 import io
-from typing import IO, TYPE_CHECKING, Any, Union, Generic, TypeVar, Callable, Iterable
+from typing import (
+    IO,
+    TYPE_CHECKING,
+    Any,
+    Union,
+    Generic,
+    Literal,
+    TypeVar,
+    Callable,
+    Iterable,
+    Optional,
+    TypedDict,
+)
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
+from rich.theme import Theme
 from rich.console import Console
+from typing_extensions import Unpack
 
 from kirin.idtable import IdTable
 from kirin.print.printable import Printable
 
 if TYPE_CHECKING:
+    from rich.style import Style
+
     from kirin import ir
 
+    class RichConsoleOptions(TypedDict, total=False):
+        color_system: Optional[
+            Literal["auto", "standard", "256", "truecolor", "windows"]
+        ]
+        force_terminal: Optional[bool]
+        force_interactive: Optional[bool]
+        soft_wrap: bool
+        stderr: bool
+        quiet: bool
+        width: Optional[int]
+        height: Optional[int]
+        style: Optional[Style | str]
+        no_color: Optional[bool]
+        record: bool
+        markup: bool
+        emoji: bool
+        log_time: bool
+        log_path: bool
+        safe_box: bool
 
-@dataclass
-class ColorScheme:
-    dialect: str = "dark_blue"
-    type: str = "dark_blue"
-    comment: str = "bright_black"
-    keyword: str = "red"
-    symbol: str = "cyan"
-    warning: str = "yellow"
+
+DEFAULT_THEME = {
+    "dark": Theme(
+        {
+            "dialect": "dark_blue",
+            "type": "dark_blue",
+            "comment": "bright_black",
+            "keyword": "red",
+            "symbol": "cyan",
+            "warning": "yellow",
+        }
+    ),
+    "light": Theme(
+        {
+            "dialect": "blue",
+            "type": "blue",
+            "comment": "bright_black",
+            "keyword": "red",
+            "symbol": "cyan",
+            "warning": "yellow",
+        }
+    ),
+}
 
 
 @dataclass
@@ -53,8 +103,6 @@ class Printer(Generic[IOType]):
     """Rich console"""
     state: PrintState = field(default_factory=PrintState)
     """Printing state"""
-    color: ColorScheme = field(default_factory=ColorScheme)
-    """Color scheme"""
     show_indent_mark: bool = True
     "Whether to show indent marks, e.g │"
 
@@ -63,13 +111,27 @@ class Printer(Generic[IOType]):
         stream: IOType | None = None,
         analysis: dict["ir.SSAValue", Printable] | None = None,
         show_indent_mark: bool = True,
+        theme: Theme | dict | Literal["dark", "light"] = "dark",
+        # NOTE: turn off jupyter rendering cuz we just want text
+        force_jupyter: "Optional[bool]" = False,
+        **kwargs: Unpack["RichConsoleOptions"],
     ):
         self.stream = stream
         self.analysis = analysis
-        self.console = Console(file=self.stream, highlight=False)
         self.state = PrintState()
-        self.color = ColorScheme()
         self.show_indent_mark = show_indent_mark
+        if isinstance(theme, dict):
+            theme = Theme(theme)
+        elif isinstance(theme, str):
+            theme = DEFAULT_THEME[theme]
+
+        self.console = Console(
+            file=self.stream,
+            highlight=False,
+            theme=theme,
+            force_jupyter=force_jupyter,
+            **kwargs,
+        )
 
     def print(self, object):
         """entry point for printing an object
@@ -112,7 +174,7 @@ class Printer(Generic[IOType]):
         """
         if node.dialect:  # not None
             self.plain_print(prefix)
-            self.plain_print(node.dialect.name, style=self.color.dialect)
+            self.plain_print(node.dialect.name, style="dialect")
         else:
             self.plain_print(prefix)
 
@@ -138,7 +200,7 @@ class Printer(Generic[IOType]):
                 "│" if i in self.state.indent_marks else " "
                 for i in range(self.state.indent)
             )
-            with self.rich(style=self.color.comment):
+            with self.rich(style="comment"):
                 self.plain_print(indent_str)
         else:
             indent_str = " " * self.state.indent

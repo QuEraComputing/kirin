@@ -14,7 +14,7 @@ class Assert(Statement):
     message: SSAValue = info.argument(String)
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.print_name(self)
 
         printer.plain_print(" ")
@@ -34,7 +34,7 @@ class Branch(Statement):
     successor: Block = info.block()
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.print_name(self)
 
         printer.plain_print(" ")
@@ -60,13 +60,13 @@ class ConditionalBranch(Statement):
     else_successor: Block = info.block()
 
     def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.print_name(self)
 
         printer.plain_print(" ")
         printer.print(self.cond)
 
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.plain_print(" goto ")
 
         printer.plain_print(printer.state.block_id[self.then_successor])
@@ -74,7 +74,7 @@ class ConditionalBranch(Statement):
         printer.print_seq(self.then_arguments, delim=", ")
         printer.plain_print(")")
 
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.plain_print(" else ")
 
         printer.plain_print(printer.state.block_id[self.else_successor])

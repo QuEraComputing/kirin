@@ -40,6 +40,6 @@ class PyAttr(Generic[T], Attribute):
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(repr(self.data))
-        with printer.rich(style=printer.color.comment):
+        with printer.rich(style="comment"):
             printer.plain_print(" : ")
             printer.print(self.type)

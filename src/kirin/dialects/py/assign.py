@@ -20,10 +20,10 @@ class Alias(ir.Statement):
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self)
         printer.plain_print(" ")
-        with printer.rich(style=printer.color.symbol):
+        with printer.rich(style="symbol"):
             printer.plain_print(self.target.data)
 
-        with printer.rich(style=printer.color.keyword):
+        with printer.rich(style="keyword"):
             printer.plain_print(" = ")
 
         printer.print(self.value)
