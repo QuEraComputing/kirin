@@ -20,7 +20,7 @@ class Concrete(interp.MethodTable):
 
     @interp.impl(GetAttr)
     def getattr(self, interp: interp.Interpreter, frame: interp.Frame, stmt: GetAttr):
-        return getattr(frame.get(stmt.obj), stmt.attrname)
+        return (getattr(frame.get(stmt.obj), stmt.attrname),)
 
 
 @dialect.register
