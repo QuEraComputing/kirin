@@ -432,7 +432,7 @@ class Block(IRNode["Region"]):
                     if arg not in printer.analysis:
                         continue
 
-                    with printer.rich(style=printer.color.warning):
+                    with printer.rich(style="warning"):
                         printer.plain_print(printer.state.ssa_id[arg], " = ")
                         printer.plain_print(repr(printer.analysis[arg]))
 
@@ -451,7 +451,7 @@ class Block(IRNode["Region"]):
                     if printer.analysis and any(
                         result in printer.analysis for result in stmt._results
                     ):
-                        with printer.rich(style=printer.color.warning):
+                        with printer.rich(style="warning"):
                             printer.plain_print(" # ---> ")
                             printer.plain_print(
                                 ", ".join(

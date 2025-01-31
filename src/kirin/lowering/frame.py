@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Callable, Optional, Sequence
 from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, SSAValue, Statement
+from kirin.exceptions import DialectLoweringError
 from kirin.lowering.stream import StmtStream
 
 if TYPE_CHECKING:
@@ -124,6 +125,8 @@ class Frame:
     StmtType = TypeVar("StmtType", bound=Statement)
 
     def append_stmt(self, stmt: StmtType) -> StmtType:
+        if not stmt.dialect or stmt.dialect not in self.state.dialects:
+            raise DialectLoweringError(f"Unsupported dialect {stmt.dialect}")
         self.current_block.stmts.append(stmt)
         stmt.source = self.state.source
         return stmt
