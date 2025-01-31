@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from stmts import RandomBranch
 
 from kirin.dialects import cf
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.ir.nodes.stmt import Statement
-from kirin.rewrite.abc import RewriteResult, RewriteRule
 
 
 @dataclass

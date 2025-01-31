@@ -1,6 +1,6 @@
-import argparse
-import logging
 import os
+import logging
+import argparse
 import subprocess
 
 import tomlkit
