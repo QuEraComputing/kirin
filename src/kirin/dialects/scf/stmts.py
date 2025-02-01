@@ -148,11 +148,27 @@ class For(ir.Statement):
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self)
         printer.plain_print(" ")
+        block = self.body.blocks[0]
+        printer.print(block.args[0])
+        printer.plain_print(" in ", style="keyword")
         printer.print(self.iterable)
-        printer.plain_print(" init ")
-        printer.print_seq(self.initializers, delim=", ")
-        printer.plain_print(" ")
-        printer.print(self.body)
+        with printer.indent():
+            printer.print_newline()
+            printer.plain_print("iter_args(")
+            for idx, (arg, val) in enumerate(zip(block.args[1:], self.initializers)):
+                printer.print(arg)
+                printer.plain_print(" = ")
+                printer.print(val)
+                if idx < len(self.initializers) - 1:
+                    printer.plain_print(", ")
+            printer.plain_print(") {")
+
+            with printer.align(printer.result_width(block.stmts)):
+                for stmt in block.stmts:
+                    printer.print_newline()
+                    printer.print_stmt(stmt)
+        printer.print_newline()
+        printer.plain_print("}")
 
 
 @statement(dialect=dialect)

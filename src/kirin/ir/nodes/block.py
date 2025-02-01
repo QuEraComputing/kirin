@@ -439,26 +439,7 @@ class Block(IRNode["Region"]):
         with printer.indent(increase=2, mark=False):
             for stmt in self.stmts:
                 printer.print_newline()
-                if stmt._results:
-                    result_str = printer.result_str(stmt._results)
-                    printer.plain_print(
-                        result_str.rjust(printer.state.result_width), " = "
-                    )
-                elif printer.state.result_width:
-                    printer.plain_print(" " * printer.state.result_width, "   ")
-                with printer.indent(printer.state.result_width + 3, mark=True):
-                    printer.print(stmt)
-                    if printer.analysis and any(
-                        result in printer.analysis for result in stmt._results
-                    ):
-                        with printer.rich(style="warning"):
-                            printer.plain_print(" # ---> ")
-                            printer.plain_print(
-                                ", ".join(
-                                    repr(printer.analysis[result])
-                                    for result in stmt._results
-                                )
-                            )
+                printer.print_stmt(stmt)
 
     def typecheck(self) -> None:
         """Checking the types of the Statments in the Block."""

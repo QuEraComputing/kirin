@@ -282,6 +282,15 @@ class Region(IRNode["Statement"]):
         for block in reversed(self.blocks) if reverse else self.blocks:
             yield from block.walk(reverse=reverse, region_first=region_first)
 
+    def stmts(self) -> Iterator[Statement]:
+        """Iterate over all the Statements in the Region. This does not walk into nested Regions.
+
+        Yields:
+            Iterator[Statement]: An iterator that yield Statements of Blocks in the Region.
+        """
+        for block in self.blocks:
+            yield from block.stmts
+
     def print_impl(self, printer: Printer) -> None:
         # populate block ids
         for block in self.blocks:
@@ -293,12 +302,7 @@ class Region(IRNode["Statement"]):
             printer.plain_print("}")
             return
 
-        result_width = 0
-        for bb in self.blocks:
-            for stmt in bb.stmts:
-                result_width = max(result_width, len(printer.result_str(stmt._results)))
-
-        with printer.align(result_width):
+        with printer.align(printer.result_width(self.stmts())):
             with printer.indent(increase=2, mark=True):
                 printer.print_newline()
                 for idx, bb in enumerate(self.blocks):

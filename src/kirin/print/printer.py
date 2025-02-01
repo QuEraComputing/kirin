@@ -163,6 +163,25 @@ class Printer(Generic[IOType]):
             self.plain_print(".")
         self.plain_print(node.name)
 
+    def print_stmt(self, node: "ir.Statement"):
+        if node._results:
+            result_str = self.result_str(node._results)
+            self.plain_print(result_str.rjust(self.state.result_width), " = ")
+        elif self.state.result_width:
+            self.plain_print(" " * self.state.result_width, "   ")
+        with self.indent(self.state.result_width + 3, mark=True):
+            self.print(node)
+            if self.analysis and any(
+                result in self.analysis for result in node._results
+            ):
+                with self.rich(style="warning"):
+                    self.plain_print(" # ---> ")
+                    self.plain_print(
+                        ", ".join(
+                            repr(self.analysis[result]) for result in node._results
+                        )
+                    )
+
     def print_dialect_path(
         self, node: Union["ir.Attribute", "ir.Statement"], prefix: str = ""
     ) -> None:
@@ -285,6 +304,20 @@ class Printer(Generic[IOType]):
                 self.plain_print(delim)
             self.plain_print(f"{key}=")
             emit(value)
+
+    def result_width(self, stmts: Iterable["ir.Statement"]) -> int:
+        """return the maximum width of the result column for a sequence of statements.
+
+        Args:
+            stmts(Iterable[ir.Statement]): sequence of statements
+
+        Returns:
+            int: maximum width of the result column
+        """
+        result_width = 0
+        for stmt in stmts:
+            result_width = max(result_width, len(self.result_str(stmt._results)))
+        return result_width
 
     @contextmanager
     def align(self, width: int):
