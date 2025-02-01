@@ -12,13 +12,22 @@ class Concrete(interp.MethodTable):
         return interp.ReturnValue(*frame.get_values(stmt.values))
 
     @interp.impl(IfElse)
-    def if_else(self, interp: interp.Interpreter, frame: interp.Frame, stmt: IfElse):
+    def if_else(self, interp_: interp.Interpreter, frame: interp.Frame, stmt: IfElse):
         cond = frame.get(stmt.cond)
         if cond:
             body = stmt.then_body
         else:
             body = stmt.else_body
-        return interp.run_ssacfg_region(frame, body)
+        block = body.blocks[0]
+        for stmt_ in block.stmts:
+            if isinstance(stmt_, Yield):
+                return frame.get_values(stmt_.values)
+            result = interp_.eval_stmt(frame, stmt_)
+            if isinstance(result, interp.SpecialValue):
+                return result
+            else:
+                frame.set_values(stmt_.results, result)
+        raise interp.InterpreterError("no yield in if-else body")
 
     @interp.impl(For)
     def for_loop(self, interpreter: interp.Interpreter, frame: interp.Frame, stmt: For):

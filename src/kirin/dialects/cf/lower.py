@@ -17,18 +17,6 @@ class CfLowering(FromPythonAST):
         state.append_stmt(cf.Branch(arguments=(), successor=next))
         return Result()
 
-    def lower_Assert(self, state: LoweringState, node: ast.Assert) -> Result:
-        from kirin.dialects.py.constant import Constant
-
-        cond = state.visit(node.test).expect_one()
-        if node.msg:
-            message = state.visit(node.msg).expect_one()
-            state.append_stmt(cf.Assert(condition=cond, message=message))
-        else:
-            message_stmt = state.append_stmt(Constant(""))
-            state.append_stmt(cf.Assert(condition=cond, message=message_stmt.result))
-        return Result()
-
     def lower_If(self, state: LoweringState, node: ast.If) -> Result:
         cond = state.visit(node.test).expect_one()
 

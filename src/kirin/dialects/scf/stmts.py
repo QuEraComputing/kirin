@@ -55,31 +55,18 @@ class IfElse(ir.Statement):
         else:
             else_body_region = ir.Region()
 
-        # if then_body terminates with a yield, we have results
+        # if either then or else body has yield, we generate results
+        # we assume if both have yields, they have the same number of results
         then_yield = then_body.last_stmt
+        else_yield = else_body.last_stmt if else_body is not None else None
         if then_yield is not None and isinstance(then_yield, Yield):
-            if else_body is None:
-                raise DialectLoweringError(
-                    "if-else statement with results must have an else block"
-                )
-            else_yield = else_body.last_stmt
-            if else_yield is None or not isinstance(else_yield, Yield):
-                raise DialectLoweringError(
-                    "if-else statement with results must have a yield in the else block"
-                )
-
-            if len(else_yield.values) != len(then_yield.values):
-                raise DialectLoweringError(
-                    "if-else statement with results must have the same number of results in both branches"
-                )
-
-            result_types = tuple(
-                then_v.type.join(else_v.type)
-                for then_v, else_v in zip(then_yield.values, else_yield.values)
-            )
+            results = then_yield.values
+        elif else_yield is not None and isinstance(else_yield, Yield):
+            results = else_yield.values
         else:
-            result_types = ()
+            results = ()
 
+        result_types = tuple(value.type for value in results)
         super().__init__(
             args=(cond,),
             regions=(then_body_region, else_body_region),

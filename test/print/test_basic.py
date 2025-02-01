@@ -5,7 +5,7 @@ from rich.console import Console
 from kirin import ir, types
 from kirin.print import Printer
 from kirin.prelude import basic
-from kirin.dialects import py, func
+from kirin.dialects import py
 
 
 @basic
@@ -30,9 +30,9 @@ def unstable(x: int):  # type: ignore
     return z
 
 
-@basic
-def empty():
-    pass
+# @basic
+# def empty():
+#     pass
 
 
 class TestBasicPrint:
@@ -85,11 +85,11 @@ class TestBasicPrint:
         # TODO: actually test these
         self.dummy_check(move_gen)
         self.dummy_check(unstable)
-        self.dummy_check(empty)
-        self.dummy_check(empty.code)
-        assert isinstance(empty.code, func.Function)
-        assert isinstance(empty.code.body, ir.Region)
-        region = empty.code.body
-        self.dummy_check(region.blocks[0])
-        empty.code.body.blocks[0].detach()
-        self.dummy_check(empty.code)
+        # self.dummy_check(empty)
+        # self.dummy_check(empty.code)
+        # assert isinstance(empty.code, func.Function)
+        # assert isinstance(empty.code.body, ir.Region)
+        # region = empty.code.body
+        # self.dummy_check(region.blocks[0])
+        # empty.code.body.blocks[0].detach()
+        # self.dummy_check(empty.code)

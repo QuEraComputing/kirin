@@ -1,28 +1,8 @@
 from kirin.ir import Block, SSAValue, Statement, IsTerminator
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
-from kirin.ir.attrs.types import Bool, String
+from kirin.ir.attrs.types import Bool
 from kirin.dialects.cf.dialect import dialect
-
-
-@statement(dialect=dialect)
-class Assert(Statement):
-    name = "assert"
-    traits = frozenset({})
-
-    condition: SSAValue
-    message: SSAValue = info.argument(String)
-
-    def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style="keyword"):
-            printer.print_name(self)
-
-        printer.plain_print(" ")
-        printer.print(self.condition)
-
-        if self.message:
-            printer.plain_print(", ")
-            printer.print(self.message)
 
 
 @statement(dialect=dialect)

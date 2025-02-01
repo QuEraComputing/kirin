@@ -14,12 +14,14 @@ class Lowering(lowering.FromPythonAST):
     def lower_If(self, state: lowering.LoweringState, node: ast.If) -> lowering.Result:
         cond = state.visit(node.test).expect_one()
         frame = state.current_frame
-        body_frame = lowering.Frame.from_stmts(node.body, state)
+        body_frame = lowering.Frame.from_stmts(node.body, state, globals=frame.globals)
         state.push_frame(body_frame)
         state.exhaust(body_frame)
         state.pop_frame()
 
-        else_frame = lowering.Frame.from_stmts(node.orelse, state)
+        else_frame = lowering.Frame.from_stmts(
+            node.orelse, state, globals=frame.globals
+        )
         state.push_frame(else_frame)
         state.exhaust(else_frame)
         state.pop_frame()
@@ -43,8 +45,18 @@ class Lowering(lowering.FromPythonAST):
                         raise DialectLoweringError(f"expected value for {name}")
                     else_yields.append(value)
 
-        body_frame.append_stmt(Yield(*body_yields))
-        else_frame.append_stmt(Yield(*else_yields))
+        if not (
+            body_frame.current_block.last_stmt
+            and body_frame.current_block.last_stmt.has_trait(ir.IsTerminator)
+        ):
+            body_frame.append_stmt(Yield(*body_yields))
+
+        if not (
+            else_frame.current_block.last_stmt
+            and else_frame.current_block.last_stmt.has_trait(ir.IsTerminator)
+        ):
+            else_frame.append_stmt(Yield(*else_yields))
+
         stmt = IfElse(
             cond,
             then_body=body_frame.current_region,

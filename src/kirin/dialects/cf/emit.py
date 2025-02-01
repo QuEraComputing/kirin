@@ -4,7 +4,7 @@ from kirin import emit
 from kirin.interp import Successor, MethodTable, impl
 from kirin.emit.julia import EmitJulia
 
-from .stmts import Assert, Branch, ConditionalBranch
+from .stmts import Branch, ConditionalBranch
 from .dialect import dialect
 
 IO_t = TypeVar("IO_t", bound=IO)
@@ -12,15 +12,6 @@ IO_t = TypeVar("IO_t", bound=IO)
 
 @dialect.register(key="emit.julia")
 class JuliaMethodTable(MethodTable):
-
-    @impl(Assert)
-    def emit_assert(
-        self, interp: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Assert
-    ):
-        interp.writeln(
-            frame, f"@assert {frame.get(stmt.condition)} {frame.get(stmt.message)}"
-        )
-        return ()
 
     @impl(Branch)
     def emit_branch(

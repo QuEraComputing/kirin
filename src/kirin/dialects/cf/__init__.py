@@ -5,7 +5,6 @@ from kirin.dialects.cf import (
 )
 from kirin.dialects.cf.lower import CfLowering as CfLowering
 from kirin.dialects.cf.stmts import (
-    Assert as Assert,
     Branch as Branch,
     ConditionalBranch as ConditionalBranch,
 )

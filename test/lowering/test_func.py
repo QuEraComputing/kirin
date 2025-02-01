@@ -6,7 +6,7 @@ from kirin.dialects import cf, func
 from kirin.lowering import Lowering
 from kirin.exceptions import DialectLoweringError
 
-lowering = Lowering(python_no_opt.union([cf, func]))
+lowering = Lowering(python_no_opt)
 
 
 def test_basic_func():

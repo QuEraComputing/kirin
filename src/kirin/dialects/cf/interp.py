@@ -1,20 +1,10 @@
-from kirin.interp import Frame, Successor, Interpreter, MethodTable, WrapException, impl
-from kirin.dialects.cf.stmts import Assert, Branch, ConditionalBranch
+from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
+from kirin.dialects.cf.stmts import Branch, ConditionalBranch
 from kirin.dialects.cf.dialect import dialect
 
 
 @dialect.register
 class CfInterpreter(MethodTable):
-
-    @impl(Assert)
-    def assert_stmt(self, interp: Interpreter, frame: Frame, stmt: Assert):
-        if frame.get(stmt.condition) is True:
-            return ()
-
-        if stmt.message:
-            raise WrapException(AssertionError(frame.get(stmt.message)))
-        else:
-            raise WrapException(AssertionError("Assertion failed"))
 
     @impl(Branch)
     def branch(self, interp: Interpreter, frame: Frame, stmt: Branch):
