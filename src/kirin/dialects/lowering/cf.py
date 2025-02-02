@@ -1,10 +1,14 @@
+"""Lowering Python AST to cf dialect.
+"""
+
 import ast
 
 from kirin import ir
 from kirin.lowering import Frame, Result, FromPythonAST, LoweringState
 from kirin.exceptions import DialectLoweringError
 from kirin.dialects.cf import stmts as cf
-from kirin.dialects.cf.dialect import dialect
+
+dialect = ir.Dialect("lowering.cf")
 
 
 @dialect.register

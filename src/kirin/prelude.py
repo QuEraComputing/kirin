@@ -7,7 +7,7 @@ from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group
 from kirin.passes import aggressive
-from kirin.dialects import cf, func, math, ilist
+from kirin.dialects import cf, func, math, ilist, lowering
 from kirin.dialects.py import (
     cmp,
     len,
@@ -56,7 +56,7 @@ def python_basic(self):
     return run_pass
 
 
-@dialect_group(python_basic.union([list, range, slice, cf, func, math]))
+@dialect_group(python_basic.union([list, range, slice, cf, lowering.cf, func, math]))
 def python_no_opt(self):
     """The Python dialect without optimization passes."""
 
@@ -66,7 +66,7 @@ def python_no_opt(self):
     return run_pass
 
 
-@dialect_group(python_basic.union([ilist, range, slice, cf, func, math]))
+@dialect_group(python_basic.union([ilist, range, slice, cf, lowering.cf, func, math]))
 def basic_no_opt(self):
     """The basic kernel without optimization passes. This is a builtin
     eDSL that includes the basic dialects that are commonly used in

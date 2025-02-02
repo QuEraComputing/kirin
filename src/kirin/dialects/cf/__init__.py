@@ -3,7 +3,6 @@ from kirin.dialects.cf import (
     constprop as constprop,
     typeinfer as typeinfer,
 )
-from kirin.dialects.cf.lower import CfLowering as CfLowering
 from kirin.dialects.cf.stmts import (
     Branch as Branch,
     ConditionalBranch as ConditionalBranch,
