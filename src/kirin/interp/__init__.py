@@ -22,6 +22,7 @@ from .frame import Frame as Frame, FrameABC as FrameABC
 from .table import MethodTable as MethodTable
 from .value import (
     Successor as Successor,
+    YieldValue as YieldValue,
     ReturnValue as ReturnValue,
     SpecialValue as SpecialValue,
     StatementResult as StatementResult,

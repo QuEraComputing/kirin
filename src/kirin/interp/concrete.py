@@ -6,7 +6,7 @@ from kirin.ir.nodes.stmt import Statement
 
 from .base import BaseInterpreter
 from .frame import Frame
-from .value import Successor, ReturnValue
+from .value import Successor, YieldValue, ReturnValue, SpecialValue
 from .exceptions import FuelExhaustedError
 
 
@@ -27,40 +27,32 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
     def run_method(self, method: Method, args: tuple[Any, ...]) -> Any:
         return self.run_callable(method.code, (method,) + args)
 
-    def run_ssacfg_region(self, frame: Frame[Any], region: Region) -> tuple[Any, ...]:
-        stmt_idx = 0
-        results = ()
-        block: Block | None = region.blocks[0]
+    def run_ssacfg_region(
+        self, frame: Frame[Any], region: Region
+    ) -> tuple[Any, ...] | None | ReturnValue[Any]:
+        block = region.blocks[0]
         while block is not None:
-            stmt = block.first_stmt
+            results = self.run_block(frame, block)
+            if isinstance(results, Successor):
+                block = results.block
+                frame.set_values(block.args, results.block_args)
+            elif isinstance(results, ReturnValue):
+                return results
+            elif isinstance(results, YieldValue):
+                return results.values
+            else:
+                return results
+        return None  # region without terminator returns empty tuple
 
-            # TODO: make this more precise
+    def run_block(self, frame: Frame[Any], block: Block) -> SpecialValue[Any]:
+        for stmt in block.stmts:
+            if self.consume_fuel() == self.FuelResult.Stop:
+                raise FuelExhaustedError("fuel exhausted")
             frame.stmt = stmt
-            frame.lino = stmt_idx
-            block = None
-
-            while stmt is not None:
-                if self.consume_fuel() == self.FuelResult.Stop:
-                    raise FuelExhaustedError("fuel exhausted")
-
-                # TODO: make this more precise
-                frame.lino = stmt_idx
-                frame.stmt = stmt
-                stmt_results = self.eval_stmt(frame, stmt)
-
-                match stmt_results:
-                    case tuple(values):
-                        frame.set_values(stmt._results, values)
-                    case ReturnValue(results):
-                        break
-                    case Successor(block, block_args):
-                        # block is not None, continue to next block
-                        frame.set_values(block.args, block_args)
-                        break
-                    case _:
-                        pass
-
-                stmt = stmt.next_stmt
-                stmt_idx += 1
-        # end of while
-        return results
+            frame.lino = stmt.source.lineno if stmt.source else 0
+            stmt_results = self.eval_stmt(frame, stmt)
+            if isinstance(stmt_results, tuple):
+                frame.set_values(stmt._results, stmt_results)
+            else:  # terminator
+                return stmt_results
+        return None

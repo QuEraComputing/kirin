@@ -59,19 +59,20 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
             _frame = self._interp.new_frame(frame.code)
             _frame.set_values(stmt.args, tuple(x.data for x in values))
             value = self._interp.eval_stmt(_frame, stmt)
-            if isinstance(value, tuple):
-                return tuple(JointResult(Value(each), Pure()) for each in value)
-            elif isinstance(value, interp.ReturnValue):
-                return interp.ReturnValue(
-                    *tuple(JointResult(Value(x), Pure()) for x in value.results)
-                )
-            elif isinstance(value, interp.Successor):
-                return interp.Successor(
-                    value.block,
-                    *tuple(
-                        JointResult(Value(each), Pure()) for each in value.block_args
-                    ),
-                )
+            match value:
+                case tuple():
+                    return tuple(JointResult(Value(each), Pure()) for each in value)
+                case interp.ReturnValue(ret):
+                    return interp.ReturnValue(JointResult(Value(ret), Pure()))
+                case interp.YieldValue(yields):
+                    return interp.YieldValue(
+                        tuple(JointResult(Value(each), Pure()) for each in yields)
+                    )
+                case interp.Successor(block, args):
+                    return interp.Successor(
+                        block,
+                        *tuple(JointResult(Value(each), Pure()) for each in args),
+                    )
         except interp.InterpreterError:
             pass
         return (self.void,)
@@ -104,8 +105,11 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         if isinstance(result, tuple) and all(x.purity is Pure() for x in result):
             return
 
-        if isinstance(result, interp.ReturnValue) and all(
-            x.purity is Pure() for x in result.results
+        if isinstance(result, interp.ReturnValue) and isinstance(result.value, Pure):
+            return
+
+        if isinstance(result, interp.YieldValue) and all(
+            isinstance(x, Pure) for x in result
         ):
             return
 

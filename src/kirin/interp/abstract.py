@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import TypeVar, Iterable
+from typing import TypeVar, Iterable, TypeAlias, overload
 from dataclasses import field, dataclass
 
 from kirin.ir import Region, SSAValue, Statement
@@ -7,10 +7,15 @@ from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
 from kirin.interp.base import BaseInterpreter, InterpreterMeta
 from kirin.interp.frame import Frame
-from kirin.interp.value import Successor, ReturnValue
+from kirin.interp.value import Successor, YieldValue, ReturnValue, SpecialValue
+from kirin.interp.exceptions import InterpreterError
 
 ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
+
+AbsIntResultType: TypeAlias = (
+    tuple[ResultType, ...] | None | ReturnValue[ResultType] | YieldValue[ResultType]
+)
 
 
 @dataclass
@@ -140,41 +145,94 @@ class AbstractInterpreter(
 
     def run_ssacfg_region(
         self, frame: AbstractFrameType, region: Region
-    ) -> tuple[ResultType, ...]:
-        result: tuple[ResultType, ...] = ()
+    ) -> tuple[ResultType, ...] | None | ReturnValue[ResultType]:
+        result = None
         frame.worklist.append(
             Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))
         )
         while (succ := frame.worklist.pop()) is not None:
             self.prehook_succ(frame, succ)
             block_result = self.run_block(frame, succ)
-            result = (
-                tuple(old.join(new) for old, new in zip(result, block_result))
-                if result
-                else block_result
-            )
+            if isinstance(block_result, Successor):
+                raise InterpreterError(
+                    "unexpected successor, successors should be in worklist"
+                )
+
+            result = self.join_results(result, block_result)
             self.posthook_succ(frame, succ)
+
+        if isinstance(result, YieldValue):
+            return result.values
         return result
 
     def run_block(
         self, frame: AbstractFrameType, succ: Successor
-    ) -> tuple[ResultType, ...]:
+    ) -> SpecialValue[ResultType]:
         self.set_values(frame, succ.block.args, succ.block_args)
-
-        stmt = succ.block.first_stmt
-        while stmt is not None:
+        for stmt in succ.block.stmts:
             if self.should_exec_stmt(stmt) is False:
-                stmt = stmt.next_stmt  # skip
                 continue
 
+            frame.stmt = stmt
+            frame.lino = stmt.source.lineno if stmt.source else 0
             stmt_results = self.eval_stmt(frame, stmt)
-            match stmt_results:
-                case tuple(values):
-                    self.set_values(frame, stmt._results, values)
-                case ReturnValue(results):  # this must be last stmt in block
-                    return results
-                case _:  # just ignore other cases
-                    pass
+            if isinstance(stmt_results, tuple):
+                self.set_values(frame, stmt._results, stmt_results)
+            else:  # terminate
+                return stmt_results
+        return None
 
-            stmt = stmt.next_stmt
-        return ()
+    @overload
+    def join_results(self, old: None, new: None) -> None: ...
+    @overload
+    def join_results(
+        self, old: ReturnValue[ResultType], new: ReturnValue[ResultType]
+    ) -> ReturnValue[ResultType]: ...
+    @overload
+    def join_results(
+        self, old: YieldValue[ResultType], new: YieldValue[ResultType]
+    ) -> YieldValue[ResultType]: ...
+    @overload
+    def join_results(
+        self, old: tuple[ResultType], new: tuple[ResultType]
+    ) -> tuple[ResultType]: ...
+    @overload
+    def join_results(
+        self,
+        old: tuple[ResultType, ...] | ReturnValue[ResultType] | None,
+        new: tuple[ResultType, ...] | ReturnValue[ResultType] | None,
+    ) -> tuple[ResultType, ...] | ReturnValue[ResultType] | None: ...
+    @overload
+    def join_results(
+        self,
+        old: ReturnValue[ResultType] | YieldValue[ResultType] | None,
+        new: ReturnValue[ResultType] | YieldValue[ResultType] | None,
+    ) -> ReturnValue[ResultType] | YieldValue[ResultType] | None: ...
+    @overload
+    def join_results(
+        self, old: AbsIntResultType[ResultType], new: AbsIntResultType[ResultType]
+    ) -> AbsIntResultType[ResultType]: ...
+
+    def join_results(
+        self,
+        old: AbsIntResultType[ResultType],
+        new: AbsIntResultType[ResultType],
+    ) -> AbsIntResultType[ResultType]:
+        if old is None:
+            return new
+        elif new is None:
+            return old
+
+        if isinstance(old, ReturnValue) and isinstance(new, ReturnValue):
+            return ReturnValue(old.value.join(new.value))
+        elif isinstance(old, YieldValue) and isinstance(new, YieldValue):
+            return YieldValue(
+                tuple(
+                    old_val.join(new_val)
+                    for old_val, new_val in zip(old.values, new.values)
+                )
+            )
+        elif isinstance(old, tuple) and isinstance(new, tuple):
+            return tuple(old_val.join(new_val) for old_val, new_val in zip(old, new))
+        else:
+            return None

@@ -6,13 +6,13 @@ from dataclasses import field, dataclass
 
 from typing_extensions import Self, deprecated
 
-from kirin.ir import Region, Statement, DialectGroup, traits
+from kirin.ir import Block, Region, Statement, DialectGroup, traits
 from kirin.ir.method import Method
 
 from .impl import Signature
 from .frame import FrameABC
 from .state import InterpreterState
-from .value import SpecialValue, StatementResult
+from .value import ReturnValue, SpecialValue, StatementResult
 from .result import Ok, Err, Result
 from .exceptions import InterpreterError
 
@@ -153,6 +153,24 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             sys.setrecursionlimit(current_recursion_limit)
         return Ok(results)
 
+    def run_stmt(
+        self, stmt: Statement, args: tuple[ValueType, ...]
+    ) -> StatementResult[ValueType]:
+        """execute a statement with arguments in a new frame.
+
+        Args:
+            stmt (Statement): the statement to run.
+            args (tuple[ValueType]): the arguments to the statement.
+
+        Returns:
+            StatementResult[ValueType]: the result of the statement.
+        """
+        frame = self.new_frame(stmt)
+        self.state.push_frame(frame)
+        frame.set_values(stmt.args, args)
+        results = self.eval_stmt(frame, stmt)
+        return results
+
     @abstractmethod
     def run_method(self, method: Method, args: tuple[ValueType, ...]) -> ValueType:
         """How to run a method.
@@ -200,17 +218,33 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self, frame: FrameType, code: Statement, region: Region
     ) -> ValueType:
         """A hook defines how to run the callable region given
-        the interpreter context.
+        the interpreter context. Frame should be pushed before calling
+        this method and popped after calling this method.
 
         A callable region is a region that can be called as a function.
         Unlike a general region (or the MLIR convention), it always return a value
         to be compatible with the Python convention.
         """
         results = self.run_ssacfg_region(frame, region)
-        if not results:
+        if isinstance(results, ReturnValue):
+            return results.value
+        elif not results:  # empty result or None
             return self.void
-        # NOTE: it's not our job validate the IR return
-        return results[0]
+        raise InterpreterError(
+            f"callable region {code.name} does not return `ReturnValue`, got {results}"
+        )
+
+    def run_block(self, frame: FrameType, block: Block) -> SpecialValue[ValueType]:
+        """Run a block within the current frame.
+
+        Args:
+            frame: the current frame.
+            block: the block to run.
+
+        Returns:
+            SpecialValue: the result of running the block terminator.
+        """
+        ...
 
     @abstractmethod
     def new_frame(self, code: Statement) -> FrameType:
@@ -263,10 +297,6 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             arg_names[len(positionals) + 1 :], positionals, kwargs
         )
         return args
-
-    @deprecated("use eval_stmt instead")
-    def run_stmt(self, frame: FrameType, stmt: Statement) -> StatementResult[ValueType]:
-        return self.eval_stmt(frame, stmt)
 
     def eval_stmt(
         self, frame: FrameType, stmt: Statement
@@ -379,7 +409,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     @abstractmethod
     def run_ssacfg_region(
         self, frame: FrameType, region: Region
-    ) -> tuple[ValueType, ...]:
+    ) -> tuple[ValueType, ...] | None | ReturnValue[ValueType]:
         """This implements how to run a region with MLIR SSA CFG convention.
 
         Args:
@@ -387,7 +417,12 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             region: the region to run.
 
         Returns:
-            ValueType: the result of running the region.
+            tuple[ValueType, ...] | SpecialValue[ValueType]: the result of running the region.
+
+        when region returns `tuple[ValueType, ...]`, it means the region terminates normally
+        with `YieldValue`. When region returns `ReturnValue`, it means the region terminates
+        and needs to pop the frame. Region cannot return `Successor` because reference to
+        external region is not allowed.
         """
         ...
 

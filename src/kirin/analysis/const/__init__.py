@@ -8,7 +8,7 @@ propagation algorithm for computing the constant values for each SSA value in
 the IR.
 """
 
-from .prop import Propagate as Propagate
+from .prop import Propagate as Propagate, ExtraFrameInfo as ExtraFrameInfo
 from .lattice import (
     Pure as Pure,
     Value as Value,

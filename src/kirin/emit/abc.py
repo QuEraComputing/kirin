@@ -78,7 +78,7 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
             match stmt_results:
                 case tuple(values):
                     frame.set_values(stmt._results, values)
-                case interp.ReturnValue(_):
+                case interp.ReturnValue(_) | interp.YieldValue(_):
                     pass
                 case _:
                     raise ValueError(f"Unexpected result {stmt_results}")
