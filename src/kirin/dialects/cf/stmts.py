@@ -13,6 +13,9 @@ class Branch(Statement):
     arguments: tuple[SSAValue, ...]
     successor: Block = info.block()
 
+    def verify(self) -> None:
+        return
+
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):
             printer.print_name(self)
@@ -61,3 +64,6 @@ class ConditionalBranch(Statement):
         printer.plain_print("(")
         printer.print_seq(self.else_arguments, delim=", ")
         printer.plain_print(")")
+
+    def verify(self) -> None:
+        return

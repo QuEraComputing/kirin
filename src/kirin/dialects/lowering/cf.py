@@ -4,9 +4,9 @@
 import ast
 
 from kirin import ir
+from kirin.dialects import cf, py
 from kirin.lowering import Frame, Result, FromPythonAST, LoweringState
 from kirin.exceptions import DialectLoweringError
-from kirin.dialects.cf import stmts as cf
 
 dialect = ir.Dialect("lowering.cf")
 
@@ -19,6 +19,83 @@ class CfLowering(FromPythonAST):
         if next is None:
             raise DialectLoweringError("code block is not exiting")
         state.append_stmt(cf.Branch(arguments=(), successor=next))
+        return Result()
+
+    def lower_For(self, state: LoweringState, node: ast.For) -> Result:
+        iterable = state.visit(node.iter).expect_one()
+        iter_stmt = state.append_stmt(py.iterable.Iter(iterable))
+        none_stmt = state.append_stmt(py.Constant(None))
+        yields: list[str] = []
+
+        def new_block_arg_if_inside_loop(frame: Frame, capture: ir.SSAValue):
+            if not capture.name:
+                raise DialectLoweringError("unexpected loop variable captured")
+            yields.append(capture.name)
+            return frame.entry_block.args.append_from(capture.type, capture.name)
+
+        frame = state.current_frame
+        next_block = ir.Block()
+
+        body_frame = state.push_frame(
+            Frame.from_stmts(
+                node.body,
+                state,
+                region=frame.current_region,
+                globals=state.current_frame.globals,
+                capture_callback=new_block_arg_if_inside_loop,
+            )
+        )
+        body_frame.next_block = next_block
+        next_value = body_frame.entry_block.args.append_from(ir.types.Any, "next_value")
+        py.unpack.unpackable(state, node.target, next_value)
+        state.exhaust(body_frame)
+        next_stmt = body_frame.append_stmt(py.iterable.Next(iter_stmt.iter))
+        cond_stmt = body_frame.append_stmt(py.cmp.Is(next_stmt.value, none_stmt.result))
+        yield_args = tuple(body_frame.get_scope(name) for name in yields)
+        state.pop_frame()
+
+        next_frame = state.push_frame(
+            Frame.from_stmts(
+                frame.stream.split(),
+                state,
+                region=frame.current_region,
+                block=next_block,
+                globals=frame.globals,
+            )
+        )
+        next_frame.next_block = frame.next_block
+        for name, arg in zip(yields, yield_args):
+            input = next_frame.current_block.args.append_from(arg.type, name)
+            next_frame.defs[name] = input
+        state.exhaust()
+        state.pop_frame()
+
+        yield_args = tuple(body_frame.get_scope(name) for name in yields)
+        body_frame.append_stmt(
+            cf.ConditionalBranch(
+                cond_stmt.result,
+                yield_args,
+                (next_stmt.value,) + yield_args,
+                then_successor=next_frame.entry_block,
+                else_successor=body_frame.entry_block,
+            )
+        )
+
+        next_stmt = frame.append_stmt(py.iterable.Next(iter_stmt.iter))
+        cond_stmt = frame.append_stmt(py.cmp.Is(next_stmt.value, none_stmt.result))
+        yield_args = tuple(frame.get_scope(name) for name in yields)
+        frame.append_stmt(
+            cf.ConditionalBranch(
+                cond_stmt.result,
+                yield_args,
+                (next_stmt.value,) + yield_args,
+                then_successor=next_frame.entry_block,
+                else_successor=body_frame.entry_block,
+            )
+        )
+        frame.current_block = next_frame.current_block
+        frame.next_block = next_frame.next_block
+        frame.defs.update(next_frame.defs)
         return Result()
 
     def lower_If(self, state: LoweringState, node: ast.If) -> Result:
