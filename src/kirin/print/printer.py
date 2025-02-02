@@ -1,51 +1,16 @@
 import io
-from typing import (
-    IO,
-    TYPE_CHECKING,
-    Any,
-    Union,
-    Generic,
-    Literal,
-    TypeVar,
-    Callable,
-    Iterable,
-    Optional,
-    TypedDict,
-)
+from typing import IO, TYPE_CHECKING, Any, Union, Literal, TypeVar, Callable, Iterable
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
 from rich.theme import Theme
 from rich.console import Console
-from typing_extensions import Unpack
 
 from kirin.idtable import IdTable
 from kirin.print.printable import Printable
 
 if TYPE_CHECKING:
-    from rich.style import Style
-
     from kirin import ir
-
-    class RichConsoleOptions(TypedDict, total=False):
-        color_system: Optional[
-            Literal["auto", "standard", "256", "truecolor", "windows"]
-        ]
-        force_terminal: Optional[bool]
-        force_interactive: Optional[bool]
-        soft_wrap: bool
-        stderr: bool
-        quiet: bool
-        width: Optional[int]
-        height: Optional[int]
-        style: Optional[Style | str]
-        no_color: Optional[bool]
-        record: bool
-        markup: bool
-        emoji: bool
-        log_time: bool
-        log_path: bool
-        safe_box: bool
 
 
 DEFAULT_THEME = {
@@ -58,7 +23,8 @@ DEFAULT_THEME = {
             "symbol": "cyan",
             "warning": "yellow",
             "string": "green",
-            "irrational": "magenta",
+            "irrational": "default",
+            "number": "default",
         }
     ),
     "light": Theme(
@@ -95,47 +61,31 @@ class PrintState:
 IOType = TypeVar("IOType", bound=IO)
 
 
-@dataclass(init=False)
-class Printer(Generic[IOType]):
-    """printer for IR nodes and other objects."""
+def _default_console():
+    return Console(force_jupyter=False)
 
-    stream: IOType | None = None
-    """Output stream"""
+
+@dataclass
+class Printer:
+    """A IR pretty printer build on top of Rich console."""
+
+    console: Console = field(default_factory=_default_console)
+    """Rich console"""
     analysis: dict["ir.SSAValue", Any] | None = None
     """Analysis results"""
-    console: Console = field(default_factory=Console)
-    """Rich console"""
     state: PrintState = field(default_factory=PrintState)
     """Printing state"""
-    show_indent_mark: bool = True
+    show_indent_mark: bool = field(default=True, kw_only=True)
     "Whether to show indent marks, e.g │"
+    theme: Theme | dict | Literal["dark", "light"] = field(default="dark", kw_only=True)
+    "Theme to use for printing"
 
-    def __init__(
-        self,
-        stream: IOType | None = None,
-        analysis: dict["ir.SSAValue", Printable] | None = None,
-        show_indent_mark: bool = True,
-        theme: Theme | dict | Literal["dark", "light"] = "dark",
-        # NOTE: turn off jupyter rendering cuz we just want text
-        force_jupyter: "Optional[bool]" = False,
-        **kwargs: Unpack["RichConsoleOptions"],
-    ):
-        self.stream = stream
-        self.analysis = analysis
-        self.state = PrintState()
-        self.show_indent_mark = show_indent_mark
-        if isinstance(theme, dict):
-            theme = Theme(theme)
-        elif isinstance(theme, str):
-            theme = DEFAULT_THEME[theme]
-
-        self.console = Console(
-            file=self.stream,
-            highlight=False,
-            theme=theme,
-            force_jupyter=force_jupyter,
-            **kwargs,
-        )
+    def __post_init__(self):
+        if isinstance(self.theme, dict):
+            self.theme = Theme(self.theme)
+        elif isinstance(self.theme, str):
+            self.theme = DEFAULT_THEME[self.theme]
+        self.console.push_theme(self.theme)
 
     def print(self, object):
         """entry point for printing an object

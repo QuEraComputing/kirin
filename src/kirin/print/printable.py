@@ -5,39 +5,20 @@ from typing import TYPE_CHECKING
 
 # NOTE: we don't want to actually load rich here
 if TYPE_CHECKING:
-    from typing import IO, Literal, Optional, TypedDict
+    from typing import Any, Literal, TypedDict
 
     from rich.theme import Theme
+    from rich.console import Console
     from typing_extensions import Unpack
 
     from kirin import ir
     from kirin.print import Printer
 
-    from .printer import RichConsoleOptions
-
     class _PrintOptions(TypedDict, total=False):
-        stream: Optional[IO[str]]
-        analysis: Optional[dict["ir.SSAValue", Printable]]
+        console: Console
+        analysis: dict["ir.SSAValue", Any]
         show_indent_mark: bool
         theme: Theme | dict | Literal["dark", "light"]
-        force_jupyter: Optional[bool]
-
-    class PrintOptions(_PrintOptions, RichConsoleOptions):
-        pass
-
-
-KEYWORD_DOC = """
-Keyword Args:
-    stream (IO[str]):
-        The stream to write the output to. If None, the output will
-        be written to stdout.
-    analysis (dict[ir.SSAValue, Printable]):
-        Analysis results to use for printing. If `None`, no analysis results
-    show_indent_mark (bool):
-        Whether to show the indentation mark.
-    theme (Theme | dict | str):
-        The theme to use for printing, defaults to "dark".
-"""
 
 
 class Printable:
@@ -52,7 +33,7 @@ class Printable:
     @staticmethod
     def __get_printer(
         printer: Printer | None = None,
-        **options: Unpack["PrintOptions"],
+        **options: Unpack["_PrintOptions"],
     ) -> Printer:
         if printer is None:
             from kirin.print import Printer
@@ -63,7 +44,7 @@ class Printable:
     def pager(
         self,
         printer: Printer | None = None,
-        **options: Unpack["PrintOptions"],
+        **options: Unpack["_PrintOptions"],
     ) -> None:
         """Pretty print the object with a pager.
 
@@ -73,9 +54,9 @@ class Printable:
                 If None, a new `Printer` object will be created.
 
         Keyword Args:
-            stream (IO[str]):
-                The stream to write the output to. If None, the output will
-                be written to stdout.
+            console (rich.Console):
+                The console to use for printing. If not provided, a new console
+                will be created.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
             show_indent_mark (bool):
@@ -94,7 +75,7 @@ class Printable:
         self,
         printer: Printer | None = None,
         end: str = "\n",
-        **options: Unpack["PrintOptions"],
+        **options: Unpack["_PrintOptions"],
     ) -> None:
         """
         Entry point of the printing process.
@@ -105,9 +86,9 @@ class Printable:
                 If None, a new `Printer` object will be created.
 
         Keyword Args:
-            stream (IO[str]):
-                The stream to write the output to. If None, the output will
-                be written to stdout.
+            console (rich.Console):
+                The console to use for printing. If not provided, a new console
+                will be created.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
             show_indent_mark (bool):
@@ -126,7 +107,7 @@ class Printable:
         self,
         printer: Printer | None = None,
         end: str = "\n",
-        **options: Unpack["PrintOptions"],
+        **options: Unpack["_PrintOptions"],
     ) -> str:
         """Print the object to a string.
 
@@ -136,9 +117,9 @@ class Printable:
                 If None, a new `Printer` object will be created.
 
         Keyword Args:
-            stream (IO[str]):
-                The stream to write the output to. If None, the output will
-                be written to stdout.
+            console (rich.Console):
+                The console to use for printing. If not provided, a new console
+                will be created.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
             show_indent_mark (bool):
