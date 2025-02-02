@@ -61,11 +61,15 @@ class PrintState:
 IOType = TypeVar("IOType", bound=IO)
 
 
+def _default_console():
+    return Console(force_jupyter=False)
+
+
 @dataclass
 class Printer:
     """A IR pretty printer build on top of Rich console."""
 
-    console: Console = field(default_factory=Console)
+    console: Console = field(default_factory=_default_console)
     """Rich console"""
     analysis: dict["ir.SSAValue", Any] | None = None
     """Analysis results"""
