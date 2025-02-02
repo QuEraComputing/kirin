@@ -80,6 +80,7 @@
                 * [stmts](kirin/dialects/py/cmp/stmts.md)
             * [constant](kirin/dialects/py/constant.md)
             * [indexing](kirin/dialects/py/indexing.md)
+            * [iterable](kirin/dialects/py/iterable.md)
             * [len](kirin/dialects/py/len.md)
             * [list](kirin/dialects/py/list/index.md)
                 * [interp](kirin/dialects/py/list/interp.md)
