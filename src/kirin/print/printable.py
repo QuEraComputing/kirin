@@ -54,9 +54,9 @@ class Printable:
                 If None, a new `Printer` object will be created.
 
         Keyword Args:
-            stream (IO[str]):
-                The stream to write the output to. If None, the output will
-                be written to stdout.
+            console (rich.Console):
+                The console to use for printing. If not provided, a new console
+                will be created.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
             show_indent_mark (bool):
@@ -86,9 +86,9 @@ class Printable:
                 If None, a new `Printer` object will be created.
 
         Keyword Args:
-            stream (IO[str]):
-                The stream to write the output to. If None, the output will
-                be written to stdout.
+            console (rich.Console):
+                The console to use for printing. If not provided, a new console
+                will be created.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
             show_indent_mark (bool):
@@ -117,9 +117,9 @@ class Printable:
                 If None, a new `Printer` object will be created.
 
         Keyword Args:
-            stream (IO[str]):
-                The stream to write the output to. If None, the output will
-                be written to stdout.
+            console (rich.Console):
+                The console to use for printing. If not provided, a new console
+                will be created.
             analysis (dict[ir.SSAValue, Printable]):
                 Analysis results to use for printing. If `None`, no analysis results
             show_indent_mark (bool):
