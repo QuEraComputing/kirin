@@ -57,6 +57,8 @@ DEFAULT_THEME = {
             "keyword": "red",
             "symbol": "cyan",
             "warning": "yellow",
+            "string": "green",
+            "irrational": "magenta",
         }
     ),
     "light": Theme(
@@ -67,6 +69,8 @@ DEFAULT_THEME = {
             "keyword": "red",
             "symbol": "cyan",
             "warning": "yellow",
+            "string": "green",
+            "irrational": "magenta",
         }
     ),
 }
