@@ -20,8 +20,7 @@
                 <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_my_stmt</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
             <span class=k>else</span><span class=p>:</span>
                 <span class=k>return</span> <span class=p>()</span>
-</code></pre></div></li> </ul> </details> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 79</span>
-<span class=normal> 80</span>
+</code></pre></div></li> </ul> </details> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 80</span>
 <span class=normal> 81</span>
 <span class=normal> 82</span>
 <span class=normal> 83</span>
@@ -41,7 +40,8 @@
 <span class=normal> 97</span>
 <span class=normal> 98</span>
 <span class=normal> 99</span>
-<span class=normal>100</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
+<span class=normal>100</span>
+<span class=normal>101</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>eval_stmt</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=n>ExtraFrameInfo</span><span class=p>],</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>JointResult</span><span class=p>]:</span>
     <span class=k>if</span> <span class=n>stmt</span><span class=o>.</span><span class=n>has_trait</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>ConstantLike</span><span class=p>):</span>
@@ -67,15 +67,15 @@
     <span class=n>frame</span><span class=p>:</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=n>ExtraFrameInfo</span><span class=p>],</span>
     <span class=n>results</span><span class=p>:</span> <span class=n>JointResult</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>JointResult</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>127</span>
-<span class=normal>128</span>
-<span class=normal>129</span>
-<span class=normal>130</span>
-<span class=normal>131</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Postprocess a frame after it is popped from the stack. This is called after a method is evaluated and the frame is popped.</p> <details class=note open> <summary>Note</summary> <p>Default implementation does nothing.</p> </details> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>131</span>
 <span class=normal>132</span>
 <span class=normal>133</span>
 <span class=normal>134</span>
-<span class=normal>135</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span>
+<span class=normal>135</span>
+<span class=normal>136</span>
+<span class=normal>137</span>
+<span class=normal>138</span>
+<span class=normal>139</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>finalize</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=n>ExtraFrameInfo</span><span class=p>],</span>
     <span class=n>results</span><span class=p>:</span> <span class=n>JointResult</span><span class=p>,</span>
@@ -95,12 +95,12 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.run_method class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_method</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_method</span><span class=p>(</span>
     <span class=n>method</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>JointResult</span>
-</code></pre></div> <div class="doc doc-contents "> <p>How to run a method.</p> <p>This is defined by subclasses to describe what's the corresponding value of a method during the interpretation.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>method</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.method.Method" href="../../../ir/method/#kirin.ir.method.Method">Method</a></code> </td> <td> <div class=doc-md-description> <p>the method to run.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the arguments to the method, does not include self.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code><span title="kirin.interp.base.ValueType">ValueType</span></code> </td> <td> <div class=doc-md-description> <p>the result of the method.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>120</span>
-<span class=normal>121</span>
-<span class=normal>122</span>
-<span class=normal>123</span>
-<span class=normal>124</span>
-<span class=normal>125</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_method</span><span class=p>(</span>
+</code></pre></div> <div class="doc doc-contents "> <p>How to run a method.</p> <p>This is defined by subclasses to describe what's the corresponding value of a method during the interpretation.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>method</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.method.Method" href="../../../ir/method/#kirin.ir.method.Method">Method</a></code> </td> <td> <div class=doc-md-description> <p>the method to run.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args</code> </td> <td> <code>tuple[<span title="kirin.interp.base.ValueType">ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the arguments to the method, does not include self.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ValueType</code></td> <td> <code><span title="kirin.interp.base.ValueType">ValueType</span></code> </td> <td> <div class=doc-md-description> <p>the result of the method.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>124</span>
+<span class=normal>125</span>
+<span class=normal>126</span>
+<span class=normal>127</span>
+<span class=normal>128</span>
+<span class=normal>129</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_method</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>method</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>JointResult</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>JointResult</span><span class=p>:</span>
     <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_callable</span><span class=p>(</span>
