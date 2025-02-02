@@ -44,6 +44,7 @@ class CFG(Printable):
     def successors(self):
         """CFG data, mapping a block to its neighbors."""
         graph: dict[ir.Block, set[ir.Block]] = {}
+        visited: set[ir.Block] = set()
         worklist: WorkList[ir.Block] = WorkList()
         if self.parent.blocks.isempty():
             return graph
@@ -54,8 +55,11 @@ class CFG(Printable):
             if block.last_stmt is not None:
                 neighbors.update(block.last_stmt.successors)
                 worklist.extend(block.last_stmt.successors)
+            visited.add(block)
 
             block = worklist.pop()
+            while block is not None and block in visited:
+                block = worklist.pop()
         return graph
 
     # graph interface
