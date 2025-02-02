@@ -2,7 +2,7 @@ from abc import ABC
 from typing import TypeVar, Iterable, TypeAlias, overload
 from dataclasses import field, dataclass
 
-from kirin.ir import Region, SSAValue, Statement
+from kirin.ir import Block, Region, SSAValue, Statement
 from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
 from kirin.interp.base import BaseInterpreter, InterpreterMeta
@@ -27,6 +27,7 @@ class AbstractFrame(Frame[ResultType]):
     """
 
     worklist: WorkList[Successor[ResultType]] = field(default_factory=WorkList)
+    visited: dict[Block, set[Successor[ResultType]]] = field(default_factory=dict)
 
 
 AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
@@ -151,8 +152,18 @@ class AbstractInterpreter(
             Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))
         )
         while (succ := frame.worklist.pop()) is not None:
+            if succ.block in frame.visited:
+                if succ in frame.visited[succ.block]:
+                    continue
+            else:
+                frame.visited[succ.block] = set()
             self.prehook_succ(frame, succ)
             block_result = self.run_block(frame, succ)
+            if len(frame.visited[succ.block]) < 128:
+                frame.visited[succ.block].add(succ)
+            else:
+                continue
+
             if isinstance(block_result, Successor):
                 raise InterpreterError(
                     "unexpected successor, successors should be in worklist"
