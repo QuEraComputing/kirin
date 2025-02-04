@@ -24,7 +24,6 @@ class Pour(ir.Statement):
 
 @statement(dialect=dialect)
 class Drink(ir.Statement):
-    name = "drink"
     traits = frozenset({ir.FromPythonCall()})
     pints: ir.SSAValue = info.argument(types.PyClass(Pints))
 
