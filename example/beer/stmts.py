@@ -28,6 +28,11 @@ class Drink(ir.Statement):
 
 
 @statement(dialect=dialect)
+class Puke(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
+
+
+@statement(dialect=dialect)
 class RandomBranch(ir.Statement):
     name = "random_br"
     traits = frozenset({ir.IsTerminator()})
@@ -36,9 +41,3 @@ class RandomBranch(ir.Statement):
     else_arguments: tuple[ir.SSAValue, ...] = info.argument()
     then_successor: ir.Block = info.block()
     else_successor: ir.Block = info.block()
-
-
-@statement(dialect=dialect)
-class Puke(ir.Statement):
-    name = "puke"
-    traits = frozenset({ir.FromPythonCall()})
