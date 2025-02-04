@@ -3,7 +3,7 @@ from recept import FeeAnalysis
 from dialect import dialect
 
 from interp import BeerMethods as BeerMethods
-from lattice import AtLeastItem
+from lattice import AtLeastXItem
 from rewrite import RandomWalkBranch
 from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
@@ -87,7 +87,7 @@ def main2(x: int):
 
 
 fee_analysis = FeeAnalysis(main2.dialects)
-results, expect = fee_analysis.run_analysis(main2, args=(AtLeastItem(data=10),))
+results, expect = fee_analysis.run_analysis(main2, args=(AtLeastXItem(data=10),))
 print(results)
 print(fee_analysis.puke_count)
 main2.print(analysis=results)

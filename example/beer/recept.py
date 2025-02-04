@@ -18,13 +18,9 @@ class FeeAnalysis(Forward[latt.Item]):
     lattice = latt.Item
     puke_count: int = field(init=False)
 
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
     def initialize(self):
         super().initialize()
         self.puke_count = 0
-        # self.constprop_results = {}
         return self
 
     def should_exec_stmt(self, stmt: ir.Statement):
@@ -77,8 +73,8 @@ class PyBinOpMethodTable(interp.MethodTable):
         left = frame.get(stmt.lhs)
         right = frame.get(stmt.rhs)
 
-        if isinstance(left, latt.AtLeastItem) or isinstance(right, latt.AtLeastItem):
-            out = latt.AtLeastItem(data=left.data + right.data)
+        if isinstance(left, latt.AtLeastXItem) or isinstance(right, latt.AtLeastXItem):
+            out = latt.AtLeastXItem(data=left.data + right.data)
         else:
             out = latt.ConstIntItem(data=left.data + right.data)
 
@@ -113,9 +109,9 @@ class BeerMethodTable(interp.MethodTable):
         # Drink depends on the beer type to have different charge:
 
         beer: latt.BeerItem = frame.get(stmt.beverage)
-        pint_count: latt.AtLeastItem | latt.ConstIntItem = frame.get(stmt.amount)
+        pint_count: latt.AtLeastXItem | latt.ConstIntItem = frame.get(stmt.amount)
 
-        out = latt.PintsItem(count=pint_count, brand=beer.brand)
+        out = latt.ItemPints(count=pint_count, brand=beer.brand)
 
         return (out,)
 
