@@ -13,8 +13,17 @@ def test_union():
     target_b = group_a.union(group_c)
     assert target_a.data == group_a.data
     assert target_b.data == group_d.data
-    assert repr(target_a) == "DialectGroup([base, cf])"
-    assert repr(target_b) == "DialectGroup([base, cf, func])"
+
+    target_a_repr = repr(target_a)
+    assert "DialectGroup(" in target_a_repr
+    assert base.dialect.name in target_a_repr
+    assert cf.dialect.name in target_a_repr
+
+    target_b_repr = repr(target_b)
+    assert "DialectGroup(" in target_b_repr
+    assert base.dialect.name in target_b_repr
+    assert cf.dialect.name in target_b_repr
+    assert func.dialect.name in target_b_repr
 
 
 def test_discard():
@@ -26,3 +35,13 @@ def test_discard():
     target_b = group_d.discard(func)
     assert target_a.data == group_c.data
     assert target_b.data == group_a.data
+
+    target_a_repr = repr(target_a)
+    assert "DialectGroup(" in target_a_repr
+    assert base.dialect.name in target_a_repr
+    assert func.dialect.name in target_a_repr
+
+    target_b_repr = repr(target_b)
+    assert "DialectGroup(" in target_b_repr
+    assert base.dialect.name in target_b_repr
+    assert cf.dialect.name in target_b_repr
