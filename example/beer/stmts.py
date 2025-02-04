@@ -1,4 +1,4 @@
-from attrs import Beer
+from attrs import Beer, Pints
 from dialect import dialect
 
 from kirin import ir, types
@@ -19,14 +19,14 @@ class Pour(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
     beverage: ir.SSAValue = info.argument(types.PyClass(Beer))
     amount: ir.SSAValue = info.argument(types.Int)
-    result: ir.ResultValue = info.result(types.PyClass(Pint))
+    result: ir.ResultValue = info.result(types.PyClass(Pints))
 
 
 @statement(dialect=dialect)
 class Drink(ir.Statement):
     name = "drink"
     traits = frozenset({ir.FromPythonCall()})
-    beverage: ir.SSAValue = info.argument(types.PyClass(Pint))
+    pints: ir.SSAValue = info.argument(types.PyClass(Pints))
 
 
 @statement(dialect=dialect)

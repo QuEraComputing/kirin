@@ -30,15 +30,21 @@ def main(x):
         Pour(beer, amount + 1)
         Puke()
 
-    beer = NewBeer(brand="budlight")
-    Drink(beer)
-    Pour(beer, 12 + x)
+    bud = NewBeer(brand="budlight")
+    heineken = NewBeer(brand="heineken")
+    tsingdao = NewBeer(brand="tsingdao")
+
+    bud_pints = Pour(bud, 12 + x)
+    heineken_pints = Pour(heineken, 10 + x)
+    tsingdao_pints = Pour(tsingdao, 8)
+    Drink(bud_pints)
     Puke()
-    some_closure(beer, 1 + 1)
+
+    some_closure(bud, 1 + 1)
     if x > 1:
-        Drink(NewBeer(brand="heineken"))
+        Drink(heineken_pints)
     else:
-        Drink(NewBeer(brand="tsingdao"))
+        Drink(tsingdao_pints)
     return x + 1
 
 
@@ -49,16 +55,16 @@ main(1)  # execute the function
 #     main(i)  # now drink a random beer!
 
 
-# analysis:
-from recept import FeeAnalysis
+# # analysis:
+# from recept import FeeAnalysis
 
-from lattice import NotItem
-from kirin.analysis.const import Value, Propagate, JointResult
+# from lattice import NotItem
+# from kirin.analysis.const import Value, Propagate, JointResult
 
-cp = Propagate(main.dialects)
-cp_results, expect = cp.run_analysis(main, (JointResult.from_const(1),))
-print(cp_results)
+# cp = Propagate(main.dialects)
+# cp_results, expect = cp.run_analysis(main, (JointResult.from_const(1),))
+# print(cp_results)
 
-fee_analysis = FeeAnalysis(main.dialects, constprop_results=cp_results)
-results, expect = fee_analysis.run_analysis(main, args=(NotItem(),))
-print(results)
+# fee_analysis = FeeAnalysis(main.dialects, constprop_results=cp_results)
+# results, expect = fee_analysis.run_analysis(main, args=(NotItem(),))
+# print(results)

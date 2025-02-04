@@ -1,5 +1,5 @@
-from typing import Any, final
-from dataclasses import field, dataclass
+from typing import final
+from dataclasses import dataclass
 
 from kirin.lattice import (
     SingletonMeta,
@@ -45,29 +45,11 @@ class AnyItem(Item, metaclass=SingletonMeta):
 
 @final
 @dataclass
-class PukePenalty(Item):
-
-    def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, PukePenalty)
-
-
-@final
-@dataclass
-class DrinkFee(Item):
-    beer_name: str
-    price: float
-
-    def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, DrinkFee)
-
-
-@final
-@dataclass
-class PourFee(Item):
+class PourFeeItem(Item):
     count: int
 
     def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, PourFee)
+        return isinstance(other, PourFeeItem)
 
 
 @final

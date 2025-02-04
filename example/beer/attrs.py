@@ -5,3 +5,9 @@ from dataclasses import dataclass
 @dataclass
 class Beer:
     brand: str
+
+
+@dataclass
+class Pints:
+    kind: Beer
+    amount: int
