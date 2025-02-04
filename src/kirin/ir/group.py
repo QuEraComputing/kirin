@@ -64,8 +64,12 @@ class DialectGroup(Generic[PassParams]):
     def __iter__(self):
         return iter(self.data)
 
+    def __repr__(self) -> str:
+        names = ", ".join(each.name for each in self.data)
+        return f"DialectGroup([{names}])"
+
     @staticmethod
-    def map_module(dialect):
+    def map_module(dialect: Union["Dialect", ModuleType]) -> "Dialect":
         """map the module to the dialect if it is a module.
         It assumes that the module has a `dialect` attribute
         that is an instance of [`Dialect`][kirin.ir.Dialect].
@@ -96,6 +100,26 @@ class DialectGroup(Generic[PassParams]):
         """
         return DialectGroup(
             dialects=self.data.union(frozenset(self.map_module(d) for d in dialect)),
+            run_pass=self.run_pass_gen,  # pass the run_pass_gen function
+        )
+
+    def discard(self, dialect: Union["Dialect", ModuleType]) -> "DialectGroup":
+        """discard a dialect from the group.
+
+        !!! note
+            This does not raise an error if the dialect is not in the group.
+
+        Args:
+            dialect (Union[Dialect, ModuleType]): the dialect to discard
+
+        Returns:
+            DialectGroup: the new dialect group with the discarded dialect.
+        """
+        dialect_ = self.map_module(dialect)
+        return DialectGroup(
+            dialects=frozenset(
+                each for each in self.data if each.name != dialect_.name
+            ),
             run_pass=self.run_pass_gen,  # pass the run_pass_gen function
         )
 

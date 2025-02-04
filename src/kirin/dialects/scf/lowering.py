@@ -2,7 +2,7 @@ import ast
 
 from kirin import ir, lowering
 from kirin.exceptions import DialectLoweringError
-from kirin.dialects.py.unpack import unpackable
+from kirin.dialects.py.unpack import unpacking
 
 from .stmts import For, Yield, IfElse
 from ._dialect import dialect
@@ -90,7 +90,7 @@ class Lowering(lowering.FromPythonAST):
             )
         )
         loop_var = body_frame.current_block.args.append_from(ir.types.Any)
-        unpackable(state, node.target, loop_var)
+        unpacking(state, node.target, loop_var)
         state.exhaust(body_frame)
         # NOTE: this frame won't have phi nodes
         body_frame.append_stmt(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore

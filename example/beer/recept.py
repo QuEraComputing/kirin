@@ -89,12 +89,6 @@ class PyBinOpMethodTable(interp.MethodTable):
 @dialect.register(key="beer.fee")
 class BeerMethodTable(interp.MethodTable):
 
-    menu_price: dict[str, float] = {
-        "budlight": 1.0,
-        "heineken": 2.0,
-        "tsingdao": 3.0,
-    }
-
     @interp.impl(NewBeer)
     def new_beer(
         self,

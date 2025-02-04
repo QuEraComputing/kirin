@@ -1,6 +1,15 @@
 """This module provides access to Python iterables.
 
 This is used to lower Python loops into `cf` dialect.
+
+This module contains the common methods for the Python iterable:
+
+- The `Iter` statement class.
+- The `Next` statement class.
+- The lowering pass for the iterable.
+- The concrete implementation of the iterable.
+
+This dialect maps `iter()` and `next()` calls to the `Iter` and `Next` statements.
 """
 
 from ast import Call

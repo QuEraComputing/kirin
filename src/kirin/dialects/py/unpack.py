@@ -1,3 +1,14 @@
+"""The unpack dialect for Python.
+
+This module contains the dialect for the Python unpack semantics, including:
+
+- The `Unpack` statement class.
+- The lowering pass for the unpack statement.
+- The concrete implementation of the unpack statement.
+- The type inference implementation of the unpack statement.
+- A helper function `unpacking` for unpacking Python AST nodes during lowering.
+"""
+
 import ast
 
 from kirin import ir, interp, lowering
@@ -54,7 +65,7 @@ class TypeInfer(interp.MethodTable):
         return tuple(ir.types.Any for _ in stmt.names)
 
 
-def unpackable(state: lowering.LoweringState, node: ast.expr, value: ir.SSAValue):
+def unpacking(state: lowering.LoweringState, node: ast.expr, value: ir.SSAValue):
     if isinstance(node, ast.Name):
         state.current_frame.defs[node.id] = value
         value.name = node.id
@@ -76,4 +87,4 @@ def unpackable(state: lowering.LoweringState, node: ast.expr, value: ir.SSAValue
             state.current_frame.defs[name] = result
 
     for idx in continue_unpack:
-        unpackable(state, node.elts[idx], stmt.results[idx])
+        unpacking(state, node.elts[idx], stmt.results[idx])

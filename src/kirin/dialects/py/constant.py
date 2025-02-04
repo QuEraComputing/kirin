@@ -1,3 +1,15 @@
+"""Constant statement for Python dialect.
+
+This module contains the dialect for the Python `constant` statement, including:
+
+- The `Constant` statement class.
+- The lowering pass for the `constant` statement.
+- The concrete implementation of the `constant` statement.
+- The Julia emitter for the `constant` statement.
+
+This dialect maps `ast.Constant` nodes to the `Constant` statement.
+"""
+
 import ast
 from typing import Generic, TypeVar
 

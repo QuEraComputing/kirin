@@ -1,34 +1,12 @@
+from group import beer
 from stmts import Pour, Puke, Drink, NewBeer
 from recept import FeeAnalysis
-from dialect import dialect
 
+from emit import EmitReceptMain
 from interp import BeerMethods as BeerMethods
 from lattice import AtLeastXItem
-from rewrite import RandomWalkBranch, NewBeerAndPukeOnDrink
-from kirin.ir import dialect_group
-from kirin.prelude import basic_no_opt
-from kirin.rewrite import Walk, Fixpoint
-from kirin.passes.fold import Fold
-
-
-# create our own beer dialect, it runs a random walk on the branches
-@dialect_group(basic_no_opt.add(dialect))
-def beer(self):
-
-    fold_pass = Fold(self)
-
-    def run_pass(mt, *, fold=True):
-        Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code)
-
-        # add const fold
-        if fold:
-            fold_pass(mt)
-
-    return run_pass
-
-
-# we are going to get drunk!
-# add our beer dialect to the default dialect (builtin, cf, func, ...)
+from rewrite import NewBeerAndPukeOnDrink
+from kirin.rewrite import Walk
 
 
 # type: ignore
@@ -110,3 +88,10 @@ results, expect = fee_analysis.run_analysis(main2, args=(AtLeastXItem(data=10),)
 print(results)
 print(fee_analysis.puke_count)
 main2.print(analysis=results)
+
+
+emitter = EmitReceptMain()
+emitter.recept_analysis_result = results
+
+emitter.run(main2, ("",))
+print(emitter.get_output())

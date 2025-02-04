@@ -1,3 +1,14 @@
+"""Attribute access dialect for Python.
+
+This module contains the dialect for the Python attribute access statement, including:
+
+- The `GetAttr` statement class.
+- The lowering pass for the attribute access statement.
+- The concrete implementation of the attribute access statement.
+
+This dialect maps `ast.Attribute` nodes to the `GetAttr` statement.
+"""
+
 import ast
 
 from kirin import ir, interp, lowering, exceptions

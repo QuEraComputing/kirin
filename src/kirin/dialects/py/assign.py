@@ -1,3 +1,14 @@
+"""Assignment dialect for Python.
+
+This module contains the dialect for the Python assignment statement, including:
+
+- Statements: `Alias`, `SetItem`.
+- The lowering pass for the assignments.
+- The concrete implementation of the assignment statements.
+
+This dialects maps Python assignment syntax.
+"""
+
 import ast
 
 from kirin import ir, interp, lowering, exceptions

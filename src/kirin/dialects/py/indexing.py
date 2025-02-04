@@ -1,3 +1,18 @@
+"""The indexing dialect for Python.
+
+This module contains the dialect for the Python indexing syntax, including:
+
+- The `GetItem` statement class.
+- A base class `Subscript` for indexing statements.
+- A trait `GetItemLike` for indexing statements.
+- The lowering pass for the indexing statement.
+- The concrete implementation of the indexing statement.
+- The constant propagation implementation (special case) of the indexing statement.
+- The type inference implementation of the indexing statement.
+- A canonical rewrite rule for the rewriting of a given getitem-like
+    statement to another getitem-like statement.
+"""
+
 import ast
 from abc import abstractmethod
 from typing import Generic, TypeVar

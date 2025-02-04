@@ -1,3 +1,15 @@
+"""builtin dialect for python builtins
+
+This dialect provides implementations for builtin functions like abs and sum.
+
+- Statements: `Abs`, `Sum`.
+- The lowering pass for the builtin functions.
+- The concrete implementation of the builtin functions.
+- The type inference implementation of the builtin functions.
+
+This dialect maps `ast.Call` nodes of builtin functions to the `Abs` and `Sum` statements.
+"""
+
 from ast import Call
 
 from kirin import ir, types, interp, lowering

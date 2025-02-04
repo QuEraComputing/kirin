@@ -85,7 +85,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.registry = self.dialects.registry.interpreter(keys=self.keys)
 
     def initialize(self) -> Self:
-        """Initialize the interpreter global states. This method is called before
+        """Initialize the interpreter global states. This method is called right upon
         calling [`run`][kirin.interp.base.BaseInterpreter.run] to initialize the
         interpreter global states.
 
