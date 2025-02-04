@@ -1,3 +1,17 @@
+"""The tuple dialect for Python.
+
+This dialect provides a way to work with Python tuples in the IR, including:
+
+- The `New` statement class.
+- The lowering pass for the tuple statement.
+- The concrete implementation of the tuple statement.
+- The type inference implementation of the tuple addition with `py.binop.Add`.
+- The constant propagation implementation of the tuple statement.
+- The Julia emitter for the tuple statement.
+
+This dialect maps `ast.Tuple` nodes to the `New` statement.
+"""
+
 import ast
 
 from kirin import ir, interp, lowering

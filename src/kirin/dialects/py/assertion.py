@@ -1,3 +1,16 @@
+"""Assertion dialect for Python.
+
+This module contains the dialect for the Python `assert` statement, including:
+
+- The `Assert` statement class.
+- The lowering pass for the `assert` statement.
+- The concrete implementation of the `assert` statement.
+- The type inference implementation of the `assert` statement.
+- The Julia emitter for the `assert` statement.
+
+This dialect maps `ast.Assert` nodes to the `Assert` statement.
+"""
+
 import ast
 
 from kirin import ir, types, interp, lowering

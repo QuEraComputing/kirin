@@ -1,3 +1,16 @@
+"""The range dialect for Python.
+
+This dialect models the builtin `range()` function in Python.
+
+The dialect includes:
+- The `Range` statement class.
+- The lowering pass for the `range()` function.
+
+This dialect does not include a concrete implementation or type inference
+for the `range()` function. One needs to use other dialect for the concrete
+implementation and type inference, e.g., `ilist` dialect.
+"""
+
 import ast
 from dataclasses import dataclass
 

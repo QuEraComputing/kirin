@@ -1,4 +1,4 @@
-"""this dialect offers a statement `eltype` for other dialects'
+"""This dialect offers a statement `eltype` for other dialects'
 type inference to query/implement the element type of a value.
 For example, the `ilist` dialect implements the `eltype` statement
 on the `ilist.IList` type to return the element type.

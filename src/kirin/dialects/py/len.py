@@ -1,3 +1,12 @@
+"""The `Len` dialect.
+
+This dialect maps the `len()` call to the `Len` statement:
+
+- The `Len` statement class.
+- The lowering pass for the `len()` call.
+- The concrete implementation of the `len()` call.
+"""
+
 import ast
 
 from kirin import ir, interp, lowering

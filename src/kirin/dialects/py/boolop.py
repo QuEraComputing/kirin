@@ -1,3 +1,15 @@
+"""Boolean operators for Python dialect.
+
+This module contains the dialect for the Python boolean operators, including:
+
+- The `And` and `Or` statement classes.
+- The lowering pass for the boolean operators.
+- The concrete implementation of the boolean operators.
+- The Julia emitter for the boolean operators.
+
+This dialect maps `ast.BoolOp` nodes to the `And` and `Or` statements.
+"""
+
 import ast
 
 from kirin import ir, interp, lowering

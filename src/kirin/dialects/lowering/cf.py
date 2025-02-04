@@ -47,7 +47,7 @@ class CfLowering(FromPythonAST):
         )
         body_frame.next_block = next_block
         next_value = body_frame.entry_block.args.append_from(ir.types.Any, "next_value")
-        py.unpack.unpackable(state, node.target, next_value)
+        py.unpack.unpacking(state, node.target, next_value)
         state.exhaust(body_frame)
         next_stmt = body_frame.append_stmt(py.iterable.Next(iter_stmt.iter))
         cond_stmt = body_frame.append_stmt(py.cmp.Is(next_stmt.value, none_stmt.result))

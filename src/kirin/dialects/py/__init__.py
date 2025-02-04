@@ -1,3 +1,11 @@
+"""Python dialects module.
+
+This module contains a set of dialects that represent
+different fractions of the Python language. The dialects
+are designed to be used in a union to represent the
+entire Python language.
+"""
+
 from . import (
     cmp as cmp,
     len as len,

@@ -1,3 +1,13 @@
+"""The slice dialect for Python.
+
+This dialect provides a `Slice` statement that represents a slice object in Python:
+
+- The `Slice` statement class.
+- The lowering pass for the `slice` call.
+- The concrete implementation of the `slice` call.
+- The type inference implementation of the `slice` call.
+"""
+
 import ast
 from dataclasses import dataclass
 
