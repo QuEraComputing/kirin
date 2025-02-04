@@ -16,7 +16,6 @@ from kirin.dialects.py import binop
 class FeeAnalysis(Forward[latt.Item]):
     keys = ["beer.fee"]
     lattice = latt.Item
-    # constprop_results: dict[ir.SSAValue, JointResult] = field(default_factory=dict)
     puke_count: int = field(init=False)
 
     def __post_init__(self) -> None:
