@@ -1,20 +1,28 @@
 from stmts import Pour, Puke, Drink, NewBeer
+from recept import FeeAnalysis
 from dialect import dialect
 
 from interp import BeerMethods as BeerMethods
+from lattice import AtLeastItem
 from rewrite import RandomWalkBranch
 from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
+from kirin.passes.fold import Fold
 
 
 # create our own beer dialect, it runs a random walk on the branches
 @dialect_group(basic_no_opt.add(dialect))
 def beer(self):
-    def run_pass(mt):
+
+    fold_pass = Fold(self)
+
+    def run_pass(mt, *, fold=True):
         Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code)
 
         # add const fold
+        if fold:
+            fold_pass(mt)
 
     return run_pass
 
@@ -25,7 +33,7 @@ def beer(self):
 
 # type: ignore
 @beer
-def main(x):
+def main(x: int):
     def some_closure(beer, amount):
         Pour(beer, amount + 1)
         Puke()
@@ -55,16 +63,31 @@ main(1)  # execute the function
 #     main(i)  # now drink a random beer!
 
 
-# # analysis:
-# from recept import FeeAnalysis
+# simple analysis example:
+@beer
+def main2(x: int):
 
-# from lattice import NotItem
-# from kirin.analysis.const import Value, Propagate, JointResult
+    bud = NewBeer(brand="budlight")
+    heineken = NewBeer(brand="heineken")
 
-# cp = Propagate(main.dialects)
-# cp_results, expect = cp.run_analysis(main, (JointResult.from_const(1),))
-# print(cp_results)
+    bud_pints = Pour(bud, 12 + x)
+    heineken_pints = Pour(heineken, 10 + x)
 
-# fee_analysis = FeeAnalysis(main.dialects, constprop_results=cp_results)
-# results, expect = fee_analysis.run_analysis(main, args=(NotItem(),))
-# print(results)
+    Drink(bud_pints)
+    Drink(heineken_pints)
+    Puke()
+
+    Drink(bud_pints)
+    Puke()
+
+    Drink(bud_pints)
+    Puke()
+
+    return x
+
+
+fee_analysis = FeeAnalysis(main2.dialects)
+results, expect = fee_analysis.run_analysis(main2, args=(AtLeastItem(data=10),))
+print(results)
+print(fee_analysis.puke_count)
+main2.print(analysis=results)

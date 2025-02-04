@@ -45,26 +45,40 @@ class AnyItem(Item, metaclass=SingletonMeta):
 
 @final
 @dataclass
-class PourFeeItem(Item):
-    count: int
+class PintsItem(Item):
+    count: Item
+    brand: str
 
     def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, PourFeeItem)
+        return (
+            isinstance(other, PintsItem)
+            and self.count == other.count
+            and self.brand == other.brand
+        )
 
 
 @final
 @dataclass
 class AtLeastItem(Item):
-    lower_bound: int
+    data: int
 
     def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, AtLeastItem) and self.lower_bound == other.lower_bound
+        return isinstance(other, AtLeastItem) and self.data == other.data
 
 
 @final
 @dataclass
 class ConstIntItem(Item):
-    lower_bound: int
+    data: int
 
     def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, AtLeastItem) and self.lower_bound == other.lower_bound
+        return isinstance(other, ConstIntItem) and self.data == other.data
+
+
+@final
+@dataclass
+class BeerItem(Item):
+    brand: str
+
+    def is_subseteq(self, other: Item) -> bool:
+        return isinstance(other, BeerItem) and self.brand == other.brand

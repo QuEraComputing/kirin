@@ -1,15 +1,15 @@
 from dataclasses import field, dataclass
 
 from attrs import Beer
-from stmts import Pour, Puke, Drink, NewBeer, RandomBranch
+from stmts import Pour, Puke, NewBeer
 from dialect import dialect
 
 import lattice as latt
 from kirin import ir, interp
+from kirin.interp import exceptions
 from kirin.analysis import Forward
-from kirin.dialects import cf, py, func
+from kirin.dialects import py
 from kirin.dialects.py import binop
-from kirin.analysis.const import Propagate, JointResult
 
 
 @dataclass
@@ -17,22 +17,24 @@ class FeeAnalysis(Forward[latt.Item]):
     keys = ["beer.fee"]
     lattice = latt.Item
     # constprop_results: dict[ir.SSAValue, JointResult] = field(default_factory=dict)
-    item_count: int = field(init=False)
+    puke_count: int = field(init=False)
 
     def __post_init__(self) -> None:
         super().__post_init__()
 
     def initialize(self):
         super().initialize()
-        self.item_count = 0
+        self.puke_count = 0
         # self.constprop_results = {}
         return self
 
     def should_exec_stmt(self, stmt: ir.Statement):
-        return isinstance(
+        return stmt.has_trait(ir.ConstantLike) or isinstance(
             stmt,
             (
-                Drink,
+                Pour,
+                binop.Add,
+                NewBeer,
                 Pour,
                 Puke,
             ),
@@ -42,18 +44,25 @@ class FeeAnalysis(Forward[latt.Item]):
         return self.run_callable(method.code, (self.lattice.bottom(),) + args)
 
 
-@func.dialect.register(key="beer.fee")
-class PyFuncMethodTable(interp.MethodTable):
+@py.constant.dialect.register(key="beer.fee")
+class PyConstMethodTable(interp.MethodTable):
 
-    @interp.impl(func.Call)
-    def call(
+    @interp.impl(py.constant.Constant)
+    def const(
         self,
         interp: FeeAnalysis,
         frame: interp.Frame[latt.Item],
-        stmt: func.Call,
+        stmt: py.constant.Constant,
     ):
-        frame.get(stmt.callee)
-        return ()
+        if isinstance(stmt.value, int):
+            return (latt.ConstIntItem(data=stmt.value),)
+        elif isinstance(stmt.value, Beer):
+            return (latt.BeerItem(brand=stmt.value.brand),)
+
+        else:
+            raise exceptions.InterpreterError(
+                f"illegal constant type {type(stmt.value)}"
+            )
 
 
 @binop.dialect.register(key="beer.fee")
@@ -66,10 +75,14 @@ class PyBinOpMethodTable(interp.MethodTable):
         frame: interp.Frame[latt.Item],
         stmt: binop.Add,
     ):
-        left: latt.ConstIntItem = frame.get(stmt.lhs)
-        right: latt.ConstIntItem = frame.get(stmt.rhs)
+        left = frame.get(stmt.lhs)
+        right = frame.get(stmt.rhs)
 
-        out = latt.ConstIntItem(data=left.value + right.value)
+        if isinstance(left, latt.AtLeastItem) or isinstance(right, latt.AtLeastItem):
+            out = latt.AtLeastItem(data=left.data + right.data)
+        else:
+            out = latt.ConstIntItem(data=left.data + right.data)
+
         return (out,)
 
 
@@ -82,23 +95,14 @@ class BeerMethodTable(interp.MethodTable):
         "tsingdao": 3.0,
     }
 
-    @interp.impl(Drink)
-    def drink(
+    @interp.impl(NewBeer)
+    def new_beer(
         self,
         interp: FeeAnalysis,
         frame: interp.Frame[latt.Item],
-        stmt: Drink,
+        stmt: NewBeer,
     ):
-        # Drink depends on the beer type to have different charge:
-
-        beer_runtime: Beer = interp.constprop_results.get(stmt.beverage).const.data
-        print("drink")
-        interp.item_count += 1
-        out = latt.DrinkFee(
-            beer_name=beer_runtime.brand, price=self.menu_price[beer_runtime.brand]
-        )
-
-        return (out,)
+        return (latt.BeerItem(brand=stmt.brand),)
 
     @interp.impl(Pour)
     def pour(
@@ -107,12 +111,13 @@ class BeerMethodTable(interp.MethodTable):
         frame: interp.Frame[latt.Item],
         stmt: Pour,
     ):
-        # pour change same rate for all beer types
+        # Drink depends on the beer type to have different charge:
 
-        amount: int = interp.constprop_results.get(stmt.amount).const.data
-        assert isinstance(amount, int)
-        interp.item_count += 1
-        out = latt.PourFee(count=amount)
+        beer: latt.BeerItem = frame.get(stmt.beverage)
+        pint_count: latt.AtLeastItem | latt.ConstIntItem = frame.get(stmt.amount)
+
+        out = latt.PintsItem(count=pint_count, brand=beer.brand)
+
         return (out,)
 
     @interp.impl(Puke)
@@ -122,5 +127,5 @@ class BeerMethodTable(interp.MethodTable):
         frame: interp.Frame[latt.Item],
         stmt: Puke,
     ):
-        # puke change same rate for all beer types
-        return (latt.PukePenalty(),)
+        interp.puke_count += 1
+        return ()
