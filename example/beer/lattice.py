@@ -44,6 +44,12 @@ class NotItem(Item, metaclass=SingletonMeta):
 @final
 @dataclass
 class AnyItem(Item, metaclass=SingletonMeta):
+    """The top of the lattice.
+
+    Since the element is the same without any field,
+    we can use the SingletonMeta to make it a singleton by inherit the metaclass
+
+    """
 
     def is_subseteq(self, other: Item) -> bool:
         return isinstance(other, AnyItem)
