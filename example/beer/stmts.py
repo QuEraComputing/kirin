@@ -15,7 +15,6 @@ class NewBeer(ir.Statement):
 
 @statement(dialect=dialect)
 class Pour(ir.Statement):
-    name = "pour"
     traits = frozenset({ir.FromPythonCall()})
     beverage: ir.SSAValue = info.argument(types.PyClass(Beer))
     amount: ir.SSAValue = info.argument(types.Int)
@@ -24,7 +23,6 @@ class Pour(ir.Statement):
 
 @statement(dialect=dialect)
 class Drink(ir.Statement):
-    name = "drink"
     traits = frozenset({ir.FromPythonCall()})
     pints: ir.SSAValue = info.argument(types.PyClass(Pints))
 
