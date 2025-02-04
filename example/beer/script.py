@@ -4,7 +4,7 @@ from dialect import dialect
 
 from interp import BeerMethods as BeerMethods
 from lattice import AtLeastXItem
-from rewrite import RandomWalkBranch
+from rewrite import Drink2Puke, RandomWalkBranch
 from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
@@ -63,7 +63,26 @@ main(1)  # execute the function
 #     main(i)  # now drink a random beer!
 
 
-# simple analysis example:
+# 2. simple rewrite:
+@beer
+def main3():
+
+    bud = NewBeer(brand="budlight")
+    heineken = NewBeer(brand="heineken")
+
+    bud_pints = Pour(bud, 2)
+    heineken_pints = Pour(heineken, 10)
+
+    Drink(bud_pints)
+    Drink(heineken_pints)
+
+
+main3.print()
+Walk(Drink2Puke()).rewrite(main3.code)
+main3.print()
+
+
+# 3. simple analysis example:
 @beer
 def main2(x: int):
 
