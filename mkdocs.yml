@@ -15,9 +15,15 @@ nav:
       - Interpretation: interp.md
       - Analysis: analysis.md
       - Dialects:
-        - Python: dialects/python.md
+        - Python:
+          - dialects/python/index.md
+          - Core: dialects/python/core.md
+          - Data: dialects/python/data.md
+          - Syntax Sugar: dialects/python/sugar.md
+          - Special Functions: dialects/python/sfunc.md
         - Function: dialects/func.md
         - Control Flow: dialects/cf.md
+        - Structural Control Flow: dialects/scf.md
         - Immutable List: dialects/ilist.md
       - Compiler 101: 101.md
       - Comparison: comparison.md
@@ -110,6 +116,7 @@ plugins:
             merge_init_into_class: true
             extensions:
               - griffe_inherited_docstrings
+              - scripts/griffe_ext.py:KirinExtension
             show_inheritance_diagram: true
             show_signature_annotations: true
             show_symbol_type_heading: true

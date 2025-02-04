@@ -114,9 +114,7 @@ class Frame(FrameABC[ValueType]):
             ValueType: The value.
 
         Raises:
-            InterpreterError: If the value is not found. This will be catched by the interpreter
-                and will be converted to an [`interp.Err`][kirin.interp.Err] in the interpretation
-                results.
+            InterpreterError: If the value is not found. This will be catched by the interpreter.
         """
         err = InterpreterError(f"SSAValue {key} not found")
         value = self.entries.get(key, err)
@@ -138,9 +136,7 @@ class Frame(FrameABC[ValueType]):
             ExpectedType: The value.
 
         Raises:
-            InterpreterError: If the value is not of the expected type. This will be catched
-                by the interpreter and will be converted to an [`interp.Err`][kirin.interp.Err]
-                in the interpretation results.
+            InterpreterError: If the value is not of the expected type.
         """
         value = self.get(key)
         if not isinstance(value, type_):

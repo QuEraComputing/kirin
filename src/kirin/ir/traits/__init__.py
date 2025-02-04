@@ -1,3 +1,14 @@
+"""Kirin IR Traits.
+
+This module defines the traits that can be used to define the behavior of
+Kirin IR nodes. The base trait is `StmtTrait`, which is a `dataclass` that
+implements the `__hash__` and `__eq__` methods.
+
+There are also some basic traits that are provided for convenience, such as
+`Pure`, `HasParent`, `ConstantLike`, `IsTerminator`, `NoTerminator`, and
+`IsolatedFromAbove`.
+"""
+
 from .abc import (
     StmtTrait as StmtTrait,
     RegionTrait as RegionTrait,

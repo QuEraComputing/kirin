@@ -44,6 +44,7 @@ class Function(Statement):
         }
     )
     sym_name: str = info.attribute(property=True)
+    """The symbol name of the function."""
     signature: Signature = info.attribute()
     body: Region = info.region(multi=True)
 

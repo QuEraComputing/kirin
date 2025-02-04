@@ -1,0 +1,2 @@
+"""Builtin region traits.
+"""

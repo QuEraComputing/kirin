@@ -13,6 +13,10 @@ StmtType = TypeVar("StmtType", bound="Statement")
 
 @dataclass(frozen=True)
 class CallableStmtInterface(StmtTrait, Generic[StmtType]):
+    """A trait that indicates that a statement is a callable statement.
+
+    A callable statement is a statement that can be called as a function.
+    """
 
     @classmethod
     @abstractmethod
@@ -23,6 +27,9 @@ class CallableStmtInterface(StmtTrait, Generic[StmtType]):
 
 @dataclass(frozen=True)
 class HasSignature(StmtTrait, ABC):
+    """A trait that indicates that a statement has a function signature
+    attribute.
+    """
 
     @classmethod
     def get_signature(cls, stmt: "Statement"):

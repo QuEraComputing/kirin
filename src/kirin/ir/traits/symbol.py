@@ -11,6 +11,10 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class SymbolOpInterface(StmtTrait):
+    """A trait that indicates that a statement is a symbol operation.
+
+    A symbol operation is a statement that has a symbol name attribute.
+    """
 
     def get_sym_name(self, stmt: "Statement") -> "PyAttr[str]":
         sym_name: PyAttr[str] | None = stmt.get_attr_or_prop("sym_name")  # type: ignore

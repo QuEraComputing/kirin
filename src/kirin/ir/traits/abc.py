@@ -22,6 +22,7 @@ GraphType = TypeVar("GraphType", bound="Graph[Block]")
 
 @dataclass(frozen=True)
 class RegionTrait(StmtTrait, Generic[GraphType]):
+    """A trait that indicates the properties of the statement's region."""
 
     @abstractmethod
     def get_graph(self, region: "Region") -> GraphType: ...
@@ -33,6 +34,7 @@ StatementType = TypeVar("StatementType", bound="Statement")
 
 @dataclass(frozen=True)
 class PythonLoweringTrait(StmtTrait, Generic[StatementType, ASTNode]):
+    """A trait that indicates that a statement can be lowered from Python AST."""
 
     @abstractmethod
     def lower(

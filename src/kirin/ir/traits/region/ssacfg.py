@@ -1,3 +1,9 @@
+"""SSACFG region trait.
+
+This module defines the SSACFGRegion trait, which is used to indicate that a
+region has an SSACFG graph.
+"""
+
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 

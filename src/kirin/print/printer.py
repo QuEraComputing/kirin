@@ -1,5 +1,15 @@
 import io
-from typing import IO, TYPE_CHECKING, Any, Union, Literal, TypeVar, Callable, Iterable
+from typing import (
+    IO,
+    TYPE_CHECKING,
+    Any,
+    Union,
+    Literal,
+    TypeVar,
+    Callable,
+    Iterable,
+    Generator,
+)
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
@@ -242,7 +252,7 @@ class Printer:
         *,
         emit: Callable[[ValueType], None] | None = None,
         delim: str = ", ",
-    ):
+    ) -> None:
         """print a mapping of key-value pairs.
 
         Args:
@@ -274,7 +284,7 @@ class Printer:
         return result_width
 
     @contextmanager
-    def align(self, width: int):
+    def align(self, width: int) -> Generator[PrintState, Any, None]:
         """align the result column width, and restore it after the context.
 
         Args:
@@ -291,7 +301,9 @@ class Printer:
             self.state.result_width = old_width
 
     @contextmanager
-    def indent(self, increase: int = 2, mark: bool | None = None):
+    def indent(
+        self, increase: int = 2, mark: bool | None = None
+    ) -> Generator[PrintState, Any, None]:
         """increase the indentation level, and restore it after the context.
 
         Args:
@@ -313,11 +325,13 @@ class Printer:
                 self.state.indent_marks.pop()
 
     @contextmanager
-    def rich(self, style: str | None = None, highlight: bool = False):
+    def rich(
+        self, style: str | None = None, highlight: bool = False
+    ) -> Generator[PrintState, Any, None]:
         """set the rich style and highlight, and restore them after the context.
 
         Args:
-            style(str): style to use, default to None
+            style(str | None): style to use, default to None
             highlight(bool): whether to highlight the text, default to False
 
         Yields:
@@ -334,7 +348,7 @@ class Printer:
             self.state.rich_highlight = old_highlight
 
     @contextmanager
-    def string_io(self):
+    def string_io(self) -> Generator[io.StringIO, Any, None]:
         """Temporary string IO for capturing output.
 
         Yields:

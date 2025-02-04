@@ -98,7 +98,7 @@ class Assert(Statement):
     message: SSAValue = info.argument(String)
 ```
 
-When interpreting an `Assert` statement, we need to check the condition and raise an error if it is false, this can be either returning the [`interp.Err`][kirin.interp.Err] object:
+When interpreting an `Assert` statement, we need to check the condition and raise an error if it is false:
 
 ```python
 @dialect.register
@@ -110,9 +110,9 @@ class CfMethods(MethodTable):
             return ()
 
         if stmt.message:
-            return Err(AssertionError(frame.get(stmt.message)), interp.state.frames)
+            raise interp.WrapException(AssertionError(frame.get(stmt.message)))
         else:
-            return Err(AssertionError(), interp.state.frames)
+            raise interp.WrapException(AssertionError("Assertion failed"))
 ```
 
 or raising an [`InterpreterError`][kirin.exceptions.InterpreterError]:
