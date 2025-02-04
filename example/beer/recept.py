@@ -10,6 +10,7 @@ from kirin.interp import exceptions
 from kirin.analysis import Forward
 from kirin.dialects import py
 from kirin.dialects.py import binop
+from kirin.analysis.forward import ForwardFrame
 
 
 @dataclass
@@ -19,21 +20,25 @@ class FeeAnalysis(Forward[latt.Item]):
     puke_count: int = field(init=False)
 
     def initialize(self):
+        """Initialize the analysis pass.
+
+        The method is called before the analysis pass starts.
+
+        Note:
+            1. Here one is *required* to call the super().initialize() to initialize the analysis pass,
+            which clear all the previous analysis results and symbol tables.
+            2. Any additional initialization that belongs to the analysis should also be done here.
+            For example, in this case, we initialize the puke_count to 0.
+
+        """
         super().initialize()
         self.puke_count = 0
         return self
 
-    def should_exec_stmt(self, stmt: ir.Statement):
-        return stmt.has_trait(ir.ConstantLike) or isinstance(
-            stmt,
-            (
-                Pour,
-                binop.Add,
-                NewBeer,
-                Pour,
-                Puke,
-            ),
-        )
+    def eval_stmt_fallback(
+        self, frame: ForwardFrame[latt.Item, None], stmt: ir.Statement
+    ) -> tuple[latt.Item, ...] | interp.SpecialValue[latt.Item]:
+        return ()
 
     def run_method(self, method: ir.Method, args: tuple[latt.Item, ...]) -> latt.Item:
         return self.run_callable(method.code, (self.lattice.bottom(),) + args)
@@ -52,7 +57,7 @@ class PyConstMethodTable(interp.MethodTable):
         if isinstance(stmt.value, int):
             return (latt.ConstIntItem(data=stmt.value),)
         elif isinstance(stmt.value, Beer):
-            return (latt.BeerItem(brand=stmt.value.brand),)
+            return (latt.ItemBeer(brand=stmt.value.brand),)
 
         else:
             raise exceptions.InterpreterError(
@@ -97,7 +102,7 @@ class BeerMethodTable(interp.MethodTable):
         frame: interp.Frame[latt.Item],
         stmt: NewBeer,
     ):
-        return (latt.BeerItem(brand=stmt.brand),)
+        return (latt.ItemBeer(brand=stmt.brand),)
 
     @interp.impl(Pour)
     def pour(
@@ -108,7 +113,7 @@ class BeerMethodTable(interp.MethodTable):
     ):
         # Drink depends on the beer type to have different charge:
 
-        beer: latt.BeerItem = frame.get(stmt.beverage)
+        beer: latt.ItemBeer = frame.get(stmt.beverage)
         pint_count: latt.AtLeastXItem | latt.ConstIntItem = frame.get(stmt.amount)
 
         out = latt.ItemPints(count=pint_count, brand=beer.brand)

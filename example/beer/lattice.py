@@ -30,6 +30,12 @@ class Item(
 @final
 @dataclass
 class NotItem(Item, metaclass=SingletonMeta):
+    """The bottom of the lattice.
+
+    Since the element is the same without any field,
+    we can use the SingletonMeta to make it a singleton by inherit the metaclass
+
+    """
 
     def is_subseteq(self, other: Item) -> bool:
         return True
@@ -77,8 +83,8 @@ class ConstIntItem(Item):
 
 @final
 @dataclass
-class BeerItem(Item):
+class ItemBeer(Item):
     brand: str
 
     def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, BeerItem) and self.brand == other.brand
+        return isinstance(other, ItemBeer) and self.brand == other.brand
