@@ -13,6 +13,8 @@ def test_union():
     target_b = group_a.union(group_c)
     assert target_a.data == group_a.data
     assert target_b.data == group_d.data
+    assert repr(target_a) == "DialectGroup([base, cf])"
+    assert repr(target_b) == "DialectGroup([base, cf, func])"
 
 
 def test_discard():
