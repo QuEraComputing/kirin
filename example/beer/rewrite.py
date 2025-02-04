@@ -26,7 +26,7 @@ class RandomWalkBranch(RewriteRule):
 
 
 @dataclass
-class Drink2Puke(RewriteRule):
+class NewBeerAndPukeOnDrink(RewriteRule):
     # sometimes someone get drunk, so they keep getting new beer and puke after they drink
     def rewrite_Statement(self, node: Statement) -> RewriteResult:
         if not isinstance(node, Drink):
