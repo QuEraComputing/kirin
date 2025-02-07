@@ -1,5 +1,6 @@
 import pytest
 
+from kirin.analysis import const
 from kirin.ir.attrs.types import (
     Int,
     Bool,
@@ -8,6 +9,7 @@ from kirin.ir.attrs.types import (
     Slice,
     Tuple,
     Union,
+    Hinted,
     String,
     Vararg,
     AnyType,
@@ -111,3 +113,9 @@ def test_generic_topbottom():
     assert t.meet(TypeAttribute.bottom()).is_subseteq(TypeAttribute.bottom())
     assert t.join(TypeAttribute.top()).is_equal(TypeAttribute.top())
     assert t.meet(TypeAttribute.top()).is_equal(t)
+
+
+def test_hinted():
+    assert Hinted(Int, const.Value(1)).is_equal(Int)
+    assert Hinted(Int, const.Value(1)).is_equal(Hinted(Int, const.Value(2)))
+    assert Hinted(Int, const.Value(1)).is_subseteq(Hinted(Int, const.Value(2)))
