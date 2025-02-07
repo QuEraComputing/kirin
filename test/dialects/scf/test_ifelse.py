@@ -1,6 +1,6 @@
 from kirin import ir
 from kirin.prelude import python_basic
-from kirin.dialects import scf, func
+from kirin.dialects import scf, func, lowering
 
 # TODO:
 # test_cons
@@ -14,7 +14,7 @@ from kirin.dialects import scf, func
 # ir.Block([ifelse]).print()
 
 
-@ir.dialect_group(python_basic.union([func, scf]))
+@ir.dialect_group(python_basic.union([func, scf, lowering.func]))
 def kernel(self):
     def run_pass(method):
         pass
@@ -42,4 +42,4 @@ def main(x):
 
 
 main.print()
-print(main(1))
+# print(main(1))

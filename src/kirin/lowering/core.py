@@ -44,6 +44,7 @@ class Lowering(ast.NodeVisitor):
         globals: dict[str, Any] | None = None,
         lineno_offset: int = 0,
         col_offset: int = 0,
+        compactify: bool = True,
     ):
         if isinstance(stmt, Callable):
             source = source or textwrap.dedent(inspect.getsource(stmt))
@@ -63,4 +64,9 @@ class Lowering(ast.NodeVisitor):
         except DialectLoweringError as e:
             e.args = (f"{e.args[0]}\n\n{state.error_hint()}",) + e.args[1:]
             raise e
+
+        if compactify:
+            from kirin.rewrite import Walk, CFGCompactify
+
+            Walk(CFGCompactify()).rewrite(state.code)
         return state.code

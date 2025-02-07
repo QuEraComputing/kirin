@@ -51,6 +51,8 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
             frame.stmt = stmt
             frame.lino = stmt.source.lineno if stmt.source else 0
             stmt_results = self.eval_stmt(frame, stmt)
+            stmt.print()
+            print(stmt_results)
             if isinstance(stmt_results, tuple):
                 frame.set_values(stmt._results, stmt_results)
             else:  # terminator

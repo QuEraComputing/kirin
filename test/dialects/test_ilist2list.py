@@ -1,9 +1,9 @@
 from kirin import ir
 from kirin.prelude import python_basic
-from kirin.dialects import func, ilist
+from kirin.dialects import func, ilist, lowering
 
 
-@ir.dialect_group(python_basic.union([func, ilist]))
+@ir.dialect_group(python_basic.union([func, ilist, lowering.func]))
 def basic_desugar(self):
     ilist_desugar = ilist.IListDesugar(self)
 

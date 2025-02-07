@@ -15,21 +15,17 @@ def test_basic_func():
 
     code = lowering.run(single)
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 2
+    assert len(code.body.blocks) == 1
     assert isinstance(code.body.blocks[0].last_stmt, func.Return)
-    # NOTE: this is expected behavior, tho this is a dead code
-    # this is for matching python behavior, it will be removed after DCE
-    assert isinstance(code.body.blocks[1].last_stmt, func.Return)
 
     def single_2(n):
         return n + 1, n + 2
 
     code = lowering.run(single_2)
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 2
+    assert len(code.body.blocks) == 1
     assert isinstance(code.body.blocks[0].last_stmt, func.Return)
     assert code.body.blocks[0].last_stmt.args[0].type.is_subseteq(types.Tuple)
-    assert isinstance(code.body.blocks[1].last_stmt, func.Return)
 
 
 def test_recursive_func():
@@ -40,7 +36,7 @@ def test_recursive_func():
 
     code = lowering.run(recursive)
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 4
+    assert len(code.body.blocks) == 3
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
     assert isinstance(code.body.blocks[2].stmts.at(2), func.Call)
     stmt: func.Call = code.body.blocks[2].stmts.at(2)  # type: ignore
@@ -77,7 +73,7 @@ def test_func_call():
     callee = ir.Method(None, callee, "callee", ["n"], lowering.dialects, code)
     code = lowering.run(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 2
+    assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)
     assert isinstance(stmt, func.Invoke)
     assert isinstance(stmt.callee, ir.Method)
@@ -94,7 +90,7 @@ def test_func_kw_call():
     callee = ir.Method(None, callee, "callee", ["n", "m"], lowering.dialects, code)
     code = lowering.run(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 2
+    assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)
     assert isinstance(stmt, func.Invoke)
     assert stmt.kwargs == ("n", "m")
@@ -104,7 +100,7 @@ def test_func_kw_call():
 
     code = lowering.run(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 2
+    assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)
     assert isinstance(stmt, func.Invoke)
     assert stmt.kwargs == ("m",)

@@ -8,7 +8,7 @@ from kirin.emit.julia import EmitJulia
 def emit(fn: ir.Method):
     with io.StringIO() as file:
         emit_ = EmitJulia(basic_no_opt, file)
-        emit_.run(fn, tuple(fn.arg_names[1:]))
+        emit_.run(fn, tuple(fn.arg_names[1:])).expect()
         return file.getvalue()
 
 
@@ -21,6 +21,7 @@ def test_func():
         return foo
 
     generated = emit(emit_func)
+    print(generated)
     assert "function emit_func(x::Int, y::Int)" in generated
     assert "@label block_0;" in generated
     assert "function foo()" in generated
@@ -63,8 +64,9 @@ def test_cf():
         else:
             return y
 
+    emit_cf.print()
     generated = emit(emit_cf)
-    print(generated)
+
     assert "var_0 = x > y" in generated
     assert "if var_0" in generated
     assert "@goto block_1" in generated

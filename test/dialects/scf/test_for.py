@@ -2,7 +2,7 @@ import pytest
 
 from kirin import ir
 from kirin.prelude import python_basic
-from kirin.dialects import py, scf, func, ilist
+from kirin.dialects import py, scf, func, ilist, lowering
 from kirin.exceptions import DialectLoweringError
 
 
@@ -32,7 +32,7 @@ def test_cons():
 def test_exec():
     xs = ilist.IList([(1, 2), (3, 4)])
 
-    @python_basic.union([func, scf, py.range, py.unpack, ilist])
+    @python_basic.union([func, scf, py.range, py.unpack, ilist, lowering.func])
     def main(x):
         for a, b in xs:
             x = x + a

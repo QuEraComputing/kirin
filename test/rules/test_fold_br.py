@@ -2,9 +2,8 @@ from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
 from kirin.analysis import const
 from kirin.rewrite.dce import DeadCodeElimination
-from kirin.analysis.cfg import CFG
 from kirin.rewrite.fold import ConstantFold
-from kirin.rewrite.cfg_compactify import CFGCompactify
+from kirin.rewrite.compactify import CFGCompactify
 
 
 @basic_no_opt
@@ -28,10 +27,9 @@ def test_branch_elim():
     branch.code.print()
     Fixpoint(Walk(fold)).rewrite(branch.code)
     branch.code.print()
-    cfg = CFG(branch.callable_region)
     # TODO: also check the generated CFG
     # interp.worklist.visited
-    Fixpoint(CFGCompactify(cfg)).rewrite(branch.code)
+    Fixpoint(CFGCompactify()).rewrite(branch.code)
     Walk(DeadCodeElimination(results)).rewrite(branch.code)
     branch.code.print()
     assert len(branch.code.body.blocks) == 4  # type: ignore

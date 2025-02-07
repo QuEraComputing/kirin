@@ -53,8 +53,9 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
     def lower(
         self, stmt: type[StatementType], state: "LoweringState", node: ast.With
     ) -> "Result":
-        from kirin import lowering
+        from kirin import ir, lowering
         from kirin.decl import fields
+        from kirin.dialects import cf
 
         fs = fields(stmt)
         if len(fs.regions) != 1:
@@ -74,11 +75,25 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
         body_frame = lowering.Frame.from_stmts(body, state, parent=state.current_frame)
         state.push_frame(body_frame)
         state.exhaust()
-        state.pop_frame()
+        region_name, region_info = next(iter(fs.regions.items()))
+        if region_info.multi:  # branch to exit block if not terminated
+            for block in body_frame.curr_region.blocks:
+                if block.last_stmt is None or not block.last_stmt.has_trait(
+                    ir.IsTerminator
+                ):
+                    block.stmts.append(
+                        cf.Branch(arguments=(), successor=body_frame.next_block)
+                    )
+            state.pop_frame()
+        else:
+            if len(body_frame.curr_region.blocks) != 1:
+                raise DialectLoweringError(
+                    f"Expected exactly one block in region {region_name}"
+                )
+            state.pop_frame(finalize_next=False)
 
         args, kwargs = state.default_Call_inputs(stmt, item.context_expr)
-        (region_name,) = fs.regions
-        kwargs[region_name] = body_frame.current_region
+        kwargs[region_name] = body_frame.curr_region
         results = state.append_stmt(stmt(*args.values(), **kwargs)).results
         if len(results) == 0:
             return lowering.Result()

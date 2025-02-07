@@ -18,10 +18,7 @@ class InlinePass(Pass):
     def unsafe_run(self, mt: ir.Method) -> RewriteResult:
 
         result = Walk(Inline(heuristic=self.herustic)).rewrite(mt.code)
-
-        if (trait := mt.code.get_trait(ir.SSACFGRegion)) is not None:
-            compactify = Fixpoint(CFGCompactify(trait.get_graph(mt.callable_region)))
-            result = compactify.rewrite(mt.code).join(result)
+        result = Walk(CFGCompactify()).rewrite(mt.code).join(result)
 
         # dce
         dce = DeadCodeElimination()

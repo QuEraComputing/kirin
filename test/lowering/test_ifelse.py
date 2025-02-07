@@ -11,9 +11,7 @@ def test_pass():
 
     code = lowering.run(nobody)
     assert isinstance(code, func.Function)
-    assert isinstance(code.body.blocks[0].last_stmt, cf.Branch)
-    assert code.body.blocks[0].last_stmt.successor is code.body.blocks[1]
-    assert isinstance(code.body.blocks[1].last_stmt, func.Return)
+    assert isinstance(code.body.blocks[-1].last_stmt, func.Return)
 
     def branch_pass():
         if True:
@@ -22,15 +20,9 @@ def test_pass():
             pass
 
     code = lowering.run(branch_pass)
+    code.print()
     assert isinstance(code, func.Function)
-    assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
-    assert code.body.blocks[0].last_stmt.then_successor is code.body.blocks[1]
-    assert code.body.blocks[0].last_stmt.else_successor is code.body.blocks[2]
-    assert isinstance(code.body.blocks[1].last_stmt, cf.Branch)
-    assert code.body.blocks[1].last_stmt.successor is code.body.blocks[3]
-    assert isinstance(code.body.blocks[2].last_stmt, cf.Branch)
-    assert code.body.blocks[2].last_stmt.successor is code.body.blocks[3]
-    assert isinstance(code.body.blocks[3].last_stmt, func.Return)
+    assert isinstance(code.body.blocks[0].last_stmt, func.Return)
 
 
 def test_basic_ifelse():
@@ -42,13 +34,12 @@ def test_basic_ifelse():
 
     code = lowering.run(single)
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 4
+    assert len(code.body.blocks) == 3
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
     assert code.body.blocks[0].last_stmt.then_successor is code.body.blocks[1]
     assert code.body.blocks[0].last_stmt.else_successor is code.body.blocks[2]
     assert isinstance(code.body.blocks[1].last_stmt, func.Return)
     assert isinstance(code.body.blocks[2].last_stmt, func.Return)
-    assert isinstance(code.body.blocks[3].last_stmt, func.Return)
 
     def single_2(n):
         if n == 0:
@@ -57,15 +48,14 @@ def test_basic_ifelse():
             return n
 
     code = lowering.run(single_2)
+    code.print()
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 4
+    assert len(code.body.blocks) == 3
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
     assert code.body.blocks[0].last_stmt.then_successor is code.body.blocks[1]
     assert code.body.blocks[0].last_stmt.else_successor is code.body.blocks[2]
-    assert isinstance(code.body.blocks[1].last_stmt, cf.Branch)
-    assert code.body.blocks[1].last_stmt.successor is code.body.blocks[3]
+    assert isinstance(code.body.blocks[1].last_stmt, func.Return)
     assert isinstance(code.body.blocks[2].last_stmt, func.Return)
-    assert isinstance(code.body.blocks[3].last_stmt, func.Return)
 
     def single_3(n):
         if n == 0:
@@ -111,8 +101,9 @@ def test_recursive_ifelse():
                 return n
 
     code = lowering.run(multi)
+    code.print()
     assert isinstance(code, func.Function)
-    assert len(code.body.blocks) == 6
+    assert len(code.body.blocks) == 5
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
     assert code.body.blocks[0].last_stmt.then_successor is code.body.blocks[1]
     assert code.body.blocks[0].last_stmt.else_successor is code.body.blocks[2]
@@ -120,7 +111,5 @@ def test_recursive_ifelse():
     assert isinstance(code.body.blocks[2].last_stmt, cf.ConditionalBranch)
     assert code.body.blocks[2].last_stmt.then_successor is code.body.blocks[3]
     assert code.body.blocks[2].last_stmt.else_successor is code.body.blocks[4]
-    assert isinstance(code.body.blocks[3].last_stmt, cf.Branch)
-    assert code.body.blocks[3].last_stmt.successor is code.body.blocks[5]
+    assert isinstance(code.body.blocks[3].last_stmt, func.Return)
     assert isinstance(code.body.blocks[4].last_stmt, func.Return)
-    assert isinstance(code.body.blocks[5].last_stmt, func.Return)

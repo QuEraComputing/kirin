@@ -30,17 +30,20 @@ class JuliaMethodTable(MethodTable):
         cond = frame.get(stmt.cond)
         interp.writeln(frame, f"if {cond}")
         frame.indent += 1
-        ori = frame.get_values(stmt.then_successor.args)
         values = frame.get_values(stmt.then_arguments)
-        for x, y in zip(ori, values):
+        block_values = tuple(interp.ssa_id[x] for x in stmt.then_successor.args)
+        frame.set_values(stmt.then_successor.args, block_values)
+        for x, y in zip(block_values, values):
             interp.writeln(frame, f"{x} = {y};")
         interp.writeln(frame, f"@goto {interp.block_id[stmt.then_successor]};")
         frame.indent -= 1
         interp.writeln(frame, "else")
         frame.indent += 1
-        ori = frame.get_values(stmt.else_successor.args)
+
         values = frame.get_values(stmt.else_arguments)
-        for x, y in zip(ori, values):
+        block_values = tuple(interp.ssa_id[x] for x in stmt.else_successor.args)
+        frame.set_values(stmt.else_successor.args, block_values)
+        for x, y in zip(block_values, values):
             interp.writeln(frame, f"{x} = {y};")
         interp.writeln(frame, f"@goto {interp.block_id[stmt.else_successor]};")
         frame.indent -= 1

@@ -6,13 +6,12 @@ from kirin.rewrite import Walk, Chain, Fixpoint
 from kirin.analysis import const
 from kirin.dialects.py import constant
 from kirin.rewrite.dce import DeadCodeElimination
-from kirin.analysis.cfg import CFG
 from kirin.rewrite.fold import ConstantFold
 from kirin.rewrite.inline import Inline
 from kirin.rewrite.getitem import InlineGetItem
 from kirin.rewrite.getfield import InlineGetField
+from kirin.rewrite.compactify import CFGCompactify
 from kirin.rewrite.call2invoke import Call2Invoke
-from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
 @basic_no_opt
@@ -66,8 +65,7 @@ def test_inline_closure():
         )
     ).rewrite(inline_closure.code)
     Walk(Inline(heuristic=lambda x: True)).rewrite(inline_closure.code)
-    cfg = CFG(inline_closure.callable_region)
-    compactify = CFGCompactify(cfg)
+    compactify = CFGCompactify()
     Fixpoint(compactify).rewrite(inline_closure.code)
     Fixpoint(Walk(DeadCodeElimination(results))).rewrite(inline_closure.code)
     inline_closure.code.print()
@@ -110,7 +108,7 @@ def test_inline_constprop():
                 )
             )
         ).rewrite(inline_foldl.code)
-        compactify = Fixpoint(CFGCompactify(CFG(inline_foldl.callable_region)))
+        compactify = Fixpoint(CFGCompactify())
         compactify.rewrite(inline_foldl.code)
         Fixpoint(Walk(DeadCodeElimination(results))).rewrite(inline_foldl.code)
 
@@ -153,9 +151,7 @@ def test_inline_single_entry():
     inline_non_pure.code.print()
     inline = Inline(heuristic=lambda x: True)
     Walk(inline).rewrite(inline_non_pure.code)
-    Fixpoint(CFGCompactify(CFG(inline_non_pure.callable_region))).rewrite(
-        inline_non_pure.code
-    )
+    Fixpoint(CFGCompactify()).rewrite(inline_non_pure.code)
     inline_non_pure.code.print()
     assert isinstance(
         inline_non_pure.callable_region.blocks[0].stmts.at(1), DummyStmtWithSiteEffect
@@ -199,10 +195,10 @@ def test_inline_non_foldable_closure():
     constprop = const.Propagate(basic_no_opt)
     constprop.run_analysis(main)
     ConstantFold(constprop.results).rewrite(main.code)
-    compact = Fixpoint(CFGCompactify(CFG(main.callable_region)))
+    compact = Fixpoint(CFGCompactify())
     compact.rewrite(main.code)
     inline.rewrite(main.code)
-    compact = Fixpoint(CFGCompactify(CFG(main.callable_region)))
+    compact = Fixpoint(CFGCompactify())
     compact.rewrite(main.code)
     Fixpoint(Walk(InlineGetField())).rewrite(main.code)
     constprop = const.Propagate(basic_no_opt)
@@ -217,5 +213,5 @@ def test_inline_non_foldable_closure():
         DummyStmt2(x, option="hello")
         return
 
-    CFGCompactify(CFG(target.callable_region)).rewrite(target.code)
+    CFGCompactify().rewrite(target.code)
     assert target.callable_region.is_structurally_equal(main.callable_region)

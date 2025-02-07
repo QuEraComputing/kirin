@@ -1,8 +1,11 @@
 from kirin.prelude import basic_no_opt
+from kirin.dialects import func
+from kirin.lowering import Lowering
 from kirin.analysis.cfg import CFG
 
+lowering = Lowering(basic_no_opt)
 
-@basic_no_opt
+
 def deadblock(x):
     if x:
         return x + 1
@@ -12,11 +15,12 @@ def deadblock(x):
 
 
 def test_reachable():
-    cfg = CFG(deadblock.callable_region)
-    assert deadblock.code.body.blocks[-1] not in cfg.successors  # type: ignore
+    code = lowering.run(deadblock, compactify=False)
+    assert isinstance(code, func.Function)
+    cfg = CFG(code.body)
+    assert code.body.blocks[-1] not in cfg.successors
 
 
-@basic_no_opt
 def foo(x: int):  # type: ignore
     def goo(y: int):
         return x + y
@@ -25,6 +29,8 @@ def foo(x: int):  # type: ignore
 
 
 def test_foo_cfg():
-    cfg = CFG(foo.callable_region)
-    assert foo.callable_region.blocks[0] in cfg.successors
-    assert foo.callable_region.blocks[1] not in cfg.successors
+    code = lowering.run(foo, compactify=False)
+    assert isinstance(code, func.Function)
+    cfg = CFG(code.body)
+    assert code.body.blocks[0] in cfg.successors
+    assert code.body.blocks[1] not in cfg.successors

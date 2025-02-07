@@ -1,8 +1,9 @@
 from kirin.ir import types
 from kirin.dialects import cf, py, func
 from kirin.lowering import Lowering
+from kirin.dialects.lowering import func as func_lowering
 
-lowering = Lowering([cf, func, py.base, py.list, py.assign])
+lowering = Lowering([cf, func, py.base, py.list, py.assign, func_lowering])
 
 
 def test_empty_list():

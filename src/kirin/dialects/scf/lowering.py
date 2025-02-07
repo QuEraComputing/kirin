@@ -17,14 +17,15 @@ class Lowering(lowering.FromPythonAST):
         body_frame = lowering.Frame.from_stmts(node.body, state, globals=frame.globals)
         state.push_frame(body_frame)
         state.exhaust(body_frame)
-        state.pop_frame()
+        state.pop_frame(finalize_next=False)  # NOTE: scf does not have multiple blocks
+        body_frame.curr_region.print()
 
         else_frame = lowering.Frame.from_stmts(
             node.orelse, state, globals=frame.globals
         )
         state.push_frame(else_frame)
         state.exhaust(else_frame)
-        state.pop_frame()
+        state.pop_frame(finalize_next=False)  # NOTE: scf does not have multiple blocks
 
         yield_names: list[str] = []
         body_yields: list[ir.SSAValue] = []
@@ -46,21 +47,21 @@ class Lowering(lowering.FromPythonAST):
                     else_yields.append(value)
 
         if not (
-            body_frame.current_block.last_stmt
-            and body_frame.current_block.last_stmt.has_trait(ir.IsTerminator)
+            body_frame.curr_block.last_stmt
+            and body_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
         ):
             body_frame.append_stmt(Yield(*body_yields))
 
         if not (
-            else_frame.current_block.last_stmt
-            and else_frame.current_block.last_stmt.has_trait(ir.IsTerminator)
+            else_frame.curr_block.last_stmt
+            and else_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
         ):
             else_frame.append_stmt(Yield(*else_yields))
 
         stmt = IfElse(
             cond,
-            then_body=body_frame.current_region,
-            else_body=else_frame.current_region,
+            then_body=body_frame.curr_region,
+            else_body=else_frame.curr_region,
         )
         for result, name, body, else_ in zip(
             stmt.results, yield_names, body_yields, else_yields
@@ -82,19 +83,19 @@ class Lowering(lowering.FromPythonAST):
             if not capture.name:
                 raise DialectLoweringError("unexpected loop variable captured")
             yields.append(capture.name)
-            return frame.current_block.args.append_from(capture.type, capture.name)
+            return frame.curr_block.args.append_from(capture.type, capture.name)
 
         body_frame = state.push_frame(
             lowering.Frame.from_stmts(
                 node.body, state, capture_callback=new_block_arg_if_inside_loop
             )
         )
-        loop_var = body_frame.current_block.args.append_from(ir.types.Any)
+        loop_var = body_frame.curr_block.args.append_from(ir.types.Any)
         unpacking(state, node.target, loop_var)
         state.exhaust(body_frame)
         # NOTE: this frame won't have phi nodes
         body_frame.append_stmt(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore
-        state.pop_frame()
+        state.pop_frame(finalize_next=False)  # NOTE: scf does not have multiple blocks
 
         initializers: list[ir.SSAValue] = []
         for name in yields:
@@ -102,7 +103,7 @@ class Lowering(lowering.FromPythonAST):
             if value is None:
                 raise DialectLoweringError(f"expected value for {name}")
             initializers.append(value)
-        stmt = For(iter_, body_frame.current_region, *initializers)
+        stmt = For(iter_, body_frame.curr_region, *initializers)
         for name, result in zip(yields, stmt.results):
             state.current_frame.defs[name] = result
         state.append_stmt(stmt)

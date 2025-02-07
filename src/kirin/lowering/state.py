@@ -74,7 +74,7 @@ class LoweringState(ast.NodeVisitor):
 
     @property
     def code(self):
-        stmt = self.current_frame.current_region.blocks[0].first_stmt
+        stmt = self.current_frame.curr_region.blocks[0].first_stmt
         if stmt:
             return stmt
         raise ValueError("No code generated")
@@ -90,10 +90,21 @@ class LoweringState(ast.NodeVisitor):
         self._current_frame = frame
         return frame
 
-    def pop_frame(self):
+    def pop_frame(self, finalize_next: bool = True):
+        """Pop the current frame and return it.
+
+        Args:
+            finalize_next(bool): If True, append the next block of the current frame.
+
+        Returns:
+            Frame: The popped frame.
+        """
         if self._current_frame is None:
             raise ValueError("No frame to pop")
         frame = self._current_frame
+
+        if finalize_next and frame.next_block.parent is None:
+            frame.append_block(frame.next_block)
         self._current_frame = frame.parent
         return frame
 

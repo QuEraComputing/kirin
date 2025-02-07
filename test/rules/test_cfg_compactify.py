@@ -6,8 +6,8 @@ from kirin.dialects.py import cmp, binop
 from kirin.analysis.cfg import CFG
 from kirin.dialects.func import Lambda
 from kirin.rewrite.inline import Inline
+from kirin.rewrite.compactify import CFGCompactify, CompactifyRegion
 from kirin.dialects.py.constant import Constant
-from kirin.rewrite.cfg_compactify import CFGCompactify
 
 
 @basic_no_opt
@@ -19,10 +19,8 @@ def foo(x: int):  # type: ignore
 
 
 def test_cfg_compactify():
-    cfg = CFG(foo.callable_region)
-    compactify = CFGCompactify(cfg)
+    compactify = Walk(CFGCompactify())
     Fixpoint(compactify).rewrite(foo.code)
-    foo.callable_region.blocks[0].stmts.at(1).print()
     assert len(foo.callable_region.blocks[0].stmts) == 2
     stmt = foo.callable_region.blocks[0].stmts.at(0)
     assert isinstance(stmt, Lambda)
@@ -48,10 +46,8 @@ def my_main_test_cfg():
 
 def test_compactify_replace_block_arguments():
     Walk(Inline(heuristic=lambda x: True)).rewrite(my_main_test_cfg.code)
-    cfg = CFG(my_main_test_cfg.callable_region)
-    compactify = CFGCompactify(cfg)
+    compactify = Walk(CFGCompactify())
     Fixpoint(compactify).rewrite(my_main_test_cfg.code)
-    my_main_test_cfg.code.print()
     stmt = my_main_test_cfg.callable_region.blocks[0].stmts.at(5)
     assert isinstance(stmt, func.Lambda)
     assert isinstance(stmt.captured[0].owner, Constant)
@@ -99,10 +95,10 @@ def test_compactify_single_branch_block():
     mul = binop.Mult(x, z)
     region.blocks[3].stmts.append(mul)
     region.blocks[3].stmts.append(func.Return(mul.result))
-    region.print()
     cfg = CFG(region)
-    compactify = CFGCompactify(cfg)
+    compactify = Walk(CompactifyRegion(cfg))
     compactify.rewrite(region)
+    region.print()
     assert len(region.blocks) == 3
     stmt = region.blocks[0].last_stmt
     assert isinstance(stmt, cf.ConditionalBranch)
@@ -122,7 +118,7 @@ def test_compactify_entry_block_single_branch():
     region.blocks[1].stmts.append(x_2)
     region.blocks[1].stmts.append(func.Return(x_2.result))
     cfg = CFG(region)
-    compactify = CFGCompactify(cfg)
+    compactify = Walk(CompactifyRegion(cfg))
     compactify.rewrite(region)
 
     target = ir.Region(ir.Block())

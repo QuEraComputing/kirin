@@ -58,7 +58,11 @@ def python_basic(self):
     return run_pass
 
 
-@dialect_group(python_basic.union([list, range, slice, cf, lowering.cf, func, math]))
+@dialect_group(
+    python_basic.union(
+        [list, range, slice, cf, func, lowering.cf, lowering.func, lowering.call, math]
+    )
+)
 def python_no_opt(self):
     """The Python dialect without optimization passes."""
 
@@ -68,7 +72,11 @@ def python_no_opt(self):
     return run_pass
 
 
-@dialect_group(python_basic.union([ilist, range, slice, cf, lowering.cf, func, math]))
+@dialect_group(
+    python_basic.union(
+        [ilist, range, slice, cf, func, math, lowering.cf, lowering.func, lowering.call]
+    )
+)
 def basic_no_opt(self):
     """The basic kernel without optimization passes. This is a builtin
     eDSL that includes the basic dialects that are commonly used in

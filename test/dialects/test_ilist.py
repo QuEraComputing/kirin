@@ -3,11 +3,11 @@ from typing import Literal
 from kirin import ir, types, rewrite
 from kirin.passes import aggressive
 from kirin.prelude import python_basic
-from kirin.dialects import py, func, ilist
+from kirin.dialects import py, func, ilist, lowering
 from kirin.passes.typeinfer import TypeInfer
 
 
-@ir.dialect_group(python_basic.union([func, ilist]))
+@ir.dialect_group(python_basic.union([func, ilist, lowering.func]))
 def basic(self):
     aggressive_fold_pass = aggressive.Fold(self)
     typeinfer_pass = TypeInfer(self)
