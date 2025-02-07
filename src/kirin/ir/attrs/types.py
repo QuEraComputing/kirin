@@ -481,9 +481,6 @@ class Hinted(TypeAttribute, typing.Generic[HintedData]):
             type = type.type
         self.type = type
 
-    def is_equal(self, other: TypeAttribute) -> bool:
-        return isinstance(other, Hinted) and self.type.is_equal(other.type)
-
     def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
         return self.type.is_subseteq(other)
 
