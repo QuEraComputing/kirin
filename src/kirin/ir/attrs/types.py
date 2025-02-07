@@ -86,7 +86,7 @@ class TypeAttribute(
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
     name = "Any"
 
@@ -98,7 +98,7 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
     name = "Bottom"
 
@@ -140,7 +140,7 @@ PyClassType = typing.TypeVar("PyClassType")
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta):
     name = "PyClass"
     typ: type[PyClassType]
@@ -197,7 +197,7 @@ LiteralType = typing.TypeVar("LiteralType")
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta):
     name = "Literal"
     data: LiteralType
@@ -222,7 +222,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class Union(TypeAttribute, metaclass=UnionTypeMeta):
     name = "Union"
     types: frozenset[TypeAttribute]
@@ -283,7 +283,7 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class TypeVar(TypeAttribute):
     name = "TypeVar"
     varname: str
@@ -320,7 +320,7 @@ class TypeVar(TypeAttribute):
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class Vararg(Attribute):
     name = "Vararg"
     typ: TypeAttribute
@@ -338,7 +338,7 @@ TypeOrVararg: typing.TypeAlias = TypeAttribute | Vararg
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class Generic(TypeAttribute, typing.Generic[PyClassType]):
     name = "Generic"
     body: PyClass[PyClassType]
@@ -461,7 +461,7 @@ HintedData = typing.TypeVar("HintedData")
 
 
 @typing.final
-@dataclass
+@dataclass(eq=False)
 class Hinted(TypeAttribute, typing.Generic[HintedData]):
     """Type wrapped with a hint.
 
