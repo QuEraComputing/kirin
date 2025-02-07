@@ -126,6 +126,7 @@ class CfLowering(FromPythonAST):
             )
         )
 
+        after_frame.defs.update(frame.defs)
         phi: set[str] = set()
         for name in if_frame.defs.keys():
             if frame.get(name):
