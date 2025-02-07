@@ -87,7 +87,10 @@ class Lowering(lowering.FromPythonAST):
 
         body_frame = state.push_frame(
             lowering.Frame.from_stmts(
-                node.body, state, capture_callback=new_block_arg_if_inside_loop
+                node.body,
+                state,
+                globals=state.current_frame.globals,
+                capture_callback=new_block_arg_if_inside_loop,
             )
         )
         loop_var = body_frame.curr_block.args.append_from(ir.types.Any)
