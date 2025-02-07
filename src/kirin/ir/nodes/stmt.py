@@ -404,8 +404,6 @@ class Statement(IRNode["Block"]):
 
         self.parent = None
         parent._stmt_len -= 1
-        assert self.prev_stmt is None
-        assert self.next_stmt is None
         return
 
     def __post_init__(self):
