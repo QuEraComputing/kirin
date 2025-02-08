@@ -1,4 +1,5 @@
 from typing import Generic, TypeVar
+from contextlib import contextmanager
 from dataclasses import field, dataclass
 
 from kirin.interp.frame import FrameABC
@@ -36,6 +37,26 @@ class InterpreterState(Generic[FrameType]):
             FrameType: The frame that was popped.
         """
         return self.frames.pop()
+
+    @contextmanager
+    def new_frame(self, frame: FrameType):
+        """Context manager to push and pop a frame.
+
+        This context manager is used to push a frame onto the stack before
+        executing a block of code and pop the frame from the stack after
+        executing the block of code.
+
+        Args:
+            frame(FrameType): The frame to push onto the stack.
+
+        Yields:
+            FrameType: The frame that was pushed.
+        """
+        self.push_frame(frame)
+        try:
+            yield frame
+        finally:
+            self.pop_frame()
 
     def current_frame(self) -> FrameType:
         """Get the current frame.
