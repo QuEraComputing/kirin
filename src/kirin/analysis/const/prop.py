@@ -105,11 +105,13 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
         if isinstance(result, tuple) and all(x.purity is Pure() for x in result):
             return
 
-        if isinstance(result, interp.ReturnValue) and isinstance(result.value, Pure):
+        if isinstance(result, interp.ReturnValue) and isinstance(
+            result.value.purity, Pure
+        ):
             return
 
         if isinstance(result, interp.YieldValue) and all(
-            isinstance(x, Pure) for x in result
+            isinstance(x.purity, Pure) for x in result
         ):
             return
 
