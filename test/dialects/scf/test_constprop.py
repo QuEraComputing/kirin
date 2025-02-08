@@ -26,3 +26,37 @@ def test_simple_loop():
     result, ret = prop.run_analysis(main)
     assert isinstance(ret.const, const.Value)
     assert ret.const.data == 2
+    assert isinstance(ret.purity, const.Pure)
+
+
+def test_nested_loop():
+    @kernel
+    def main():
+        x = 0
+        for i in range(2):
+            for j in range(3):
+                x = x + 1
+        return x
+
+    prop = const.Propagate(kernel)
+    result, ret = prop.run_analysis(main)
+    assert isinstance(ret.const, const.Value)
+    assert ret.const.data == 6
+    assert isinstance(ret.purity, const.Pure)
+
+
+def test_nested_loop_with_if():
+    @kernel
+    def main():
+        x = 0
+        for i in range(2):
+            if i == 0:
+                for j in range(3):
+                    x = x + 1
+        return x
+
+    prop = const.Propagate(kernel)
+    result, ret = prop.run_analysis(main)
+    assert isinstance(ret.const, const.Value)
+    assert ret.const.data == 3
+    assert isinstance(ret.purity, const.Pure)
