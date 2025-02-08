@@ -31,16 +31,19 @@ class DialectConstProp(interp.MethodTable):
         cond = frame.get(stmt.cond)
         if isinstance(cond.const, const.Value):
             with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
+                body_frame.entries.update(frame.entries)
                 if cond.const.data:
                     results = interp_.run_ssacfg_region(body_frame, stmt.then_body)
                 else:
                     results = interp_.run_ssacfg_region(body_frame, stmt.else_body)
         else:
             with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-                then_results = interp_.run_ssacfg_region(frame, stmt.then_body)
+                body_frame.entries.update(frame.entries)
+                then_results = interp_.run_ssacfg_region(body_frame, stmt.then_body)
 
             with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-                else_results = interp_.run_ssacfg_region(frame, stmt.else_body)
+                body_frame.entries.update(frame.entries)
+                else_results = interp_.run_ssacfg_region(body_frame, stmt.else_body)
             results = interp_.join_results(then_results, else_results)
 
         return results
@@ -59,6 +62,7 @@ class DialectConstProp(interp.MethodTable):
         if isinstance(iterable.const, const.Value):
             for value in iterable.const.data:
                 with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
+                    body_frame.entries.update(frame.entries)
                     body_frame.set_values(
                         block_args,
                         (const.JointResult(const.Value(value), iterable.purity),)
