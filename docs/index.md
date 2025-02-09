@@ -39,32 +39,26 @@ While the mission and audience may be very different, Kirin has been deeply insp
 
 In this example, we will mutate python's semantics to
 support a small eDSL (embedded domain-specific language) called `beer`.
-It describes the process of brewing beer and get drunk.
+It describes the process of brewing, pour, drink beers and get drunk.
 
 Before we start, let's take a look at what would our `beer` language look like:
 
 ```python
 @beer
-def main(x):
-    beer = NewBeer("budlight") # (1)!
-    Pour(beer, 12) # (2)!
-    Drink(beer) # (3)!
+def main(x: int):
+    beer = NewBeer(brand="budlight") # (1)!
+    pints = Pour(beer, x) # (2)!
+    Drink(pints) # (3)!
     Puke() # (4)!
-    if x > 1: # (5)!
-        Drink(NewBeer("heineken")) # (6)!
-    else:
-        Drink(NewBeer("tsingdao")) # (7)!
-    return x + 1 # (8)!
+
+    return x + 1 # (5)!
 ```
 
 1. The `NewBeer` statement creates a new beer object with a given brand.
-2. The `Pour` statement pours a beer object.
-3. The `Drink` statement drinks a beer object.
+2. The `Pour` statement pours a beer for `x` portions into pints object.
+3. The `Drink` statement drinks pints object.
 4. The `Puke` statement pukes. Now we are drunk!
-5. Instead of a normal `if else` branching statement, we execute the branches randomly because we are drunk.
-6. The `Drink` statement drinks a `heineken` beer object for some possibility.
-7. The `Drink` statement drinks a `tsingdao` beer object for some possibility.
-8. Doing some math to get a result.
+5. Doing some math to get a result.
 
 The beer language is wrapped with a decorator `@beer` to indicate that the function is written in the `beer` language instead of normal Python. (think about how would you program GPU kernels in Python, or how would you use `jax.jit` and `numba.jit` decorators).
 
@@ -82,8 +76,8 @@ main.print()
 
 ![beer-printing](assets/beer-printing.png)
 
-### Defining the dialect
 
+### Defining the dialect
 First, let's define the [dialect](def.md#dialects) object, which is a registry for all
 the objects modeling the semantics.
 
@@ -95,8 +89,8 @@ dialect = ir.Dialect("beer")
 
 ### Defining the statements
 
-Next, we want to define a runtime value `Beer` for the `beer` language so that we may use
-later in our interpreter. This is just a standard Python `dataclass`.
+Next, we want to define a runtime value `Beer`, as well as the runtime value of `Pints` for the `beer` language so that we may use
+later in our interpreter. These are just a standard Python `dataclass`.
 
 ```python
 from dataclasses import dataclass
@@ -104,60 +98,68 @@ from dataclasses import dataclass
 @dataclass
 class Beer:
     brand: str
+
+@dataclass
+class Pints:
+    kind: Beer
+    amount: int
 ```
 
 Now, we can define the `beer` language's [statements](def.md#statements).
 
 ```python
 from kirin.decl import statement, info
-from kirin.dialects.py import types
+from kirin import ir, types
 
 @statement(dialect=dialect)
 class NewBeer(Statement):
     name = "new_beer" # (1)!
-    traits = frozenset({ir.Pure()}) # (2)!
-    brand: ir.SSAValue = info.argument(types.String) # (3)!
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()}) # (2)!
+    brand: str = info.attribute(types.String) # (3)!
     result: ir.ResultValue = info.result(types.PyClass(Beer)) # (4)!
 ```
 
 1. The `name` field specifies the name of the statement in the IR text format (e.g printing).
 2. The `traits` field specifies the statement's traits, in this case, it is a
    [pure function](101.md/#what-is-purity) because each brand name uniquely identifies a
-   beer object.
-3. The `brand` field specifies the argument of the statement. It is a string value. The arguments
-   of a [`Statement`](def.md#statements) must be [`ir.SSAValue`](def.md#ssa-values) objects with a
-   field specifier `info.argument` that optionally specifies the type of the argument. The type used
-   here is `types.String` which is not Python's type but a [`TypeAttribute`](def.md#attributes) object
-   from the `py.types` dialect.
+   beer object. We also add a trait of `FromPythonCall()` to allow lowering from python ast.
+3. The `brand` field specifies the argument of the statement. It is an Attribute of string value. See [`PyAttr`][kirin.ir.PyAttr] for further details.
 4. The `result` field specifies the result of the statement. Usually a statement only has one result
    value. The type of the result must be [`ir.ResultValue`](def.md#ssa-values) with a field specifier
     `info.result` that optionally specifies the type of the result.
 
 the `NewBeer` statement creates a new beer object with a given brand. Thus
-it takes a string as an argument and returns a `Beer` object. Click the plus sign above
+it takes a string as an attribute and returns a `Beer` object. Click the plus sign above
 to see the corresponding explanation.
 
-```python
-@statement(dialect=dialect)
-class Drink(Statement):
-    name = "drink"
-    beverage: ir.SSAValue = info.argument(types.PyClass(Beer))
-```
-
-Similarly, we define `Drink` statement that takes a `Beer` object as an argument. The `types.PyClass` type
-from `py.type` dialect understands Python classes and can take a Python class as an argument to create a
-type attribute.
 
 ```python
 @statement(dialect=dialect)
-class Pour(Statement):
-    name = "pour"
-    beverage: ir.SSAValue = info.argument(types.PyClass(Beer))
+class Pour(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
+    beverage: ir.SSAValue = info.argument(types.PyClass(Beer))# (1)!
     amount: ir.SSAValue = info.argument(types.Int)
+    result: ir.ResultValue = info.result(types.PyClass(Pints))
 ```
 
-The `Pour` statement takes a `Beer` object and an integer amount as arguments. The `types.Int` type is
-from the `py.types` dialect. Now we can define a more complicated statement that involves control flow.
+1. The arguments of a [`Statement`](def.md#statements) must be [`ir.SSAValue`](def.md#ssa-values) objects with a
+   field specifier `info.argument` that optionally specifies the type of the argument.
+
+Next, we define `Pour` statement that takes a `Beer` object as an argument, and the result value is a `Pints` object. The `types.PyClass` type understands Python classes and can take a Python class as an argument to create a type attribute [`TypeAttribute`](def.md#attributes).
+
+
+```python
+@statement(dialect=dialect)
+class Drink(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
+    pints: ir.SSAValue = info.argument(types.PyClass(Pints))
+```
+
+Similarly, we define `Drink` statement that takes a `Pints` object as an argument. As the same previously, the `types.PyClass` type understands Python classes (in this case Pints class) and can take a Python class as an argument to create a type attribute. Notice that drink does not have any return value.
+
+
+<!--
+Now we can define a more complicated statement that involves control flow.
 
 ```python
 @statement(dialect=dialect)
@@ -184,49 +186,53 @@ class RandomBranch(Statement):
 
 the `RandomBranch` statement is a terminator that takes a boolean condition and two tuples of arguments. However,
 unlike a normal `if else` branching statement, it does not execute the branches based on the condition. Instead,
-it randomly chooses one of the branches to execute.
+it randomly chooses one of the branches to execute. -->
 
-### Defining the interpreter
+### Defining the method table for concrete interpreter
 
-Now with the statements defined, we can define how to interpret them
+Now with the statements defined, we can define how to interpret them by defining the method table associate with each statement.
 
 ```python
-from kirin.interp import DialectInterpreter, Interpreter, ResultValue, Successor, impl
+from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
 
 @dialect.register
-class BeerInterpreter(DialectInterpreter):
+class BeerMethods(MethodTable):
     ...
+
 ```
 
-the `BeerInterpreter` class is a subclass of `DialectInterpreter` that registers the implementation
-of each implementation. The implementation is a method decorated with `@impl` that executes the
+the `BeerMethods` class is a subclass of `MethodTable`. Together with the decorator from the dialect group `dialect.register`, they registers the implementation  method table to interpreter. The implementation is a method decorated with `@impl` that executes the
 statement.
 
 ```python
     @impl(NewBeer)
-    def new_beer(self, interp: Interpreter, stmt: NewBeer, values: tuple):
-        return ResultValue(Beer(values[0]))
+    def new_beer(self, interp: Interpreter, frame: Frame, stmt: NewBeer):
+        return (Beer(stmt.brand),)
 
     @impl(Drink)
-    def drink(self, interp: Interpreter, stmt: Drink, values: tuple):
-        print(f"Drinking {values[0].brand}")
-        return ResultValue()
+    def drink(self, interp: Interpreter, frame: Frame, stmt: Drink):
+        pints: Pints = frame.get(stmt.pints)
+        print(f"Drinking {pints.amount} pints of {pints.kind.brand}")
+        return ()
 
     @impl(Pour)
-    def pour(self, interp: Interpreter, stmt: Pour, values: tuple):
-        print(f"Pouring {values[0].brand} {values[1]}")
-        return ResultValue()
+    def pour(self, interp: Interpreter, frame: Frame, stmt: Pour):
+        beer: Beer = frame.get(stmt.beverage)
+        amount: int = frame.get(stmt.amount)
+        print(f"Pouring {beer.brand} {amount}")
+
+        return (Pints(beer, amount),)
 
     @impl(Puke)
-    def puke(self, interp: Interpreter, stmt: Puke, values: tuple):
+    def puke(self, interp: Interpreter, frame: Frame, stmt: Puke):
         print("Puking!!!")
-        return ResultValue()
+        return ()
 ```
 
 Normally, most implementations are just straightforward like the above except that they will
-do more meaningful things than printing. The [`ResultValue`][kirin.interp.ResultValue] object is
-a result type of the interpreter that saying the return value is just a normal tuple of values.
-This will be different when we implement interpretation for a terminator:
+do more meaningful things than printing. The eturn value is just a normal tuple that contain interpretation runtime values.
+
+<!-- This will be different when we implement interpretation for a terminator:
 
 ```python
     @impl(RandomBranch)
@@ -244,8 +250,8 @@ This will be different when we implement interpretation for a terminator:
 
 The `random_branch` implementation randomly chooses one of the branches to execute. The return value
 is a [`Successor`][kirin.interp.Successor] object that specifies the next block to execute and the arguments
-to pass to the block.
-
+to pass to the block. -->
+<!--
 ### Rewrite Python `if else` statement to `RandomBranch`
 
 Now we can define a rewrite pass that rewrites Python `if else` statement to `RandomBranch` statement.
@@ -280,7 +286,7 @@ class RewriteToRandomBranch(RewriteRule):
 2. Import the `RewriteRule` class from the `rewrite` module.
 3. This is the signature of `rewrite_Statement` method. Your IDE should hint you the type signature so you can auto-complete it.
 4. Check if the statement is a `ConditionalBranch` statement. If it is not, return an empty `RewriteResult`.
-5. Replace the `ConditionalBranch` statement with a `RandomBranch` statement and return a `RewriteResult` that indicates the rewrite has been done. Every statement has a [`replace_by`][kirin.ir.Statement.replace_by] method that replaces the statement with another statement.
+5. Replace the `ConditionalBranch` statement with a `RandomBranch` statement and return a `RewriteResult` that indicates the rewrite has been done. Every statement has a [`replace_by`][kirin.ir.Statement.replace_by] method that replaces the statement with another statement. -->
 
 ### Putting everything together
 

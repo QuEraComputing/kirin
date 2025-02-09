@@ -9,9 +9,23 @@ from rewrite import NewBeerAndPukeOnDrink
 from kirin.rewrite import Walk
 
 
-# type: ignore
 @beer
 def main(x: int):
+    beer = NewBeer(brand="budlight")  # (1)!
+    pints = Pour(beer, x)  # (2)!
+    Drink(pints)  # (3)!
+    Puke()  # (4)!
+
+    return x + 1  # (5)!
+
+
+main.print()
+exit(1)
+
+
+# type: ignore
+@beer
+def main2(x: int):
     def some_closure(beer, amount):
         Pour(beer, amount + 1)
         Puke()
@@ -34,8 +48,8 @@ def main(x: int):
     return x + 1
 
 
-main.code.print()
-main(1)  # execute the function
+main2.code.print()
+main2(1)  # execute the function
 # for i in range(10):
 #     print("iteration", i)
 #     main(i)  # now drink a random beer!
