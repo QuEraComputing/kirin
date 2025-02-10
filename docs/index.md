@@ -158,36 +158,6 @@ class Drink(ir.Statement):
 Similarly, we define `Drink` statement that takes a `Pints` object as an argument. As the same previously, the `types.PyClass` type understands Python classes (in this case Pints class) and can take a Python class as an argument to create a type attribute. Notice that drink does not have any return value.
 
 
-<!--
-Now we can define a more complicated statement that involves control flow.
-
-```python
-@statement(dialect=dialect)
-class RandomBranch(Statement):
-    name = "random_br"
-    traits = frozenset({IsTerminator()}) # (1)!
-    cond: SSAValue = info.argument(types.Bool) # (2)!
-    then_arguments: tuple[ir.SSAValue, ...] = info.argument() # (3)!
-    else_arguments: tuple[ir.SSAValue, ...] = info.argument() # (4)!
-    then_successor: ir.Block = info.block() # (5)!
-    else_successor: ir.Block = info.block() # (6)!
-```
-
-1. The `traits` field specifies that this statement is a terminator. A terminator is a statement that
-   ends a block. In this case, the `RandomBranch` statement is a terminator because it decides which
-   block to go next.
-2. The `cond` field specifies the condition of the branch. It is a boolean value.
-3. The `then_arguments` field specifies the arguments that are passed to the `then_successor` block. Unlike
-   previous examples, the `then_arguments` field is annotated with `tuple[ir.SSAValue, ...]`, which means
-   it takes a tuple of `ir.SSAValue` objects (like what it means in a `dataclass`).
-4. The `else_arguments` field specifies the arguments that are passed to the `else_successor` block.
-5. The `then_successor` field specifies the block that the control flow goes to if the condition is true.
-6. The `else_successor` field specifies the block that the control flow goes to if the condition is false.
-
-the `RandomBranch` statement is a terminator that takes a boolean condition and two tuples of arguments. However,
-unlike a normal `if else` branching statement, it does not execute the branches based on the condition. Instead,
-it randomly chooses one of the branches to execute. -->
-
 ### Defining the method table for concrete interpreter
 
 Now with the statements defined, we can define how to interpret them by defining the method table associate with each statement.
@@ -207,7 +177,7 @@ statement.
 ```python
     @impl(NewBeer)
     def new_beer(self, interp: Interpreter, frame: Frame, stmt: NewBeer):
-        return (Beer(stmt.brand),)
+        return (Beer(stmt.brand),) # (1)!
 
     @impl(Drink)
     def drink(self, interp: Interpreter, frame: Frame, stmt: Drink):
@@ -216,7 +186,7 @@ statement.
         return ()
 
     @impl(Pour)
-    def pour(self, interp: Interpreter, frame: Frame, stmt: Pour):
+    def pour(self, interp: Interpreter, frame: Frame, stmt: Pour): # (2)!
         beer: Beer = frame.get(stmt.beverage)
         amount: int = frame.get(stmt.amount)
         print(f"Pouring {beer.brand} {amount}")
@@ -226,67 +196,61 @@ statement.
     @impl(Puke)
     def puke(self, interp: Interpreter, frame: Frame, stmt: Puke):
         print("Puking!!!")
-        return ()
+        return () # (3)!
 ```
 
-Normally, most implementations are just straightforward like the above except that they will
-do more meaningful things than printing. The eturn value is just a normal tuple that contain interpretation runtime values.
+1. The statement has return value which is a `Beer` runtime object.
+2. Sometimes, the execution of a statement will have *side-effect* and return value.
+For example, here the execution `Pour` statement print strings (side-effect) as well as return a `Pints` runtime object.
+3. In the case where the statement does not have any return value but simply have side-effect only, the return value is simply an empty tuple.
 
-<!-- This will be different when we implement interpretation for a terminator:
+The return value is just a normal tuple that contain interpretation runtime values. Click the plus sign above
+to see the corresponding explanation.
 
-```python
-    @impl(RandomBranch)
-    def random_branch(self, interp: Interpreter, stmt: RandomBranch, values: tuple):
-        frame = interp.state.current_frame()
-        if randint(0, 1):
-            return Successor(
-                stmt.then_successor, *frame.get_values(stmt.then_arguments)
-            )
-        else:
-            return Successor(
-                stmt.else_successor, *frame.get_values(stmt.then_arguments)
-            )
-```
 
-The `random_branch` implementation randomly chooses one of the branches to execute. The return value
-is a [`Successor`][kirin.interp.Successor] object that specifies the next block to execute and the arguments
-to pass to the block. -->
-<!--
-### Rewrite Python `if else` statement to `RandomBranch`
+### Rewrite `Drink` statement
 
-Now we can define a rewrite pass that rewrites Python `if else` statement to `RandomBranch` statement.
-This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.RewriteRule] and implementing the
+Sometimes when we are drunk, we will do something that is not expected. Here, we introduce how to do rewrite on the program.
+What we want to do is simple:
+
+Everytime we drink, we will to buy yet another new beer and also puke. Sounds like a drunk person will do huh.
+
+
+More specifically, we want to rewrite the program such that, everytime we encounter a `Drink` statement, we insert a `NewBeer` statement, and `Puke` after `Drink`.
+Let's define a rewrite pass that rewrite our `Drink` statement. This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.RewriteRule] and implementing the
 `rewrite_Statement` method. The `RewriteRule` class is a standard Python visitor on Kirin's IR.
 
-Here, we only need to implement the `rewrite_Statement` method to rewrite the `if else` statement to `RandomBranch`.
 
 ```python
-from kirin.dialects import cf # (1)!
-from kirin.rewrite import RewriteResult, RewriteRule # (2)!
+from kirin.rewrite import RewriteResult, RewriteRule # (1)!
+from kirin import ir
 
 @dataclass
-class RewriteToRandomBranch(RewriteRule):
-
-    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult: # (3)!
-        if not isinstance(node, cf.ConditionalBranch): # (4)!
+class NewBeerAndPukeOnDrink(RewriteRule):
+    # sometimes someone get drunk, so they keep getting new beer and puke after they drink
+    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult: # (2)!
+        if not isinstance(node, Drink): # (3)!
             return RewriteResult()
-        node.replace_by(
-            RandomBranch(
-                cond=node.cond,
-                then_arguments=node.then_arguments,
-                then_successor=node.then_successor,
-                else_arguments=node.else_arguments,
-                else_successor=node.else_successor,
-            )
-        )
-        return RewriteResult(has_done_something=True) # (5)!
+
+        # 1. create new stmts:
+        new_beer_stmt = NewBeer(brand="saporo") # (4)!
+        puke_stmt = Puke() # (5)!
+
+        # 2. put them in the ir
+        new_beer_stmt.insert_after(node) # (6)!
+        puke_stmt.insert_after(new_beer_stmt)
+
+        return RewriteResult(has_done_something=True) # (7)!
 ```
 
-1. Import the control flow dialect `cf` which is what Python `if else` statement compiles to by default in the `basic` dialect group.
-2. Import the `RewriteRule` class from the `rewrite` module.
-3. This is the signature of `rewrite_Statement` method. Your IDE should hint you the type signature so you can auto-complete it.
-4. Check if the statement is a `ConditionalBranch` statement. If it is not, return an empty `RewriteResult`.
-5. Replace the `ConditionalBranch` statement with a `RandomBranch` statement and return a `RewriteResult` that indicates the rewrite has been done. Every statement has a [`replace_by`][kirin.ir.Statement.replace_by] method that replaces the statement with another statement. -->
+1. Import the `RewriteRule` class from the `rewrite` module.
+2. This is the signature of `rewrite_Statement` method. Your IDE should hint you the type signature so you can auto-complete it.
+3. Check if the statement is a `Drink` statement. If it is not, return an empty `RewriteResult`.
+4. Create new `NewBeer` statement.
+5. Create new `Puke` statement.
+6. insert the new created statements into the IR. Each of the ir.Statement provides API such as [`insert_after`][kirin.ir.Statement.insert_after], [`insert_before`][kirin.ir.Statement.insert_after] and [`replace_by`][kirin.ir.Statement.replace_by] that allow you to insert a new statement either after or before, or repalce the current statement with another one.
+7. Return a `RewriteResult` that indicates the rewrite has been done.
+
 
 ### Putting everything together
 
@@ -297,13 +261,16 @@ because Kirin will do it for you!
 ```python
 from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
-from kirin.rewrite import Fixpoint, Walk
+from kirin.rewrite import Walk
 
 @dialect_group(basic_no_opt.add(dialect)) # (1)!
 def beer(self): # (2)!
+
     # some initialization if you need it
-    def run_pass(mt): # (3)!
-        Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code) # (4)!
+    def run_pass(mt, drunk:bool=True): # (3)!
+
+        if drunk:
+            Walk(NewBeerAndPukeOnDrink()).rewrite(mt.code) # (4)!
 
     return run_pass # (5)!
 ```
@@ -311,10 +278,12 @@ def beer(self): # (2)!
 1. The [`dialect_group`][kirin.ir.group.dialect_group] decorator specifies the dialect group that the `beer` dialect belongs to. In this case, instead of rebuilding the whole dialect group, we just add our `dialect` object to the [`basic_no_opt`][kirin.prelude.basic_no_opt] dialect group which provides all the basic Python semantics, such as math, function, closure, control flows, etc.
 2. The `beer` function is the decorator that will be used to decorate the `main` function.
 3. The `run_pass` function wraps all the passes that need to run on the input method. It optionally can take some arguments or keyword arguments that will be passed to the `beer` decorator.
-4. Inside the `run_pass` function, we will traverse the entire IR and rewrite all the `ConditionalBranch` statements to `RandomBranch` statements until no more rewrites can be done.
+4. Inside the `run_pass` function, we will traverse the entire IR and use the rule `NewBeerAndPukeOnDrink` to rewrite all the `Drink` statements.
 5. Remember to return the `run_pass` function at the end of the `beer` function.
 
 This is it!
+
+For further advanced use case see [`CookBook/Beer`](cookbook/beer_dialect/control_flow_rewrite.md)
 
 ## License
 

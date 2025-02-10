@@ -2,15 +2,15 @@ from dataclasses import dataclass
 
 from stmts import Puke, Drink, NewBeer, RandomBranch
 
+from kirin import ir
 from kirin.dialects import cf
 from kirin.rewrite.abc import RewriteRule, RewriteResult
-from kirin.ir.nodes.stmt import Statement
 
 
 @dataclass
 class RandomWalkBranch(RewriteRule):
 
-    def rewrite_Statement(self, node: Statement) -> RewriteResult:
+    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, cf.ConditionalBranch):
             return RewriteResult()
         node.replace_by(
@@ -28,7 +28,7 @@ class RandomWalkBranch(RewriteRule):
 @dataclass
 class NewBeerAndPukeOnDrink(RewriteRule):
     # sometimes someone get drunk, so they keep getting new beer and puke after they drink
-    def rewrite_Statement(self, node: Statement) -> RewriteResult:
+    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, Drink):
             return RewriteResult()
 
