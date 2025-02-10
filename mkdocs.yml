@@ -30,6 +30,10 @@ nav:
       - Contributing: contrib.md
   - Cookbook:
     - cookbook/index.md
+    - examples:
+      - Beer Dialect:
+        - Advance Rewrite: cookbook/beer_dialect/cf_rewrite.md
+
   - Blog:
     - blog/index.md
   - API Reference:

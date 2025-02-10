@@ -112,7 +112,7 @@ from kirin.decl import statement, info
 from kirin import ir, types
 
 @statement(dialect=dialect)
-class NewBeer(Statement):
+class NewBeer(ir.Statement):
     name = "new_beer" # (1)!
     traits = frozenset({ir.Pure(), ir.FromPythonCall()}) # (2)!
     brand: str = info.attribute(types.String) # (3)!
@@ -157,6 +157,14 @@ class Drink(ir.Statement):
 
 Similarly, we define `Drink` statement that takes a `Pints` object as an argument. As the same previously, the `types.PyClass` type understands Python classes (in this case Pints class) and can take a Python class as an argument to create a type attribute. Notice that drink does not have any return value.
 
+Finally, we define `Puke` statement that describe the puke action, which does not have any arguments and no return value.
+
+```python
+@statement(dialect=dialect)
+class Puke(ir.Statement):
+    traits = frozenset({ir.FromPythonCall()})
+```
+
 
 ### Defining the method table for concrete interpreter
 
@@ -171,7 +179,7 @@ class BeerMethods(MethodTable):
 
 ```
 
-the `BeerMethods` class is a subclass of `MethodTable`. Together with the decorator from the dialect group `dialect.register`, they registers the implementation  method table to interpreter. The implementation is a method decorated with `@impl` that executes the
+The `BeerMethods` class is a subclass of `MethodTable`. Together with the decorator from the dialect group `dialect.register`, they registers the implementation  method table to interpreter. The implementation is a method decorated with `@impl` that executes the
 statement.
 
 ```python
