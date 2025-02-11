@@ -108,5 +108,6 @@ class Lowering(lowering.FromPythonAST):
         stmt = For(iter_, body_frame.curr_region, *initializers)
         for name, result in zip(yields, stmt.results):
             state.current_frame.defs[name] = result
+            result.name = name
         state.append_stmt(stmt)
         return lowering.Result()

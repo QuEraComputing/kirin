@@ -40,3 +40,21 @@ def test_exec():
 
     main.print()
     assert main(0) == 4
+
+
+def test_issue_213():
+
+    @python_basic.union([func, scf, py.range, py.unpack, ilist, lowering.func])
+    def main():
+        j = 0.0
+        i = 0
+        for k in range(2):
+            j = j + i + k
+
+        for k in range(2):
+            j = j + i
+
+        return j
+
+    assert main.py_func is not None
+    assert main() == main.py_func()
