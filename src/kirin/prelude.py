@@ -7,7 +7,7 @@ from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group
 from kirin.passes import aggressive
-from kirin.dialects import cf, func, math, ilist, lowering
+from kirin.dialects import cf, scf, func, math, ilist, lowering
 from kirin.dialects.py import (
     cmp,
     len,
@@ -158,5 +158,40 @@ def basic(self):
 
         if typeinfer:
             typeinfer_pass(mt)
+
+    return run_pass
+
+
+@dialect_group(
+    python_basic.union(
+        [ilist, range, slice, scf, cf, func, math, lowering.func, lowering.call]
+    )
+)
+def structural_no_opt(self):
+    """Structural kernel without optimization passes."""
+
+    def run_pass(method: Method) -> None:
+        pass
+
+    return run_pass
+
+
+@dialect_group(
+    python_basic.union(
+        [ilist, range, slice, scf, cf, func, math, lowering.func, lowering.call]
+    )
+)
+def structural(self):
+    """Structural kernel without optimization passes."""
+    typeinfer_pass = TypeInfer(self)
+
+    def run_pass(
+        method: Method, *, verify: bool = True, typeinfer: bool = True
+    ) -> None:
+        if verify:
+            method.verify()
+
+        if typeinfer:
+            typeinfer_pass(method)
 
     return run_pass
