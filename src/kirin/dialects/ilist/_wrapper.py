@@ -1,4 +1,4 @@
-from typing import Any, TypeVar, Iterable
+from typing import TypeVar
 
 from kirin import ir
 from kirin.lowering import wraps
@@ -6,34 +6,43 @@ from kirin.lowering import wraps
 from . import stmts
 from .runtime import IList
 
-T_Elem = TypeVar("T_Elem")
-T_Out = TypeVar("T_Out")
-T_Result = TypeVar("T_Result")
+ElemT = TypeVar("ElemT")
+OutElemT = TypeVar("OutElemT")
+LenT = TypeVar("LenT")
+ResultT = TypeVar("ResultT")
 
 
 @wraps(stmts.Map)
-def map(fn: ir.Method[[T_Elem], T_Out], collection: Iterable) -> IList | list: ...
+def map(
+    fn: ir.Method[[ElemT], OutElemT], collection: IList[ElemT, LenT] | list[ElemT]
+) -> IList[OutElemT, LenT]: ...
 
 
 @wraps(stmts.Foldr)
 def foldr(
-    fn: ir.Method[[T_Elem, T_Out], T_Out], collection: Iterable, init: T_Out
-) -> T_Out: ...
+    fn: ir.Method[[ElemT, OutElemT], OutElemT],
+    collection: IList[ElemT, LenT] | list[ElemT],
+    init: OutElemT,
+) -> OutElemT: ...
 
 
 @wraps(stmts.Foldl)
 def foldl(
-    fn: ir.Method[[T_Out, T_Elem], T_Out], collection: Iterable, init: T_Out
-) -> T_Out: ...
+    fn: ir.Method[[OutElemT, ElemT], OutElemT],
+    collection: IList[ElemT, LenT] | list[ElemT],
+    init: OutElemT,
+) -> OutElemT: ...
 
 
 @wraps(stmts.Scan)
 def scan(
-    fn: ir.Method[[T_Out, T_Elem], tuple[T_Out, T_Result]],
-    collection: Iterable,
-    init: T_Out,
-) -> tuple[T_Out, IList[T_Result, Any]]: ...
+    fn: ir.Method[[OutElemT, ElemT], tuple[OutElemT, ResultT]],
+    collection: IList[ElemT, LenT] | list[ElemT],
+    init: OutElemT,
+) -> tuple[OutElemT, IList[ResultT, LenT]]: ...
 
 
 @wraps(stmts.ForEach)
-def for_each(fn: ir.Method[[T_Elem], None], collection: Iterable) -> None: ...
+def for_each(
+    fn: ir.Method[[ElemT], None], collection: IList[ElemT, LenT] | list[ElemT]
+) -> None: ...
