@@ -105,6 +105,7 @@
             * [lowering](kirin/dialects/scf/lowering.md)
             * [stmts](kirin/dialects/scf/stmts.md)
             * [typeinfer](kirin/dialects/scf/typeinfer.md)
+            * [unroll](kirin/dialects/scf/unroll.md)
     * [emit](kirin/emit/index.md)
         * [abc](kirin/emit/abc.md)
         * [exceptions](kirin/emit/exceptions.md)
