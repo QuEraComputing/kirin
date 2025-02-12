@@ -21,8 +21,8 @@ class Module(ir.Statement):
     traits = frozenset(
         {ir.IsolatedFromAbove(), ir.SymbolTable(), ir.SymbolOpInterface()}
     )
-    sym_name: str = info.attribute(property=True)
-    entry: str = info.attribute(property=True)
+    sym_name: str = info.attribute()
+    entry: str = info.attribute()
     body: ir.Region = info.region(multi=False)
 
 
@@ -37,9 +37,9 @@ class Invoke(ir.Statement):
         after looking up the symbol table.
     """
 
-    callee: str = info.attribute(property=True)
+    callee: str = info.attribute()
     inputs: tuple[ir.SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute(property=True)
+    kwargs: tuple[str, ...] = info.attribute()
     result: ir.ResultValue = info.result()
 
     def print_impl(self, printer: Printer) -> None:

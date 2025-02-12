@@ -21,7 +21,6 @@ class CommonSubexpressionElimination(RewriteRule):
                 (type(stmt),)
                 + tuple(stmt.args)
                 + tuple(stmt.attributes.values())
-                + tuple(stmt.properties.values())
                 + tuple(stmt.successors)
                 + tuple(stmt.regions)
             )

@@ -22,7 +22,7 @@ class DummyStatement(ir.Statement):
     xxx_result: ir.ResultValue = info.result(T)
 
     # attributes
-    xxx_property: Any = info.attribute(T, default="", property=True)
+    xxx_property: Any = info.attribute(T, default="")
     xxx_attribute: ir.PyAttr[float] = info.attribute()
     xxx_dict: dict[str, int] = info.attribute()
 

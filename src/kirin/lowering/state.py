@@ -292,7 +292,7 @@ class LoweringState(ast.NodeVisitor):
                     raise DialectLoweringError(
                         f"Expected global value for attribute or property {arg}"
                     )
-                if (decl := fs.attributes.get(arg, fs.properties.get(arg))) is not None:
+                if (decl := fs.attributes.get(arg)) is not None:
                     if decl.annotation is Any:
                         kwargs[arg] = global_value.unwrap()
                     else:

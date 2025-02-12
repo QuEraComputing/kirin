@@ -26,10 +26,6 @@ class EmitProperty(BaseModifier):
             getter, setter = self._emit_attribute_property(f)
             set_new_attribute(self.cls, name, property(getter, setter))
 
-        for name, f in self.fields.properties.items():
-            getter, setter = self._emit_attribute_property(f)
-            set_new_attribute(self.cls, name, property(getter, setter))
-
         for i, (name, f) in enumerate(self.fields.blocks.items()):
             getter, setter = self._emit_successor_property(i, f)
             set_new_attribute(self.cls, name, property(getter, setter))
@@ -113,7 +109,7 @@ class EmitProperty(BaseModifier):
     def _emit_attribute_property(self, f: info.AttributeField):
         from kirin.ir.attrs.py import PyAttr
 
-        storage = "properties" if f.property else "attributes"
+        storage = "attributes"
         attr = f"{self._self_name}.{storage}['{f.name}']"
         getter = create_fn(
             f"_get_{f.name}",
@@ -123,33 +119,20 @@ class EmitProperty(BaseModifier):
             return_type=f.annotation,
         )
 
-        if f.property:
-            setter = create_fn(
-                f"_set_{f.name}",
-                args=[self._self_name, "value: _value_hint"],
-                body=[
-                    f"raise AttributeError('attribute property {f.name} is read-only')"
-                ],
-                globals=self.globals,
-                locals={"_value_hint": PyAttr if f.pytype else f.annotation},
-                return_type=None,
-            )
-        else:
-
-            setter = create_fn(
-                f"_set_{f.name}",
-                args=[self._self_name, "value: _value_hint"],
-                body=[
-                    (
-                        f"{attr} = value if isinstance(value, {self._KIRIN_PYATTR}) else {self._KIRIN_PYATTR}(value)"
-                        if f.pytype
-                        else f"{attr} = value"
-                    )
-                ],
-                globals=self.globals,
-                locals={"_value_hint": f.annotation},
-                return_type=None,
-            )
+        setter = create_fn(
+            f"_set_{f.name}",
+            args=[self._self_name, "value: _value_hint"],
+            body=[
+                (
+                    f"{attr} = value if isinstance(value, {self._KIRIN_PYATTR}) else {self._KIRIN_PYATTR}(value)"
+                    if f.pytype
+                    else f"{attr} = value"
+                )
+            ],
+            globals=self.globals,
+            locals={"_value_hint": PyAttr if f.pytype else f.annotation},
+            return_type=None,
+        )
 
         return getter, setter
 

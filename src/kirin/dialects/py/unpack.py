@@ -22,7 +22,7 @@ dialect = ir.Dialect("py.unpack")
 @statement(dialect=dialect, init=False)
 class Unpack(ir.Statement):
     value: ir.SSAValue = info.argument(types.Any)
-    names: tuple[str | None, ...] = info.attribute(property=True)
+    names: tuple[str | None, ...] = info.attribute()
 
     def __init__(self, value: ir.SSAValue, names: tuple[str | None, ...]):
         result_types = [types.Any] * len(names)
@@ -30,7 +30,7 @@ class Unpack(ir.Statement):
             args=(value,),
             result_types=result_types,
             args_slice={"value": 0},
-            properties={"names": ir.PyAttr(names)},
+            attributes={"names": ir.PyAttr(names)},
         )
         for result, name in zip(self.results, names):
             result.name = name

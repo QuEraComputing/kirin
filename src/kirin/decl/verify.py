@@ -25,7 +25,6 @@ class Verify(BaseModifier):
         "regions",
         "successors",
         "attributes",
-        "properties",
     }
 
     def verify_mro(self):

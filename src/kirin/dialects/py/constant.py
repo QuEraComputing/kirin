@@ -27,7 +27,7 @@ T = TypeVar("T", covariant=True)
 class Constant(ir.Statement, Generic[T]):
     name = "constant"
     traits = frozenset({ir.Pure(), ir.ConstantLike(), ir.FromPythonCall()})
-    value: T = info.attribute(property=True)
+    value: T = info.attribute()
     result: ir.ResultValue = info.result()
 
     # NOTE: we allow py.Constant take data.PyAttr too
@@ -35,7 +35,7 @@ class Constant(ir.Statement, Generic[T]):
         if not isinstance(value, ir.PyAttr):
             value = ir.PyAttr(value)
         super().__init__(
-            properties={"value": value},
+            attributes={"value": value},
             result_types=(value.type,),
         )
 

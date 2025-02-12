@@ -126,7 +126,6 @@ class Statement(IRNode["Block"]):
     successors: list[Block] = field(init=False)
     _regions: list[Region] = field(init=False)
     attributes: dict[str, Attribute] = field(init=False)
-    properties: dict[str, Attribute] = field(init=False)
 
     parent: Block | None = field(default=None, init=False, repr=False)
     _next_stmt: Statement | None = field(default=None, init=False, repr=False)
@@ -410,10 +409,6 @@ class Statement(IRNode["Block"]):
         assert self.name != ""
         assert isinstance(self.name, str)
 
-        for key in self.attributes:
-            if key in self.properties:
-                raise ValueError(f"name clash: Attribute {key} is already a property")
-
     def __init__(
         self,
         *,
@@ -421,7 +416,6 @@ class Statement(IRNode["Block"]):
         regions: Sequence[Region] = (),
         successors: Sequence[Block] = (),
         attributes: Mapping[str, Attribute] = {},
-        properties: Mapping[str, Attribute] = {},
         results: Sequence[ResultValue] = (),
         result_types: Sequence[TypeAttribute] = (),
         args_slice: Mapping[str, int | slice] = {},
@@ -463,7 +457,6 @@ class Statement(IRNode["Block"]):
             self._results = list(results)
 
         self.successors = list(successors)
-        self.properties = dict(properties)
         self.attributes = dict(attributes)
         self.regions = list(regions)
 
@@ -492,7 +485,6 @@ class Statement(IRNode["Block"]):
             regions=regions or other._regions,
             successors=successors or other.successors,
             attributes=attributes or other.attributes,
-            properties=other.properties,  # properties are immutable, thus no need to copy
             result_types=[result.type for result in other._results],
             args_slice=other._name_args_slice,
         )
@@ -549,7 +541,6 @@ class Statement(IRNode["Block"]):
             or len(self.regions) != len(other.regions)
             or len(self.successors) != len(other.successors)
             or self.attributes != other.attributes
-            or self.properties != other.properties
         ):
             return False
 
@@ -622,12 +613,6 @@ class Statement(IRNode["Block"]):
                 suffix="]",
             )
 
-        if self.properties:
-            printer.plain_print("<{")
-            with printer.rich(highlight=True):
-                printer.print_mapping(self.properties, delim=", ")
-            printer.plain_print("}>")
-
         if self.regions:
             printer.print_seq(
                 self.regions,
@@ -659,7 +644,7 @@ class Statement(IRNode["Block"]):
         Returns:
             Attribute | None: The attribute or property of the Statement.
         """
-        return self.attributes.get(key, self.properties.get(key))
+        return self.attributes.get(key)
 
     @classmethod
     def has_trait(cls, trait_type: type[StmtTrait]) -> bool:

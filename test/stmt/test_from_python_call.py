@@ -30,7 +30,7 @@ class DummyStatement(ir.Statement):
     xxx_result: ir.ResultValue = info.result(T)
 
     # attributes
-    xxx_property: Any = info.attribute(default="", property=True)
+    xxx_property: Any = info.attribute(default="")
     xxx_attribute: bool = info.attribute()
 
 

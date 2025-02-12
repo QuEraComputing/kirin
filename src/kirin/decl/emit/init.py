@@ -95,10 +95,6 @@ class EmitInit(BaseModifier):
             if f.init:
                 kw_params.append(self._init_param_value(f))
 
-        for f in self.fields.properties.values():
-            if f.init:
-                kw_params.append(self._init_param_value(f))
-
         for f in self.fields.regions.values():
             if f.init:
                 kw_params.append(self._init_param_value(f))
@@ -120,7 +116,6 @@ class EmitInit(BaseModifier):
                 f"successors={self._blocks_seq()},"
                 f"result_types={self._result_types_seq()},"
                 f"attributes={self._attribute_seq()},"
-                f"properties={self._properties_seq()},"
                 f"args_slice={self._args_slice(has_args_groups)}"
                 ")"
             )
@@ -211,15 +206,6 @@ class EmitInit(BaseModifier):
             )
 
         return value
-
-    def _properties_seq(self):
-        props = ",".join(
-            [
-                f'"{name}": {self._attribute_value(f)}'
-                for name, f in self.fields.properties.items()
-            ]
-        )
-        return "{" + props + "}"
 
     def _regions_seq(self):
         regions = [self._regions_value(f) for f in self.fields.regions.values()]

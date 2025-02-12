@@ -28,7 +28,6 @@ class AttributeField(Field):
     repr: bool
     default_factory: Optional[Callable[[], Attribute]]
     type: types.TypeAttribute
-    property: bool
     pytype: bool = False
     "if `True`, annotation is a python type hint instead of `TypeAttribute`"
 
@@ -45,7 +44,6 @@ def attribute(
     default_factory: Optional[Callable[[], Any]] = None,
     kw_only: bool = True,
     alias: Optional[str] = None,
-    property: bool = False,
 ) -> Any:
     if kw_only is False:
         raise TypeError("attribute fields must be keyword-only")
@@ -58,7 +56,6 @@ def attribute(
         default_factory=default_factory,
         kw_only=kw_only,
         alias=alias,
-        property=property,
     )
 
 
@@ -242,8 +239,6 @@ class StatementFields:
     """blocks of the statement."""
     attributes: dict[str, AttributeField] = field(default_factory=dict)
     """attributes of the statement."""
-    properties: dict[str, AttributeField] = field(default_factory=dict)
-    """properties of the statement."""
 
     class Args:
         def __init__(self, fields: "StatementFields"):
@@ -299,7 +294,6 @@ class StatementFields:
             or name in self.regions
             or name in self.blocks
             or name in self.attributes
-            or name in self.properties
         )
 
     def __setitem__(self, name, value):
@@ -312,10 +306,7 @@ class StatementFields:
         elif isinstance(value, BlockField):
             self.blocks[name] = value
         elif isinstance(value, AttributeField):
-            if value.property:
-                self.properties[name] = value
-            else:
-                self.attributes[name] = value
+            self.attributes[name] = value
         else:
             raise TypeError(f"unknown field type {value}")
 
@@ -326,7 +317,6 @@ class StatementFields:
         yield from self.regions.values()
         yield from self.blocks.values()
         yield from self.attributes.values()
-        yield from self.properties.values()
 
     def __len__(self):
         return (
@@ -335,12 +325,11 @@ class StatementFields:
             + len(self.regions)
             + len(self.blocks)
             + len(self.attributes)
-            + len(self.properties)
         )
 
     @cached_property
     def attr_or_props(self):
-        return set(list(self.attributes.keys()) + list(self.properties.keys()))
+        return set(self.attributes.keys())
 
     @cached_property
     def required_names(self):
@@ -348,7 +337,6 @@ class StatementFields:
         return set(
             list(self.args.keys())
             + [name for name, f in self.attributes.items() if f.has_no_default()]
-            + [name for name, f in self.properties.items() if f.has_no_default()]
             + [name for name, f in self.blocks.items() if f.has_no_default()]
             + [name for name, f in self.regions.items() if f.has_no_default()]
         )

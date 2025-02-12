@@ -29,7 +29,6 @@ class DummyStatement(ir.Statement):
     xxx_result: ir.ResultValue = info.result(T)
 
     # attributes
-    xxx_property: Any = info.attribute(T, default="", property=True)
     xxx_attribute: Any = info.attribute(T)
     xxx_dict: dict[str, int] = info.attribute()
 
@@ -71,15 +70,9 @@ def test_scan_fields():
     assert isinstance(xxx_result, ResultField)
     assert xxx_result.type == T
 
-    xxx_property = ff.properties["xxx_property"]
-    assert isinstance(xxx_property, AttributeField)
-    assert xxx_property.type == T
-    assert xxx_property.property is True
-
     xxx_attribute = ff.attributes["xxx_attribute"]
     assert isinstance(xxx_attribute, AttributeField)
     assert xxx_attribute.type == T
-    assert xxx_attribute.property is False
 
     xxx_dict = ff.attributes["xxx_dict"]
     assert isinstance(xxx_dict, AttributeField)

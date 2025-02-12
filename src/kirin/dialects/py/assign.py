@@ -25,7 +25,7 @@ class Alias(ir.Statement):
     name = "alias"
     traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     value: ir.SSAValue = info.argument(T)
-    target: ir.PyAttr[str] = info.attribute(property=True)
+    target: ir.PyAttr[str] = info.attribute()
     result: ir.ResultValue = info.result(T)
 
     def print_impl(self, printer: Printer) -> None:

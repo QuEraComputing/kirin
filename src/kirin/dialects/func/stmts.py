@@ -44,7 +44,7 @@ class Function(Statement):
             SSACFGRegion(),
         }
     )
-    sym_name: str = info.attribute(property=True)
+    sym_name: str = info.attribute()
     """The symbol name of the function."""
     signature: Signature = info.attribute()
     body: Region = info.region(multi=True)
@@ -77,7 +77,7 @@ class Call(Statement):
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     inputs: tuple[SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute(default_factory=lambda: (), property=True)
+    kwargs: tuple[str, ...] = info.attribute(default_factory=lambda: ())
     result: ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 
@@ -149,7 +149,7 @@ class Lambda(Statement):
     traits = frozenset(
         {Pure(), SymbolOpInterface(), FuncOpCallableInterface(), SSACFGRegion()}
     )
-    sym_name: str = info.attribute(property=True)
+    sym_name: str = info.attribute()
     signature: Signature = info.attribute()
     captured: tuple[SSAValue, ...] = info.argument()
     body: Region = info.region(multi=True)
@@ -185,7 +185,7 @@ class GetField(Statement):
     name = "getfield"
     traits = frozenset({Pure()})
     obj: SSAValue = info.argument(MethodType)
-    field: int = info.attribute(property=True)
+    field: int = info.attribute()
     # NOTE: mypy somehow doesn't understand default init=False
     result: ResultValue = info.result(init=False)
 
@@ -203,9 +203,9 @@ class GetField(Statement):
 class Invoke(Statement):
     name = "invoke"
     traits = frozenset({MaybePure()})
-    callee: Method = info.attribute(property=True)
+    callee: Method = info.attribute()
     inputs: tuple[SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute(property=True)
+    kwargs: tuple[str, ...] = info.attribute()
     result: ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 
