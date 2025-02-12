@@ -102,7 +102,9 @@ class Propagate(ForwardExtra[Frame, Result]):
             return (Unknown(),)
 
         ret = method(self, frame, stmt)
-        if not stmt.has_trait(ir.MaybePure):  # cannot be pure at all
+        if stmt.has_trait(ir.IsTerminator):
+            return ret
+        elif not stmt.has_trait(ir.MaybePure):  # cannot be pure at all
             frame.frame_is_not_pure = True
         elif (
             stmt not in self.should_be_pure
