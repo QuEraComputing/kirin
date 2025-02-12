@@ -1,4 +1,4 @@
-from kirin import ir, interp
+from kirin import ir, types, interp
 from kirin.analysis import ForwardFrame, TypeInference
 from kirin.dialects.eltype import ElType
 
@@ -13,7 +13,7 @@ class TypeInfer(interp.MethodTable):
     def yield_stmt(
         self,
         interp_: TypeInference,
-        frame: ForwardFrame[ir.types.TypeAttribute, None],
+        frame: ForwardFrame[types.TypeAttribute],
         stmt: Yield,
     ):
         return interp.YieldValue(frame.get_values(stmt.values))
@@ -22,11 +22,11 @@ class TypeInfer(interp.MethodTable):
     def if_else(
         self,
         interp_: TypeInference,
-        frame: ForwardFrame[ir.types.TypeAttribute, None],
+        frame: ForwardFrame[types.TypeAttribute],
         stmt: IfElse,
     ):
-        if frame.get(stmt.cond) is ir.types.Any:
-            frame.set(stmt.cond, ir.types.Bool)
+        if frame.get(stmt.cond) is types.Any:
+            frame.set(stmt.cond, types.Bool)
         then_results = interp_.run_ssacfg_region(frame, stmt.then_body)
         else_results = interp_.run_ssacfg_region(frame, stmt.else_body)
         return interp_.join_results(then_results, else_results)
@@ -35,7 +35,7 @@ class TypeInfer(interp.MethodTable):
     def for_loop(
         self,
         interp_: TypeInference,
-        frame: ForwardFrame[ir.types.TypeAttribute, None],
+        frame: ForwardFrame[types.TypeAttribute],
         stmt: For,
     ):
         iterable = frame.get(stmt.iterable)

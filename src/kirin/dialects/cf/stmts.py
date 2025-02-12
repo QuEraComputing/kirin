@@ -1,17 +1,16 @@
-from kirin.ir import Block, SSAValue, Statement, IsTerminator
+from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
-from kirin.ir.attrs.types import Bool
 from kirin.dialects.cf.dialect import dialect
 
 
 @statement(dialect=dialect)
-class Branch(Statement):
+class Branch(ir.Statement):
     name = "br"
-    traits = frozenset({IsTerminator()})
+    traits = frozenset({ir.IsTerminator()})
 
-    arguments: tuple[SSAValue, ...]
-    successor: Block = info.block()
+    arguments: tuple[ir.SSAValue, ...]
+    successor: ir.Block = info.block()
 
     def verify(self) -> None:
         return
@@ -31,16 +30,16 @@ class Branch(Statement):
 
 
 @statement(dialect=dialect)
-class ConditionalBranch(Statement):
+class ConditionalBranch(ir.Statement):
     name = "cond_br"
-    traits = frozenset({IsTerminator()})
+    traits = frozenset({ir.IsTerminator()})
 
-    cond: SSAValue = info.argument(Bool)
-    then_arguments: tuple[SSAValue, ...]
-    else_arguments: tuple[SSAValue, ...]
+    cond: ir.SSAValue = info.argument(types.Bool)
+    then_arguments: tuple[ir.SSAValue, ...]
+    else_arguments: tuple[ir.SSAValue, ...]
 
-    then_successor: Block = info.block()
-    else_successor: Block = info.block()
+    then_successor: ir.Block = info.block()
+    else_successor: ir.Block = info.block()
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):

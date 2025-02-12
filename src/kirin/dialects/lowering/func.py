@@ -1,6 +1,6 @@
 import ast
 
-from kirin import ir, lowering
+from kirin import ir, types, lowering
 from kirin.dialects import cf, func
 from kirin.exceptions import DialectLoweringError
 
@@ -37,8 +37,8 @@ class Lowering(lowering.FromPythonAST):
         entries: dict[str, ir.SSAValue] = {}
         entr_block = ir.Block()
         fn_self = entr_block.args.append_from(
-            ir.types.Generic(
-                ir.Method, ir.types.Tuple.where(signature.inputs), signature.output
+            types.Generic(
+                ir.Method, types.Tuple.where(signature.inputs), signature.output
             ),
             node.name + "_self",
         )
@@ -125,10 +125,10 @@ class Lowering(lowering.FromPythonAST):
     @staticmethod
     def get_hint(state: lowering.LoweringState, node: ast.expr | None):
         if node is None:
-            return ir.types.Any
+            return types.Any
 
         try:
             t = state.get_global(node).unwrap()
-            return ir.types.hint2type(t)
+            return types.hint2type(t)
         except:  # noqa: E722
             raise DialectLoweringError(f"expect a type hint, got {ast.unparse(node)}")

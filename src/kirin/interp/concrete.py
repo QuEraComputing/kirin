@@ -24,7 +24,9 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
     def new_frame(self, code: Statement) -> Frame[Any]:
         return Frame.from_func_like(code)
 
-    def run_method(self, method: Method, args: tuple[Any, ...]) -> Any:
+    def run_method(
+        self, method: Method, args: tuple[Any, ...]
+    ) -> tuple[Frame[Any], Any]:
         return self.run_callable(method.code, (method,) + args)
 
     def run_ssacfg_region(

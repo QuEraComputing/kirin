@@ -24,7 +24,7 @@ class SymbolOpInterface(StmtTrait):
         return sym_name
 
     def verify(self, stmt: "Statement"):
-        from kirin.ir.attrs.types import String
+        from kirin.types import String
 
         sym_name = self.get_sym_name(stmt)
         if not (isinstance(sym_name, PyAttr) and sym_name.type.is_subseteq(String)):

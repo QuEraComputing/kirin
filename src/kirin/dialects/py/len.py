@@ -9,7 +9,7 @@ This dialect maps the `len()` call to the `Len` statement:
 
 import ast
 
-from kirin import ir, interp, lowering
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 
 dialect = ir.Dialect("py.len")
@@ -19,8 +19,8 @@ dialect = ir.Dialect("py.len")
 class Len(ir.Statement):
     name = "len"
     traits = frozenset({ir.Pure(), ir.FromPythonCall()})
-    value: ir.SSAValue = info.argument(ir.types.Any)
-    result: ir.ResultValue = info.result(ir.types.Int)
+    value: ir.SSAValue = info.argument(types.Any)
+    result: ir.ResultValue = info.result(types.Int)
 
 
 @dialect.register

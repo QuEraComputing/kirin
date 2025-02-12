@@ -3,7 +3,7 @@
 
 import ast
 
-from kirin import ir
+from kirin import ir, types
 from kirin.dialects import cf, py
 from kirin.lowering import Frame, Result, FromPythonAST, LoweringState
 from kirin.exceptions import DialectLoweringError
@@ -43,7 +43,7 @@ class CfLowering(FromPythonAST):
                 capture_callback=new_block_arg_if_inside_loop,
             )
         )
-        next_value = body_frame.entr_block.args.append_from(ir.types.Any, "next_value")
+        next_value = body_frame.entr_block.args.append_from(types.Any, "next_value")
         py.unpack.unpacking(state, node.target, next_value)
         state.exhaust(body_frame)
         self.branch_next_if_not_terminated(body_frame)
@@ -95,7 +95,7 @@ class CfLowering(FromPythonAST):
                 globals=frame.globals,
             )
         )
-        true_cond = if_frame.entr_block.args.append_from(ir.types.Bool, cond.name)
+        true_cond = if_frame.entr_block.args.append_from(types.Bool, cond.name)
         if cond.name:
             if_frame.defs[cond.name] = true_cond
         state.exhaust()
@@ -110,7 +110,7 @@ class CfLowering(FromPythonAST):
                 globals=frame.globals,
             )
         )
-        true_cond = else_frame.entr_block.args.append_from(ir.types.Bool, cond.name)
+        true_cond = else_frame.entr_block.args.append_from(types.Bool, cond.name)
         if cond.name:
             else_frame.defs[cond.name] = true_cond
         state.exhaust()
@@ -140,7 +140,7 @@ class CfLowering(FromPythonAST):
 
         for name in phi:
             after_frame.defs[name] = after_frame.entr_block.args.append_from(
-                ir.types.Any, name
+                types.Any, name
             )
 
         state.exhaust()

@@ -26,11 +26,11 @@ class Fold(Pass):
         result = Fixpoint(
             Walk(
                 Chain(
-                    ConstantFold(constprop_results),
                     WrapConst(constprop_results),
-                    InlineGetItem(constprop_results),
-                    Call2Invoke(constprop_results),
-                    DeadCodeElimination(constprop_results),
+                    ConstantFold(),
+                    InlineGetItem(),
+                    Call2Invoke(),
+                    DeadCodeElimination(),
                 )
             )
         ).rewrite(mt.code)
@@ -38,8 +38,4 @@ class Fold(Pass):
         if mt.code.has_trait(SSACFGRegion):
             result = Walk(CFGCompactify()).rewrite(mt.code).join(result)
 
-        return (
-            Fixpoint(Walk(DeadCodeElimination(constprop_results)))
-            .rewrite(mt.code)
-            .join(result)
-        )
+        return Fixpoint(Walk(DeadCodeElimination())).rewrite(mt.code).join(result)

@@ -1,6 +1,5 @@
-from kirin.ir import types
+from kirin import types
 from kirin.interp import Frame, MethodTable, impl
-from kirin.analysis import const
 from kirin.dialects.py.binop import Add
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.py.indexing import GetItem
@@ -45,9 +44,6 @@ class TypeInfer(MethodTable):
         if not lhs_type.is_subseteq(IListType) or not rhs_type.is_subseteq(IListType):
             return (types.Bottom,)
 
-        lhs_type = types.unwrap_hinted(lhs_type)
-        rhs_type = types.unwrap_hinted(rhs_type)
-
         if not isinstance(lhs_type, types.Generic):  # just annotated with list
             lhs_type = IListType[types.Any, types.Any]
 
@@ -88,13 +84,14 @@ class TypeInfer(MethodTable):
             raise TypeError(f"Expected list, got {obj_type}")
 
         # just list type
-        index_type = frame.get(stmt.index)
         if not isinstance(obj_type, types.Generic):
             return (IListType[types.Any, types.Any],)
-        elif isinstance(index_type, types.Hinted) and isinstance(
-            index_type.data, const.Value
-        ):
+        elif index_ := interp.maybe_const(stmt.index, slice):
             # TODO: actually calculate the size
-            return (IListType[obj_type.vars[0], types.Any],)
+            obj_len = obj_type.vars[1]
+            if not isinstance(obj_len, types.Literal):
+                return (IListType[obj_type.vars[0], types.Any],)
+            LenT = types.Literal(len(range(obj_len.data)[index_]))
+            return (IListType[obj_type.vars[0], LenT],)
         else:
             return (IListType[obj_type.vars[0], types.Any],)

@@ -1,14 +1,14 @@
 from typing import Sequence
 
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
 
 from .runtime import IList
 from ._dialect import dialect
 
-ElemT = ir.types.TypeVar("ElemT")
-ListLen = ir.types.TypeVar("ListLen")
-IListType = ir.types.Generic(IList, ElemT, ListLen)
+ElemT = types.TypeVar("ElemT")
+ListLen = types.TypeVar("ListLen")
+IListType = types.Generic(IList, ElemT, ListLen)
 
 
 @statement(dialect=dialect, init=False)
@@ -23,13 +23,13 @@ class New(ir.Statement):
     ) -> None:
         # get elem type
         if not values:
-            elem_type = ir.types.Any
+            elem_type = types.Any
         else:
             elem_type = values[0].type
             for v in values:
                 elem_type = elem_type.join(v.type)
 
-        result_type = IListType[elem_type, ir.types.Literal(len(values))]
+        result_type = IListType[elem_type, types.Literal(len(values))]
         super().__init__(
             args=values,
             result_types=(result_type,),
@@ -45,13 +45,13 @@ class Push(ir.Statement):
     result: ir.ResultValue = info.result(IListType[ElemT])
 
 
-OutElemT = ir.types.TypeVar("OutElemT")
+OutElemT = types.TypeVar("OutElemT")
 
 
 @statement(dialect=dialect)
 class Map(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
-    fn: ir.SSAValue = info.argument(ir.types.Generic(ir.Method, [ElemT], OutElemT))
+    fn: ir.SSAValue = info.argument(types.Generic(ir.Method, [ElemT], OutElemT))
     collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
     result: ir.ResultValue = info.result(IListType[OutElemT, ListLen])
 
@@ -60,7 +60,7 @@ class Map(ir.Statement):
 class Foldr(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
     fn: ir.SSAValue = info.argument(
-        ir.types.Generic(ir.Method, [ElemT, OutElemT], OutElemT)
+        types.Generic(ir.Method, [ElemT, OutElemT], OutElemT)
     )
     collection: ir.SSAValue = info.argument(IListType[ElemT])
     init: ir.SSAValue = info.argument(OutElemT)
@@ -71,36 +71,32 @@ class Foldr(ir.Statement):
 class Foldl(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
     fn: ir.SSAValue = info.argument(
-        ir.types.Generic(ir.Method, [OutElemT, ElemT], OutElemT)
+        types.Generic(ir.Method, [OutElemT, ElemT], OutElemT)
     )
     collection: ir.SSAValue = info.argument(IListType[ElemT])
     init: ir.SSAValue = info.argument(OutElemT)
     result: ir.ResultValue = info.result(OutElemT)
 
 
-CarryT = ir.types.TypeVar("CarryT")
-ResultT = ir.types.TypeVar("ResultT")
+CarryT = types.TypeVar("CarryT")
+ResultT = types.TypeVar("ResultT")
 
 
 @statement(dialect=dialect)
 class Scan(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
     fn: ir.SSAValue = info.argument(
-        ir.types.Generic(
-            ir.Method, [OutElemT, ElemT], ir.types.Tuple[OutElemT, ResultT]
-        )
+        types.Generic(ir.Method, [OutElemT, ElemT], types.Tuple[OutElemT, ResultT])
     )
     collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
     init: ir.SSAValue = info.argument(OutElemT)
     result: ir.ResultValue = info.result(
-        ir.types.Tuple[OutElemT, IListType[ResultT, ListLen]]
+        types.Tuple[OutElemT, IListType[ResultT, ListLen]]
     )
 
 
 @statement(dialect=dialect)
 class ForEach(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
-    fn: ir.SSAValue = info.argument(
-        ir.types.Generic(ir.Method, [ElemT], ir.types.NoneType)
-    )
+    fn: ir.SSAValue = info.argument(types.Generic(ir.Method, [ElemT], types.NoneType))
     collection: ir.SSAValue = info.argument(IListType[ElemT])

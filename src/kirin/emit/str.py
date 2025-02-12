@@ -27,11 +27,14 @@ class EmitStr(EmitABC[EmitStrFrame, str], ABC, Generic[IO_t]):
             prefix=self.prefix, prefix_if_none=self.prefix_if_none
         )
         self.block_id = idtable.IdTable[ir.Block](prefix=self.prefix + "block_")
+        return self
 
     def new_frame(self, code: ir.Statement) -> EmitStrFrame:
         return EmitStrFrame.from_func_like(code)
 
-    def run_method(self, method: ir.Method, args: tuple[str, ...]) -> str:
+    def run_method(
+        self, method: ir.Method, args: tuple[str, ...]
+    ) -> tuple[EmitStrFrame, str]:
         if len(self.state.frames) >= self.max_depth:
             raise interp.InterpreterError("maximum recursion depth exceeded")
         return self.run_callable(method.code, (method.sym_name,) + args)

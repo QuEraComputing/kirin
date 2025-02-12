@@ -18,7 +18,7 @@ from abc import abstractmethod
 from typing import Generic, TypeVar
 from dataclasses import dataclass
 
-from kirin import ir, interp, lowering, exceptions
+from kirin import ir, types, interp, lowering, exceptions
 from kirin.decl import info, statement
 from kirin.analysis import const
 from kirin.rewrite.abc import RewriteRule, RewriteResult
@@ -75,7 +75,7 @@ class GetItem(Subscript):
     traits = frozenset({ir.Pure(), PyGetItemLike(), ir.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     index: ir.SSAValue = info.argument(print=False)
-    result: ir.ResultValue = info.result(ir.types.Any)
+    result: ir.ResultValue = info.result(types.Any)
 
 
 @dialect.register
@@ -111,53 +111,50 @@ class TypeInfer(interp.MethodTable):
     def getitem(
         self,
         interp: TypeInference,
-        frame: interp.Frame[ir.types.TypeAttribute],
+        frame: interp.Frame[types.TypeAttribute],
         stmt: GetItem,
     ):
         obj = frame.get(stmt.obj)
-        if interp.is_const(obj):  # unwrap const
-            obj = obj.type
-        index: ir.types.TypeAttribute = frame.get(stmt.index)
+        index: types.TypeAttribute = frame.get(stmt.index)
         # TODO: replace this when we can multiple dispatch
-        if obj.is_subseteq(ir.types.Tuple):
+        if obj.is_subseteq(types.Tuple):
             return self.getitem_tuple(interp, stmt, obj, index)
         else:
-            return (ir.types.Any,)
+            return (types.Any,)
 
     def getitem_tuple(
         self,
         interp,
         stmt: GetItem,
-        obj: ir.types.TypeAttribute,
-        index: ir.types.TypeAttribute,
+        obj: types.TypeAttribute,
+        index: types.TypeAttribute,
     ):
-        if isinstance(obj, ir.types.Generic):
-            if index.is_subseteq(ir.types.Int):
+        if isinstance(obj, types.Generic):
+            if index.is_subseteq(types.Int):
                 return self.getitem_tuple_index(interp, stmt, obj, index)
-            elif index.is_subseteq(ir.types.Slice):
+            elif index.is_subseteq(types.Slice):
                 return self.getitem_tuple_slice(interp, stmt, obj, index)
             else:
-                return (ir.types.Bottom,)
-        elif isinstance(obj, ir.types.PyClass):
-            return (ir.types.Any,)
+                return (types.Bottom,)
+        elif isinstance(obj, types.PyClass):
+            return (types.Any,)
         else:
-            return (ir.types.Bottom,)
+            return (types.Bottom,)
 
     def getitem_tuple_index(
         self,
         interp: TypeInference,
         stmt: GetItem,
-        obj: ir.types.Generic,
-        index: ir.types.TypeAttribute,
+        obj: types.Generic,
+        index: types.TypeAttribute,
     ):
-        if interp.is_const(index) and index.type.is_subseteq(ir.types.Int):
-            index_: int = index.data.data
+        if index_ := interp.maybe_const(stmt.index, int):
             if obj.vararg and index_ >= len(obj.vars):
                 return (obj.vararg.typ,)
             elif index_ < len(obj.vars):
                 return (obj.vars[index_],)
             else:
-                return (ir.types.Bottom,)
+                return (types.Bottom,)
         else:
             return (self.getitem_tuple_union(obj),)
 
@@ -165,34 +162,33 @@ class TypeInfer(interp.MethodTable):
         self,
         interp: TypeInference,
         stmt: GetItem,
-        obj: ir.types.Generic,
-        index: ir.types.TypeAttribute,
+        obj: types.Generic,
+        index: types.TypeAttribute,
     ):
-        if interp.is_const(index):
-            data: slice = index.data.data
-            if obj.vararg and data.stop >= len(obj.vars):
+        if index_ := interp.maybe_const(stmt.index, slice):
+            if obj.vararg and index_.stop >= len(obj.vars):
                 return (
-                    ir.types.Union(
-                        *obj.vars[slice(data.start, len(obj.vars), data.step)],
+                    types.Union(
+                        *obj.vars[slice(index_.start, len(obj.vars), index_.step)],
                         obj.vararg.typ,
                     ),
                 )
-            elif data.stop is None or data.stop < len(obj.vars):
+            elif index_.stop is None or index_.stop < len(obj.vars):
                 return (
-                    ir.types.Tuple.where(
-                        obj.vars[slice(data.start, data.stop, data.step)]
+                    types.Tuple.where(
+                        obj.vars[slice(index_.start, index_.stop, index_.step)]
                     ),
                 )
             else:  # out of bounds
-                return (ir.types.Bottom,)
+                return (types.Bottom,)
         else:
-            return (ir.types.Tuple[ir.types.Vararg(self.getitem_tuple_union(obj))],)
+            return (types.Tuple[types.Vararg(self.getitem_tuple_union(obj))],)
 
-    def getitem_tuple_union(self, obj: ir.types.Generic):
+    def getitem_tuple_union(self, obj: types.Generic):
         if obj.vararg:
-            return ir.types.Union(*obj.vars, obj.vararg.typ)
+            return types.Union(*obj.vars, obj.vararg.typ)
         else:
-            return ir.types.Union(*obj.vars)
+            return types.Union(*obj.vars)
 
 
 @dialect.register(key="constprop")
@@ -202,26 +198,22 @@ class ConstProp(interp.MethodTable):
     def getitem(
         self,
         _: const.Propagate,
-        frame: interp.Frame[const.JointResult],
+        frame: const.Frame,
         stmt: GetItem,
-    ) -> interp.StatementResult[const.JointResult]:
-        obj = frame.get(stmt.obj).const
-        index = frame.get(stmt.index).const
+    ) -> interp.StatementResult[const.Result]:
+        obj = frame.get(stmt.obj)
+        index = frame.get(stmt.index)
         if not isinstance(index, const.Value):
-            return (const.JointResult(const.Unknown(), const.Pure()),)
+            return (const.Unknown(),)
 
         if isinstance(obj, const.PartialTuple):
             obj = obj.data
             if isinstance(index.data, int) and 0 <= index.data < len(obj):
-                return (const.JointResult(obj[index.data], const.Pure()),)
+                return (obj[index.data],)
             elif isinstance(index.data, slice):
                 start, stop, step = index.data.indices(len(obj))
-                return (
-                    const.JointResult(
-                        const.PartialTuple(obj[start:stop:step]), const.Pure()
-                    ),
-                )
-        return (const.JointResult(const.Unknown(), const.Pure()),)
+                return (const.PartialTuple(obj[start:stop:step]),)
+        return (const.Unknown(),)
 
 
 GetItemLikeStmt = TypeVar("GetItemLikeStmt", bound=ir.Statement)
@@ -230,12 +222,10 @@ GetItemLikeStmt = TypeVar("GetItemLikeStmt", bound=ir.Statement)
 @dataclass(init=False)
 class RewriteGetItem(RewriteRule, Generic[GetItemLikeStmt]):
     target_stmt_type: type[GetItemLikeStmt]
-    obj_type: ir.types.TypeAttribute
+    obj_type: types.TypeAttribute
     getitem_like: GetItemLike[GetItemLikeStmt]
 
-    def __init__(
-        self, stmt_type: type[GetItemLikeStmt], obj_type: ir.types.TypeAttribute
-    ):
+    def __init__(self, stmt_type: type[GetItemLikeStmt], obj_type: types.TypeAttribute):
         trait = stmt_type.get_trait(GetItemLike)
         if trait is None:
             raise ValueError(f"{stmt_type} does not have GetItemLike trait")

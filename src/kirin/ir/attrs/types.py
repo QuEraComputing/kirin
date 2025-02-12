@@ -9,18 +9,17 @@ from typing_extensions import Never
 from kirin.print import Printer
 from kirin.lattice import (
     UnionMeta,
-    LatticeMeta,
     SingletonMeta,
     BoundedLattice,
     IsSubsetEqMixin,
     SimpleMeetMixin,
 )
 
-from .abc import Attribute, AttributeMeta
+from .abc import Attribute, LatticeAttributeMeta
 from ._types import _TypeAttribute
 
 
-class TypeAttributeMeta(AttributeMeta, LatticeMeta):
+class TypeAttributeMeta(LatticeAttributeMeta):
     """Metaclass for type attributes."""
 
     pass
@@ -68,9 +67,6 @@ class TypeAttribute(
         elif isinstance(other, TypeAttribute):
             return Union(self, other)
         return AnyType()  # don't know how to join
-
-    def is_subseteq_Hinted(self, other: "Hinted") -> bool:
-        return self.is_subseteq(other.type)
 
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self, prefix="!")
@@ -457,44 +453,6 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         raise TypeError("Type arguments do not match")
 
 
-HintedData = typing.TypeVar("HintedData")
-
-
-@typing.final
-@dataclass(eq=False)
-class Hinted(TypeAttribute, typing.Generic[HintedData]):
-    """Type wrapped with a hint.
-
-    `Hinted` is used to represent a type with additional data that can be used as
-    a hint for type inference. The additional data is only used for specific type
-    inference purposes, or improve certain type inference precision, it does not affect the
-    order of types in the lattice.
-    """
-
-    name = "Hinted"
-    type: TypeAttribute
-    data: HintedData
-
-    def __init__(self, type: TypeAttribute, data: HintedData):
-        self.data = data
-        if isinstance(type, Hinted):
-            type = type.type
-        self.type = type
-
-    def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
-        return self.type.is_subseteq(other)
-
-    def __hash__(self) -> int:
-        return hash(self.type)
-
-    def print_impl(self, printer: Printer) -> None:
-        printer.print_name(self, prefix="!")
-        printer.plain_print("(")
-        printer.print(self.type)
-        printer.plain_print(", ", self.data)
-        printer.plain_print(")")
-
-
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:
     "provides the syntax sugar [A, B, C] type Generic(tuple, A, B, C)"
     return tuple(Generic(tuple, *arg) if isinstance(arg, list) else arg for arg in args)
@@ -556,26 +514,3 @@ def hint2type(hint) -> TypeAttribute:
     for arg in args:
         params.append(hint2type(arg))
     return Generic(body, *params)
-
-
-def unwrap_hinted(hint: TypeAttribute) -> TypeAttribute:
-    if isinstance(hint, Hinted):
-        return hint.type
-    return hint
-
-
-Any = AnyType()
-Bottom = BottomType()
-Int = PyClass(int)
-Float = PyClass(float)
-String = PyClass(str)
-Bool = PyClass(bool)
-NoneType = PyClass(type(None))
-List = Generic(list, TypeVar("T"))
-Slice = Generic(slice, TypeVar("T"))
-Tuple = Generic(tuple, Vararg(TypeVar("T")))
-Dict = Generic(dict, TypeVar("K"), TypeVar("V"))
-Set = Generic(set, TypeVar("T"))
-FrozenSet = Generic(frozenset, TypeVar("T"))
-TypeofFunctionType = Generic[type(lambda: None)]
-FunctionType = Generic(type(lambda: None), Tuple, Vararg(Any))

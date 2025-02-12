@@ -11,7 +11,7 @@ This module contains the dialect for the Python unpack semantics, including:
 
 import ast
 
-from kirin import ir, interp, lowering
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
 from kirin.exceptions import DialectLoweringError
@@ -21,11 +21,11 @@ dialect = ir.Dialect("py.unpack")
 
 @statement(dialect=dialect, init=False)
 class Unpack(ir.Statement):
-    value: ir.SSAValue = info.argument(ir.types.Any)
+    value: ir.SSAValue = info.argument(types.Any)
     names: tuple[str | None, ...] = info.attribute(property=True)
 
     def __init__(self, value: ir.SSAValue, names: tuple[str | None, ...]):
-        result_types = [ir.types.Any] * len(names)
+        result_types = [types.Any] * len(names)
         super().__init__(
             args=(value,),
             result_types=result_types,
@@ -53,16 +53,16 @@ class Concrete(interp.MethodTable):
 class TypeInfer(interp.MethodTable):
 
     @interp.impl(Unpack)
-    def unpack(self, interp, frame: interp.Frame[ir.types.TypeAttribute], stmt: Unpack):
+    def unpack(self, interp, frame: interp.Frame[types.TypeAttribute], stmt: Unpack):
         value = frame.get(stmt.value)
-        if isinstance(value, ir.types.Generic) and value.is_subseteq(ir.types.Tuple):
+        if isinstance(value, types.Generic) and value.is_subseteq(types.Tuple):
             if value.vararg:
                 rest = tuple(value.vararg.typ for _ in stmt.names[len(value.vars) :])
                 return tuple(value.vars) + rest
             else:
                 return value.vars
         # TODO: support unpacking other types
-        return tuple(ir.types.Any for _ in stmt.names)
+        return tuple(types.Any for _ in stmt.names)
 
 
 def unpacking(state: lowering.LoweringState, node: ast.expr, value: ir.SSAValue):

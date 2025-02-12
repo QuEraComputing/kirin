@@ -7,7 +7,7 @@ the input types with the output types.
 
 from dataclasses import field, dataclass
 
-from kirin.ir import types
+from kirin import types
 
 
 @dataclass

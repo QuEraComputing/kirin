@@ -1,6 +1,6 @@
 import ast
 
-from kirin import ir, lowering
+from kirin import ir, types, lowering
 from kirin.dialects import func
 from kirin.exceptions import DialectLoweringError
 
@@ -25,7 +25,7 @@ class Lowering(lowering.FromPythonAST):
     ) -> lowering.Result:
         args, keywords = self.__lower_Call_args_kwargs(state, node)
         stmt = func.Invoke(args, callee=method, kwargs=keywords)
-        stmt.result.type = method.return_type or ir.types.Any
+        stmt.result.type = method.return_type or types.Any
         return lowering.Result(state.append_stmt(stmt))
 
     def __lower_Call_args_kwargs(

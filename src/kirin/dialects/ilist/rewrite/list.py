@@ -1,4 +1,4 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.dialects.py import constant
 from kirin.rewrite.abc import RewriteRule
 from kirin.rewrite.result import RewriteResult
@@ -26,15 +26,13 @@ class List2IList(RewriteRule):
 
     def _rewrite_SSAValue_type(self, value: ir.SSAValue):
         # NOTE: cannot use issubseteq here because type can be Bottom
-        if isinstance(value.type, ir.types.Generic) and issubclass(
+        if isinstance(value.type, types.Generic) and issubclass(
             value.type.body.typ, list
         ):
-            value.type = IListType[value.type.vars[0], ir.types.Any]
+            value.type = IListType[value.type.vars[0], types.Any]
             return True
 
-        elif isinstance(value.type, ir.types.PyClass) and issubclass(
-            value.type.typ, list
-        ):
-            value.type = IListType[ir.types.Any, ir.types.Any]
+        elif isinstance(value.type, types.PyClass) and issubclass(value.type.typ, list):
+            value.type = IListType[types.Any, types.Any]
             return True
         return False

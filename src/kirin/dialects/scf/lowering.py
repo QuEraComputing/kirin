@@ -1,6 +1,6 @@
 import ast
 
-from kirin import ir, lowering
+from kirin import ir, types, lowering
 from kirin.exceptions import DialectLoweringError
 from kirin.dialects.py.unpack import unpacking
 
@@ -92,7 +92,7 @@ class Lowering(lowering.FromPythonAST):
                 capture_callback=new_block_arg_if_inside_loop,
             )
         )
-        loop_var = body_frame.curr_block.args.append_from(ir.types.Any)
+        loop_var = body_frame.curr_block.args.append_from(types.Any)
         unpacking(state, node.target, loop_var)
         state.exhaust(body_frame)
         # NOTE: this frame won't have phi nodes

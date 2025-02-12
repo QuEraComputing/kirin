@@ -1,8 +1,8 @@
-from typing import Iterable
+from typing import Iterable, cast
 
-from kirin import ir
+from kirin import ir, types
 from kirin.interp import Frame, MethodTable, ReturnValue, impl
-from kirin.analysis.typeinfer import TypeInference
+from kirin.analysis.typeinfer import TypeInference, TypeResolution
 from kirin.dialects.func.stmts import (
     Call,
     Invoke,
@@ -20,7 +20,7 @@ class TypeInfer(MethodTable):
 
     @impl(ConstantNone)
     def const_none(self, interp: TypeInference, frame: Frame, stmt: ConstantNone):
-        return (ir.types.NoneType,)
+        return (types.NoneType,)
 
     @impl(Return)
     def return_(self, interp: TypeInference, frame: Frame, stmt: Return) -> ReturnValue:
@@ -29,13 +29,12 @@ class TypeInfer(MethodTable):
     @impl(Call)
     def call(self, interp: TypeInference, frame: Frame, stmt: Call):
         # give up on dynamic method calls
-        callee = frame.get(stmt.callee)
-        if not interp.is_const(callee):
-            return (stmt.result.type,)
-
-        mt: ir.Method = callee.data.data
+        mt = interp.maybe_const(stmt.callee, ir.Method)
+        if mt is None:
+            return self._solve_method_type(interp, frame, stmt)
         return self._invoke_method(
             interp,
+            frame,
             mt,
             stmt.args[1:],
             interp.permute_values(
@@ -43,10 +42,30 @@ class TypeInfer(MethodTable):
             ),
         )
 
+    def _solve_method_type(self, interp: TypeInference, frame: Frame, stmt: Call):
+        mt_inferred = frame.get(stmt.callee)
+        if not isinstance(mt_inferred, types.Generic):
+            return (types.Bottom,)
+
+        if len(mt_inferred.vars) != 2:
+            return (types.Bottom,)
+
+        args = mt_inferred.vars[0]
+        result = mt_inferred.vars[1]
+        if not args.is_subseteq(types.Tuple):
+            return (types.Bottom,)
+
+        resolve = TypeResolution()
+        args = cast(types.Generic, args)
+        for arg, value in zip(args.vars, frame.get_values(stmt.inputs)):
+            resolve.solve(arg, value)
+        return (resolve.substitute(result),)
+
     @impl(Invoke)
     def invoke(self, interp: TypeInference, frame: Frame, stmt: Invoke):
         return self._invoke_method(
             interp,
+            frame,
             stmt.callee,
             stmt.inputs,
             interp.permute_values(
@@ -57,6 +76,7 @@ class TypeInfer(MethodTable):
     def _invoke_method(
         self,
         interp: TypeInference,
+        frame: Frame,
         mt: ir.Method,
         args: Iterable[ir.SSAValue],
         values: tuple,
@@ -73,14 +93,13 @@ class TypeInfer(MethodTable):
         # implicit type check at call site. This will be validated either compile time
         # or runtime.
         # update the results with the narrowed types
-        for arg, typ in zip(args, inputs):
-            interp.results[arg] = typ
-
-        return (interp.run_method(mt, inputs),)
+        frame.set_values(args, inputs)
+        _, ret = interp.run_method(mt, inputs)
+        return (ret,)
 
     @impl(Lambda)
     def lambda_(self, interp: TypeInference, frame, stmt: Lambda):
-        return (ir.types.PyClass(ir.Method),)
+        return (types.PyClass(ir.Method),)
 
     @impl(GetField)
     def getfield(self, interp: TypeInference, frame, stmt: GetField):

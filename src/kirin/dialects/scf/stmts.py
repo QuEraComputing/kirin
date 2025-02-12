@@ -1,4 +1,4 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.exceptions import VerificationError, DialectLoweringError
 from kirin.print.printer import Printer
@@ -16,7 +16,9 @@ class IfElse(ir.Statement):
     """
 
     name = "if"
-    cond: ir.SSAValue = info.argument(ir.types.Any)
+    traits = frozenset({ir.MaybePure()})
+    purity: bool = info.attribute(default=False)
+    cond: ir.SSAValue = info.argument(types.Any)
     # NOTE: we don't enforce the type here
     # because anything implements __bool__ in Python
     # can be used as a condition
@@ -72,6 +74,7 @@ class IfElse(ir.Statement):
             regions=(then_body_region, else_body_region),
             result_types=result_types,
             args_slice={"cond": 0},
+            attributes={"purity": ir.PyAttr(False)},
         )
 
     def print_impl(self, printer: Printer) -> None:
@@ -88,9 +91,11 @@ class IfElse(ir.Statement):
 @statement(dialect=dialect, init=False)
 class For(ir.Statement):
     name = "for"
-    iterable: ir.SSAValue = info.argument(ir.types.Any)
+    traits = frozenset({ir.MaybePure()})
+    purity: bool = info.attribute(default=False)
+    iterable: ir.SSAValue = info.argument(types.Any)
     body: ir.Region = info.region(multi=False)
-    initializers: tuple[ir.SSAValue, ...] = info.argument(ir.types.Any)
+    initializers: tuple[ir.SSAValue, ...] = info.argument(types.Any)
 
     def __init__(
         self,
@@ -115,6 +120,7 @@ class For(ir.Statement):
             regions=(body,),
             result_types=tuple(value.type for value in stmt.values),
             args_slice={"iterable": 0, "initializers": slice(1, None)},
+            attributes={"purity": ir.PyAttr(False)},
         )
 
     def verify(self) -> None:
@@ -139,6 +145,13 @@ class For(ir.Statement):
         printer.print(block.args[0])
         printer.plain_print(" in ", style="keyword")
         printer.print(self.iterable)
+        with printer.rich(style="comment"):
+            printer.plain_print(" -> ")
+            printer.print_seq(
+                tuple(result.type for result in self.results),
+                delim=", ",
+                style="comment",
+            )
         with printer.indent():
             printer.print_newline()
             printer.plain_print("iter_args(")
@@ -162,7 +175,7 @@ class For(ir.Statement):
 class Yield(ir.Statement):
     name = "yield"
     traits = frozenset({ir.IsTerminator()})
-    values: tuple[ir.SSAValue, ...] = info.argument(ir.types.Any)
+    values: tuple[ir.SSAValue, ...] = info.argument(types.Any)
 
     def __init__(self, *values: ir.SSAValue):
         super().__init__(args=values, args_slice={"values": slice(None)})

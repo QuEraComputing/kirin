@@ -143,7 +143,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         sys.setrecursionlimit(self.max_python_recursion_depth)
         args = self.get_args(mt.arg_names[len(args) + 1 :], args, kwargs)
         try:
-            results = self.run_method(mt, args)
+            _, results = self.run_method(mt, args)
         except InterpreterError as e:
             # NOTE: initialize will create new State
             # so we don't need to copy the frames.
@@ -172,11 +172,14 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         return results
 
     @abstractmethod
-    def run_method(self, method: Method, args: tuple[ValueType, ...]) -> ValueType:
+    def run_method(
+        self, method: Method, args: tuple[ValueType, ...]
+    ) -> tuple[FrameType, ValueType]:
         """How to run a method.
 
         This is defined by subclasses to describe what's the corresponding
-        value of a method during the interpretation.
+        value of a method during the interpretation. Usually, this method
+        just calls [`run_callable`][kirin.interp.base.BaseInterpreter.run_callable].
 
         Args:
             method (Method): the method to run.
@@ -187,7 +190,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         """
         ...
 
-    def run_callable(self, code: Statement, args: tuple[ValueType, ...]) -> ValueType:
+    def run_callable(
+        self, code: Statement, args: tuple[ValueType, ...]
+    ) -> tuple[FrameType, ValueType]:
         """Run a callable statement.
 
         Args:
@@ -209,10 +214,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.state.push_frame(frame)
         body = interface.get_callable_region(code)
         if not body.blocks:
-            return self.finalize(self.state.pop_frame(), self.void)
+            return self.state.pop_frame(), self.void
         frame.set_values(body.blocks[0].args, args)
         results = self.run_callable_region(frame, code, body)
-        return self.finalize(self.state.pop_frame(), results)
+        return self.state.pop_frame(), results
 
     def run_callable_region(
         self, frame: FrameType, code: Statement, region: Region
@@ -250,15 +255,6 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     def new_frame(self, code: Statement) -> FrameType:
         """Create a new frame for the given method."""
         ...
-
-    def finalize(self, frame: FrameType, results: ValueType) -> ValueType:
-        """Postprocess a frame after it is popped from the stack. This is
-        called after a method is evaluated and the frame is popped.
-
-        Note:
-            Default implementation does nothing.
-        """
-        return results
 
     @staticmethod
     def get_args(
@@ -376,7 +372,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             + str(type(self))
         )
 
-    def eval_recursion_limit(self, frame: FrameType) -> ValueType:
+    def eval_recursion_limit(self, frame: FrameType) -> tuple[FrameType, ValueType]:
         """Return the value of recursion exception, e.g in concrete
         interpreter, it will raise an exception if the limit is reached;
         in type inference, it will return a special value.

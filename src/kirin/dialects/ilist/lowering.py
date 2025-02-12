@@ -1,6 +1,6 @@
 import ast
 
-from kirin.ir import types
+from kirin import types
 from kirin.lowering import Result, FromPythonAST, LoweringState
 
 from . import stmts as ilist

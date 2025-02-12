@@ -1,8 +1,7 @@
-from typing import Any
 from dataclasses import dataclass
 
-from kirin import ir
 from kirin.rewrite import Walk, Chain, Fixpoint
+from kirin.analysis import const
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.rewrite.dce import DeadCodeElimination
 from kirin.rewrite.fold import ConstantFold
@@ -19,19 +18,19 @@ from kirin.rewrite.call2invoke import Call2Invoke
 class Fold(RewriteRule):
     rule: RewriteRule
 
-    def __init__(self, results: dict[ir.SSAValue, Any]):
+    def __init__(self, frame: const.Frame):
         rule = Fixpoint(
             Chain(
-                Walk(WrapConst(results)),
+                Walk(WrapConst(frame)),
                 Walk(Inline(lambda _: True)),
-                Walk(ConstantFold(results)),
-                Walk(Call2Invoke(results)),
+                Walk(ConstantFold()),
+                Walk(Call2Invoke()),
                 Fixpoint(
                     Walk(
                         Chain(
-                            InlineGetItem(results),
+                            InlineGetItem(),
                             InlineGetField(),
-                            DeadCodeElimination(results),
+                            DeadCodeElimination(),
                         )
                     )
                 ),

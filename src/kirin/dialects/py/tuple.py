@@ -14,7 +14,7 @@ This dialect maps `ast.Tuple` nodes to the `New` statement.
 
 import ast
 
-from kirin import ir, interp, lowering
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.analysis import const
 from kirin.emit.julia import EmitJulia, EmitStrFrame
@@ -29,7 +29,7 @@ class New(ir.Statement):
     result: ir.ResultValue = info.result()
 
     def __init__(self, values: tuple[ir.SSAValue, ...]) -> None:
-        result_type = ir.types.Generic(tuple, *tuple(value.type for value in values))
+        result_type = types.Generic(tuple, *tuple(value.type for value in values))
         super().__init__(
             args=values,
             result_types=[
@@ -49,14 +49,14 @@ class Concrete(interp.MethodTable):
 @dialect.register(key="typeinfer")
 class TypeInfer(interp.MethodTable):
 
-    @interp.impl(Add, ir.types.PyClass(tuple), ir.types.PyClass(tuple))
-    def add(self, interp, frame: interp.Frame[ir.types.TypeAttribute], stmt):
+    @interp.impl(Add, types.PyClass(tuple), types.PyClass(tuple))
+    def add(self, interp, frame: interp.Frame[types.TypeAttribute], stmt):
         lhs = frame.get(stmt.lhs)
         rhs = frame.get(stmt.rhs)
-        if isinstance(lhs, ir.types.Generic) and isinstance(rhs, ir.types.Generic):
-            return (ir.types.Generic(tuple, *(lhs.vars + rhs.vars)),)
+        if isinstance(lhs, types.Generic) and isinstance(rhs, types.Generic):
+            return (types.Generic(tuple, *(lhs.vars + rhs.vars)),)
         else:
-            return (ir.types.PyClass(tuple),)  # no type param, so unknown
+            return (types.PyClass(tuple),)  # no type param, so unknown
 
 
 @dialect.register(key="constprop")
@@ -66,15 +66,10 @@ class ConstPropTable(interp.MethodTable):
     def new_tuple(
         self,
         _: const.Propagate,
-        frame: interp.Frame[const.JointResult],
+        frame: const.Frame,
         stmt: New,
-    ) -> interp.StatementResult[const.JointResult]:
-        return (
-            const.JointResult(
-                const.PartialTuple(tuple(x.const for x in frame.get_values(stmt.args))),
-                const.Pure(),
-            ),
-        )
+    ) -> interp.StatementResult[const.Result]:
+        return (const.PartialTuple(tuple(x for x in frame.get_values(stmt.args))),)
 
 
 @dialect.register

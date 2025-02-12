@@ -2,28 +2,30 @@
 """
 
 from typing import Any, final
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 
 from kirin import ir
 from kirin.lattice import (
-    LatticeMeta,
-    SingletonMeta,
     BoundedLattice,
     IsSubsetEqMixin,
     SimpleJoinMixin,
     SimpleMeetMixin,
 )
+from kirin.ir.attrs.abc import LatticeAttributeMeta, SingletonLatticeAttributeMeta
+from kirin.print.printer import Printer
 
 from ._visitor import _ElemVisitor
 
 
 @dataclass
 class Result(
+    ir.Attribute,
     IsSubsetEqMixin["Result"],
     SimpleJoinMixin["Result"],
     SimpleMeetMixin["Result"],
     BoundedLattice["Result"],
     _ElemVisitor,
+    metaclass=LatticeAttributeMeta,
 ):
     """Base class for constant analysis results."""
 
@@ -35,29 +37,38 @@ class Result(
     def bottom(cls) -> "Result":
         return Bottom()
 
+    def print_impl(self, printer: Printer) -> None:
+        printer.plain_print(repr(self))
+
 
 @final
 @dataclass
-class Unknown(Result, metaclass=SingletonMeta):
+class Unknown(Result, metaclass=SingletonLatticeAttributeMeta):
     """Unknown constant value. This is the top element of the lattice."""
 
     def is_subseteq(self, other: Result) -> bool:
         return isinstance(other, Unknown)
 
+    def __hash__(self) -> int:
+        return id(self)
+
 
 @final
 @dataclass
-class Bottom(Result, metaclass=SingletonMeta):
+class Bottom(Result, metaclass=SingletonLatticeAttributeMeta):
     """Bottom element of the lattice."""
 
     def is_subseteq(self, other: Result) -> bool:
         return True
 
+    def __hash__(self) -> int:
+        return id(self)
+
 
 @final
 @dataclass
 class Value(Result):
-    """Constant value. Wraps any Python value."""
+    """Constant value. Wraps any hashable Python value."""
 
     data: Any
 
@@ -69,6 +80,12 @@ class Value(Result):
             return self.data == other.data
         return False
 
+    def __hash__(self) -> int:
+        # NOTE: we use id here because the data
+        # may not be hashable. This is fine because
+        # the data is guaranteed to be unique.
+        return id(self)
+
 
 @dataclass
 class PartialConst(Result):
@@ -78,7 +95,7 @@ class PartialConst(Result):
 
 
 @final
-class PartialTupleMeta(LatticeMeta):
+class PartialTupleMeta(LatticeAttributeMeta):
     """Metaclass for PartialTuple.
 
     This metaclass canonicalizes PartialTuple instances with all Value elements
@@ -139,6 +156,9 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
             return all(x.is_subseteq(Value(y)) for x, y in zip(self.data, other.data))
         return False
 
+    def __hash__(self) -> int:
+        return hash(self.data)
+
 
 @final
 @dataclass
@@ -151,6 +171,9 @@ class PartialLambda(PartialConst):
     argnames: list[str]
     code: ir.Statement
     captured: tuple[Result, ...]
+
+    def __hash__(self) -> int:
+        return hash((self.argnames, self.code, self.captured))
 
     def is_subseteq_PartialLambda(self, other: "PartialLambda") -> bool:
         if self.code is not other.code:
@@ -194,82 +217,3 @@ class PartialLambda(PartialConst):
             self.code,
             tuple(x.meet(y) for x, y in zip(self.captured, other.captured)),
         )
-
-
-@dataclass(frozen=True)
-class Purity(
-    SimpleJoinMixin["Purity"], SimpleMeetMixin["Purity"], BoundedLattice["Purity"]
-):
-    """Base class for purity lattice."""
-
-    @classmethod
-    def bottom(cls) -> "Purity":
-        return PurityBottom()
-
-    @classmethod
-    def top(cls) -> "Purity":
-        return NotPure()
-
-
-@dataclass(frozen=True)
-class Pure(Purity, metaclass=SingletonMeta):
-    """The result is from a pure function."""
-
-    def is_subseteq(self, other: Purity) -> bool:
-        return isinstance(other, (NotPure, Pure))
-
-
-@dataclass(frozen=True)
-class NotPure(Purity, metaclass=SingletonMeta):
-    """The result is from an impure function."""
-
-    def is_subseteq(self, other: Purity) -> bool:
-        return isinstance(other, NotPure)
-
-
-@dataclass(frozen=True)
-class PurityBottom(Purity, metaclass=SingletonMeta):
-    """The bottom element of the purity lattice."""
-
-    def is_subseteq(self, other: Purity) -> bool:
-        return True
-
-
-@dataclass
-class JointResult(BoundedLattice["JointResult"]):
-    """Joint result of constant value and purity.
-
-    This lattice is used to join the constant value and purity of a function
-    during constant propagation analysis. This allows the analysis to track
-    both the constant value and the purity of the function, so that the analysis
-    can propagate constant values through function calls even if the function
-    is only partially pure.
-    """
-
-    const: Result
-    """The constant value of the result."""
-    purity: Purity = field(default_factory=Purity.top)
-    """The purity of statement that produces the result."""
-
-    @classmethod
-    def from_const(cls, value: Any) -> "JointResult":
-        return cls(Value(value), Purity.top())
-
-    @classmethod
-    def top(cls) -> "JointResult":
-        return cls(Result.top(), Purity.top())
-
-    @classmethod
-    def bottom(cls) -> "JointResult":
-        return cls(Result.bottom(), Purity.bottom())
-
-    def is_subseteq(self, other: "JointResult") -> bool:
-        return self.const.is_subseteq(other.const) and self.purity.is_subseteq(
-            other.purity
-        )
-
-    def join(self, other: "JointResult") -> "JointResult":
-        return JointResult(self.const.join(other.const), self.purity.join(other.purity))
-
-    def meet(self, other: "JointResult") -> "JointResult":
-        return JointResult(self.const.meet(other.const), self.purity.join(other.purity))

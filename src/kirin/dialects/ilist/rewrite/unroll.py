@@ -1,4 +1,4 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.rewrite.abc import RewriteRule
 from kirin.rewrite.result import RewriteResult
 from kirin.dialects.py.tuple import New as TupleNew
@@ -20,14 +20,14 @@ class Unroll(RewriteRule):
 
     def _get_collection_len(self, collection: ir.SSAValue):
         coll_type = collection.type
-        if not isinstance(coll_type, ir.types.Generic):
+        if not isinstance(coll_type, types.Generic):
             return None
 
         if not coll_type.is_subseteq(IListType):
             return None
 
         if not (
-            isinstance(coll_type.vars[1], ir.types.Literal)
+            isinstance(coll_type.vars[1], types.Literal)
             and isinstance(coll_type.vars[1].data, int)
         ):
             return None

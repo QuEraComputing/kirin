@@ -1,14 +1,11 @@
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 
 from kirin import ir
-from kirin.analysis import const
-from kirin.dialects import func
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 
 @dataclass
 class DeadCodeElimination(RewriteRule):
-    results: dict[ir.SSAValue, const.JointResult] = field(default_factory=dict)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if self.is_pure(node):
@@ -25,14 +22,6 @@ class DeadCodeElimination(RewriteRule):
         if node.has_trait(ir.Pure):
             return True
 
-        if isinstance(node, func.Invoke):
-            for result in node.results:
-                value = self.results.get(result, None)
-                if value is None:
-                    return False
-
-                if value.purity is not const.Pure():
-                    return False
+        if (trait := node.get_trait(ir.MaybePure)) and trait.is_pure(node):
             return True
-
         return False

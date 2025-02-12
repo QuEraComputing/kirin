@@ -14,13 +14,13 @@ This dialect maps `iter()` and `next()` calls to the `Iter` and `Next` statement
 
 from ast import Call
 
-from kirin import ir, interp, lowering
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.exceptions import DialectLoweringError
 
 dialect = ir.Dialect("py.iterable")
 
-PyRangeIterType = ir.types.PyClass(type(iter(range(0))))
+PyRangeIterType = types.PyClass(type(iter(range(0))))
 
 
 @statement(dialect=dialect)
@@ -28,16 +28,16 @@ class Iter(ir.Statement):
     """This is equivalent to `iter(value)` in Python."""
 
     traits = frozenset({ir.Pure()})
-    value: ir.SSAValue = info.argument(ir.types.Any)
-    iter: ir.ResultValue = info.result(ir.types.Any)
+    value: ir.SSAValue = info.argument(types.Any)
+    iter: ir.ResultValue = info.result(types.Any)
 
 
 @statement(dialect=dialect)
 class Next(ir.Statement):
     """This is equivalent to `next(iterable, None)` in Python."""
 
-    iter: ir.SSAValue = info.argument(ir.types.Any)
-    value: ir.ResultValue = info.result(ir.types.Any)
+    iter: ir.SSAValue = info.argument(types.Any)
+    value: ir.ResultValue = info.result(types.Any)
 
 
 @dialect.register
@@ -55,13 +55,13 @@ class Concrete(interp.MethodTable):
 @dialect.register(key="typeinfer")
 class TypeInfer(interp.MethodTable):
 
-    @interp.impl(Iter, ir.types.PyClass(range))
+    @interp.impl(Iter, types.PyClass(range))
     def iter_(self, interp, frame: interp.Frame, stmt: Iter):
         return (PyRangeIterType,)
 
     @interp.impl(Next, PyRangeIterType)
     def next_(self, interp, frame: interp.Frame, stmt: Next):
-        return (ir.types.Int,)
+        return (types.Int,)
 
 
 @dialect.register

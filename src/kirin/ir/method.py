@@ -1,24 +1,27 @@
+import typing
 from types import ModuleType
-from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
+
+# from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
 from kirin.ir.traits import HasSignature, CallableStmtInterface
 from kirin.exceptions import VerificationError
 from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
+from kirin.ir.attrs.types import Generic
 from kirin.print.printable import Printable
 
-if TYPE_CHECKING:
+if typing.TYPE_CHECKING:
     from kirin.ir.group import DialectGroup
 
-Param = ParamSpec("Param")
-RetType = TypeVar("RetType")
+Param = typing.ParamSpec("Param")
+RetType = typing.TypeVar("RetType")
 
 
 @dataclass
-class Method(Printable, Generic[Param, RetType]):
+class Method(Printable, typing.Generic[Param, RetType]):
     mod: ModuleType | None  # ref
-    py_func: Callable[Param, RetType] | None  # ref
+    py_func: typing.Callable[Param, RetType] | None  # ref
     sym_name: str
     arg_names: list[str]
     dialects: "DialectGroup"  # own
@@ -32,6 +35,9 @@ class Method(Printable, Generic[Param, RetType]):
     verified: bool = False
     """if `code.verify` has been run on this method
     """
+
+    def __hash__(self) -> int:
+        return id(self)
 
     def __call__(self, *args: Param.args, **kwargs: Param.kwargs) -> RetType:
         from kirin.interp.concrete import Interpreter
@@ -49,6 +55,14 @@ class Method(Printable, Generic[Param, RetType]):
     @property
     def arg_types(self):
         return tuple(arg.type for arg in self.args)
+
+    @property
+    def self_type(self):
+        trait = self.code.get_trait(HasSignature)
+        if trait is None:
+            raise ValueError("Method body must implement HasSignature")
+        signature = trait.get_signature(self.code)
+        return Generic(Method, Generic(tuple, *signature.inputs), signature.output)
 
     @property
     def callable_region(self):

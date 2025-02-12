@@ -13,7 +13,6 @@ from kirin.ir.ssa import (
     DeletedSSAValue as DeletedSSAValue,
 )
 from kirin.ir.use import Use as Use
-from kirin.ir.attrs import types as types
 from kirin.ir.group import DialectGroup as DialectGroup, dialect_group as dialect_group
 from kirin.ir.nodes import (
     Block as Block,
@@ -25,6 +24,7 @@ from kirin.ir.method import Method as Method
 from kirin.ir.traits import (
     Pure as Pure,
     HasParent as HasParent,
+    MaybePure as MaybePure,
     StmtTrait as StmtTrait,
     RegionTrait as RegionTrait,
     SymbolTable as SymbolTable,

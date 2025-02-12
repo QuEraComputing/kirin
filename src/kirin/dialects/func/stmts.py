@@ -1,8 +1,10 @@
+from kirin import types
 from kirin.ir import (
     Pure,
     Method,
     Region,
     HasParent,
+    MaybePure,
     Statement,
     ResultValue,
     ConstantLike,
@@ -12,7 +14,6 @@ from kirin.ir import (
     IsolatedFromAbove,
     SymbolOpInterface,
     CallableStmtInterface,
-    types,
 )
 from kirin.decl import info, statement
 from kirin.ir.ssa import SSAValue
@@ -72,11 +73,13 @@ class Function(Statement):
 @statement(dialect=dialect)
 class Call(Statement):
     name = "call"
+    traits = frozenset({MaybePure()})
     # not a fixed type here so just any
     callee: SSAValue = info.argument()
     inputs: tuple[SSAValue, ...] = info.argument()
     kwargs: tuple[str, ...] = info.attribute(default_factory=lambda: (), property=True)
     result: ResultValue = info.result()
+    purity: bool = info.attribute(default=False)
 
     def print_impl(self, printer: Printer) -> None:
         pprint_calllike(self, printer.state.ssa_id[self.callee], printer)
@@ -199,10 +202,12 @@ class GetField(Statement):
 @statement(dialect=dialect)
 class Invoke(Statement):
     name = "invoke"
+    traits = frozenset({MaybePure()})
     callee: Method = info.attribute(property=True)
     inputs: tuple[SSAValue, ...] = info.argument()
     kwargs: tuple[str, ...] = info.attribute(property=True)
     result: ResultValue = info.result()
+    purity: bool = info.attribute(default=False)
 
     def print_impl(self, printer: Printer) -> None:
         pprint_calllike(self, self.callee.sym_name, printer)

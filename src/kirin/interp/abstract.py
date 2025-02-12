@@ -141,8 +141,10 @@ class AbstractInterpreter(
         """
         frame.set_values(ssa, results)
 
-    def eval_recursion_limit(self, frame: AbstractFrameType) -> ResultType:
-        return self.lattice.bottom()
+    def eval_recursion_limit(
+        self, frame: AbstractFrameType
+    ) -> tuple[AbstractFrameType, ResultType]:
+        return frame, self.lattice.bottom()
 
     def run_ssacfg_region(
         self, frame: AbstractFrameType, region: Region

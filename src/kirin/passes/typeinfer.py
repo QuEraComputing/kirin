@@ -16,10 +16,10 @@ class TypeInfer(Pass):
         self.infer = TypeInference(self.dialects)
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
-        typeinfer_results, return_type = self.infer.run_analysis(mt, mt.arg_types)
+        frame, return_type = self.infer.run_analysis(mt, mt.arg_types)
         if trait := mt.code.get_trait(HasSignature):
             trait.set_signature(mt.code, Signature(mt.arg_types, return_type))
 
-        result = Walk(ApplyType(typeinfer_results)).rewrite(mt.code)
+        result = Walk(ApplyType(frame.entries)).rewrite(mt.code)
         mt.inferred = True
         return result

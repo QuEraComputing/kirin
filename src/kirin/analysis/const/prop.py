@@ -1,22 +1,25 @@
 from dataclasses import field, dataclass
 
-from kirin import ir, interp
+from kirin import ir, types, interp
 from kirin.analysis.forward import ForwardExtra, ForwardFrame
 
-from .lattice import Pure, Value, NotPure, Unknown, JointResult
+from .lattice import Value, Result, Unknown
 
 
 @dataclass
-class ExtraFrameInfo:
+class Frame(ForwardFrame[Result]):
+    should_be_pure: set[ir.Statement] = field(default_factory=set)
+    """If any ir.MaybePure is actually pure."""
     frame_is_not_pure: bool = False
+    """If we hit any non-pure statement."""
 
 
 @dataclass
-class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
+class Propagate(ForwardExtra[Frame, Result]):
     """Forward dataflow analysis for constant propagation.
 
     This analysis is a forward dataflow analysis that propagates constant values
-    through the program. It uses the `JointResult` lattice to track the constant
+    through the program. It uses the `Result` lattice to track the constant
     values and purity of the values.
 
     The analysis is implemented as a forward dataflow analysis, where the
@@ -30,9 +33,10 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
     """
 
     keys = ["constprop"]
-    lattice = JointResult
+    lattice = Result
 
     _interp: interp.Interpreter = field(init=False)
+    should_be_pure: set[ir.Statement] = field(init=False)
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -47,95 +51,66 @@ class Propagate(ForwardExtra[JointResult, ExtraFrameInfo]):
     def initialize(self):
         super().initialize()
         self._interp.initialize()
+        self.should_be_pure = set()
         return self
+
+    def new_frame(self, code: ir.Statement) -> Frame:
+        return Frame.from_func_like(code)
 
     def _try_eval_const_pure(
         self,
-        frame: ForwardFrame[JointResult, ExtraFrameInfo],
+        frame: Frame,
         stmt: ir.Statement,
         values: tuple[Value, ...],
-    ) -> interp.StatementResult[JointResult]:
+    ) -> interp.StatementResult[Result]:
         try:
             _frame = self._interp.new_frame(frame.code)
             _frame.set_values(stmt.args, tuple(x.data for x in values))
             value = self._interp.eval_stmt(_frame, stmt)
             match value:
                 case tuple():
-                    return tuple(JointResult(Value(each), Pure()) for each in value)
+                    return tuple(Value(each) for each in value)
                 case interp.ReturnValue(ret):
-                    return interp.ReturnValue(JointResult(Value(ret), Pure()))
+                    return interp.ReturnValue(Value(ret))
                 case interp.YieldValue(yields):
-                    return interp.YieldValue(
-                        tuple(JointResult(Value(each), Pure()) for each in yields)
-                    )
+                    return interp.YieldValue(tuple(Value(each) for each in yields))
                 case interp.Successor(block, args):
                     return interp.Successor(
                         block,
-                        *tuple(JointResult(Value(each), Pure()) for each in args),
+                        *tuple(Value(each) for each in args),
                     )
         except interp.InterpreterError:
             pass
         return (self.void,)
 
     def eval_stmt(
-        self, frame: ForwardFrame[JointResult, ExtraFrameInfo], stmt: ir.Statement
-    ) -> interp.StatementResult[JointResult]:
+        self, frame: Frame, stmt: ir.Statement
+    ) -> interp.StatementResult[Result]:
         if stmt.has_trait(ir.ConstantLike):
             return self._try_eval_const_pure(frame, stmt, ())
         elif stmt.has_trait(ir.Pure):
-            values = tuple(x.const for x in frame.get_values(stmt.args))
-            if ir.types.is_tuple_of(values, Value):
+            values = frame.get_values(stmt.args)
+            if types.is_tuple_of(values, Value):
                 return self._try_eval_const_pure(frame, stmt, values)
 
         method = self.lookup_registry(frame, stmt)
-        if method is not None:
-            ret = method(self, frame, stmt)
-            self._set_frame_not_pure(ret)
-            return ret
-        elif stmt.has_trait(ir.Pure):
-            # fallback to top for other statements
-            return (JointResult(Unknown(), Pure()),)
-        else:
-            if frame.extra is None:
-                frame.extra = ExtraFrameInfo(True)
-            return (JointResult(Unknown(), NotPure()),)
+        if method is None:
+            if stmt.has_trait(ir.Pure):
+                return (Unknown(),)  # no implementation but pure
+            # not pure, and no implementation, let's say it's not pure
+            frame.frame_is_not_pure = True
+            return (Unknown(),)
 
-    def _set_frame_not_pure(self, result: interp.StatementResult[JointResult]):
-        frame = self.state.current_frame()
-        if isinstance(result, tuple) and all(x.purity is Pure() for x in result):
-            return
-
-        if isinstance(result, interp.ReturnValue) and isinstance(
-            result.value.purity, Pure
-        ):
-            return
-
-        if isinstance(result, interp.YieldValue) and all(
-            isinstance(x.purity, Pure) for x in result
-        ):
-            return
-
-        if isinstance(result, interp.Successor) and all(
-            x.purity is Pure() for x in result.block_args
-        ):
-            return
-
-        if frame.extra is None:
-            frame.extra = ExtraFrameInfo(True)
+        ret = method(self, frame, stmt)
+        if not stmt.has_trait(ir.MaybePure):  # cannot be pure at all
+            frame.frame_is_not_pure = True
+        elif (
+            stmt not in self.should_be_pure
+        ):  # implementation cannot decide if it's pure
+            frame.frame_is_not_pure = True
+        return ret
 
     def run_method(
-        self, method: ir.Method, args: tuple[JointResult, ...]
-    ) -> JointResult:
-        return self.run_callable(
-            method.code, (JointResult(Value(method), NotPure()),) + args
-        )
-
-    def finalize(
-        self,
-        frame: ForwardFrame[JointResult, ExtraFrameInfo],
-        results: JointResult,
-    ) -> JointResult:
-        results = super().finalize(frame, results)
-        if frame.extra is not None and frame.extra.frame_is_not_pure:
-            return JointResult(results.const, NotPure())
-        return results
+        self, method: ir.Method, args: tuple[Result, ...]
+    ) -> tuple[Frame, Result]:
+        return self.run_callable(method.code, (Value(method),) + args)

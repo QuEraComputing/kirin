@@ -1,4 +1,4 @@
-from typing import TypeGuard, final
+from typing import TypeVar, final
 
 from kirin import ir, types, interp
 from kirin.analysis import const
@@ -28,22 +28,19 @@ class TypeInference(Forward[types.TypeAttribute]):
     # within the IR. Type inference will use the interpreted
     # value (which is a type) to determine the method dispatch.
     def build_signature(
-        self, frame: ForwardFrame[types.TypeAttribute, None], stmt: ir.Statement
+        self, frame: ForwardFrame[types.TypeAttribute], stmt: ir.Statement
     ) -> Signature:
         _args = ()
         for x in frame.get_values(stmt.args):
-            _args += (self._unwrap(x),)
+            # TODO: remove this after we have multiple dispatch...
+            if isinstance(x, types.Generic):
+                _args += (x.body,)
+            else:
+                _args += (x,)
         return Signature(stmt.__class__, _args)
 
-    def _unwrap(self, value: types.TypeAttribute) -> types.TypeAttribute:
-        if isinstance(value, types.Hinted):
-            return self._unwrap(value.type)
-        elif isinstance(value, types.Generic):
-            return value.body
-        return value
-
     def eval_stmt_fallback(
-        self, frame: ForwardFrame[types.TypeAttribute, None], stmt: ir.Statement
+        self, frame: ForwardFrame[types.TypeAttribute], stmt: ir.Statement
     ) -> tuple[types.TypeAttribute, ...] | interp.SpecialValue[types.TypeAttribute]:
         resolve = TypeResolution()
         for arg, value in zip(stmt.args, frame.get_values(stmt.args)):
@@ -52,23 +49,30 @@ class TypeInference(Forward[types.TypeAttribute]):
 
     def run_method(
         self, method: ir.Method, args: tuple[types.TypeAttribute, ...]
-    ) -> types.TypeAttribute:
-        return self.run_callable(
-            method.code, (types.Hinted(types.PyClass(ir.Method), method),) + args
-        )
+    ) -> tuple[ForwardFrame[types.TypeAttribute], types.TypeAttribute]:
+        return self.run_callable(method.code, (method.self_type,) + args)
 
-    def is_const(
-        self, value: types.TypeAttribute
-    ) -> TypeGuard[types.Hinted[const.Value]]:
-        return isinstance(value, types.Hinted) and isinstance(value.data, const.Value)
+    T = TypeVar("T")
 
-    def is_partial_const(
-        self, value: types.TypeAttribute
-    ) -> TypeGuard[
-        types.Hinted[const.Value]
-        | types.Hinted[const.PartialTuple]
-        | types.Hinted[const.PartialLambda]
-    ]:
-        return isinstance(value, types.Hinted) and isinstance(
-            value.data, (const.Value, const.PartialConst)
-        )
+    @classmethod
+    def maybe_const(cls, value: ir.SSAValue, type_: type[T]) -> T | None:
+        """Get a constant value of a given type.
+
+        If the value is not a constant or the constant is not of the given type, return
+        `None`.
+        """
+        hint = value.hints.get("const")
+        if isinstance(hint, const.Value) and isinstance(hint.data, type_):
+            return hint.data
+
+    @classmethod
+    def expect_const(cls, value: ir.SSAValue, type_: type[T]):
+        """Expect a constant value of a given type.
+
+        If the value is not a constant or the constant is not of the given type, raise
+        an `InterpreterError`.
+        """
+        hint = cls.maybe_const(value, type_)
+        if hint is None:
+            raise interp.InterpreterError(f"expected {type_}, got {hint}")
+        return hint

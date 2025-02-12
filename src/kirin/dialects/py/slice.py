@@ -13,7 +13,6 @@ from dataclasses import dataclass
 
 from kirin import ir, types, interp, lowering, exceptions
 from kirin.decl import info, statement
-from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.py.constant import Constant
 
 dialect = ir.Dialect("py.slice")
@@ -28,14 +27,17 @@ class SliceLowering(ir.FromPythonCall["Slice"]):
         return _lower_slice(state, node)
 
 
+T = types.TypeVar("T")
+
+
 @statement(dialect=dialect, init=False)
 class Slice(ir.Statement):
     name = "slice"
     traits = frozenset({ir.Pure(), SliceLowering()})
-    start: ir.SSAValue = info.argument(types.Any)
-    stop: ir.SSAValue = info.argument(types.Any)
-    step: ir.SSAValue = info.argument(types.Any)
-    result: ir.ResultValue = info.result(types.Slice)
+    start: ir.SSAValue = info.argument(T | types.NoneType)
+    stop: ir.SSAValue = info.argument(T | types.NoneType)
+    step: ir.SSAValue = info.argument(T | types.NoneType)
+    result: ir.ResultValue = info.result(types.Slice[T])
 
     def __init__(
         self, start: ir.SSAValue, stop: ir.SSAValue, step: ir.SSAValue
@@ -49,9 +51,9 @@ class Slice(ir.Statement):
             if stop.type.is_subseteq(types.NoneType):
                 result_type = types.Bottom
             else:
-                result_type = types.Slice[types.unwrap_hinted(stop.type)]
+                result_type = types.Slice[stop.type]
         else:
-            result_type = types.Slice[types.unwrap_hinted(start.type)]
+            result_type = types.Slice[start.type]
 
         super().__init__(
             args=(start, stop, step),
@@ -97,28 +99,6 @@ class Lowering(lowering.FromPythonAST):
         self, state: lowering.LoweringState, node: ast.Call
     ) -> lowering.Result:
         return _lower_slice(state, node)
-
-
-@dialect.register(key="typeinfer")
-class TypeInfer(interp.MethodTable):
-
-    @interp.impl(Slice)
-    def slice(
-        self,
-        interp: TypeInference,
-        frame: interp.Frame[types.TypeAttribute],
-        stmt: Slice,
-    ):
-        start, stop, step = frame.get_values(stmt.args)
-        if interp.is_const(start) and interp.is_const(stop) and interp.is_const(step):
-            return (
-                types.Hinted(
-                    stmt.result.type,
-                    slice(start.data.data, stop.data.data, step.data.data),
-                ),
-            )
-
-        return (stmt.result.type,)
 
 
 def _lower_slice(state: lowering.LoweringState, node: ast.Call) -> lowering.Result:

@@ -11,13 +11,13 @@ This dialects maps Python assignment syntax.
 
 import ast
 
-from kirin import ir, interp, lowering, exceptions
+from kirin import ir, types, interp, lowering, exceptions
 from kirin.decl import info, statement
 from kirin.print import Printer
 
 dialect = ir.Dialect("py.assign")
 
-T = ir.types.TypeVar("T")
+T = types.TypeVar("T")
 
 
 @statement(dialect=dialect)

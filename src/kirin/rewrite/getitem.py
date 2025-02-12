@@ -8,7 +8,6 @@ from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 @dataclass
 class InlineGetItem(RewriteRule):
-    results: dict[ir.SSAValue, const.JointResult]
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, py.indexing.GetItem):
@@ -17,10 +16,7 @@ class InlineGetItem(RewriteRule):
         if not isinstance(node.obj.owner, py.tuple.New):
             return RewriteResult()
 
-        if node.index not in self.results:
-            return RewriteResult()
-
-        if not isinstance(index_value := self.results[node.index].const, const.Value):
+        if not isinstance(index_value := node.index.hints.get("const"), const.Value):
             return RewriteResult()
 
         stmt = node.obj.owner

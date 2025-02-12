@@ -8,6 +8,7 @@ from dataclasses import field, dataclass
 from typing_extensions import Self
 
 from kirin.print import Printer, Printable
+from kirin.ir.attrs.abc import Attribute
 from kirin.ir.attrs.types import AnyType, TypeAttribute
 
 if TYPE_CHECKING:
@@ -22,6 +23,8 @@ class SSAValue(ABC, Printable):
 
     type: TypeAttribute = field(default_factory=AnyType, init=False, repr=True)
     """The type of this SSA value."""
+    hints: dict[str, Attribute] = field(default_factory=dict, init=False, repr=False)
+    """Hints for this SSA value."""
     uses: set[Use] = field(init=False, default_factory=set, repr=False)
     """The uses of this SSA value."""
     _name: str | None = field(init=False, default=None, repr=True)

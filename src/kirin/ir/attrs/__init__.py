@@ -12,7 +12,6 @@ This module contains the following:
 `types.TypeVar`: A type attribute representing a type variable.
 `types.Literal`: A type attribute representing a literal type.
 `types.Generic`: A type attribute representing a generic type.
-`types.Hinted`: A type attribute representing a hinted type.
 `types.Union`: A type attribute representing a union type.
 
 ## `py` module

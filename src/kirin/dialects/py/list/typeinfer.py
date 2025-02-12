@@ -12,8 +12,6 @@ class TypeInfer(interp.MethodTable):
     def add(self, interp, frame: interp.Frame, stmt: Add):
         lhs_type = frame.get(stmt.lhs)
         rhs_type = frame.get(stmt.rhs)
-        lhs_type = types.unwrap_hinted(lhs_type)
-        rhs_type = types.unwrap_hinted(rhs_type)
         if isinstance(lhs_type, types.Generic):
             lhs_elem_type = lhs_type.vars[0]
         else:
@@ -30,8 +28,7 @@ class TypeInfer(interp.MethodTable):
     def getitem_list_int(
         self, interp, frame: interp.Frame[types.TypeAttribute], stmt: GetItem
     ):
-        obj = frame.get(stmt.obj)
-        obj_type = types.unwrap_hinted(obj)
+        obj_type = frame.get(stmt.obj)
         if isinstance(obj_type, types.Generic):
             return (obj_type.vars[0],)
         else:
@@ -41,8 +38,7 @@ class TypeInfer(interp.MethodTable):
     def getitem_list_slice(
         self, interp, frame: interp.Frame[types.TypeAttribute], stmt: GetItem
     ):
-        obj = frame.get(stmt.obj)
-        obj_type = types.unwrap_hinted(obj)
+        obj_type = frame.get(stmt.obj)
         if isinstance(obj_type, types.Generic):
             return (types.List[obj_type.vars[0]],)
         else:

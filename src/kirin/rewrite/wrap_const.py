@@ -1,4 +1,3 @@
-from typing import TypeGuard
 from dataclasses import dataclass
 
 from kirin import ir
@@ -8,25 +7,20 @@ from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 @dataclass
 class WrapConst(RewriteRule):
-    results: dict[ir.SSAValue, const.JointResult]
-
-    @staticmethod
-    def worth(
-        value: const.Result,
-    ) -> TypeGuard[const.Value | const.PartialLambda | const.PartialTuple]:
-        return isinstance(value, (const.Value, const.PartialLambda, const.PartialTuple))
+    frame: const.Frame
 
     def wrap(self, value: ir.SSAValue) -> bool:
-        if isinstance(value.type, ir.types.Hinted) and isinstance(
-            value.type.data, const.Result
-        ):
+        result = self.frame.entries.get(value)
+        if not result:
             return False
 
-        if (result := self.results.get(value)) is not None and self.worth(result.const):
-            value.type = ir.types.Hinted(value.type, result.const)
-            return True
-
-        return False
+        const_hint = value.hints.get("const")
+        if const_hint and isinstance(const_hint, const.Result):
+            const_result = result.join(const_hint)
+        else:
+            const_result = result
+        value.hints["const"] = const_result
+        return True
 
     def rewrite_Block(self, node: ir.Block) -> RewriteResult:
         has_done_something = False
@@ -40,4 +34,10 @@ class WrapConst(RewriteRule):
         for result in node.results:
             if self.wrap(result):
                 has_done_something = True
+
+        if (
+            trait := node.get_trait(ir.MaybePure)
+        ) and node in self.frame.should_be_pure:
+            trait.set_pure(node)
+            has_done_something = True
         return RewriteResult(has_done_something=has_done_something)

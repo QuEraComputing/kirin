@@ -13,7 +13,7 @@ This dialect maps `ast.Constant` nodes to the `Constant` statement.
 import ast
 from typing import Generic, TypeVar
 
-from kirin import ir, interp, lowering, exceptions
+from kirin import ir, types, interp, lowering, exceptions
 from kirin.decl import info, statement
 from kirin.print import Printer
 from kirin.emit.julia import EmitJulia, EmitStrFrame
@@ -48,7 +48,7 @@ class Constant(ir.Statement, Generic[T]):
             printer.print(self.result.type)
 
     def typecheck(self) -> None:
-        if not isinstance(self.result.type, ir.types.TypeAttribute):
+        if not isinstance(self.result.type, types.TypeAttribute):
             raise exceptions.VerificationError(
                 self, f"Expected result type to be PyType, got {self.result.type}"
             )

@@ -5,11 +5,11 @@ This dialect provides the dialect necessary for compiling a function into
 lower-level IR with all its callee functions.
 """
 
-from kirin import ir, interp
+from kirin import ir, types, interp
 from kirin.decl import info, statement
 from kirin.print import Printer
 from kirin.analysis import TypeInference
-from kirin.exceptions import InterpreterError, VerificationError
+from kirin.exceptions import VerificationError
 
 from ._pprint_helper import pprint_calllike
 
@@ -78,11 +78,11 @@ class Concrete(interp.MethodTable):
     ):
         callee = interpreter.symbol_table.get(stmt.callee)
         if callee is None:
-            raise InterpreterError(f"symbol {stmt.callee} not found")
+            raise interp.InterpreterError(f"symbol {stmt.callee} not found")
 
         trait = callee.get_trait(ir.CallableStmtInterface)
         if trait is None:
-            raise InterpreterError(
+            raise interp.InterpreterError(
                 f"{stmt.callee} is not callable, got {callee.__class__.__name__}"
             )
 
@@ -118,11 +118,11 @@ class TypeInfer(interp.MethodTable):
     ):
         callee = interp.symbol_table.get(stmt.callee)
         if callee is None:
-            return (ir.types.Bottom,)
+            return (types.Bottom,)
 
         trait = callee.get_trait(ir.CallableStmtInterface)
         if trait is None:
-            return (ir.types.Bottom,)
+            return (types.Bottom,)
 
         body = trait.get_callable_region(callee)
         mt = ir.Method(

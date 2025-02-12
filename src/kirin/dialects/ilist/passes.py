@@ -1,4 +1,4 @@
-from kirin.ir import Method, types
+from kirin import ir, types
 from kirin.rewrite import Walk, Fixpoint
 from kirin.passes.abc import Pass
 from kirin.rewrite.result import RewriteResult
@@ -11,7 +11,7 @@ class IListDesugar(Pass):
     constant `list` type into `IList` type.
     """
 
-    def unsafe_run(self, mt: Method) -> RewriteResult:
+    def unsafe_run(self, mt: ir.Method) -> RewriteResult:
         for arg in mt.args:
             _check_list(arg.type, arg.type)
         return Fixpoint(Walk(List2IList())).rewrite(mt.code)

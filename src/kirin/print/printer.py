@@ -239,7 +239,7 @@ class Printer:
         self.plain_print(prefix, style=style, highlight=highlight)
         for idx, item in enumerate(seq):
             if idx > 0:
-                self.plain_print(delim)
+                self.plain_print(delim, style=style)
             emit(item)
         self.plain_print(suffix, style=style, highlight=highlight)
 

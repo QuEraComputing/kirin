@@ -1,4 +1,4 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.analysis import const
 from kirin.rewrite.abc import RewriteRule
 from kirin.rewrite.result import RewriteResult
@@ -7,7 +7,7 @@ from ..stmts import IListType
 from ..runtime import IList
 
 
-class RewriteHinted(RewriteRule):
+class ConstList2IList(RewriteRule):
     """Rewrite type annotation for SSAValue with constant `IList`
     in `Hinted` type. This should be run after constant folding and
     `WrapConst` rule.
@@ -16,18 +16,15 @@ class RewriteHinted(RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         has_done_something = False
         for result in node.results:
-            if not isinstance(result.type, ir.types.Hinted):
+            if not isinstance(hint := result.hints.get("const"), const.Value):
                 continue
-            if not isinstance(result.type.data, const.Value):
-                continue
-            typ = result.type.type
-            data = result.type.data.data
-            if isinstance(typ, ir.types.PyClass) and typ.is_subseteq(
-                ir.types.PyClass(IList)
-            ):
+
+            typ = result.type
+            data = hint.data
+            if isinstance(typ, types.PyClass) and typ.is_subseteq(types.PyClass(IList)):
                 has_done_something = self._rewrite_IList_type(result, data)
-            elif isinstance(typ, ir.types.Generic) and typ.body.is_subseteq(
-                ir.types.PyClass(IList)
+            elif isinstance(typ, types.Generic) and typ.body.is_subseteq(
+                types.PyClass(IList)
             ):
                 has_done_something = self._rewrite_IList_type(result, data)
         return RewriteResult(has_done_something=has_done_something)
@@ -39,11 +36,10 @@ class RewriteHinted(RewriteRule):
         if not data.data:
             return False
 
-        elem_type = ir.types.PyClass(type(data[0]))
+        elem_type = types.PyClass(type(data[0]))
         for elem in data.data[1:]:
-            elem_type = elem_type.join(ir.types.PyClass(type(elem)))
+            elem_type = elem_type.join(types.PyClass(type(elem)))
 
-        result.type = ir.types.Hinted(
-            IListType[elem_type, ir.types.Literal(len(data.data))], data
-        )
+        result.type = IListType[elem_type, types.Literal(len(data.data))]
+        result.hints["const"] = const.Value(data)
         return True

@@ -17,6 +17,29 @@ class Pure(StmtTrait):
 
 
 @dataclass(frozen=True)
+class MaybePure(StmtTrait):
+    """A trait that indicates the statement may be pure,
+    i.e., a call statement can be pure if the callee is pure.
+    """
+
+    @classmethod
+    def is_pure(cls, stmt: "Statement") -> bool:
+        # TODO: simplify this after removing property
+        from kirin.ir.attrs.py import PyAttr
+
+        purity = stmt.attributes.get("purity")
+        if isinstance(purity, PyAttr) and purity.data:
+            return True
+        return False
+
+    @classmethod
+    def set_pure(cls, stmt: "Statement") -> None:
+        from kirin.ir.attrs.py import PyAttr
+
+        stmt.attributes["purity"] = PyAttr(True)
+
+
+@dataclass(frozen=True)
 class ConstantLike(StmtTrait):
     """A trait that indicates that a statement is constant-like, i.e., it
     represents a constant value.

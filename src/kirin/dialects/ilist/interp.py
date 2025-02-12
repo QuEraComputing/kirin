@@ -1,4 +1,4 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.interp import Frame, Interpreter, MethodTable, impl
 from kirin.dialects.py.len import Len
 from kirin.dialects.py.binop import Add
@@ -20,11 +20,11 @@ class IListInterpreter(MethodTable):
     def new(self, interp, frame: Frame, stmt: New):
         return (IList(list(frame.get_values(stmt.values))),)
 
-    @impl(Len, ir.types.PyClass(IList))
+    @impl(Len, types.PyClass(IList))
     def len(self, interp, frame: Frame, stmt: Len):
         return (len(frame.get(stmt.value).data),)
 
-    @impl(Add, ir.types.PyClass(IList), ir.types.PyClass(IList))
+    @impl(Add, types.PyClass(IList), types.PyClass(IList))
     def add(self, interp, frame: Frame, stmt: Add):
         return (IList(frame.get(stmt.lhs).data + frame.get(stmt.rhs).data),)
 

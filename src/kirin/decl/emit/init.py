@@ -3,7 +3,7 @@ from dataclasses import MISSING
 
 from typing_extensions import Unpack
 
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info
 from kirin.decl.base import BaseModifier, StatementOptions
 
@@ -37,7 +37,7 @@ class EmitInit(BaseModifier):
         self.has_post_init = hasattr(self.cls, self._POST_INIT_NAME)
         self.globals.update(
             {
-                "_PY_ANY": ir.types.Any,
+                "_PY_ANY": types.Any,
                 self._KIRIN_STMT: ir.Statement,
                 self._SELF_CLASS: self.cls,
                 self._RESULT_VALUE_NAME: ir.ResultValue,

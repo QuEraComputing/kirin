@@ -17,6 +17,7 @@ from .abc import (
 from .basic import (
     Pure as Pure,
     HasParent as HasParent,
+    MaybePure as MaybePure,
     ConstantLike as ConstantLike,
     IsTerminator as IsTerminator,
     NoTerminator as NoTerminator,

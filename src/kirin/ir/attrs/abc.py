@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, ClassVar, Optional
 from dataclasses import field, dataclass
 
 from kirin.print import Printable
+from kirin.lattice.abc import LatticeMeta, SingletonMeta
 
 if TYPE_CHECKING:
     from kirin.ir.dialect import Dialect
@@ -10,6 +11,18 @@ if TYPE_CHECKING:
 
 class AttributeMeta(ABCMeta):
     """Metaclass for attributes."""
+
+    pass
+
+
+class LatticeAttributeMeta(LatticeMeta, AttributeMeta):
+    """Metaclass for lattice attributes."""
+
+    pass
+
+
+class SingletonLatticeAttributeMeta(LatticeAttributeMeta, SingletonMeta):
+    """Metaclass for singleton lattice attributes."""
 
     pass
 

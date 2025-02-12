@@ -8,7 +8,7 @@ from dataclasses import KW_ONLY
 
 from beartype.door import is_subhint
 
-from kirin import ir
+from kirin import ir, types
 
 from .base import BaseModifier
 from .info import Field, ArgumentField, AttributeField, StatementFields, argument
@@ -108,8 +108,8 @@ class ScanFields(BaseModifier):
             if guess and not is_subhint(
                 guess, ir.Attribute
             ):  # not specified, and using python type
-                if f.type is ir.types.Any:  # not set or too generic
-                    f.type = ir.types.hint2type(guess)
+                if f.type is types.Any:  # not set or too generic
+                    f.type = types.hint2type(guess)
                 f.pytype = True
 
     @staticmethod

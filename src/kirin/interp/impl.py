@@ -11,7 +11,8 @@ from typing import (
 )
 from dataclasses import dataclass
 
-from kirin.ir import Attribute, Statement, types
+from kirin import types
+from kirin.ir import Attribute, Statement
 from kirin.interp.value import StatementResult
 
 if TYPE_CHECKING:

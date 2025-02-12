@@ -1,9 +1,9 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.decl import info, statement
 
 from ._dialect import dialect
 
-T = ir.types.TypeVar("T")
+T = types.TypeVar("T")
 
 
 @statement

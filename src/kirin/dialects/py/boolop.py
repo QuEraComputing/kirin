@@ -12,7 +12,7 @@ This dialect maps `ast.BoolOp` nodes to the `And` and `Or` statements.
 
 import ast
 
-from kirin import ir, interp, lowering
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.emit.julia import EmitJulia, EmitStrFrame
 from kirin.exceptions import DialectLoweringError
@@ -25,7 +25,7 @@ class BoolOp(ir.Statement):
     traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     lhs: ir.SSAValue = info.argument(print=False)
     rhs: ir.SSAValue = info.argument(print=False)
-    result: ir.ResultValue = info.result(ir.types.Bool)
+    result: ir.ResultValue = info.result(types.Bool)
 
 
 @statement(dialect=dialect)

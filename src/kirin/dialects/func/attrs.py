@@ -1,7 +1,8 @@
 from typing import Generic, TypeVar
 from dataclasses import dataclass
 
-from kirin.ir import Method, Attribute, types
+from kirin import types
+from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
 from kirin.dialects.func.dialect import dialect
 
