@@ -4,8 +4,8 @@ from attrs import Beer
 from stmts import Pour, Puke, NewBeer
 from dialect import dialect
 
-import lattice as latt
 from kirin import ir, interp
+from lattice import Item, ItemBeer, ItemPints, AtLeastXItem, ConstIntItem
 from kirin.interp import exceptions
 from kirin.analysis import Forward
 from kirin.dialects import py
@@ -14,9 +14,9 @@ from kirin.analysis.forward import ForwardFrame
 
 
 @dataclass
-class FeeAnalysis(Forward[latt.Item]):
+class FeeAnalysis(Forward[Item]):
     keys = ["beer.fee"]
-    lattice = latt.Item
+    lattice = Item
     puke_count: int = field(init=False)
 
     def initialize(self):
@@ -36,11 +36,11 @@ class FeeAnalysis(Forward[latt.Item]):
         return self
 
     def eval_stmt_fallback(
-        self, frame: ForwardFrame[latt.Item, None], stmt: ir.Statement
-    ) -> tuple[latt.Item, ...] | interp.SpecialValue[latt.Item]:
+        self, frame: ForwardFrame[Item], stmt: ir.Statement
+    ) -> tuple[Item, ...] | interp.SpecialValue[Item]:
         return ()
 
-    def run_method(self, method: ir.Method, args: tuple[latt.Item, ...]) -> latt.Item:
+    def run_method(self, method: ir.Method, args: tuple[Item, ...]):
         return self.run_callable(method.code, (self.lattice.bottom(),) + args)
 
 
@@ -51,13 +51,13 @@ class PyConstMethodTable(interp.MethodTable):
     def const(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
+        frame: interp.Frame[Item],
         stmt: py.constant.Constant,
     ):
         if isinstance(stmt.value, int):
-            return (latt.ConstIntItem(data=stmt.value),)
+            return (ConstIntItem(data=stmt.value),)
         elif isinstance(stmt.value, Beer):
-            return (latt.ItemBeer(brand=stmt.value.brand),)
+            return (ItemBeer(brand=stmt.value.brand),)
 
         else:
             raise exceptions.InterpreterError(
@@ -72,16 +72,16 @@ class PyBinOpMethodTable(interp.MethodTable):
     def add(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
+        frame: interp.Frame[Item],
         stmt: binop.Add,
     ):
         left = frame.get(stmt.lhs)
         right = frame.get(stmt.rhs)
 
-        if isinstance(left, latt.AtLeastXItem) or isinstance(right, latt.AtLeastXItem):
-            out = latt.AtLeastXItem(data=left.data + right.data)
+        if isinstance(left, AtLeastXItem) or isinstance(right, AtLeastXItem):
+            out = AtLeastXItem(data=left.data + right.data)
         else:
-            out = latt.ConstIntItem(data=left.data + right.data)
+            out = ConstIntItem(data=left.data + right.data)
 
         return (out,)
 
@@ -93,24 +93,26 @@ class BeerMethodTable(interp.MethodTable):
     def new_beer(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
+        frame: interp.Frame[Item],
         stmt: NewBeer,
     ):
-        return (latt.ItemBeer(brand=stmt.brand),)
+        return (ItemBeer(brand=stmt.brand),)
 
     @interp.impl(Pour)
     def pour(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
+        frame: interp.Frame[Item],
         stmt: Pour,
     ):
         # Drink depends on the beer type to have different charge:
 
-        beer: latt.ItemBeer = frame.get(stmt.beverage)
-        pint_count: latt.AtLeastXItem | latt.ConstIntItem = frame.get(stmt.amount)
+        beer = frame.get_typed(stmt.beverage, ItemBeer)
+        pint_count: AtLeastXItem | ConstIntItem = frame.get(
+            stmt.amount
+        )  # FIXME: fix the type hinting here
 
-        out = latt.ItemPints(count=pint_count, brand=beer.brand)
+        out = ItemPints(count=pint_count, brand=beer.brand)
 
         return (out,)
 
@@ -118,7 +120,7 @@ class BeerMethodTable(interp.MethodTable):
     def puke(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
+        frame: interp.Frame[Item],
         stmt: Puke,
     ):
         interp.puke_count += 1

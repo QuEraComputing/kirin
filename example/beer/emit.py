@@ -1,4 +1,5 @@
 from io import StringIO
+from typing import cast
 from dataclasses import field, dataclass
 
 import stmts
@@ -23,7 +24,7 @@ def default_menu_price():
 @dataclass
 class EmitReceptMain(EmitStr):
     keys = ["emit.recept"]
-    dialects: ir.DialectGroup = field(default=beer)
+    dialects: ir.DialectGroup = field(default_factory=lambda: beer)
     file: StringIO = field(default_factory=StringIO)
     menu_price: dict[str, float] = field(default_factory=default_menu_price)
     recept_analysis_result: dict[ir.SSAValue, Item] = field(default_factory=dict)
@@ -71,7 +72,7 @@ class BeerEmit(interp.MethodTable):
 
     @interp.impl(stmts.Pour)
     def emit_pour(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: stmts.Pour):
-        pints_item: ItemPints = emit.recept_analysis_result[stmt.result]
+        pints_item = cast(ItemPints, emit.recept_analysis_result[stmt.result])
 
         amount_str = ""
         price_str = ""

@@ -1,3 +1,4 @@
+# type: ignore
 from group import beer
 from stmts import Pour, Puke, Drink, NewBeer
 from recept import FeeAnalysis
@@ -20,10 +21,8 @@ def main(x: int):
 
 
 main.print()
-exit(1)
 
 
-# type: ignore
 @beer
 def main2(x: int):
     def some_closure(beer, amount):
@@ -76,7 +75,7 @@ main3.print()
 
 # 3. simple analysis example:
 @beer
-def main2(x: int):
+def analysis_demo(x: int):
 
     bud = NewBeer(brand="budlight")
     heineken = NewBeer(brand="heineken")
@@ -97,15 +96,17 @@ def main2(x: int):
     return x
 
 
-fee_analysis = FeeAnalysis(main2.dialects)
-results, expect = fee_analysis.run_analysis(main2, args=(AtLeastXItem(data=10),))
-print(results)
+fee_analysis = FeeAnalysis(analysis_demo.dialects)
+results, expect = fee_analysis.run_analysis(
+    analysis_demo, args=(AtLeastXItem(data=10),)
+)
+print(results.entries)
 print(fee_analysis.puke_count)
-main2.print(analysis=results)
+analysis_demo.print(analysis=results.entries)
 
 
 emitter = EmitReceptMain()
-emitter.recept_analysis_result = results
+emitter.recept_analysis_result = results.entries
 
-emitter.run(main2, ("",))
+emitter.run(analysis_demo, ("",))
 print(emitter.get_output())
