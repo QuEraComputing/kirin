@@ -61,18 +61,14 @@
                 <span class=bp>self</span><span class=o>.</span><span class=n>file</span><span class=o>.</span><span class=n>read</span><span class=p>(),</span>
             <span class=p>]</span>
         <span class=p>)</span>
-
-
-<span class=nd>@func</span><span class=o>.</span><span class=n>dialect</span><span class=o>.</span><span class=n>register</span><span class=p>(</span><span class=n>key</span><span class=o>=</span><span class=s2>&quot;emit.recept&quot;</span><span class=p>)</span>
+</code></pre></div> <p>The same as all the other kirin interpreters, we need to implement MethodTable for our emit interpreter. Here, we register method tables to key <code>emit.recept</code>.</p> <div class=highlight><pre><span></span><code><span class=nd>@func</span><span class=o>.</span><span class=n>dialect</span><span class=o>.</span><span class=n>register</span><span class=p>(</span><span class=n>key</span><span class=o>=</span><span class=s2>&quot;emit.recept&quot;</span><span class=p>)</span>
 <span class=k>class</span> <span class=nc>FuncEmit</span><span class=p>(</span><span class=n>interp</span><span class=o>.</span><span class=n>MethodTable</span><span class=p>):</span>
 
     <span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>func</span><span class=o>.</span><span class=n>Function</span><span class=p>)</span>
     <span class=k>def</span> <span class=nf>emit_func</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>emit</span><span class=p>:</span> <span class=n>EmitReceptMain</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>EmitStrFrame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>func</span><span class=o>.</span><span class=n>Function</span><span class=p>):</span>
         <span class=n>_</span> <span class=o>=</span> <span class=n>emit</span><span class=o>.</span><span class=n>run_ssacfg_region</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=o>.</span><span class=n>body</span><span class=p>)</span>
         <span class=k>return</span> <span class=p>()</span>
-
-
-<span class=nd>@dialect</span><span class=o>.</span><span class=n>register</span><span class=p>(</span><span class=n>key</span><span class=o>=</span><span class=s2>&quot;emit.recept&quot;</span><span class=p>)</span>
+</code></pre></div> <p>For our <code>Pour</code> Statement, we want to generate a transaction each time we pour. We will get the previous analysis result from the corresponding SSAValue. If the lattce element is a <code>AtLeastXItem</code>, we generate a line with beer brand, and <code>&gt;= x</code>. If its a <code>ConstIntItem</code> we just directly generate the amount.</p> <div class=highlight><pre><span></span><code><span class=nd>@dialect</span><span class=o>.</span><span class=n>register</span><span class=p>(</span><span class=n>key</span><span class=o>=</span><span class=s2>&quot;emit.recept&quot;</span><span class=p>)</span>
 <span class=k>class</span> <span class=nc>BeerEmit</span><span class=p>(</span><span class=n>interp</span><span class=o>.</span><span class=n>MethodTable</span><span class=p>):</span>
 
     <span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>stmts</span><span class=o>.</span><span class=n>Pour</span><span class=p>)</span>
