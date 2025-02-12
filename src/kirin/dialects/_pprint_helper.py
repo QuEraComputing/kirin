@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+from kirin import ir
+
 if TYPE_CHECKING:
     from kirin.ir import Statement
     from kirin.print.printer import Printer
@@ -13,18 +15,6 @@ def pprint_calllike(
     printer.plain_print(" ")
 
     n_total = len(invoke_or_call.args)
-    # if (callee := getattr(invoke_or_call, "callee", None)) is None:
-    #     raise ValueError(f"{invoke_or_call} does not have a callee")
-
-    # if isinstance(callee, SSAValue):
-    #     printer.plain_print(printer.state.ssa_id[callee])
-    # elif isinstance(callee, Method):
-    #     printer.plain_print(callee.sym_name)
-    # elif isinstance(callee, str):
-    #     printer.plain_print(callee)
-    # else:
-    #     raise ValueError(f"Unknown callee type {type(callee)}")
-
     printer.plain_print(callee)
     if (inputs := getattr(invoke_or_call, "inputs", None)) is None:
         raise ValueError(f"{invoke_or_call} does not have inputs")
@@ -53,9 +43,11 @@ def pprint_calllike(
     printer.print_mapping(kwargs, delim=", ")
     printer.plain_print(")")
 
-    with printer.rich(style="black"):
+    with printer.rich(style="comment"):
         printer.plain_print(" : ")
         printer.print_seq(
             [result.type for result in invoke_or_call._results],
             delim=", ",
         )
+        if trait := invoke_or_call.get_trait(ir.MaybePure):
+            printer.plain_print(f" maybe_pure={trait.is_pure(invoke_or_call)}")

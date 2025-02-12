@@ -141,9 +141,19 @@ class SkipBlock(RewriteRule):
 
         has_done_something = False
         predecessors = self.cfg.predecessors.get(node, set())
-        if len(predecessors) == 1:  # only if there is one predecessor
+        # only if there is one predecessor and no uses of the arguments
+        if len(predecessors) == 1 and all(
+            self.can_skip(stmt, each) for each in node.args
+        ):
             has_done_something = self.rewrite_pred(node, stmt, next(iter(predecessors)))
         return RewriteResult(has_done_something=has_done_something)
+
+    def can_skip(self, terminator: cf.Branch, value: ir.SSAValue) -> bool:
+        for use in value.uses:
+            if use.stmt is terminator:
+                continue
+            return False
+        return True
 
     def rewrite_pred(
         self, node: ir.Block, node_terminator: cf.Branch, predecessor: ir.Block

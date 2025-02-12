@@ -22,18 +22,22 @@ class Fold(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
         constprop = const.Propagate(self.dialects)
-        constprop_results, _ = constprop.run_analysis(mt)
-        result = Fixpoint(
-            Walk(
-                Chain(
-                    WrapConst(constprop_results),
-                    ConstantFold(),
-                    InlineGetItem(),
-                    Call2Invoke(),
-                    DeadCodeElimination(),
+        frame, _ = constprop.run_analysis(mt)
+        result = Walk(WrapConst(frame)).rewrite(mt.code)
+        result = (
+            Fixpoint(
+                Walk(
+                    Chain(
+                        ConstantFold(),
+                        InlineGetItem(),
+                        Call2Invoke(),
+                        # DeadCodeElimination(),
+                    )
                 )
             )
-        ).rewrite(mt.code)
+            .rewrite(mt.code)
+            .join(result)
+        )
 
         if mt.code.has_trait(SSACFGRegion):
             result = Walk(CFGCompactify()).rewrite(mt.code).join(result)
