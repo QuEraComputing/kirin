@@ -145,27 +145,27 @@ def recurse():
 
 def test_constprop():
     infer = const.Propagate(basic_no_opt)
-    _, ret = infer.run_analysis(main)
-    assert ret.const == const.Value((3, 4))
-    assert len(infer.results) == 3
+    frame, ret = infer.run_analysis(main)
+    assert ret == const.Value((3, 4))
+    assert len(frame.entries) == 3
 
-    _, ret = infer.run_analysis(goo)
-    assert ret.const == const.PartialTuple((const.Value(3), const.Unknown()))
-    assert len(infer.results) == 6
-    block: ir.Block = goo.code.body.blocks[0]  # type: ignore
-    assert infer.results[block.stmts.at(1).results[0]].const == const.Value(3)
-    assert infer.results[block.stmts.at(2).results[0]].const == const.Unknown()
-    assert infer.results[block.stmts.at(3).results[0]].const == const.PartialTuple(
+    frame, ret = infer.run_analysis(goo)
+    assert ret == const.PartialTuple((const.Value(3), const.Unknown()))
+    assert len(frame.entries) == 6
+    block = goo.callable_region.blocks[0]
+    assert frame.entries[block.stmts.at(1).results[0]] == const.Value(3)
+    assert frame.entries[block.stmts.at(2).results[0]] == const.Unknown()
+    assert frame.entries[block.stmts.at(3).results[0]] == const.PartialTuple(
         (const.Value(3), const.Unknown())
     )
 
     _, ret = infer.run_analysis(bar)
-    assert ret.const == const.Value(3)
+    assert ret == const.Value(3)
 
     _, ret = infer.run_analysis(foo)
-    assert ret.const == const.Unknown()
+    assert ret == const.Unknown()
     _, ret = infer.run_analysis(recurse)
-    assert ret.const == const.Value((0, 0, 0))
+    assert ret == const.Value((0, 0, 0))
 
 
 @basic_no_opt
@@ -193,16 +193,16 @@ def _for_loop_test_constp(
 
 def test_issue_40():
     constprop = const.Propagate(basic_no_opt)
-    _, result = constprop.run_analysis(
+    frame, ret = constprop.run_analysis(
         _for_loop_test_constp,
         (
-            const.JointResult.from_const(0),
-            const.JointResult.from_const(()),
-            const.JointResult.from_const(5),
+            const.Value(0),
+            const.Value(()),
+            const.Value(5),
         ),
     )
-    assert isinstance(result.const, const.Value)
-    assert result.const.data == _for_loop_test_constp(cntr=0, x=(), n_range=5)
+    assert isinstance(ret, const.Value)
+    assert ret.data == _for_loop_test_constp(cntr=0, x=(), n_range=5)
 
 
 dummy_dialect = ir.Dialect("dummy")
@@ -229,12 +229,12 @@ def test_intraprocedure_side_effect():
             return x
 
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
-    results, ret = constprop.run_analysis(side_effect_intraprocedure)
+    frame, ret = constprop.run_analysis(side_effect_intraprocedure)
     new_tuple = (
         side_effect_intraprocedure.callable_region.blocks[2].stmts.at(3).results[0]
     )
-    assert isinstance(ret.const, const.Unknown)
-    assert results[new_tuple].const == const.Value((1, 2, 3))
+    assert isinstance(ret, const.Unknown)
+    assert frame.entries[new_tuple] == const.Value((1, 2, 3))
 
 
 def test_interprocedure_true_branch():
@@ -254,10 +254,10 @@ def test_interprocedure_true_branch():
             return cond
 
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
-    results, ret = constprop.run_analysis(side_effect_true_branch_const)
-    assert isinstance(ret.const, const.Unknown)  # instead of NotPure
+    frame, ret = constprop.run_analysis(side_effect_true_branch_const)
+    assert isinstance(ret, const.Unknown)  # instead of NotPure
     true_branch = side_effect_true_branch_const.callable_region.blocks[1]
-    assert results[true_branch.stmts.at(0).results[0]].const == const.Value(None)
+    assert frame.entries[true_branch.stmts.at(0).results[0]] == const.Value(None)
 
 
 def test_non_pure_recursion():
@@ -269,9 +269,9 @@ def test_non_pure_recursion():
         return x
 
     constprop = const.Propagate(basic_no_opt)
-    results, _ = constprop.run_analysis(for_loop_append)
+    frame, _ = constprop.run_analysis(for_loop_append)
     stmt = for_loop_append.callable_region.blocks[1].stmts.at(3)
-    assert isinstance(results[stmt.results[0]].const, const.Unknown)
+    assert isinstance(frame.entries[stmt.results[0]], const.Unknown)
 
 
 def test_closure_prop():
@@ -312,12 +312,12 @@ def test_closure_prop():
         return x()
 
     constprop = const.Propagate(basic_no_opt.add(dialect))
-    results, ret = constprop.run_analysis(main)
-    main.print(analysis=results)
+    frame, ret = constprop.run_analysis(main)
+    main.print(analysis=frame.entries)
     stmt = main.callable_region.blocks[0].stmts.at(3)
-    call_result = results[stmt.results[0]]
-    assert isinstance(call_result.const, const.Value)
-    assert call_result.const.data == 2
+    call_result = frame.entries[stmt.results[0]]
+    assert isinstance(call_result, const.Value)
+    assert call_result.data == 2
 
     @basic_no_opt.add(dialect)
     def main2():
@@ -326,8 +326,8 @@ def test_closure_prop():
         return x()
 
     constprop = const.Propagate(basic_no_opt.add(dialect))
-    results, _ = constprop.run_analysis(main2)
-    main2.print(analysis=results)
+    frame, _ = constprop.run_analysis(main2)
+    main2.print(analysis=frame.entries)
     stmt = main2.callable_region.blocks[0].stmts.at(3)
-    call_result = results[stmt.results[0]]
-    assert isinstance(call_result.const, const.Value)
+    call_result = frame.entries[stmt.results[0]]
+    assert isinstance(call_result, const.Value)

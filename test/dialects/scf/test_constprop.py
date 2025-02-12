@@ -23,10 +23,10 @@ def test_simple_loop():
         return x
 
     prop = const.Propagate(kernel)
-    result, ret = prop.run_analysis(main)
-    assert isinstance(ret.const, const.Value)
-    assert ret.const.data == 2
-    assert isinstance(ret.purity, const.Pure)
+    frame, ret = prop.run_analysis(main)
+    assert isinstance(ret, const.Value)
+    assert ret.data == 2
+    assert frame.frame_is_not_pure is False
 
 
 def test_nested_loop():
@@ -39,10 +39,10 @@ def test_nested_loop():
         return x
 
     prop = const.Propagate(kernel)
-    result, ret = prop.run_analysis(main)
-    assert isinstance(ret.const, const.Value)
-    assert ret.const.data == 6
-    assert isinstance(ret.purity, const.Pure)
+    frame, ret = prop.run_analysis(main)
+    assert isinstance(ret, const.Value)
+    assert ret.data == 6
+    assert frame.frame_is_not_pure is False
 
 
 def test_nested_loop_with_if():
@@ -56,10 +56,10 @@ def test_nested_loop_with_if():
         return x
 
     prop = const.Propagate(kernel)
-    result, ret = prop.run_analysis(main)
-    assert isinstance(ret.const, const.Value)
-    assert ret.const.data == 3
-    assert isinstance(ret.purity, const.Pure)
+    frame, ret = prop.run_analysis(main)
+    assert isinstance(ret, const.Value)
+    assert ret.data == 3
+    assert frame.frame_is_not_pure is False
 
 
 def test_nested_loop_with_if_else():
@@ -76,7 +76,7 @@ def test_nested_loop_with_if_else():
         return x
 
     prop = const.Propagate(kernel)
-    result, ret = prop.run_analysis(main)
-    assert isinstance(ret.const, const.Value)
-    assert ret.const.data == 5
-    assert isinstance(ret.purity, const.Pure)
+    frame, ret = prop.run_analysis(main)
+    assert isinstance(ret, const.Value)
+    assert ret.data == 5
+    assert frame.frame_is_not_pure is False

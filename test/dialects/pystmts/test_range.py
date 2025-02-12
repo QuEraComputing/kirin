@@ -1,5 +1,8 @@
+from typing import cast
+
 from kirin import types
 from kirin.prelude import basic
+from kirin.analysis import const
 from kirin.dialects.py.range import Range
 
 
@@ -11,21 +14,25 @@ def new_range(a: int, b: int, c: int):
     return x, y, z
 
 
-def test_new_range():
-    stmt: Range = new_range.code.body.blocks[0].stmts.at(2)
-    assert isinstance(stmt.start.type, types.Hinted)
-    assert stmt.start.type.data.data == 0
-    assert stmt.stop.type.is_subseteq(types.Int)
-    assert isinstance(stmt.step.type, types.Hinted)
-    assert stmt.step.type.data.data == 1
+new_range.print()
 
-    stmt: Range = new_range.code.body.blocks[0].stmts.at(4)
+
+def test_new_range():
+    stmt = cast(Range, new_range.callable_region.blocks[0].stmts.at(2))
+    assert isinstance(hint := stmt.start.hints.get("const"), const.Value)
+    assert hint.data == 0
+    assert stmt.stop.type.is_subseteq(types.Int)
+    assert isinstance(hint := stmt.step.hints.get("const"), const.Value)
+    assert hint.data == 1
+
+    stmt = cast(Range, new_range.callable_region.blocks[0].stmts.at(4))
     assert stmt.start.type.is_subseteq(types.Int)
     assert stmt.stop.type.is_subseteq(types.Int)
-    assert isinstance(stmt.step.type, types.Hinted)
-    assert stmt.step.type.data.data == 1
+    assert stmt.step.type.is_subseteq(types.Int)
+    assert isinstance(hint := stmt.step.hints.get("const"), const.Value)
+    assert hint.data == 1
 
-    stmt: Range = new_range.code.body.blocks[0].stmts.at(5)
+    stmt = cast(Range, new_range.callable_region.blocks[0].stmts.at(5))
     assert stmt.start.type.is_subseteq(types.Int)
     assert stmt.stop.type.is_subseteq(types.Int)
     assert stmt.step.type.is_subseteq(types.Int)

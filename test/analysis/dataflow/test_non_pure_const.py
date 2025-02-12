@@ -28,15 +28,15 @@ def side_effect(pos: int):
 
 def test_non_pure_const():
     constprop = const.Propagate(basic_no_opt)
-    results, ret = constprop.run_analysis(
+    frame, ret = constprop.run_analysis(
         recursion,
         (
-            const.JointResult(const.Value(side_effect), const.PurityBottom()),
-            const.JointResult.top(),
-            const.JointResult.top(),
+            const.Value(side_effect),
+            const.Result.top(),
+            const.Result.top(),
         ),
     )
-    recursion.print(analysis=results)
-    ret = results[recursion.callable_region.blocks[2].stmts.at(3).results[0]]
-    assert isinstance(ret.const, const.Value)
-    assert isinstance(ret.purity, const.NotPure)
+    # recursion.print(analysis=frame.entries)
+    ret = frame.entries[recursion.callable_region.blocks[2].stmts.at(3).results[0]]
+    assert isinstance(ret, const.Value)
+    assert frame.frame_is_not_pure

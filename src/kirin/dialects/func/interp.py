@@ -17,7 +17,7 @@ class Interpreter(MethodTable):
     @impl(Call)
     def call(self, interp: concrete.Interpreter, frame: Frame, stmt: Call):
         mt: Method = frame.get(stmt.callee)
-        result = interp.run_method(
+        _, result = interp.run_method(
             mt,
             interp.permute_values(
                 mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
@@ -27,7 +27,7 @@ class Interpreter(MethodTable):
 
     @impl(Invoke)
     def invoke(self, interp: concrete.Interpreter, frame: Frame, stmt: Invoke):
-        result = interp.run_method(
+        _, result = interp.run_method(
             stmt.callee,
             interp.permute_values(
                 stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs

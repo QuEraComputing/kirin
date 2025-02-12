@@ -1,4 +1,4 @@
-from kirin import ir, lowering
+from kirin import ir, types, lowering
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Chain, Fixpoint, compactify
 from kirin.analysis import CFG
@@ -8,7 +8,7 @@ from kirin.dialects import cf, py, func
 def test_duplicated_branch():
     code = func.Function(
         sym_name="duplicated_branch",
-        signature=func.Signature((), ir.types.NoneType),
+        signature=func.Signature((), types.NoneType),
         body=ir.Region(),
     )
     code.body.blocks.append(ir.Block())
@@ -40,7 +40,7 @@ def test_duplicated_branch():
 
     target = func.Function(
         sym_name="duplicated_branch",
-        signature=func.Signature((), ir.types.NoneType),
+        signature=func.Signature((), types.NoneType),
         body=ir.Region(),
     )
     target.body.blocks.append(ir.Block())
@@ -57,15 +57,15 @@ def test_duplicated_branch():
 def test_cfg_skip_block():
     code = func.Function(
         sym_name="cfg_double_branch",
-        signature=func.Signature((), ir.types.NoneType),
+        signature=func.Signature((), types.NoneType),
         body=ir.Region(),
     )
     code.body.blocks.append(ir.Block())
     code.body.blocks.append(ir.Block())
     code.body.blocks.append(ir.Block())
     code.body.blocks.append(ir.Block())
-    code.body.blocks[0].args.append_from(ir.types.Any, "self")
-    cond = code.body.blocks[0].args.append_from(ir.types.Any, "cond")
+    code.body.blocks[0].args.append_from(types.Any, "self")
+    cond = code.body.blocks[0].args.append_from(types.Any, "cond")
     a = py.Constant(1)
     b = py.Constant(2)
     c = py.Constant(3)
@@ -83,14 +83,14 @@ def test_cfg_skip_block():
         )
     )
 
-    bb1_a = code.body.blocks[1].args.append_from(ir.types.Any, "a")
+    bb1_a = code.body.blocks[1].args.append_from(types.Any, "a")
     code.body.blocks[1].stmts.append(cf.Branch((bb1_a,), successor=code.body.blocks[3]))
 
-    bb2_b = code.body.blocks[2].args.append_from(ir.types.Any, "b")
-    code.body.blocks[2].args.append_from(ir.types.Any, "c")
+    bb2_b = code.body.blocks[2].args.append_from(types.Any, "b")
+    code.body.blocks[2].args.append_from(types.Any, "c")
     code.body.blocks[2].stmts.append(cf.Branch((bb2_b,), successor=code.body.blocks[3]))
 
-    code.body.blocks[3].args.append_from(ir.types.Any, "x")
+    code.body.blocks[3].args.append_from(types.Any, "x")
     none = func.ConstantNone()
     code.body.blocks[3].stmts.append(none)
     code.body.blocks[3].stmts.append(func.Return(none.result))
@@ -101,7 +101,7 @@ def test_cfg_skip_block():
 
     target = func.Function(
         sym_name="cfg_double_branch",
-        signature=func.Signature((), ir.types.NoneType),
+        signature=func.Signature((), types.NoneType),
         body=ir.Region(),
     )
     target.body.blocks.append(ir.Block())
@@ -109,8 +109,8 @@ def test_cfg_skip_block():
 
     bb0 = target.body.blocks[0]
     bb1 = target.body.blocks[1]
-    bb0.args.append_from(ir.types.Any, "self")
-    cond = bb0.args.append_from(ir.types.Any, "cond")
+    bb0.args.append_from(types.Any, "self")
+    cond = bb0.args.append_from(types.Any, "cond")
     a = py.Constant(1)
     b = py.Constant(2)
     c = py.Constant(3)
@@ -121,7 +121,7 @@ def test_cfg_skip_block():
         )
     )
 
-    bb1.args.append_from(ir.types.Any, "x")
+    bb1.args.append_from(types.Any, "x")
     none = func.ConstantNone()
     bb1.stmts.extend([none, func.Return(none.result)])
     code.print()

@@ -39,7 +39,8 @@ class IListInterpreter(MethodTable):
         ret = []
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            ret.append(interp.run_method(fn, (elem,)))
+            _, item = interp.run_method(fn, (elem,))
+            ret.append(item)
         return (IList(ret),)
 
     @impl(Scan)
@@ -52,7 +53,7 @@ class IListInterpreter(MethodTable):
         ys = []
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            carry, y = interp.run_method(fn, (carry, elem))
+            _, (carry, y) = interp.run_method(fn, (carry, elem))
             ys.append(y)
         return ((carry, IList(ys)),)
 
@@ -71,7 +72,7 @@ class IListInterpreter(MethodTable):
         acc = init
         for elem in coll:
             # NOTE: assume fn has been type checked
-            acc = interp.run_method(fn, (acc, elem))
+            _, acc = interp.run_method(fn, (acc, elem))
         return (acc,)
 
     @impl(ForEach)

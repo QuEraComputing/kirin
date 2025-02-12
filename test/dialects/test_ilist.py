@@ -53,11 +53,11 @@ def test_ilist_fcf():
 
     @basic
     def map(xs: ilist.IList[int, Literal[3]]):
-        return ilist.Map(add1, xs)  # type: ignore
+        return ilist.map(add1, xs)
 
     @basic
     def foreach(xs: ilist.IList[int, Literal[3]]):
-        ilist.ForEach(add1, xs)  # type: ignore
+        ilist.for_each(add1, xs)
 
     map_before = map(xs)
     foreach_before = foreach(xs)

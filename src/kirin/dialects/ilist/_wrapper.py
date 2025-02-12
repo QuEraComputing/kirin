@@ -1,4 +1,4 @@
-from typing import TypeVar
+import typing
 
 from kirin import ir
 from kirin.lowering import wraps
@@ -6,10 +6,10 @@ from kirin.lowering import wraps
 from . import stmts
 from .runtime import IList
 
-ElemT = TypeVar("ElemT")
-OutElemT = TypeVar("OutElemT")
-LenT = TypeVar("LenT")
-ResultT = TypeVar("ResultT")
+ElemT = typing.TypeVar("ElemT")
+OutElemT = typing.TypeVar("OutElemT")
+LenT = typing.TypeVar("LenT")
+ResultT = typing.TypeVar("ResultT")
 
 
 @wraps(stmts.Map)
@@ -44,5 +44,5 @@ def scan(
 
 @wraps(stmts.ForEach)
 def for_each(
-    fn: ir.Method[[ElemT], None], collection: IList[ElemT, LenT] | list[ElemT]
+    fn: ir.Method[[ElemT], typing.Any], collection: IList[ElemT, LenT] | list[ElemT]
 ) -> None: ...

@@ -36,7 +36,6 @@ class Propagate(ForwardExtra[Frame, Result]):
     lattice = Result
 
     _interp: interp.Interpreter = field(init=False)
-    should_be_pure: set[ir.Statement] = field(init=False)
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -51,7 +50,6 @@ class Propagate(ForwardExtra[Frame, Result]):
     def initialize(self):
         super().initialize()
         self._interp.initialize()
-        self.should_be_pure = set()
         return self
 
     def new_frame(self, code: ir.Statement) -> Frame:
@@ -107,7 +105,7 @@ class Propagate(ForwardExtra[Frame, Result]):
         elif not stmt.has_trait(ir.MaybePure):  # cannot be pure at all
             frame.frame_is_not_pure = True
         elif (
-            stmt not in self.should_be_pure
+            stmt not in frame.should_be_pure
         ):  # implementation cannot decide if it's pure
             frame.frame_is_not_pure = True
         return ret
