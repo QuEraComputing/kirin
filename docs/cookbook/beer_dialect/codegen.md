@@ -37,7 +37,6 @@ Kirin also provide Codegen framework (we call it Emit), which is also a kind of 
 Here, since we want to codegen recept in text format, our target is `Str`. We will use a `EmitStr` kirin provide. In general one can also customize the Codegen by customizing `EmitABC`, but here we will just directly using `EmitStr` provided by kirin.
 
 ```python
-
 def default_menu_price():
     return {
         "budlight": 3.0,
@@ -81,8 +80,11 @@ class EmitReceptMain(EmitStr):
                 self.file.read(),
             ]
         )
+```
 
+The same as all the other kirin interpreters, we need to implement MethodTable for our emit interpreter. Here, we register method tables to key `emit.recept`.
 
+```python
 @func.dialect.register(key="emit.recept")
 class FuncEmit(interp.MethodTable):
 
@@ -90,8 +92,11 @@ class FuncEmit(interp.MethodTable):
     def emit_func(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: func.Function):
         _ = emit.run_ssacfg_region(frame, stmt.body)
         return ()
+```
 
+For our `Pour` Statement, we want to generate a transaction each time we pour. We will get the previous analysis result from the corresponding SSAValue. If the lattce element is a `AtLeastXItem`, we generate a line with beer brand, and `>= x`. If its a `ConstIntItem` we just directly generate the amount.
 
+```python
 @dialect.register(key="emit.recept")
 class BeerEmit(interp.MethodTable):
 
@@ -127,5 +132,4 @@ emitter.recept_analysis_result = results
 
 emitter.run(main2, ("",))
 print(emitter.get_output())
-
 ```
