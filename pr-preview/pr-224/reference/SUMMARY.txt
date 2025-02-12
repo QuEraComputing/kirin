@@ -195,4 +195,5 @@
         * [wrap_const](kirin/rewrite/wrap_const.md)
     * [source](kirin/source.md)
     * [symbol_table](kirin/symbol_table.md)
+    * [types](kirin/types.md)
     * [worklist](kirin/worklist.md)

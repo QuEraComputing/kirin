@@ -3,13 +3,13 @@
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code></p> <p>Merge non-branching blocks on the edge of the CFG.</p> <p>Example:</p> <pre><code>/---&gt; [B] --&gt; [D] --&gt; [E]
 </code></pre> <p>[A]-----&gt; [C] -------------^</p> <p>[B] and [D] are non-branching blocks on the same edge. They can be merged into one block.</p> <pre><code>/---&gt; [B,D] --&gt; [E]
 </code></pre> <p>[A]-----&gt; [C] -------^</p> <div class="doc doc-children"> </div> </div> </div> <div class="doc doc-object doc-class"> <h2 id=kirin.rewrite.compactify.CompactifyRegion class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">CompactifyRegion</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>CompactifyRegion</span><span class=p>(</span><span class=n>cfg</span><span class=p>:</span> <span class=n>CFG</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code></p> <p>Wrapper to share the CFG object with same CFG region.</p> <details class=quote> <summary>Source code in <code>src/kirin/rewrite/compactify.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>248</span>
-<span class=normal>249</span>
-<span class=normal>250</span>
-<span class=normal>251</span>
-<span class=normal>252</span>
-<span class=normal>253</span>
-<span class=normal>254</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>cfg</span><span class=p>:</span> <span class=n>CFG</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code></p> <p>Wrapper to share the CFG object with same CFG region.</p> <details class=quote> <summary>Source code in <code>src/kirin/rewrite/compactify.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>258</span>
+<span class=normal>259</span>
+<span class=normal>260</span>
+<span class=normal>261</span>
+<span class=normal>262</span>
+<span class=normal>263</span>
+<span class=normal>264</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>cfg</span><span class=p>:</span> <span class=n>CFG</span><span class=p>):</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>cfg</span> <span class=o>=</span> <span class=n>cfg</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>rule</span> <span class=o>=</span> <span class=n>Fixpoint</span><span class=p>(</span>
         <span class=n>Chain</span><span class=p>(</span>

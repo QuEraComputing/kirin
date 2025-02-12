@@ -61,13 +61,13 @@
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=c1># get elem type</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=n>values</span><span class=p>:</span>
-        <span class=n>elem_type</span> <span class=o>=</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Any</span>
+        <span class=n>elem_type</span> <span class=o>=</span> <span class=n>types</span><span class=o>.</span><span class=n>Any</span>
     <span class=k>else</span><span class=p>:</span>
         <span class=n>elem_type</span> <span class=o>=</span> <span class=n>values</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span><span class=o>.</span><span class=n>type</span>
         <span class=k>for</span> <span class=n>v</span> <span class=ow>in</span> <span class=n>values</span><span class=p>:</span>
             <span class=n>elem_type</span> <span class=o>=</span> <span class=n>elem_type</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>v</span><span class=o>.</span><span class=n>type</span><span class=p>)</span>
 
-    <span class=n>result_type</span> <span class=o>=</span> <span class=n>IListType</span><span class=p>[</span><span class=n>elem_type</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Literal</span><span class=p>(</span><span class=nb>len</span><span class=p>(</span><span class=n>values</span><span class=p>))]</span>
+    <span class=n>result_type</span> <span class=o>=</span> <span class=n>IListType</span><span class=p>[</span><span class=n>elem_type</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>Literal</span><span class=p>(</span><span class=nb>len</span><span class=p>(</span><span class=n>values</span><span class=p>))]</span>
     <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>(</span>
         <span class=n>args</span><span class=o>=</span><span class=n>values</span><span class=p>,</span>
         <span class=n>result_types</span><span class=o>=</span><span class=p>(</span><span class=n>result_type</span><span class=p>,),</span>
