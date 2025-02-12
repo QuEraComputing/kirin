@@ -18,7 +18,7 @@
 <span class=normal>52</span>
 <span class=normal>53</span>
 <span class=normal>54</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>typecheck</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
-    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>result</span><span class=o>.</span><span class=n>type</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>):</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>result</span><span class=o>.</span><span class=n>type</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>):</span>
         <span class=k>raise</span> <span class=n>exceptions</span><span class=o>.</span><span class=n>VerificationError</span><span class=p>(</span>
             <span class=bp>self</span><span class=p>,</span> <span class=sa>f</span><span class=s2>&quot;Expected result type to be PyType, got </span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>result</span><span class=o>.</span><span class=n>type</span><span class=si>}</span><span class=s2>&quot;</span>
         <span class=p>)</span>

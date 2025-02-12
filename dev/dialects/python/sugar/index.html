@@ -14,11 +14,13 @@
     <span class=k>return</span> <span class=p>(</span><span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>obj</span><span class=p>)[</span><span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>)],)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.indexing.ConstProp class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">ConstProp</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>ConstProp</span><span class=p>()</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.MethodTable" href="../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable">MethodTable</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.ConstProp.getitem class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem</span><span class=p>(</span>
-    <span class=n>_</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Propagate</span><span class=p>,</span>
-    <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>],</span>
-    <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>201</span>
+    <span class=n>_</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Propagate</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>]</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>197</span>
+<span class=normal>198</span>
+<span class=normal>199</span>
+<span class=normal>200</span>
+<span class=normal>201</span>
 <span class=normal>202</span>
 <span class=normal>203</span>
 <span class=normal>204</span>
@@ -33,38 +35,26 @@
 <span class=normal>213</span>
 <span class=normal>214</span>
 <span class=normal>215</span>
-<span class=normal>216</span>
-<span class=normal>217</span>
-<span class=normal>218</span>
-<span class=normal>219</span>
-<span class=normal>220</span>
-<span class=normal>221</span>
-<span class=normal>222</span>
-<span class=normal>223</span>
-<span class=normal>224</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
+<span class=normal>216</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
 <span class=k>def</span> <span class=nf>getitem</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>_</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Propagate</span><span class=p>,</span>
-    <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>],</span>
+    <span class=n>frame</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Frame</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>]:</span>
-    <span class=n>obj</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>obj</span><span class=p>)</span><span class=o>.</span><span class=n>const</span>
-    <span class=n>index</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>)</span><span class=o>.</span><span class=n>const</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>]:</span>
+    <span class=n>obj</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>obj</span><span class=p>)</span>
+    <span class=n>index</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>)</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>index</span><span class=p>,</span> <span class=n>const</span><span class=o>.</span><span class=n>Value</span><span class=p>):</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>Unknown</span><span class=p>(),</span> <span class=n>const</span><span class=o>.</span><span class=n>Pure</span><span class=p>()),)</span>
+        <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>Unknown</span><span class=p>(),)</span>
 
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>const</span><span class=o>.</span><span class=n>PartialTuple</span><span class=p>):</span>
         <span class=n>obj</span> <span class=o>=</span> <span class=n>obj</span><span class=o>.</span><span class=n>data</span>
         <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=p>,</span> <span class=nb>int</span><span class=p>)</span> <span class=ow>and</span> <span class=mi>0</span> <span class=o>&lt;=</span> <span class=n>index</span><span class=o>.</span><span class=n>data</span> <span class=o>&lt;</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=p>):</span>
-            <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>(</span><span class=n>obj</span><span class=p>[</span><span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=p>],</span> <span class=n>const</span><span class=o>.</span><span class=n>Pure</span><span class=p>()),)</span>
+            <span class=k>return</span> <span class=p>(</span><span class=n>obj</span><span class=p>[</span><span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=p>],)</span>
         <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=p>,</span> <span class=nb>slice</span><span class=p>):</span>
             <span class=n>start</span><span class=p>,</span> <span class=n>stop</span><span class=p>,</span> <span class=n>step</span> <span class=o>=</span> <span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=o>.</span><span class=n>indices</span><span class=p>(</span><span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=p>))</span>
-            <span class=k>return</span> <span class=p>(</span>
-                <span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>(</span>
-                    <span class=n>const</span><span class=o>.</span><span class=n>PartialTuple</span><span class=p>(</span><span class=n>obj</span><span class=p>[</span><span class=n>start</span><span class=p>:</span><span class=n>stop</span><span class=p>:</span><span class=n>step</span><span class=p>]),</span> <span class=n>const</span><span class=o>.</span><span class=n>Pure</span><span class=p>()</span>
-                <span class=p>),</span>
-            <span class=p>)</span>
-    <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>JointResult</span><span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>Unknown</span><span class=p>(),</span> <span class=n>const</span><span class=o>.</span><span class=n>Pure</span><span class=p>()),)</span>
+            <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>PartialTuple</span><span class=p>(</span><span class=n>obj</span><span class=p>[</span><span class=n>start</span><span class=p>:</span><span class=n>stop</span><span class=p>:</span><span class=n>step</span><span class=p>]),)</span>
+    <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>Unknown</span><span class=p>(),)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.indexing.GetItem class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">GetItem</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-kirin-statement"><code>kirin-statement</code></small> <small class="doc doc-label doc-label-krin-statement"><code>krin-statement</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>GetItem</span><span class=p>(</span><span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.Subscript" href="#kirin.dialects.py.indexing.Subscript">Subscript</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.GetItem.index class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">index</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-kirin-argument"><code>kirin-argument</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>index</span><span class=p>:</span> <span class=n>SSAValue</span> <span class=o>=</span> <span class=n>argument</span><span class=p>(</span><span class=nb>print</span><span class=o>=</span><span class=kc>False</span><span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.GetItem.name class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">name</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>name</span> <span class=o>=</span> <span class=s1>&#39;getitem&#39;</span>
@@ -145,20 +135,16 @@
     <span class=k>return</span> <span class=n>stmt_type</span><span class=p>(</span><span class=n>obj</span><span class=o>=</span><span class=n>obj</span><span class=p>,</span> <span class=n>index</span><span class=o>=</span><span class=n>index</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.indexing.RewriteGetItem class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">RewriteGetItem</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>RewriteGetItem</span><span class=p>(</span>
     <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span>
-    <span class=n>obj_type</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../reference/kirin/rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code>, <code><span title="typing.Generic">Generic</span>[<a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.GetItemLikeStmt" href="#kirin.dialects.py.indexing.GetItemLikeStmt">GetItemLikeStmt</a>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>236</span>
-<span class=normal>237</span>
-<span class=normal>238</span>
-<span class=normal>239</span>
-<span class=normal>240</span>
-<span class=normal>241</span>
-<span class=normal>242</span>
-<span class=normal>243</span>
-<span class=normal>244</span>
-<span class=normal>245</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
-    <span class=bp>self</span><span class=p>,</span> <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span> <span class=n>obj_type</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span>
-<span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../reference/kirin/rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code>, <code><span title="typing.Generic">Generic</span>[<a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.GetItemLikeStmt" href="#kirin.dialects.py.indexing.GetItemLikeStmt">GetItemLikeStmt</a>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>228</span>
+<span class=normal>229</span>
+<span class=normal>230</span>
+<span class=normal>231</span>
+<span class=normal>232</span>
+<span class=normal>233</span>
+<span class=normal>234</span>
+<span class=normal>235</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span> <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>):</span>
     <span class=n>trait</span> <span class=o>=</span> <span class=n>stmt_type</span><span class=o>.</span><span class=n>get_trait</span><span class=p>(</span><span class=n>GetItemLike</span><span class=p>)</span>
     <span class=k>if</span> <span class=n>trait</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
         <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>stmt_type</span><span class=si>}</span><span class=s2> does not have GetItemLike trait&quot;</span><span class=p>)</span>
@@ -170,17 +156,17 @@
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.obj_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">obj_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>obj_type</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>=</span> <span class=n>obj_type</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.target_stmt_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">target_stmt_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>target_stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>]</span> <span class=o>=</span> <span class=n>stmt_type</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.rewrite_Statement class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">rewrite_Statement</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>rewrite_Statement</span><span class=p>(</span><span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>247</span>
-<span class=normal>248</span>
-<span class=normal>249</span>
-<span class=normal>250</span>
-<span class=normal>251</span>
-<span class=normal>252</span>
-<span class=normal>253</span>
-<span class=normal>254</span>
-<span class=normal>255</span>
-<span class=normal>256</span>
-<span class=normal>257</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>237</span>
+<span class=normal>238</span>
+<span class=normal>239</span>
+<span class=normal>240</span>
+<span class=normal>241</span>
+<span class=normal>242</span>
+<span class=normal>243</span>
+<span class=normal>244</span>
+<span class=normal>245</span>
+<span class=normal>246</span>
+<span class=normal>247</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>GetItem</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>RewriteResult</span><span class=p>()</span>
 
@@ -195,7 +181,7 @@
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../reference/kirin/ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <div class="doc doc-children"> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.indexing.TypeInfer class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">TypeInfer</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>TypeInfer</span><span class=p>()</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.MethodTable" href="../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable">MethodTable</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.TypeInfer.getitem class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem</span><span class=p>(</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
-    <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>],</span>
+    <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>],</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
 <span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>110</span>
@@ -211,31 +197,29 @@
 <span class=normal>120</span>
 <span class=normal>121</span>
 <span class=normal>122</span>
-<span class=normal>123</span>
-<span class=normal>124</span>
-<span class=normal>125</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
+<span class=normal>123</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
 <span class=k>def</span> <span class=nf>getitem</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
-    <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>],</span>
+    <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>],</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
 <span class=p>):</span>
     <span class=n>obj</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>obj</span><span class=p>)</span>
-    <span class=k>if</span> <span class=n>interp</span><span class=o>.</span><span class=n>is_const</span><span class=p>(</span><span class=n>obj</span><span class=p>):</span>  <span class=c1># unwrap const</span>
-        <span class=n>obj</span> <span class=o>=</span> <span class=n>obj</span><span class=o>.</span><span class=n>type</span>
-    <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>)</span>
+    <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>)</span>
     <span class=c1># TODO: replace this when we can multiple dispatch</span>
-    <span class=k>if</span> <span class=n>obj</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Tuple</span><span class=p>):</span>
+    <span class=k>if</span> <span class=n>obj</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Tuple</span><span class=p>):</span>
         <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>getitem_tuple</span><span class=p>(</span><span class=n>interp</span><span class=p>,</span> <span class=n>stmt</span><span class=p>,</span> <span class=n>obj</span><span class=p>,</span> <span class=n>index</span><span class=p>)</span>
     <span class=k>else</span><span class=p>:</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Any</span><span class=p>,)</span>
+        <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Any</span><span class=p>,)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.TypeInfer.getitem_tuple class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem_tuple</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem_tuple</span><span class=p>(</span>
     <span class=n>interp</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-    <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
-    <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>127</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>125</span>
+<span class=normal>126</span>
+<span class=normal>127</span>
 <span class=normal>128</span>
 <span class=normal>129</span>
 <span class=normal>130</span>
@@ -250,33 +234,33 @@
 <span class=normal>139</span>
 <span class=normal>140</span>
 <span class=normal>141</span>
-<span class=normal>142</span>
-<span class=normal>143</span>
-<span class=normal>144</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple</span><span class=p>(</span>
+<span class=normal>142</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-    <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
-    <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>):</span>
-    <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>):</span>
-        <span class=k>if</span> <span class=n>index</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Int</span><span class=p>):</span>
+    <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>):</span>
+        <span class=k>if</span> <span class=n>index</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Int</span><span class=p>):</span>
             <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>getitem_tuple_index</span><span class=p>(</span><span class=n>interp</span><span class=p>,</span> <span class=n>stmt</span><span class=p>,</span> <span class=n>obj</span><span class=p>,</span> <span class=n>index</span><span class=p>)</span>
-        <span class=k>elif</span> <span class=n>index</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Slice</span><span class=p>):</span>
+        <span class=k>elif</span> <span class=n>index</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Slice</span><span class=p>):</span>
             <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>getitem_tuple_slice</span><span class=p>(</span><span class=n>interp</span><span class=p>,</span> <span class=n>stmt</span><span class=p>,</span> <span class=n>obj</span><span class=p>,</span> <span class=n>index</span><span class=p>)</span>
         <span class=k>else</span><span class=p>:</span>
-            <span class=k>return</span> <span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
-    <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>PyClass</span><span class=p>):</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Any</span><span class=p>,)</span>
+            <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
+    <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>PyClass</span><span class=p>):</span>
+        <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Any</span><span class=p>,)</span>
     <span class=k>else</span><span class=p>:</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
+        <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.TypeInfer.getitem_tuple_index class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem_tuple_index</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem_tuple_index</span><span class=p>(</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-    <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
-    <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
+    <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>146</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>144</span>
+<span class=normal>145</span>
+<span class=normal>146</span>
 <span class=normal>147</span>
 <span class=normal>148</span>
 <span class=normal>149</span>
@@ -289,33 +273,32 @@
 <span class=normal>156</span>
 <span class=normal>157</span>
 <span class=normal>158</span>
-<span class=normal>159</span>
-<span class=normal>160</span>
-<span class=normal>161</span>
-<span class=normal>162</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_index</span><span class=p>(</span>
+<span class=normal>159</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_index</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-    <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
-    <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
+    <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>):</span>
-    <span class=k>if</span> <span class=n>interp</span><span class=o>.</span><span class=n>is_const</span><span class=p>(</span><span class=n>index</span><span class=p>)</span> <span class=ow>and</span> <span class=n>index</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Int</span><span class=p>):</span>
-        <span class=n>index_</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=o>.</span><span class=n>data</span>
+    <span class=k>if</span> <span class=n>index_</span> <span class=o>:=</span> <span class=n>interp</span><span class=o>.</span><span class=n>maybe_const</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>,</span> <span class=nb>int</span><span class=p>):</span>
         <span class=k>if</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span> <span class=ow>and</span> <span class=n>index_</span> <span class=o>&gt;=</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>):</span>
             <span class=k>return</span> <span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vararg</span><span class=o>.</span><span class=n>typ</span><span class=p>,)</span>
         <span class=k>elif</span> <span class=n>index_</span> <span class=o>&lt;</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>):</span>
             <span class=k>return</span> <span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>[</span><span class=n>index_</span><span class=p>],)</span>
         <span class=k>else</span><span class=p>:</span>
-            <span class=k>return</span> <span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
+            <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
     <span class=k>else</span><span class=p>:</span>
         <span class=k>return</span> <span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>getitem_tuple_union</span><span class=p>(</span><span class=n>obj</span><span class=p>),)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.TypeInfer.getitem_tuple_slice class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem_tuple_slice</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem_tuple_slice</span><span class=p>(</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-    <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
-    <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
+    <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>164</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>161</span>
+<span class=normal>162</span>
+<span class=normal>163</span>
+<span class=normal>164</span>
 <span class=normal>165</span>
 <span class=normal>166</span>
 <span class=normal>167</span>
@@ -336,46 +319,41 @@
 <span class=normal>182</span>
 <span class=normal>183</span>
 <span class=normal>184</span>
-<span class=normal>185</span>
-<span class=normal>186</span>
-<span class=normal>187</span>
-<span class=normal>188</span>
-<span class=normal>189</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_slice</span><span class=p>(</span>
+<span class=normal>185</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_slice</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
-    <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
-    <span class=n>index</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
+    <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
+    <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>):</span>
-    <span class=k>if</span> <span class=n>interp</span><span class=o>.</span><span class=n>is_const</span><span class=p>(</span><span class=n>index</span><span class=p>):</span>
-        <span class=n>data</span><span class=p>:</span> <span class=nb>slice</span> <span class=o>=</span> <span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=o>.</span><span class=n>data</span>
-        <span class=k>if</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span> <span class=ow>and</span> <span class=n>data</span><span class=o>.</span><span class=n>stop</span> <span class=o>&gt;=</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>):</span>
+    <span class=k>if</span> <span class=n>index_</span> <span class=o>:=</span> <span class=n>interp</span><span class=o>.</span><span class=n>maybe_const</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>,</span> <span class=nb>slice</span><span class=p>):</span>
+        <span class=k>if</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span> <span class=ow>and</span> <span class=n>index_</span><span class=o>.</span><span class=n>stop</span> <span class=o>&gt;=</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>):</span>
             <span class=k>return</span> <span class=p>(</span>
-                <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span>
-                    <span class=o>*</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>[</span><span class=nb>slice</span><span class=p>(</span><span class=n>data</span><span class=o>.</span><span class=n>start</span><span class=p>,</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>),</span> <span class=n>data</span><span class=o>.</span><span class=n>step</span><span class=p>)],</span>
+                <span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span>
+                    <span class=o>*</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>[</span><span class=nb>slice</span><span class=p>(</span><span class=n>index_</span><span class=o>.</span><span class=n>start</span><span class=p>,</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>),</span> <span class=n>index_</span><span class=o>.</span><span class=n>step</span><span class=p>)],</span>
                     <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span><span class=o>.</span><span class=n>typ</span><span class=p>,</span>
                 <span class=p>),</span>
             <span class=p>)</span>
-        <span class=k>elif</span> <span class=n>data</span><span class=o>.</span><span class=n>stop</span> <span class=ow>is</span> <span class=kc>None</span> <span class=ow>or</span> <span class=n>data</span><span class=o>.</span><span class=n>stop</span> <span class=o>&lt;</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>):</span>
+        <span class=k>elif</span> <span class=n>index_</span><span class=o>.</span><span class=n>stop</span> <span class=ow>is</span> <span class=kc>None</span> <span class=ow>or</span> <span class=n>index_</span><span class=o>.</span><span class=n>stop</span> <span class=o>&lt;</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>):</span>
             <span class=k>return</span> <span class=p>(</span>
-                <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Tuple</span><span class=o>.</span><span class=n>where</span><span class=p>(</span>
-                    <span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>[</span><span class=nb>slice</span><span class=p>(</span><span class=n>data</span><span class=o>.</span><span class=n>start</span><span class=p>,</span> <span class=n>data</span><span class=o>.</span><span class=n>stop</span><span class=p>,</span> <span class=n>data</span><span class=o>.</span><span class=n>step</span><span class=p>)]</span>
+                <span class=n>types</span><span class=o>.</span><span class=n>Tuple</span><span class=o>.</span><span class=n>where</span><span class=p>(</span>
+                    <span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>[</span><span class=nb>slice</span><span class=p>(</span><span class=n>index_</span><span class=o>.</span><span class=n>start</span><span class=p>,</span> <span class=n>index_</span><span class=o>.</span><span class=n>stop</span><span class=p>,</span> <span class=n>index_</span><span class=o>.</span><span class=n>step</span><span class=p>)]</span>
                 <span class=p>),</span>
             <span class=p>)</span>
         <span class=k>else</span><span class=p>:</span>  <span class=c1># out of bounds</span>
-            <span class=k>return</span> <span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
+            <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
     <span class=k>else</span><span class=p>:</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Vararg</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>getitem_tuple_union</span><span class=p>(</span><span class=n>obj</span><span class=p>))],)</span>
-</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.TypeInfer.getitem_tuple_union class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem_tuple_union</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem_tuple_union</span><span class=p>(</span><span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>191</span>
-<span class=normal>192</span>
-<span class=normal>193</span>
-<span class=normal>194</span>
-<span class=normal>195</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_union</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>):</span>
+        <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Tuple</span><span class=p>[</span><span class=n>types</span><span class=o>.</span><span class=n>Vararg</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>getitem_tuple_union</span><span class=p>(</span><span class=n>obj</span><span class=p>))],)</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.TypeInfer.getitem_tuple_union class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem_tuple_union</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem_tuple_union</span><span class=p>(</span><span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>)</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>187</span>
+<span class=normal>188</span>
+<span class=normal>189</span>
+<span class=normal>190</span>
+<span class=normal>191</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_union</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>):</span>
     <span class=k>if</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span><span class=p>:</span>
-        <span class=k>return</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span><span class=o>*</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>,</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span><span class=o>.</span><span class=n>typ</span><span class=p>)</span>
+        <span class=k>return</span> <span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span><span class=o>*</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>,</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span><span class=o>.</span><span class=n>typ</span><span class=p>)</span>
     <span class=k>else</span><span class=p>:</span>
-        <span class=k>return</span> <span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span><span class=o>*</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>)</span>
+        <span class=k>return</span> <span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span><span class=o>*</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> </div> </div> </div><h3 id=attribute>Attribute</h3> <div class="doc doc-object doc-module"> <h2 id=kirin.dialects.py.attr class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-module"></code> <span class="doc doc-object-name doc-module-name">kirin.dialects.py.attr</span> </h2> <div class="doc doc-contents first"> <p>Attribute access dialect for Python.</p> <p>This module contains the dialect for the Python attribute access statement, including:</p> <ul> <li>The <code>GetAttr</code> statement class.</li> <li>The lowering pass for the attribute access statement.</li> <li>The concrete implementation of the attribute access statement.</li> </ul> <p>This dialect maps <code>ast.Attribute</code> nodes to the <code>GetAttr</code> statement.</p> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.dialects.py.attr.dialect class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">dialect</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>dialect</span> <span class=o>=</span> <span class=n>Dialect</span><span class=p>(</span><span class=s1>&#39;py.attr&#39;</span><span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.attr.Concrete class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">Concrete</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>Concrete</span><span class=p>()</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.MethodTable" href="../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable">MethodTable</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.attr.Concrete.getattr class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getattr</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nb>getattr</span><span class=p>(</span>
