@@ -12,6 +12,7 @@ This dialect depends on the following dialects:
 
 from . import (
     interp as interp,
+    unroll as unroll,
     lowering as lowering,
     constprop as constprop,
     typeinfer as typeinfer,
