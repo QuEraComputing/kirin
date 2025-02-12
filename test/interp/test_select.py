@@ -8,21 +8,19 @@ from kirin.prelude import basic
 from kirin.dialects import py
 from kirin.ir.method import Method
 from kirin.ir.nodes.stmt import Statement
-from kirin.analysis.forward import ForwardExtra, ForwardFrame
+from kirin.analysis.forward import Forward, ForwardFrame
 
 
 @dataclass(init=False)
-class DummyInterpreter(ForwardExtra[EmptyLattice, None]):
+class DummyInterpreter(Forward[EmptyLattice]):
     keys = ["test_interp"]
     lattice = EmptyLattice
 
-    def run_method(
-        self, method: Method, args: tuple[EmptyLattice, ...]
-    ) -> EmptyLattice:
+    def run_method(self, method: Method, args: tuple[EmptyLattice, ...]):
         return self.run_callable(method.code, (EmptyLattice(),) + args)
 
     def eval_stmt_fallback(
-        self, frame: ForwardFrame[EmptyLattice, None], stmt: Statement
+        self, frame: ForwardFrame[EmptyLattice], stmt: Statement
     ) -> tuple[EmptyLattice, ...] | interp.SpecialValue[EmptyLattice]:
         ret = super().eval_stmt_fallback(frame, stmt)
         print("fallback: ", ret)

@@ -1,4 +1,4 @@
-from kirin.ir import types
+from kirin import types
 from kirin.dialects import cf, py, func
 from kirin.lowering import Lowering
 from kirin.dialects.lowering import func as func_lowering

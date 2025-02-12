@@ -1,5 +1,4 @@
-from kirin import ir
-from kirin.ir import types
+from kirin import ir, types
 from kirin.prelude import basic_no_opt
 from kirin.analysis.typeinfer import TypeInference
 

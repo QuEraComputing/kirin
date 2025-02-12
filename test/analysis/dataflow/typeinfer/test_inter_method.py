@@ -1,4 +1,4 @@
-from kirin.ir import types
+from kirin import types
 from kirin.prelude import basic
 
 
