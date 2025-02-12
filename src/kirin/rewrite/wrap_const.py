@@ -7,6 +7,16 @@ from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 @dataclass
 class WrapConst(RewriteRule):
+    """Insert constant hints into the SSA values.
+
+    !!! note
+        This pass is not exactly the same as ConstantFold. ConstantFold
+        only rewrites the SSAValue with `const.Value` into a constant
+        statement. This rule, however, inserts the entire constant lattice
+        into the SSAValue's hints. Thus enabling other rules/analysis to
+        utilize the constant information beyond just `const.Value`.
+    """
+
     frame: const.Frame
 
     def wrap(self, value: ir.SSAValue) -> bool:

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     class _PrintOptions(TypedDict, total=False):
         console: Console
+        hint: str
         analysis: dict["ir.SSAValue", Any]
         show_indent_mark: bool
         theme: Theme | dict | Literal["dark", "light"]

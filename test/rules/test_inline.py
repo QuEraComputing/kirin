@@ -2,7 +2,7 @@
 from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
-from kirin.rewrite import Walk, Chain, Fixpoint
+from kirin.rewrite import Walk, Chain, Fixpoint, WrapConst
 from kirin.analysis import const
 from kirin.dialects.py import constant
 from kirin.rewrite.dce import DeadCodeElimination
@@ -95,22 +95,23 @@ def inline_foldl(x):
 def test_inline_constprop():
     def fold():
         constprop = const.Propagate(inline_foldl.dialects)
-        results, _ = constprop.run_analysis(inline_foldl)
+        frame, _ = constprop.run_analysis(inline_foldl)
         Fixpoint(
             Walk(
                 Chain(
                     [
-                        ConstantFold(results),
-                        InlineGetItem(results),
-                        Call2Invoke(results),
-                        DeadCodeElimination(results),
+                        WrapConst(frame),
+                        ConstantFold(),
+                        InlineGetItem(),
+                        Call2Invoke(),
+                        DeadCodeElimination(),
                     ]
                 )
             )
         ).rewrite(inline_foldl.code)
         compactify = Fixpoint(CFGCompactify())
         compactify.rewrite(inline_foldl.code)
-        Fixpoint(Walk(DeadCodeElimination(results))).rewrite(inline_foldl.code)
+        Fixpoint(Walk(DeadCodeElimination())).rewrite(inline_foldl.code)
 
     Walk(Inline(heuristic=lambda x: True)).rewrite(inline_foldl.code)
     fold()
@@ -193,8 +194,9 @@ def test_inline_non_foldable_closure():
     inline = Walk(Inline(lambda _: True))
     inline.rewrite(main.code)
     constprop = const.Propagate(basic_no_opt)
-    constprop.run_analysis(main)
-    ConstantFold(constprop.results).rewrite(main.code)
+    frame, _ = constprop.run_analysis(main)
+    Walk(Fixpoint(WrapConst(frame))).rewrite(main.code)
+    ConstantFold().rewrite(main.code)
     compact = Fixpoint(CFGCompactify())
     compact.rewrite(main.code)
     inline.rewrite(main.code)
@@ -202,9 +204,10 @@ def test_inline_non_foldable_closure():
     compact.rewrite(main.code)
     Fixpoint(Walk(InlineGetField())).rewrite(main.code)
     constprop = const.Propagate(basic_no_opt)
-    constprop.run_analysis(main, ())
-    Walk(DeadCodeElimination(constprop.results)).rewrite(main.code)
-    main.print(analysis=constprop.results)
+    frame, ret = constprop.run_analysis(main, ())
+    Walk(Fixpoint(WrapConst(frame))).rewrite(main.code)
+    Walk(DeadCodeElimination()).rewrite(main.code)
+    main.print(analysis=frame.entries)
 
     @basic_no_opt.add(dialect)
     def target():

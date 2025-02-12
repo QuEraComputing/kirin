@@ -13,15 +13,12 @@ def unstable(x: int):  # type: ignore
     return z
 
 
-unstable.print()
-
-
 def test_apply_type():
     def stmt_at(block_id, stmt_id: int) -> ir.Statement:
         return unstable.callable_region.blocks[block_id].stmts.at(stmt_id)  # type: ignore
 
     assert stmt_at(0, 0).results.types == [types.Int]
-    assert stmt_at(0, 1).results[0].hints.get("const") == const.Value(1)
+    assert stmt_at(0, 0).results[0].hints.get("const") == const.Value(1)
     assert stmt_at(0, 1).results.types == [types.Int]
     assert stmt_at(0, 2).results.types == [types.Int]
     assert stmt_at(0, 2).results[0].hints.get("const") == const.Value(10)

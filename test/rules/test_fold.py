@@ -1,5 +1,5 @@
 from kirin.prelude import basic_no_opt
-from kirin.rewrite import Walk, Fixpoint
+from kirin.rewrite import Walk, Fixpoint, WrapConst
 from kirin.analysis import const
 from kirin.rewrite.fold import ConstantFold
 
@@ -16,8 +16,9 @@ def foldable(x: int) -> int:
 def test_const_fold():
     before = foldable(1)
     const_prop = const.Propagate(foldable.dialects)
-    results, _ = const_prop.run_analysis(foldable)
-    fold = ConstantFold(results)
+    frame, _ = const_prop.run_analysis(foldable)
+    Fixpoint(Walk(WrapConst(frame))).rewrite(foldable.code)
+    fold = ConstantFold()
     Fixpoint(Walk(fold)).rewrite(foldable.code)
     after = foldable(1)
 
