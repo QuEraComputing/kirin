@@ -55,6 +55,8 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
             stmt_results = self.eval_stmt(frame, stmt)
             if isinstance(stmt_results, tuple):
                 frame.set_values(stmt._results, stmt_results)
+            elif stmt_results is None:
+                continue  # empty result
             else:  # terminator
                 return stmt_results
         return None

@@ -24,6 +24,13 @@ class TypeInference(Forward[types.TypeAttribute]):
     keys = ["typeinfer"]
     lattice = types.TypeAttribute
 
+    def run_analysis(
+        self, method: ir.Method, args: tuple[types.TypeAttribute, ...] | None = None
+    ) -> tuple[ForwardFrame[types.TypeAttribute], types.TypeAttribute]:
+        if args is None:
+            args = method.arg_types
+        return super().run_analysis(method, args)
+
     # NOTE: unlike concrete interpreter, instead of using type information
     # within the IR. Type inference will use the interpreted
     # value (which is a type) to determine the method dispatch.

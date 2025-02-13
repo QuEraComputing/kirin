@@ -50,14 +50,17 @@ class Method(Printable, typing.Generic[Param, RetType]):
 
     @property
     def args(self):
+        """Return the arguments of the method. (excluding self)"""
         return tuple(arg for arg in self.callable_region.blocks[0].args[1:])
 
     @property
     def arg_types(self):
+        """Return the types of the arguments of the method. (excluding self)"""
         return tuple(arg.type for arg in self.args)
 
     @property
     def self_type(self):
+        """Return the type of the self argument of the method."""
         trait = self.code.get_trait(HasSignature)
         if trait is None:
             raise ValueError("Method body must implement HasSignature")

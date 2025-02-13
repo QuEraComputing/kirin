@@ -3,7 +3,7 @@ import pytest
 from kirin import ir, types
 from kirin.prelude import python_basic
 from kirin.dialects import py, scf, func, ilist, lowering
-from kirin.exceptions import DialectLoweringError
+from kirin.exceptions import VerificationError
 
 
 def test_cons():
@@ -20,13 +20,15 @@ def test_cons():
     idx = body.blocks[0].args.append_from(types.Any, "idx")
     body.blocks[0].stmts.append(scf.Yield(idx))
 
-    with pytest.raises(DialectLoweringError):
+    with pytest.raises(VerificationError):
         stmt = scf.For(iter.result, body, x0.result)
+        stmt.verify()
 
     body = ir.Region(ir.Block([]))
     idx = body.blocks[0].args.append_from(types.Any, "idx")
-    with pytest.raises(DialectLoweringError):
+    with pytest.raises(VerificationError):
         stmt = scf.For(iter.result, body, x0.result)
+        stmt.verify()
 
 
 def test_exec():

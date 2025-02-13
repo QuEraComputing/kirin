@@ -191,6 +191,8 @@ class AbstractInterpreter(
             stmt_results = self.eval_stmt(frame, stmt)
             if isinstance(stmt_results, tuple):
                 self.set_values(frame, stmt._results, stmt_results)
+            elif stmt_results is None:
+                continue  # empty result
             else:  # terminate
                 return stmt_results
         return None

@@ -2,7 +2,6 @@ from collections.abc import Iterable
 
 from kirin import interp
 from kirin.analysis import const
-from kirin.dialects import func
 
 from .stmts import For, Yield, IfElse
 from ._dialect import dialect
@@ -92,13 +91,6 @@ class DialectConstProp(interp.MethodTable):
         loop_vars = frame.get_values(stmt.initializers)
         body_block = stmt.body.blocks[0]
         block_args = body_block.args
-        terminator = body_block.last_stmt
-
-        # NOTE: if terminate is Return, there is no result
-        if isinstance(terminator, func.Return):
-            item = const.Value(next(iter(iterable.data)))
-            frame.worklist.append(interp.Successor(body_block, item, *loop_vars))
-            return
 
         for value in iterable.data:
             with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
