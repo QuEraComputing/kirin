@@ -83,13 +83,17 @@
     <span class=n>regions</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>Region</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>successors</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>Block</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>attributes</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Attribute</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
-    <span class=n>properties</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Attribute</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>results</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>ResultValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>result_types</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>TypeAttribute</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>source</span><span class=p>:</span> <span class=n>SourceInfo</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.base.IRNode" href="../base/#kirin.ir.nodes.base.IRNode">IRNode</a>[&#39;Block&#39;]</code></p> <p>The Statment is an instruction in the IR</p> <div class="admonition note"> <p class=admonition-title>Pretty Printing</p> <p>This object is pretty printable via <a class="autorefs autorefs-internal" href="../../../print/printable/#kirin.print.printable.Printable.print"><code>.print()</code></a> method.</p> </div> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>417</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.base.IRNode" href="../base/#kirin.ir.nodes.base.IRNode">IRNode</a>[&#39;Block&#39;]</code></p> <p>The Statment is an instruction in the IR</p> <div class="admonition note"> <p class=admonition-title>Pretty Printing</p> <p>This object is pretty printable via <a class="autorefs autorefs-internal" href="../../../print/printable/#kirin.print.printable.Printable.print"><code>.print()</code></a> method.</p> </div> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>412</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span>
+<span class=normal>417</span>
 <span class=normal>418</span>
 <span class=normal>419</span>
 <span class=normal>420</span>
@@ -138,21 +142,13 @@
 <span class=normal>463</span>
 <span class=normal>464</span>
 <span class=normal>465</span>
-<span class=normal>466</span>
-<span class=normal>467</span>
-<span class=normal>468</span>
-<span class=normal>469</span>
-<span class=normal>470</span>
-<span class=normal>471</span>
-<span class=normal>472</span>
-<span class=normal>473</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>466</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>regions</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>Region</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>successors</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>Block</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>attributes</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Attribute</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
-    <span class=n>properties</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Attribute</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
     <span class=n>results</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>ResultValue</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>result_types</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>TypeAttribute</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>args_slice</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>]</span> <span class=o>=</span> <span class=p>{},</span>
@@ -194,7 +190,6 @@
         <span class=bp>self</span><span class=o>.</span><span class=n>_results</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>results</span><span class=p>)</span>
 
     <span class=bp>self</span><span class=o>.</span><span class=n>successors</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>successors</span><span class=p>)</span>
-    <span class=bp>self</span><span class=o>.</span><span class=n>properties</span> <span class=o>=</span> <span class=nb>dict</span><span class=p>(</span><span class=n>properties</span><span class=p>)</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>attributes</span> <span class=o>=</span> <span class=nb>dict</span><span class=p>(</span><span class=n>attributes</span><span class=p>)</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>regions</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>regions</span><span class=p>)</span>
 
@@ -212,7 +207,8 @@
 </code></pre></div> <div class="doc doc-contents "> <p>Get the previous statement.</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.nodes.stmt.Statement.regions class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">regions</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> <small class="doc doc-label doc-label-property"><code>property</code></small> <small class="doc doc-label doc-label-writable"><code>writable</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>regions</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=n>Region</span><span class=p>]</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>regions</span><span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Get a list of regions of the Statement.</p> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>list[<a class="autorefs autorefs-internal" title="kirin.ir.nodes.region.Region" href="../region/#kirin.ir.nodes.region.Region">Region</a>]</code> </td> <td> <div class=doc-md-description> <p>list[Region]: The list of regions of the Statement.</p> </div> </td> </tr> </tbody> </table> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.nodes.stmt.Statement.results class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">results</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-property"><code>property</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>results</span><span class=p>:</span> <span class=n>ResultList</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Get the result values of the Statement.</p> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ResultList</code></td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.stmt.ResultList" href="#kirin.ir.nodes.stmt.ResultList">ResultList</a></code> </td> <td> <div class=doc-md-description> <p>The result values View of the Statement.</p> </div> </td> </tr> </tbody> </table> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.delete class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">delete</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>delete</span><span class=p>(</span><span class=n>safe</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Delete the Statement completely from the IR graph.</p> <details class=note open> <summary>Note</summary> <p>This method will detach + remove references of the Statement.</p> </details> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>safe</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If True, raise error if there is anything that still reference components in the Statement. Defaults to True.</p> </div> </td> <td> <code>True</code> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>364</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Delete the Statement completely from the IR graph.</p> <details class=note open> <summary>Note</summary> <p>This method will detach + remove references of the Statement.</p> </details> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>safe</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If True, raise error if there is anything that still reference components in the Statement. Defaults to True.</p> </div> </td> <td> <code>True</code> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>363</span>
+<span class=normal>364</span>
 <span class=normal>365</span>
 <span class=normal>366</span>
 <span class=normal>367</span>
@@ -223,8 +219,7 @@
 <span class=normal>372</span>
 <span class=normal>373</span>
 <span class=normal>374</span>
-<span class=normal>375</span>
-<span class=normal>376</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>delete</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>safe</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>375</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>delete</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>safe</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Delete the Statement completely from the IR graph.</span>
 
 <span class=sd>    Note:</span>
@@ -238,7 +233,8 @@
     <span class=k>for</span> <span class=n>result</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_results</span><span class=p>:</span>
         <span class=n>result</span><span class=o>.</span><span class=n>delete</span><span class=p>(</span><span class=n>safe</span><span class=o>=</span><span class=n>safe</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.detach class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">detach</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>detach</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>detach the statement from its parent block.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>378</span>
+</code></pre></div> <div class="doc doc-contents "> <p>detach the statement from its parent block.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>377</span>
+<span class=normal>378</span>
 <span class=normal>379</span>
 <span class=normal>380</span>
 <span class=normal>381</span>
@@ -266,8 +262,7 @@
 <span class=normal>403</span>
 <span class=normal>404</span>
 <span class=normal>405</span>
-<span class=normal>406</span>
-<span class=normal>407</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>detach</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>406</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>detach</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;detach the statement from its parent block.&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>parent</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
         <span class=k>return</span>
@@ -298,13 +293,13 @@
     <span class=n>parent</span><span class=o>.</span><span class=n>_stmt_len</span> <span class=o>-=</span> <span class=mi>1</span>
     <span class=k>return</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.drop_all_references class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">drop_all_references</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>drop_all_references</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Remove all the dependency that reference/uses this Statement.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>356</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Remove all the dependency that reference/uses this Statement.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>355</span>
+<span class=normal>356</span>
 <span class=normal>357</span>
 <span class=normal>358</span>
 <span class=normal>359</span>
 <span class=normal>360</span>
-<span class=normal>361</span>
-<span class=normal>362</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>drop_all_references</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>361</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>drop_all_references</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Remove all the dependency that reference/uses this Statement.&quot;&quot;&quot;</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>parent</span> <span class=o>=</span> <span class=kc>None</span>
     <span class=k>for</span> <span class=n>idx</span><span class=p>,</span> <span class=n>arg</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_args</span><span class=p>):</span>
@@ -312,11 +307,11 @@
     <span class=k>for</span> <span class=n>region</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_regions</span><span class=p>:</span>
         <span class=n>region</span><span class=o>.</span><span class=n>drop_all_references</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.expect_one_result class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">expect_one_result</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>expect_one_result</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=n>ResultValue</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Check if the statement contain only one result, and return it</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>689</span>
-<span class=normal>690</span>
-<span class=normal>691</span>
-<span class=normal>692</span>
-<span class=normal>693</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>expect_one_result</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ResultValue</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Check if the statement contain only one result, and return it</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>674</span>
+<span class=normal>675</span>
+<span class=normal>676</span>
+<span class=normal>677</span>
+<span class=normal>678</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>expect_one_result</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ResultValue</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Check if the statement contain only one result, and return it&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_results</span><span class=p>)</span> <span class=o>!=</span> <span class=mi>1</span><span class=p>:</span>
         <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;expected one result, got </span><span class=si>{</span><span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>_results</span><span class=p>)</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>)</span>
@@ -328,7 +323,14 @@
     <span class=n>successors</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=n>Block</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=n>attributes</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Attribute</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Self</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Create a similar Statement with new <code>ResultValue</code> and without attaching to any parent block. This still references to the old successor and regions.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>475</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Create a similar Statement with new <code>ResultValue</code> and without attaching to any parent block. This still references to the old successor and regions.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>468</span>
+<span class=normal>469</span>
+<span class=normal>470</span>
+<span class=normal>471</span>
+<span class=normal>472</span>
+<span class=normal>473</span>
+<span class=normal>474</span>
+<span class=normal>475</span>
 <span class=normal>476</span>
 <span class=normal>477</span>
 <span class=normal>478</span>
@@ -344,15 +346,7 @@
 <span class=normal>488</span>
 <span class=normal>489</span>
 <span class=normal>490</span>
-<span class=normal>491</span>
-<span class=normal>492</span>
-<span class=normal>493</span>
-<span class=normal>494</span>
-<span class=normal>495</span>
-<span class=normal>496</span>
-<span class=normal>497</span>
-<span class=normal>498</span>
-<span class=normal>499</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>491</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>from_stmt</span><span class=p>(</span>
     <span class=bp>cls</span><span class=p>,</span>
     <span class=n>other</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span>
@@ -372,22 +366,21 @@
         <span class=n>regions</span><span class=o>=</span><span class=n>regions</span> <span class=ow>or</span> <span class=n>other</span><span class=o>.</span><span class=n>_regions</span><span class=p>,</span>
         <span class=n>successors</span><span class=o>=</span><span class=n>successors</span> <span class=ow>or</span> <span class=n>other</span><span class=o>.</span><span class=n>successors</span><span class=p>,</span>
         <span class=n>attributes</span><span class=o>=</span><span class=n>attributes</span> <span class=ow>or</span> <span class=n>other</span><span class=o>.</span><span class=n>attributes</span><span class=p>,</span>
-        <span class=n>properties</span><span class=o>=</span><span class=n>other</span><span class=o>.</span><span class=n>properties</span><span class=p>,</span>  <span class=c1># properties are immutable, thus no need to copy</span>
         <span class=n>result_types</span><span class=o>=</span><span class=p>[</span><span class=n>result</span><span class=o>.</span><span class=n>type</span> <span class=k>for</span> <span class=n>result</span> <span class=ow>in</span> <span class=n>other</span><span class=o>.</span><span class=n>_results</span><span class=p>],</span>
         <span class=n>args_slice</span><span class=o>=</span><span class=n>other</span><span class=o>.</span><span class=n>_name_args_slice</span><span class=p>,</span>
     <span class=p>)</span>
     <span class=k>return</span> <span class=n>obj</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.get_attr_or_prop class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_attr_or_prop</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_attr_or_prop</span><span class=p>(</span><span class=n>key</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Attribute</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get the attribute or property of the Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key</code> </td> <td> <code>str</code> </td> <td> <div class=doc-md-description> <p>The key of the attribute or property.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.attrs.abc.Attribute" href="../../attrs/abc/#kirin.ir.attrs.abc.Attribute">Attribute</a> | None</code> </td> <td> <div class=doc-md-description> <p>Attribute | None: The attribute or property of the Statement.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>653</span>
-<span class=normal>654</span>
-<span class=normal>655</span>
-<span class=normal>656</span>
-<span class=normal>657</span>
-<span class=normal>658</span>
-<span class=normal>659</span>
-<span class=normal>660</span>
-<span class=normal>661</span>
-<span class=normal>662</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_attr_or_prop</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Attribute</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get the attribute or property of the Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key</code> </td> <td> <code>str</code> </td> <td> <div class=doc-md-description> <p>The key of the attribute or property.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.attrs.abc.Attribute" href="../../attrs/abc/#kirin.ir.attrs.abc.Attribute">Attribute</a> | None</code> </td> <td> <div class=doc-md-description> <p>Attribute | None: The attribute or property of the Statement.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>638</span>
+<span class=normal>639</span>
+<span class=normal>640</span>
+<span class=normal>641</span>
+<span class=normal>642</span>
+<span class=normal>643</span>
+<span class=normal>644</span>
+<span class=normal>645</span>
+<span class=normal>646</span>
+<span class=normal>647</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_attr_or_prop</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Attribute</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the attribute or property of the Statement.</span>
 
 <span class=sd>    Args:</span>
@@ -396,15 +389,15 @@
 <span class=sd>    Returns:</span>
 <span class=sd>        Attribute | None: The attribute or property of the Statement.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
-    <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>attributes</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>key</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>properties</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>key</span><span class=p>))</span>
+    <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>attributes</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>key</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.get_trait class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_trait</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_trait</span><span class=p>(</span><span class=n>trait</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>TraitType</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>TraitType</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get the trait of the Statement.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>681</span>
-<span class=normal>682</span>
-<span class=normal>683</span>
-<span class=normal>684</span>
-<span class=normal>685</span>
-<span class=normal>686</span>
-<span class=normal>687</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get the trait of the Statement.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>666</span>
+<span class=normal>667</span>
+<span class=normal>668</span>
+<span class=normal>669</span>
+<span class=normal>670</span>
+<span class=normal>671</span>
+<span class=normal>672</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>get_trait</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>trait</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>TraitType</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>TraitType</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the trait of the Statement.&quot;&quot;&quot;</span>
     <span class=k>for</span> <span class=n>t</span> <span class=ow>in</span> <span class=bp>cls</span><span class=o>.</span><span class=n>traits</span><span class=p>:</span>
@@ -412,20 +405,20 @@
             <span class=k>return</span> <span class=n>t</span>
     <span class=k>return</span> <span class=kc>None</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.has_trait class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">has_trait</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>has_trait</span><span class=p>(</span><span class=n>trait_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>StmtTrait</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Check if the Statement has a specific trait.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>trait_type</code> </td> <td> <code>type[<a class="autorefs autorefs-internal" title="kirin.ir.traits.StmtTrait" href="../../traits/abc/#kirin.ir.traits.abc.StmtTrait">StmtTrait</a>]</code> </td> <td> <div class=doc-md-description> <p>The type of trait to check for.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>bool</code></td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>True if the class has the specified trait, False otherwise.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>664</span>
-<span class=normal>665</span>
-<span class=normal>666</span>
-<span class=normal>667</span>
-<span class=normal>668</span>
-<span class=normal>669</span>
-<span class=normal>670</span>
-<span class=normal>671</span>
-<span class=normal>672</span>
-<span class=normal>673</span>
-<span class=normal>674</span>
-<span class=normal>675</span>
-<span class=normal>676</span>
-<span class=normal>677</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Check if the Statement has a specific trait.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>trait_type</code> </td> <td> <code>type[<a class="autorefs autorefs-internal" title="kirin.ir.traits.StmtTrait" href="../../traits/abc/#kirin.ir.traits.abc.StmtTrait">StmtTrait</a>]</code> </td> <td> <div class=doc-md-description> <p>The type of trait to check for.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>bool</code></td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>True if the class has the specified trait, False otherwise.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>649</span>
+<span class=normal>650</span>
+<span class=normal>651</span>
+<span class=normal>652</span>
+<span class=normal>653</span>
+<span class=normal>654</span>
+<span class=normal>655</span>
+<span class=normal>656</span>
+<span class=normal>657</span>
+<span class=normal>658</span>
+<span class=normal>659</span>
+<span class=normal>660</span>
+<span class=normal>661</span>
+<span class=normal>662</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>has_trait</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>trait_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>StmtTrait</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Check if the Statement has a specific trait.</span>
 
@@ -443,7 +436,8 @@
 </code></pre></div> <div class="doc doc-contents "> <p>Insert the current Statement after the input Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.stmt.Statement" href="#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>Input Statement.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=example open> <summary>Example</summary> <p>The following example demonstrates how to insert a Statement after another Statement. After <code>insert_after</code> is called, <code>stmt1</code> will be inserted after <code>stmt2</code>, which appears in IR in the order (stmt2 -&gt; stmt1) <div class=highlight><pre><span></span><code><span class=n>stmt1</span> <span class=o>=</span> <span class=n>Statement</span><span class=p>()</span>
 <span class=n>stmt2</span> <span class=o>=</span> <span class=n>Statement</span><span class=p>()</span>
 <span class=n>stmt1</span><span class=o>.</span><span class=n>insert_after</span><span class=p>(</span><span class=n>stmt2</span><span class=p>)</span>
-</code></pre></div></p> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>223</span>
+</code></pre></div></p> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>222</span>
+<span class=normal>223</span>
 <span class=normal>224</span>
 <span class=normal>225</span>
 <span class=normal>226</span>
@@ -475,8 +469,7 @@
 <span class=normal>252</span>
 <span class=normal>253</span>
 <span class=normal>254</span>
-<span class=normal>255</span>
-<span class=normal>256</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>insert_after</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>255</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>insert_after</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Insert the current Statement after the input Statement.</span>
 
 <span class=sd>    Args:</span>
@@ -514,7 +507,8 @@
 </code></pre></div> <div class="doc doc-contents "> <p>Insert the current Statement before the input Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.stmt.Statement" href="#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>Input Statement.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=example open> <summary>Example</summary> <p>The following example demonstrates how to insert a Statement before another Statement. After <code>insert_before</code> is called, <code>stmt1</code> will be inserted before <code>stmt2</code>, which appears in IR in the order (stmt1 -&gt; stmt2) <div class=highlight><pre><span></span><code><span class=n>stmt1</span> <span class=o>=</span> <span class=n>Statement</span><span class=p>()</span>
 <span class=n>stmt2</span> <span class=o>=</span> <span class=n>Statement</span><span class=p>()</span>
 <span class=n>stmt1</span><span class=o>.</span><span class=n>insert_before</span><span class=p>(</span><span class=n>stmt2</span><span class=p>)</span>
-</code></pre></div></p> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>258</span>
+</code></pre></div></p> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>257</span>
+<span class=normal>258</span>
 <span class=normal>259</span>
 <span class=normal>260</span>
 <span class=normal>261</span>
@@ -546,8 +540,7 @@
 <span class=normal>287</span>
 <span class=normal>288</span>
 <span class=normal>289</span>
-<span class=normal>290</span>
-<span class=normal>291</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>insert_before</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>290</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>insert_before</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Insert the current Statement before the input Statement.</span>
 
 <span class=sd>    Args:</span>
@@ -587,7 +580,15 @@
         <span class=nb>dict</span><span class=p>[</span><span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span>
     <span class=p>)</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Check if the Statement is structurally equal to another Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>other</code> </td> <td> <code><span title="typing_extensions.Self">Self</span></code> </td> <td> <div class=doc-md-description> <p>The other Statelemt to compare with.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>context</code> </td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.nodes.base.IRNode" href="../base/#kirin.ir.nodes.base.IRNode">IRNode</a> | <a class="autorefs autorefs-internal" title="kirin.ir.ssa.SSAValue" href="../../ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.ir.nodes.base.IRNode" href="../base/#kirin.ir.nodes.base.IRNode">IRNode</a> | <a class="autorefs autorefs-internal" title="kirin.ir.ssa.SSAValue" href="../../ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>] | None</code> </td> <td> <div class=doc-md-description> <p>A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>bool</code></td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>True if the IRNode is structurally equal to the other.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>527</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Check if the Statement is structurally equal to another Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>other</code> </td> <td> <code><span title="typing_extensions.Self">Self</span></code> </td> <td> <div class=doc-md-description> <p>The other Statelemt to compare with.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>context</code> </td> <td> <code>dict[<a class="autorefs autorefs-internal" title="kirin.ir.nodes.base.IRNode" href="../base/#kirin.ir.nodes.base.IRNode">IRNode</a> | <a class="autorefs autorefs-internal" title="kirin.ir.ssa.SSAValue" href="../../ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>, <a class="autorefs autorefs-internal" title="kirin.ir.nodes.base.IRNode" href="../base/#kirin.ir.nodes.base.IRNode">IRNode</a> | <a class="autorefs autorefs-internal" title="kirin.ir.ssa.SSAValue" href="../../ssa/#kirin.ir.ssa.SSAValue">SSAValue</a>] | None</code> </td> <td> <div class=doc-md-description> <p>A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>bool</code></td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>True if the IRNode is structurally equal to the other.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>519</span>
+<span class=normal>520</span>
+<span class=normal>521</span>
+<span class=normal>522</span>
+<span class=normal>523</span>
+<span class=normal>524</span>
+<span class=normal>525</span>
+<span class=normal>526</span>
+<span class=normal>527</span>
 <span class=normal>528</span>
 <span class=normal>529</span>
 <span class=normal>530</span>
@@ -635,16 +636,7 @@
 <span class=normal>572</span>
 <span class=normal>573</span>
 <span class=normal>574</span>
-<span class=normal>575</span>
-<span class=normal>576</span>
-<span class=normal>577</span>
-<span class=normal>578</span>
-<span class=normal>579</span>
-<span class=normal>580</span>
-<span class=normal>581</span>
-<span class=normal>582</span>
-<span class=normal>583</span>
-<span class=normal>584</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>is_structurally_equal</span><span class=p>(</span>
+<span class=normal>575</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>is_structurally_equal</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>other</span><span class=p>:</span> <span class=n>Self</span><span class=p>,</span>
     <span class=n>context</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
@@ -669,7 +661,6 @@
         <span class=ow>or</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>regions</span><span class=p>)</span> <span class=o>!=</span> <span class=nb>len</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>regions</span><span class=p>)</span>
         <span class=ow>or</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>successors</span><span class=p>)</span> <span class=o>!=</span> <span class=nb>len</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>successors</span><span class=p>)</span>
         <span class=ow>or</span> <span class=bp>self</span><span class=o>.</span><span class=n>attributes</span> <span class=o>!=</span> <span class=n>other</span><span class=o>.</span><span class=n>attributes</span>
-        <span class=ow>or</span> <span class=bp>self</span><span class=o>.</span><span class=n>properties</span> <span class=o>!=</span> <span class=n>other</span><span class=o>.</span><span class=n>properties</span>
     <span class=p>):</span>
         <span class=k>return</span> <span class=kc>False</span>
 
@@ -703,7 +694,8 @@
 
     <span class=k>return</span> <span class=kc>True</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.replace_by class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">replace_by</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>replace_by</span><span class=p>(</span><span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Replace the current Statement by the input Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.stmt.Statement" href="#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>Input Statement.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>293</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Replace the current Statement by the input Statement.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>stmt</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.stmt.Statement" href="#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>Input Statement.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>292</span>
+<span class=normal>293</span>
 <span class=normal>294</span>
 <span class=normal>295</span>
 <span class=normal>296</span>
@@ -713,8 +705,7 @@
 <span class=normal>300</span>
 <span class=normal>301</span>
 <span class=normal>302</span>
-<span class=normal>303</span>
-<span class=normal>304</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>replace_by</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>303</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>replace_by</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Replace the current Statement by the input Statement.</span>
 
 <span class=sd>    Args:</span>
@@ -727,18 +718,18 @@
             <span class=n>result</span><span class=o>.</span><span class=n>name</span> <span class=o>=</span> <span class=n>old_result</span><span class=o>.</span><span class=n>name</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>delete</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.typecheck class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">typecheck</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>typecheck</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>check the type of the statement.</p> <details class=note open> <summary>Note</summary> <ol> <li>Statement should implement typecheck. this is done automatically via @statement, but in the case manualy implementation is needed, it should be implemented here.</li> <li>This API should be called after all the types are figured out (by typeinfer)</li> </ol> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>700</span>
-<span class=normal>701</span>
-<span class=normal>702</span>
-<span class=normal>703</span>
-<span class=normal>704</span>
-<span class=normal>705</span>
-<span class=normal>706</span>
-<span class=normal>707</span>
-<span class=normal>708</span>
-<span class=normal>709</span>
-<span class=normal>710</span>
-<span class=normal>711</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>typecheck</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>check the type of the statement.</p> <details class=note open> <summary>Note</summary> <ol> <li>Statement should implement typecheck. this is done automatically via @statement, but in the case manualy implementation is needed, it should be implemented here.</li> <li>This API should be called after all the types are figured out (by typeinfer)</li> </ol> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>685</span>
+<span class=normal>686</span>
+<span class=normal>687</span>
+<span class=normal>688</span>
+<span class=normal>689</span>
+<span class=normal>690</span>
+<span class=normal>691</span>
+<span class=normal>692</span>
+<span class=normal>693</span>
+<span class=normal>694</span>
+<span class=normal>695</span>
+<span class=normal>696</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>typecheck</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;check the type of the statement.</span>
 
 <span class=sd>    Note:</span>
@@ -751,8 +742,8 @@
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=k>raise</span> <span class=ne>NotImplementedError</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>713</span>
-<span class=normal>714</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>698</span>
+<span class=normal>699</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=k>return</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.stmt.Statement.walk class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">walk</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>walk</span><span class=p>(</span>
     <span class=o>*</span><span class=p>,</span>
@@ -760,7 +751,15 @@
     <span class=n>region_first</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span><span class=p>,</span>
     <span class=n>include_self</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Iterator</span><span class=p>[</span><span class=n>Statement</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Traversal the Statements of Regions.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>reverse</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If walk in the reversed manner. Defaults to False.</p> </div> </td> <td> <code>False</code> </td> </tr> <tr class=doc-section-item> <td> <code>region_first</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If the walk should go through the Statement first or the Region of a Statement first. Defaults to False.</p> </div> </td> <td> <code>False</code> </td> </tr> <tr class=doc-section-item> <td> <code>include_self</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If the walk should include the Statement itself. Defaults to True.</p> </div> </td> <td> <code>True</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Yields:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.stmt.Statement" href="#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements of Blocks in the Region, in the specified order.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>501</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Traversal the Statements of Regions.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>reverse</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If walk in the reversed manner. Defaults to False.</p> </div> </td> <td> <code>False</code> </td> </tr> <tr class=doc-section-item> <td> <code>region_first</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If the walk should go through the Statement first or the Region of a Statement first. Defaults to False.</p> </div> </td> <td> <code>False</code> </td> </tr> <tr class=doc-section-item> <td> <code>include_self</code> </td> <td> <code>bool</code> </td> <td> <div class=doc-md-description> <p>If the walk should include the Statement itself. Defaults to True.</p> </div> </td> <td> <code>True</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Yields:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.nodes.stmt.Statement" href="#kirin.ir.nodes.stmt.Statement">Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements of Blocks in the Region, in the specified order.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/stmt.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>493</span>
+<span class=normal>494</span>
+<span class=normal>495</span>
+<span class=normal>496</span>
+<span class=normal>497</span>
+<span class=normal>498</span>
+<span class=normal>499</span>
+<span class=normal>500</span>
+<span class=normal>501</span>
 <span class=normal>502</span>
 <span class=normal>503</span>
 <span class=normal>504</span>
@@ -776,15 +775,7 @@
 <span class=normal>514</span>
 <span class=normal>515</span>
 <span class=normal>516</span>
-<span class=normal>517</span>
-<span class=normal>518</span>
-<span class=normal>519</span>
-<span class=normal>520</span>
-<span class=normal>521</span>
-<span class=normal>522</span>
-<span class=normal>523</span>
-<span class=normal>524</span>
-<span class=normal>525</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>walk</span><span class=p>(</span>
+<span class=normal>517</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>walk</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
     <span class=n>reverse</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span><span class=p>,</span>
