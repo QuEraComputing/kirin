@@ -4,7 +4,7 @@ from kirin.dialects.py.binop import Add
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.py.indexing import GetItem
 
-from .stmts import Push, IListType
+from .stmts import New, Push, IListType
 from .runtime import IList
 from ._dialect import dialect
 
@@ -18,6 +18,18 @@ class TypeInfer(MethodTable):
             return typ.vars[1].data
         else:
             return types.Any
+
+    @impl(New)
+    def new(self, interp: TypeInference, frame: Frame[types.TypeAttribute], stmt: New):
+        values = frame.get_values(stmt.values)
+        if not values:
+            return (IListType[types.Any, types.Literal(0)],)
+
+        elem_type = values[0]
+        for v in values:
+            elem_type = elem_type.join(v)
+
+        return (IListType[elem_type, types.Literal(len(values))],)
 
     @impl(Push)
     def push(
