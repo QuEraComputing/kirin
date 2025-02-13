@@ -1,6 +1,7 @@
 import typing
 from abc import abstractmethod
 from dataclasses import dataclass
+from collections.abc import Hashable
 
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
@@ -181,6 +182,8 @@ class LiteralMeta(TypeAttributeMeta):
     def __call__(self, data):
         if isinstance(data, Attribute):
             return data
+        elif not isinstance(data, Hashable):
+            return PyClass(type(data))
         elif data in self._cache:
             return self._cache[data]
 
@@ -207,8 +210,11 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
     def is_subseteq_Union(self, other: "Union") -> bool:
         return any(self.is_subseteq(t) for t in other.types)
 
+    def is_subseteq_Literal(self, other: "Literal") -> bool:
+        return self.data == other.data
+
     def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
-        return self.is_equal(other)
+        return PyClass(type(self.data)).is_subseteq(other)
 
     def __hash__(self) -> int:
         return hash((Literal, self.data))

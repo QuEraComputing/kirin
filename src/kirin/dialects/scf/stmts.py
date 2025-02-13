@@ -87,6 +87,39 @@ class IfElse(ir.Statement):
             printer.plain_print(" else ", style="keyword")
             printer.print(self.else_body)
 
+    def verify(self) -> None:
+        from kirin.dialects.func import Return
+
+        if len(self.then_body.blocks) != 1:
+            raise VerificationError(self, "then region must have a single block")
+
+        if len(self.else_body.blocks) != 1:
+            raise VerificationError(self, "else region must have a single block")
+
+        then_block = self.then_body.blocks[0]
+        else_block = self.else_body.blocks[0]
+        if len(then_block.args) != 1:
+            raise VerificationError(
+                self, "then block must have a single argument for condition"
+            )
+
+        if len(else_block.args) != 1:
+            raise VerificationError(
+                self, "else block must have a single argument for condition"
+            )
+
+        then_stmt = then_block.last_stmt
+        else_stmt = else_block.last_stmt
+        if then_stmt is None or not isinstance(then_stmt, (Yield, Return)):
+            raise VerificationError(
+                self, "then block must terminate with a yield or return"
+            )
+
+        if else_stmt is None or not isinstance(else_stmt, (Yield, Return)):
+            raise VerificationError(
+                self, "else block must terminate with a yield or return"
+            )
+
 
 @statement(dialect=dialect, init=False)
 class For(ir.Statement):

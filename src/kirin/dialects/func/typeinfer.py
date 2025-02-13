@@ -2,6 +2,7 @@ from typing import Iterable, cast
 
 from kirin import ir, types
 from kirin.interp import Frame, MethodTable, ReturnValue, impl
+from kirin.analysis import const
 from kirin.analysis.typeinfer import TypeInference, TypeResolution
 from kirin.dialects.func.stmts import (
     Call,
@@ -24,6 +25,8 @@ class TypeInfer(MethodTable):
 
     @impl(Return)
     def return_(self, interp: TypeInference, frame: Frame, stmt: Return) -> ReturnValue:
+        if isinstance(hint := stmt.value.hints.get("const"), const.Value):
+            return ReturnValue(types.Literal(hint.data))
         return ReturnValue(frame.get(stmt.value))
 
     @impl(Call)

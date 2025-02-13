@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from kirin import interp
+from kirin import ir, interp
 from kirin.analysis import const
 
 from .stmts import For, Yield, IfElse
@@ -32,35 +32,50 @@ class DialectConstProp(interp.MethodTable):
     ):
         cond = frame.get(stmt.cond)
         if isinstance(cond, const.Value):
-            with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-                body_frame.entries.update(frame.entries)
-                if cond.data:
-                    results = interp_.run_ssacfg_region(body_frame, stmt.then_body)
-                else:
-                    results = interp_.run_ssacfg_region(body_frame, stmt.else_body)
-
-            if not body_frame.frame_is_not_pure:
-                frame.should_be_pure.add(stmt)
+            if cond.data:
+                body = stmt.then_body
+            else:
+                body = stmt.else_body
+            body_frame, ret = self._prop_const_cond_ifelse(
+                interp_, frame, stmt, cond, body
+            )
+            frame.entries.update(body_frame.entries)
+            return ret
         else:
-            with interp_.state.new_frame(interp_.new_frame(stmt)) as then_body_frame:
-                then_body_frame.entries.update(frame.entries)
-                then_results = interp_.run_ssacfg_region(
-                    then_body_frame, stmt.then_body
-                )
+            then_frame, then_results = self._prop_const_cond_ifelse(
+                interp_, frame, stmt, const.Value(True), stmt.then_body
+            )
+            else_frame, else_results = self._prop_const_cond_ifelse(
+                interp_, frame, stmt, const.Value(False), stmt.else_body
+            )
+            ret = interp_.join_results(then_results, else_results)
 
-            with interp_.state.new_frame(interp_.new_frame(stmt)) as else_body_frame:
-                else_body_frame.entries.update(frame.entries)
-                else_results = interp_.run_ssacfg_region(
-                    else_body_frame, stmt.else_body
-                )
-            results = interp_.join_results(then_results, else_results)
-
-            if (
-                not then_body_frame.frame_is_not_pure
-                or not else_body_frame.frame_is_not_pure
-            ):
+            if not then_frame.frame_is_not_pure or not else_frame.frame_is_not_pure:
                 frame.should_be_pure.add(stmt)
-        return results
+
+            # NOTE: then_frame and else_frame do not change
+            # parent frame variables value except cond
+            frame.entries.update(then_frame.entries)
+            frame.entries.update(else_frame.entries)
+            frame.set(stmt.cond, cond)
+        return ret
+
+    def _prop_const_cond_ifelse(
+        self,
+        interp_: const.Propagate,
+        frame: const.Frame,
+        stmt: IfElse,
+        cond: const.Value,
+        body: ir.Region,
+    ):
+        with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
+            body_frame.entries.update(frame.entries)
+            body_frame.set(body.blocks[0].args[0], cond)
+            results = interp_.run_ssacfg_region(body_frame, body)
+
+        if not body_frame.frame_is_not_pure:
+            frame.should_be_pure.add(stmt)
+        return body_frame, results
 
     @interp.impl(For)
     def for_loop(

@@ -1,5 +1,6 @@
 from kirin.prelude import structural_no_opt
 from kirin.analysis import const
+from kirin.dialects import scf, func
 
 prop = const.Propagate(structural_no_opt)
 
@@ -78,3 +79,24 @@ def test_inside_return():
     frame, ret = prop.run_analysis(simple_loop)
     assert isinstance(ret, const.Value)
     assert ret.data == 0
+
+    # def test_simple_ifelse():
+    @structural_no_opt
+    def simple_ifelse(x: int):
+        cond = x > 0
+        if cond:
+            return cond
+        else:
+            return 0
+
+    simple_ifelse.print()
+    frame, ret = prop.run_analysis(simple_ifelse)
+    ifelse = simple_ifelse.callable_region.blocks[0].stmts.at(2)
+    assert isinstance(ifelse, scf.IfElse)
+    terminator = ifelse.then_body.blocks[0].last_stmt
+    assert isinstance(terminator, func.Return)
+    assert isinstance(frame.entries[terminator.value], const.Value)
+    terminator = ifelse.else_body.blocks[0].last_stmt
+    assert isinstance(terminator, func.Return)
+    assert isinstance(value := frame.entries[terminator.value], const.Value)
+    assert value.data == 0
