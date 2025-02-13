@@ -1,5 +1,6 @@
 from kirin import types
 from kirin.interp import Frame, MethodTable, impl
+from kirin.dialects.eltype import ElType
 from kirin.dialects.py.binop import Add
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.py.indexing import GetItem
@@ -18,6 +19,16 @@ class TypeInfer(MethodTable):
             return typ.vars[1].data
         else:
             return types.Any
+
+    @impl(ElType, types.PyClass(IList))
+    def eltype_list(
+        self, interp: TypeInference, frame: Frame[types.TypeAttribute], stmt: ElType
+    ):
+        list_type = frame.get(stmt.container)
+        if isinstance(list_type, types.Generic):
+            return (list_type.vars[0],)
+        else:
+            return (types.Any,)
 
     @impl(New)
     def new(self, interp: TypeInference, frame: Frame[types.TypeAttribute], stmt: New):

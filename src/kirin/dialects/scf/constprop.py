@@ -2,6 +2,7 @@ from collections.abc import Iterable
 
 from kirin import interp
 from kirin.analysis import const
+from kirin.dialects import func
 
 from .stmts import For, Yield, IfElse
 from ._dialect import dialect
@@ -70,33 +71,51 @@ class DialectConstProp(interp.MethodTable):
         stmt: For,
     ):
         iterable = frame.get(stmt.iterable)
-        loop_vars = frame.get_values(stmt.initializers)
-        block_args = stmt.body.blocks[0].args
-
         if isinstance(iterable, const.Value):
-            frame_is_not_pure = False
-            if not isinstance(iterable.data, Iterable):
-                raise interp.InterpreterError(
-                    f"Expected iterable, got {type(iterable.data)}"
-                )
-            for value in iterable.data:
-                with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-                    body_frame.entries.update(frame.entries)
-                    body_frame.set_values(
-                        block_args,
-                        (const.Value(value),) + loop_vars,
-                    )
-                    loop_vars = interp_.run_ssacfg_region(body_frame, stmt.body)
-
-                if body_frame.frame_is_not_pure:
-                    frame_is_not_pure = True
-                if loop_vars is None:
-                    loop_vars = ()
-                elif isinstance(loop_vars, interp.ReturnValue):
-                    return loop_vars
-
-            if not frame_is_not_pure:
-                frame.should_be_pure.add(stmt)
-            return loop_vars
+            return self._prop_const_iterable_forloop(interp_, frame, stmt, iterable)
         else:  # TODO: support other iteration
             return tuple(interp_.lattice.top() for _ in stmt.results)
+
+    def _prop_const_iterable_forloop(
+        self,
+        interp_: const.Propagate,
+        frame: const.Frame,
+        stmt: For,
+        iterable: const.Value,
+    ):
+        frame_is_not_pure = False
+        if not isinstance(iterable.data, Iterable):
+            raise interp.InterpreterError(
+                f"Expected iterable, got {type(iterable.data)}"
+            )
+
+        loop_vars = frame.get_values(stmt.initializers)
+        body_block = stmt.body.blocks[0]
+        block_args = body_block.args
+        terminator = body_block.last_stmt
+
+        # NOTE: if terminate is Return, there is no result
+        if isinstance(terminator, func.Return):
+            item = const.Value(next(iter(iterable.data)))
+            frame.worklist.append(interp.Successor(body_block, item, *loop_vars))
+            return
+
+        for value in iterable.data:
+            with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
+                body_frame.entries.update(frame.entries)
+                body_frame.set_values(
+                    block_args,
+                    (const.Value(value),) + loop_vars,
+                )
+                loop_vars = interp_.run_ssacfg_region(body_frame, stmt.body)
+
+            if body_frame.frame_is_not_pure:
+                frame_is_not_pure = True
+            if loop_vars is None:
+                loop_vars = ()
+            elif isinstance(loop_vars, interp.ReturnValue):
+                return loop_vars
+
+        if not frame_is_not_pure:
+            frame.should_be_pure.add(stmt)
+        return loop_vars

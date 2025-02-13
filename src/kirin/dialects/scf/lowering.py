@@ -96,7 +96,11 @@ class Lowering(lowering.FromPythonAST):
         unpacking(state, node.target, loop_var)
         state.exhaust(body_frame)
         # NOTE: this frame won't have phi nodes
-        body_frame.append_stmt(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore
+        if yields and (
+            body_frame.curr_block.last_stmt is None
+            or not body_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
+        ):
+            body_frame.append_stmt(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore
         state.pop_frame(finalize_next=False)  # NOTE: scf does not have multiple blocks
 
         initializers: list[ir.SSAValue] = []

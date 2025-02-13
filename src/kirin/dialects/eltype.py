@@ -17,7 +17,7 @@ class ElType(ir.Statement):
     This statement is used by other dialects to query the element type of a value.
     """
 
-    container: ir.SSAValue = info.argument(types.PyClass(types.TypeAttribute))
+    container: ir.SSAValue = info.argument(types.Any)
     """The value to query the element type of."""
     elem: ir.ResultValue = info.result(types.PyClass(types.TypeAttribute))
     """The element type of the value."""

@@ -18,6 +18,7 @@ from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.analysis import const
 from kirin.emit.julia import EmitJulia, EmitStrFrame
+from kirin.dialects.eltype import ElType
 from kirin.dialects.py.binop import Add
 
 dialect = ir.Dialect("py.tuple")
@@ -48,6 +49,17 @@ class Concrete(interp.MethodTable):
 
 @dialect.register(key="typeinfer")
 class TypeInfer(interp.MethodTable):
+
+    @interp.impl(ElType, types.PyClass(tuple))
+    def eltype_tuple(self, interp, frame: interp.Frame, stmt: ElType):
+        tuple_type = frame.get(stmt.container)
+        if isinstance(tuple_type, types.Generic):
+            ret = tuple_type.vars[0]
+            for var in tuple_type.vars[1:]:
+                ret = ret.join(var)
+            return (ret,)
+        else:
+            return (types.Any,)
 
     @interp.impl(Add, types.PyClass(tuple), types.PyClass(tuple))
     def add(self, interp, frame: interp.Frame[types.TypeAttribute], stmt):

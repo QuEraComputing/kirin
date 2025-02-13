@@ -137,27 +137,49 @@ class Printer:
             self.plain_print(" " * self.state.result_width, "   ")
         with self.indent(self.state.result_width + 3, mark=True):
             self.print(node)
-            if self.analysis and any(
-                result in self.analysis for result in node._results
-            ):
-                with self.rich(style="warning"):
-                    self.plain_print(" # ---> ")
-                    self.plain_print(
-                        ", ".join(
-                            repr(self.analysis[result]) for result in node._results
-                        )
-                    )
-            if self.hint:
-                with self.rich(style="comment"):
-                    self.plain_print(" # ")
-                    for idx, result in enumerate(node.results):
-                        if result.hints.get(self.hint):
-                            self.plain_print(repr(result.hints.get(self.hint)))
-                        else:
-                            self.plain_print("##")
+            with self.rich(style="warning"):
+                self.print_analysis(*node._results, prefix=" # ---> ")
+            with self.rich(style="comment"):
+                self.print_hint(*node._results)
 
-                        if idx < len(node.results) - 1:
-                            self.plain_print(", ")
+    def print_hint(
+        self,
+        *values: "ir.SSAValue",
+        prefix: str = "//hint<",
+        suffix: str = ">",
+    ):
+        if not self.hint:
+            return
+
+        self.plain_print(prefix)
+        self.plain_print(self.hint)
+        for idx, item in enumerate(values):
+            if idx > 0:
+                self.plain_print(", ")
+
+            if item.hints.get(self.hint):
+                self.plain_print(repr(item.hints.get(self.hint)))
+            else:
+                self.plain_print("missing")
+        self.plain_print(suffix)
+
+    def print_analysis(
+        self,
+        *values: "ir.SSAValue",
+        prefix: str = "",
+    ):
+        if self.analysis is None or not values:
+            return
+
+        self.plain_print(prefix)
+        for idx, value in enumerate(values):
+            if idx > 0:
+                self.plain_print(", ")
+
+            if result := self.analysis.get(value):
+                self.plain_print(repr(result))
+            else:
+                self.plain_print("missing")
 
     def print_dialect_path(
         self, node: Union["ir.Attribute", "ir.Statement"], prefix: str = ""

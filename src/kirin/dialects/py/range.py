@@ -14,8 +14,9 @@ implementation and type inference, e.g., `ilist` dialect.
 import ast
 from dataclasses import dataclass
 
-from kirin import ir, types, lowering, exceptions
+from kirin import ir, types, interp, lowering, exceptions
 from kirin.decl import info, statement
+from kirin.dialects import eltype
 
 dialect = ir.Dialect("py.range")
 
@@ -46,6 +47,14 @@ class Lowering(lowering.FromPythonAST):
         self, state: lowering.LoweringState, node: ast.Call
     ) -> lowering.Result:
         return _lower_range(state, node)
+
+
+@dialect.register(key="typeinfer")
+class TypeInfer(interp.MethodTable):
+
+    @interp.impl(eltype.ElType, types.PyClass(range))
+    def eltype_range(self, interp_, frame: interp.Frame, stmt: eltype.ElType):
+        return (types.Int,)
 
 
 def _lower_range(state: lowering.LoweringState, node: ast.Call) -> lowering.Result:

@@ -1,5 +1,6 @@
 from kirin import ir, types, interp
 from kirin.analysis import ForwardFrame, TypeInference
+from kirin.dialects import func
 from kirin.dialects.eltype import ElType
 
 from .stmts import For, Yield, IfElse
@@ -40,17 +41,23 @@ class TypeInfer(interp.MethodTable):
     ):
         iterable = frame.get(stmt.iterable)
         loop_vars = frame.get_values(stmt.initializers)
-        block_args = stmt.body.blocks[0].args
+        body_block = stmt.body.blocks[0]
+        block_args = body_block.args
 
         eltype = interp_.run_stmt(ElType(ir.TestValue()), (iterable,))
         if not isinstance(eltype, tuple):  # error
             return (interp_.lattice.bottom(),)
-        value = eltype[0]
-        frame.set_values(block_args, (value,) + loop_vars)
+        item = eltype[0]
+        frame.set_values(block_args, (item,) + loop_vars)
+
+        if isinstance(body_block.last_stmt, func.Return):
+            frame.worklist.append(interp.Successor(body_block, item, *loop_vars))
+            return  # if terminate is Return, there is no result
+
         loop_vars_ = interp_.run_ssacfg_region(frame, stmt.body)
         if isinstance(loop_vars_, interp.ReturnValue):
             return loop_vars_
         elif isinstance(loop_vars_, tuple):
             return interp_.join_results(loop_vars, loop_vars_)
         else:  # None, loop has no result
-            return ()
+            return

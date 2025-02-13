@@ -104,29 +104,39 @@ class For(ir.Statement):
         *initializers: ir.SSAValue,
     ):
         stmt = body.blocks[0].last_stmt
-        if stmt is None or not isinstance(stmt, Yield):
-            raise DialectLoweringError("for loop body must terminate with a yield")
-
-        if len(body.blocks) != 1:
-            raise DialectLoweringError("for loop body must have a single block")
-
-        if len(body.blocks[0].args) != len(initializers) + 1:
-            raise DialectLoweringError(
-                "for loop body must have arguments for all initializers and the loop variable"
-            )
-
+        if isinstance(stmt, Yield):
+            result_types = tuple(value.type for value in stmt.values)
+        else:
+            result_types = ()
         super().__init__(
             args=(iterable, *initializers),
             regions=(body,),
-            result_types=tuple(value.type for value in stmt.values),
+            result_types=result_types,
             args_slice={"iterable": 0, "initializers": slice(1, None)},
             attributes={"purity": ir.PyAttr(False)},
         )
 
     def verify(self) -> None:
+        from kirin.dialects.func import Return
+
+        if len(self.body.blocks) != 1:
+            raise VerificationError(self, "for loop body must have a single block")
+
+        if len(self.body.blocks[0].args) != len(self.initializers) + 1:
+            raise VerificationError(
+                self,
+                "for loop body must have arguments for all initializers and the loop variable",
+            )
+
         stmt = self.body.blocks[0].last_stmt
-        if stmt is None or not isinstance(stmt, Yield):
-            raise VerificationError(self, "for loop body must terminate with a yield")
+        if stmt is None or not isinstance(stmt, (Yield, Return)):
+            raise VerificationError(
+                self, "for loop body must terminate with a yield or return"
+            )
+
+        if isinstance(stmt, Return):
+            return
+
         if len(stmt.values) != len(self.initializers):
             raise VerificationError(
                 self,
@@ -145,24 +155,37 @@ class For(ir.Statement):
         printer.print(block.args[0])
         printer.plain_print(" in ", style="keyword")
         printer.print(self.iterable)
-        with printer.rich(style="comment"):
-            printer.plain_print(" -> ")
-            printer.print_seq(
-                tuple(result.type for result in self.results),
-                delim=", ",
-                style="comment",
-            )
-        with printer.indent():
-            printer.print_newline()
-            printer.plain_print("iter_args(")
-            for idx, (arg, val) in enumerate(zip(block.args[1:], self.initializers)):
-                printer.print(arg)
-                printer.plain_print(" = ")
-                printer.print(val)
-                if idx < len(self.initializers) - 1:
-                    printer.plain_print(", ")
-            printer.plain_print(") {")
+        if self.results:
+            with printer.rich(style="comment"):
+                printer.plain_print(" -> ")
+                printer.print_seq(
+                    tuple(result.type for result in self.results),
+                    delim=", ",
+                    style="comment",
+                )
 
+        with printer.indent():
+            if self.initializers:
+                printer.print_newline()
+                printer.plain_print("iter_args(")
+                for idx, (arg, val) in enumerate(
+                    zip(block.args[1:], self.initializers)
+                ):
+                    printer.print(arg)
+                    printer.plain_print(" = ")
+                    printer.print(val)
+                    if idx < len(self.initializers) - 1:
+                        printer.plain_print(", ")
+                printer.plain_print(")")
+
+            printer.plain_print(" {")
+            if printer.analysis is not None:
+                with printer.rich(style="warning"):
+                    for arg in block.args:
+                        printer.print_newline()
+                        printer.print_analysis(
+                            arg, prefix=f"{printer.state.ssa_id[arg]} --> "
+                        )
             with printer.align(printer.result_width(block.stmts)):
                 for stmt in block.stmts:
                     printer.print_newline()

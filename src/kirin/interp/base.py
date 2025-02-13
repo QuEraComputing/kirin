@@ -169,6 +169,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.state.push_frame(frame)
         frame.set_values(stmt.args, args)
         results = self.eval_stmt(frame, stmt)
+        self.state.pop_frame()
         return results
 
     @abstractmethod

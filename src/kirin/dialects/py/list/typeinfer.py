@@ -1,4 +1,5 @@
 from kirin import types, interp
+from kirin.dialects.eltype import ElType
 from kirin.dialects.py.binop import Add
 from kirin.dialects.py.indexing import GetItem
 
@@ -7,6 +8,14 @@ from ._dialect import dialect
 
 @dialect.register(key="typeinfer")
 class TypeInfer(interp.MethodTable):
+
+    @interp.impl(ElType, types.PyClass(list))
+    def eltype_list(self, interp, frame: interp.Frame, stmt: ElType):
+        list_type = frame.get(stmt.container)
+        if isinstance(list_type, types.Generic):
+            return (list_type.vars[0],)
+        else:
+            return (types.Any,)
 
     @interp.impl(Add, types.PyClass(list), types.PyClass(list))
     def add(self, interp, frame: interp.Frame, stmt: Add):
