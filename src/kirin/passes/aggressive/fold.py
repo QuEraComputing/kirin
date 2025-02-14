@@ -18,23 +18,6 @@ from kirin.analysis import const
 from kirin.ir.method import Method
 from kirin.rewrite.abc import RewriteResult
 
-# Chain(
-#                 Walk(WrapConst(frame)),
-#                 Walk(Inline(lambda _: True)),
-#                 Walk(ConstantFold()),
-#                 Walk(Call2Invoke()),
-#                 Fixpoint(
-#                     Walk(
-#                         Chain(
-#                             InlineGetItem(),
-#                             InlineGetField(),
-#                             DeadCodeElimination(),
-#                         )
-#                     )
-#                 ),
-#                 Walk(CFGCompactify()),
-#             )
-
 
 @dataclass
 class Fold(Pass):
