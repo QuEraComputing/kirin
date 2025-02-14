@@ -1,4 +1,4 @@
-from kirin import ir, types, interp
+from kirin import ir, interp
 from kirin.analysis import const
 from kirin.dialects import func
 
@@ -53,10 +53,10 @@ class Methods(interp.MethodTable):
         body_block = body.blocks[0]
         body_term = body_block.last_stmt
         if isinstance(body_term, func.Return):
-            frame.worklist.append(interp.Successor(body_block, types.Bool))
+            frame.worklist.append(interp.Successor(body_block, frame.get(stmt.cond)))
             return
 
         with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
             body_frame.entries.update(frame.entries)
-            body_frame.set(body_block.args[0], types.Bool)
-            return interp_.run_ssacfg_region(body_frame, stmt.then_body)
+            body_frame.set(body_block.args[0], frame.get(stmt.cond))
+            return interp_.run_ssacfg_region(body_frame, body)

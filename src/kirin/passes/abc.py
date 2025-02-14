@@ -33,7 +33,8 @@ class Pass(ABC):
     def fixpoint(self, mt: Method, max_iter: int = 32) -> RewriteResult:
         result = RewriteResult()
         for _ in range(max_iter):
-            result = self.unsafe_run(mt).join(result)
+            result_ = self.unsafe_run(mt)
+            result = result_.join(result)
             if not result.has_done_something:
                 break
         mt.code.verify()

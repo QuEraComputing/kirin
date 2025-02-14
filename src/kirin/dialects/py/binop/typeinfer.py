@@ -27,9 +27,9 @@ class TypeInfer(interp.MethodTable):
     def subi(self, *_):
         return (types.Int,)
 
-    @interp.impl(stmts.Sub, types.Float, types.Float)
-    @interp.impl(stmts.Sub, types.Float, types.Int)
-    @interp.impl(stmts.Sub, types.Int, types.Float)
+    @interp.impl(stmts.Mult, types.Float, types.Float)
+    @interp.impl(stmts.Mult, types.Float, types.Int)
+    @interp.impl(stmts.Mult, types.Int, types.Float)
     def multf(self, *_):
         return (types.Float,)
 

@@ -37,7 +37,7 @@ class TypeInfer(absint.Methods):
 
         eltype = interp_.run_stmt(ElType(ir.TestValue()), (iterable,))
         if not isinstance(eltype, tuple):  # error
-            return (interp_.lattice.bottom(),)
+            return
         item = eltype[0]
         frame.set_values(block_args, (item,) + loop_vars)
 
@@ -45,7 +45,11 @@ class TypeInfer(absint.Methods):
             frame.worklist.append(interp.Successor(body_block, item, *loop_vars))
             return  # if terminate is Return, there is no result
 
-        loop_vars_ = interp_.run_ssacfg_region(frame, stmt.body)
+        with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
+            body_frame.entries.update(frame.entries)
+            loop_vars_ = interp_.run_ssacfg_region(body_frame, stmt.body)
+
+        frame.entries.update(body_frame.entries)
         if isinstance(loop_vars_, interp.ReturnValue):
             return loop_vars_
         elif isinstance(loop_vars_, tuple):

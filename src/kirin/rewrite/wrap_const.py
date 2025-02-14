@@ -27,6 +27,8 @@ class WrapConst(RewriteRule):
         const_hint = value.hints.get("const")
         if const_hint and isinstance(const_hint, const.Result):
             const_result = result.join(const_hint)
+            if const_result.is_equal(const_hint):
+                return False
         else:
             const_result = result
         value.hints["const"] = const_result

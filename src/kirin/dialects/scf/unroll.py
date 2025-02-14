@@ -62,7 +62,7 @@ class ForLoop(RewriteRule):
         # TODO: support for PartialTuple and IList with known length
         if not isinstance(hint := node.iterable.hints.get("const"), const.Value):
             return RewriteResult()
-
+        print(hint)
         loop_vars = node.initializers
         for item in hint.data:
             body = node.body.clone()
