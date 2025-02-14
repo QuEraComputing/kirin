@@ -161,6 +161,7 @@ class Region(IRNode["Statement"]):
                 successor_map[block].stmts.append(new_stmt)
                 for result, new_result in zip(stmt.results, new_stmt.results):
                     _ssamap[result] = new_result
+                    new_result.name = result.name
 
         return ret
 
