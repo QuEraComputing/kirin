@@ -152,7 +152,7 @@ class Region(IRNode["Statement"]):
             for stmt in block.stmts:
                 new_stmt = stmt.from_stmt(
                     stmt,
-                    args=[_ssamap[arg] for arg in stmt.args],
+                    args=[_ssamap.get(arg, arg) for arg in stmt.args],
                     regions=[region.clone(_ssamap) for region in stmt.regions],
                     successors=[
                         successor_map[successor] for successor in stmt.successors

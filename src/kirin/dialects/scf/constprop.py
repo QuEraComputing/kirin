@@ -41,6 +41,10 @@ class DialectConstProp(interp.MethodTable):
                 interp_, frame, stmt, cond, body
             )
             frame.entries.update(body_frame.entries)
+            if not body_frame.frame_is_not_pure and not isinstance(
+                body.blocks[0].last_stmt, func.Return
+            ):
+                frame.should_be_pure.add(stmt)
             return ret
         else:
             then_frame, then_results = self._prop_const_cond_ifelse(
@@ -80,11 +84,6 @@ class DialectConstProp(interp.MethodTable):
             body_frame.entries.update(frame.entries)
             body_frame.set(body.blocks[0].args[0], cond)
             results = interp_.run_ssacfg_region(body_frame, body)
-
-        if not body_frame.frame_is_not_pure and not isinstance(
-            body.blocks[0].last_stmt, func.Return
-        ):
-            frame.should_be_pure.add(stmt)
         return body_frame, results
 
     @interp.impl(For)

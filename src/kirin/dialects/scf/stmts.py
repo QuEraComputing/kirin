@@ -87,6 +87,9 @@ class IfElse(ir.Statement):
             printer.plain_print(" else ", style="keyword")
             printer.print(self.else_body)
 
+        with printer.rich(style="comment"):
+            printer.plain_print(f" -> purity={self.purity}")
+
     def verify(self) -> None:
         from kirin.dialects.func import Return
 
@@ -225,6 +228,8 @@ class For(ir.Statement):
                     printer.print_stmt(stmt)
         printer.print_newline()
         printer.plain_print("}")
+        with printer.rich(style="comment"):
+            printer.plain_print(f" -> purity={self.purity}")
 
 
 @statement(dialect=dialect)

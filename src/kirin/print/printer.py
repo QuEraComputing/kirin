@@ -145,10 +145,10 @@ class Printer:
     def print_hint(
         self,
         *values: "ir.SSAValue",
-        prefix: str = "//hint<",
+        prefix: str = " // hint<",
         suffix: str = ">",
     ):
-        if not self.hint:
+        if not self.hint or not values:
             return
 
         self.plain_print(prefix)
@@ -157,7 +157,8 @@ class Printer:
             if idx > 0:
                 self.plain_print(", ")
 
-            if item.hints.get(self.hint):
+            self.plain_print("=")
+            if item.hints.get(self.hint) is not None:
                 self.plain_print(repr(item.hints.get(self.hint)))
             else:
                 self.plain_print("missing")
