@@ -108,10 +108,10 @@
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.range.Lowering class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">Lowering</span> </h3> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.lowering.FromPythonAST" href="../../../reference/kirin/lowering/dialect/#kirin.lowering.dialect.FromPythonAST">FromPythonAST</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.range.Lowering.lower_Call_range class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_Call_range</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_Call_range</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/range.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>45</span>
-<span class=normal>46</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/range.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>46</span>
 <span class=normal>47</span>
-<span class=normal>48</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Call_range</span><span class=p>(</span>
+<span class=normal>48</span>
+<span class=normal>49</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Call_range</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>return</span> <span class=n>_lower_range</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>node</span><span class=p>)</span>
@@ -130,33 +130,42 @@
     <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span>
     <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/range.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>26</span>
-<span class=normal>27</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/range.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>27</span>
 <span class=normal>28</span>
-<span class=normal>29</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower</span><span class=p>(</span>
+<span class=normal>29</span>
+<span class=normal>30</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=s2>&quot;Range&quot;</span><span class=p>],</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>return</span> <span class=n>_lower_range</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>node</span><span class=p>)</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.range.TypeInfer class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">TypeInfer</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>TypeInfer</span><span class=p>()</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.MethodTable" href="../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable">MethodTable</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.range.TypeInfer.eltype_range class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">eltype_range</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>eltype_range</span><span class=p>(</span>
+    <span class=n>interp_</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>eltype</span><span class=o>.</span><span class=n>ElType</span>
+<span class=p>)</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/range.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>55</span>
+<span class=normal>56</span>
+<span class=normal>57</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>eltype</span><span class=o>.</span><span class=n>ElType</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>PyClass</span><span class=p>(</span><span class=nb>range</span><span class=p>))</span>
+<span class=k>def</span> <span class=nf>eltype_range</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>interp_</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>eltype</span><span class=o>.</span><span class=n>ElType</span><span class=p>):</span>
+    <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Int</span><span class=p>,)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.py.range._lower_range class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">_lower_range</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>_lower_range</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/range.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>51</span>
-<span class=normal>52</span>
-<span class=normal>53</span>
-<span class=normal>54</span>
-<span class=normal>55</span>
-<span class=normal>56</span>
-<span class=normal>57</span>
-<span class=normal>58</span>
-<span class=normal>59</span>
-<span class=normal>60</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/range.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>60</span>
 <span class=normal>61</span>
 <span class=normal>62</span>
 <span class=normal>63</span>
 <span class=normal>64</span>
 <span class=normal>65</span>
 <span class=normal>66</span>
-<span class=normal>67</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>_lower_range</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
+<span class=normal>67</span>
+<span class=normal>68</span>
+<span class=normal>69</span>
+<span class=normal>70</span>
+<span class=normal>71</span>
+<span class=normal>72</span>
+<span class=normal>73</span>
+<span class=normal>74</span>
+<span class=normal>75</span>
+<span class=normal>76</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>_lower_range</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>args</span><span class=p>)</span> <span class=o>==</span> <span class=mi>1</span><span class=p>:</span>
         <span class=n>start</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>visit</span><span class=p>(</span><span class=n>ast</span><span class=o>.</span><span class=n>Constant</span><span class=p>(</span><span class=mi>0</span><span class=p>))</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>
         <span class=n>stop</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>visit</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>args</span><span class=p>[</span><span class=mi>0</span><span class=p>])</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>

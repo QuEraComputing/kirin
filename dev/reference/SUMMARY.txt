@@ -100,6 +100,7 @@
                 * [typeinfer](kirin/dialects/py/unary/typeinfer.md)
             * [unpack](kirin/dialects/py/unpack.md)
         * [scf](kirin/dialects/scf/index.md)
+            * [absint](kirin/dialects/scf/absint.md)
             * [constprop](kirin/dialects/scf/constprop.md)
             * [interp](kirin/dialects/scf/interp.md)
             * [lowering](kirin/dialects/scf/lowering.md)

@@ -92,7 +92,9 @@
 <span class=normal>193</span>
 <span class=normal>194</span>
 <span class=normal>195</span>
-<span class=normal>196</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_block</span><span class=p>(</span>
+<span class=normal>196</span>
+<span class=normal>197</span>
+<span class=normal>198</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_block</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>AbstractFrameType</span><span class=p>,</span> <span class=n>succ</span><span class=p>:</span> <span class=n>Successor</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>SpecialValue</span><span class=p>[</span><span class=n>ResultType</span><span class=p>]:</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>set_values</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>succ</span><span class=o>.</span><span class=n>block</span><span class=o>.</span><span class=n>args</span><span class=p>,</span> <span class=n>succ</span><span class=o>.</span><span class=n>block_args</span><span class=p>)</span>
@@ -105,6 +107,8 @@
         <span class=n>stmt_results</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>eval_stmt</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
         <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>stmt_results</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>):</span>
             <span class=bp>self</span><span class=o>.</span><span class=n>set_values</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=o>.</span><span class=n>_results</span><span class=p>,</span> <span class=n>stmt_results</span><span class=p>)</span>
+        <span class=k>elif</span> <span class=n>stmt_results</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=k>continue</span>  <span class=c1># empty result</span>
         <span class=k>else</span><span class=p>:</span>  <span class=c1># terminate</span>
             <span class=k>return</span> <span class=n>stmt_results</span>
     <span class=k>return</span> <span class=kc>None</span>

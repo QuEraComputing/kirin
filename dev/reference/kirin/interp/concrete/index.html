@@ -26,7 +26,9 @@
 <span class=normal>57</span>
 <span class=normal>58</span>
 <span class=normal>59</span>
-<span class=normal>60</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_block</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>[</span><span class=n>Any</span><span class=p>],</span> <span class=n>block</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>SpecialValue</span><span class=p>[</span><span class=n>Any</span><span class=p>]:</span>
+<span class=normal>60</span>
+<span class=normal>61</span>
+<span class=normal>62</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_block</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>[</span><span class=n>Any</span><span class=p>],</span> <span class=n>block</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>SpecialValue</span><span class=p>[</span><span class=n>Any</span><span class=p>]:</span>
     <span class=k>for</span> <span class=n>stmt</span> <span class=ow>in</span> <span class=n>block</span><span class=o>.</span><span class=n>stmts</span><span class=p>:</span>
         <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>consume_fuel</span><span class=p>()</span> <span class=o>==</span> <span class=bp>self</span><span class=o>.</span><span class=n>FuelResult</span><span class=o>.</span><span class=n>Stop</span><span class=p>:</span>
             <span class=k>raise</span> <span class=n>FuelExhaustedError</span><span class=p>(</span><span class=s2>&quot;fuel exhausted&quot;</span><span class=p>)</span>
@@ -35,6 +37,8 @@
         <span class=n>stmt_results</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>eval_stmt</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
         <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>stmt_results</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>):</span>
             <span class=n>frame</span><span class=o>.</span><span class=n>set_values</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>_results</span><span class=p>,</span> <span class=n>stmt_results</span><span class=p>)</span>
+        <span class=k>elif</span> <span class=n>stmt_results</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=k>continue</span>  <span class=c1># empty result</span>
         <span class=k>else</span><span class=p>:</span>  <span class=c1># terminator</span>
             <span class=k>return</span> <span class=n>stmt_results</span>
     <span class=k>return</span> <span class=kc>None</span>
