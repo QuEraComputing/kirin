@@ -18,19 +18,19 @@
     <span class=n>purity</span><span class=p>:</span> <span class=nb>bool</span>
 <span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.func.stmts.Invoke.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/func/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>215</span>
-<span class=normal>216</span>
-<span class=normal>217</span>
-<span class=normal>218</span>
-<span class=normal>219</span>
-<span class=normal>220</span>
-<span class=normal>221</span>
+</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/func/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>221</span>
 <span class=normal>222</span>
 <span class=normal>223</span>
 <span class=normal>224</span>
 <span class=normal>225</span>
 <span class=normal>226</span>
-<span class=normal>227</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>227</span>
+<span class=normal>228</span>
+<span class=normal>229</span>
+<span class=normal>230</span>
+<span class=normal>231</span>
+<span class=normal>232</span>
+<span class=normal>233</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>kwargs</span><span class=p>:</span>
         <span class=k>for</span> <span class=n>name</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>kwargs</span><span class=p>:</span>
             <span class=k>if</span> <span class=n>name</span> <span class=ow>not</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>callee</span><span class=o>.</span><span class=n>arg_names</span><span class=p>:</span>
@@ -51,9 +51,9 @@
     <span class=n>body</span><span class=p>:</span> <span class=n>Region</span>
 <span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.func.stmts.Lambda.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/func/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>158</span>
-<span class=normal>159</span>
-<span class=normal>160</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as typecheck, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/func/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>164</span>
+<span class=normal>165</span>
+<span class=normal>166</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>body</span><span class=o>.</span><span class=n>blocks</span><span class=o>.</span><span class=n>isempty</span><span class=p>():</span>
         <span class=k>raise</span> <span class=n>VerificationError</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>&quot;lambda body must not be empty&quot;</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h2 id=kirin.dialects.func.stmts.Return class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">Return</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-krin-statement"><code>krin-statement</code></small> </span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>Return</span><span class=p>(</span><span class=n>value_or_stmt</span><span class=p>:</span> <span class=n>SSAValue</span> <span class=o>|</span> <span class=n>Statement</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span>
