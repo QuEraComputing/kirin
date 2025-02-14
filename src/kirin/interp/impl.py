@@ -70,6 +70,9 @@ class ImplDef(Def[tuple[Signature, ...], "MethodFunction"]):
         else:
             return f"interp {self.parent.name}"
 
+    def __call__(self, *args, **kwargs):
+        return self.impl(*args, **kwargs)
+
 
 @dataclass
 class AttributeImplDef(Def[type[Attribute], "AttributeFunction"]):

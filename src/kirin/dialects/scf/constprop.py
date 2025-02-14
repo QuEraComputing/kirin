@@ -2,6 +2,7 @@ from collections.abc import Iterable
 
 from kirin import ir, interp
 from kirin.analysis import const
+from kirin.dialects import func
 
 from .stmts import For, Yield, IfElse
 from ._dialect import dialect
@@ -48,10 +49,19 @@ class DialectConstProp(interp.MethodTable):
             else_frame, else_results = self._prop_const_cond_ifelse(
                 interp_, frame, stmt, const.Value(False), stmt.else_body
             )
-            ret = interp_.join_results(then_results, else_results)
-
-            if not then_frame.frame_is_not_pure or not else_frame.frame_is_not_pure:
-                frame.should_be_pure.add(stmt)
+            # TODO: pick the non-return value
+            if isinstance(then_results, interp.ReturnValue) and isinstance(
+                else_results, interp.ReturnValue
+            ):
+                return interp.ReturnValue(then_results.value.join(else_results.value))
+            elif isinstance(then_results, interp.ReturnValue):
+                ret = else_results
+            elif isinstance(else_results, interp.ReturnValue):
+                ret = then_results
+            else:
+                if not then_frame.frame_is_not_pure or not else_frame.frame_is_not_pure:
+                    frame.should_be_pure.add(stmt)
+                ret = interp_.join_results(then_results, else_results)
 
             # NOTE: then_frame and else_frame do not change
             # parent frame variables value except cond
@@ -73,7 +83,9 @@ class DialectConstProp(interp.MethodTable):
             body_frame.set(body.blocks[0].args[0], cond)
             results = interp_.run_ssacfg_region(body_frame, body)
 
-        if not body_frame.frame_is_not_pure:
+        if not body_frame.frame_is_not_pure and not isinstance(
+            body.blocks[0].last_stmt, func.Return
+        ):
             frame.should_be_pure.add(stmt)
         return body_frame, results
 

@@ -11,6 +11,7 @@ This dialect depends on the following dialects:
 """
 
 from . import (
+    absint as absint,
     interp as interp,
     unroll as unroll,
     lowering as lowering,
