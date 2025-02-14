@@ -51,7 +51,7 @@ OutElemT = types.TypeVar("OutElemT")
 @statement(dialect=dialect)
 class Map(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
-    fn: ir.SSAValue = info.argument(types.Generic(ir.Method, [ElemT], OutElemT))
+    fn: ir.SSAValue = info.argument(types.MethodType[[ElemT], OutElemT])
     collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
     result: ir.ResultValue = info.result(IListType[OutElemT, ListLen])
 

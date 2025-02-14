@@ -1,8 +1,8 @@
 from kirin import ir, types
-from kirin.rewrite import Walk, Fixpoint
+from kirin.rewrite import Walk, Chain, Fixpoint
 from kirin.passes.abc import Pass
 from kirin.rewrite.result import RewriteResult
-from kirin.dialects.ilist.rewrite import List2IList
+from kirin.dialects.ilist.rewrite import List2IList, ConstList2IList
 
 
 class IListDesugar(Pass):
@@ -14,7 +14,7 @@ class IListDesugar(Pass):
     def unsafe_run(self, mt: ir.Method) -> RewriteResult:
         for arg in mt.args:
             _check_list(arg.type, arg.type)
-        return Fixpoint(Walk(List2IList())).rewrite(mt.code)
+        return Fixpoint(Walk(Chain(ConstList2IList(), List2IList()))).rewrite(mt.code)
 
 
 def _check_list(total: types.TypeAttribute, type_: types.TypeAttribute):

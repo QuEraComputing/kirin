@@ -1,6 +1,7 @@
 from typing import TypeVar, final
 
 from kirin import ir, types, interp
+from kirin.decl import fields
 from kirin.analysis import const
 from kirin.interp.impl import Signature
 from kirin.analysis.forward import Forward, ForwardFrame
@@ -50,8 +51,12 @@ class TypeInference(Forward[types.TypeAttribute]):
         self, frame: ForwardFrame[types.TypeAttribute], stmt: ir.Statement
     ) -> tuple[types.TypeAttribute, ...] | interp.SpecialValue[types.TypeAttribute]:
         resolve = TypeResolution()
-        for arg, value in zip(stmt.args, frame.get_values(stmt.args)):
-            resolve.solve(arg.type, value)
+        fs = fields(stmt)
+        for f, value in zip(fs.args.values(), frame.get_values(stmt.args)):
+            resolve.solve(f.type, value)
+
+        for arg, f in zip(stmt.args, fs.args.values()):
+            frame.set(arg, frame.get(arg).meet(resolve.substitute(f.type)))
         return tuple(resolve.substitute(result.type) for result in stmt.results)
 
     def run_method(

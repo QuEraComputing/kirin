@@ -147,7 +147,13 @@ class Return(Statement):
 class Lambda(Statement):
     name = "lambda"
     traits = frozenset(
-        {Pure(), SymbolOpInterface(), FuncOpCallableInterface(), SSACFGRegion()}
+        {
+            Pure(),
+            HasSignature(),
+            SymbolOpInterface(),
+            FuncOpCallableInterface(),
+            SSACFGRegion(),
+        }
     )
     sym_name: str = info.attribute()
     signature: Signature = info.attribute()

@@ -101,8 +101,20 @@ class TypeInfer(MethodTable):
         return (ret,)
 
     @impl(Lambda)
-    def lambda_(self, interp: TypeInference, frame, stmt: Lambda):
-        return (types.PyClass(ir.Method),)
+    def lambda_(
+        self, interp_: TypeInference, frame: Frame[types.TypeAttribute], stmt: Lambda
+    ):
+        body_frame, ret = interp_.run_callable(
+            stmt,
+            (types.MethodType,)
+            + tuple(arg.type for arg in stmt.body.blocks[0].args[1:]),
+        )
+        argtypes = tuple(arg.type for arg in stmt.body.blocks[0].args[1:])
+        ret = types.MethodType[[*argtypes], ret]
+        frame.entries.update(body_frame.entries)  # pass results back to upper frame
+        self_ = stmt.body.blocks[0].args[0]
+        frame.set(self_, ret)
+        return (ret,)
 
     @impl(GetField)
     def getfield(self, interp: TypeInference, frame, stmt: GetField):

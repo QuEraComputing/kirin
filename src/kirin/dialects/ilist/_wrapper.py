@@ -1,6 +1,5 @@
 import typing
 
-from kirin import ir
 from kirin.lowering import wraps
 
 from . import stmts
@@ -11,16 +10,19 @@ OutElemT = typing.TypeVar("OutElemT")
 LenT = typing.TypeVar("LenT")
 ResultT = typing.TypeVar("ResultT")
 
+# NOTE: we use Callable here to make nested function work.
+
 
 @wraps(stmts.Map)
 def map(
-    fn: ir.Method[[ElemT], OutElemT], collection: IList[ElemT, LenT] | list[ElemT]
+    fn: typing.Callable[[ElemT], OutElemT],
+    collection: IList[ElemT, LenT] | list[ElemT],
 ) -> IList[OutElemT, LenT]: ...
 
 
 @wraps(stmts.Foldr)
 def foldr(
-    fn: ir.Method[[ElemT, OutElemT], OutElemT],
+    fn: typing.Callable[[ElemT, OutElemT], OutElemT],
     collection: IList[ElemT, LenT] | list[ElemT],
     init: OutElemT,
 ) -> OutElemT: ...
@@ -28,7 +30,7 @@ def foldr(
 
 @wraps(stmts.Foldl)
 def foldl(
-    fn: ir.Method[[OutElemT, ElemT], OutElemT],
+    fn: typing.Callable[[OutElemT, ElemT], OutElemT],
     collection: IList[ElemT, LenT] | list[ElemT],
     init: OutElemT,
 ) -> OutElemT: ...
@@ -36,7 +38,7 @@ def foldl(
 
 @wraps(stmts.Scan)
 def scan(
-    fn: ir.Method[[OutElemT, ElemT], tuple[OutElemT, ResultT]],
+    fn: typing.Callable[[OutElemT, ElemT], tuple[OutElemT, ResultT]],
     collection: IList[ElemT, LenT] | list[ElemT],
     init: OutElemT,
 ) -> tuple[OutElemT, IList[ResultT, LenT]]: ...
@@ -44,5 +46,6 @@ def scan(
 
 @wraps(stmts.ForEach)
 def for_each(
-    fn: ir.Method[[ElemT], typing.Any], collection: IList[ElemT, LenT] | list[ElemT]
+    fn: typing.Callable[[ElemT], typing.Any],
+    collection: IList[ElemT, LenT] | list[ElemT],
 ) -> None: ...
