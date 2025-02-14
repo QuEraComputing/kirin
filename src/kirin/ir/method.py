@@ -102,3 +102,17 @@ class Method(Printable, typing.Generic[Param, RetType]):
             raise Exception(msg) from e
         self.verified = True
         return
+
+    def similar(self, dialects: typing.Optional["DialectGroup"] = None):
+        return Method(
+            self.mod,
+            self.py_func,
+            self.sym_name,
+            self.arg_names,
+            dialects or self.dialects,
+            self.code.from_stmt(self.code, regions=[self.callable_region.clone()]),
+            self.fields,
+            self.file,
+            self.inferred,
+            self.verified,
+        )
