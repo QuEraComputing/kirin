@@ -13,6 +13,9 @@ class IList(Generic[T, L]):
 
     data: Sequence[T]
 
+    def __hash__(self) -> int:
+        return id(self)  # do not hash the data
+
     def __len__(self) -> int:
         return len(self.data)
 

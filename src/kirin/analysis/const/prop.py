@@ -61,25 +61,25 @@ class Propagate(ForwardExtra[Frame, Result]):
         stmt: ir.Statement,
         values: tuple[Value, ...],
     ) -> interp.StatementResult[Result]:
-        try:
-            _frame = self._interp.new_frame(frame.code)
-            _frame.set_values(stmt.args, tuple(x.data for x in values))
-            value = self._interp.eval_stmt(_frame, stmt)
-            match value:
-                case tuple():
-                    return tuple(Value(each) for each in value)
-                case interp.ReturnValue(ret):
-                    return interp.ReturnValue(Value(ret))
-                case interp.YieldValue(yields):
-                    return interp.YieldValue(tuple(Value(each) for each in yields))
-                case interp.Successor(block, args):
-                    return interp.Successor(
-                        block,
-                        *tuple(Value(each) for each in args),
-                    )
-        except interp.InterpreterError:
-            pass
-        return (self.void,)
+        _frame = self._interp.new_frame(frame.code)
+        _frame.set_values(stmt.args, tuple(x.data for x in values))
+        method = self._interp.lookup_registry(frame, stmt)
+        if method is not None:
+            value = method(self._interp, _frame, stmt)
+        else:
+            return (Unknown(),)
+        match value:
+            case tuple():
+                return tuple(Value(each) for each in value)
+            case interp.ReturnValue(ret):
+                return interp.ReturnValue(Value(ret))
+            case interp.YieldValue(yields):
+                return interp.YieldValue(tuple(Value(each) for each in yields))
+            case interp.Successor(block, args):
+                return interp.Successor(
+                    block,
+                    *tuple(Value(each) for each in args),
+                )
 
     def eval_stmt(
         self, frame: Frame, stmt: ir.Statement

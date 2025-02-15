@@ -1,3 +1,4 @@
+from typing import Callable
 from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, Statement
@@ -21,6 +22,7 @@ class Walk(RewriteRule):
 
     rule: RewriteRule
     worklist: WorkList[IRNode] = field(default_factory=WorkList)
+    skip: Callable[[IRNode], bool] = field(default=lambda _: False)
 
     # options
     reverse: bool = field(default=False)
@@ -44,6 +46,9 @@ class Walk(RewriteRule):
         return RewriteResult(has_done_something=has_done_something)
 
     def populate_worklist(self, node: IRNode) -> None:
+        if self.skip(node):
+            return
+
         if isinstance(node, Statement):
             self.populate_worklist_Statement(node)
         elif isinstance(node, Region):

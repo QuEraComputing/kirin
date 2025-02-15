@@ -1,3 +1,4 @@
+from .cse import CommonSubexpressionElimination as CommonSubexpressionElimination
 from .dce import DeadCodeElimination as DeadCodeElimination
 from .fold import ConstantFold as ConstantFold
 from .walk import Walk as Walk
