@@ -27,7 +27,7 @@ class GlobalValueElimination(RewriteRule):
             return RewriteResult()
 
         # get hash:
-        hash_value: int = hash(node.value)
+        hash_value: int = hash(node.value) + hash(type(node.value))
 
         if hash_value in self.seen:
             node.result.replace_by(self.seen[hash_value])
