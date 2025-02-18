@@ -72,6 +72,12 @@ BoundedLatticeType = TypeVar("BoundedLatticeType", bound="BoundedLattice")
 
 
 class BoundedLattice(Lattice[BoundedLatticeType]):
+    """ABC for bounded lattices as Python class.
+
+    `BoundedLattice` is an abstract class that can be inherited from.
+    It requires the implementation of the `bottom` and `top` methods.
+    """
+
     @classmethod
     @abstractmethod
     def bottom(cls) -> BoundedLatticeType: ...
