@@ -23,10 +23,7 @@ class ConstantFold(RewriteRule):
         elif isinstance(node, cf.ConditionalBranch):
             return self.rewrite_cf_ConditionalBranch(node)
 
-        if (trait := node.get_trait(ir.MaybePure)) and not trait.is_pure(node):
-            return RewriteResult()
-
-        if not node.has_trait(ir.Pure):
+        if not self.is_pure(node):
             return RewriteResult()
 
         has_done_something = False

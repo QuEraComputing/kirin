@@ -1,7 +1,7 @@
 from abc import ABC
 from dataclasses import dataclass
 
-from kirin.ir import Block, IRNode, Region, Statement
+from kirin.ir import Pure, Block, IRNode, Region, MaybePure, Statement
 from kirin.rewrite.result import RewriteResult
 
 
@@ -33,3 +33,11 @@ class RewriteRule(ABC):
 
     def rewrite_Statement(self, node: Statement) -> RewriteResult:
         return RewriteResult()
+
+    def is_pure(self, node: Statement):
+        if node.has_trait(Pure):
+            return True
+
+        if (trait := node.get_trait(MaybePure)) and trait.is_pure(node):
+            return True
+        return False

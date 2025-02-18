@@ -31,7 +31,7 @@ class Fold(Pass):
                         ConstantFold(),
                         InlineGetItem(),
                         Call2Invoke(),
-                        # DeadCodeElimination(),
+                        DeadCodeElimination(),
                     )
                 )
             )

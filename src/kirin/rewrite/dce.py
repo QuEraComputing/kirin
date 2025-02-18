@@ -17,11 +17,3 @@ class DeadCodeElimination(RewriteRule):
             return RewriteResult(has_done_something=True)
 
         return RewriteResult()
-
-    def is_pure(self, node: ir.Statement):
-        if node.has_trait(ir.Pure):
-            return True
-
-        if (trait := node.get_trait(ir.MaybePure)) and trait.is_pure(node):
-            return True
-        return False

@@ -25,9 +25,7 @@ def test_branch_elim():
     frame, ret = const_prop.run_analysis(branch)
     Walk(Fixpoint(WrapConst(frame))).rewrite(branch.code)
     fold = ConstantFold()
-    branch.code.print()
     Fixpoint(Walk(fold)).rewrite(branch.code)
-    branch.code.print()
     # TODO: also check the generated CFG
     # interp.worklist.visited
     Fixpoint(CFGCompactify()).rewrite(branch.code)
