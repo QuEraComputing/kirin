@@ -50,15 +50,12 @@ def test_cse_constant_int_float():
         return y + z + x
 
     out = gv2(2)
-    print(out)
-    print(type(out))
 
     Walk(CommonSubexpressionElimination()).rewrite(gv2.code)
     gv2.print()
 
     out2 = gv2(2)
-    print(out2)
-    print(type(out2))
 
-
-test_cse_constant_int_float()
+    assert out == out2
+    assert type(out) is type(out2)
+    assert type(out) is float
