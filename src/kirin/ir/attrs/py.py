@@ -36,7 +36,7 @@ class PyAttr(Generic[T], Attribute):
             self.type = pytype
 
     def __hash__(self):
-        return hash(self.data)
+        return hash(self.data) + hash(self.type)
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(repr(self.data))
