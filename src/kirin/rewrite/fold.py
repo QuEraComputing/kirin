@@ -12,6 +12,7 @@ class ConstantFold(RewriteRule):
 
     def get_const(self, value: ir.SSAValue):
         ret = value.hints.get("const")
+
         if ret is not None and isinstance(ret, const.Value):
             return ret
         return None
@@ -21,6 +22,12 @@ class ConstantFold(RewriteRule):
             return RewriteResult()
         elif isinstance(node, cf.ConditionalBranch):
             return self.rewrite_cf_ConditionalBranch(node)
+
+        if (trait := node.get_trait(ir.MaybePure)) and not trait.is_pure(node):
+            return RewriteResult()
+
+        if not node.has_trait(ir.Pure):
+            return RewriteResult()
 
         has_done_something = False
         for old_result in node.results:
