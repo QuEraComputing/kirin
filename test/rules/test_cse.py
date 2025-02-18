@@ -1,4 +1,4 @@
-from kirin.prelude import basic_no_opt
+from kirin.prelude import basic, basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
 from kirin.rewrite.cse import CommonSubexpressionElimination
 
@@ -39,3 +39,26 @@ def test_cse_constant():
     cse_constant.print()
     assert before == after
     assert len(cse_constant.callable_region.blocks[0].stmts) == 5
+
+
+def test_cse_constant_int_float():
+
+    @basic(fold=False, typeinfer=True)
+    def gv2(x: int):
+        y = 1
+        z = 1.0
+        return y + z + x
+
+    out = gv2(2)
+    print(out)
+    print(type(out))
+
+    Walk(CommonSubexpressionElimination()).rewrite(gv2.code)
+    gv2.print()
+
+    out2 = gv2(2)
+    print(out2)
+    print(type(out2))
+
+
+test_cse_constant_int_float()
