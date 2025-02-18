@@ -67,7 +67,10 @@ class DialectConstProp(interp.MethodTable):
             elif isinstance(else_results, interp.ReturnValue):
                 ret = then_results
             else:
-                if not then_frame.frame_is_not_pure or not else_frame.frame_is_not_pure:
+                if not (
+                    then_frame.frame_is_not_pure is True
+                    or else_frame.frame_is_not_pure is True
+                ):
                     frame.should_be_pure.add(stmt)
                 ret = interp_.join_results(then_results, else_results)
         return ret
