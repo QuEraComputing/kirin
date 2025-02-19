@@ -25,7 +25,10 @@ class TypeInfer(MethodTable):
 
     @impl(Return)
     def return_(self, interp: TypeInference, frame: Frame, stmt: Return) -> ReturnValue:
-        if isinstance(hint := stmt.value.hints.get("const"), const.Value):
+        if (
+            isinstance(hint := stmt.value.hints.get("const"), const.Value)
+            and hint.data is not None
+        ):
             return ReturnValue(types.Literal(hint.data))
         return ReturnValue(frame.get(stmt.value))
 
