@@ -1,29 +1,29 @@
-## Beer price/fee analysis
+## Food price/fee analysis
 
-In this section we will discuss on how to perform analysis of a kirin program. We will again use our `beer` dialect example.
+In this section we will discuss on how to perform analysis of a kirin program. We will again use our `food` dialect example.
 
 ### Goal
 
 Let's Consider the following program
 ```python
-@beer
+@food
 def main2(x: int):
 
-    bud = NewBeer(brand="budlight")
-    heineken = NewBeer(brand="heineken")
+    burger = NewFood(type="burger")
+    salad = NewFood(type="salad")
 
-    bud_pints = Pour(bud, 12 + x)
-    heineken_pints = Pour(heineken, 10 + x)
+    burger_serving = Cook(burger, 12 + x)
+    salad_serving = Cook(salad, 10 + x)
 
-    Drink(bud_pints)
-    Drink(heineken_pints)
-    Puke()
+    Eat(burger_serving)
+    Eat(salad_serving)
+    Nap()
 
-    Drink(bud_pints)
-    Puke()
+    Eat(burger_serving)
+    Nap()
 
-    Drink(bud_pints)
-    Puke()
+    Eat(burger_serving)
+    Nap()
 
     return x
 ```
@@ -103,16 +103,17 @@ Next there are a few more lattice elements we want to define:
 ```python
 @final
 @dataclass
-class ItemPints(Item): # (1)!
+class ItemServing(Item): # (1)!
     count: Item
-    brand: str
+    type: str
 
     def is_subseteq(self, other: Item) -> bool:
         return (
-            isinstance(other, ItemPints)
+            isinstance(other, ItemServing)
             and self.count == other.count
-            and self.brand == other.brand
+            and self.type == other.type
         )
+
 
 @final
 @dataclass
@@ -125,7 +126,7 @@ class AtLeastXItem(Item): # (2)!
 
 @final
 @dataclass
-class ConstIntItem(Item):
+class ConstIntItem(Item): # (3)!
     data: int
 
     def is_subseteq(self, other: Item) -> bool:
@@ -134,19 +135,17 @@ class ConstIntItem(Item):
 
 @final
 @dataclass
-class ItemBeer(Item):
-    brand: str
+class ItemFood(Item): # (4)!
+    type: str
 
     def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, ItemBeer) and self.brand == other.brand
-
-
+        return isinstance(other, ItemFood) and self.type == other.type
 ```
 
-1. `ItemPints` which contain information of the beer brand of `Pints`, as well as the count
+1. `ItemServing` which contain information of the kind of food of the `Serving`, as well as the count
 2. `AtLeastXItem` which contain information of a constant type result value is a number that is least `x`. The `data` contain the lower-bound
 3. `ConstIntItem` which contain concrete number.
-4. `ItemBeer` which contain information of `Beer`.
+4. `ItemFood` which contains information of `Food`.
 
 
 ### Custom Forward Data Flow Analysis
@@ -158,14 +157,14 @@ In kirin, the analysis pass is implemented with `AbstractInterpreter` (inspired 
 Here our analysis want to do two things.
 
 1. Get all the analysis results as dictionary of SSAVAlue to lattice element.
-2. Count how many time one puke.
+2. Count how many time one naps.
 
 ```python
 @dataclass
 class FeeAnalysis(Forward[latt.Item]): # (1)!
-    keys = ["beer.fee"] # (2)!
+    keys = ["food.fee"] # (2)!
     lattice = latt.Item
-    puke_count: int = field(init=False)
+    nap_count: int = field(init=False)
 
     def initialize(self): # (3)!
         """Initialize the analysis pass.
@@ -176,11 +175,11 @@ class FeeAnalysis(Forward[latt.Item]): # (1)!
             1. Here one is *required* to call the super().initialize() to initialize the analysis pass,
             which clear all the previous analysis results and symbol tables.
             2. Any additional initialization that belongs to the analysis should also be done here.
-            For example, in this case, we initialize the puke_count to 0.
+            For example, in this case, we initialize the nap_count to 0.
 
         """
         super().initialize()
-        self.puke_count = 0
+        self.nap_count = 0
         return self
 
     def eval_stmt_fallback( # (4)!
@@ -190,6 +189,37 @@ class FeeAnalysis(Forward[latt.Item]): # (1)!
 
     def run_method(self, method: ir.Method, args: tuple[latt.Item, ...]) -> latt.Item: # (5)!
         return self.run_callable(method.code, (self.lattice.bottom(),) + args)
+
+@dataclass
+class FeeAnalysis(Forward[Item]): # (1)!
+    keys = ["food.fee"] # (2)!
+    lattice = Item
+    nap_count: int = field(init=False)
+
+    def initialize(self): # (3)!
+        """Initialize the analysis pass.
+
+        The method is called before the analysis pass starts.
+
+        Note:
+            1. Here one is *required* to call the super().initialize() to initialize the analysis pass,
+            which clear all the previous analysis results and symbol tables.
+            2. Any additional initialization that belongs to the analysis should also be done here.
+            For example, in this case, we initialize the nap_count to 0.
+
+        """
+        super().initialize()
+        self.nap_count = 0
+        return self
+
+    def eval_stmt_fallback( # (4)!
+        self, frame: ForwardFrame[Item], stmt: ir.Statement
+    ) -> tuple[Item, ...] | interp.SpecialValue[Item]:
+        return ()
+
+    def run_method(self, method: ir.Method, args: tuple[Item, ...]): # (5)!
+        return self.run_callable(method.code, (self.lattice.bottom(),) + args)
+
 
 ```
 
@@ -205,25 +235,25 @@ Now we want to implement how the statement gets run. This is the same as what we
 
 Note that each dialect can have multiple registered `MethodTable`, distinguished by `key`. The interpreter use `key` to find corresponding `MethodTable`s for each dialect in a dialect group.
 
-Here, we use `key="beer.fee"`
+Here, we use `key="food.fee"`
 
-First we need to implement for `Constant` statement in `py.constant` dialect. If its `int`, we return `ConstIntItem` lattice element. If its `Beer`, we return `ItemBeer`.
+First we need to implement for `Constant` statement in `py.constant` dialect. If its `int`, we return `ConstIntItem` lattice element. If its `Food`, we return `ItemFood`.
 
 ```python
-@py.constant.dialect.register(key="beer.fee")
+@py.constant.dialect.register(key="food.fee")
 class PyConstMethodTable(interp.MethodTable):
 
     @interp.impl(py.constant.Constant)
     def const(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
+        frame: interp.Frame[Item],
         stmt: py.constant.Constant,
     ):
         if isinstance(stmt.value, int):
-            return (latt.ConstIntItem(data=stmt.value),)
-        elif isinstance(stmt.value, Beer):
-            return (latt.ItemBeer(brand=stmt.value.brand),)
+            return (ConstIntItem(data=stmt.value),)
+        elif isinstance(stmt.value, Food):
+            return (ItemFood(type=stmt.value.type),)
 
         else:
             raise exceptions.InterpreterError(
@@ -234,65 +264,65 @@ class PyConstMethodTable(interp.MethodTable):
 
 Next, since we allow `add` in the program, we also need to let abstract interpreter know how to interprete `binop.Add` statement, which is in `py.binop` dialect.
 ```python
-@binop.dialect.register(key="beer.fee")
+@binop.dialect.register(key="food.fee")
 class PyBinOpMethodTable(interp.MethodTable):
 
     @interp.impl(binop.Add)
     def add(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
+        frame: interp.Frame[Item],
         stmt: binop.Add,
     ):
         left = frame.get(stmt.lhs)
         right = frame.get(stmt.rhs)
 
-        if isinstance(left, latt.AtLeastXItem) or isinstance(right, latt.AtLeastXItem):
-            out = latt.AtLeastXItem(data=left.data + right.data)
+        if isinstance(left, AtLeastXItem) or isinstance(right, AtLeastXItem):
+            out = AtLeastXItem(data=left.data + right.data)
         else:
-            out = latt.ConstIntItem(data=left.data + right.data)
+            out = ConstIntItem(data=left.data + right.data)
 
         return (out,)
 ```
 
-Finally, we need implementation for our beer dialect Statements.
+Finally, we need implementation for our food dialect Statements.
 ```python
-@dialect.register(key="beer.fee")
-class BeerMethodTable(interp.MethodTable):
+@dialect.register(key="food.fee")
+class FoodMethodTable(interp.MethodTable):
 
-    @interp.impl(NewBeer)
-    def new_beer(
+    @interp.impl(NewFood)
+    def new_food(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
-        stmt: NewBeer,
+        frame: interp.Frame[Item],
+        stmt: NewFood,
     ):
-        return (latt.ItemBeer(brand=stmt.brand),)
+        return (ItemFood(type=stmt.type),)
 
-    @interp.impl(Pour)
-    def pour(
+    @interp.impl(Cook)
+    def cook(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
-        stmt: Pour,
+        frame: interp.Frame[Item],
+        stmt: Cook,
     ):
-        # Drink depends on the beer type to have different charge:
+        # food depends on the food type to have different charge:
 
-        beer: latt.ItemBeer = frame.get(stmt.beverage)
-        pint_count: latt.AtLeastXItem | latt.ConstIntItem = frame.get(stmt.amount)
+        food = frame.get_typed(stmt.target, ItemFood)
+        serving_count: AtLeastXItem | ConstIntItem = frame.get(stmt.amount)
 
-        out = latt.ItemPints(count=pint_count, brand=beer.brand)
+        out = ItemServing(count=serving_count, type=food.type)
 
         return (out,)
 
-    @interp.impl(Puke)
-    def puke(
+    @interp.impl(Nap)
+    def nap(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[latt.Item],
-        stmt: Puke,
+        frame: interp.Frame[Item],
+        stmt: Nap,
     ):
-        interp.puke_count += 1
+        interp.nap_count += 1
         return ()
 
 ```
@@ -303,5 +333,5 @@ class BeerMethodTable(interp.MethodTable):
 fee_analysis = FeeAnalysis(main2.dialects)
 results, expect = fee_analysis.run_analysis(main2, args=(AtLeastXItem(data=10),))
 print(results)
-print(fee_analysis.puke_count)
+print(fee_analysis.nap_count)
 ```

@@ -1,35 +1,35 @@
-## Codegen Beer receipt
+## Codegen Food receipt
 
-At the end of the day, we enjoy the beers, get drunk, but still need to pay the bill.
-In this section we will use the previous beer fee analysis result, and discuss how to using kirin's codegen framework to generate a receipt.
+At the end of the day, we enjoy the food, take a nap, but still need to pay the bill.
+In this section we will use the previous food fee analysis result, and discuss how to using kirin's codegen framework to generate a receipt.
 
 ### Goal
 
 Lets again continue with the same program, and using the previous `FeeAnalysis` to get analysis result.
 ```python
-@beer
+@food
 def main2(x: int):
 
-    bud = NewBeer(brand="budlight")
-    heineken = NewBeer(brand="heineken")
+    burger = NewFood(type="burger")
+    salad = NewFood(type="salad")
 
-    bud_pints = Pour(bud, 12 + x)
-    heineken_pints = Pour(heineken, 10 + x)
+    burger_serving = Cook(burger, 12 + x)
+    salad_serving = Cook(salad, 10 + x)
 
-    Drink(bud_pints)
-    Drink(heineken_pints)
-    Puke()
+    Eat(burger_serving)
+    Eat(salad_serving)
+    Nap()
 
-    Drink(bud_pints)
-    Puke()
+    Eat(burger_serving)
+    Nap()
 
-    Drink(bud_pints)
-    Puke()
+    Eat(burger_serving)
+    Nap()
 
     return x
 ```
 
-We want to generate a recept of bill that listed the type of beer one pour, and how many pints one pour.
+We want to generate a recept of bill that listed the type of food cooked, and the amount of servings that were cooked.
 
 ### Codegen using kirin EmitStr
 Kirin also provide Codegen framework (we call it Emit), which is also a kind of `Interpreter`!
@@ -39,16 +39,17 @@ Here, since we want to codegen recept in text format, our target is `Str`. We wi
 ```python
 def default_menu_price():
     return {
-        "budlight": 3.0,
-        "heineken": 4.0,
-        "tsingdao": 2.0,
+        "burger": 3.0,
+        "salad": 4.0,
+        "chicken": 2.0,
     }
+
 
 
 @dataclass
 class EmitReceptMain(EmitStr):
     keys = ["emit.recept"]
-    dialects: ir.DialectGroup = field(default=beer)
+    dialects: ir.DialectGroup = field(default=food)
     file: StringIO = field(default_factory=StringIO)
     menu_price: dict[str, float] = field(default_factory=default_menu_price)
     recept_analysis_result: dict[ir.SSAValue, Item] = field(default_factory=dict)
@@ -94,32 +95,32 @@ class FuncEmit(interp.MethodTable):
         return ()
 ```
 
-For our `Pour` Statement, we want to generate a transaction each time we pour. We will get the previous analysis result from the corresponding SSAValue. If the lattce element is a `AtLeastXItem`, we generate a line with beer brand, and `>= x`. If its a `ConstIntItem` we just directly generate the amount.
+For our `Cook` Statement, we want to generate a transaction each time we cook. We will get the previous analysis result from the corresponding SSAValue. If the lattce element is a `AtLeastXItem`, we generate a line with the food type, and `>= x`. If its a `ConstIntItem` we just directly generate the amount.
 
 ```python
 @dialect.register(key="emit.recept")
-class BeerEmit(interp.MethodTable):
+class FoodEmit(interp.MethodTable):
 
-    @interp.impl(stmts.Pour)
-    def emit_pour(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: stmts.Pour):
-        pints_item: ItemPints = emit.recept_analysis_result[stmt.result]
+    @interp.impl(stmts.Cook)
+    def emit_cook(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: stmts.Cook):
+        serving_item = cast(ItemServing, emit.recept_analysis_result[stmt.result])
 
         amount_str = ""
         price_str = ""
-        if isinstance(pints_item.count, AtLeastXItem):
-            amount_str = f">={pints_item.count.data}"
+        if isinstance(serving_item.count, AtLeastXItem):
+            amount_str = f">={serving_item.count.data}"
             price_str = (
-                f"  >=${emit.menu_price[pints_item.brand] * pints_item.count.data}"
+                f"  >=${emit.menu_price[serving_item.type] * serving_item.count.data}"
             )
-        elif isinstance(pints_item.count, ConstIntItem):
-            amount_str = f"  {pints_item.count.data}"
+        elif isinstance(serving_item.count, ConstIntItem):
+            amount_str = f"  {serving_item.count.data}"
             price_str = (
-                f"  ${emit.menu_price[pints_item.brand] * pints_item.count.data}"
+                f"  ${emit.menu_price[serving_item.type] * serving_item.count.data}"
             )
         else:
             raise EmitError("invalid analysis result.")
 
-        emit.writeln(frame, f"{pints_item.brand}\t{amount_str}\t{price_str}")
+        emit.writeln(frame, f"{serving_item.type}\t{amount_str}\t{price_str}")
 
         return ()
 ```

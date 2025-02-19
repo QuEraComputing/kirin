@@ -103,7 +103,7 @@ JAX is a great project for automatic differentiation and scientific computing. I
 
 While Kirin draws inspiration from MLIR, xDSL, Julia compiler plugin, and JAXPR, we aim to build a more user-friendly compiler infrastructure for scientists to solve their specific problems. There are nothing fundamentally new in theory, but the combination is new. Here are some key differences:
 
-**Composable Python Lowering**, in our beer-lang example, the kernel decorator `@beer` is just
+**Composable Python Lowering**, in our food-lang example, the kernel decorator `@food` is just
 a `DialectGroup` object that contains the `Dialect` objects you specified to include for the frontend. The Python syntax just maginally works! This is because Kirin features a composable lowering system that allows you to claim Python syntax from each separate dialect. When combining the dialects together, Kirin will be able to compile each Python syntax to the corresponding IR nodes, e.g
 
 - `func` dialect claims function related syntax: the `ast.FunctionDef`, nested `ast.FunctionDef` (as closures), `ast.Call`, `ast.Return`, etc.

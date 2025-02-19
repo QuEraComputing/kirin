@@ -35,32 +35,32 @@ While the mission and audience may be very different, Kirin has been deeply insp
 - [JAX](https://jax.readthedocs.io/en/latest/) and [numba](https://numba.pydata.org/), the frontend syntax and the way it is designed.
 - [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl) and its predecessors, the design of rule-based rewriter.
 
-## Quick Example: the `beer` language
+## Quick Example: the `food` language
 
 In this example, we will mutate python's semantics to
-support a small eDSL (embedded domain-specific language) called `beer`.
-It describes the process of brewing, pour, drink beers and get drunk.
+support a small eDSL (embedded domain-specific language) called `food`.
+It describes the process of cooking, eating food and taking food naps after.
 
-Before we start, let's take a look at what would our `beer` language look like:
+Before we start, let's take a look at what would our `food` language look like:
 
 ```python
-@beer
+@food
 def main(x: int):
-    beer = NewBeer(brand="budlight") # (1)!
-    pints = Pour(beer, x) # (2)!
-    Drink(pints) # (3)!
-    Puke() # (4)!
+    food = NewFood(type="burger")  # (1)!
+    serving = Cook(food, x)  # (2)!
+    Eat(serving)  # (3)!
+    Nap()  # (4)!
 
-    return x + 1 # (5)!
+    return x + 1  # (5)!
 ```
 
-1. The `NewBeer` statement creates a new beer object with a given brand.
-2. The `Pour` statement pours a beer for `x` portions into pints object.
-3. The `Drink` statement drinks pints object.
-4. The `Puke` statement pukes. Now we are drunk!
+1. The `NewFood` statement creates a new food object with a given type.
+2. The `Cook` statement makes that food for `x` portions into a servings object.
+3. The `Eat` statement means you eat a serving object.
+4. The `Nap` statement means you nap. Food mkes you sleepy!!
 5. Doing some math to get a result.
 
-The beer language is wrapped with a decorator `@beer` to indicate that the function is written in the `beer` language instead of normal Python. (think about how would you program GPU kernels in Python, or how would you use `jax.jit` and `numba.jit` decorators).
+The food language is wrapped with a decorator `@food` to indicate that the function is written in the `food` language instead of normal Python. (think about how would you program GPU kernels in Python, or how would you use `jax.jit` and `numba.jit` decorators).
 
 You can run the `main` function as if it is a normal Python function.
 
@@ -84,84 +84,86 @@ the objects modeling the semantics.
 ```python
 from kirin import ir
 
-dialect = ir.Dialect("beer")
+dialect = ir.Dialect("food")
 ```
 
 ### Defining the statements
 
-Next, we want to define a runtime value `Beer`, as well as the runtime value of `Pints` for the `beer` language so that we may use
+Next, we want to define a runtime value `Food`, as well as the runtime value of `Servings` for the `food` language so that we may use
 later in our interpreter. These are just a standard Python `dataclass`.
 
 ```python
 from dataclasses import dataclass
 
 @dataclass
-class Beer:
-    brand: str
+class Food:
+    type: str
+
 
 @dataclass
-class Pints:
-    kind: Beer
+class Serving:
+    kind: Food
     amount: int
 ```
 
-Now, we can define the `beer` language's [statements](def.md#statements).
+Now, we can define the `food` language's [statements](def.md#statements).
 
 ```python
 from kirin.decl import statement, info
 from kirin import ir, types
 
 @statement(dialect=dialect)
-class NewBeer(ir.Statement):
-    name = "new_beer" # (1)!
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()}) # (2)!
-    brand: str = info.attribute(types.String) # (3)!
-    result: ir.ResultValue = info.result(types.PyClass(Beer)) # (4)!
+class NewFood(ir.Statement):
+    name = "new_food"
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    type: str = info.attribute(types.String)
+    result: ir.ResultValue = info.result(types.PyClass(Food))
 ```
 
 1. The `name` field specifies the name of the statement in the IR text format (e.g printing).
 2. The `traits` field specifies the statement's traits, in this case, it is a
    [pure function](101.md/#what-is-purity) because each brand name uniquely identifies a
-   beer object. We also add a trait of `FromPythonCall()` to allow lowering from python ast.
-3. The `brand` field specifies the argument of the statement. It is an Attribute of string value. See [`PyAttr`][kirin.ir.PyAttr] for further details.
+   food object. We also add a trait of `FromPythonCall()` to allow lowering from python ast.
+3. The `type` field specifies the argument of the statement. It is an Attribute of string value. See [`PyAttr`][kirin.ir.PyAttr] for further details.
 4. The `result` field specifies the result of the statement. Usually a statement only has one result
    value. The type of the result must be [`ir.ResultValue`](def.md#ssa-values) with a field specifier
     `info.result` that optionally specifies the type of the result.
 
-the `NewBeer` statement creates a new beer object with a given brand. Thus
-it takes a string as an attribute and returns a `Beer` object. Click the plus sign above
+the `NewFood` statement creates a new food object with a given brand. Thus
+it takes a string as an attribute and returns a `Food` object. Click the plus sign above
 to see the corresponding explanation.
 
 
 ```python
 @statement(dialect=dialect)
-class Pour(ir.Statement):
+class Cook(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
-    beverage: ir.SSAValue = info.argument(types.PyClass(Beer))# (1)!
+    target: ir.SSAValue = info.argument(types.PyClass(Food)) # (1)!
     amount: ir.SSAValue = info.argument(types.Int)
-    result: ir.ResultValue = info.result(types.PyClass(Pints))
+    result: ir.ResultValue = info.result(types.PyClass(Serving))
+
 ```
 
 1. The arguments of a [`Statement`](def.md#statements) must be [`ir.SSAValue`](def.md#ssa-values) objects with a
    field specifier `info.argument` that optionally specifies the type of the argument.
 
-Next, we define `Pour` statement that takes a `Beer` object as an argument, and the result value is a `Pints` object. The `types.PyClass` type understands Python classes and can take a Python class as an argument to create a type attribute [`TypeAttribute`](def.md#attributes).
+Next, we define `Cook` statement that takes a `Food` object as an argument, and the result value is a `Serving` object. The `types.PyClass` type understands Python classes and can take a Python class as an argument to create a type attribute [`TypeAttribute`](def.md#attributes).
 
 
 ```python
 @statement(dialect=dialect)
-class Drink(ir.Statement):
+class Eat(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
-    pints: ir.SSAValue = info.argument(types.PyClass(Pints))
+    target: ir.SSAValue = info.argument(types.PyClass(Serving))
 ```
 
-Similarly, we define `Drink` statement that takes a `Pints` object as an argument. As the same previously, the `types.PyClass` type understands Python classes (in this case Pints class) and can take a Python class as an argument to create a type attribute. Notice that drink does not have any return value.
+Similarly, we define `Eat` statement that takes a `Serving` object as an argument. As the same previously, the `types.PyClass` type understands Python classes (in this case Serving class) and can take a Python class as an argument to create a type attribute. Notice that eat does not have any return value.
 
-Finally, we define `Puke` statement that describe the puke action, which does not have any arguments and no return value.
+Finally, we define `Nap` statement that describe the nap action, which does not have any arguments and no return value.
 
 ```python
 @statement(dialect=dialect)
-class Puke(ir.Statement):
+class Nap(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
 ```
 
@@ -174,58 +176,58 @@ Now with the statements defined, we can define how to interpret them by defining
 from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
 
 @dialect.register
-class BeerMethods(MethodTable):
+class FoodMethods(MethodTable):
     ...
 
 ```
 
-The `BeerMethods` class is a subclass of `MethodTable`. Together with the decorator from the dialect group `dialect.register`, they registers the implementation  method table to interpreter. The implementation is a method decorated with `@impl` that executes the
+The `FoodMethods` class is a subclass of `MethodTable`. Together with the decorator from the dialect group `dialect.register`, they registers the implementation  method table to interpreter. The implementation is a method decorated with `@impl` that executes the
 statement.
 
 ```python
-    @impl(NewBeer)
-    def new_beer(self, interp: Interpreter, frame: Frame, stmt: NewBeer):
-        return (Beer(stmt.brand),) # (1)!
+    @impl(NewFood)
+    def new_food(self, interp: Interpreter, frame: Frame, stmt: NewFood):
+        return (Food(stmt.type),) # (1)!
 
-    @impl(Drink)
-    def drink(self, interp: Interpreter, frame: Frame, stmt: Drink):
-        pints: Pints = frame.get(stmt.pints)
-        print(f"Drinking {pints.amount} pints of {pints.kind.brand}")
+    @impl(Eat)
+    def eat(self, interp: Interpreter, frame: Frame, stmt: Eat):
+        serving: Serving = frame.get(stmt.target)
+        print(f"Eating {serving.amount} servings of {serving.kind.type}")
         return ()
 
-    @impl(Pour)
-    def pour(self, interp: Interpreter, frame: Frame, stmt: Pour): # (2)!
-        beer: Beer = frame.get(stmt.beverage)
+    @impl(Cook)
+    def cook(self, interp: Interpreter, frame: Frame, stmt: Cook): # (2)!
+        food: Food = frame.get(stmt.target)
         amount: int = frame.get(stmt.amount)
-        print(f"Pouring {beer.brand} {amount}")
+        print(f"Cooking {food.type} {amount}")
 
-        return (Pints(beer, amount),)
+        return (Serving(food, amount),)
 
-    @impl(Puke)
-    def puke(self, interp: Interpreter, frame: Frame, stmt: Puke):
-        print("Puking!!!")
+    @impl(Nap)
+    def nap(self, interp: Interpreter, frame: Frame, stmt: Nap):
+        print("Napping!!!")
         return () # (3)!
 ```
 
-1. The statement has return value which is a `Beer` runtime object.
+1. The statement has return value which is a `Food` runtime object.
 2. Sometimes, the execution of a statement will have *side-effect* and return value.
-For example, here the execution `Pour` statement print strings (side-effect) as well as return a `Pints` runtime object.
+For example, here the execution `Cook` statement print strings (side-effect) as well as return a `Serving` runtime object.
 3. In the case where the statement does not have any return value but simply have side-effect only, the return value is simply an empty tuple.
 
 The return value is just a normal tuple that contain interpretation runtime values. Click the plus sign above
 to see the corresponding explanation.
 
 
-### Rewrite `Drink` statement
+### Rewrite `Eat` statement
 
-Sometimes when we are drunk, we will do something that is not expected. Here, we introduce how to do rewrite on the program.
+Sometimes when we are hungry, we will do something that is not expected. Here, we introduce how to do rewrite on the program.
 What we want to do is simple:
 
-Everytime we drink, we will to buy yet another new beer and also puke. Sounds like a drunk person will do huh.
+Everytime we eat, we will to buy another piece of food, then take a nap. Someone has the munchies eh.
 
 
-More specifically, we want to rewrite the program such that, everytime we encounter a `Drink` statement, we insert a `NewBeer` statement, and `Puke` after `Drink`.
-Let's define a rewrite pass that rewrite our `Drink` statement. This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.RewriteRule] and implementing the
+More specifically, we want to rewrite the program such that, everytime we encounter a `Eat` statement, we insert a `NewFood` statement, and `Nap` after `Eat`.
+Let's define a rewrite pass that rewrite our `Eat` statement. This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.RewriteRule] and implementing the
 `rewrite_Statement` method. The `RewriteRule` class is a standard Python visitor on Kirin's IR.
 
 
@@ -234,35 +236,36 @@ from kirin.rewrite import RewriteResult, RewriteRule # (1)!
 from kirin import ir
 
 @dataclass
-class NewBeerAndPukeOnDrink(RewriteRule):
-    # sometimes someone get drunk, so they keep getting new beer and puke after they drink
+class NewFoodAndNap(RewriteRule):
+    # sometimes someone is hungry and needs a nap
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult: # (2)!
-        if not isinstance(node, Drink): # (3)!
+        if not isinstance(node, Eat): # (3)!
             return RewriteResult()
 
         # 1. create new stmts:
-        new_beer_stmt = NewBeer(brand="saporo") # (4)!
-        puke_stmt = Puke() # (5)!
+        new_food_stmt = NewFood(type="burger") # (4)!
+        nap_stmt = Nap() # (5)!
 
         # 2. put them in the ir
-        new_beer_stmt.insert_after(node) # (6)!
-        puke_stmt.insert_after(new_beer_stmt)
+        new_food_stmt.insert_after(node) # (6)!
+        nap_stmt.insert_after(new_food_stmt)
 
         return RewriteResult(has_done_something=True) # (7)!
+
 ```
 
 1. Import the `RewriteRule` class from the `rewrite` module.
 2. This is the signature of `rewrite_Statement` method. Your IDE should hint you the type signature so you can auto-complete it.
-3. Check if the statement is a `Drink` statement. If it is not, return an empty `RewriteResult`.
-4. Create new `NewBeer` statement.
-5. Create new `Puke` statement.
+3. Check if the statement is a `Eat` statement. If it is not, return an empty `RewriteResult`.
+4. Create new `NewFood` statement.
+5. Create new `Nap` statement.
 6. insert the new created statements into the IR. Each of the ir.Statement provides API such as [`insert_after`][kirin.ir.Statement.insert_after], [`insert_before`][kirin.ir.Statement.insert_after] and [`replace_by`][kirin.ir.Statement.replace_by] that allow you to insert a new statement either after or before, or repalce the current statement with another one.
 7. Return a `RewriteResult` that indicates the rewrite has been done.
 
 
 ### Putting everything together
 
-Now we can put everything together and finally create the `beer` decorator, and
+Now we can put everything together and finally create the `food` decorator, and
 you do not need to figure out the complicated type hinting and decorator implementation
 because Kirin will do it for you!
 
@@ -271,27 +274,30 @@ from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk
 
+
 @dialect_group(basic_no_opt.add(dialect)) # (1)!
-def beer(self): # (2)!
+def food(self): # (2)!
 
-    # some initialization if you need it
-    def run_pass(mt, drunk:bool=True): # (3)!
+    fold_pass = Fold(self)
 
-        if drunk:
-            Walk(NewBeerAndPukeOnDrink()).rewrite(mt.code) # (4)!
+    def run_pass(mt, *, fold:bool=True, hungry:bool=True):  # (3)!
+        Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code)
+        
+        if hungry:
+            Walk(NewFoodAndNap()).rewrite(mt.code) # (4)!
 
     return run_pass # (5)!
 ```
 
-1. The [`dialect_group`][kirin.ir.group.dialect_group] decorator specifies the dialect group that the `beer` dialect belongs to. In this case, instead of rebuilding the whole dialect group, we just add our `dialect` object to the [`basic_no_opt`][kirin.prelude.basic_no_opt] dialect group which provides all the basic Python semantics, such as math, function, closure, control flows, etc.
-2. The `beer` function is the decorator that will be used to decorate the `main` function.
-3. The `run_pass` function wraps all the passes that need to run on the input method. It optionally can take some arguments or keyword arguments that will be passed to the `beer` decorator.
-4. Inside the `run_pass` function, we will traverse the entire IR and use the rule `NewBeerAndPukeOnDrink` to rewrite all the `Drink` statements.
-5. Remember to return the `run_pass` function at the end of the `beer` function.
+1. The [`dialect_group`][kirin.ir.group.dialect_group] decorator specifies the dialect group that the `food` dialect belongs to. In this case, instead of rebuilding the whole dialect group, we just add our `dialect` object to the [`basic_no_opt`][kirin.prelude.basic_no_opt] dialect group which provides all the basic Python semantics, such as math, function, closure, control flows, etc.
+2. The `food` function is the decorator that will be used to decorate the `main` function.
+3. The `run_pass` function wraps all the passes that need to run on the input method. It optionally can take some arguments or keyword arguments that will be passed to the `food` decorator.
+4. Inside the `run_pass` function, we will traverse the entire IR and use the rule `NewFoodAndNap` to rewrite all the `Eat` statements.
+5. Remember to return the `run_pass` function at the end of the `food` function.
 
 This is it!
 
-For further advanced use case see [`CookBook/Beer`](cookbook/beer_dialect/control_flow_rewrite.md)
+For further advanced use case see [`CookBook/Food`](cookbook/beer_dialect/control_flow_rewrite.md)
 
 ## License
 

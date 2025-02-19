@@ -1,12 +1,12 @@
 ## Rewrite if-else control flow
 
-In the main page, we introduce a simple `beer` dialect example, and described how to use kirin to define a simple compiler.
-In this section, we want to continue with this `beer`, and considering more compilcated rewrite pass
-that involving the build-in python dialect if-else control flow.
+In the main page, we introduce a simple `food` dialect example, and described how to use kirin to define a simple compiler.
+In this section, we want to continue with this exampe, and consider a more compilcated rewrite pass
+that involves the build-in python dialect if-else control flow.
 
 ### Goal
-When one get really really grunk, not only does one puke, we also would make random decision.
-Here specifically, We want to rewrite the existing `IfElse` statement defined in the existing `py` dialect into a customize `RandomBranch` statement we defined in our beer dialect.
+When one get really really full, not only does one nap, we also would make random decision.
+Here specifically, We want to rewrite the existing `IfElse` statement defined in the existing `py` dialect into a customize `RandomBranch` statement we defined in our food dialect.
 
 The execution of `RandomBranch`, as stated in its name, randomly execute a branch each time we run it.
 
@@ -44,14 +44,14 @@ unlike a normal `if else` branching statement, it does not execute the branches 
 it randomly chooses one of the branches to execute. We will implement the execution behavior of this statement in the following.
 
 ### Implementation and MethodTable
-Recall in the introduction of beer dialect we metioned about `MethodTable`. Now we have defined the statement, we will need to tell interpreter how to interprete this Statement we defined.
+Recall in the introduction of food dialect we metioned about `MethodTable`. Now we have defined the statement, we will need to tell interpreter how to interprete this Statement we defined.
 
-Let's find the `BeerMethods` MethodTable that we defined and registered to `beer` dialect previously:
+Let's find the `FoodMethods` MethodTable that we defined and registered to `food` dialect previously:
 ```python
 from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
 
 @dialect.register
-class BeerMethods(MethodTable):
+class FoodMethods(MethodTable):
     ...
 ```
 
@@ -120,13 +120,13 @@ from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
 
 @dialect_group(basic_no_opt.add(dialect))
-def beer(self):
+def food(self):
 
     # some initialization if you need it
-    def run_pass(mt, drunk:bool=False, got_lost: bool=True): # (1)!
+    def run_pass(mt, hungry:bool=False, got_lost: bool=True): # (1)!
 
         if drunk:
-            Walk(NewBeerAndPukeOnDrink()).rewrite(mt.code)
+            Walk(NewFoodAndNap()).rewrite(mt.code)
 
         if got_lost:
             Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code) # (2)!

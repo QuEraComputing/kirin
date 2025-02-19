@@ -28,7 +28,7 @@ class FeeAnalysis(Forward[Item]):
             1. Here one is *required* to call the super().initialize() to initialize the analysis pass,
             which clear all the previous analysis results and symbol tables.
             2. Any additional initialization that belongs to the analysis should also be done here.
-            For example, in this case, we initialize the puke_count to 0.
+            For example, in this case, we initialize the nap_count to 0.
 
         """
         super().initialize()
