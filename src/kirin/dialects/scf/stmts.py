@@ -83,7 +83,11 @@ class IfElse(ir.Statement):
         printer.print(self.cond)
         printer.plain_print(" ")
         printer.print(self.then_body)
-        if self.else_body.blocks:
+        if self.else_body.blocks and not (
+            len(self.else_body.blocks[0].stmts) == 1
+            and isinstance(else_term := self.else_body.blocks[0].last_stmt, Yield)
+            and not else_term.values  # empty yield
+        ):
             printer.plain_print(" else ", style="keyword")
             printer.print(self.else_body)
 

@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable):
+class ArgumentList(
+    MutableSequenceView[tuple[SSAValue, ...], "Statement", SSAValue], Printable
+):
     """A View object that contains a list of Arguemnts of a Statement.
 
     Description:
@@ -34,6 +36,13 @@ class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable)
         This object is pretty printable via
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
+
+    def __delitem__(self, idx: int) -> None:
+        arg = self.field[idx]
+        arg.remove_use(Use(self.node, idx))
+        new_args = (*self.field[:idx], *self.field[idx + 1 :])
+        self.node._args = new_args
+        self.field = new_args
 
     def set_item(self, idx: int, value: SSAValue) -> None:
         """Set the argument SSAVAlue at the specified index.
@@ -81,7 +90,7 @@ class ArgumentList(MutableSequenceView[tuple, "Statement", SSAValue], Printable)
 
 
 @dataclass
-class ResultList(MutableSequenceView[list, "Statement", ResultValue]):
+class ResultList(MutableSequenceView[list[ResultValue], "Statement", ResultValue]):
     """A View object that contains a list of ResultValue of a Statement.
 
     Description:
@@ -96,6 +105,11 @@ class ResultList(MutableSequenceView[list, "Statement", ResultValue]):
         self, idx: int | slice, value: ResultValue | Sequence[ResultValue]
     ) -> None:
         raise NotImplementedError("Cannot set result value directly")
+
+    def __delitem__(self, idx: int) -> None:
+        result = self.field[idx]
+        del self.field[idx]
+        result.delete()
 
     @property
     def types(self) -> Sequence[TypeAttribute]:

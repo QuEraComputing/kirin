@@ -84,6 +84,7 @@ class ForLoop(RewriteRule):
             # TODO: check this in validation
             if isinstance(terminator, Yield):
                 loop_vars = terminator.values
+                terminator.delete()
 
         for result, output in zip(node.results, loop_vars):
             result.replace_by(output)
