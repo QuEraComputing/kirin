@@ -40,10 +40,19 @@ class Lowering(lowering.FromPythonAST):
     def lower_Attribute(
         self, state: lowering.LoweringState, node: ast.Attribute
     ) -> lowering.Result:
+        from kirin.dialects.py import Constant
+
         if not isinstance(node.ctx, ast.Load):
             raise exceptions.DialectLoweringError(
                 f"unsupported attribute context {node.ctx}"
             )
+
+        # NOTE: eagerly load global variables
+        value = state.get_global_nothrow(node)
+        if value is not None:
+            stmt = state.append_stmt(Constant(value.unwrap()))
+            return lowering.Result(stmt)
+
         value = state.visit(node.value).expect_one()
         stmt = GetAttr(obj=value, attrname=node.attr)
         state.append_stmt(stmt)
