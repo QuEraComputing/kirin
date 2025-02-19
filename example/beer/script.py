@@ -1,21 +1,21 @@
 # type: ignore
-from group import beer
-from stmts import Pour, Puke, Drink, NewBeer
+from group import food
+from stmts import Cook, Nap, Eat, NewFood
 from recept import FeeAnalysis
 
 from emit import EmitReceptMain
-from interp import BeerMethods as BeerMethods
+from interp import FoodMethods as FoodMethods
 from lattice import AtLeastXItem
-from rewrite import NewBeerAndPukeOnDrink
+from rewrite import NewFoodAndNap
 from kirin.rewrite import Walk
 
 
-@beer
+@food
 def main(x: int):
-    beer = NewBeer(brand="budlight")  # (1)!
-    pints = Pour(beer, x)  # (2)!
-    Drink(pints)  # (3)!
-    Puke()  # (4)!
+    food = NewFood(type="burger")  # (1)!
+    serving = Cook(food, x)  # (2)!
+    Eat(serving)  # (3)!
+    Nap()  # (4)!
 
     return x + 1  # (5)!
 
@@ -23,27 +23,27 @@ def main(x: int):
 main.print()
 
 
-@beer
+@food
 def main2(x: int):
-    def some_closure(beer, amount):
-        Pour(beer, amount + 1)
-        Puke()
+    def some_closure(food, amount):
+        Cook(food, amount + 1)
+        Nap()
 
-    bud = NewBeer(brand="budlight")
-    heineken = NewBeer(brand="heineken")
-    tsingdao = NewBeer(brand="tsingdao")
+    fish = NewFood(type="fish")
+    chicken = NewFood(type="chicken")
+    potatoes = NewFood(type="potatoes")
 
-    bud_pints = Pour(bud, 12 + x)
-    heineken_pints = Pour(heineken, 10 + x)
-    tsingdao_pints = Pour(tsingdao, 8)
-    Drink(bud_pints)
-    Puke()
+    fish_serving = Cook(fish, 12 + x)
+    chicken_serving = Cook(chicken, 10 + x)
+    potatoes_serving = Cook(potatoes, 8)
+    Eat(fish_serving)
+    Nap()
 
-    some_closure(bud, 1 + 1)
+    some_closure(fish, 1 + 1)
     if x > 1:
-        Drink(heineken_pints)
+        Eat(chicken_serving)
     else:
-        Drink(tsingdao_pints)
+        Eat(potatoes_serving)
     return x + 1
 
 
@@ -51,47 +51,47 @@ main2.code.print()
 main2(1)  # execute the function
 # for i in range(10):
 #     print("iteration", i)
-#     main(i)  # now drink a random beer!
+#     main(i)  # now eat a random food!
 
 
 # 2. simple rewrite:
-@beer
+@food
 def main3():
 
-    bud = NewBeer(brand="budlight")
-    heineken = NewBeer(brand="heineken")
+    sandwich = NewFood(type="sandwich")
+    chips = NewFood(type="chips")
 
-    bud_pints = Pour(bud, 2)
-    heineken_pints = Pour(heineken, 10)
+    sandwich_serving = Cook(sandwich, 2)
+    chips_serving = Cook(chips, 10)
 
-    Drink(bud_pints)
-    Drink(heineken_pints)
+    Eat(sandwich_serving)
+    Eat(chips_serving)
 
 
 main3.print()
-Walk(NewBeerAndPukeOnDrink()).rewrite(main3.code)
+Walk(NewFoodAndNap()).rewrite(main3.code)
 main3.print()
 
 
 # 3. simple analysis example:
-@beer
+@food
 def analysis_demo(x: int):
 
-    bud = NewBeer(brand="budlight")
-    heineken = NewBeer(brand="heineken")
+    burger = NewFood(type="burger")
+    salad = NewFood(type="salad")
 
-    bud_pints = Pour(bud, 12 + x)
-    heineken_pints = Pour(heineken, 10 + x)
+    burger_serving = Cook(burger, 12 + x)
+    salad_serving = Cook(salad, 10 + x)
 
-    Drink(bud_pints)
-    Drink(heineken_pints)
-    Puke()
+    Eat(burger_serving)
+    Eat(salad_serving)
+    Nap()
 
-    Drink(bud_pints)
-    Puke()
+    Eat(burger_serving)
+    Nap()
 
-    Drink(bud_pints)
-    Puke()
+    Eat(burger_serving)
+    Nap()
 
     return x
 
@@ -101,7 +101,7 @@ results, expect = fee_analysis.run_analysis(
     analysis_demo, args=(AtLeastXItem(data=10),)
 )
 print(results.entries)
-print(fee_analysis.puke_count)
+print(fee_analysis.nap_count)
 analysis_demo.print(analysis=results.entries)
 
 

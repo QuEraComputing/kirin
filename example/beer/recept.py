@@ -1,11 +1,11 @@
 from dataclasses import field, dataclass
 
-from attrs import Beer
-from stmts import Pour, Puke, NewBeer
+from attrs import Food
+from stmts import Cook, Nap, NewFood
 from dialect import dialect
 
 from kirin import ir, interp
-from lattice import Item, ItemBeer, ItemPints, AtLeastXItem, ConstIntItem
+from lattice import Item, ItemFood, ItemServing, AtLeastXItem, ConstIntItem
 from kirin.interp import exceptions
 from kirin.analysis import Forward
 from kirin.dialects import py
@@ -15,9 +15,9 @@ from kirin.analysis.forward import ForwardFrame
 
 @dataclass
 class FeeAnalysis(Forward[Item]):
-    keys = ["beer.fee"]
+    keys = ["food.fee"]
     lattice = Item
-    puke_count: int = field(init=False)
+    nap_count: int = field(init=False)
 
     def initialize(self):
         """Initialize the analysis pass.
@@ -32,7 +32,7 @@ class FeeAnalysis(Forward[Item]):
 
         """
         super().initialize()
-        self.puke_count = 0
+        self.nap_count = 0
         return self
 
     def eval_stmt_fallback(
@@ -44,7 +44,7 @@ class FeeAnalysis(Forward[Item]):
         return self.run_callable(method.code, (self.lattice.bottom(),) + args)
 
 
-@py.constant.dialect.register(key="beer.fee")
+@py.constant.dialect.register(key="food.fee")
 class PyConstMethodTable(interp.MethodTable):
 
     @interp.impl(py.constant.Constant)
@@ -56,8 +56,8 @@ class PyConstMethodTable(interp.MethodTable):
     ):
         if isinstance(stmt.value, int):
             return (ConstIntItem(data=stmt.value),)
-        elif isinstance(stmt.value, Beer):
-            return (ItemBeer(brand=stmt.value.brand),)
+        elif isinstance(stmt.value, Food):
+            return (ItemFood(type=stmt.value.type),)
 
         else:
             raise exceptions.InterpreterError(
@@ -65,7 +65,7 @@ class PyConstMethodTable(interp.MethodTable):
             )
 
 
-@binop.dialect.register(key="beer.fee")
+@binop.dialect.register(key="food.fee")
 class PyBinOpMethodTable(interp.MethodTable):
 
     @interp.impl(binop.Add)
@@ -86,42 +86,42 @@ class PyBinOpMethodTable(interp.MethodTable):
         return (out,)
 
 
-@dialect.register(key="beer.fee")
-class BeerMethodTable(interp.MethodTable):
+@dialect.register(key="food.fee")
+class FoodMethodTable(interp.MethodTable):
 
-    @interp.impl(NewBeer)
-    def new_beer(
+    @interp.impl(NewFood)
+    def new_food(
         self,
         interp: FeeAnalysis,
         frame: interp.Frame[Item],
-        stmt: NewBeer,
+        stmt: NewFood,
     ):
-        return (ItemBeer(brand=stmt.brand),)
+        return (ItemFood(type=stmt.type),)
 
-    @interp.impl(Pour)
-    def pour(
+    @interp.impl(Cook)
+    def cook(
         self,
         interp: FeeAnalysis,
         frame: interp.Frame[Item],
-        stmt: Pour,
+        stmt: Cook,
     ):
-        # Drink depends on the beer type to have different charge:
+        # food depends on the food type to have different charge:
 
-        beer = frame.get_typed(stmt.beverage, ItemBeer)
-        pint_count: AtLeastXItem | ConstIntItem = frame.get(
+        food = frame.get_typed(stmt.target, ItemFood)
+        serving_count: AtLeastXItem | ConstIntItem = frame.get(
             stmt.amount
         )  # FIXME: fix the type hinting here
 
-        out = ItemPints(count=pint_count, brand=beer.brand)
+        out = ItemServing(count=serving_count, type=food.type)
 
         return (out,)
 
-    @interp.impl(Puke)
-    def puke(
+    @interp.impl(Nap)
+    def nap(
         self,
         interp: FeeAnalysis,
         frame: interp.Frame[Item],
-        stmt: Puke,
+        stmt: Nap,
     ):
-        interp.puke_count += 1
+        interp.nap_count += 1
         return ()

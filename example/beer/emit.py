@@ -3,11 +3,11 @@ from typing import cast
 from dataclasses import field, dataclass
 
 import stmts
-from group import beer
+from group import food
 from dialect import dialect
 
 from kirin import ir, interp
-from lattice import Item, ItemPints, AtLeastXItem, ConstIntItem
+from lattice import Item, ItemServing, AtLeastXItem, ConstIntItem
 from kirin.emit import EmitStr, EmitStrFrame
 from kirin.dialects import func
 from kirin.emit.exceptions import EmitError
@@ -15,16 +15,16 @@ from kirin.emit.exceptions import EmitError
 
 def default_menu_price():
     return {
-        "budlight": 3.0,
-        "heineken": 4.0,
-        "tsingdao": 2.0,
+        "burger": 3.0,
+        "salad": 4.0,
+        "chicken": 2.0,
     }
 
 
 @dataclass
 class EmitReceptMain(EmitStr):
     keys = ["emit.recept"]
-    dialects: ir.DialectGroup = field(default_factory=lambda: beer)
+    dialects: ir.DialectGroup = field(default_factory=lambda: food)
     file: StringIO = field(default_factory=StringIO)
     menu_price: dict[str, float] = field(default_factory=default_menu_price)
     recept_analysis_result: dict[ir.SSAValue, Item] = field(default_factory=dict)
@@ -68,27 +68,27 @@ class FuncEmit(interp.MethodTable):
 
 
 @dialect.register(key="emit.recept")
-class BeerEmit(interp.MethodTable):
+class FoodEmit(interp.MethodTable):
 
-    @interp.impl(stmts.Pour)
-    def emit_pour(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: stmts.Pour):
-        pints_item = cast(ItemPints, emit.recept_analysis_result[stmt.result])
+    @interp.impl(stmts.Cook)
+    def emit_cook(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: stmts.Cook):
+        serving_item = cast(ItemServing, emit.recept_analysis_result[stmt.result])
 
         amount_str = ""
         price_str = ""
-        if isinstance(pints_item.count, AtLeastXItem):
-            amount_str = f">={pints_item.count.data}"
+        if isinstance(serving_item.count, AtLeastXItem):
+            amount_str = f">={serving_item.count.data}"
             price_str = (
-                f"  >=${emit.menu_price[pints_item.brand] * pints_item.count.data}"
+                f"  >=${emit.menu_price[serving_item.type] * serving_item.count.data}"
             )
-        elif isinstance(pints_item.count, ConstIntItem):
-            amount_str = f"  {pints_item.count.data}"
+        elif isinstance(serving_item.count, ConstIntItem):
+            amount_str = f"  {serving_item.count.data}"
             price_str = (
-                f"  ${emit.menu_price[pints_item.brand] * pints_item.count.data}"
+                f"  ${emit.menu_price[serving_item.type] * serving_item.count.data}"
             )
         else:
             raise EmitError("invalid analysis result.")
 
-        emit.writeln(frame, f"{pints_item.brand}\t{amount_str}\t{price_str}")
+        emit.writeln(frame, f"{serving_item.type}\t{amount_str}\t{price_str}")
 
         return ()

@@ -57,15 +57,15 @@ class AnyItem(Item, metaclass=SingletonMeta):
 
 @final
 @dataclass
-class ItemPints(Item):
+class ItemServing(Item):
     count: Item
-    brand: str
+    type: str
 
     def is_subseteq(self, other: Item) -> bool:
         return (
-            isinstance(other, ItemPints)
+            isinstance(other, ItemServing)
             and self.count == other.count
-            and self.brand == other.brand
+            and self.type == other.type
         )
 
 
@@ -89,8 +89,8 @@ class ConstIntItem(Item):
 
 @final
 @dataclass
-class ItemBeer(Item):
-    brand: str
+class ItemFood(Item):
+    type: str
 
     def is_subseteq(self, other: Item) -> bool:
-        return isinstance(other, ItemBeer) and self.brand == other.brand
+        return isinstance(other, ItemFood) and self.type == other.type

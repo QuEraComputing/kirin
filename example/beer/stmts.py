@@ -1,4 +1,4 @@
-from attrs import Beer, Pints
+from attrs import Food, Serving
 from dialect import dialect
 
 from kirin import ir, types
@@ -6,29 +6,29 @@ from kirin.decl import info, statement
 
 
 @statement(dialect=dialect)
-class NewBeer(ir.Statement):
-    name = "new_beer"
+class NewFood(ir.Statement):
+    name = "new_food"
     traits = frozenset({ir.Pure(), ir.FromPythonCall()})
-    brand: str = info.attribute(types.String)
-    result: ir.ResultValue = info.result(types.PyClass(Beer))
+    type: str = info.attribute(types.String)
+    result: ir.ResultValue = info.result(types.PyClass(Food))
 
 
 @statement(dialect=dialect)
-class Pour(ir.Statement):
+class Cook(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
-    beverage: ir.SSAValue = info.argument(types.PyClass(Beer))
+    target: ir.SSAValue = info.argument(types.PyClass(Food))
     amount: ir.SSAValue = info.argument(types.Int)
-    result: ir.ResultValue = info.result(types.PyClass(Pints))
+    result: ir.ResultValue = info.result(types.PyClass(Serving))
 
 
 @statement(dialect=dialect)
-class Drink(ir.Statement):
+class Eat(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
-    pints: ir.SSAValue = info.argument(types.PyClass(Pints))
+    target: ir.SSAValue = info.argument(types.PyClass(Serving))
 
 
 @statement(dialect=dialect)
-class Puke(ir.Statement):
+class Nap(ir.Statement):
     traits = frozenset({ir.FromPythonCall()})
 
 

@@ -1,36 +1,36 @@
 from random import randint
 
-from attrs import Beer, Pints
-from stmts import Pour, Puke, Drink, NewBeer, RandomBranch
+from attrs import Food, Serving
+from stmts import Cook, Nap, Eat, NewFood, RandomBranch
 from dialect import dialect
 
 from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
 
 
 @dialect.register
-class BeerMethods(MethodTable):
+class FoodMethods(MethodTable):
 
-    @impl(NewBeer)
-    def new_beer(self, interp: Interpreter, frame: Frame, stmt: NewBeer):
-        return (Beer(stmt.brand),)
+    @impl(NewFood)
+    def new_food(self, interp: Interpreter, frame: Frame, stmt: NewFood):
+        return (Food(stmt.type),)
 
-    @impl(Drink)
-    def drink(self, interp: Interpreter, frame: Frame, stmt: Drink):
-        pints: Pints = frame.get(stmt.pints)
-        print(f"Drinking {pints.amount} pints of {pints.kind.brand}")
+    @impl(Eat)
+    def eat(self, interp: Interpreter, frame: Frame, stmt: Eat):
+        serving: Serving = frame.get(stmt.target)
+        print(f"Eating {serving.amount} servings of {serving.kind.type}")
         return ()
 
-    @impl(Pour)
-    def pour(self, interp: Interpreter, frame: Frame, stmt: Pour):
-        beer: Beer = frame.get(stmt.beverage)
+    @impl(Cook)
+    def cook(self, interp: Interpreter, frame: Frame, stmt: Cook):
+        food: Food = frame.get(stmt.target)
         amount: int = frame.get(stmt.amount)
-        print(f"Pouring {beer.brand} {amount}")
+        print(f"Cooking {food.type} {amount}")
 
-        return (Pints(beer, amount),)
+        return (Serving(food, amount),)
 
-    @impl(Puke)
-    def puke(self, interp: Interpreter, frame: Frame, stmt: Puke):
-        print("Puking!!!")
+    @impl(Nap)
+    def nap(self, interp: Interpreter, frame: Frame, stmt: Nap):
+        print("Napping!!!")
         return ()
 
     @impl(RandomBranch)

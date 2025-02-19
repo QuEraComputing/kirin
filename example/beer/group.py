@@ -7,9 +7,9 @@ from kirin.rewrite import Walk, Fixpoint
 from kirin.passes.fold import Fold
 
 
-# create our own beer dialect, it runs a random walk on the branches
+# create our own food dialect, it runs a random walk on the branches
 @dialect_group(basic_no_opt.add(dialect))
-def beer(self):
+def food(self):
 
     fold_pass = Fold(self)
 

@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
 
-# runtime value of a beer
+# runtime value of a food
 @dataclass
-class Beer:
-    brand: str
+class Food:
+    type: str
 
 
 @dataclass
-class Pints:
-    kind: Beer
+class Serving:
+    kind: Food
     amount: int

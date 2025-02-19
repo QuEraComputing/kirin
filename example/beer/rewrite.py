@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from stmts import Puke, Drink, NewBeer, RandomBranch
+from stmts import Nap, Eat, NewFood, RandomBranch
 
 from kirin import ir
 from kirin.dialects import cf
@@ -26,18 +26,18 @@ class RandomWalkBranch(RewriteRule):
 
 
 @dataclass
-class NewBeerAndPukeOnDrink(RewriteRule):
-    # sometimes someone get drunk, so they keep getting new beer and puke after they drink
+class NewFoodAndNap(RewriteRule):
+    # sometimes someone is hungry and needs a nap
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if not isinstance(node, Drink):
+        if not isinstance(node, Eat):
             return RewriteResult()
 
         # 1. create new stmts:
-        new_beer_stmt = NewBeer(brand="saporo")
-        puke_stmt = Puke()
+        new_food_stmt = NewFood(type="burger")
+        nap_stmt = Nap()
 
         # 2. put them in the ir
-        new_beer_stmt.insert_after(node)
-        puke_stmt.insert_after(new_beer_stmt)
+        new_food_stmt.insert_after(node)
+        nap_stmt.insert_after(new_food_stmt)
 
         return RewriteResult(has_done_something=True)
