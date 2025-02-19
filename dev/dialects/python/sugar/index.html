@@ -385,13 +385,31 @@
 <span class=normal>47</span>
 <span class=normal>48</span>
 <span class=normal>49</span>
-<span class=normal>50</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Attribute</span><span class=p>(</span>
+<span class=normal>50</span>
+<span class=normal>51</span>
+<span class=normal>52</span>
+<span class=normal>53</span>
+<span class=normal>54</span>
+<span class=normal>55</span>
+<span class=normal>56</span>
+<span class=normal>57</span>
+<span class=normal>58</span>
+<span class=normal>59</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Attribute</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>LoweringState</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Attribute</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
+    <span class=kn>from</span> <span class=nn>kirin.dialects.py</span> <span class=kn>import</span> <span class=n>Constant</span>
+
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Load</span><span class=p>):</span>
         <span class=k>raise</span> <span class=n>exceptions</span><span class=o>.</span><span class=n>DialectLoweringError</span><span class=p>(</span>
             <span class=sa>f</span><span class=s2>&quot;unsupported attribute context </span><span class=si>{</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=si>}</span><span class=s2>&quot;</span>
         <span class=p>)</span>
+
+    <span class=c1># NOTE: eagerly load global variables</span>
+    <span class=n>value</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>get_global_nothrow</span><span class=p>(</span><span class=n>node</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>value</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=n>stmt</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>append_stmt</span><span class=p>(</span><span class=n>Constant</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>unwrap</span><span class=p>()))</span>
+        <span class=k>return</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>(</span><span class=n>stmt</span><span class=p>)</span>
+
     <span class=n>value</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>visit</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>value</span><span class=p>)</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>
     <span class=n>stmt</span> <span class=o>=</span> <span class=n>GetAttr</span><span class=p>(</span><span class=n>obj</span><span class=o>=</span><span class=n>value</span><span class=p>,</span> <span class=n>attrname</span><span class=o>=</span><span class=n>node</span><span class=o>.</span><span class=n>attr</span><span class=p>)</span>
     <span class=n>state</span><span class=o>.</span><span class=n>append_stmt</span><span class=p>(</span><span class=n>stmt</span><span class=p>)</span>
