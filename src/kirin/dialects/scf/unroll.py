@@ -23,7 +23,7 @@ class PickIfElse(RewriteRule):
             return self.insert_body(node, node.else_body)
 
     def insert_body(self, node: IfElse, body: ir.Region):
-        body_block = body.clone().blocks[0]
+        body_block = body.blocks[0]
         body_block.args[0].replace_by(node.cond)
         block_stmt = body_block.first_stmt
         while block_stmt and not block_stmt.has_trait(ir.IsTerminator):

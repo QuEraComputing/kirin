@@ -21,7 +21,9 @@ class InlineGetItem(RewriteRule):
 
         stmt = node.obj.owner
         index = index_value.data
-        if isinstance(index, int) and 0 <= index < len(stmt.args):
+        if isinstance(index, int) and (
+            0 <= index < len(stmt.args) or -len(stmt.args) <= index < 0
+        ):
             node.result.replace_by(stmt.args[index])
             return RewriteResult(has_done_something=True)
         elif isinstance(index, slice):

@@ -119,6 +119,8 @@ class TypeInfer(interp.MethodTable):
         # TODO: replace this when we can multiple dispatch
         if obj.is_subseteq(types.Tuple):
             return self.getitem_tuple(interp, stmt, obj, index)
+        elif obj.is_subseteq(types.String):
+            return (types.String,)
         else:
             return (types.Any,)
 
@@ -149,9 +151,11 @@ class TypeInfer(interp.MethodTable):
         index: types.TypeAttribute,
     ):
         if index_ := interp.maybe_const(stmt.index, int):
-            if obj.vararg and index_ >= len(obj.vars):
+            if obj.vararg and (index_ >= len(obj.vars) or -len(obj.vars) <= index_ < 0):
                 return (obj.vararg.typ,)
-            elif index_ < len(obj.vars):
+            elif obj.vars and (
+                0 <= index_ < len(obj.vars) or -len(obj.vars) <= index_ < 0
+            ):
                 return (obj.vars[index_],)
             else:
                 return (types.Bottom,)

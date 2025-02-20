@@ -38,7 +38,7 @@ class TypeInfer(interp.MethodTable):
         return (types.Int,)
 
     @interp.impl(stmts.Div)
-    def divf(self, *_):
+    def divf(self, typeinfer_, frame, stmt):
         return (types.Float,)
 
     @interp.impl(stmts.Mod, types.Float, types.Float)

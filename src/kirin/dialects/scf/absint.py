@@ -59,4 +59,6 @@ class Methods(interp.MethodTable):
         with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
             body_frame.entries.update(frame.entries)
             body_frame.set(body_block.args[0], frame.get(stmt.cond))
-            return interp_.run_ssacfg_region(body_frame, body)
+            ret = interp_.run_ssacfg_region(body_frame, body)
+            frame.entries.update(body_frame.entries)
+            return ret
