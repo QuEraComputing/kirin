@@ -2,10 +2,22 @@
 """
 
 from kirin import ir
-from kirin.dialects import cf, py, func
+from kirin.dialects import cf, py, func, lowering
 
 
-@ir.dialect_group([func, py.base, py.constant, py.assign, py.binop, py.unary])
+@ir.dialect_group(
+    [
+        func,
+        lowering.func,
+        lowering.call,
+        lowering.cf,
+        py.base,
+        py.constant,
+        py.assign,
+        py.binop,
+        py.unary,
+    ]
+)
 def simple(self):
     def run_pass(mt):
         return mt
