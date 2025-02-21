@@ -74,7 +74,7 @@ or you can inspect the compile result via
 main.print()
 ```
 
-![beer-printing](assets/beer-printing.png)
+![food-printing](assets/food-printing.png)
 
 
 ### Defining the dialect
@@ -282,7 +282,7 @@ def food(self): # (2)!
 
     def run_pass(mt, *, fold:bool=True, hungry:bool=True):  # (3)!
         Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code)
-        
+
         if hungry:
             Walk(NewFoodAndNap()).rewrite(mt.code) # (4)!
 
