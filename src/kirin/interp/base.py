@@ -338,6 +338,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
                     f"method must return tuple or SpecialResult, got {results}"
                 )
             return results
+        elif stmt.dialect not in self.dialects:
+            # NOTE: we should terminate the interpreter because this is a
+            # deveoper error, not a user error.
+            raise ValueError(f"dialect {stmt.dialect} is not supported by {type(self)}")
 
         return self.eval_stmt_fallback(frame, stmt)
 

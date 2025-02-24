@@ -123,6 +123,17 @@ class DialectGroup(Generic[PassParams]):
             run_pass=self.run_pass_gen,  # pass the run_pass_gen function
         )
 
+    def __contains__(self, dialect) -> bool:
+        """check if the dialect is in the group.
+
+        Args:
+            dialect (Union[Dialect, ModuleType]): the dialect to check.
+
+        Returns:
+            bool: True if the dialect is in the group, False otherwise.
+        """
+        return self.map_module(dialect) in self.data
+
     @property
     def registry(self) -> "Registry":
         """return the registry for the dialect group. This
