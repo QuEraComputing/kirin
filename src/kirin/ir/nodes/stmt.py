@@ -502,6 +502,10 @@ class Statement(IRNode["Block"]):
             result_types=[result.type for result in other._results],
             args_slice=other._name_args_slice,
         )
+        # inherit the hint:
+        for result, other_result in zip(obj._results, other._results):
+            result.hints = dict(other_result.hints)
+
         return obj
 
     def walk(

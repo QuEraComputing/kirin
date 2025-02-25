@@ -39,3 +39,14 @@ def test_block_append():
     block.stmts.append(py.Constant(1))
     block.print()
     assert len(block.stmts) == 2
+
+
+def test_stmt_from_stmt():
+
+    x = py.Constant(1)
+
+    x.result.hints["const"] = py.constant.types.Int
+
+    y = x.from_stmt(x)
+
+    assert y.result.hints["const"] == py.constant.types.Int
