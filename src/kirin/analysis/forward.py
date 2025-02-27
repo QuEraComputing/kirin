@@ -35,13 +35,17 @@ class ForwardExtra(
         self,
         method: ir.Method,
         args: tuple[LatticeElemType, ...] | None = None,
-        raise_error_if_failed: bool = False,
+        *,
+        no_raise: bool = True,
     ) -> tuple[ForwardFrameType, LatticeElemType]:
         """Run the forward dataflow analysis.
 
         Args:
             method(ir.Method): The method to analyze.
             args(tuple[LatticeElemType]): The arguments to the method. Defaults to tuple of top values.
+
+        Keyword Args:
+            no_raise(bool): If True, return bottom values if the analysis fails. Defaults to True.
 
         Returns:
             ForwardFrameType: The results of the analysis contained in the frame.
@@ -63,7 +67,7 @@ class ForwardExtra(
         except interp.InterpreterError as e:
             # NOTE: initialize will create new State
             # so we don't need to copy the frames.
-            if raise_error_if_failed:
+            if not no_raise:
                 raise e
             return self.new_frame(method.code), self.lattice.bottom()
         finally:
