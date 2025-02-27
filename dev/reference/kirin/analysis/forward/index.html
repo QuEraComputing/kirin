@@ -9,8 +9,8 @@
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.analysis.forward.ForwardExtra" href="#kirin.analysis.forward.ForwardExtra">ForwardExtra</a>[<span title="kirin.analysis.forward.ForwardFrame">ForwardFrame</span>[<span title="kirin.analysis.forward.LatticeElemType">LatticeElemType</span>], <span title="kirin.analysis.forward.LatticeElemType">LatticeElemType</span>]</code>, <code><span title="abc.ABC">ABC</span></code></p> <p>Forward dataflow analysis.</p> <p>This is the base class for forward dataflow analysis. If your analysis requires extra information per frame, you should subclass <a class="autorefs autorefs-internal" href="#kirin.analysis.forward.ForwardExtra"><code>ForwardExtra</code></a> instead.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.forward.Forward.new_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">new_frame</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>new_frame</span><span class=p>(</span>
     <span class=n>code</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 99</span>
-<span class=normal>100</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>new_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>]:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Create a new frame for the given method.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>106</span>
+<span class=normal>107</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>new_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>code</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ForwardFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>]:</span>
     <span class=k>return</span> <span class=n>ForwardFrame</span><span class=o>.</span><span class=n>from_func_like</span><span class=p>(</span><span class=n>code</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h2 id=kirin.analysis.forward.ForwardExtra class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">ForwardExtra</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>ForwardExtra</span><span class=p>(</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>DialectGroup</span><span class=p>,</span>
@@ -23,8 +23,10 @@
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.AbstractInterpreter" href="../../interp/abstract/#kirin.interp.abstract.AbstractInterpreter">AbstractInterpreter</a>[<span title="kirin.analysis.forward.ForwardFrameType">ForwardFrameType</span>, <span title="kirin.analysis.forward.LatticeElemType">LatticeElemType</span>]</code>, <code><span title="abc.ABC">ABC</span></code></p> <p>Abstract interpreter but record results for each SSA value.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>LatticeElemType</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The lattice element type.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>ExtraType</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The type of extra information to be stored in the frame.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.forward.ForwardExtra.run_analysis class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">run_analysis</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>run_analysis</span><span class=p>(</span>
     <span class=n>method</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+    <span class=o>*</span><span class=p>,</span>
+    <span class=n>no_raise</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ForwardFrameType</span><span class=p>,</span> <span class=n>LatticeElemType</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Run the forward dataflow analysis.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>method(ir.Method)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The method to analyze.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args(tuple[LatticeElemType])</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The arguments to the method. Defaults to tuple of top values.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ForwardFrameType</code></td> <td> <code><span title="kirin.analysis.forward.ForwardFrameType">ForwardFrameType</span></code> </td> <td> <div class=doc-md-description> <p>The results of the analysis contained in the frame.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>LatticeElemType</code></td> <td> <code><span title="kirin.analysis.forward.LatticeElemType">LatticeElemType</span></code> </td> <td> <div class=doc-md-description> <p>The result of the analysis for the method return value.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/analysis/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>34</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Run the forward dataflow analysis.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>method(ir.Method)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The method to analyze.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>args(tuple[LatticeElemType])</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The arguments to the method. Defaults to tuple of top values.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Other Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>no_raise(bool)</code></td> <td> </td> <td> <div class=doc-md-description> <p>If True, return bottom values if the analysis fails. Defaults to True.</p> </div> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ForwardFrameType</code></td> <td> <code><span title="kirin.analysis.forward.ForwardFrameType">ForwardFrameType</span></code> </td> <td> <div class=doc-md-description> <p>The results of the analysis contained in the frame.</p> </div> </td> </tr> <tr class=doc-section-item> <td><code>LatticeElemType</code></td> <td> <code><span title="kirin.analysis.forward.LatticeElemType">LatticeElemType</span></code> </td> <td> <div class=doc-md-description> <p>The result of the analysis for the method return value.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/analysis/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>34</span>
 <span class=normal>35</span>
 <span class=normal>36</span>
 <span class=normal>37</span>
@@ -59,16 +61,28 @@
 <span class=normal>66</span>
 <span class=normal>67</span>
 <span class=normal>68</span>
-<span class=normal>69</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_analysis</span><span class=p>(</span>
+<span class=normal>69</span>
+<span class=normal>70</span>
+<span class=normal>71</span>
+<span class=normal>72</span>
+<span class=normal>73</span>
+<span class=normal>74</span>
+<span class=normal>75</span>
+<span class=normal>76</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>run_analysis</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>method</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span>
     <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+    <span class=o>*</span><span class=p>,</span>
+    <span class=n>no_raise</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ForwardFrameType</span><span class=p>,</span> <span class=n>LatticeElemType</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Run the forward dataflow analysis.</span>
 
 <span class=sd>    Args:</span>
 <span class=sd>        method(ir.Method): The method to analyze.</span>
 <span class=sd>        args(tuple[LatticeElemType]): The arguments to the method. Defaults to tuple of top values.</span>
+
+<span class=sd>    Keyword Args:</span>
+<span class=sd>        no_raise(bool): If True, return bottom values if the analysis fails. Defaults to True.</span>
 
 <span class=sd>    Returns:</span>
 <span class=sd>        ForwardFrameType: The results of the analysis contained in the frame.</span>
@@ -87,9 +101,11 @@
     <span class=n>sys</span><span class=o>.</span><span class=n>setrecursionlimit</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>max_python_recursion_depth</span><span class=p>)</span>
     <span class=k>try</span><span class=p>:</span>
         <span class=n>frame</span><span class=p>,</span> <span class=n>ret</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_method</span><span class=p>(</span><span class=n>method</span><span class=p>,</span> <span class=n>args</span><span class=p>)</span>
-    <span class=k>except</span> <span class=n>interp</span><span class=o>.</span><span class=n>InterpreterError</span><span class=p>:</span>
+    <span class=k>except</span> <span class=n>interp</span><span class=o>.</span><span class=n>InterpreterError</span> <span class=k>as</span> <span class=n>e</span><span class=p>:</span>
         <span class=c1># NOTE: initialize will create new State</span>
         <span class=c1># so we don&#39;t need to copy the frames.</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>no_raise</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=n>e</span>
         <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>new_frame</span><span class=p>(</span><span class=n>method</span><span class=o>.</span><span class=n>code</span><span class=p>),</span> <span class=bp>self</span><span class=o>.</span><span class=n>lattice</span><span class=o>.</span><span class=n>bottom</span><span class=p>()</span>
     <span class=k>finally</span><span class=p>:</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>_eval_lock</span> <span class=o>=</span> <span class=kc>False</span>
@@ -100,14 +116,7 @@
     <span class=n>ssa</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>],</span>
     <span class=n>results</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>],</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Set the abstract values for the given SSA values in the frame.</p> <p>This method is used to customize how the abstract values are set in the frame. By default, the abstract values are set directly in the frame. This method is overridden to join the results if the SSA value already exists in the frame.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>71</span>
-<span class=normal>72</span>
-<span class=normal>73</span>
-<span class=normal>74</span>
-<span class=normal>75</span>
-<span class=normal>76</span>
-<span class=normal>77</span>
-<span class=normal>78</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Set the abstract values for the given SSA values in the frame.</p> <p>This method is used to customize how the abstract values are set in the frame. By default, the abstract values are set directly in the frame. This method is overridden to join the results if the SSA value already exists in the frame.</p> <details class=quote> <summary>Source code in <code>src/kirin/analysis/forward.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>78</span>
 <span class=normal>79</span>
 <span class=normal>80</span>
 <span class=normal>81</span>
@@ -117,7 +126,14 @@
 <span class=normal>85</span>
 <span class=normal>86</span>
 <span class=normal>87</span>
-<span class=normal>88</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>set_values</span><span class=p>(</span>
+<span class=normal>88</span>
+<span class=normal>89</span>
+<span class=normal>90</span>
+<span class=normal>91</span>
+<span class=normal>92</span>
+<span class=normal>93</span>
+<span class=normal>94</span>
+<span class=normal>95</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>set_values</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>frame</span><span class=p>:</span> <span class=n>AbstractFrame</span><span class=p>[</span><span class=n>LatticeElemType</span><span class=p>],</span>
     <span class=n>ssa</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>],</span>
