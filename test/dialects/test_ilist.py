@@ -7,7 +7,9 @@ from kirin.dialects import py, func, ilist, lowering
 from kirin.passes.typeinfer import TypeInfer
 
 
-@ir.dialect_group(python_basic.union([func, ilist, lowering.func]))
+@ir.dialect_group(
+    python_basic.union([func, ilist, lowering.func, lowering.range.ilist])
+)
 def basic(self):
     aggressive_fold_pass = aggressive.Fold(self)
     typeinfer_pass = TypeInfer(self)

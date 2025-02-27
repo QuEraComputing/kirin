@@ -34,7 +34,9 @@ def test_cons():
 def test_exec():
     xs = ilist.IList([(1, 2), (3, 4)])
 
-    @python_basic.union([func, scf, py.range, py.unpack, ilist, lowering.func])
+    @python_basic.union(
+        [func, scf, py.unpack, ilist, lowering.func, lowering.range.ilist]
+    )
     def main(x):
         for a, b in xs:
             x = x + a
@@ -46,7 +48,9 @@ def test_exec():
 
 def test_issue_213():
 
-    @python_basic.union([func, scf, py.range, py.unpack, ilist, lowering.func])
+    @python_basic.union(
+        [func, scf, py.unpack, ilist, lowering.func, lowering.range.ilist]
+    )
     def main():
         j = 0.0
         i = 0
