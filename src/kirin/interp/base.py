@@ -341,7 +341,8 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         elif stmt.dialect not in self.dialects:
             # NOTE: we should terminate the interpreter because this is a
             # deveoper error, not a user error.
-            raise ValueError(f"dialect {stmt.dialect} is not supported by {type(self)}")
+            name = stmt.dialect.name if stmt.dialect else "None"
+            raise ValueError(f"dialect {name} is not supported by {self.dialects}")
 
         return self.eval_stmt_fallback(frame, stmt)
 
