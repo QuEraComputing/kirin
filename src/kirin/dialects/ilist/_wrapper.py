@@ -13,6 +13,22 @@ ResultT = typing.TypeVar("ResultT")
 # NOTE: we use Callable here to make nested function work.
 
 
+@typing.overload
+def range(stop: int) -> IList[int, typing.Any]: ...
+
+
+@typing.overload
+def range(start: int, stop: int) -> IList[int, typing.Any]: ...
+
+
+@typing.overload
+def range(start: int, stop: int, step: int) -> IList[int, typing.Any]: ...
+
+
+@wraps(stmts.Range)
+def range(start: int, stop: int, step: int) -> IList[int, typing.Any]: ...
+
+
 @wraps(stmts.Map)
 def map(
     fn: typing.Callable[[ElemT], OutElemT],

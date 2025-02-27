@@ -28,7 +28,10 @@ from .callable import (
     HasSignature as HasSignature,
     CallableStmtInterface as CallableStmtInterface,
 )
-from .lowering.call import FromPythonCall as FromPythonCall
+from .lowering.call import (
+    FromPythonCall as FromPythonCall,
+    FromPythonRangeLike as FromPythonRangeLike,
+)
 from .region.ssacfg import SSACFGRegion as SSACFGRegion
 from .lowering.context import (
     FromPythonWith as FromPythonWith,

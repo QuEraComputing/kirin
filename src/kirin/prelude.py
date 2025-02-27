@@ -15,7 +15,6 @@ from kirin.dialects.py import (
     base,
     list,
     binop,
-    range,
     slice,
     tuple,
     unary,
@@ -60,7 +59,17 @@ def python_basic(self):
 
 @dialect_group(
     python_basic.union(
-        [list, range, slice, cf, func, lowering.cf, lowering.func, lowering.call, math]
+        [
+            list,
+            slice,
+            cf,
+            func,
+            lowering.cf,
+            lowering.func,
+            lowering.call,
+            lowering.range.ilist,
+            math,
+        ]
     )
 )
 def python_no_opt(self):
@@ -74,7 +83,17 @@ def python_no_opt(self):
 
 @dialect_group(
     python_basic.union(
-        [ilist, range, slice, cf, func, math, lowering.cf, lowering.func, lowering.call]
+        [
+            ilist,
+            slice,
+            cf,
+            func,
+            math,
+            lowering.cf,
+            lowering.func,
+            lowering.call,
+            lowering.range.ilist,
+        ]
     )
 )
 def basic_no_opt(self):
@@ -164,7 +183,17 @@ def basic(self):
 
 @dialect_group(
     python_basic.union(
-        [ilist, range, slice, scf, cf, func, math, lowering.func, lowering.call]
+        [
+            ilist,
+            slice,
+            scf,
+            cf,
+            func,
+            math,
+            lowering.func,
+            lowering.call,
+            lowering.range.ilist,
+        ]
     )
 )
 def structural_no_opt(self):
@@ -178,7 +207,17 @@ def structural_no_opt(self):
 
 @dialect_group(
     python_basic.union(
-        [ilist, range, slice, scf, cf, func, math, lowering.func, lowering.call]
+        [
+            ilist,
+            slice,
+            scf,
+            cf,
+            func,
+            math,
+            lowering.func,
+            lowering.call,
+            lowering.range.ilist,
+        ]
     )
 )
 def structural(self):

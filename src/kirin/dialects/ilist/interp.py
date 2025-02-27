@@ -2,9 +2,8 @@ from kirin import ir, types
 from kirin.interp import Frame, Interpreter, MethodTable, impl
 from kirin.dialects.py.len import Len
 from kirin.dialects.py.binop import Add
-from kirin.dialects.py.range import Range
 
-from .stmts import Map, New, Push, Scan, Foldl, Foldr, ForEach
+from .stmts import Map, New, Push, Scan, Foldl, Foldr, Range, ForEach
 from .runtime import IList
 from ._dialect import dialect
 

@@ -37,6 +37,7 @@ from kirin.ir.traits import (
     FromPythonWith as FromPythonWith,
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
+    FromPythonRangeLike as FromPythonRangeLike,
     PythonLoweringTrait as PythonLoweringTrait,
     CallableStmtInterface as CallableStmtInterface,
     FromPythonWithSingleItem as FromPythonWithSingleItem,

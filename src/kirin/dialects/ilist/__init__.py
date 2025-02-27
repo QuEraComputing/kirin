@@ -24,10 +24,11 @@ from .stmts import (
 from .passes import IListDesugar as IListDesugar
 from .runtime import IList as IList
 from ._dialect import dialect as dialect
-from ._wrapper import (
+from ._wrapper import (  # careful this is not the builtin range
     map as map,
     scan as scan,
     foldl as foldl,
     foldr as foldr,
+    range as range,
     for_each as for_each,
 )

@@ -54,7 +54,6 @@ class TypeInference(Forward[types.TypeAttribute]):
         fs = fields(stmt)
         for f, value in zip(fs.args.values(), frame.get_values(stmt.args)):
             resolve.solve(f.type, value)
-
         for arg, f in zip(stmt.args, fs.args.values()):
             frame.set(arg, frame.get(arg).meet(resolve.substitute(f.type)))
         return tuple(resolve.substitute(result.type) for result in stmt.results)

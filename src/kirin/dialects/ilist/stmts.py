@@ -11,6 +11,16 @@ ListLen = types.TypeVar("ListLen")
 IListType = types.Generic(IList, ElemT, ListLen)
 
 
+@statement(dialect=dialect)
+class Range(ir.Statement):
+    name = "range"
+    traits = frozenset({ir.Pure(), ir.FromPythonRangeLike()})
+    start: ir.SSAValue = info.argument(types.Int)
+    stop: ir.SSAValue = info.argument(types.Int)
+    step: ir.SSAValue = info.argument(types.Int)
+    result: ir.ResultValue = info.result(IListType[types.Int, types.Any])
+
+
 @statement(dialect=dialect, init=False)
 class New(ir.Statement):
     traits = frozenset({ir.Pure(), ir.FromPythonCall()})

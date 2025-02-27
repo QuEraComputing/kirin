@@ -5,13 +5,22 @@ from kirin.dialects.py.binop import Add
 from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.py.indexing import GetItem
 
-from .stmts import New, Push, IListType
+from .stmts import New, Push, Range, IListType
 from .runtime import IList
 from ._dialect import dialect
 
 
 @dialect.register(key="typeinfer")
 class TypeInfer(MethodTable):
+
+    @impl(Range)
+    def range(
+        self, interp_: TypeInference, frame: Frame[types.TypeAttribute], stmt: Range
+    ):
+        result = interp_.maybe_const(stmt.result, IList)
+        if result:
+            return (IListType[types.Int, types.Literal(len(result))],)
+        return (IListType[types.Int, types.Any],)
 
     @staticmethod
     def _get_list_len(typ: types.Generic):
