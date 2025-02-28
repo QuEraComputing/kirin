@@ -115,7 +115,7 @@ Kirin helps you define the compiler for different dialects and compose multiple 
 
 ## **Example: Extending an eDSL to support parallel gates with Kirin**
 
-Suppose you have an existing quantum circuit language (in OpenQASM 2) and want to add **parallel gates**—a concept that your hardware supports but the original language doesn’t. The neutral atom quantum computers at QuEra are capable of a high degree of parallelism, which enables us to create a parallel dialect that provides the semantics of parallel gates, e.g you can write a [GHZ state preparation circuit using parallel gates](https://bloqade.quera.com/latest/digital/examples/ghz/) with less circuit depth compared to typical serial execution.
+Suppose you have an existing quantum circuit language (in OpenQASM 2) and want to add **parallel gates**—a concept that your hardware supports but the original language doesn’t. The neutral atom quantum computers at QuEra are capable of a high degree of parallelism, which enables us to create a parallel dialect that provides the semantics of parallel gates, e.g you can write a [GHZ state preparation circuit using parallel gates](https://bloqade.quera.com/latest/digital/examples/ghz/) with less circuit depth compared to typical serial execution. This parallelism is also what makes our device powerful in implementing the transversal gates for quantum error correction (QEC).
 
 To support parallel gates with Kirin, you would:
 
