@@ -204,7 +204,7 @@ We are scientists, just like you, striving for scientific breakthroughs. But weâ
 
 Kirin isnâ€™t just another compiler. It does not aim to be yet another version of existing compiler infrastructure made for professional compiler experts. Kirin is an extensible framework for *building* compilers and orchestrating specialized eDSL tools **for scientists**. By abstracting boilerplate and emphasizing interoperability, Kirin lets scientists focus on what matters: translating domain knowledge into efficient, reusable computational solutions.
 
-![image.png](https://prod-files-secure.s3.us-west-2.amazonaws.com/079fcbbc-2341-425e-8668-6c48dc681d7a/895fef36-16b4-4682-8559-87f03c926104/image.png)
+![puzzle-pieces.png](puzzle-pieces.png)
 
 Kirin's Python-based framework supports quantum innovation while enabling scientists across disciplines to build accessible, composable compiler solutions. By open-sourcing this infrastructure, we aim to unite researchers in creating domain-specific languages that will advance quantum computing and scientific discovery across multiple fields.
 
