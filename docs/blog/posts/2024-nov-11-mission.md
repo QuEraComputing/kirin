@@ -5,6 +5,7 @@ authors:
     - kaihsin
     - weinbe58
     - johnzl-777
+    - jwurtz
     - yuval
     - dean
     - shengtao
