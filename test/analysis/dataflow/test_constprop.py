@@ -1,6 +1,6 @@
 from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.prelude import basic_no_opt
+from kirin.prelude import basic, basic_no_opt
 from kirin.analysis import const
 from kirin.dialects import ilist
 
@@ -331,3 +331,25 @@ def test_closure_prop():
     stmt = main2.callable_region.blocks[0].stmts.at(3)
     call_result = frame.entries[stmt.results[0]]
     assert isinstance(call_result, const.Value)
+
+
+def test_call_lambda_prop_with_getfield():
+
+    @basic
+    def my_ps(val: float) -> ir.Method:
+
+        def my_ps_impl():
+            return val * 0.3
+
+        return my_ps_impl
+
+    @basic(fold=True)
+    def my_ps2(val: float):
+
+        my_ps_impl = my_ps(val)
+
+        return my_ps_impl()
+
+    my_ps2.print()
+
+    assert my_ps2(3.0) == 3.0 * 0.3

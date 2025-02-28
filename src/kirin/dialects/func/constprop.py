@@ -128,11 +128,18 @@ class DialectConstProp(MethodTable):
         stmt: GetField,
     ) -> StatementResult[const.Result]:
         callee_self = frame.get(stmt.obj)
+
+        # because Call construct a method from lambda with fields are lattice elements
+        # so we need to also check the fields are lattice elem or not
         if isinstance(callee_self, const.Value) and isinstance(
             callee_self.data, ir.Method
         ):
             mt: ir.Method = callee_self.data
-            return (const.Value(mt.fields[stmt.field]),)
+            if isinstance(mt.fields[stmt.field], const.Result):
+                return (mt.fields[stmt.field],)
+            else:
+                return (const.Value(mt.fields[stmt.field]),)
+
         elif isinstance(callee_self, const.PartialLambda):
             return (callee_self.captured[stmt.field],)
         return (const.Unknown(),)

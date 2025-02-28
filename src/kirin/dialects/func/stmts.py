@@ -189,7 +189,7 @@ class Lambda(Statement):
 @statement(dialect=dialect)
 class GetField(Statement):
     name = "getfield"
-    traits = frozenset({Pure()})
+    traits = frozenset({MaybePure()})
     obj: SSAValue = info.argument(MethodType)
     field: int = info.attribute()
     # NOTE: mypy somehow doesn't understand default init=False
