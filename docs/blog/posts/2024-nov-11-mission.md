@@ -7,6 +7,7 @@ authors:
     - johnzl-777
     - yuval
     - shengtao
+    - takuya
 ---
 
 # Introducing Kirin, our new open-source software development tool for fault-tolerant quantum computing
