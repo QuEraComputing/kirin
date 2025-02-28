@@ -1,6 +1,6 @@
 from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.exceptions import VerificationError, DialectLoweringError
+from kirin.exceptions import VerificationError
 from kirin.print.printer import Printer
 
 from ._dialect import dialect
@@ -16,7 +16,7 @@ class IfElse(ir.Statement):
     """
 
     name = "if"
-    traits = frozenset({ir.MaybePure()})
+    traits = frozenset({ir.MaybePure(), ir.SSACFGRegion()})
     purity: bool = info.attribute(default=False)
     cond: ir.SSAValue = info.argument(types.Any)
     # NOTE: we don't enforce the type here
@@ -32,41 +32,44 @@ class IfElse(ir.Statement):
         else_body: ir.Region | ir.Block | None = None,
     ):
         if isinstance(then_body, ir.Region):
-            if len(then_body.blocks) != 1:
-                raise DialectLoweringError(
-                    "if-else statement must have a single block in the then region"
-                )
             then_body_region = then_body
-            then_body = then_body_region.blocks[0]
+            if then_body_region.blocks:
+                then_body_block = then_body_region.blocks[-1]
+            else:
+                then_body_block = None
         elif isinstance(then_body, ir.Block):
+            then_body_block = then_body
             then_body_region = ir.Region(then_body)
 
         if isinstance(else_body, ir.Region):
             if not else_body.blocks:  # empty region
                 else_body_region = else_body
-                else_body = None
-            elif len(else_body.blocks) != 1:
-                raise DialectLoweringError(
-                    "if-else statement must have a single block in the else region"
-                )
+                else_body_block = None
+            elif len(else_body.blocks) == 0:
+                else_body_region = else_body
+                else_body_block = None
             else:
                 else_body_region = else_body
-                else_body = else_body_region.blocks[0]
+                else_body_block = else_body_region.blocks[0]
         elif isinstance(else_body, ir.Block):
             else_body_region = ir.Region(else_body)
+            else_body_block = else_body
         else:
             else_body_region = ir.Region()
+            else_body_block = None
 
         # if either then or else body has yield, we generate results
         # we assume if both have yields, they have the same number of results
-        then_yield = then_body.last_stmt
-        else_yield = else_body.last_stmt if else_body is not None else None
-        if then_yield is not None and isinstance(then_yield, Yield):
-            results = then_yield.values
-        elif else_yield is not None and isinstance(else_yield, Yield):
-            results = else_yield.values
-        else:
-            results = ()
+        results = ()
+        if then_body_block is not None:
+            then_yield = then_body_block.last_stmt
+            else_yield = (
+                else_body_block.last_stmt if else_body_block is not None else None
+            )
+            if then_yield is not None and isinstance(then_yield, Yield):
+                results = then_yield.values
+            elif else_yield is not None and isinstance(else_yield, Yield):
+                results = else_yield.values
 
         result_types = tuple(value.type for value in results)
         super().__init__(
@@ -131,7 +134,7 @@ class IfElse(ir.Statement):
 @statement(dialect=dialect, init=False)
 class For(ir.Statement):
     name = "for"
-    traits = frozenset({ir.MaybePure()})
+    traits = frozenset({ir.MaybePure(), ir.SSACFGRegion()})
     purity: bool = info.attribute(default=False)
     iterable: ir.SSAValue = info.argument(types.Any)
     body: ir.Region = info.region(multi=False)

@@ -13,7 +13,7 @@ from kirin.dialects.py.constant import Constant
 
 @dataclass
 class Inline(RewriteRule):
-    heuristic: Callable[[ir.IRNode], bool]
+    heuristic: Callable[[ir.Statement], bool]
     """inline heuristic that determines whether a function should be inlined
     """
 
