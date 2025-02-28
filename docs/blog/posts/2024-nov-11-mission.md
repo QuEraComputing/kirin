@@ -45,7 +45,7 @@ Kirin empowers scientists to build tailored embedded domain-specific languages (
 
 ### What are Kernel Functions?
 
-A kernel function is a piece of code that runs on specialized hardware—like a GPU, a cluster, or a quantum computer—instead of going through normal Python interpretation. While this concept may be unfamiliar in quantum computing, it's common in machine learning frameworks like JAX or PyTorch (TODO: link to their explanation), where the `@jit` decorator marks Python functions as kernels for compilation and optimization.
+A kernel function is a piece of code that runs on specialized hardware—like a GPU, a cluster, or a quantum computer—instead of going through normal Python interpretation. While this concept may be unfamiliar in quantum computing, it's common in machine learning frameworks like JAX ([jax jit](https://docs.jax.dev/en/latest/jit-compilation.html), [pallas](https://docs.jax.dev/en/latest/pallas/index.html)), [PyTorch](https://pytorch.org/docs/stable/jit.html) or [CUDA.jl](https://cuda.juliagpu.org/stable/development/kernel/), where the `@jit` decorator marks Python functions as kernels for compilation and optimization.
 
 ### **Example: Extending QASM2 with Kirin**
 
@@ -54,6 +54,8 @@ Suppose you have an existing quantum circuit language (like OpenQASM 2) and want
 The baseline `qasm2.main` decorator adheres strictly to QASM2 specifications:
 
 ```python
+from bloqade import qasm2
+
 @qasm2.main
 def main():
     qreg = qasm2.qreg(2) # quantum register
@@ -67,23 +69,26 @@ def main():
 You may find it becoming somewhat restrictive when writing more complicated examples due to lack of some common Python language features such as recursions and loops. To address this, we also provide `qasm2.extended` decorator that introduces some common Python languages features as well as some special gates for neutral atom arrays. For instance, see the following Quantum Fourier Transform (QFT) example written with recursion
 
 ```python
+import math
+from bloqade import qasm2
+
 @qasm2.extended
-def qft(qreg: qasm2.QReg, n: int):
-    if n == 0:
+def qft(qreg: qasm2.QReg, n: int, k: int):
+    if k == n:
         return qreg
 
-    qasm2.h(qreg[0])
-    for i in range(1, n):
-        qasm2.cu1(qreg[i], qreg[0], 2 * math.pi / 2**i)
-    qft(qreg, n - 1) # recursion
+    qasm2.h(qreg[k])
+    for i in range(k + 1, n):
+        qasm2.cu1(qreg[i], qreg[k], 2 * math.pi / 2**i)
+    qft(qreg, n, k + 1)  # recursion
     return qreg
 ```
 
-Below you can see what this immediately compiles to. While we aren’t going to dive too deep into what the output means, the interested reader can learn more about it in Kirin’s documentation (TODO: link to SSA IR basics)
+Below you can see what this immediately compiles to. While we aren’t going to dive too deep into what the output means, the interested reader can learn more about it in [Kirin’s documentation](https://queracomputing.github.io/kirin/latest/101/).
 
-![image.png](attachment:ccaac755-5ab7-4d30-8ab4-176912db441b:image.png)
+![qft-code.png](qft-code.png)
 
-caption: Compilation result of Bloqade’s extended qasm2 kernel of a QFT program.
+<!-- caption: Compilation result of Bloqade’s extended qasm2 kernel of a QFT program. -->
 
 At a high-level, this is an Intermediate Representation (IR) that the compiler emits. By representing a human-readable program in a machine-friendly IR, it allows us to further compile the program into other lower-level representations such as atom moves and pulses for neutral atom quantum computers.
 
@@ -110,7 +115,7 @@ Kirin helps you define the compiler for different dialects and compose multiple 
 
 ## **Example: Extending an eDSL to support parallel gates with Kirin**
 
-Suppose you have an existing quantum circuit language (in OpenQASM 2) and want to add **parallel gates**—a concept that your hardware supports but the original language doesn’t. The neutral atom quantum computers at QuEra are capable of a high degree of parallelism, which enables us to create a parallel dialect that provides the semantics of parallel gates, e.g you can write a GHZ state preparation circuit using parallel gates (TODO: link to example in documentation) with less circuit depth compared to typical serial execution.
+Suppose you have an existing quantum circuit language (in OpenQASM 2) and want to add **parallel gates**—a concept that your hardware supports but the original language doesn’t. The neutral atom quantum computers at QuEra are capable of a high degree of parallelism, which enables us to create a parallel dialect that provides the semantics of parallel gates, e.g you can write a [GHZ state preparation circuit using parallel gates](https://bloqade.quera.com/latest/digital/examples/ghz/) with less circuit depth compared to typical serial execution.
 
 To support parallel gates with Kirin, you would:
 
@@ -171,13 +176,13 @@ By open-sourcing both our quantum eDSLs and infrastructure, we invite the entire
 
 Kirin is open source, and we welcome the community’s feedback
 
-- **Download and Install**: Check out Kirin’s repository on GitHub (TODO: link) and install via `pip`:
+- **Download and Install**: Check out Kirin’s [repository on GitHub](https://github.com/QuEraComputing/kirin) and install via `pip`:
 
 ```bash
 pip install kirin-toolchain
 ```
 
-- **Documentation and Examples**: Visit our docs site (TODO: link) for a getting-started guide and examples.
+- **Documentation and Examples**: Visit our [docs site](https://queracomputing.github.io/kirin/latest/) for a getting-started guide and examples.
 - **Contribute**: We’re looking for new dialect ideas, bug reports, documentation improvements, or help with integration. Raise an issue or submit a PR on GitHub if you’d like to get involved. Or just join issue discussions on existing topics!
 
 Whether you’re a quantum researcher, a compiler engineer, or just passionate about building next-generation compiler tools, **Kirin** is here to help you design, optimize, and compose advanced computational workflows with ease. We can’t wait to see what you’ll create!
