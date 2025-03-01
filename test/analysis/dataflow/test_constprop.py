@@ -331,3 +331,24 @@ def test_closure_prop():
     stmt = main2.callable_region.blocks[0].stmts.at(3)
     call_result = frame.entries[stmt.results[0]]
     assert isinstance(call_result, const.Value)
+
+
+def test_issue_300():
+    @basic_no_opt
+    def my_ps(val: float):
+        def my_ps_impl():
+            return val * 0.3
+
+        return my_ps_impl
+
+    @basic_no_opt
+    def my_ps2(val: float):
+        my_ps_impl = my_ps(val)
+        return my_ps_impl()
+
+    prop = const.Propagate(basic_no_opt)
+    frame, ret = prop.run_analysis(my_ps2)
+    invoke = my_ps2.callable_region.blocks[0].stmts.at(0)
+    call = my_ps2.callable_region.blocks[0].stmts.at(1)
+    assert invoke in frame.should_be_pure
+    assert call in frame.should_be_pure

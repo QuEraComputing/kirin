@@ -1,5 +1,4 @@
-"""Lowering Python AST to cf dialect.
-"""
+"""Lowering Python AST to cf dialect."""
 
 import ast
 

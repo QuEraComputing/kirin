@@ -1,5 +1,4 @@
-"""A minimal language example with a single pass that does nothing.
-"""
+"""A minimal language example with a single pass that does nothing."""
 
 from kirin import ir
 from kirin.dialects import cf, py, func, lowering

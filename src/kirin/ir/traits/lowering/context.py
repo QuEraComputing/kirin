@@ -1,5 +1,4 @@
-"""Traits for customizing lowering of Python `with` syntax to a statement.
-"""
+"""Traits for customizing lowering of Python `with` syntax to a statement."""
 
 import ast
 from typing import TYPE_CHECKING, TypeVar

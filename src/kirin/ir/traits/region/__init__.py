@@ -1,2 +1,1 @@
-"""Builtin region traits.
-"""
+"""Builtin region traits."""
