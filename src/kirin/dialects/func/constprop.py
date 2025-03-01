@@ -21,10 +21,10 @@ class DialectConstProp(MethodTable):
         # give up on dynamic method calls
         callee = frame.get(stmt.callee)
         if isinstance(callee, const.PartialLambda):
-            call_frame, ret = self._call_lambda(
-                interp,
-                callee,
-                interp.permute_values(
+            call_frame, ret = interp.run_callable(
+                callee.code,
+                (callee,)
+                + interp.permute_values(
                     callee.argnames, frame.get_values(stmt.inputs), stmt.kwargs
                 ),
             )
@@ -45,32 +45,6 @@ class DialectConstProp(MethodTable):
         if not call_frame.frame_is_not_pure:
             frame.should_be_pure.add(stmt)
         return (ret,)
-
-    def _call_lambda(
-        self,
-        interp: const.Propagate,
-        callee: const.PartialLambda,
-        args: tuple[const.Result, ...],
-    ):
-        # NOTE: we still use PartialLambda because
-        # we want to gurantee what we receive here in captured
-        # values are all lattice elements and not just obtain via
-        # Const(Method(...)) which is Any.
-        if (trait := callee.code.get_trait(ir.SymbolOpInterface)) is not None:
-            name = trait.get_sym_name(callee.code).data
-        else:
-            name = "lambda"
-
-        mt = ir.Method(
-            mod=None,
-            py_func=None,
-            sym_name=name,
-            arg_names=callee.argnames,
-            dialects=interp.dialects,
-            code=callee.code,
-            fields=callee.captured,
-        )
-        return interp.run_method(mt, args)
 
     @impl(Invoke)
     def invoke(

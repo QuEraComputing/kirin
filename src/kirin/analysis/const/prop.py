@@ -84,15 +84,15 @@ class Propagate(ForwardExtra[Frame, Result]):
     def eval_stmt(
         self, frame: Frame, stmt: ir.Statement
     ) -> interp.StatementResult[Result]:
-        if stmt.has_trait(ir.ConstantLike):
-            return self._try_eval_const_pure(frame, stmt, ())
-        elif stmt.has_trait(ir.Pure):
-            values = frame.get_values(stmt.args)
-            if types.is_tuple_of(values, Value):
-                return self._try_eval_const_pure(frame, stmt, values)
-
         method = self.lookup_registry(frame, stmt)
         if method is None:
+            if stmt.has_trait(ir.ConstantLike):
+                return self._try_eval_const_pure(frame, stmt, ())
+            elif stmt.has_trait(ir.Pure):
+                values = frame.get_values(stmt.args)
+                if types.is_tuple_of(values, Value):
+                    return self._try_eval_const_pure(frame, stmt, values)
+
             if stmt.has_trait(ir.Pure):
                 return (Unknown(),)  # no implementation but pure
             # not pure, and no implementation, let's say it's not pure
@@ -100,7 +100,7 @@ class Propagate(ForwardExtra[Frame, Result]):
             return (Unknown(),)
 
         ret = method(self, frame, stmt)
-        if stmt.has_trait(ir.IsTerminator):
+        if stmt.has_trait(ir.IsTerminator) or stmt.has_trait(ir.Pure):
             return ret
         elif not stmt.has_trait(ir.MaybePure):  # cannot be pure at all
             frame.frame_is_not_pure = True
