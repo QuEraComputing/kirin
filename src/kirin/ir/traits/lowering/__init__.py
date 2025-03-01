@@ -1,2 +1,1 @@
-"""Lowering traits for the IR.
-"""
+"""Lowering traits for the IR."""

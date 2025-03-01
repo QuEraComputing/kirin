@@ -1,5 +1,4 @@
-"""Copied from dataclasses in Python 3.10.13.
-"""
+"""Copied from dataclasses in Python 3.10.13."""
 
 from types import FunctionType
 

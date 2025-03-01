@@ -1,5 +1,4 @@
-"""A function dialect that is compatible with python semantics.
-"""
+"""A function dialect that is compatible with python semantics."""
 
 from kirin.dialects.func import (
     emit as emit,
