@@ -465,7 +465,7 @@ def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg
 
 
 def _split_type_args(
-    args: tuple[TypeVarValue, ...]
+    args: tuple[TypeVarValue, ...],
 ) -> tuple[tuple[TypeAttribute, ...], Vararg | None]:
     args = _typeparams_list2tuple(args)
     if args is None or len(args) == 0:

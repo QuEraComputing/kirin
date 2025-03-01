@@ -1,5 +1,4 @@
-"""Bindings for built-in types.
-"""
+"""Bindings for built-in types."""
 
 from kirin.ir.method import Method
 from kirin.ir.attrs.types import (

@@ -1,5 +1,4 @@
-"""Lattice for constant analysis.
-"""
+"""Lattice for constant analysis."""
 
 from typing import Any, final
 from dataclasses import dataclass

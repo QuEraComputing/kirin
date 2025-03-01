@@ -1,5 +1,4 @@
-"""Definition of Kirin's Intermediate Representation (IR) nodes.
-"""
+"""Definition of Kirin's Intermediate Representation (IR) nodes."""
 
 from kirin.ir.nodes.base import IRNode as IRNode
 from kirin.ir.nodes.stmt import Statement as Statement
