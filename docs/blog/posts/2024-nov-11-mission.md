@@ -12,7 +12,7 @@ authors:
     - takuya
 ---
 
-# Introducing Kirin, our new open-source software development tool for fault-tolerant quantum computing
+# Introducing Kirin, a new open-source software development tool for fault-tolerant quantum computing
 
 Today, we are excited to introduce **Kirin (Kernel Intermediate Representation INfrastructure)**, a new Python-based compiler infrastructure designed to simplify how scientists and engineers create embedded domain-specific languages (eDSLs)—especially in the space of quantum computing. We are introducing this alongside the next generation of the **Bloqade SDK (v0.16)** — the neutral atom quantum computing software development kit.
 
@@ -49,7 +49,7 @@ A kernel function is a piece of code that runs on specialized hardware—like a 
 
 ### **Example: Extending QASM2 with Kirin**
 
-Suppose you have an existing quantum circuit language (like OpenQASM 2) and want to add **recursion and loops**—a concept that your original language doesn’t. Let’s see how this works.
+Suppose you have an existing quantum circuit language (like OpenQASM 2) and want to add **recursion and loops**—a concept that your original circuit language doesn’t have. Let’s see how this works.
 
 The baseline `qasm2.main` decorator adheres strictly to QASM2 specifications:
 
@@ -158,11 +158,10 @@ Under the hood, Kirin translates this code into its IR, combining Python semanti
 
 This initial release of Kirin centers on the **infrastructure**—the IR, dialect system, and Python integration—so you can:
 
-1.	**Prototype New eDSLs**: Start defining your own dialects or try out the built-in ones (for quantum gates, parallel operations, etc.).
-
-2.	**Optimize with Custom Passes**: Take advantage of IR transformations to optimize your kernel for speed, resource usage, or hardware constraints.
-
-3.	**Contribute**: Share your domain expertise by creating new dialects or compiler transforms —be it for advanced noise modeling, novel quantum error correction strategies, or new compilation algorithms.
+- **Prototype New eDSLs**: Start defining your own dialects or try out the built-in ones (for quantum gates, parallel operations, etc.).
+- **Optimize with Custom Passes**: Take advantage of IR transformations to optimize your kernel for speed, resource usage, or hardware constraints.
+- **Contribute**: Share your domain expertise by creating new dialects or compiler transforms — be it for advanced noise modeling, novel quantum error correction strategies, or new compilation algorithms. Join us on [slack](https://join.slack.com/t/kirin-1lj5658/shared_invite/zt-30qhwg83r-fTUdXF9w47nTiNFgO18X4w) or [GitHub](https://github.com/QuEraComputing/kirin) to discuss your ideas!
+- **Star US on GitHub**: If you like what you see, please give us a star on [GitHub](https://github.com/QuEraComputing/kirin)!
 
 Looking ahead, we plan to release additional dialects and compiler tools that will enable:
 
@@ -170,7 +169,7 @@ Looking ahead, we plan to release additional dialects and compiler tools that wi
 2. Hardware-specific optimizations to improve execution fidelity and performance on neutral atom platform
 3. A fully functional pipeline to access our state-of-the-art neutral atom hardware
 
-By open-sourcing both our quantum eDSLs and infrastructure, we invite the entire community to join us in advancing quantum computing. Together, we can push the boundaries of what's possible.
+By open-sourcing both our quantum eDSLs (Bloqade) and infrastructure (Kirin), we invite the entire community to join us in advancing quantum computing. Together, we can push the boundaries of what's possible.
 
 ## Get Involved
 
@@ -214,7 +213,7 @@ Kirin isn’t just another compiler—it’s a **framework** for building compil
 
 - **Quantum Hardware** like neutral-atom arrays, trapped ions, or superconducting qubits
 - **Classical HPC** kernels for domain-specific simulation workflows
-- **Hybrid Quantum-Classical** pipelines that blend circuit-based and analog approaches
+- **Hybrid Quantum-Classical** blend quantum and classical workflows treating both as first-class citizens
 
 Kirin’s modular design gives you a foundation to express your domain logic, refine it through compiler passes, and ultimately generate efficient, hardware-friendly instructions. Because Kirin is built by scientists *for* scientists, it emphasizes approachable abstractions and leaves the door open for community-driven innovation.
 
