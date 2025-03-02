@@ -160,8 +160,7 @@ This initial release of Kirin centers on the **infrastructure**—the IR, dialec
 
 - **Prototype New eDSLs**: Start defining your own dialects or try out the built-in ones (for quantum gates, parallel operations, etc.).
 - **Optimize with Custom Passes**: Take advantage of IR transformations to optimize your kernel for speed, resource usage, or hardware constraints.
-- **Contribute**: Share your domain expertise by creating new dialects or compiler transforms — be it for advanced noise modeling, novel quantum error correction strategies, or new compilation algorithms. Join us on [slack](https://join.slack.com/t/kirin-1lj5658/shared_invite/zt-30qhwg83r-fTUdXF9w47nTiNFgO18X4w) or [GitHub](https://github.com/QuEraComputing/kirin) to discuss your ideas!
-- **Star US on GitHub**: If you like what you see, please give us a star on [GitHub](https://github.com/QuEraComputing/kirin)!
+- **Contribute**: Share your domain expertise by creating new dialects or compiler transforms — be it for advanced noise modeling, novel quantum error correction strategies, or new compilation algorithms.
 
 Looking ahead, we plan to release additional dialects and compiler tools that will enable:
 
@@ -171,9 +170,7 @@ Looking ahead, we plan to release additional dialects and compiler tools that wi
 
 By open-sourcing both our quantum eDSLs (Bloqade) and infrastructure (Kirin), we invite the entire community to join us in advancing quantum computing. Together, we can push the boundaries of what's possible.
 
-## Get Involved
-
-Kirin is open source, and we welcome the community’s feedback
+## Try it out
 
 - **Download and Install**: Check out Kirin’s [repository on GitHub](https://github.com/QuEraComputing/kirin) and install via `pip`:
 
@@ -182,7 +179,14 @@ pip install kirin-toolchain
 ```
 
 - **Documentation and Examples**: Visit our [docs site](https://queracomputing.github.io/kirin/latest/) for a getting-started guide and examples.
-- **Contribute**: We’re looking for new dialect ideas, bug reports, documentation improvements, or help with integration. Raise an issue or submit a PR on GitHub if you’d like to get involved. Or just join issue discussions on existing topics!
+
+## Community
+
+We encourage everyone join the effort to build this infrastructure together
+
+- **Slack** join via [this link](https://join.slack.com/t/kirin-1lj5658/shared_invite/zt-30qhwg83r-fTUdXF9w47nTiNFgO18X4w) to meet and share your ideas about Kirin with the community!
+- **GitHub Discussion** Have trouble using Kirin but not sure if it should be a bug report? Or just want to announce your package built using Kirin? Or more public discussion or announcement in the community? Try Kirin’s [GitHub Discussion](https://github.com/QuEraComputing/kirin/discussions).
+- **Star US on GitHub**: If you like what you see, please give us a star on [GitHub](https://github.com/QuEraComputing/kirin)!
 
 Whether you’re a quantum researcher, a compiler engineer, or just passionate about building next-generation compiler tools, **Kirin** is here to help you design, optimize, and compose advanced computational workflows with ease. We can’t wait to see what you’ll create!
 
