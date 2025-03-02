@@ -186,7 +186,7 @@ We encourage everyone join the effort to build this infrastructure together
 
 - **Slack** join via [this link](https://join.slack.com/t/kirin-1lj5658/shared_invite/zt-30qhwg83r-fTUdXF9w47nTiNFgO18X4w) to meet and share your ideas about Kirin with the community!
 - **GitHub Discussion** Have trouble using Kirin but not sure if it should be a bug report? Or just want to announce your package built using Kirin? Or more public discussion or announcement in the community? Try Kirin’s [GitHub Discussion](https://github.com/QuEraComputing/kirin/discussions).
-- **Star US on GitHub**: If you like what you see, please give us a star on [GitHub](https://github.com/QuEraComputing/kirin)!
+- **Star Kirin on GitHub**: If you like what you see, please give us a star on [GitHub](https://github.com/QuEraComputing/kirin)!
 
 Whether you’re a quantum researcher, a compiler engineer, or just passionate about building next-generation compiler tools, **Kirin** is here to help you design, optimize, and compose advanced computational workflows with ease. We can’t wait to see what you’ll create!
 
