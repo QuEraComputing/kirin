@@ -1,6 +1,46 @@
 authors:
   rogerluo:
     name: Xiuzhe (Roger) Luo
-    description: Creator
+    description: I cast quantum spells. Senior Scientific Software Engineer at QuEra Computing Inc.
     avatar: https://github.com/Roger-luo.png
     url: https://rogerluo.dev
+  weinbe58:
+    name: Phillip Weinberg
+    description: I build Classical and Quantum software. Senior Scientific Software Engineer at QuEra Computing Inc.
+    avatar: https://github.com/weinbe58.png
+    url: https://github.com/weinbe58
+  kaihsin:
+    name: Kai-Hsin Wu
+    description: Scientific Software Engineer at QuEra Computing Inc.
+    avatar: https://github.com/kaihsin.png
+    url: https://github.com/kaihsin
+  johnzl-777:
+    name: John Long
+    description: Scientific Software Developer at QuEra Computing Inc.
+    avatar: https://github.com/johnzl-777.png
+    url: https://github.com/johnzl-777
+  yuval:
+    name: Yuval Boger
+    description: Chief Commercial Officer at QuEra Computing Inc.
+    avatar: https://media.licdn.com/dms/image/v2/D5603AQHYz_g9GdF7jQ/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1690639226393?e=1746057600&v=beta&t=Jji90LOhwmtBohp3FtD5peXCqkO_QFzOyt7gzdHNCZI
+    url: https://www.linkedin.com/in/yuvalboger/
+  shengtao:
+    name: Shengtao Wang
+    description: Quantum Algorithms & Applications Manager at QuEra Computing Inc.
+    avatar: https://media.licdn.com/dms/image/v2/C5603AQH8_yNWMmTWbw/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1572705692501?e=1746057600&v=beta&t=T_XyG8bvHA4gNIwZvGb0oteEXLO_6GaBx3p2P2e_Llw
+    url: https://www.linkedin.com/in/shengtao-wang-aa6548178/
+  takuya:
+    name: Takuya Kitagawa
+    description: President of QuEra Computing Inc.
+    avatar: https://media.licdn.com/dms/image/v2/C4D03AQH1s7sGmGmfag/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1516633791754?e=1746057600&v=beta&t=ClOY_mraAuv0uN7hQZhugcsYqPUlSvdBVG9IgtXb5sw
+    url: https://www.linkedin.com/in/takuya-kitagawa-2b366117/
+  dean:
+    name: Dean Bogdanovic
+    description: Discovering new technology applications. Senior Vice President of Engineering at QuEra Computing Inc.
+    avatar: https://www.sdmmag.com/ext/resources/2022/05/03/Alef_Dean-Bogdanovic_Headshot.jpeg?1651611331
+    url: https://www.linkedin.com/in/dbogdanovic/
+  jwurtz:
+    name: Jonathan Wurtz
+    description: Quantum Solutions Lead at QuEra Computing Inc.
+    avatar: https://github.com/jon-wurtz.png
+    url: https://www.linkedin.com/in/jonathan-wurtz-7a4855181/
