@@ -14,17 +14,18 @@ authors:
 
 # Introducing Kirin, a new open-source software development tool for fault-tolerant quantum computing
 
-Today, we are excited to introduce **Kirin (Kernel Intermediate Representation INfrastructure)**, a new Python-based compiler infrastructure designed to simplify how scientists and engineers create embedded domain-specific languages (eDSLs)—especially in the space of quantum computing. We are introducing this alongside the next generation of the **Bloqade SDK (v0.16)** — the neutral atom quantum computing software development kit.
+Today, we are excited to introduce **Kirin (Kernel Intermediate Representation INfrastructure)**, a new Python-based compiler infrastructure designed to simplify how scientists and engineers create embedded domain-specific languages (eDSLs)—especially in the space of quantum computing. We are introducing this alongside the next generation of the Bloqade SDK (v0.16) — the neutral atom quantum computing software development kit.
 
-Note: if you are unfamiliar with eDSLs, see the appendix for a more detailed description of the motivation and use of eDSLs.
+!!! note
+    if you are unfamiliar with eDSLs, see the [appendix](#appendix-the-growing-need-for-edsls-in-quantum-science) for a more detailed description of the motivation and use of eDSLs.
 
-[Bloqade](https://bloqade.quera.com) will serve as a hub for eDSLs targeting neutral-atom quantum computers. Kirin introduces a powerful system of dialects and a robust Intermediate Representation (IR) that together address the unique challenges in quantum programming, scientific simulation, and hardware control. In this inaugural release (v0.16), we introduce a **QASM2** eDSL and its neutral-atom extensions, powered by Kirin.
+[Bloqade](https://bloqade.quera.com) will serve as a hub for eDSLs targeting neutral-atom quantum computers. Kirin introduces a powerful system of dialects and a robust Intermediate Representation (IR) that together address the unique challenges in quantum programming, scientific simulation, and hardware control. In this inaugural release (v0.21), we introduce a **QASM2 eDSL** and its neutral-atom extensions, powered by Kirin.
 
 Together, these open-source tools are designed to empower scientists and developers to push the boundaries of quantum computing and scientific research.
 
 ## What is Kirin?
 
-Kirin is a new compiler infrastructure designed to simplify the development of **embedded domain-specific languages (eDSLs)**, particularly for quantum computing and other scientific domains. In quantum computing, fragmented representations of quantum objects—such as circuits, pulses, noise models, control flows, and tensor networks—create significant challenges in unifying them. Kirin addresses these challenges by providing tools to **unify and compose** these diverse representations and their corresponding compilation processes.
+Kirin is a new compiler infrastructure designed to simplify the development of **embedded domain-specific languages (eDSLs)**, particularly for quantum computing and other scientific domains. In quantum computing, fragmented representations of quantum objects—such as circuits, pulses, noise models, control flows, and tensor networks—create significant challenges in integrating them into a cohesive framework. Kirin addresses these challenges by providing tools to **unify and compose** these diverse representations and their corresponding compilation processes.
 
 ## Kirin’s mission
 
@@ -45,11 +46,11 @@ Kirin empowers scientists to build tailored embedded domain-specific languages (
 
 ### What are Kernel Functions?
 
-A kernel function is a piece of code that runs on specialized hardware—like a GPU, a cluster, or a quantum computer—instead of going through normal Python interpretation. While this concept may be unfamiliar in quantum computing, it's common in machine learning frameworks like JAX ([jax jit](https://docs.jax.dev/en/latest/jit-compilation.html), [pallas](https://docs.jax.dev/en/latest/pallas/index.html)), [PyTorch](https://pytorch.org/docs/stable/jit.html) or [CUDA.jl](https://cuda.juliagpu.org/stable/development/kernel/), where the `@jit` decorator marks Python functions as kernels for compilation and optimization.
+A kernel function is a piece of code that runs on specialized hardware—like a GPU, a cluster, or a quantum computer—instead of going through normal Python interpretation. While this concept may be unfamiliar in the field of quantum computing, it's common in machine learning frameworks like JAX ([jax jit](https://docs.jax.dev/en/latest/jit-compilation.html), [pallas](https://docs.jax.dev/en/latest/pallas/index.html)), [PyTorch](https://pytorch.org/docs/stable/jit.html) or [CUDA.jl](https://cuda.juliagpu.org/stable/development/kernel/), where the `@jit` decorator marks Python functions as kernels for compilation and optimization.
 
 ### **Example: Extending QASM2 with Kirin**
 
-Suppose you have an existing quantum circuit language (like OpenQASM 2) and want to add **recursion and loops**—a concept that your original circuit language doesn’t have. Let’s see how this works.
+Suppose you have an existing quantum circuit language (like OpenQASM 2) and you would like to add **recursion and loops** — a concept that your original circuit language doesn’t have. Let’s see how this works.
 
 The baseline `qasm2.main` decorator adheres strictly to QASM2 specifications:
 
@@ -66,7 +67,7 @@ def main():
        qasm2.x(qreg[0])
 ```
 
-You may find it becoming somewhat restrictive when writing more complicated examples due to lack of some common Python language features such as recursions and loops. To address this, we also provide `qasm2.extended` decorator that introduces some common Python languages features as well as some special gates for neutral atom arrays. For instance, see the following Quantum Fourier Transform (QFT) example written with recursion
+You may quickly find it restrictive when writing more complicated examples due to the lack of some common Python language features such as recursions and loops. To address this, we provide a `qasm2.extended` decorator that introduces some common Python language features as well as some special gates for the neutral atom platform. For instance, see the following Quantum Fourier Transform (QFT) example written with recursion:
 
 ```python
 import math
@@ -84,11 +85,12 @@ def qft(qreg: qasm2.QReg, n: int, k: int):
     return qreg
 ```
 
-Below you can see what this immediately compiles to. While we aren’t going to dive too deep into what the output means, the interested reader can learn more about it in [Kirin’s documentation](https://queracomputing.github.io/kirin/latest/101/).
+Below, you can see what this immediately compiles to. While we aren’t going to dive too deeply into what the output means, the interested readers can learn more about it in [Kirin’s documentation](https://queracomputing.github.io/kirin/latest/101/).
 
-![qft-code.png](qft-code.png)
-
-<!-- caption: Compilation result of Bloqade’s extended qasm2 kernel of a QFT program. -->
+<figure markdown="span">
+  ![QFT IR](qft-code.png){ width="800" }
+  <figcaption>Compilation result of Bloqade’s extended qasm2 kernel of a QFT program.</figcaption>
+</figure>
 
 At a high-level, this is an Intermediate Representation (IR) that the compiler emits. By representing a human-readable program in a machine-friendly IR, it allows us to further compile the program into other lower-level representations such as atom moves and pulses for neutral atom quantum computers.
 
@@ -96,7 +98,7 @@ At a high-level, this is an Intermediate Representation (IR) that the compiler e
 
 At QuEra, we can design and compile many different eDSLs to enable fast iterations on our machine architecture. This begs the question: how do we easily compose and maintain them?
 
-The Kirin answer to the problem  **dialects** - smaller, highly composable units of languages. While the actual implementation of the `@qasm2.extended` eDSL involves several dialects, in general, it introduces the QASM2 unitary operator into Python, so equivalently you can just write
+The answer to the problem in Kirin is **dialects** — smaller, highly composable units of languages. While the actual implementation of the `@qasm2.extended` eDSL involves several dialects, in general, it introduces the QASM2 unitary operator into Python, so equivalently you can just write
 
 ```python
 from kirin.prelude import basic
@@ -106,20 +108,22 @@ from bloqade import qasm2
 def qft(qreg: qasm2.QReg, n: int): ... # same as previous
 ```
 
-Where the`basic` dialect provides the basic Python language support (e.g functions, control flows) and the `qasm2.uop` dialect provides the QASM2 gates. So creating a new eDSL on top of an existing one is very simple:
+where the `basic` dialect provides the basic Python language support (e.g., functions, control flows) and the `qasm2.uop` dialect provides the QASM2 gates. Thus, creating a new eDSL on top of an existing one is very simple:
 
 - step 1: Define the semantics you want to add on top of an existing eDSL as dialects
 - step 2: Add them to the existing eDSL via `.add` method
 
-Kirin helps you define the compiler for different dialects and compose multiple compiler components made for different dialects together easily.
+Kirin, the compiler infrastructure, helps you define the compilers for different dialects and easily compose multiple compiler components made for different dialects.
 
 ## **Example: Extending an eDSL to support parallel gates with Kirin**
 
-Suppose you have an existing quantum circuit language (in OpenQASM 2) and want to add **parallel gates**—a concept that your hardware supports but the original language doesn’t. The neutral atom quantum computers at QuEra are capable of a high degree of parallelism, which enables us to create a parallel dialect that provides the semantics of parallel gates, e.g you can write a [GHZ state preparation circuit using parallel gates](https://bloqade.quera.com/latest/digital/examples/ghz/) with less circuit depth compared to typical serial execution. This parallelism is also what makes our device powerful in implementing the transversal gates for quantum error correction (QEC).
+Suppose you have an existing quantum circuit language (in OpenQASM 2) and would like to add **parallel gates**—a concept that your hardware supports but the original language doesn’t. The neutral-atom quantum computers at QuEra are capable of a high degree of parallelism, which calls for a parallel dialect that provides the semantics of parallel gates. For example, you can write a [GHZ state preparation circuit using parallel gates](https://bloqade.quera.com/latest/digital/examples/ghz/) with a shorter circuit depth compared to a typical serial execution. This parallelism is also what makes our device powerful in implementing certain transversal gates that are desirable for quantum error correction (QEC).
 
 To support parallel gates with Kirin, you would:
 
-1. **Define a Dialect** that expresses parallel operations (for example, `parallel.u` or `parallel.cz`).
+To support parallel gates with Kirin, you would:
+
+1. **Define a dialect** that expresses parallel operations (for example, `parallel.u` or `parallel.cz`).
 2. **Compose** that dialect with your base language dialect(s).
 3. **Decorate** your Python function with Kirin’s compiler directive, so it compiles to the new IR.
 
@@ -152,21 +156,21 @@ def ghz_layer(i_layer: int, qreg: qasm2.QReg):
     qasm2.parallel.u(qargs=targ_qubits, theta=math.pi / 2, phi=0.0, lam=0.0)
 ```
 
-Under the hood, Kirin translates this code into its IR, combining Python semantics such as closure (from `basic`) with the parallel gate semantics (from `qasm2.dialects.parallel`). You can then run optimization passes or map the IR to specific device instructions—**all without rewriting your entire stack**. For convenience, we wrap the above extension with some modification in a dialect group  `@qasm2.extended`  demonstrated previously in Bloqade SDK.
+Under the hood, Kirin translates this code into its IR, combining Python semantics such as closure (from `basic`) with the parallel gate semantics (from `qasm2.dialects.parallel`). You can then run optimization passes or map the IR to specific device instructions—**all without rewriting your entire stack**. For convenience, we wrap the above extension with some modification in a dialect group  `@qasm2.extended`  demonstrated previously in the Bloqade SDK.
 
 ## Outlook and Future Plans
 
-This initial release of Kirin centers on the **infrastructure**—the IR, dialect system, and Python integration—so you can:
+This initial release of Kirin centers on the **infrastructure** — the IR, dialect system, and Python integration — so you can:
 
-- **Prototype New eDSLs**: Start defining your own dialects or try out the built-in ones (for quantum gates, parallel operations, etc.).
-- **Optimize with Custom Passes**: Take advantage of IR transformations to optimize your kernel for speed, resource usage, or hardware constraints.
-- **Contribute**: Share your domain expertise by creating new dialects or compiler transforms — be it for advanced noise modeling, novel quantum error correction strategies, or new compilation algorithms.
+1.	**Prototype New eDSLs**: Start defining your own dialects or try out the built-in ones (for quantum gates, parallel operations, etc.).
+2.	**Optimize with Custom Passes**: Take advantage of IR transformations to optimize your kernel for speed, resource usage, or hardware constraints.
+3.	**Contribute**: Share your domain expertise by creating new dialects or compiler transforms —be it for advanced noise modeling, novel quantum error correction strategies, or new compilation algorithms.
 
 Looking ahead, we plan to release additional dialects and compiler tools that will enable:
 
 1. Programming with lower-level neutral atom machine concepts, including atom movement
-2. Hardware-specific optimizations to improve execution fidelity and performance on neutral atom platform
-3. A fully functional pipeline to access our state-of-the-art neutral atom hardware
+2. Hardware-specific optimizations to improve execution fidelity and performance on the neutral-atom platform
+3. A fully functional pipeline to access our state-of-the-art neutral-atom hardware
 
 By open-sourcing both our quantum eDSLs (Bloqade) and infrastructure (Kirin), we invite the entire community to join us in advancing quantum computing. Together, we can push the boundaries of what's possible.
 
@@ -177,7 +181,6 @@ By open-sourcing both our quantum eDSLs (Bloqade) and infrastructure (Kirin), we
 ```bash
 pip install kirin-toolchain
 ```
-
 - **Documentation and Examples**: Visit our [docs site](https://queracomputing.github.io/kirin/latest/) for a getting-started guide and examples.
 
 ## Community
@@ -185,41 +188,35 @@ pip install kirin-toolchain
 We encourage everyone join the effort to build this infrastructure together
 
 - **Slack** join via [this link](https://join.slack.com/t/kirin-1lj5658/shared_invite/zt-30qhwg83r-fTUdXF9w47nTiNFgO18X4w) to meet and share your ideas about Kirin with the community!
-- **GitHub Discussion** Have trouble using Kirin but not sure if it should be a bug report? Or just want to announce your package built using Kirin? Or more public discussion or announcement in the community? Try Kirin’s [GitHub Discussion](https://github.com/QuEraComputing/kirin/discussions).
+- **GitHub Discussion**: ****Have trouble using Kirin but not sure if it should be a bug report? Or want to announce your package built using Kirin? Or more public discussion or announcement in the community? Try Kirin’s [GitHub Discussion](https://github.com/QuEraComputing/kirin/discussions).
 - **Star Kirin on GitHub**: If you like what you see, please give us a star on [GitHub](https://github.com/QuEraComputing/kirin)!
 
 Whether you’re a quantum researcher, a compiler engineer, or just passionate about building next-generation compiler tools, **Kirin** is here to help you design, optimize, and compose advanced computational workflows with ease. We can’t wait to see what you’ll create!
 
 ## Appendix: The Growing Need for eDSLs in Quantum Science
 
-Over the past decade, the fields of quantum computing and scientific research have seen remarkable progress, both in **software** and **hardware**. Scientists have developed increasingly sophisticated simulators—such as quantum circuit simulators, differential equation solvers, and differentiable solvers—as well as a variety of human-controllable physical systems, including neutral atoms, trapped ions, superconducting qubits, and optical lattices. These systems are now being used for a wide range of applications.
+Over the past decade, the fields of quantum computing and scientific research have seen remarkable progress, both in **software** and **hardware**. Scientists have developed increasingly sophisticated simulators—such as quantum circuit simulators, differential equation solvers, and differentiable solvers—as well as a variety of highly controllable quantum systems, including neutral atoms, trapped ions, superconducting qubits, and atoms in optical lattices. These systems are now being used for a wide range of applications.
 
 This rapid progress underscores the need for more advanced tools to effectively interact with these simulators and physical systems. To address this, scientists have created numerous **domain-specific languages (DSLs)** and their corresponding compilers. Examples include:
 
 - **Quantum Circuit Languages**: Quipper, ProjectQ, Q#, Cirq, OpenQASM 2 & 3, PennyLane, Stim
 - **Tensor Network Libraries**: ITensor, OMEinsum, QUIMB, Tenet
 
-At its core, computation translates problem descriptions into signals controlling physical systems, making every computation fundamentally a compilation challenge. Building domain-specific languages (DSLs) and compilers is complex, typically beyond most scientists' expertise. Specialized domains like circuit simplification, hardware engineering, atomic physics, and quantum error correction require deep integration into software. Relying on a small compiler engineering team to develop these DSLs is inherently unscalable.
+At its core, computations translate problem descriptions into signals controlling physical systems, making every computation fundamentally a compilation challenge. Building domain-specific languages (DSLs) and compilers is complex, typically beyond most scientists' expertise. Specialized domains like circuit simplification, hardware engineering, atomic physics, and quantum error correction require deep integration into software. Relying on a small compiler engineering team to develop these DSLs is inherently impractical at the current stage of quantum.
 
-We are scientists, just like you, striving for scientific breakthroughs. But we’ve found ourselves stuck trying to build compilers to program our own machines and simulators. Existing tools are either too complex for scientists to use effectively or not flexible enough to adapt to our specific needs. These challenges are not unique to the neutral atom platform—they exist across the broader quantum computing community.
+We are scientists, just like you, striving for scientific breakthroughs. But we’ve found ourselves stuck trying to build complex compilers to program our own machines and simulators. Existing tools are either too complex for scientists to use effectively or not flexible enough to adapt to our specific needs. These challenges are not unique to the neutral-atom community—they exist across the broader quantum computing community.
 
-### **What Kirin Isn’t**
+### How Kirin Fits Into the Bigger Picture
 
-Kirin isn’t just another compiler. It does not aim to be yet another version of existing compiler infrastructure made for professional compiler experts. Kirin is an extensible framework for *building* compilers and orchestrating specialized eDSL tools **for scientists**. By abstracting boilerplate and emphasizing interoperability, Kirin lets scientists focus on what matters: translating domain knowledge into efficient, reusable computational solutions.
-
-![puzzle-pieces.png](puzzle-pieces.png)
-
-Kirin's Python-based framework supports quantum innovation while enabling scientists across disciplines to build accessible, composable compiler solutions. By open-sourcing this infrastructure, we aim to unite researchers in creating domain-specific languages that will advance quantum computing and scientific discovery across multiple fields.
-
-**How Kirin Fits Into the Bigger Picture**
-
-Kirin isn’t just another compiler—it’s a **framework** for building compilers. If you’re working with:
+Kirin isn’t just another compiler — it’s a **framework** for building compilers. If you’re working with:
 
 - **Quantum Hardware** like neutral-atom arrays, trapped ions, or superconducting qubits
 - **Classical HPC** kernels for domain-specific simulation workflows
 - **Hybrid Quantum-Classical** blend quantum and classical workflows treating both as first-class citizens
 
 Kirin’s modular design gives you a foundation to express your domain logic, refine it through compiler passes, and ultimately generate efficient, hardware-friendly instructions. Because Kirin is built by scientists *for* scientists, it emphasizes approachable abstractions and leaves the door open for community-driven innovation.
+
+![puzzle-pieces.png](puzzle-pieces.png)
 
 ## Acknowledgement
 
@@ -231,4 +228,4 @@ While the mission and audience may be very different, Kirin has been deeply insp
 - [JAX](https://jax.readthedocs.io/en/latest/) and [numba](https://numba.pydata.org/), the frontend syntax and the way it is designed.
 - [Symbolics.jl](https://github.com/JuliaSymbolics/Symbolics.jl) and its predecessors, the design of rule-based rewriter.
 
-Part of the work is also inspired in previous collaboration in YaoCompiler, thus we would like to thank [Valentin Churavy](https://github.com/vchuravy) and [William Moses](https://github.com/wsmoses) for early discussions around the compiler plugin topic. We thank early support of the YaoCompiler project from [Unitary Fundation](https://unitary.foundation/).
+Part of the work is also inspired in previous collaboration in YaoCompiler, thus we would like to thank [Valentin Churavy](https://github.com/vchuravy) and [William Moses](https://github.com/wsmoses) for early discussions around the compiler plugin topic. We thank early support of the YaoCompiler project from [Unitary Foundation](https://unitary.foundation/).
