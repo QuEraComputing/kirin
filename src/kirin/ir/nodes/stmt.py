@@ -611,7 +611,7 @@ class Statement(IRNode["Block"]):
             if isinstance(values, SSAValue):
                 printer.print(values)
             else:
-                printer.print_seq(values, delim=", ")
+                printer.print_seq(values, delim=", ", prefix="(", suffix=")")
 
             if idx < len(self._name_args_slice) - 1:
                 printer.plain_print(", ")

@@ -1,16 +1,16 @@
-from typing import Generic, TypeVar
+from typing import TypeVar
 from dataclasses import dataclass
 
 from kirin.print import Printer
 
-from .abc import Attribute
+from .data import Data
 from .types import PyClass, TypeAttribute
 
 T = TypeVar("T")
 
 
 @dataclass
-class PyAttr(Generic[T], Attribute):
+class PyAttr(Data[T]):
     """Python attribute for compile-time values.
     This is a generic attribute that holds a Python value.
 
@@ -25,7 +25,6 @@ class PyAttr(Generic[T], Attribute):
 
     name = "PyAttr"
     data: T
-    type: TypeAttribute
 
     def __init__(self, data: T, pytype: TypeAttribute | None = None):
         self.data = data
@@ -43,3 +42,6 @@ class PyAttr(Generic[T], Attribute):
         with printer.rich(style="comment"):
             printer.plain_print(" : ")
             printer.print(self.type)
+
+    def unwrap(self) -> T:
+        return self.data

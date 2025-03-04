@@ -16,11 +16,14 @@ class List2IList(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         has_done_something = False
+        if isinstance(node, constant.Constant) and isinstance(node.value, list):
+            eltype = self._eltype(node.result.type)
+            node.replace_by(
+                constant.Constant(value=IList(data=node.value, elem=eltype))
+            )
+
         for result in node.results:
             has_done_something = self._rewrite_SSAValue_type(result)
-
-        if has_done_something and isinstance(node, constant.Constant):
-            node.replace_by(constant.Constant(value=IList(data=node.value)))
 
         return RewriteResult(has_done_something=has_done_something)
 
@@ -36,3 +39,8 @@ class List2IList(RewriteRule):
             value.type = IListType[types.Any, types.Any]
             return True
         return False
+
+    def _eltype(self, type: types.TypeAttribute):
+        if isinstance(type, types.Generic) and issubclass(type.body.typ, (list, IList)):
+            return type.vars[0]
+        return types.Any

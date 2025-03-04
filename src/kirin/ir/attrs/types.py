@@ -179,16 +179,16 @@ class LiteralMeta(TypeAttributeMeta):
         super(LiteralMeta, self).__init__(*args, **kwargs)
         self._cache = {}
 
-    def __call__(self, data):
-        if isinstance(data, Attribute):
-            return data
+    def __call__(self, data, datatype=None):
+        if isinstance(data, TypeAttribute):
+            return data  # already a type
         elif not isinstance(data, Hashable):
-            return PyClass(type(data))
-        elif data in self._cache:
-            return self._cache[data]
+            raise ValueError("Literal data must be hashable")
+        elif (data, datatype) in self._cache:
+            return self._cache[(data, datatype)]
 
-        instance = super(LiteralMeta, self).__call__(data)
-        self._cache[data] = instance
+        instance = super(LiteralMeta, self).__call__(data, datatype)
+        self._cache[(data, datatype)] = instance
         return instance
 
 
@@ -200,6 +200,14 @@ LiteralType = typing.TypeVar("LiteralType")
 class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta):
     name = "Literal"
     data: LiteralType
+    type: TypeAttribute
+    """type of the literal, this is useful when the Python type of
+    data does not represent the type in IR, e.g Literal(1, types.Int32)
+    """
+
+    def __init__(self, data: LiteralType, datatype: TypeAttribute | None = None):
+        self.data = data
+        self.type = datatype or PyClass(type(data))
 
     def is_equal(self, other: TypeAttribute) -> bool:
         return self is other
@@ -211,16 +219,16 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         return any(self.is_subseteq(t) for t in other.types)
 
     def is_subseteq_Literal(self, other: "Literal") -> bool:
-        return self.data == other.data
+        return self.data == other.data and self.type.is_subseteq(other.type)
 
     def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
-        return PyClass(type(self.data)).is_subseteq(other)
+        return self.type.is_subseteq(other)
 
     def __hash__(self) -> int:
         return hash((Literal, self.data))
 
     def print_impl(self, printer: Printer) -> None:
-        printer.plain_print(repr(self.data))
+        printer.plain_print("Literal(", repr(self.data), ",", self.type, ")")
 
 
 @typing.final

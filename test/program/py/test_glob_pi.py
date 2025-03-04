@@ -11,4 +11,4 @@ def test_math_pi():
 
     stmt = main.callable_region.blocks[0].stmts.at(0)
     assert isinstance(stmt, py.Constant)
-    assert stmt.value == math.pi
+    assert stmt.value.unwrap() == math.pi

@@ -27,12 +27,12 @@ T = TypeVar("T", covariant=True)
 class Constant(ir.Statement, Generic[T]):
     name = "constant"
     traits = frozenset({ir.Pure(), ir.ConstantLike(), ir.FromPythonCall()})
-    value: T = info.attribute()
+    value: ir.Data[T] = info.attribute()
     result: ir.ResultValue = info.result()
 
     # NOTE: we allow py.Constant take data.PyAttr too
-    def __init__(self, value: T | ir.PyAttr[T]) -> None:
-        if not isinstance(value, ir.PyAttr):
+    def __init__(self, value: T | ir.Data[T]) -> None:
+        if not isinstance(value, ir.Data):
             value = ir.PyAttr(value)
         super().__init__(
             attributes={"value": value},
@@ -68,7 +68,7 @@ class Concrete(interp.MethodTable):
 
     @interp.impl(Constant)
     def constant(self, interp, frame: interp.Frame, stmt: Constant):
-        return (stmt.value,)
+        return (stmt.value.unwrap(),)
 
 
 @dialect.register(key="emit.julia")
@@ -76,4 +76,4 @@ class JuliaTable(interp.MethodTable):
 
     @interp.impl(Constant)
     def emit_Constant(self, emit: EmitJulia, frame: EmitStrFrame, stmt: Constant):
-        return (emit.emit_attribute(ir.PyAttr(stmt.value)),)
+        return (emit.emit_attribute(stmt.value),)

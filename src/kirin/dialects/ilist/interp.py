@@ -13,11 +13,16 @@ class IListInterpreter(MethodTable):
 
     @impl(Range)
     def _range(self, interp, frame: Frame, stmt: Range):
-        return (IList(range(*frame.get_values(stmt.args))),)
+        return (IList(range(*frame.get_values(stmt.args)), elem=types.Int),)
 
     @impl(New)
     def new(self, interp, frame: Frame, stmt: New):
-        return (IList(list(frame.get_values(stmt.values))),)
+        elem_type = types.Any
+        if stmt.values:
+            elem_type = stmt.values[0].type
+            for each in stmt.values[1:]:
+                elem_type = elem_type.join(each.type)
+        return (IList(list(frame.get_values(stmt.values)), elem=elem_type),)
 
     @impl(Len, types.PyClass(IList))
     def len(self, interp, frame: Frame, stmt: Len):
@@ -25,11 +30,13 @@ class IListInterpreter(MethodTable):
 
     @impl(Add, types.PyClass(IList), types.PyClass(IList))
     def add(self, interp, frame: Frame, stmt: Add):
-        return (IList(frame.get(stmt.lhs).data + frame.get(stmt.rhs).data),)
+        lhs, rhs = frame.get(stmt.lhs), frame.get(stmt.rhs)
+        return (IList(lhs.data + rhs.data, elem=lhs.elem.join(rhs.elem)),)
 
     @impl(Push)
     def push(self, interp, frame: Frame, stmt: Push):
-        return (IList(frame.get(stmt.lst).data + [frame.get(stmt.value)]),)
+        lst = frame.get(stmt.lst)
+        return (IList(lst.data + [frame.get(stmt.value)], elem=lst.elem),)
 
     @impl(Map)
     def map(self, interp: Interpreter, frame: Frame, stmt: Map):
@@ -40,7 +47,7 @@ class IListInterpreter(MethodTable):
             # NOTE: assume fn has been type checked
             _, item = interp.run_method(fn, (elem,))
             ret.append(item)
-        return (IList(ret),)
+        return (IList(ret, elem=fn.return_type),)
 
     @impl(Scan)
     def scan(self, interp: Interpreter, frame: Frame, stmt: Scan):
@@ -54,7 +61,15 @@ class IListInterpreter(MethodTable):
             # NOTE: assume fn has been type checked
             _, (carry, y) = interp.run_method(fn, (carry, elem))
             ys.append(y)
-        return ((carry, IList(ys)),)
+
+        if (
+            isinstance(fn.return_type, types.Generic)
+            and fn.return_type.is_subseteq(types.Tuple)
+            and len(fn.return_type.vars) == 2
+        ):
+            return ((carry, IList(ys, fn.return_type.vars[1])),)
+        else:
+            return ((carry, IList(ys, types.Any)),)
 
     @impl(Foldr)
     def foldr(self, interp: Interpreter, frame: Frame, stmt: Foldr):

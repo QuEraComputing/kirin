@@ -119,33 +119,33 @@ def test_ilist_fcf():
 
     stmt = foldl.callable_region.blocks[0].stmts.at(2)
     assert isinstance(stmt, py.Constant)
-    assert stmt.value == 0
+    assert stmt.value.unwrap() == 0
     assert isinstance(foldl.callable_region.blocks[0].stmts.at(4), func.Call)
 
     stmt = foldl.callable_region.blocks[0].stmts.at(5)
     assert isinstance(stmt, py.Constant)
-    assert stmt.value == 1
+    assert stmt.value.unwrap() == 1
     assert isinstance(foldl.callable_region.blocks[0].stmts.at(7), func.Call)
 
     stmt = foldl.callable_region.blocks[0].stmts.at(8)
     assert isinstance(stmt, py.Constant)
-    assert stmt.value == 2
+    assert stmt.value.unwrap() == 2
     assert isinstance(foldl.callable_region.blocks[0].stmts.at(10), func.Call)
 
     # ========== foldl
     stmt = foldr.callable_region.blocks[0].stmts.at(2)
     assert isinstance(stmt, py.Constant)
-    assert stmt.value == 2
+    assert stmt.value.unwrap() == 2
     assert isinstance(foldr.callable_region.blocks[0].stmts.at(4), func.Call)
 
     stmt = foldr.callable_region.blocks[0].stmts.at(5)
     assert isinstance(stmt, py.Constant)
-    assert stmt.value == 1
+    assert stmt.value.unwrap() == 1
     assert isinstance(foldr.callable_region.blocks[0].stmts.at(7), func.Call)
 
     stmt = foldr.callable_region.blocks[0].stmts.at(8)
     assert isinstance(stmt, py.Constant)
-    assert stmt.value == 0
+    assert stmt.value.unwrap() == 0
     assert isinstance(foldr.callable_region.blocks[0].stmts.at(10), func.Call)
 
 
@@ -161,11 +161,3 @@ def test_ilist_range():
         return range(0, 3)
 
     assert const_range() == ilist.IList(range(0, 3))
-
-
-@basic
-def main(xs: ilist.IList[int, Literal[3]]):
-    return xs + [4, 5, 6] + xs
-
-
-main.print()
