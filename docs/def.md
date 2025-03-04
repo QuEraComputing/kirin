@@ -128,11 +128,33 @@ with the [`info.argument`][kirin.decl.info.argument],[`info.result`][kirin.decl.
 === "MLIR"
 
     ```mlir
+    class MyOp<string mnemonic, list<Trait> traits = []> :
+        Op<MyDialect, mnemonic, traits>;
+
+    def dialect_MyOp : MyOp<"awesome"> {
+        let summary = "my awesome statement";
+
+        let description = [{my awesome statement}];
+
+        let arguments = (
+            // some inputs, e.g ins F64ElementsAttr:$value from the MLIR Toy example
+        );
+
+        let results = (
+            // some outputs, e.g outs F64Tensor from the MLIR Toy example
+        );
+      }
     ```
 
 === "xDSL"
 
     ```python
+    from xdsl.irdl import IRDLOperation, irdl_op_definition, traits_def
+
+    @irdl_op_definition
+    class MyStatement(IRDLOperation):
+        name = "awesome"
+        traits = traits_def(Pure())
     ```
 
 Like a function, a statement can have multiple inputs and outputs.
@@ -157,14 +179,40 @@ Like a function, a statement can have multiple inputs and outputs.
 === "MLIR"
 
     ```mlir
+    def dialect_Add : MyOp<"add"> {
+        let summary = "my add statement";
+
+        let description = [{my add statement}];
+
+        let arguments = (
+            AnySignlessInteger:$lhs,
+            AnySignlessInteger:$rhs
+        );
+
+        let results = (outs I64:$output);
+    }
     ```
 
 === "xDSL"
 
     ```python
+    from xdsl.irdl import IRDLOperation, irdl_op_definition, traits_def
+
+    @irdl_op_definition
+    class Add(IRDLOperation):
+        T: ClassVar = VarConstraint("T", signlessIntegerLike)
+        lhs = operand_def(T)
+        rhs = operand_def(T)
+        result = result_def(T)
+        assembly_format = "$lhs `,` $rhs attr-dict `:` type($result)"
     ```
 
 A statement can have blocks as successors, which describe the control flow of the program.
+
+!!! note
+    For Kirin, because `Statement`s are just dataclass, the `__init__` method is generated
+    in the same convention as Python `dataclass`. The field descriptor `info.xxx` are also using
+    standard `dataclass` field descriptor convention. Most of the time, one can just use the default dataclass `__init__`. For comparison, in MLIR, the `BranchOp` will need a custom builder to add the operands and successors. Similarly, in xDSL, the `BranchOp` will need a `__init__` method to add the operands and successors.
 
 === "Kirin"
 
@@ -185,14 +233,43 @@ A statement can have blocks as successors, which describe the control flow of th
 === "MLIR"
 
     ```mlir
+    def BranchOp : CF_Op<"br", [
+       DeclareOpInterfaceMethods<BranchOpInterface, ["getSuccessorForOperands"]>,
+       Pure, Terminator
+     ]> {
+        let arguments = (ins Variadic<AnyType>:$destOperands);
+        let successors = (successor AnySuccessor:$dest);
+
+        let builders = [
+            OpBuilder<(ins "Block *":$dest,
+                CArg<"ValueRange", "{}">:$destOperands), [{
+            $_state.addSuccessors(dest);
+            $_state.addOperands(destOperands);
+            }]>];
+    }
     ```
 
 === "xDSL"
 
     ```python
+    from xdsl.irdl import IRDLOperation, irdl_op_definition, traits_def
+
+    @irdl_op_definition
+    class BranchOp(IRDLOperation):
+        """Branch operation"""
+
+        name = "cf.br"
+
+        arguments = var_operand_def()
+        successor = successor_def()
+
+        traits = traits_def(IsTerminator(), BranchOpHasCanonicalizationPatterns())
+
+        def __init__(self, dest: Block, *ops: Operation | SSAValue):
+           super().__init__(operands=[[op for op in ops]], successors=[dest])
     ```
 
-It can also have a region that contains other statements, for example, a function statement
+It can also have a region that contains other statements, for example, a function statement (simplified).
 
 === "Kirin"
 
@@ -201,7 +278,7 @@ It can also have a region that contains other statements, for example, a functio
     class Function(ir.Statement):
        name = "func"
        traits = frozenset({SSACFGRegion()}) # (1)!
-       sym_name: str = info.attribute(property=True) # (2)!
+       sym_name: str = info.attribute() # (2)!
        body: Region = info.region(multi=True) # (3)!
     ```
 
@@ -213,11 +290,41 @@ It can also have a region that contains other statements, for example, a functio
 === "MLIR"
 
     ```mlir
+    def FuncOp : Func_Op<"func", [
+        AffineScope, AutomaticAllocationScope,
+        FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface
+    ]> {
+        let arguments = (ins SymbolNameAttr:$sym_name);
+        let regions = (region AnyRegion:$body);
+
+        let builders = [OpBuilder<(ins
+           "StringRef":$name, "FunctionType":$type,
+           CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+           CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)
+        >];
+        let hasCustomAssemblyFormat = 1;
+    }
     ```
 
 === "xDSL"
 
     ```python
+    @irdl_op_definition
+    class FuncOp(IRDLOperation):
+        name = "func.func"
+        traits = traits_def(
+            IsolatedFromAbove(), SymbolOpInterface(), FuncOpCallableInterface()
+        )
+        body = region_def()
+        sym_name = prop_def(StringAttr)
+
+        def __init__(
+            self,
+            name: str,
+            region: Region | type[Region.DEFAULT] = Region.DEFAULT,
+        ):
+            properties: dict[str, Attribute | None] = {"sym_name": StringAttr(name)}
+            super().__init__(properties=properties, regions=[region])
     ```
 
 ### Constructing a Statement
