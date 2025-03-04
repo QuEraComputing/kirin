@@ -47,33 +47,127 @@
     <span class=n>name</span> <span class=o>=</span> <span class=s2>&quot;awesome&quot;</span> <span class=c1># (3)!</span>
     <span class=n>traits</span> <span class=o>=</span> <span class=nb>frozenset</span><span class=p>({</span><span class=n>ir</span><span class=o>.</span><span class=n>Pure</span><span class=p>()})</span> <span class=c1># (4)!</span>
     <span class=c1># blabla, we will talk about this later</span>
-</code></pre></div> <ol> <li>the decorator <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> is used to generate implementations for the <code>MyStatement</code> class based on the fields defined in the class.</li> <li>The <code>MyStatement</code> class inherits from <a class="autorefs autorefs-internal" href="../reference/kirin/ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement"><code>ir.Statement</code></a>.</li> <li>The <code>name</code> field is the name of the statement, if your desired name is just <code>my_statement</code>, you can omit this field, <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> will automatically generate the name by converting the class name to snake case. The name is what will be used in text/pretty printing.</li> <li>The <code>traits</code> field is used to specify the traits of the statement. In this case, the statement is pure.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
-</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
+</code></pre></div> <ol> <li>the decorator <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> is used to generate implementations for the <code>MyStatement</code> class based on the fields defined in the class.</li> <li>The <code>MyStatement</code> class inherits from <a class="autorefs autorefs-internal" href="../reference/kirin/ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement"><code>ir.Statement</code></a>.</li> <li>The <code>name</code> field is the name of the statement, if your desired name is just <code>my_statement</code>, you can omit this field, <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> will automatically generate the name by converting the class name to snake case. The name is what will be used in text/pretty printing.</li> <li>The <code>traits</code> field is used to specify the traits of the statement. In this case, the statement is pure.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>class MyOp&lt;string mnemonic, list&lt;Trait&gt; traits = []&gt; :
+    Op&lt;MyDialect, mnemonic, traits&gt;;
+
+def dialect_MyOp : MyOp&lt;&quot;awesome&quot;&gt; {
+    let summary = &quot;my awesome statement&quot;;
+
+    let description = [{my awesome statement}];
+
+    let arguments = (
+        // some inputs, e.g ins F64ElementsAttr:$value from the MLIR Toy example
+    );
+
+    let results = (
+        // some outputs, e.g outs F64Tensor from the MLIR Toy example
+    );
+  }
+</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=kn>from</span> <span class=nn>xdsl.irdl</span> <span class=kn>import</span> <span class=n>IRDLOperation</span><span class=p>,</span> <span class=n>irdl_op_definition</span><span class=p>,</span> <span class=n>traits_def</span>
+
+<span class=nd>@irdl_op_definition</span>
+<span class=k>class</span> <span class=nc>MyStatement</span><span class=p>(</span><span class=n>IRDLOperation</span><span class=p>):</span>
+    <span class=n>name</span> <span class=o>=</span> <span class=s2>&quot;awesome&quot;</span>
+    <span class=n>traits</span> <span class=o>=</span> <span class=n>traits_def</span><span class=p>(</span><span class=n>Pure</span><span class=p>())</span>
 </code></pre></div> </div> </div> </div> <p>Like a function, a statement can have multiple inputs and outputs.</p> <div class="tabbed-set tabbed-alternate" data-tabs=2:3><input checked=checked id=__tabbed_2_1 name=__tabbed_2 type=radio><input id=__tabbed_2_2 name=__tabbed_2 type=radio><input id=__tabbed_2_3 name=__tabbed_2 type=radio><div class=tabbed-labels><label for=__tabbed_2_1>Kirin</label><label for=__tabbed_2_2>MLIR</label><label for=__tabbed_2_3>xDSL</label></div> <div class=tabbed-content> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=nd>@statement</span> <span class=c1># (1)!</span>
 <span class=k>class</span> <span class=nc>Add</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>):</span>
     <span class=n>traits</span> <span class=o>=</span> <span class=nb>frozenset</span><span class=p>({</span><span class=n>ir</span><span class=o>.</span><span class=n>Pure</span><span class=p>()})</span> <span class=c1># (2)!</span>
     <span class=n>lhs</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span> <span class=o>=</span> <span class=n>info</span><span class=o>.</span><span class=n>argument</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Int</span><span class=p>)</span> <span class=c1># (3)!</span>
     <span class=n>rhs</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span> <span class=o>=</span> <span class=n>info</span><span class=o>.</span><span class=n>argument</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Int</span><span class=p>)</span> <span class=c1># (4)!</span>
     <span class=n>output</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>ResultValue</span> <span class=o>=</span> <span class=n>info</span><span class=o>.</span><span class=n>result</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>types</span><span class=o>.</span><span class=n>Int</span><span class=p>)</span> <span class=c1># (5)!</span>
-</code></pre></div> <ol> <li>the decorator <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> is used to generate implementations for the <code>MyStatement</code> class based on the fields defined in the class.</li> <li>The <code>traits</code> field is used to specify the traits of the statement. In this case, the statement is pure.</li> <li>The <code>lhs</code> field is the left-hand side input value of the statement. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.argument"><code>info.argument</code></a> is used to specify the type of the input value.</li> <li>The <code>rhs</code> field is the right-hand side input value of the statement. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.argument"><code>info.argument</code></a> is used to specify the type of the input value.</li> <li>The <code>output</code> field is the output value of the statement. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.result"><code>info.result</code></a> is used to specify the type of the output value.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
-</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
-</code></pre></div> </div> </div> </div> <p>A statement can have blocks as successors, which describe the control flow of the program.</p> <div class="tabbed-set tabbed-alternate" data-tabs=3:3><input checked=checked id=__tabbed_3_1 name=__tabbed_3 type=radio><input id=__tabbed_3_2 name=__tabbed_3 type=radio><input id=__tabbed_3_3 name=__tabbed_3 type=radio><div class=tabbed-labels><label for=__tabbed_3_1>Kirin</label><label for=__tabbed_3_2>MLIR</label><label for=__tabbed_3_3>xDSL</label></div> <div class=tabbed-content> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=nd>@statement</span>
+</code></pre></div> <ol> <li>the decorator <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> is used to generate implementations for the <code>MyStatement</code> class based on the fields defined in the class.</li> <li>The <code>traits</code> field is used to specify the traits of the statement. In this case, the statement is pure.</li> <li>The <code>lhs</code> field is the left-hand side input value of the statement. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.argument"><code>info.argument</code></a> is used to specify the type of the input value.</li> <li>The <code>rhs</code> field is the right-hand side input value of the statement. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.argument"><code>info.argument</code></a> is used to specify the type of the input value.</li> <li>The <code>output</code> field is the output value of the statement. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.result"><code>info.result</code></a> is used to specify the type of the output value.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>def dialect_Add : MyOp&lt;&quot;add&quot;&gt; {
+    let summary = &quot;my add statement&quot;;
+
+    let description = [{my add statement}];
+
+    let arguments = (
+        AnySignlessInteger:$lhs,
+        AnySignlessInteger:$rhs
+    );
+
+    let results = (outs I64:$output);
+}
+</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=kn>from</span> <span class=nn>xdsl.irdl</span> <span class=kn>import</span> <span class=n>IRDLOperation</span><span class=p>,</span> <span class=n>irdl_op_definition</span><span class=p>,</span> <span class=n>traits_def</span>
+
+<span class=nd>@irdl_op_definition</span>
+<span class=k>class</span> <span class=nc>Add</span><span class=p>(</span><span class=n>IRDLOperation</span><span class=p>):</span>
+    <span class=n>T</span><span class=p>:</span> <span class=n>ClassVar</span> <span class=o>=</span> <span class=n>VarConstraint</span><span class=p>(</span><span class=s2>&quot;T&quot;</span><span class=p>,</span> <span class=n>signlessIntegerLike</span><span class=p>)</span>
+    <span class=n>lhs</span> <span class=o>=</span> <span class=n>operand_def</span><span class=p>(</span><span class=n>T</span><span class=p>)</span>
+    <span class=n>rhs</span> <span class=o>=</span> <span class=n>operand_def</span><span class=p>(</span><span class=n>T</span><span class=p>)</span>
+    <span class=n>result</span> <span class=o>=</span> <span class=n>result_def</span><span class=p>(</span><span class=n>T</span><span class=p>)</span>
+    <span class=n>assembly_format</span> <span class=o>=</span> <span class=s2>&quot;$lhs `,` $rhs attr-dict `:` type($result)&quot;</span>
+</code></pre></div> </div> </div> </div> <p>A statement can have blocks as successors, which describe the control flow of the program.</p> <div class="admonition note"> <p class=admonition-title>Note</p> <p>For Kirin, because <code>Statement</code>s are just dataclass, the <code>__init__</code> method is generated in the same convention as Python <code>dataclass</code>. The field descriptor <code>info.xxx</code> are also using standard <code>dataclass</code> field descriptor convention. Most of the time, one can just use the default dataclass <code>__init__</code>. For comparison, in MLIR, the <code>BranchOp</code> will need a custom builder to add the operands and successors. Similarly, in xDSL, the <code>BranchOp</code> will need a <code>__init__</code> method to add the operands and successors.</p> </div> <div class="tabbed-set tabbed-alternate" data-tabs=3:3><input checked=checked id=__tabbed_3_1 name=__tabbed_3 type=radio><input id=__tabbed_3_2 name=__tabbed_3 type=radio><input id=__tabbed_3_3 name=__tabbed_3 type=radio><div class=tabbed-labels><label for=__tabbed_3_1>Kirin</label><label for=__tabbed_3_2>MLIR</label><label for=__tabbed_3_3>xDSL</label></div> <div class=tabbed-content> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=nd>@statement</span>
 <span class=k>class</span> <span class=nc>Branch</span><span class=p>(</span><span class=n>Statement</span><span class=p>):</span>
    <span class=n>name</span> <span class=o>=</span> <span class=s2>&quot;br&quot;</span>
    <span class=n>traits</span> <span class=o>=</span> <span class=nb>frozenset</span><span class=p>({</span><span class=n>IsTerminator</span><span class=p>()})</span> <span class=c1># (1)!</span>
 
    <span class=n>arguments</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span> <span class=c1># (2)!</span>
    <span class=n>successor</span><span class=p>:</span> <span class=n>Block</span> <span class=o>=</span> <span class=n>info</span><span class=o>.</span><span class=n>block</span><span class=p>()</span> <span class=c1># (3)!</span>
-</code></pre></div> <ol> <li>The <code>traits</code> field is used to specify the traits of the statement. In this case, the statement is a <a href=/101.md/#terminator>terminator</a>.</li> <li>The <code>arguments</code> field is the input values of the statement. Branch can take multiple arguments, <code>tuple[SSAValue, ...]</code> is used to specify that the field is a tuple of <code>SSAValue</code>. Note that only <code>...</code> is supported because if the number of arguments is known, we recommend specifying them explicitly.</li> <li>The <code>successor</code> field is the block that the statement will go to after execution. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.block"><code>info.block</code></a> is used to specify the type of the field.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
-</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
-</code></pre></div> </div> </div> </div> <p>It can also have a region that contains other statements, for example, a function statement</p> <div class="tabbed-set tabbed-alternate" data-tabs=4:3><input checked=checked id=__tabbed_4_1 name=__tabbed_4 type=radio><input id=__tabbed_4_2 name=__tabbed_4 type=radio><input id=__tabbed_4_3 name=__tabbed_4 type=radio><div class=tabbed-labels><label for=__tabbed_4_1>Kirin</label><label for=__tabbed_4_2>MLIR</label><label for=__tabbed_4_3>xDSL</label></div> <div class=tabbed-content> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=nd>@statement</span>
+</code></pre></div> <ol> <li>The <code>traits</code> field is used to specify the traits of the statement. In this case, the statement is a <a href=/101.md/#terminator>terminator</a>.</li> <li>The <code>arguments</code> field is the input values of the statement. Branch can take multiple arguments, <code>tuple[SSAValue, ...]</code> is used to specify that the field is a tuple of <code>SSAValue</code>. Note that only <code>...</code> is supported because if the number of arguments is known, we recommend specifying them explicitly.</li> <li>The <code>successor</code> field is the block that the statement will go to after execution. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.block"><code>info.block</code></a> is used to specify the type of the field.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>def BranchOp : CF_Op&lt;&quot;br&quot;, [
+   DeclareOpInterfaceMethods&lt;BranchOpInterface, [&quot;getSuccessorForOperands&quot;]&gt;,
+   Pure, Terminator
+ ]&gt; {
+    let arguments = (ins Variadic&lt;AnyType&gt;:$destOperands);
+    let successors = (successor AnySuccessor:$dest);
+
+    let builders = [
+        OpBuilder&lt;(ins &quot;Block *&quot;:$dest,
+            CArg&lt;&quot;ValueRange&quot;, &quot;{}&quot;&gt;:$destOperands), [{
+        $_state.addSuccessors(dest);
+        $_state.addOperands(destOperands);
+        }]&gt;];
+}
+</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=kn>from</span> <span class=nn>xdsl.irdl</span> <span class=kn>import</span> <span class=n>IRDLOperation</span><span class=p>,</span> <span class=n>irdl_op_definition</span><span class=p>,</span> <span class=n>traits_def</span>
+
+<span class=nd>@irdl_op_definition</span>
+<span class=k>class</span> <span class=nc>BranchOp</span><span class=p>(</span><span class=n>IRDLOperation</span><span class=p>):</span>
+<span class=w>    </span><span class=sd>&quot;&quot;&quot;Branch operation&quot;&quot;&quot;</span>
+
+    <span class=n>name</span> <span class=o>=</span> <span class=s2>&quot;cf.br&quot;</span>
+
+    <span class=n>arguments</span> <span class=o>=</span> <span class=n>var_operand_def</span><span class=p>()</span>
+    <span class=n>successor</span> <span class=o>=</span> <span class=n>successor_def</span><span class=p>()</span>
+
+    <span class=n>traits</span> <span class=o>=</span> <span class=n>traits_def</span><span class=p>(</span><span class=n>IsTerminator</span><span class=p>(),</span> <span class=n>BranchOpHasCanonicalizationPatterns</span><span class=p>())</span>
+
+    <span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>dest</span><span class=p>:</span> <span class=n>Block</span><span class=p>,</span> <span class=o>*</span><span class=n>ops</span><span class=p>:</span> <span class=n>Operation</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>):</span>
+       <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>(</span><span class=n>operands</span><span class=o>=</span><span class=p>[[</span><span class=n>op</span> <span class=k>for</span> <span class=n>op</span> <span class=ow>in</span> <span class=n>ops</span><span class=p>]],</span> <span class=n>successors</span><span class=o>=</span><span class=p>[</span><span class=n>dest</span><span class=p>])</span>
+</code></pre></div> </div> </div> </div> <p>It can also have a region that contains other statements, for example, a function statement (simplified).</p> <div class="tabbed-set tabbed-alternate" data-tabs=4:3><input checked=checked id=__tabbed_4_1 name=__tabbed_4 type=radio><input id=__tabbed_4_2 name=__tabbed_4 type=radio><input id=__tabbed_4_3 name=__tabbed_4 type=radio><div class=tabbed-labels><label for=__tabbed_4_1>Kirin</label><label for=__tabbed_4_2>MLIR</label><label for=__tabbed_4_3>xDSL</label></div> <div class=tabbed-content> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=nd>@statement</span>
 <span class=k>class</span> <span class=nc>Function</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>):</span>
    <span class=n>name</span> <span class=o>=</span> <span class=s2>&quot;func&quot;</span>
    <span class=n>traits</span> <span class=o>=</span> <span class=nb>frozenset</span><span class=p>({</span><span class=n>SSACFGRegion</span><span class=p>()})</span> <span class=c1># (1)!</span>
-   <span class=n>sym_name</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>info</span><span class=o>.</span><span class=n>attribute</span><span class=p>(</span><span class=nb>property</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span> <span class=c1># (2)!</span>
+   <span class=n>sym_name</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>info</span><span class=o>.</span><span class=n>attribute</span><span class=p>()</span> <span class=c1># (2)!</span>
    <span class=n>body</span><span class=p>:</span> <span class=n>Region</span> <span class=o>=</span> <span class=n>info</span><span class=o>.</span><span class=n>region</span><span class=p>(</span><span class=n>multi</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span> <span class=c1># (3)!</span>
-</code></pre></div> <ol> <li>The <code>traits</code> field contains the <code>SSACFGRegion</code> trait, which indicates that the region in the statement is a standard control-flow graph.</li> <li>The <code>sym_name</code> field is the name of the function. In the <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> decorator, if a field annotated with normal Python types (not an IR node, e.g <a class="autorefs autorefs-internal" href="../reference/kirin/ir/ssa/#kirin.ir.ssa.SSAValue"><code>ir.SSAValue</code></a>, <a class="autorefs autorefs-internal" href="../reference/kirin/ir/nodes/block/#kirin.ir.nodes.block.Block"><code>ir.Block</code></a>, <a class="autorefs autorefs-internal" href="../reference/kirin/ir/nodes/region/#kirin.ir.nodes.region.Region"><code>ir.Region</code></a>), it will be treated as a <a class="autorefs autorefs-internal" href="../reference/kirin/ir/attrs/py/#kirin.ir.attrs.py.PyAttr"><code>PyAttr</code></a> attribute.</li> <li>The <code>body</code> field is the region that contains the statements of the function. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.region"><code>info.region</code></a> is used to specify this region can contain multiple blocks.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
-</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>
+</code></pre></div> <ol> <li>The <code>traits</code> field contains the <code>SSACFGRegion</code> trait, which indicates that the region in the statement is a standard control-flow graph.</li> <li>The <code>sym_name</code> field is the name of the function. In the <a class="autorefs autorefs-internal" href="../reference/kirin/decl/#kirin.decl.statement"><code>@statement</code></a> decorator, if a field annotated with normal Python types (not an IR node, e.g <a class="autorefs autorefs-internal" href="../reference/kirin/ir/ssa/#kirin.ir.ssa.SSAValue"><code>ir.SSAValue</code></a>, <a class="autorefs autorefs-internal" href="../reference/kirin/ir/nodes/block/#kirin.ir.nodes.block.Block"><code>ir.Block</code></a>, <a class="autorefs autorefs-internal" href="../reference/kirin/ir/nodes/region/#kirin.ir.nodes.region.Region"><code>ir.Region</code></a>), it will be treated as a <a class="autorefs autorefs-internal" href="../reference/kirin/ir/attrs/py/#kirin.ir.attrs.py.PyAttr"><code>PyAttr</code></a> attribute.</li> <li>The <code>body</code> field is the region that contains the statements of the function. The field descriptor <a class="autorefs autorefs-internal" href="../reference/kirin/decl/info/#kirin.decl.info.region"><code>info.region</code></a> is used to specify this region can contain multiple blocks.</li> </ol> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code>def FuncOp : Func_Op&lt;&quot;func&quot;, [
+    AffineScope, AutomaticAllocationScope,
+    FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface
+]&gt; {
+    let arguments = (ins SymbolNameAttr:$sym_name);
+    let regions = (region AnyRegion:$body);
+
+    let builders = [OpBuilder&lt;(ins
+       &quot;StringRef&quot;:$name, &quot;FunctionType&quot;:$type,
+       CArg&lt;&quot;ArrayRef&lt;NamedAttribute&gt;&quot;, &quot;{}&quot;&gt;:$attrs,
+       CArg&lt;&quot;ArrayRef&lt;DictionaryAttr&gt;&quot;, &quot;{}&quot;&gt;:$argAttrs)
+    &gt;];
+    let hasCustomAssemblyFormat = 1;
+}
+</code></pre></div> </div> <div class=tabbed-block> <div class=highlight><pre><span></span><code><span class=nd>@irdl_op_definition</span>
+<span class=k>class</span> <span class=nc>FuncOp</span><span class=p>(</span><span class=n>IRDLOperation</span><span class=p>):</span>
+    <span class=n>name</span> <span class=o>=</span> <span class=s2>&quot;func.func&quot;</span>
+    <span class=n>traits</span> <span class=o>=</span> <span class=n>traits_def</span><span class=p>(</span>
+        <span class=n>IsolatedFromAbove</span><span class=p>(),</span> <span class=n>SymbolOpInterface</span><span class=p>(),</span> <span class=n>FuncOpCallableInterface</span><span class=p>()</span>
+    <span class=p>)</span>
+    <span class=n>body</span> <span class=o>=</span> <span class=n>region_def</span><span class=p>()</span>
+    <span class=n>sym_name</span> <span class=o>=</span> <span class=n>prop_def</span><span class=p>(</span><span class=n>StringAttr</span><span class=p>)</span>
+
+    <span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+        <span class=bp>self</span><span class=p>,</span>
+        <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span>
+        <span class=n>region</span><span class=p>:</span> <span class=n>Region</span> <span class=o>|</span> <span class=nb>type</span><span class=p>[</span><span class=n>Region</span><span class=o>.</span><span class=n>DEFAULT</span><span class=p>]</span> <span class=o>=</span> <span class=n>Region</span><span class=o>.</span><span class=n>DEFAULT</span><span class=p>,</span>
+    <span class=p>):</span>
+        <span class=n>properties</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Attribute</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>=</span> <span class=p>{</span><span class=s2>&quot;sym_name&quot;</span><span class=p>:</span> <span class=n>StringAttr</span><span class=p>(</span><span class=n>name</span><span class=p>)}</span>
+        <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>(</span><span class=n>properties</span><span class=o>=</span><span class=n>properties</span><span class=p>,</span> <span class=n>regions</span><span class=o>=</span><span class=p>[</span><span class=n>region</span><span class=p>])</span>
 </code></pre></div> </div> </div> </div> <h3 id=constructing-a-statement>Constructing a Statement</h3> <p>Statements can be constructed in similar ways to constructing a normal Python <code>dataclass</code>. Taking the previous definitions as an example:</p> <div class=highlight><pre><span></span><code><span class=kn>from</span> <span class=nn>kirin.dialects.py.constant</span> <span class=kn>import</span> <span class=n>Constant</span>
 
 <span class=n>lhs</span><span class=p>,</span> <span class=n>rhs</span> <span class=o>=</span> <span class=n>Constant</span><span class=p>(</span><span class=mi>1</span><span class=p>),</span> <span class=n>Constant</span><span class=p>(</span><span class=mi>2</span><span class=p>)</span> <span class=c1># (1)!</span>
