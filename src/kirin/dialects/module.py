@@ -22,7 +22,7 @@ class Module(ir.Statement):
         {ir.IsolatedFromAbove(), ir.SymbolTable(), ir.SymbolOpInterface()}
     )
     sym_name: str = info.attribute()
-    entry: str = info.attribute()
+    entry: str = info.attribute(default="main")
     body: ir.Region = info.region(multi=False)
 
 
