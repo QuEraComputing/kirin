@@ -131,6 +131,7 @@
     * [ir](kirin/ir/index.md)
         * [attrs](kirin/ir/attrs/index.md)
             * [abc](kirin/ir/attrs/abc.md)
+            * [data](kirin/ir/attrs/data.md)
             * [py](kirin/ir/attrs/py.md)
             * [types](kirin/ir/attrs/types.md)
         * [dialect](kirin/ir/dialect.md)
