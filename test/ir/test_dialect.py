@@ -31,5 +31,3 @@ def test_py_type_register():
         dialect.register_py_type(
             TestClass, display_name="TestType", prefix="other_prefix"
         )
-
-
