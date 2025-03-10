@@ -41,6 +41,10 @@ class Attribute(ABC, Printable, metaclass=AttributeMeta):
     """Dialect of the attribute. (default: None)"""
     name: ClassVar[str] = field(init=False, repr=False)
     """Name of the attribute in printing and other text format."""
+    traits: ClassVar[frozenset[str]] = field(
+        default=frozenset(), init=False, repr=False
+    )
+    """Set of Attribute traits."""
 
     @abstractmethod
     def __hash__(self) -> int: ...
