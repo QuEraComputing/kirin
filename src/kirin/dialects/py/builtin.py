@@ -76,3 +76,16 @@ class TypeInfer(interp.MethodTable):
     @interp.impl(Abs, types.Float)
     def absf(self, interp, frame, stmt):
         return (types.Float,)
+
+
+dialect.register_py_type(float)
+dialect.register_py_type(int)
+dialect.register_py_type(bool)
+dialect.register_py_type(str)
+dialect.register_py_type(type(None))
+dialect.register_py_type(list)
+dialect.register_py_type(dict)
+dialect.register_py_type(tuple)
+dialect.register_py_type(set)
+dialect.register_py_type(frozenset)
+dialect.register_py_type(slice)
