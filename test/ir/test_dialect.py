@@ -9,6 +9,9 @@ def test_py_type_register():
     class TestClass:
         pass
 
+    class OtherTestClass:
+        pass
+
     dialect = Dialect("test")
 
     TestType = dialect.register_py_type(
@@ -19,7 +22,7 @@ def test_py_type_register():
     assert dialect.python_types == {("test", "TestType"): TestType}
 
     with pytest.raises(ValueError):
-        dialect.register_py_type(TestClass, display_name="TestType", prefix="test")
+        dialect.register_py_type(OtherTestClass, display_name="TestType", prefix="test")
 
     with pytest.raises(ValueError):
         dialect.register_py_type(TestClass, display_name="TestClass", prefix="test")

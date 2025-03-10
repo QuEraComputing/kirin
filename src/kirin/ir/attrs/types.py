@@ -114,7 +114,9 @@ class PyClassMeta(TypeAttributeMeta):
         super(PyClassMeta, self).__init__(*args, **kwargs)
         self._cache = {}
 
-    def __call__(self, typ, *args, **kwargs):
+    def __call__(self, typ, *, display_name: str | None = None, prefix="py"):
+        display_name = display_name if display_name is not None else typ.__name__
+
         if typ is typing.Any:
             return AnyType()
         elif typ is typing.NoReturn or typ is Never:
@@ -125,10 +127,19 @@ class PyClassMeta(TypeAttributeMeta):
             typ = list
         elif isinstance(typ, TypeVar):
             return hint2type(typ)
-        elif isinstance(typ, type) and typ in self._cache:
+
+        if isinstance(typ, type) and typ in self._cache:
+            obj = self._cache[typ]
+            if display_name != obj.display_name or prefix != obj.prefix:
+                raise ValueError(
+                    f"Type {typ} already registered to {obj.prefix}.{obj.display_name}"
+                )
+
             return self._cache[typ]
 
-        instance = super(PyClassMeta, self).__call__(typ, *args, **kwargs)
+        instance = super(PyClassMeta, self).__call__(
+            typ, display_name=display_name, prefix=prefix
+        )
         self._cache[typ] = instance
         return instance
 
@@ -147,6 +158,7 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def __init__(
         self,
         typ: type[PyClassType],
+        *,
         display_name: str | None = None,
         prefix: str = "py",
     ) -> None:

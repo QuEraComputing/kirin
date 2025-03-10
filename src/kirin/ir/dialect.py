@@ -138,28 +138,17 @@ class Dialect:
 
         if isinstance(node, type):
             node = PyClass(node, display_name=display_name, prefix=prefix)
-            display_name = node.display_name if display_name is None else display_name
 
         if isinstance(node, PyClass):
-            if (node.prefix, node.display_name) in self.python_types:
+            if (node.prefix, node.display_name) in self.python_types and (
+                other_node := self.python_types[(node.prefix, node.display_name)]
+            ) != node:
                 raise ValueError(
-                    f"Cannot register {node} to Dialect "
-                    f", key {node.prefix}.{node.display_name} exists"
-                )
-
-            if node.prefix != prefix:
-                raise ValueError(
-                    f"Cannot register {node} to Dialect "
-                    f", prefix {node.prefix} does not match {prefix}"
-                )
-
-            if node.display_name != display_name:
-                raise ValueError(
-                    f"Cannot register {node} to Dialect "
-                    f", display_name {node.display_name} does not match {display_name}"
+                    f"Cannot register {node} to Dialect, type {other_node.prefix}.{other_node.display_name} exists for {other_node.typ}"
                 )
 
             self.python_types[(node.prefix, node.display_name)] = node
             return node
+
         else:
             raise ValueError(f"Cannot register {node} to Dialect")
