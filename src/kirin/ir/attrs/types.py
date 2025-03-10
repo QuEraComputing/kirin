@@ -114,7 +114,7 @@ class PyClassMeta(TypeAttributeMeta):
         super(PyClassMeta, self).__init__(*args, **kwargs)
         self._cache = {}
 
-    def __call__(self, typ):
+    def __call__(self, typ, *args, **kwargs):
         if typ is typing.Any:
             return AnyType()
         elif typ is typing.NoReturn or typ is Never:
@@ -128,7 +128,7 @@ class PyClassMeta(TypeAttributeMeta):
         elif isinstance(typ, type) and typ in self._cache:
             return self._cache[typ]
 
-        instance = super(PyClassMeta, self).__call__(typ)
+        instance = super(PyClassMeta, self).__call__(typ, *args, **kwargs)
         self._cache[typ] = instance
         return instance
 
