@@ -130,30 +130,36 @@ class Dialect:
 
     def register_py_type(
         self,
-        type_or_py_class: type[T] | "PyClass[T]",
+        node: type[T] | "PyClass[T]",
         display_name: str | None = None,
         prefix: str = "py",
     ):
         from kirin.ir.attrs.types import PyClass
 
-        if isinstance(type_or_py_class, type):
-            type_or_py_class = PyClass(
-                type_or_py_class, display_name=display_name, prefix=prefix
-            )
+        if isinstance(node, type):
+            node = PyClass(node, display_name=display_name, prefix=prefix)
+            display_name = node.display_name if display_name is None else display_name
 
-        if isinstance(type_or_py_class, PyClass):
-            if (
-                type_or_py_class.prefix,
-                type_or_py_class.display_name,
-            ) in self.python_types:
+        if isinstance(node, PyClass):
+            if (node.prefix, node.display_name) in self.python_types:
                 raise ValueError(
-                    f"Cannot register {type_or_py_class} to Dialect "
-                    f", key {type_or_py_class.prefix}.{type_or_py_class.display_name} exists"
+                    f"Cannot register {node} to Dialect "
+                    f", key {node.prefix}.{node.display_name} exists"
                 )
 
-            self.python_types[
-                (type_or_py_class.prefix, type_or_py_class.display_name)
-            ] = type_or_py_class
-            return type_or_py_class
+            if node.prefix != prefix:
+                raise ValueError(
+                    f"Cannot register {node} to Dialect "
+                    f", prefix {node.prefix} does not match {prefix}"
+                )
+
+            if node.display_name != display_name:
+                raise ValueError(
+                    f"Cannot register {node} to Dialect "
+                    f", display_name {node.display_name} does not match {display_name}"
+                )
+
+            self.python_types[(node.prefix, node.display_name)] = node
+            return node
         else:
-            raise ValueError(f"Cannot register {type_or_py_class} to Dialect")
+            raise ValueError(f"Cannot register {node} to Dialect")
