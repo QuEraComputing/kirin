@@ -141,9 +141,18 @@ PyClassType = typing.TypeVar("PyClassType")
 class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta):
     name = "PyClass"
     typ: type[PyClassType]
+    display_name: str
+    prefix: str
 
-    def __init__(self, typ: type[PyClassType]) -> None:
+    def __init__(
+        self,
+        typ: type[PyClassType],
+        display_name: str | None = None,
+        prefix: str = "py",
+    ) -> None:
         self.typ = typ
+        self.display_name = display_name if display_name is not None else typ.__name__
+        self.prefix = prefix
 
     def is_subseteq_PyClass(self, other: "PyClass") -> bool:
         return issubclass(self.typ, other.typ)
@@ -170,7 +179,7 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
         return self.typ.__name__
 
     def print_impl(self, printer: Printer) -> None:
-        printer.plain_print("!py.", self.typ.__name__)
+        printer.plain_print(f"!{self.prefix}.", self.display_name)
 
 
 class LiteralMeta(TypeAttributeMeta):
