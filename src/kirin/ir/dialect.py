@@ -11,6 +11,7 @@ from kirin.ir.attrs.abc import Attribute
 T = TypeVar("T")
 
 if TYPE_CHECKING:
+    from kirin.types import PyClass
     from kirin.interp.table import MethodTable
     from kirin.lowering.dialect import FromPythonAST
 
@@ -39,6 +40,9 @@ class Dialect:
     """A dictionary of registered method table in the dialect."""
     lowering: dict[str, FromPythonAST] = field(default_factory=dict, init=True)
     """A dictionary of registered python lowering implmentations in the dialect."""
+    python_types: dict[tuple[str, str], "PyClass"] = field(
+        default_factory=dict, init=True
+    )
 
     def __post_init__(self) -> None:
         from kirin.lowering.dialect import NoSpecialLowering
@@ -123,3 +127,33 @@ class Dialect:
             return wrapper
 
         return wrapper(node)
+
+    def register_py_type(
+        self,
+        type_or_py_class: type[T] | "PyClass[T]",
+        display_name: str | None = None,
+        prefix: str = "py",
+    ):
+        from kirin.ir.attrs.types import PyClass
+
+        if isinstance(type_or_py_class, type):
+            type_or_py_class = PyClass(
+                type_or_py_class, display_name=display_name, prefix=prefix
+            )
+
+        if isinstance(type_or_py_class, PyClass):
+            if (
+                type_or_py_class.prefix,
+                type_or_py_class.display_name,
+            ) in self.python_types:
+                raise ValueError(
+                    f"Cannot register {type_or_py_class} to Dialect "
+                    f", key {type_or_py_class.prefix}.{type_or_py_class.display_name} exists"
+                )
+
+            self.python_types[
+                (type_or_py_class.prefix, type_or_py_class.display_name)
+            ] = type_or_py_class
+            return type_or_py_class
+        else:
+            raise ValueError(f"Cannot register {type_or_py_class} to Dialect")
