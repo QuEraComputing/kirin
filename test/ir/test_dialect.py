@@ -33,5 +33,3 @@ def test_py_type_register():
         )
 
 
-if __name__ == "__main__":
-    test_py_type_register()
