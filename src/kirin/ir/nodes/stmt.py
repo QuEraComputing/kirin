@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Mapping, TypeVar, ClassVar, Iterator, Sequence
+from typing import TYPE_CHECKING, Union, Mapping, TypeVar, ClassVar, Iterator, Sequence
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
@@ -8,7 +8,7 @@ from typing_extensions import Self
 from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue, ResultValue
 from kirin.ir.use import Use
-from kirin.ir.traits import StmtTrait
+from kirin.ir.traits import StmtTrait, LarkLoweringTrait
 from kirin.ir.attrs.abc import Attribute
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import MutableSequenceView
@@ -679,7 +679,7 @@ class Statement(IRNode["Block"]):
                 return True
         return False
 
-    TraitType = TypeVar("TraitType", bound=StmtTrait)
+    TraitType = TypeVar("TraitType", bound=Union[StmtTrait, LarkLoweringTrait])
 
     @classmethod
     def get_trait(cls, trait: type[TraitType]) -> TraitType | None:

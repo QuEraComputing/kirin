@@ -1,8 +1,9 @@
 from abc import ABC, ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Optional
+from typing import TYPE_CHECKING, Union, TypeVar, ClassVar, Optional
 from dataclasses import field, dataclass
 
 from kirin.print import Printable
+from kirin.ir.traits import AttrTrait, LarkLoweringTrait
 from kirin.lattice.abc import LatticeMeta, SingletonMeta
 
 if TYPE_CHECKING:
@@ -41,10 +42,20 @@ class Attribute(ABC, Printable, metaclass=AttributeMeta):
     """Dialect of the attribute. (default: None)"""
     name: ClassVar[str] = field(init=False, repr=False)
     """Name of the attribute in printing and other text format."""
-    traits: ClassVar[frozenset[str]] = field(
+    traits: ClassVar[frozenset[AttrTrait]] = field(
         default=frozenset(), init=False, repr=False
     )
     """Set of Attribute traits."""
 
     @abstractmethod
     def __hash__(self) -> int: ...
+
+    TraitType = TypeVar("TraitType", bound=Union[AttrTrait, LarkLoweringTrait])
+
+    @classmethod
+    def get_trait(cls, trait: type[TraitType]) -> TraitType | None:
+        """Get the trait of the Statement."""
+        for t in cls.traits:
+            if isinstance(t, trait):
+                return t
+        return None
