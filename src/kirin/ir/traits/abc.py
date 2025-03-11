@@ -22,6 +22,8 @@ class StmtTrait(ABC):
         pass
 
 
+# TODO: Merge AttrTrait and StmtTrait into a single Trait class
+#       and remove StmtTrait and AttrTrait classes.
 @dataclass(frozen=True)
 class AttrTrait(ABC):
     """Base class for all attribute traits."""
