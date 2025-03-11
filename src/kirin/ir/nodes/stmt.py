@@ -679,7 +679,9 @@ class Statement(IRNode["Block"]):
                 return True
         return False
 
-    TraitType = TypeVar("TraitType", bound=Union[StmtTrait, LarkLoweringTrait])
+    TraitType = TypeVar(
+        "TraitType", bound=Union[StmtTrait, LarkLoweringTrait["Statement"]]
+    )
 
     @classmethod
     def get_trait(cls, trait: type[TraitType]) -> TraitType | None:

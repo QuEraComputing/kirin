@@ -50,7 +50,9 @@ class Attribute(ABC, Printable, metaclass=AttributeMeta):
     @abstractmethod
     def __hash__(self) -> int: ...
 
-    TraitType = TypeVar("TraitType", bound=Union[AttrTrait, LarkLoweringTrait])
+    TraitType = TypeVar(
+        "TraitType", bound=Union[AttrTrait, LarkLoweringTrait["Attribute"]]
+    )
 
     @classmethod
     def get_trait(cls, trait: type[TraitType]) -> TraitType | None:

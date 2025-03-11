@@ -1,5 +1,5 @@
 import textwrap
-from typing import Any, Callable, ClassVar
+from typing import ClassVar
 from dataclasses import field, dataclass
 
 import lark
@@ -11,58 +11,33 @@ from kirin.exceptions import LarkLoweringError
 from kirin.lowering.state import LoweringState
 from kirin.lowering.result import Result
 
-SSA_IDENTIFIER: str = 'ssa_identifier'
-BLOCK_IDENTIFIER: str = 'block_identifier'
-BLOCK: str = 'block'
-REGION: str = 'region'
-SIGNATURE: str = 'signature'
-TYPE: str = 'type'
-DIALECT: str = 'dialect'
-ATTR: str = 'attr'
-
-def _default_grammar_registry():
-    return {
-        ir.Region: 'region',
-        ir.SSAValue : 'ssa_identifier',
-        ir.Block: 'block',
-        ir.Attribute: 'attr',
-        ir.Statement: 'stmt',
-        types.TypeAttribute: 'type',
-        types.PyClass: 'pytype',
-    }
+SSA_IDENTIFIER: str = "ssa_identifier"
+BLOCK_IDENTIFIER: str = "block_identifier"
+BLOCK: str = "block"
+REGION: str = "region"
+SIGNATURE: str = "signature"
+TYPE: str = "type"
+DIALECT: str = "dialect"
+ATTR: str = "attr"
 
 
 @dataclass
 class Grammer:
-    HEADER: ClassVar[str] =
+    rule_ids: IdTable[type[ir.Statement | ir.Attribute] | types.PyClass] = field(
+        default_factory=IdTable, init=False
     )
-    dialect_group: ir.DialectGroup
-    base_grammer_rules: dict[Any, str] = field(default_factory=)
-    grammar_registry: dict[Any, str] = field(default_factory=dict)
+    stmt_ids: list[str] = field(default_factory=list, init=False)
+    attr_ids: list[str] = field(default_factory=list, init=False)
+    rules: list[str] = field(default_factory=list, init=False)
+    stmt_traits: dict[str, LarkLoweringTrait[ir.Statement]] = field(
+        default_factory=dict, init=False
+    )
+    attr_traits: dict[str, LarkLoweringTrait[ir.Attribute] | types.PyClass] = field(
+        default_factory=dict, init=False
+    )
 
-
-    def get_parser(self, start: str) -> "LarkParser":
-
-
-
-
-
-
-
-@dataclass(init=False)
-class LarkParser:
-    dialects: ir.DialectGroup
-    lark_parser: lark.Lark
-    stmt_traits: dict[str, LarkLoweringTrait]
-    attr_traits: dict[str, LarkLoweringTrait]
-    py_types: dict[str, types.PyClass]
-
-
-
-    def __init__(self, dialects: ir.DialectGroup, start_node: ir.Statement):
-        self.dialects = dialects
-
-        header = textwrap.dedent("""
+    header: ClassVar[str] = textwrap.dedent(
+        """
         %import common.NEWLINE
         %import common.CNAME -> IDENTIFIER
         %import common.INT
@@ -72,86 +47,98 @@ class LarkParser:
         %ignore WS
         %ignore "│"
 
-        region: "{{" newline [block*] "}}" newline
-        block: block_identifier '(' [ssa_identifier (',' ssa_identifier)*] ')' newline stmts
-        signature: '(' [type (',' type )*] ')' '->' type
-
-        stmts: stmt*
+        region: "{{" newline (newline block)* "}}" newline*
+        block: block_identifier block_args  newline (stmt newline)*
 
         stmt = {stmt_rule}
-        type = {type_rule}
         attr = {attr_rule}
 
         block_identifier: "^" INT
-        typed_identifier: ssa_identifier ":" type
+        block_args: '(' ssa_identifier (',' ssa_identifier)* ')'
         ssa_identifier: '%' (IDENTIFIER | INT) | '%' (IDENTIFIER | INT) ":" type
-        ?newline: NEWLINE | (NEWLINE '//' /.+/)
-        """)
+        newline: NEWLINE | "//" NEWLINE | "//" /.+/ NEWLINE
+        """
+    )
+
+    def add_attr(self, node: type[ir.Attribute]) -> str:
+        trait: LarkLoweringTrait[ir.Attribute] = node.get_trait(LarkLoweringTrait)
+
+        if trait is None:
+            raise LarkLoweringError(
+                f"Attribute {node} does not have a LarkLoweringTrait"
+            )
+
+        self.attr_ids(rule_id := self.rule_ids[node])
+        self.rules.append(f"{rule_id}: {trait.lark_rule(self, node)}")
+        return rule_id, trait
+
+    def add_stmt(self, node: type[ir.Statement]) -> str:
+        trait: LarkLoweringTrait[ir.Statement] = node.get_trait(LarkLoweringTrait)
+
+        if trait is None:
+            raise LarkLoweringError(
+                f"Statement {node} does not have a LarkLoweringTrait"
+            )
+
+        self.stmt_ids(rule_id := self.rule_ids[node])
+        self.rules.append(f"{rule_id}: {trait.lark_rule(self, node)}")
+        return rule_id, trait
+
+    def add_pyclass(self, node: types.PyClass) -> str:
+        rule = f'"{node.prefix}.{node.display_name}"'
+        self.attr_ids(rule_id := self.rule_ids[node])
+        self.rules.append(f"{rule_id}: {rule}")
+        return rule_id
+
+    def emit(self) -> str:
+        stmt = " | ".join(self.stmt_ids)
+        attr = " | ".join(self.attr_ids)
+        return self.header.format(stmt_rule=stmt, attr_rule=attr) + "\n".join(
+            self.rules
+        )
 
 
-        base_grammer_rules =  _default_grammar_registry()
+@dataclass(init=False)
+class LarkParser:
+    dialects: ir.DialectGroup
+    lark_parser: lark.Lark
+    stmt_traits: dict[str, LarkLoweringTrait[ir.Statement]]
+    attr_traits: dict[str, LarkLoweringTrait[ir.Attribute] | types.PyClass]
+    state: LoweringState | None = None
+
+    def __init__(self, dialects: ir.DialectGroup, start_node: ir.Statement):
+        self.dialects = dialects
 
         start = None
-        rule_table = IdTable[Any](prefix="rule")
-
-        current_rules = dict(base_grammer_rules)
-
-        grammer = []
-        stmt_rules = []
-        attr_rules = []
-        type_rules = []
+        grammer = Grammer()
 
         for dialect in dialects.data:
             for attr in dialect.attrs:
-                lark_trait = attr.get_trait(LarkLoweringTrait)
-                if lark_trait is None:
-                    raise LarkLoweringError(f"Attribute {attr} does not have a LarkLoweringTrait")
+                rule_id, trait = grammer.add_attr(attr)
+                self.attr_traits[rule_id] = trait
 
-                attr_rule = lark_trait.lark_rule(base_grammer_rules, attr)
-                current_rules[attr] = (rule_id := rule_table.add(attr))
-                attr_rules.append(rule_id)
-                grammer.append(f"{rule_id}: {attr_rule}")
-                self.attr_traits[rule_id] = lark_trait
-
-            for (prefix, display_name), type_binding in dialect.python_types.items():
-                rule = f'"!" "{prefix}.{display_name}"'
-                current_rules[type_binding] = (rule_id := rule_table.add(type_binding))
-                type_rules.append(f"{rule_id}: {rule}")
-                self.py_types[rule_id] = type_binding
-
+            for type_binding in dialect.python_types.keys():
+                rule_id = grammer.add_pyclass(type_binding)
+                self.attr_traits[rule_id] = type_binding
 
             for stmt in dialect.stmts:
-                lark_trait = stmt.get_trait(LarkLoweringTrait)
-                if lark_trait is None:
-                    raise LarkLoweringError(f"Statement {stmt} does not have a LarkLoweringTrait")
-
-                stmt_rule = lark_trait.lark_rule(base_grammer_rules, stmt)
+                rule_id, trait = grammer.add_attr(attr)
+                self.stmt_traits[rule_id] = trait
 
                 if stmt is start_node:
-                    start = stmt_rule
-
-                current_rules[stmt] = (rule_id := rule_table.add(stmt))
-                stmt_rules.append(rule_id)
-                grammer.append(f"{rule_id}: {stmt_rule}")
-                self.stmt_traits[rule_id] = lark_trait
-
-        stmt_rule = " | ".join(stmt_rules)
-        attr_rule = " | ".join(attr_rules)
-        type_rule = " | ".join(type_rules)
-
-        grammer = header + "\n".join(grammer)
-        grammer = grammer.format(stmt_rule=stmt_rule, attr_rule=attr_rule, type_rule=type_rule)
+                    start = rule_id
 
         if start is None:
             raise LarkLoweringError(f"Start node {start_node} is not in the dialects")
 
-        self.lark_parser = lark.Lark(grammer, start=start)
+        self.lark_parser = lark.Lark(grammer.emit(), start=start)
 
-
-
-    def lower(self, tree: lark.Tree):
+    def lower(self, tree: lark.Tree) -> Result:
         node_type = tree.data
-        if node_type == "region":
+
+        if node_type == "newline":
+            return None
+        elif node_type == "region":
             return self.lower_region(tree)
         elif node_type == "block":
             return self.lower_block(tree)
@@ -164,4 +151,22 @@ class LarkParser:
         else:
             raise LarkLoweringError(f"Unknown node type {node_type}")
 
+    def lower_region(self, tree: lark.Tree) -> ir.Region:
 
+        for child in tree.children:
+            self.lower(child)
+
+        return Result()
+
+    def lower_block(self, tree: lark.Tree) -> ir.Block:
+        block = self.state.current_frame.curr_block
+
+        block_args = tree.children[1]
+        assert block_args.data == "block_args"
+        for arg in block_args.children:
+            block.args.append(self.lower(arg).expect_one())
+
+        for stmt in tree.children[2:]:
+            self.lower(stmt)
+
+        self.state.current_frame.curr_block

@@ -35,7 +35,7 @@ class FromLark(LarkLoweringTrait):
 
         stmt_body = f'"{stmt_type.dialect.name}.{stmt_type.name}" '
         return_match = ", ".join("ssa_identifier" for _ in range(num_results))
-        type_match = ", ".join(' "!" type_identifier' for _ in range(num_results))
+        type_match = ", ".join(' "!" attr' for _ in range(num_results))
         stmt_args = ", ".join(
             f'"{arg.name}" "=" ssa_identifier' for arg in stmt_fields.args
         )
