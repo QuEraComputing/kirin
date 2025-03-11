@@ -2,7 +2,7 @@ import ast
 import inspect
 import builtins
 from typing import TYPE_CHECKING, Any, TypeVar, get_origin
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from kirin.ir import Method, SSAValue, Statement, DialectGroup, traits
 from kirin.source import SourceInfo
@@ -17,7 +17,47 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class LoweringState(ast.NodeVisitor):
+class LowerToSSA:
+    _current_frame: Frame | None = field(kw_only=True, default=None)
+
+    @property
+    def current_frame(self):
+        if self._current_frame is None:
+            raise ValueError("No frame")
+        return self._current_frame
+
+    StmtType = TypeVar("StmtType", bound=Statement)
+
+    def append_stmt(self, stmt: StmtType) -> StmtType:
+        """Shorthand for appending a statement to the current block of current frame."""
+        return self.current_frame.append_stmt(stmt)
+
+    def push_frame(self, frame: Frame):
+        frame.parent = self._current_frame
+        self._current_frame = frame
+        return frame
+
+    def pop_frame(self, finalize_next: bool = True):
+        """Pop the current frame and return it.
+
+        Args:
+            finalize_next(bool): If True, append the next block of the current frame.
+
+        Returns:
+            Frame: The popped frame.
+        """
+        if self._current_frame is None:
+            raise ValueError("No frame to pop")
+        frame = self._current_frame
+
+        if finalize_next and frame.next_block.parent is None:
+            frame.append_block(frame.next_block)
+        self._current_frame = frame.parent
+        return frame
+
+
+@dataclass
+class LoweringState(ast.NodeVisitor, LowerToSSA):
     # from parent
     dialects: DialectGroup
     registry: dict[str, FromPythonAST]
@@ -33,7 +73,6 @@ class LoweringState(ast.NodeVisitor):
     # line_range: tuple[int, int]  # current (<start>, <end>)
     # col_range: tuple[int, int]  # current (<start>, <end>)
     max_lines: int = 3
-    _current_frame: Frame | None = None
 
     @classmethod
     def from_stmt(
@@ -67,46 +106,11 @@ class LoweringState(ast.NodeVisitor):
         return state
 
     @property
-    def current_frame(self):
-        if self._current_frame is None:
-            raise ValueError("No frame")
-        return self._current_frame
-
-    @property
     def code(self):
         stmt = self.current_frame.curr_region.blocks[0].first_stmt
         if stmt:
             return stmt
         raise ValueError("No code generated")
-
-    StmtType = TypeVar("StmtType", bound=Statement)
-
-    def append_stmt(self, stmt: StmtType) -> StmtType:
-        """Shorthand for appending a statement to the current block of current frame."""
-        return self.current_frame.append_stmt(stmt)
-
-    def push_frame(self, frame: Frame):
-        frame.parent = self._current_frame
-        self._current_frame = frame
-        return frame
-
-    def pop_frame(self, finalize_next: bool = True):
-        """Pop the current frame and return it.
-
-        Args:
-            finalize_next(bool): If True, append the next block of the current frame.
-
-        Returns:
-            Frame: The popped frame.
-        """
-        if self._current_frame is None:
-            raise ValueError("No frame to pop")
-        frame = self._current_frame
-
-        if finalize_next and frame.next_block.parent is None:
-            frame.append_block(frame.next_block)
-        self._current_frame = frame.parent
-        return frame
 
     def update_lineno(self, node):
         self.source = SourceInfo.from_ast(node, self.lineno_offset, self.col_offset)
