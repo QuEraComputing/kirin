@@ -132,7 +132,7 @@ class Unroll(RewriteRule):
         return RewriteResult(has_done_something=True)
 
     def rewrite_Len(self, node: Len):
-        if (coll_len := self._get_collection_len(node.collection)) is None:
+        if (coll_len := self._get_collection_len(node.value)) is None:
             return RewriteResult()
 
         node.replace_by(Constant(coll_len))
