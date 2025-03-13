@@ -64,12 +64,14 @@ class InferLen(RewriteRule):
 
     @cached_property
     def Constant(self):
+        # Avoid circular import caching the result
         from kirin.dialects.py.constant import Constant
 
         return Constant
 
     @cached_property
     def IListType(self):
+        # Avoid circular import caching the result
         from kirin.dialects.ilist import IListType
 
         return IListType
