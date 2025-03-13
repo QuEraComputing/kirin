@@ -109,9 +109,7 @@
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.len.InferLen.EllipsisType class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">EllipsisType</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>EllipsisType</span> <span class=o>=</span> <span class=n>PyClass</span><span class=p>(</span><span class=nb>type</span><span class=p>(</span><span class=o>...</span><span class=p>))</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.len.InferLen.IListType class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">IListType</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-cached"><code>cached</code></small> <small class="doc doc-label doc-label-property"><code>property</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>IListType</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.len.InferLen._get_collection_len class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">_get_collection_len</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>_get_collection_len</span><span class=p>(</span><span class=n>collection</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/len.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>77</span>
-<span class=normal>78</span>
-<span class=normal>79</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/len.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>79</span>
 <span class=normal>80</span>
 <span class=normal>81</span>
 <span class=normal>82</span>
@@ -126,7 +124,9 @@
 <span class=normal>91</span>
 <span class=normal>92</span>
 <span class=normal>93</span>
-<span class=normal>94</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>_get_collection_len</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>collection</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>):</span>
+<span class=normal>94</span>
+<span class=normal>95</span>
+<span class=normal>96</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>_get_collection_len</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>collection</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>):</span>
     <span class=n>coll_type</span> <span class=o>=</span> <span class=n>collection</span><span class=o>.</span><span class=n>type</span>
 
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>coll_type</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>):</span>
@@ -145,15 +145,15 @@
     <span class=k>else</span><span class=p>:</span>
         <span class=k>return</span> <span class=kc>None</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.len.InferLen.rewrite_Statement class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">rewrite_Statement</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>rewrite_Statement</span><span class=p>(</span><span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/len.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 96</span>
-<span class=normal> 97</span>
-<span class=normal> 98</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/len.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 98</span>
 <span class=normal> 99</span>
 <span class=normal>100</span>
 <span class=normal>101</span>
 <span class=normal>102</span>
 <span class=normal>103</span>
-<span class=normal>104</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
+<span class=normal>104</span>
+<span class=normal>105</span>
+<span class=normal>106</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>Len</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>RewriteResult</span><span class=p>()</span>
 
