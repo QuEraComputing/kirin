@@ -32,14 +32,14 @@ class RegionTrait(Trait["Region"], Generic[GraphType]):
 
 
 ASTNode = TypeVar("ASTNode", bound=ast.AST)
-StatementType = TypeVar("StatementType", bound="Statement")
+StmtType = TypeVar("StmtType", bound="Statement")
 
 
 @dataclass(frozen=True)
-class PythonLoweringTrait(Trait[StatementType], Generic[StatementType, ASTNode]):
+class PythonLoweringTrait(Trait[StmtType], Generic[StmtType, ASTNode]):
     """A trait that indicates that a statement can be lowered from Python AST."""
 
     @abstractmethod
     def lower(
-        self, stmt: type[StatementType], state: "lowering.LoweringState", node: ASTNode
+        self, stmt: type[StmtType], state: "lowering.LoweringState", node: ASTNode
     ) -> "lowering.Result": ...
