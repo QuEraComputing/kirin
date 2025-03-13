@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
-class Pure(Trait):
+class Pure(Trait["Statement"]):
     """A trait that indicates that a statement is pure, i.e., it has no side
     effects.
     """
@@ -17,7 +17,7 @@ class Pure(Trait):
 
 
 @dataclass(frozen=True)
-class MaybePure(Trait):
+class MaybePure(Trait["Statement"]):
     """A trait that indicates the statement may be pure,
     i.e., a call statement can be pure if the callee is pure.
     """
@@ -40,7 +40,7 @@ class MaybePure(Trait):
 
 
 @dataclass(frozen=True)
-class ConstantLike(Trait):
+class ConstantLike(Trait["Statement"]):
     """A trait that indicates that a statement is constant-like, i.e., it
     represents a constant value.
     """
@@ -49,7 +49,7 @@ class ConstantLike(Trait):
 
 
 @dataclass(frozen=True)
-class IsTerminator(Trait):
+class IsTerminator(Trait["Statement"]):
     """A trait that indicates that a statement is a terminator, i.e., it
     terminates a block.
     """
@@ -58,19 +58,19 @@ class IsTerminator(Trait):
 
 
 @dataclass(frozen=True)
-class NoTerminator(Trait):
+class NoTerminator(Trait["Statement"]):
     """A trait that indicates that the region of a statement has no terminator."""
 
     pass
 
 
 @dataclass(frozen=True)
-class IsolatedFromAbove(Trait):
+class IsolatedFromAbove(Trait["Statement"]):
     pass
 
 
 @dataclass(frozen=True)
-class HasParent(Trait):
+class HasParent(Trait["Statement"]):
     """A trait that indicates that a statement has a parent
     statement.
     """
