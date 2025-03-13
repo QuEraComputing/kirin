@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from kirin import lowering
     from kirin.ir import Block, Region, Statement
     from kirin.graph import Graph
-    from kirin.parse.grammar import Grammar, LarkParser
+    from kirin.parse.grammar import Grammar, DialectGroupParser
 
 
 IRNodeType = TypeVar("IRNodeType")
@@ -60,7 +60,7 @@ class LarkLoweringTrait(Trait[IRNodeType]):
     @abstractmethod
     def lower(
         self,
-        parser: "LarkParser",
+        parser: "DialectGroupParser",
         state: "lowering.LoweringState",
         node: type[IRNodeType],
         tree: lark.Tree,

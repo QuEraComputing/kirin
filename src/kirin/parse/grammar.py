@@ -102,7 +102,7 @@ class Grammar:
 
 
 @dataclass(init=False)
-class LarkParser:
+class DialectGroupParser:
     dialects: ir.DialectGroup
     lark_parser: lark.Lark
     stmt_traits: dict[str, LarkLoweringTrait[ir.Statement]]
