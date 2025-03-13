@@ -9,11 +9,14 @@ if TYPE_CHECKING:
     from kirin.graph import Graph
 
 
+IRNodeType = TypeVar("IRNodeType")
+
+
 @dataclass(frozen=True)
-class StmtTrait(ABC):
+class Trait(ABC, Generic[IRNodeType]):
     """Base class for all statement traits."""
 
-    def verify(self, stmt: "Statement"):
+    def verify(self, node: IRNodeType):
         pass
 
 
@@ -21,7 +24,7 @@ GraphType = TypeVar("GraphType", bound="Graph[Block]")
 
 
 @dataclass(frozen=True)
-class RegionTrait(StmtTrait, Generic[GraphType]):
+class RegionTrait(Trait["Region"], Generic[GraphType]):
     """A trait that indicates the properties of the statement's region."""
 
     @abstractmethod
@@ -33,7 +36,7 @@ StatementType = TypeVar("StatementType", bound="Statement")
 
 
 @dataclass(frozen=True)
-class PythonLoweringTrait(StmtTrait, Generic[StatementType, ASTNode]):
+class PythonLoweringTrait(Trait[StatementType], Generic[StatementType, ASTNode]):
     """A trait that indicates that a statement can be lowered from Python AST."""
 
     @abstractmethod

@@ -10,7 +10,7 @@ There are also some basic traits that are provided for convenience, such as
 """
 
 from .abc import (
-    StmtTrait as StmtTrait,
+    Trait as Trait,
     RegionTrait as RegionTrait,
     PythonLoweringTrait as PythonLoweringTrait,
 )

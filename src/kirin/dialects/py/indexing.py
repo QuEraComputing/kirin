@@ -30,7 +30,7 @@ GetItemLikeStmt = TypeVar("GetItemLikeStmt", bound=ir.Statement)
 
 
 @dataclass(frozen=True, eq=False)
-class GetItemLike(ir.StmtTrait, Generic[GetItemLikeStmt]):
+class GetItemLike(ir.Trait, Generic[GetItemLikeStmt]):
 
     @abstractmethod
     def get_object(self, stmt: GetItemLikeStmt) -> ir.SSAValue: ...

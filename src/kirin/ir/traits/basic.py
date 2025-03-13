@@ -1,14 +1,14 @@
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
-from .abc import StmtTrait
+from .abc import Trait
 
 if TYPE_CHECKING:
     from kirin.ir import Statement
 
 
 @dataclass(frozen=True)
-class Pure(StmtTrait):
+class Pure(Trait):
     """A trait that indicates that a statement is pure, i.e., it has no side
     effects.
     """
@@ -17,7 +17,7 @@ class Pure(StmtTrait):
 
 
 @dataclass(frozen=True)
-class MaybePure(StmtTrait):
+class MaybePure(Trait):
     """A trait that indicates the statement may be pure,
     i.e., a call statement can be pure if the callee is pure.
     """
@@ -40,7 +40,7 @@ class MaybePure(StmtTrait):
 
 
 @dataclass(frozen=True)
-class ConstantLike(StmtTrait):
+class ConstantLike(Trait):
     """A trait that indicates that a statement is constant-like, i.e., it
     represents a constant value.
     """
@@ -49,7 +49,7 @@ class ConstantLike(StmtTrait):
 
 
 @dataclass(frozen=True)
-class IsTerminator(StmtTrait):
+class IsTerminator(Trait):
     """A trait that indicates that a statement is a terminator, i.e., it
     terminates a block.
     """
@@ -58,19 +58,19 @@ class IsTerminator(StmtTrait):
 
 
 @dataclass(frozen=True)
-class NoTerminator(StmtTrait):
+class NoTerminator(Trait):
     """A trait that indicates that the region of a statement has no terminator."""
 
     pass
 
 
 @dataclass(frozen=True)
-class IsolatedFromAbove(StmtTrait):
+class IsolatedFromAbove(Trait):
     pass
 
 
 @dataclass(frozen=True)
-class HasParent(StmtTrait):
+class HasParent(Trait):
     """A trait that indicates that a statement has a parent
     statement.
     """

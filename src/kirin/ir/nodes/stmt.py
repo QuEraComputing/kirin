@@ -8,7 +8,7 @@ from typing_extensions import Self
 from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue, ResultValue
 from kirin.ir.use import Use
-from kirin.ir.traits import StmtTrait
+from kirin.ir.traits import Trait
 from kirin.ir.attrs.abc import Attribute
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import MutableSequenceView
@@ -132,7 +132,7 @@ class Statement(IRNode["Block"]):
 
     name: ClassVar[str]
     dialect: ClassVar[Dialect | None] = field(default=None, init=False, repr=False)
-    traits: ClassVar[frozenset[StmtTrait]]
+    traits: ClassVar[frozenset[Trait["Statement"]]] = frozenset()
     _arg_groups: ClassVar[frozenset[str]] = frozenset()
 
     _args: tuple[SSAValue, ...] = field(init=False)
@@ -665,7 +665,7 @@ class Statement(IRNode["Block"]):
         return self.attributes.get(key)
 
     @classmethod
-    def has_trait(cls, trait_type: type[StmtTrait]) -> bool:
+    def has_trait(cls, trait_type: type[Trait["Statement"]]) -> bool:
         """Check if the Statement has a specific trait.
 
         Args:
@@ -679,7 +679,7 @@ class Statement(IRNode["Block"]):
                 return True
         return False
 
-    TraitType = TypeVar("TraitType", bound=StmtTrait)
+    TraitType = TypeVar("TraitType", bound=Trait["Statement"])
 
     @classmethod
     def get_trait(cls, trait: type[TraitType]) -> TraitType | None:
