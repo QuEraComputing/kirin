@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal
 
 from kirin import ir, types, rewrite
 from kirin.passes import aggressive
@@ -107,20 +107,10 @@ def test_ilist_fcf():
     def foldr(xs: ilist.IList[int, Literal[3]]):
         return ilist.Foldr(add2, xs, init=123)  # type: ignore
 
-    @basic
-    def len_func(xs: ilist.IList[int, Literal[3]]):
-        return len(xs)
-
-    @basic
-    def len_func2(xs: ilist.IList[int, Any]):
-        return len(xs)
-
     foldl_before = foldl(xs)
     foldr_before = foldr(xs)
     rule.rewrite(foldl.code)
     rule.rewrite(foldr.code)
-    rule.rewrite(len_func.code)
-    rule.rewrite(len_func2.code)
     foldl_after = foldl(xs)
     foldr_after = foldr(xs)
 
@@ -157,13 +147,6 @@ def test_ilist_fcf():
     assert isinstance(stmt, py.Constant)
     assert stmt.value.unwrap() == 0
     assert isinstance(foldr.callable_region.blocks[0].stmts.at(10), func.Call)
-
-    stmt = len_func.callable_region.blocks[0].stmts.at(0)
-    assert isinstance(stmt, py.Constant)
-    assert stmt.value.unwrap() == 3
-
-    stmt = len_func2.callable_region.blocks[0].stmts.at(0)
-    assert isinstance(stmt, py.Len)
 
 
 def test_ilist_range():

@@ -1,7 +1,6 @@
 from kirin import ir, types
 from kirin.rewrite.abc import RewriteRule
 from kirin.rewrite.result import RewriteResult
-from kirin.dialects.py.len import Len
 from kirin.dialects.py.tuple import New as TupleNew
 from kirin.dialects.func.stmts import Call
 from kirin.dialects.ilist.stmts import Map, New, Scan, Foldl, Foldr, ForEach, IListType
@@ -129,11 +128,4 @@ class Unroll(RewriteRule):
             fn_call.insert_before(node)
 
         node.delete()
-        return RewriteResult(has_done_something=True)
-
-    def rewrite_Len(self, node: Len):
-        if (coll_len := self._get_collection_len(node.value)) is None:
-            return RewriteResult()
-
-        node.replace_by(Constant(coll_len))
         return RewriteResult(has_done_something=True)
