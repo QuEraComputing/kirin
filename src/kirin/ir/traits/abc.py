@@ -3,10 +3,13 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
+import lark
+
 if TYPE_CHECKING:
     from kirin import lowering
     from kirin.ir import Block, Region, Statement
     from kirin.graph import Graph
+    from kirin.parse.grammer import Grammer, LarkParser
 
 
 IRNodeType = TypeVar("IRNodeType")
@@ -42,4 +45,20 @@ class PythonLoweringTrait(Trait[StmtType], Generic[StmtType, ASTNode]):
     @abstractmethod
     def lower(
         self, stmt: type[StmtType], state: "lowering.LoweringState", node: ASTNode
+    ) -> "lowering.Result": ...
+
+
+@dataclass(frozen=True)
+class LarkLoweringTrait(Trait[IRNodeType]):
+
+    @abstractmethod
+    def lark_rule(self, rules: "Grammer", node: IRNodeType) -> str: ...
+
+    @abstractmethod
+    def lower(
+        self,
+        parser: "LarkParser",
+        state: "lowering.LoweringState",
+        node: type[IRNodeType],
+        tree: lark.Tree,
     ) -> "lowering.Result": ...
