@@ -22,12 +22,15 @@ ATTR: str = "attr"
 
 
 @dataclass
-class Grammer:
+class Grammar:
     rule_ids: IdTable[type[ir.Statement | ir.Attribute] | types.PyClass] = field(
         default_factory=IdTable, init=False
     )
     stmt_ids: list[str] = field(default_factory=list, init=False)
     attr_ids: list[str] = field(default_factory=list, init=False)
+    attr_rules: dict[type[ir.Attribute] | types.PyClass, str] = field(
+        default_factory=dict, init=False
+    )
     rules: list[str] = field(default_factory=list, init=False)
     stmt_traits: dict[str, LarkLoweringTrait[ir.Statement]] = field(
         default_factory=dict, init=False
@@ -110,7 +113,7 @@ class LarkParser:
         self.dialects = dialects
 
         start = None
-        grammer = Grammer()
+        grammer = Grammar()
 
         for dialect in dialects.data:
             for attr in dialect.attrs:

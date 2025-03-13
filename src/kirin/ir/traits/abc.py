@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from kirin import lowering
     from kirin.ir import Block, Region, Statement
     from kirin.graph import Graph
-    from kirin.parse.grammer import Grammer, LarkParser
+    from kirin.parse.grammar import Grammar, LarkParser
 
 
 IRNodeType = TypeVar("IRNodeType")
@@ -55,7 +55,7 @@ class PythonLoweringTrait(Trait[StmtType], Generic[StmtType, ASTNode]):
 class LarkLoweringTrait(Trait[IRNodeType]):
 
     @abstractmethod
-    def lark_rule(self, rules: "Grammer", node: IRNodeType) -> str: ...
+    def lark_rule(self, grammar: "Grammar", node: IRNodeType) -> str: ...
 
     @abstractmethod
     def lower(

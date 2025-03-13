@@ -1,8 +1,7 @@
-from kirin import ir
 from kirin.decl import fields
 from kirin.exceptions import LarkLoweringError
 from kirin.ir.nodes.stmt import Statement
-from kirin.parse.grammer import LarkParser
+from kirin.parse.grammar import Grammar, LarkParser
 from kirin.lowering.state import LoweringState
 from kirin.lowering.result import Result as Result
 
@@ -12,7 +11,7 @@ from ..abc import LarkLoweringTrait
 class FromLark(LarkLoweringTrait):
     def lark_rule(
         self,
-        grammer_rules: dict[ir.IRNode | ir.Attribute, str],
+        grammar: Grammar,
         stmt_type: type[Statement],
     ) -> str:
         assert (
@@ -31,6 +30,7 @@ class FromLark(LarkLoweringTrait):
                 f"Statement {stmt_type} has blocks, which are not supported by FromLark trait. create a custom trait for this statement"
             )
 
+        # TODO: replace global rules like: ssa_identifier, attr, etc with module constants: kirin.parse.grammar.SSA_IDENTIFIER, kirin.parse.grammar.ATTR, etc
         num_results = len(stmt_fields.results)
 
         stmt_body = f'"{stmt_type.dialect.name}.{stmt_type.name}" '
@@ -40,7 +40,7 @@ class FromLark(LarkLoweringTrait):
             f'"{arg.name}" "=" ssa_identifier' for arg in stmt_fields.args
         )
         attr_args = ", ".join(
-            f'"{name}" "=" {grammer_rules[attr.type]}'
+            f'"{name}" "=" {grammar.attr_rules[type(attr.type)]}'
             for name, attr in stmt_fields.attributes.items()
         )
 
