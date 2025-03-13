@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 IRNodeType = TypeVar("IRNodeType")
 
 
+IRNodeType = TypeVar("IRNodeType")
+
+
 @dataclass(frozen=True)
 class Trait(ABC, Generic[IRNodeType]):
     """Base class for all statement traits."""

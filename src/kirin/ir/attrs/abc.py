@@ -50,6 +50,21 @@ class Attribute(ABC, Printable, metaclass=AttributeMeta):
     @abstractmethod
     def __hash__(self) -> int: ...
 
+    @classmethod
+    def has_trait(cls, trait_type: type[Trait["Attribute"]]) -> bool:
+        """Check if the Statement has a specific trait.
+
+        Args:
+            trait_type (type[Trait]): The type of trait to check for.
+
+        Returns:
+            bool: True if the class has the specified trait, False otherwise.
+        """
+        for trait in cls.traits:
+            if isinstance(trait, trait_type):
+                return True
+        return False
+
     TraitType = TypeVar("TraitType", bound=Trait["Attribute"])
 
     def get_trait(self, trait: type[TraitType]) -> Optional[TraitType]:
