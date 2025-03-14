@@ -1,5 +1,5 @@
 import textwrap
-from typing import Generic, TypeVar, ClassVar
+from typing import Any, Generic, TypeVar, ClassVar
 from dataclasses import field, dataclass
 
 import lark
@@ -9,6 +9,7 @@ from kirin.idtable import IdTable
 from kirin.ir.traits import LarkLoweringTrait
 from kirin.exceptions import LarkLoweringError
 from kirin.lowering.state import LoweringState
+from kirin.lowering.result import Result
 
 SSA_IDENTIFIER: str = "ssa_identifier"
 BLOCK_IDENTIFIER: str = "block_identifier"
@@ -23,8 +24,8 @@ NodeType = TypeVar("NodeType", bound=ir.Statement | ir.Attribute | None)
 
 
 @dataclass
-class LarkLowerResult(Generic[NodeType]):
-    result: NodeType = None
+class LarkLowerResult:
+    result: Any = None
 
     def expect_none(self):
         if self.result is not None:
@@ -39,6 +40,12 @@ class LarkLowerResult(Generic[NodeType]):
     def expect_attr(self) -> ir.Attribute:
         if not isinstance(self.result, ir.Attribute):
             raise LarkLoweringError(f"Expected attribute, got {self.result}")
+
+        return self.result
+
+    def expect_ssa(self) -> ir.SSAValue:
+        if not isinstance(self.result, ir.SSAValue):
+            raise LarkLoweringError(f"Expected SSA, got {self.result}")
 
         return self.result
 
@@ -83,13 +90,17 @@ class Grammar:
 
         region: "{{" newline (newline block)* "}}" newline*
         block: block_identifier block_args  newline (stmt newline)*
+        stmt_ssa_args: "(" ssa_assign ("," ssa_assign)* ")" | "(" ")"
+        stmt_attr_args: "{" attr_assign (",", attr_assign)* "}"
 
         stmt = {stmt_rule}
         attr = {attr_rule}
 
         block_identifier: "^" INT
+        ssa_assign: IDENTIFIER "=" ssa_identifier
+        attr_assign: IDENTIFIER "=" attr
         block_args: '(' ssa_identifier (',' ssa_identifier)* ')'
-        ssa_identifier: '%' (IDENTIFIER | INT) | '%' (IDENTIFIER | INT) ":" type
+        ssa_identifier: '%' (IDENTIFIER | INT)
         newline: NEWLINE | "//" NEWLINE | "//" /.+/ NEWLINE
         """
     )
@@ -167,51 +178,43 @@ class DialectGroupParser:
 
         self.lark_parser = lark.Lark(grammer.emit(), start=start)
 
-    def lower(self, tree: lark.Tree):
+    def visit(self, tree: lark.Tree) -> Result:
         node_type = tree.data
+        visitor = getattr(self, f"visit_{node_type}", self.default_visit)
+        return visitor(tree)
 
-        if node_type == "newline":
-            return LarkLowerResult()
-        elif node_type == "region":
-            return self.lower_region(tree)
-        elif node_type == "block":
-            return self.lower_block(tree)
-        elif node_type == "stmt":
-            return self.lower_stmt(tree)
-        elif node_type == "attr":
-            return self.lower_attr(tree)
-        else:
-            raise LarkLoweringError(f"Unknown node type {node_type}")
+    def default_visit(self, tree: lark.Tree):
+        raise LarkLoweringError(f"Unknown node type {tree.data}")
 
-    def lower_region(self, tree: lark.Tree):
+    def visit_region(self, tree: lark.Tree):
         for child in tree.children:
-            self.lower(child)
-        return LarkLowerResult()
+            self.visit(child)
+        return Result()
 
-    def lower_block(self, tree: lark.Tree):
+    def visit_block(self, tree: lark.Tree):
         block = self.state.current_frame.curr_block
 
         block_args = tree.children[1]
         assert block_args.data == "block_args"
         for arg in block_args.children:
-            block.args.append(self.lower(arg).expect_one())
+            block.args.append(self.visit(arg).expect_one())
 
         for stmt in tree.children[2:]:
-            self.lower(stmt)
+            self.visit(stmt)
 
         self.state.current_frame.append_block()
-        return LarkLowerResult()
+        return Result()
 
-    def lower_stmt(self, tree: lark.Tree):
+    def visit_stmt(self, tree: lark.Tree):
         if tree.data not in self.stmt_registry:
             raise LarkLoweringError(f"Unknown statement type {tree.data}")
 
         stmt = self.stmt_registry[tree.data].lower(self, self.state, tree).expect_stmt()
         self.state.current_frame.append_stmt(stmt)
 
-        return LarkLowerResult()
+        return Result()
 
-    def lower_attr(self, tree: lark.Tree):
+    def visit_attr(self, tree: lark.Tree):
         if tree.data not in self.attr_registry:
             raise LarkLoweringError(f"Unknown statement type {tree.data}")
 
@@ -220,6 +223,15 @@ class DialectGroupParser:
             return LarkLowerResult(reg_result)
         else:
             return reg_result.lower(self, self.state, tree)
+
+    def visit_stmt_ssa_args(self, tree: lark.Tree):
+        return Result([self.visit(child).expect_one() for child in tree.children])
+
+    def visit_ssa_assign(self, tree: lark.Tree):
+        return Result([self.visit(tree.children[1]).expect_one()])
+
+    def visit_ssa_identifier(self, tree: lark.Tree):
+
 
     def run(self, body: str, entry: type[NodeType]) -> NodeType:
         raise NotImplementedError("TODO: implement run method")
