@@ -85,7 +85,7 @@ class Frame(Generic[NodeAST]):
         )
 
     @classmethod
-    def from_ast(
+    def from_stmts(
         cls,
         stmts: Sequence[ast.stmt] | StmtStream[ast.stmt],
         state: "LoweringState",

@@ -62,7 +62,7 @@ class LoweringState(ast.NodeVisitor):
             max_lines=max_lines,
         )
 
-        frame = Frame.from_ast([stmt], state, globals=globals)
+        frame = Frame.from_stmts([stmt], state, globals=globals)
         state.push_frame(frame)
         return state
 

@@ -71,7 +71,7 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
                 f"Expected context expression to be a call for with {stmt.name}"
             )
 
-        body_frame = lowering.Frame.from_ast(body, state, parent=state.current_frame)
+        body_frame = lowering.Frame.from_stmts(body, state, parent=state.current_frame)
         state.push_frame(body_frame)
         state.exhaust()
         region_name, region_info = next(iter(fs.regions.items()))
