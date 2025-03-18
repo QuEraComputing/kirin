@@ -1,6 +1,8 @@
 import ast
 from dataclasses import dataclass
 
+import lark
+
 
 @dataclass
 class SourceInfo:
@@ -18,4 +20,22 @@ class SourceInfo:
             getattr(node, "col_offset", 0) + col_offset,
             end_lineno + lineno_offset if end_lineno is not None else None,
             end_col_offset + col_offset if end_col_offset is not None else None,
+        )
+
+    @classmethod
+    def from_lark_tree(cls, node: lark.Tree | lark.Token):
+        return cls(
+            node.meta.line,
+            node.meta.column,
+            node.meta.end_line,
+            node.meta.end_column,
+        )
+
+    @classmethod
+    def from_lark_token(cls, token: lark.Token):
+        return cls(
+            token.line,
+            token.column,
+            token.end_line,
+            token.end_column,
         )

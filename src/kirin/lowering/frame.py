@@ -1,5 +1,5 @@
 import ast
-from typing import TYPE_CHECKING, Any, TypeVar, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Callable, Optional, Sequence
 from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, SSAValue, Statement
@@ -7,19 +7,22 @@ from kirin.exceptions import DialectLoweringError
 from kirin.lowering.stream import StmtStream
 
 if TYPE_CHECKING:
+    from kirin.parse.grammar import LarkLoweringState
     from kirin.lowering.state import LoweringState
 
 
 CallbackFn = Callable[["Frame", SSAValue], SSAValue]
 
+NodeAST = TypeVar("NodeAST")
+
 
 @dataclass
-class Frame:
+class Frame(Generic[NodeAST]):
     state: "LoweringState"
     """lowering state"""
     parent: Optional["Frame"]
     """parent frame, if any"""
-    stream: StmtStream[ast.stmt]
+    stream: StmtStream[NodeAST]
     """stream of statements to be lowered"""
 
     curr_region: Region
@@ -42,7 +45,47 @@ class Frame:
     """callback function that creates a local SSAValue value when an captured value was used."""
 
     @classmethod
-    def from_stmts(
+    def from_lark(
+        cls,
+        state: "LarkLoweringState",
+        parent: Optional["Frame"] = None,
+        region: Optional[Region] = None,
+        entr_block: Optional[Block] = None,
+        next_block: Optional[Block] = None,
+    ):
+        """Create a new frame from a lark lowering state.
+
+        - `state`: lark lowering state.
+        - `region`: `Region` to append the new block to, `None` to create a new one, default `None`.
+        - `entr_block`: `Block` to append the new statements to,
+            `None` to create a new one and attached to the region, default `None`.
+        - `next_block`: `Block` to use if branching to a new block, if `None` to create
+            a new one without attaching to the region. (note: this should not attach to
+            the region at frame construction)
+        """
+        if region is None:
+            entr_block = entr_block or Block()
+            region = Region(entr_block)
+
+        if entr_block is None:
+            entr_block = region.blocks[0]
+
+        assert (
+            region.blocks[0] is entr_block
+        ), "entr_block must be the first block in the region"
+
+        return cls(
+            state=state,
+            parent=parent,
+            stream=StmtStream([]),
+            curr_region=region,
+            entr_block=entr_block,
+            curr_block=entr_block,
+            next_block=next_block or Block(),
+        )
+
+    @classmethod
+    def from_ast(
         cls,
         stmts: Sequence[ast.stmt] | StmtStream[ast.stmt],
         state: "LoweringState",

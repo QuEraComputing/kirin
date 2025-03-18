@@ -34,7 +34,7 @@ class CfLowering(FromPythonAST):
         none_stmt = frame.append_stmt(py.Constant(None))
 
         body_frame = state.push_frame(
-            Frame.from_stmts(
+            Frame.from_ast(
                 node.body,
                 state,
                 region=state.current_frame.curr_region,
@@ -87,7 +87,7 @@ class CfLowering(FromPythonAST):
         frame = state.current_frame
         before_block = frame.curr_block
         if_frame = state.push_frame(
-            Frame.from_stmts(
+            Frame.from_ast(
                 node.body,
                 state,
                 region=frame.curr_region,
@@ -102,7 +102,7 @@ class CfLowering(FromPythonAST):
         state.pop_frame()
 
         else_frame = state.push_frame(
-            Frame.from_stmts(
+            Frame.from_ast(
                 node.orelse,
                 state,
                 region=frame.curr_region,
@@ -117,7 +117,7 @@ class CfLowering(FromPythonAST):
         state.pop_frame()
 
         after_frame = state.push_frame(
-            Frame.from_stmts(
+            Frame.from_ast(
                 frame.stream.split(),
                 state,
                 region=frame.curr_region,

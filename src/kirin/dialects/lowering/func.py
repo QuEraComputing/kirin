@@ -60,7 +60,7 @@ class Lowering(lowering.FromPythonAST):
             return stmt.result
 
         func_frame = state.push_frame(
-            lowering.Frame.from_stmts(
+            lowering.Frame.from_ast(
                 node.body,
                 state,
                 entr_block=entr_block,

@@ -1,8 +1,9 @@
+from lark import Tree, Token
+
 from kirin.decl import fields
 from kirin.exceptions import LarkLoweringError
 from kirin.ir.nodes.stmt import Statement
-from kirin.parse.grammar import Grammar, LarkParser
-from kirin.lowering.state import LoweringState
+from kirin.parse.grammar import Grammar, LarkLowerResult, LarkLoweringState
 from kirin.lowering.result import Result as Result
 
 from ..abc import LarkLoweringTrait
@@ -30,31 +31,41 @@ class FromLark(LarkLoweringTrait):
                 f"Statement {stmt_type} has blocks, which are not supported by FromLark trait. create a custom trait for this statement"
             )
 
-        # TODO: replace global rules like: ssa_identifier, attr, etc with module constants: kirin.parse.grammar.SSA_IDENTIFIER, kirin.parse.grammar.ATTR, etc
-        num_results = len(stmt_fields.results)
+        results = 'stmt_return_args "=" ' if len(stmt_fields.results) > 0 else ""
+        attrs = "stmt_attr_args" if len(stmt_fields.attrs) > 0 else ""
 
-        stmt_body = f'"{stmt_type.dialect.name}.{stmt_type.name}" '
-        return_match = ", ".join("ssa_identifier" for _ in range(num_results))
-        type_match = ", ".join(' "!" attr' for _ in range(num_results))
-        stmt_args_rule = ", ".join(
-            f'"{arg.name}" "=" ssa_identifier' for arg in stmt_fields.args
-        )
-        attr_args_rule = ", ".join(
-            f'"{name}" "=" {grammar.attr_rules[type(attr.type)]}'
-            for name, attr in stmt_fields.attributes.items()
-        )
-
-        stmt_rule = f'{stmt_body} "(" {stmt_args_rule} ")"'
-
-        if len(attr_args_rule) > 0:
-            stmt_rule = f'{stmt_rule} "{{" {attr_args_rule} "}}"'
-
-        if len(return_match) > 0:
-            stmt_rule = f'"{return_match} "=" {stmt_rule} ":" {type_match}'
-
-        return stmt_rule
+        return f'{results} "{stmt_type.dialect.name}.{stmt_type.name}" stmt_ssa_args {attrs}'
 
     def lower(
-        self, parser: LarkParser, state: LoweringState, stmt: Statement
-    ) -> Result:
-        pass
+        self, state: LarkLoweringState, stmt_type: type[Statement], tree: Tree
+    ) -> LarkLowerResult:
+        results = []
+        attrs = {}
+        match tree.children:
+            case [
+                Tree() as results_tree,
+                Token(),
+                Token(),
+                Tree() as ssa_args_tree,
+                Tree() as attrs_tree,
+            ]:
+                results = state.visit(results_tree).expect(list)
+                ssa_args = state.visit(ssa_args_tree).expect(dict)
+                attrs = state.visit(attrs_tree).expect(dict)
+            case [Tree() as results_tree, Token(), Token(), Tree() as ssa_args_tree]:
+                results = state.visit(results_tree).expect(list)
+                ssa_args = state.visit(ssa_args_tree).expect(dict)
+            case [Token(), Tree() as ssa_args_tree, Tree() as attrs_tree]:
+                ssa_args = state.visit(ssa_args_tree).expect(dict)
+                attrs = state.visit(attrs_tree).expect(dict)
+            case [Token(), Tree() as ssa_args_tree]:
+                ssa_args = state.visit(ssa_args_tree).expect(dict)
+            case _:
+                raise ValueError(f"Unexpected tree shape: {tree}")
+
+        stmt = state.append_stmt(stmt_type(**ssa_args, **attrs))
+        state.current_frame.defs.update(
+            {result: ssa for result, ssa in zip(results, stmt.results)}
+        )
+
+        return LarkLowerResult(stmt)
