@@ -195,3 +195,27 @@ def test_ilist_constprop():
     assert isinstance(target, const.Value)
     for x, y in zip(target.data, ilist.IList([0.3, 0.6, 0.9])):
         assert abs(x - y) < 1e-9
+
+    @basic_no_opt
+    def add(x, y):
+        return x + y
+
+    @basic_no_opt
+    def foldl(xs):
+        return ilist.foldl(add, xs, init=0)
+
+    @basic_no_opt
+    def foldr(xs):
+        return ilist.foldr(add, xs, init=0)
+
+    @basic_no_opt
+    def main2():
+        values = [1, 2, 3]
+        return foldl(values), foldr(values)
+
+    prop = const.Propagate(basic_no_opt)
+    frame, result = prop.run_analysis(main2)
+    target_ssa = main2.callable_region.blocks[0].stmts.at(-2).results[0]
+    target = frame.entries[target_ssa]
+    assert isinstance(target, const.Value)
+    assert target.data == (6, 6)
