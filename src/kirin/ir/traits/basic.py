@@ -1,6 +1,8 @@
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
+from kirin.ir.nodes.stmt import Statement
+
 from .abc import Trait
 
 if TYPE_CHECKING:
@@ -21,6 +23,12 @@ class MaybePure(Trait["Statement"]):
     """A trait that indicates the statement may be pure,
     i.e., a call statement can be pure if the callee is pure.
     """
+
+    def verify(self, node: Statement):
+        if node.has_trait(Pure):
+            raise ValueError("Cannot have both Pure and MaybePure traits")
+        if "purity" not in node.attributes:
+            raise ValueError("`MaybePure` trait requires `purity` attribute to be set")
 
     @classmethod
     def is_pure(cls, stmt: "Statement") -> bool:
