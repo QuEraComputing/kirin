@@ -42,6 +42,7 @@
             * [stmts](kirin/dialects/func/stmts.md)
             * [typeinfer](kirin/dialects/func/typeinfer.md)
         * [ilist](kirin/dialects/ilist/index.md)
+            * [constprop](kirin/dialects/ilist/constprop.md)
             * [interp](kirin/dialects/ilist/interp.md)
             * [lowering](kirin/dialects/ilist/lowering.md)
             * [passes](kirin/dialects/ilist/passes.md)
