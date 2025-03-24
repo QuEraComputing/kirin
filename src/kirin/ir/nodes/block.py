@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from typing_extensions import Self
 
 from kirin.print import Printer
-from kirin.ir.ssa import SSAValue, BlockArgument
+from kirin.ir.ssa import SSAValue, BlockArgument, DeletedSSAValue
 from kirin.exceptions import VerificationError
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import View, MutableSequenceView
@@ -90,13 +90,16 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
         Raises:
             ValueError: If the argument does not belong to the reference block.
         """
+        if safe and len(arg.uses) > 0:
+            raise ValueError("Cannot delete SSA value with uses")
+
         if arg.block is not self.node:
             raise ValueError("Attempt to delete an argument that is not in the block")
 
         for block_arg in self.field[arg.index + 1 :]:
             block_arg.index -= 1
         self.node._args = (*self.field[: arg.index], *self.field[arg.index + 1 :])
-        arg.delete(safe=safe)
+        arg.replace_by(DeletedSSAValue(arg))
 
     def __delitem__(self, idx: int) -> None:
         self.delete(self.field[idx])
