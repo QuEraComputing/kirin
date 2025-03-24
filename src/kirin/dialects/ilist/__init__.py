@@ -9,6 +9,7 @@ from . import (
     interp as interp,
     rewrite as rewrite,
     lowering as lowering,
+    constprop as constprop,
     typeinfer as typeinfer,
 )
 from .stmts import (

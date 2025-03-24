@@ -1,8 +1,8 @@
-from typing import Literal
+from typing import Any, Literal
 
 from kirin import ir, types, rewrite
 from kirin.passes import aggressive
-from kirin.prelude import python_basic
+from kirin.prelude import basic_no_opt, python_basic
 from kirin.dialects import py, func, ilist, lowering
 from kirin.passes.typeinfer import TypeInfer
 
@@ -57,7 +57,7 @@ def test_ilist_fcf():
     def map(xs: ilist.IList[int, Literal[3]]):
         return ilist.map(add1, xs)
 
-    @basic
+    @basic_no_opt
     def foreach(xs: ilist.IList[int, Literal[3]]):
         ilist.for_each(add1, xs)
 
@@ -161,3 +161,61 @@ def test_ilist_range():
         return range(0, 3)
 
     assert const_range() == ilist.IList(range(0, 3))
+
+
+def test_ilist_constprop():
+    from kirin.analysis import const
+
+    @basic_no_opt
+    def test_impl(x: float) -> float:
+        return x * 0.3
+
+    @basic_no_opt
+    def _for_loop(
+        values: ilist.IList[float, Any],
+    ) -> ilist.IList[float, Any]:
+
+        def gen(i: int):
+            return test_impl(
+                x=values[i],
+            )
+
+        n_range = len(values)
+        return ilist.map(fn=gen, collection=ilist.range(n_range))
+
+    @basic_no_opt
+    def main():
+        values = [1.0, 2.0, 3.0]
+        return _for_loop(values)  # type: ignore
+
+    prop = const.Propagate(basic_no_opt)
+    frame, result = prop.run_analysis(main)
+    target_ssa = main.callable_region.blocks[0].stmts.at(-2).results[0]
+    target = frame.entries[target_ssa]
+    assert isinstance(target, const.Value)
+    for x, y in zip(target.data, ilist.IList([0.3, 0.6, 0.9])):
+        assert abs(x - y) < 1e-9
+
+    @basic_no_opt
+    def add(x, y):
+        return x + y
+
+    @basic_no_opt
+    def foldl(xs):
+        return ilist.foldl(add, xs, init=0)
+
+    @basic_no_opt
+    def foldr(xs):
+        return ilist.foldr(add, xs, init=0)
+
+    @basic_no_opt
+    def main2():
+        values = [1, 2, 3]
+        return foldl(values), foldr(values)
+
+    prop = const.Propagate(basic_no_opt)
+    frame, result = prop.run_analysis(main2)
+    target_ssa = main2.callable_region.blocks[0].stmts.at(-2).results[0]
+    target = frame.entries[target_ssa]
+    assert isinstance(target, const.Value)
+    assert target.data == (6, 6)
