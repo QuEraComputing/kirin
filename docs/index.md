@@ -312,7 +312,9 @@ def food(self): # (2)!
     fold_pass = Fold(self)
 
     def run_pass(mt, *, fold:bool=True, hungry:bool=True):  # (3)!
-        Fixpoint(Walk(NewFoodAndNap())).rewrite(mt.code)
+
+        if fold:
+            fold_pass(mt)
 
         if hungry:
             Walk(NewFoodAndNap()).rewrite(mt.code) # (4)!
