@@ -49,7 +49,7 @@ class New(ir.Statement):
 
 @statement(dialect=dialect)
 class Push(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
     lst: ir.SSAValue = info.argument(IListType[ElemT])
     value: ir.SSAValue = info.argument(IListType[ElemT])
     result: ir.ResultValue = info.result(IListType[ElemT])
@@ -60,7 +60,8 @@ OutElemT = types.TypeVar("OutElemT")
 
 @statement(dialect=dialect)
 class Map(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({ir.MaybePure(), ir.FromPythonCall()})
+    purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(types.MethodType[[ElemT], OutElemT])
     collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
     result: ir.ResultValue = info.result(IListType[OutElemT, ListLen])
@@ -68,7 +69,8 @@ class Map(ir.Statement):
 
 @statement(dialect=dialect)
 class Foldr(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({ir.MaybePure(), ir.FromPythonCall()})
+    purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(
         types.Generic(ir.Method, [ElemT, OutElemT], OutElemT)
     )
@@ -79,7 +81,8 @@ class Foldr(ir.Statement):
 
 @statement(dialect=dialect)
 class Foldl(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({ir.MaybePure(), ir.FromPythonCall()})
+    purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(
         types.Generic(ir.Method, [OutElemT, ElemT], OutElemT)
     )
@@ -94,7 +97,8 @@ ResultT = types.TypeVar("ResultT")
 
 @statement(dialect=dialect)
 class Scan(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({ir.MaybePure(), ir.FromPythonCall()})
+    purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(
         types.Generic(ir.Method, [OutElemT, ElemT], types.Tuple[OutElemT, ResultT])
     )
@@ -107,6 +111,7 @@ class Scan(ir.Statement):
 
 @statement(dialect=dialect)
 class ForEach(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({ir.MaybePure(), ir.FromPythonCall()})
+    purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(types.Generic(ir.Method, [ElemT], types.NoneType))
     collection: ir.SSAValue = info.argument(IListType[ElemT])
