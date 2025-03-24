@@ -83,6 +83,7 @@ class Lowering(lowering.FromPythonAST):
         iter_ = state.visit(node.iter).expect_one()
 
         yields: list[str] = []
+        parent_frame = state.current_frame
 
         def new_block_arg_if_inside_loop(frame: lowering.Frame, capture: ir.SSAValue):
             if not capture.name:
@@ -101,6 +102,14 @@ class Lowering(lowering.FromPythonAST):
         loop_var = body_frame.curr_block.args.append_from(types.Any)
         unpacking(state, node.target, loop_var)
         state.exhaust(body_frame)
+
+        # if a variable is assigned in loop body and exist in parent frame
+        # it should be captured as initializers and yielded
+        for name, value in body_frame.defs.items():
+            if name in parent_frame.defs:
+                yields.append(name)
+                body_frame.curr_block.args.append_from(value.type, name)
+
         # NOTE: this frame won't have phi nodes
         if yields and (
             body_frame.curr_block.last_stmt is None
@@ -116,6 +125,7 @@ class Lowering(lowering.FromPythonAST):
                 raise DialectLoweringError(f"expected value for {name}")
             initializers.append(value)
         stmt = For(iter_, body_frame.curr_region, *initializers)
+
         for name, result in zip(yields, stmt.results):
             state.current_frame.defs[name] = result
             result.name = name

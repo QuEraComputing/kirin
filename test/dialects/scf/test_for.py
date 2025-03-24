@@ -64,3 +64,16 @@ def test_issue_213():
 
     assert main.py_func is not None
     assert main() == main.py_func()
+
+
+def test_simple_assign():
+    @python_basic.union(
+        [func, scf, py.unpack, lowering.func, ilist, lowering.range.ilist]
+    )
+    def main(n: int):
+        x = 0
+        for i in range(n):
+            x = i
+        return x
+
+    assert main(5) == 4
