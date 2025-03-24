@@ -55,7 +55,7 @@ class Propagate(ForwardExtra[Frame, Result]):
     def new_frame(self, code: ir.Statement) -> Frame:
         return Frame.from_func_like(code)
 
-    def _try_eval_const_pure(
+    def try_eval_const_pure(
         self,
         frame: Frame,
         stmt: ir.Statement,
@@ -87,11 +87,11 @@ class Propagate(ForwardExtra[Frame, Result]):
         method = self.lookup_registry(frame, stmt)
         if method is None:
             if stmt.has_trait(ir.ConstantLike):
-                return self._try_eval_const_pure(frame, stmt, ())
+                return self.try_eval_const_pure(frame, stmt, ())
             elif stmt.has_trait(ir.Pure):
                 values = frame.get_values(stmt.args)
                 if types.is_tuple_of(values, Value):
-                    return self._try_eval_const_pure(frame, stmt, values)
+                    return self.try_eval_const_pure(frame, stmt, values)
 
             if stmt.has_trait(ir.Pure):
                 return (Unknown(),)  # no implementation but pure
