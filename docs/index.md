@@ -327,7 +327,7 @@ def food(self): # (2)!
 
 This is it!
 
-For further advanced use case see [`CookBook/Food`](cookbook/beer_dialect/control_flow_rewrite.md)
+For further advanced use case see [`CookBook/Food`](cookbook/foodlang/cf_rewrite.md)
 
 ## Contributors
 
