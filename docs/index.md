@@ -257,7 +257,7 @@ Everytime we eat, we will to buy another piece of food, then take a nap. Someone
 
 
 More specifically, we want to rewrite the program such that, everytime we encounter a `Eat` statement, we insert a `NewFood` statement, and `Nap` after `Eat`.
-Let's define a rewrite pass that rewrite our `Eat` statement. This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.RewriteRule] and implementing the
+Let's define a rewrite pass that rewrite our `Eat` statement. This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.abc.RewriteRule] and implementing the
 `rewrite_Statement` method. The `RewriteRule` class is a standard Python visitor on Kirin's IR.
 
 
@@ -327,7 +327,7 @@ def food(self): # (2)!
 
 This is it!
 
-For further advanced use case see [`CookBook/Food`](cookbook/beer_dialect/control_flow_rewrite.md)
+For further advanced use case see [`CookBook/Food`](cookbook/foodlang/cf_rewrite.md)
 
 ## Contributors
 
