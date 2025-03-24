@@ -24,7 +24,7 @@ GraphType = TypeVar("GraphType", bound="Graph[Block]")
 
 
 @dataclass(frozen=True)
-class RegionTrait(Trait["Region"], Generic[GraphType]):
+class RegionTrait(Trait["Statement"], Generic[GraphType]):
     """A trait that indicates the properties of the statement's region."""
 
     @abstractmethod
