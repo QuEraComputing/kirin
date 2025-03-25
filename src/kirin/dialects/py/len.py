@@ -87,8 +87,6 @@ class InferLen(RewriteRule):
             and isinstance(coll_type.vars[1].data, int)
         ):
             return coll_type.vars[1].data
-        elif coll_type.is_subseteq(types.Tuple) and coll_type.vararg is None:
-            return len(coll_type.vars)
         else:
             return None
 
