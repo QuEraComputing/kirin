@@ -195,6 +195,7 @@
         * [fold](kirin/rewrite/fold.md)
         * [getfield](kirin/rewrite/getfield.md)
         * [getitem](kirin/rewrite/getitem.md)
+        * [infer_len](kirin/rewrite/infer_len.md)
         * [inline](kirin/rewrite/inline.md)
         * [result](kirin/rewrite/result.md)
         * [walk](kirin/rewrite/walk.md)
