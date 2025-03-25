@@ -39,7 +39,7 @@ class TypeInfer(MethodTable):
         # give up on dynamic method calls
         mt = interp.maybe_const(stmt.callee, ir.Method)
         if mt is None:
-            return self._solve_method_type(interp, frame, stmt)
+            return self._solve_method_type_in_call(interp, frame, stmt)
         return self._invoke_method(
             interp,
             frame,
@@ -50,7 +50,9 @@ class TypeInfer(MethodTable):
             ),
         )
 
-    def _solve_method_type(self, interp: TypeInference, frame: Frame, stmt: Call):
+    def _solve_method_type_in_call(
+        self, interp: TypeInference, frame: Frame, stmt: Call
+    ):
         mt_inferred = frame.get(stmt.callee)
         if not isinstance(mt_inferred, types.Generic):
             return (types.Bottom,)
@@ -58,15 +60,19 @@ class TypeInfer(MethodTable):
         if len(mt_inferred.vars) != 2:
             return (types.Bottom,)
 
-        args = mt_inferred.vars[0]
+        params = mt_inferred.vars[0]
         result = mt_inferred.vars[1]
-        if not args.is_subseteq(types.Tuple):
+        if not params.is_subseteq(types.Tuple):
             return (types.Bottom,)
 
+        inputs = frame.get_values(stmt.inputs)
         resolve = TypeResolution()
-        args = cast(types.Generic, args)
-        for arg, value in zip(args.vars, frame.get_values(stmt.inputs)):
-            resolve.solve(arg, value)
+        if isinstance(params, types.TypeVar):
+            resolve.solve(params, types.Tuple[*inputs])
+        else:
+            params = cast(types.Generic, params)
+            for arg, value in zip(params.vars, frame.get_values(stmt.inputs)):
+                resolve.solve(arg, value)
         return (resolve.substitute(result),)
 
     @impl(Invoke)
