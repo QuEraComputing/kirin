@@ -8,6 +8,7 @@ from .inline import Inline as Inline
 from .getitem import InlineGetItem as InlineGetItem
 from .fixpoint import Fixpoint as Fixpoint
 from .getfield import InlineGetField as InlineGetField
+from .infer_len import InferLen as InferLen
 from .apply_type import ApplyType as ApplyType
 from .compactify import CFGCompactify as CFGCompactify
 from .wrap_const import WrapConst as WrapConst

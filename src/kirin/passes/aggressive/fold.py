@@ -6,6 +6,7 @@ from kirin.rewrite import (
     Chain,
     Inline,
     Fixpoint,
+    InferLen,
     WrapConst,
     Call2Invoke,
     ConstantFold,
@@ -29,7 +30,7 @@ class Fold(Pass):
     def unsafe_run(self, mt: Method) -> RewriteResult:
         result = RewriteResult()
         frame, _ = self.constprop.run_analysis(mt)
-        result = Walk(WrapConst(frame)).rewrite(mt.code).join(result)
+        result = Walk(Chain(WrapConst(frame), InferLen())).rewrite(mt.code).join(result)
         rule = Chain(
             ConstantFold(),
             Call2Invoke(),

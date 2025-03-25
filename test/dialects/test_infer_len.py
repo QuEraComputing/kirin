@@ -6,7 +6,9 @@ from kirin.dialects import py, ilist
 
 
 def test():
-    rule = rewrite.Fixpoint(rewrite.Walk(py.len.InferLen()))
+    rule = rewrite.Fixpoint(
+        rewrite.Walk(rewrite.Chain(rewrite.InferLen(), rewrite.ConstantFold()))
+    )
 
     @basic
     def len_func(xs: ilist.IList[int, Literal[3]]):

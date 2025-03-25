@@ -8,12 +8,10 @@ This dialect maps the `len()` call to the `Len` statement:
 """
 
 import ast
-from functools import cached_property
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.analysis import const
-from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 dialect = ir.Dialect("py.len")
 
@@ -57,45 +55,3 @@ class Lowering(lowering.FromPythonAST):
         return lowering.Result(
             state.append_stmt(Len(value=state.visit(node.args[0]).expect_one()))
         )
-
-
-class InferLen(RewriteRule):
-
-    @cached_property
-    def Constant(self):
-        # Avoid circular import caching the result
-        from kirin.dialects.py.constant import Constant
-
-        return Constant
-
-    @cached_property
-    def IListType(self):
-        # Avoid circular import caching the result
-        from kirin.dialects.ilist import IListType
-
-        return IListType
-
-    def _get_collection_len(self, collection: ir.SSAValue):
-        coll_type = collection.type
-
-        if not isinstance(coll_type, types.Generic):
-            return None
-
-        if (
-            coll_type.is_subseteq(self.IListType)
-            and isinstance(coll_type.vars[1], types.Literal)
-            and isinstance(coll_type.vars[1].data, int)
-        ):
-            return coll_type.vars[1].data
-        else:
-            return None
-
-    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if not isinstance(node, Len):
-            return RewriteResult()
-
-        if (coll_len := self._get_collection_len(node.value)) is None:
-            return RewriteResult()
-
-        node.replace_by(self.Constant(coll_len))
-        return RewriteResult(has_done_something=True)
