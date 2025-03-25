@@ -60,7 +60,6 @@ class Lowering(lowering.FromPythonAST):
 
 
 class InferLen(RewriteRule):
-    EllipsisType = types.PyClass(type(...))
 
     @cached_property
     def Constant(self):
@@ -88,9 +87,7 @@ class InferLen(RewriteRule):
             and isinstance(coll_type.vars[1].data, int)
         ):
             return coll_type.vars[1].data
-        elif coll_type.is_subseteq(types.Tuple) and not any(
-            var.is_subseteq(self.EllipsisType) for var in coll_type.vars
-        ):
+        elif coll_type.is_subseteq(types.Tuple) and coll_type.vararg is None:
             return len(coll_type.vars)
         else:
             return None
