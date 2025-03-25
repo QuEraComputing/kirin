@@ -1,11 +1,11 @@
 ## Codegen Food receipt
 
-At the end of the day, we enjoy the food, take a nap, but still need to pay the bill.
-In this section we will use the previous food fee analysis result, and discuss how to using kirin's codegen framework to generate a receipt.
+At the end of the day, we enjoy the food and take a nap, but still need to pay the bill.
+In this section we will use the previous food language analysis result, and discuss how to use Kirin's codegen framework to generate a receipt.
 
 ### Goal
 
-Lets again continue with the same program, and using the previous `FeeAnalysis` to get analysis result.
+Lets again continue with the same program, using the previously created `FeeAnalysis` pass to get an analysis result.
 ```python
 @food
 def main2(x: int):
@@ -29,12 +29,12 @@ def main2(x: int):
     return x
 ```
 
-We want to generate a recept of bill that listed the type of food cooked, and the amount of servings that were cooked.
+We want to generate a receipt of bill that listed the type of food cooked, and the amount of servings that were cooked.
 
 ### Codegen using kirin EmitStr
-Kirin also provide Codegen framework (we call it Emit), which is also a kind of `Interpreter`!
+Kirin also provides a Codegen framework (we call it `Emit`), which is also a kind of `Interpreter`! (These days, what *isn't* an interpreter? :P)
 
-Here, since we want to codegen recept in text format, our target is `Str`. We will use a `EmitStr` kirin provide. In general one can also customize the Codegen by customizing `EmitABC`, but here we will just directly using `EmitStr` provided by kirin.
+Here, since we want to codegen a receipt in text format, our target is `Str`. We will use the `EmitStr` class Kirin provides which does a lot of the heavy lifting for us. In general, one can also customize the Codegen by subclassing from `EmitABC`, but here we will just directly using `EmitStr` provided by kirin.
 
 ```python
 def default_menu_price():
@@ -47,12 +47,12 @@ def default_menu_price():
 
 
 @dataclass
-class EmitReceptMain(EmitStr):
-    keys = ["emit.recept"]
+class EmitReceiptMain(EmitStr):
+    keys = ["emit.receipt"]
     dialects: ir.DialectGroup = field(default=food)
     file: StringIO = field(default_factory=StringIO)
     menu_price: dict[str, float] = field(default_factory=default_menu_price)
-    recept_analysis_result: dict[ir.SSAValue, Item] = field(default_factory=dict)
+    receipt_analysis_result: dict[ir.SSAValue, Item] = field(default_factory=dict)
 
     def initialize(self):
         super().initialize()
@@ -83,27 +83,27 @@ class EmitReceptMain(EmitStr):
         )
 ```
 
-The same as all the other kirin interpreters, we need to implement MethodTable for our emit interpreter. Here, we register method tables to key `emit.recept`.
+As with all other Kirin interpreters, we need to implement a `MethodTable` for our emit interpreter. Here, we register method tables to the key `emit.receipt`.
 
 ```python
-@func.dialect.register(key="emit.recept")
+@func.dialect.register(key="emit.receipt")
 class FuncEmit(interp.MethodTable):
 
     @interp.impl(func.Function)
-    def emit_func(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: func.Function):
+    def emit_func(self, emit: EmitReceiptMain, frame: EmitStrFrame, stmt: func.Function):
         _ = emit.run_ssacfg_region(frame, stmt.body)
         return ()
 ```
 
-For our `Cook` Statement, we want to generate a transaction each time we cook. We will get the previous analysis result from the corresponding SSAValue. If the lattce element is a `AtLeastXItem`, we generate a line with the food type, and `>= x`. If its a `ConstIntItem` we just directly generate the amount.
+For our `Cook` Statement, we want to generate a transaction each time we cook. We will get the previous analysis result from the corresponding SSAValue. If the lattice element is a `AtLeastXItem`, we generate a line with the food type, and `>= x`. If its a `ConstIntItem` we just directly generate the amount.
 
 ```python
-@dialect.register(key="emit.recept")
+@dialect.register(key="emit.receipt")
 class FoodEmit(interp.MethodTable):
 
     @interp.impl(stmts.Cook)
-    def emit_cook(self, emit: EmitReceptMain, frame: EmitStrFrame, stmt: stmts.Cook):
-        serving_item = cast(ItemServing, emit.recept_analysis_result[stmt.result])
+    def emit_cook(self, emit: EmitReceiptMain, frame: EmitStrFrame, stmt: stmts.Cook):
+        serving_item = cast(ItemServing, emit.receipt_analysis_result[stmt.result])
 
         amount_str = ""
         price_str = ""
@@ -128,8 +128,8 @@ class FoodEmit(interp.MethodTable):
 ## Put together:
 
 ```python
-emitter = EmitReceptMain()
-emitter.recept_analysis_result = results
+emitter = EmitReceiptMain()
+emitter.receipt_analysis_result = results
 
 emitter.run(main2, ("",))
 print(emitter.get_output())

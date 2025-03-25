@@ -55,21 +55,21 @@ Part of the work is also inspired in previous collaboration in [YaoCompiler](htt
 
 ## Kirin and friends
 
-While at the moment only us at [QuEra Computing Inc](https://quera.com) are actively developing Kirin and using it in our projects, we are open to collaboration and contributions from the community. If you are using Kirin in your project, please let us know so we can add you to the list of projects using Kirin.
+While at the moment only us at [QuEra Computing Inc](https://quera.com) are actively developing Kirin and using it in our projects, we are open to collaboration and encourage contributions from the community! If you are using Kirin in your project, please let us know so we can add you to the list of projects using Kirin.
 
 ### Quantum Computing
 
-Kirin has been used for building several eDSLs within [QuEraComputing](https://quera.com), including:
+Kirin has been used for building several eDSLs within [QuEra Computing](https://quera.com), including:
 
-- [bloqade.qasm2](https://github.com/QuEraComputing/bloqade/tree/main/src/bloqade/qasm2) This is an eDSL for quantum computing that we uses Kirin to define an eDSL for the Quantum Assembly Language (QASM) 2.0. It demonstrates how to create multiple dialects, run custom analysis and rewrites, and generate code from the dialects (back to QASM 2.0 in this case).
-- [bloqade.stim](https://github.com/QuEraComputing/bloqade/tree/main/src/bloqade/stim) This is an eDSL for quantum computing that we uses Kirin to define an eDSL for the [STIM](https://github.com/quantumlib/Stim/) language. It demonstrates how to create multiple dialects, run custom analysis and rewrites, and generate code from the dialects (back to Stim in this case).
-- [bloqade.qBraid](https://github.com/QuEraComputing/bloqade/blob/main/src/bloqade/qbraid/lowering.py) this example demonstrates how to lower from an existing representation into Kirin IR by using the visitor pattern.
+- [bloqade.qasm2](https://github.com/QuEraComputing/bloqade/tree/main/src/bloqade/qasm2) - uses Kirin to define an eDSL for the Quantum Assembly Language (QASM) 2.0. It demonstrates how to create multiple dialects, run custom analysis and rewrites, and generate code from the dialects (back to QASM 2.0 in this case).
+- [bloqade.stim](https://github.com/QuEraComputing/bloqade/tree/main/src/bloqade/stim) - uses Kirin to define an eDSL for the [Stim](https://github.com/quantumlib/Stim/) language. It demonstrates how to create multiple dialects, run custom analysis and rewrites, and generate code from the dialects (back to Stim in this case).
+- [bloqade.qBraid](https://github.com/QuEraComputing/bloqade/blob/main/src/bloqade/qbraid/lowering.py) - An example demonstrating how to lower from an existing representation into Kirin IR by using the visitor pattern.
 
-We are in the process of open-sourcing more eDSLs built on top of Kirin.
+We are in the process of open-sourcing more eDSLs built on top of Kirin and encourage you to keep an eye out for them!
 
 ## Quick Example: the `food` language
 
-For the impatient, we prepare an example that requires no background knowledge in any specific domain. In this example, we will mutate python's semantics to support a small eDSL (embedded domain-specific language) called `food`. It describes the process of cooking, eating food and taking food naps after.
+For the impatient, we prepare an example that requires no background knowledge in any specific domain. In this example, we will mutate python's semantics to support a small eDSL called `food`. It describes the process of cooking, eating food, and taking food naps after.
 
 Before we start, let's take a look at what would our `food` language look like:
 
@@ -87,7 +87,7 @@ def main(x: int):
 1. The `NewFood` statement creates a new food object with a given type.
 2. The `Cook` statement makes that food for `x` portions into a servings object.
 3. The `Eat` statement means you eat a serving object.
-4. The `Nap` statement means you nap. Food mkes you sleepy!!
+4. The `Nap` statement means you nap. Eating food makes you sleepy!!
 5. Doing some math to get a result.
 
 The food language is wrapped with a decorator `@food` to indicate that the function is written in the `food` language instead of normal Python. (think about how would you program GPU kernels in Python, or how would you use `jax.jit` and `numba.jit` decorators).
@@ -98,7 +98,7 @@ You can run the `main` function as if it is a normal Python function.
 main(1)
 ```
 
-or you can inspect the compile result via
+or you can inspect the compiled result via
 
 ```python
 main.print()
@@ -153,7 +153,7 @@ class NewFood(ir.Statement):
 1. The `name` field specifies the name of the statement in the IR text format (e.g printing).
 2. The `traits` field specifies the statement's traits, in this case, it is a
    [pure function](101.md/#what-is-purity) because each brand name uniquely identifies a
-   food object. We also add a trait of `FromPythonCall()` to allow lowering from python ast.
+   food object. We also add a trait of `FromPythonCall()` to allow lowering from a Python call in the Python AST.
 3. The `type` field specifies the argument of the statement. It is an Attribute of string value. See [`PyAttr`][kirin.ir.PyAttr] for further details.
 4. The `result` field specifies the result of the statement. Usually a statement only has one result
    value. The type of the result must be [`ir.ResultValue`](def.md#ssa-values) with a field specifier
@@ -187,9 +187,9 @@ class Eat(ir.Statement):
     target: ir.SSAValue = info.argument(types.PyClass(Serving))
 ```
 
-Similarly, we define `Eat` statement that takes a `Serving` object as an argument. As the same previously, the `types.PyClass` type understands Python classes (in this case Serving class) and can take a Python class as an argument to create a type attribute. Notice that eat does not have any return value.
+Similarly, we define `Eat` statement that takes a `Serving` object as an argument. As the same previously, the `types.PyClass` type understands Python classes (in this case the `Serving` class) and can take a Python class as an argument to create a type attribute. Notice that `Eat` does not have any return value.
 
-Finally, we define `Nap` statement that describe the nap action, which does not have any arguments and no return value.
+Finally, we define the `Nap` statement that describes the nap action, which does not have any arguments and has no return value.
 
 ```python
 @statement(dialect=dialect)
@@ -203,7 +203,7 @@ class Nap(ir.Statement):
 Now with the statements defined, we can define how to interpret them by defining the method table associate with each statement.
 
 ```python
-from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
+from kirin.interp import Frame, Interpreter, MethodTable, impl
 
 @dialect.register
 class FoodMethods(MethodTable):
@@ -211,7 +211,7 @@ class FoodMethods(MethodTable):
 
 ```
 
-The `FoodMethods` class is a subclass of `MethodTable`. Together with the decorator from the dialect group `dialect.register`, they registers the implementation  method table to interpreter. The implementation is a method decorated with `@impl` that executes the
+The `FoodMethods` class is a subclass of `MethodTable`. Together with the decorator from the dialect group `@dialect.register`, they register the implementation of the method table to interpreter. The implementation is a method decorated with `@impl` that executes the
 statement.
 
 ```python
@@ -244,25 +244,26 @@ statement.
 For example, here the execution `Cook` statement print strings (side-effect) as well as return a `Serving` runtime object.
 3. In the case where the statement does not have any return value but simply have side-effect only, the return value is simply an empty tuple.
 
-The return value is just a normal tuple that contain interpretation runtime values. Click the plus sign above
+The return value is just a normal tuple that contains interpretation runtime values. Click the plus sign above
 to see the corresponding explanation.
 
 
 ### Rewrite `Eat` statement
 
-Sometimes when we are hungry, we will do something that is not expected. Here, we introduce how to do rewrite on the program.
+Sometimes when we are hungry, we will do something that is not expected. Here, we introduce how to do a rewrite on the program.
 What we want to do is simple:
 
-Everytime we eat, we will to buy another piece of food, then take a nap. Someone has the munchies eh.
+Every time we eat, we will to buy another piece of food, then take a nap. *Someone has the munchies, eh?*
 
 
-More specifically, we want to rewrite the program such that, everytime we encounter a `Eat` statement, we insert a `NewFood` statement, and `Nap` after `Eat`.
-Let's define a rewrite pass that rewrite our `Eat` statement. This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.abc.RewriteRule] and implementing the
+More specifically, we want to rewrite the program such that, every time we encounter a `Eat` statement, we insert a `NewFood` statement, and `Nap` after `Eat`.
+Let's define a rewrite pass that rewrites our `Eat` statement. This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.abc.RewriteRule] and implementing the
 `rewrite_Statement` method. The `RewriteRule` class is a standard Python visitor on Kirin's IR.
 
 
 ```python
-from kirin.rewrite import RewriteResult, RewriteRule # (1)!
+from kirin.rewrite.abc import RewriteRule # (1)!
+from kirin.rewrite.result import RewriteResult
 from kirin import ir
 
 @dataclass
@@ -285,11 +286,11 @@ class NewFoodAndNap(RewriteRule):
 ```
 
 1. Import the `RewriteRule` class from the `rewrite` module.
-2. This is the signature of `rewrite_Statement` method. Your IDE should hint you the type signature so you can auto-complete it.
+2. This is the signature of the `rewrite_Statement` method. Your IDE should hint the type signature so you can auto-complete it.
 3. Check if the statement is a `Eat` statement. If it is not, return an empty `RewriteResult`.
 4. Create new `NewFood` statement.
 5. Create new `Nap` statement.
-6. insert the new created statements into the IR. Each of the ir.Statement provides API such as [`insert_after`][kirin.ir.Statement.insert_after], [`insert_before`][kirin.ir.Statement.insert_after] and [`replace_by`][kirin.ir.Statement.replace_by] that allow you to insert a new statement either after or before, or repalce the current statement with another one.
+6. insert the new created statements into the IR. Each of the ir.Statement provides an API such as [`insert_after`][kirin.ir.Statement.insert_after], [`insert_before`][kirin.ir.Statement.insert_after] and [`replace_by`][kirin.ir.Statement.replace_by] that allows you to insert a new statement either after or before, or replace the current statement with another one.
 7. Return a `RewriteResult` that indicates the rewrite has been done.
 
 
@@ -303,6 +304,7 @@ because Kirin will do it for you!
 from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk
+from kirin.passes import Fold
 
 
 @dialect_group(basic_no_opt.add(dialect)) # (1)!
@@ -311,7 +313,9 @@ def food(self): # (2)!
     fold_pass = Fold(self)
 
     def run_pass(mt, *, fold:bool=True, hungry:bool=True):  # (3)!
-        Fixpoint(Walk(RandomWalkBranch())).rewrite(mt.code)
+
+        if fold:
+            fold_pass(mt)
 
         if hungry:
             Walk(NewFoodAndNap()).rewrite(mt.code) # (4)!
@@ -327,7 +331,7 @@ def food(self): # (2)!
 
 This is it!
 
-For further advanced use case see [`CookBook/Food`](cookbook/foodlang/cf_rewrite.md)
+For further advanced use case see [`CookBook/Food`](cookbook/foodlang/cf_rewrite/)
 
 ## Contributors
 

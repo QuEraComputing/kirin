@@ -12,4 +12,4 @@ paste the code snippets into your own project and modify them as needed.
 
 ## Table of Contents
 
-- [Continue of FoodLang](foodlang/cf_rewrite.md)
+- [Continuation of FoodLang](foodlang/cf_rewrite.md)
