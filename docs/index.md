@@ -55,7 +55,7 @@ Part of the work is also inspired in previous collaboration in [YaoCompiler](htt
 
 ## Kirin and friends
 
-While at the moment only us at [QuEra Computing Inc](https://quera.com) are actively developing Kirin and using it in our projects, we are open to collaboration and contributions from the community. If you are using Kirin in your project, please let us know so we can add you to the list of projects using Kirin.
+While at the moment only us at [QuEra Computing Inc](https://quera.com) are actively developing Kirin and using it in our projects, we are open to collaboration and encourage contributions from the community! If you are using Kirin in your project, please let us know so we can add you to the list of projects using Kirin.
 
 ### Quantum Computing
 
@@ -303,7 +303,8 @@ because Kirin will do it for you!
 ```python
 from kirin.ir import dialect_group
 from kirin.prelude import basic_no_opt
-from kirin.rewrite import Walk, Fixpoint
+from kirin.rewrite import Walk
+from kirin.passes import Fold
 
 
 @dialect_group(basic_no_opt.add(dialect)) # (1)!
@@ -330,7 +331,7 @@ def food(self): # (2)!
 
 This is it!
 
-For further advanced use case see [`CookBook/Food`](cookbook/foodlang/cf_rewrite.md)
+For further advanced use case see [`CookBook/Food`](cookbook/foodlang/cf_rewrite/)
 
 ## Contributors
 

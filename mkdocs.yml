@@ -32,9 +32,9 @@ nav:
     - cookbook/index.md
     - examples:
       - Food Dialect:
-        - Advance Rewrite: cookbook/foodlang/cf_rewrite.md
-        - Food Price Analysis: cookbook/foodlang/analysis.md
-        - Recept Codegen: cookbook/foodlang/codegen.md
+        - Advanced Rewriting: cookbook/foodlang/cf_rewrite.md
+        - Food Pricing Analysis Pass: cookbook/foodlang/analysis.md
+        - Receipt Codegen: cookbook/foodlang/codegen.md
 
   - Blog:
     - blog/index.md
