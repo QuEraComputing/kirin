@@ -12,6 +12,7 @@ There are also some basic traits that are provided for convenience, such as
 from .abc import (
     Trait as Trait,
     RegionTrait as RegionTrait,
+    LarkLoweringTrait as LarkLoweringTrait,
     PythonLoweringTrait as PythonLoweringTrait,
 )
 from .basic import (

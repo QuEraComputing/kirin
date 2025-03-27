@@ -57,3 +57,7 @@ class VerificationError(Exception):
 
 class DuplicatedDefinitionError(Exception):
     pass
+
+
+class LarkLoweringError(Exception):
+    pass
