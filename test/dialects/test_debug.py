@@ -16,3 +16,5 @@ def test_debug_printing():
             else:
                 count = count + 300
         return count
+
+    test_if_inside_for()
