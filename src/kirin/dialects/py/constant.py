@@ -42,7 +42,10 @@ class Constant(ir.Statement, Generic[T]):
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self)
         printer.plain_print(" ")
-        printer.plain_print(repr(self.value))
+        if isinstance(self.value, ir.PyAttr):
+            printer.plain_print(repr(self.value.data))
+        else:  # other attributes
+            printer.plain_print(repr(self.value))
         with printer.rich(style="comment"):
             printer.plain_print(" : ")
             printer.print(self.result.type)
