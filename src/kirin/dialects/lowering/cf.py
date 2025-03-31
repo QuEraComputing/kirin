@@ -54,8 +54,8 @@ class CfLowering(FromPythonAST):
         body_frame.next_block.stmts.append(
             cf.ConditionalBranch(
                 cond_stmt.result,
-                yield_args,
-                (next_stmt.value,) + yield_args,
+                then_arguments=yield_args,
+                else_arguments=(next_stmt.value,) + yield_args,
                 then_successor=frame.next_block,
                 else_successor=body_frame.entr_block,
             )
@@ -184,6 +184,7 @@ class CfLowering(FromPythonAST):
                 else_successor=else_frame.entr_block,
             )
         )
+        frame.defs.update(after_frame.defs)
         frame.jump_next()
         return Result()
 
