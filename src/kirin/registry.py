@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from kirin.ir import Attribute
     from kirin.ir.group import DialectGroup
     from kirin.ir.nodes import Statement
-    from kirin.lowering import FromPythonAST
+    from kirin.lowering2 import FromPythonAST
     from kirin.interp.impl import Signature
     from kirin.interp.table import MethodTable
 
