@@ -32,6 +32,7 @@
             * [interp](kirin/dialects/cf/interp.md)
             * [stmts](kirin/dialects/cf/stmts.md)
             * [typeinfer](kirin/dialects/cf/typeinfer.md)
+        * [debug](kirin/dialects/debug.md)
         * [eltype](kirin/dialects/eltype.md)
         * [func](kirin/dialects/func/index.md)
             * [attrs](kirin/dialects/func/attrs.md)
