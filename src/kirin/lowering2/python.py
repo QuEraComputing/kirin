@@ -33,9 +33,7 @@ class PythonLowering(LoweringABC[ast.stmt | Callable]):
             self.dialects = ir.DialectGroup(dialects)
 
         self.max_lines = max_lines
-        self.registry: dict[str, FromPythonAST] = self.dialects.registry.ast(
-            keys=keys or ["main", "default"]
-        )
+        self.registry = self.dialects.registry.ast(keys=keys or ["main", "default"])
 
     def run(
         self,
