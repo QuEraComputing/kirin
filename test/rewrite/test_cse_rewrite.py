@@ -1,6 +1,7 @@
 from kirin.prelude import basic_no_opt
-from kirin.rewrite.walk import Walk
 from kirin.rewrite.cse import CommonSubexpressionElimination
+from kirin.rewrite.walk import Walk
+
 
 @basic_no_opt
 def main():
@@ -8,6 +9,7 @@ def main():
     y = 1
     z = 1
     return x + y + z
+
 
 main.print()
 
