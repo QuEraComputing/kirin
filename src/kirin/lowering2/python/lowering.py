@@ -120,7 +120,10 @@ class PythonLowering(LoweringABC[ast.AST]):
 
     # Python AST visitor methods
     def visit(self, state: State[ast.AST], node: ast.AST) -> Result:
-        state.source = SourceInfo.from_ast(node, state.lineno_offset, state.col_offset)
+        if hasattr(node, "lineno"):
+            state.source = SourceInfo.from_ast(
+                node, state.lineno_offset, state.col_offset
+            )
         name = node.__class__.__name__
         if name in self.registry:
             return self.registry[name].lower(state, node)
@@ -132,6 +135,11 @@ class PythonLowering(LoweringABC[ast.AST]):
         )
 
     def visit_Call(self, state: State[ast.AST], node: ast.Call) -> Result:
+        if hasattr(node.func, "lineno"):
+            state.source = SourceInfo.from_ast(
+                node.func, state.lineno_offset, state.col_offset
+            )
+
         global_callee_result = self.lower_global_no_raise(state, node.func)
         if global_callee_result is None:
             return self.visit_Call_local(state, node)
@@ -214,6 +222,11 @@ class PythonLowering(LoweringABC[ast.AST]):
 
         if (trait := global_callee.get_trait(FromPythonCall)) is not None:
             return trait.lower(global_callee, state, node)
+        raise DialectLoweringError(
+            f"invalid call syntax for {global_callee.__name__}, "
+            f"expected FromPythonCall trait to be implemented"
+            f" for {global_callee.__name__}"
+        )
 
     def visit_Call_Method(
         self, state: State[ast.AST], node: ast.Call, global_callee: ir.Method
@@ -255,8 +268,11 @@ class PythonLowering(LoweringABC[ast.AST]):
         )
 
     def error_hint(self, state: State[ast.AST]) -> str:
-        begin = max(0, state.source.lineno - self.max_lines)
-        end = max(state.source.lineno + self.max_lines, state.source.end_lineno or 0)
+        begin = max(0, state.source.lineno - self.max_lines) - state.lineno_offset
+        end = (
+            max(state.source.lineno + self.max_lines, state.source.end_lineno or 0)
+            - state.lineno_offset
+        )
         end = min(len(state.lines), end)  # make sure end is within bounds
         lines = state.lines[begin:end]
         code_indent = min(map(self.__get_indent, lines), default=0)
@@ -264,8 +280,18 @@ class PythonLowering(LoweringABC[ast.AST]):
 
         snippet_lines = []
         for lineno, line in enumerate(lines, begin):
-            if lineno == state.source.lineno:
-                snippet_lines.append(("-" * (state.source.col_offset)) + "^")
+            if lineno == state.source.lineno - state.lineno_offset:
+                print(
+                    f"col_offset: {state.source.col_offset}, end_col_offset: {state.source.end_col_offset}"
+                )
+                hint = " " * (state.source.col_offset - code_indent)
+                if state.source.end_col_offset:
+                    hint += "^" * (
+                        state.source.end_col_offset - state.source.col_offset
+                    )
+                else:
+                    hint += "^"
+                snippet_lines.append(hint)
 
             snippet_lines.append(line[code_indent:])
 

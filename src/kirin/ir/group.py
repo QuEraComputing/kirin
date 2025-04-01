@@ -204,7 +204,7 @@ class DialectGroup(Generic[PassParams]):
                         f"overwriting function definition of `{py_func.__name__}`"
                     )
 
-                lineno_offset = call_site_frame.f_lineno - 1
+                lineno_offset = call_site_frame.f_lineno
                 file = call_site_frame.f_code.co_filename
 
             code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
