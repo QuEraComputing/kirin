@@ -27,5 +27,3 @@ def test():
 
     stmt = len_func3.callable_region.blocks[0].stmts.at(0)
     assert isinstance(stmt, py.Len)
-
-
