@@ -20,7 +20,7 @@ class GlobalExprEval(ast.NodeVisitor):
     frame: Frame
 
     def generic_visit(self, node: ast.AST) -> Any:
-        raise DialectLoweringError(
+        raise GlobalEvalError(
             f"Cannot lower global {node.__class__.__name__} node: {node}"
         )
 
