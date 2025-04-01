@@ -13,18 +13,16 @@ from typing import (
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
-from kirin.ir import Statement
+from kirin.ir import Block, Region, SSAValue, Statement
 from kirin.source import SourceInfo
 
 from .abc import ASTNodeType
 from .frame import Frame, CallbackFn
+from .stream import StmtStream
 from .exception import DialectLoweringError
 
 if TYPE_CHECKING:
-    from kirin.ir import Block, Region, SSAValue
-
     from .abc import LoweringABC
-    from .stream import StmtStream
 
 
 @dataclass

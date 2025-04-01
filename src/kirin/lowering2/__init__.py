@@ -8,5 +8,6 @@ from .python.traits import (
     FromPythonRangeLike as FromPythonRangeLike,
     FromPythonWithSingleItem as FromPythonWithSingleItem,
 )
+from .python.binding import wraps as wraps
 from .python.dialect import FromPythonAST as FromPythonAST
 from .python.lowering import PythonLowering as PythonLowering
