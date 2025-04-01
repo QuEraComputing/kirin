@@ -105,7 +105,7 @@ class State(Generic[ASTNodeType]):
         return self.Result(result)
 
     def get_literal(self, value) -> SSAValue:
-        return self.parent.lower_literal(value)
+        return self.parent.lower_literal(self, value)
 
     @overload
     def get_global(
@@ -177,7 +177,7 @@ class State(Generic[ASTNodeType]):
 
         frame = Frame(
             state=self,
-            parent=parent or self.current_frame,
+            parent=parent or self._current_frame,
             stream=stmts,
             curr_region=region or Region(entr_block),
             entr_block=entr_block,

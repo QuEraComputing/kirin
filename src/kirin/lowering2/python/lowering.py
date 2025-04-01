@@ -91,7 +91,7 @@ class PythonLowering(LoweringABC[ast.AST]):
             col_offset=col_offset,
         )
 
-        with state.frame([stmt], globals=globals) as frame:
+        with state.frame([stmt], parent=None, globals=globals) as frame:
             try:
                 self.visit(state, stmt)
             except DialectLoweringError as e:
@@ -136,7 +136,8 @@ class PythonLowering(LoweringABC[ast.AST]):
         if global_callee_result is None:
             return self.visit_Call_local(state, node)
 
-        global_callee = global_callee_result
+        global_callee = global_callee_result.data
+
         if isinstance(global_callee, Binding):
             global_callee = global_callee.parent
 
