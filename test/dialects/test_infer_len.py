@@ -29,4 +29,3 @@ def test():
     assert isinstance(stmt, py.Len)
 
 
-test()
