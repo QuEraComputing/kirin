@@ -33,14 +33,9 @@ from kirin.ir.traits import (
     IsTerminator as IsTerminator,
     NoTerminator as NoTerminator,
     SSACFGRegion as SSACFGRegion,
-    FromPythonCall as FromPythonCall,
-    FromPythonWith as FromPythonWith,
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
-    FromPythonRangeLike as FromPythonRangeLike,
-    PythonLoweringTrait as PythonLoweringTrait,
     CallableStmtInterface as CallableStmtInterface,
-    FromPythonWithSingleItem as FromPythonWithSingleItem,
 )
 from kirin.ir.dialect import Dialect as Dialect
 from kirin.ir.attrs.py import PyAttr as PyAttr

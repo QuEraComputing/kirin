@@ -1,27 +1,26 @@
 from __future__ import annotations
 
-import ast
-from typing import TYPE_CHECKING, Any, TypeVar, Callable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Callable, Optional, overload
 from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, SSAValue, Statement
 
+from .stream import Stmt, StmtStream
 from .exception import DialectLoweringError
 
 if TYPE_CHECKING:
     from .state import State
-    from .stream import StmtStream
 
 CallbackFn = Callable[["Frame", SSAValue], SSAValue]
 
 
 @dataclass
-class Frame:
+class Frame(Generic[Stmt]):
     state: State
     """lowering state"""
     parent: Optional[Frame]
     """parent frame, if any"""
-    stream: StmtStream[ast.stmt]
+    stream: StmtStream[Stmt]
     """stream of statements"""
 
     curr_region: Region
@@ -42,55 +41,26 @@ class Frame:
     capture_callback: Optional[CallbackFn] = None
     """callback function that creates a local SSAValue value when an captured value was used."""
 
-    @classmethod
-    def from_stmts(
-        cls,
-        stmts: Sequence[ast.stmt] | StmtStream[ast.stmt],
-        state: "State",
-        parent: Optional["Frame"] = None,
-        region: Optional[Region] = None,
-        entr_block: Optional[Block] = None,
-        next_block: Optional[Block] = None,
-        globals: dict[str, Any] | None = None,
-        capture_callback: Optional[CallbackFn] = None,
-    ):
-        """Create a new frame from a list of statements or a new `StmtStream`.
-
-        - `stmts`: list of statements or a `StmtStream` to be lowered.
-        - `region`: `Region` to append the new block to, `None` to create a new one, default `None`.
-        - `entr_block`: `Block` to append the new statements to,
-            `None` to create a new one and attached to the region, default `None`.
-        - `next_block`: `Block` to use if branching to a new block, if `None` to create
-            a new one without attaching to the region. (note: this should not attach to
-            the region at frame construction)
-        - `globals`: global variables, default `None`.
-        """
-        if not isinstance(stmts, StmtStream):
-            stmts = StmtStream(stmts)
-
-        region = region or Region()
-
-        entr_block = entr_block or Block()
-        region.blocks.append(entr_block)
-
-        return cls(
-            state=state,
-            parent=parent,
-            stream=stmts,
-            curr_region=region or Region(entr_block),
-            entr_block=entr_block,
-            curr_block=entr_block,
-            next_block=next_block or Block(),
-            globals=globals or {},
-            capture_callback=capture_callback,
-        )
-
     def __repr__(self):
         return f"Frame({len(self.defs)} defs, {len(self.globals)} globals)"
 
     StmtType = TypeVar("StmtType", bound=Statement)
 
-    def append_stmt(self, stmt: StmtType) -> StmtType:
+    @overload
+    def push(self, node: StmtType) -> StmtType: ...
+
+    @overload
+    def push(self, node: Block) -> Block: ...
+
+    def push(self, node: StmtType | Block) -> StmtType | Block:
+        if isinstance(node, Block):
+            return self._push_block(node)
+        elif isinstance(node, Statement):
+            return self._push_stmt(node)
+        else:
+            raise DialectLoweringError(f"Unsupported type {type(node)} in push()")
+
+    def _push_stmt(self, stmt: StmtType) -> StmtType:
         if not stmt.dialect:
             raise DialectLoweringError(f"unexpected builtin statement {stmt.name}")
         elif stmt.dialect not in self.state.parent.dialects:
@@ -101,13 +71,12 @@ class Frame:
         stmt.source = self.state.source
         return stmt
 
-    def append_block(self, block: Block | None = None):
+    def _push_block(self, block: Block):
         """Append a block to the current region.
 
         Args:
             block(Block): block to append, default `None` to create a new block.
         """
-        block = block or Block()
         self.curr_region.blocks.append(block)
         self.curr_block = block
         return block
@@ -120,7 +89,7 @@ class Frame:
         Returns:
             Block: the next block
         """
-        block = self.append_block(self.next_block)
+        block = self.push(self.next_block)
         self.next_block = Block()
         return block
 
@@ -131,7 +100,7 @@ class Frame:
 
         # NOTE: look up local first, then globals
         if name in self.globals:
-            return self.state.parent.lower_Constant(self.globals[name])
+            return self.state.get_literal(self.globals[name])
         return None
 
     def get_local(self, name: str) -> SSAValue | None:
@@ -170,3 +139,10 @@ class Frame:
             return value
         else:
             raise DialectLoweringError(f"Variable {name} not found in scope")
+
+    def exhaust(self):
+        """Exhaust the current stream and return the remaining statements."""
+        stream = self.stream
+        while stream:
+            stmt = stream.pop()
+            self.state.parent.visit(self.state, stmt)

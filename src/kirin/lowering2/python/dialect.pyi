@@ -1,11 +1,9 @@
 import ast
 import sys
-from typing import TypeAlias
 
 from kirin.ir import Method, SSAValue
+from kirin.lowering2.abc import Result
 from kirin.lowering2.state import State
-
-Result: TypeAlias = SSAValue | None
 
 class FromPythonAST:
     @property

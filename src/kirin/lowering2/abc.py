@@ -1,18 +1,34 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, TypeAlias
 from dataclasses import dataclass
 
-if TYPE_CHECKING:
-    from kirin.ir import SSAValue, Statement, DialectGroup
+from kirin.ir import SSAValue, Statement, DialectGroup
 
+from .exception import DialectLoweringError
+
+if TYPE_CHECKING:
+    from .state import State
+
+
+Result: TypeAlias = SSAValue | Statement | None
+"""Result of lowering a node.
+This is used to indicate that the node can be lowered to a SSAValue or None.
+
+If the node is corresponding to a single statement that has a single result value,
+the result can also be a Statement for convenience.
+
+If the node can be assigned to a variable syntax-wise, it returns the SSAValue.
+If the node cannot be assigned to a variable, it returns None.
+"""
 
 EntryNodeType = TypeVar("EntryNodeType")
+ASTNodeType = TypeVar("ASTNodeType")
 
 
 @dataclass
-class LoweringABC(ABC, Generic[EntryNodeType]):
+class LoweringABC(ABC, Generic[ASTNodeType]):
     """Base class for lowering.
 
     This class is used to lower the AST nodes to IR.
@@ -25,7 +41,7 @@ class LoweringABC(ABC, Generic[EntryNodeType]):
     @abstractmethod
     def run(
         self,
-        stmt: EntryNodeType,
+        stmt: ASTNodeType,
         source: str | None = None,
         globals: dict[str, Any] | None = None,
         lineno_offset: int = 0,
@@ -34,4 +50,60 @@ class LoweringABC(ABC, Generic[EntryNodeType]):
     ) -> Statement: ...
 
     @abstractmethod
-    def lower_Constant(self, value) -> SSAValue: ...
+    def visit(self, state: State[ASTNodeType], node: ASTNodeType) -> Result:
+        """Entry point of AST visitors.
+
+        Args:
+            state: lowering state
+            node: AST node to be lowered
+        Returns:
+            SSAValue: if the node can be assigned to a variable syntax-wise,
+                what is the `SSAValue`.
+            Statement: if the node is a single statement that has a single result value.
+                This is equivalent to returning `stmt.results[0]`.
+            None: If the node cannot be assigned to a variable syntax-wise.
+        Raises:
+            DialectLoweringError: if the node cannot be lowered.
+        """
+        ...
+
+    @abstractmethod
+    def lower_literal(self, value) -> SSAValue: ...
+
+    @dataclass
+    class Result:
+        data: Any
+
+        ExpectT = TypeVar("ExpectT")
+
+        def expect(self, typ: type[ExpectT]) -> ExpectT:
+            if not isinstance(self.data, typ):
+                raise DialectLoweringError(f"expected {typ}, got {type(self.data)}")
+            return self.data
+
+    @abstractmethod
+    def lower_global(
+        self, state: State[ASTNodeType], node: ASTNodeType
+    ) -> LoweringABC.Result:
+        """Transform a given global expression to a SSAValue.
+
+        This method is overridden by the subclass to transform a given global
+        AST expression to a value as `LoweringABC.Result`.
+
+        The subclass must implement this method to transform a given global
+        AST expression to a SSAValue.
+        """
+        ...
+
+    def lower_global_no_raise(
+        self, state: State[ASTNodeType], node: ASTNodeType
+    ) -> LoweringABC.Result | None:
+        """Transform a given global expression to a SSAValue.
+
+        This method can be overridden by the subclass to transform a given global
+        AST expression to a SSAValue.
+        """
+        try:
+            return self.lower_global(state, node)
+        except DialectLoweringError:
+            return None
