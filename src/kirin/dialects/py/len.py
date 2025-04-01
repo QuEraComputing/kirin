@@ -9,7 +9,7 @@ This dialect maps the `len()` call to the `Len` statement:
 
 import ast
 
-from kirin import ir, types, interp, lowering
+from kirin import ir, types, interp, lowering2
 from kirin.decl import info, statement
 from kirin.analysis import const
 
@@ -19,7 +19,7 @@ dialect = ir.Dialect("py.len")
 @statement(dialect=dialect)
 class Len(ir.Statement):
     name = "len"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering2.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Any)
     result: ir.ResultValue = info.result(types.Int)
 
@@ -47,11 +47,9 @@ class ConstProp(interp.MethodTable):
 
 
 @dialect.register
-class Lowering(lowering.FromPythonAST):
+class Lowering(lowering2.FromPythonAST):
 
     def lower_Call_len(
-        self, state: lowering.LoweringState, node: ast.Call
-    ) -> lowering.Result:
-        return lowering.Result(
-            state.append_stmt(Len(value=state.visit(node.args[0]).expect_one()))
-        )
+        self, state: lowering2.State, node: ast.Call
+    ) -> lowering2.Result:
+        return state.current_frame.push(Len(state.lower(node.args[0]).expect_one()))

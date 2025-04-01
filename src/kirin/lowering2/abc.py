@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from .state import State
 
 
-Result: TypeAlias = SSAValue | Statement | None
+Result: TypeAlias = SSAValue | tuple[SSAValue, ...] | Statement | None
 """Result of lowering a node.
 This is used to indicate that the node can be lowered to a SSAValue or None.
 

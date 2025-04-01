@@ -11,7 +11,7 @@ This dialect maps `ast.Attribute` nodes to the `GetAttr` statement.
 
 import ast
 
-from kirin import ir, interp, lowering, exceptions
+from kirin import ir, interp, lowering2, exceptions
 from kirin.decl import info, statement
 
 dialect = ir.Dialect("py.attr")
@@ -20,7 +20,7 @@ dialect = ir.Dialect("py.attr")
 @statement(dialect=dialect)
 class GetAttr(ir.Statement):
     name = "getattr"
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({lowering2.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     attrname: str = info.attribute()
     result: ir.ResultValue = info.result()
@@ -35,11 +35,11 @@ class Concrete(interp.MethodTable):
 
 
 @dialect.register
-class Lowering(lowering.FromPythonAST):
+class Lowering(lowering2.FromPythonAST):
 
     def lower_Attribute(
-        self, state: lowering.LoweringState, node: ast.Attribute
-    ) -> lowering.Result:
+        self, state: lowering2.State, node: ast.Attribute
+    ) -> lowering2.Result:
         from kirin.dialects.py import Constant
 
         if not isinstance(node.ctx, ast.Load):
@@ -48,12 +48,9 @@ class Lowering(lowering.FromPythonAST):
             )
 
         # NOTE: eagerly load global variables
-        value = state.get_global_nothrow(node)
+        value = state.get_global(node, no_raise=True)
         if value is not None:
-            stmt = state.append_stmt(Constant(value.unwrap()))
-            return lowering.Result(stmt)
+            return state.current_frame.push(Constant(value.data))
 
-        value = state.visit(node.value).expect_one()
-        stmt = GetAttr(obj=value, attrname=node.attr)
-        state.append_stmt(stmt)
-        return lowering.Result(stmt)
+        value = state.lower(node.value).expect_one()
+        return state.current_frame.push(GetAttr(obj=value, attrname=node.attr))

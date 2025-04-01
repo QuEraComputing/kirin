@@ -113,7 +113,7 @@ class PythonLowering(LoweringABC[ast.AST]):
         return code
 
     def lower_literal(self, state: State[ast.AST], value) -> ir.SSAValue:
-        return state.lower(ast.Constant(value=value)).expect()
+        return state.lower(ast.Constant(value=value)).expect_one()
 
     def lower_global(self, state: State[ast.AST], node: ast.AST) -> LoweringABC.Result:
         return LoweringABC.Result(GlobalExprEval(state.current_frame).visit(node))
@@ -224,7 +224,7 @@ class PythonLowering(LoweringABC[ast.AST]):
         raise DialectLoweringError("`lower_Call_global_method` not implemented")
 
     def visit_Call_local(self, state: State[ast.AST], node: ast.Call) -> Result:
-        callee = state.lower(node.func).expect()
+        callee = state.lower(node.func).expect_one()
         if "Call_local" in self.registry:
             return self.registry["Call_local"].lower_Call_local(state, callee, node)
         raise DialectLoweringError("`lower_Call_local` not implemented")

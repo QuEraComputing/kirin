@@ -16,7 +16,7 @@ StmtType = TypeVar("StmtType", bound="ir.Statement")
 
 
 @dataclass(frozen=True)
-class PythonLoweringTrait(ir.Trait[StmtType], Generic[StmtType, ASTNode]):
+class PythonLoweringTrait(ir.Trait[ir.Statement], Generic[StmtType, ASTNode]):
     """A trait that indicates that a statement can be lowered from Python AST."""
 
     @abstractmethod
@@ -105,9 +105,9 @@ class PythonLoweringTrait(ir.Trait[StmtType], Generic[StmtType, ASTNode]):
         if name in group_names:
             if not isinstance(value, ast.Tuple):
                 raise DialectLoweringError(f"Expected tuple for group argument {name}")
-            target[name] = tuple(state.lower(elem).expect() for elem in value.elts)
+            target[name] = tuple(state.lower(elem).expect_one() for elem in value.elts)
         else:
-            target[name] = state.lower(value).expect()
+            target[name] = state.lower(value).expect_one()
 
 
 StatementType = TypeVar("StatementType", bound="ir.Statement")
@@ -151,16 +151,16 @@ class FromPythonRangeLike(FromPythonCall[StatementType]):
         nargs = len(node.args)
         if nargs == 1:
             start = state.get_literal(0)
-            stop = state.lower(node.args[0]).expect()
+            stop = state.lower(node.args[0]).expect_one()
             step = state.get_literal(1)
         elif nargs == 2:
-            start = state.lower(node.args[0]).expect()
-            stop = state.lower(node.args[1]).expect()
+            start = state.lower(node.args[0]).expect_one()
+            stop = state.lower(node.args[1]).expect_one()
             step = state.get_literal(1)
         elif nargs == 3:
-            start = state.lower(node.args[0]).expect()
-            stop = state.lower(node.args[1]).expect()
-            step = state.lower(node.args[2]).expect()
+            start = state.lower(node.args[0]).expect_one()
+            stop = state.lower(node.args[1]).expect_one()
+            step = state.lower(node.args[2]).expect_one()
         else:
             raise DialectLoweringError("range() takes 1-3 arguments")
 

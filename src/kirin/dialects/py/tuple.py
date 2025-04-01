@@ -14,7 +14,7 @@ This dialect maps `ast.Tuple` nodes to the `New` statement.
 
 import ast
 
-from kirin import ir, types, interp, lowering
+from kirin import ir, types, interp, lowering2
 from kirin.decl import info, statement
 from kirin.analysis import const
 from kirin.emit.julia import EmitJulia, EmitStrFrame
@@ -26,7 +26,7 @@ dialect = ir.Dialect("py.tuple")
 
 @statement(dialect=dialect)
 class New(ir.Statement):
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering2.FromPythonCall()})
     result: ir.ResultValue = info.result()
 
     def __init__(self, values: tuple[ir.SSAValue, ...]) -> None:
@@ -85,15 +85,11 @@ class ConstPropTable(interp.MethodTable):
 
 
 @dialect.register
-class Lowering(lowering.FromPythonAST):
+class Lowering(lowering2.FromPythonAST):
 
-    def lower_Tuple(
-        self, state: lowering.LoweringState, node: ast.Tuple
-    ) -> lowering.Result:
-        return lowering.Result(
-            state.append_stmt(
-                stmt=New(tuple(state.visit(elem).expect_one() for elem in node.elts))
-            )
+    def lower_Tuple(self, state: lowering2.State, node: ast.Tuple) -> lowering2.Result:
+        return state.current_frame.push(
+            New(tuple(state.lower(elem).expect_one() for elem in node.elts))
         )
 
 

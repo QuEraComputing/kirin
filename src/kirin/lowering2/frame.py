@@ -121,7 +121,7 @@ class Frame(Generic[Stmt]):
             return value
         return None
 
-    def __getitem__(self, name: str) -> SSAValue | None:
+    def __getitem__(self, name: str) -> SSAValue:
         """Get a variable from current scope.
 
         Args:

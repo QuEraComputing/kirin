@@ -1,17 +1,16 @@
 import ast
 
-from kirin import types
-from kirin.lowering import Result, FromPythonAST, LoweringState
+from kirin import types, lowering2
 
 from . import stmts as ilist
 from ._dialect import dialect
 
 
 @dialect.register
-class PythonLowering(FromPythonAST):
+class PythonLowering(lowering2.FromPythonAST):
 
-    def lower_List(self, state: LoweringState, node: ast.List) -> Result:
-        elts = tuple(state.visit(each).expect_one() for each in node.elts)
+    def lower_List(self, state: lowering2.State, node: ast.List) -> lowering2.Result:
+        elts = tuple(state.lower(each).expect_one() for each in node.elts)
 
         if len(elts):
             typ = elts[0].type
@@ -20,6 +19,4 @@ class PythonLowering(FromPythonAST):
         else:
             typ = types.Any
 
-        stmt = ilist.New(values=tuple(elts))
-        state.append_stmt(stmt)
-        return Result(stmt)
+        return state.current_frame.push(ilist.New(values=tuple(elts)))

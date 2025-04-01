@@ -65,7 +65,7 @@ class State(Generic[ASTNodeType]):
         return stmt
 
     @property
-    def root_frame(self) -> Frame:
+    def root_frame(self) -> Frame[ASTNodeType]:
         """root frame of the lowering process"""
         if self._current_frame is None:
             raise ValueError("current frame is None")
@@ -75,7 +75,7 @@ class State(Generic[ASTNodeType]):
         return root
 
     @property
-    def current_frame(self) -> Frame:
+    def current_frame(self) -> Frame[ASTNodeType]:
         """current frame being lowered"""
         if self._current_frame is None:
             raise ValueError("current frame is None")
@@ -83,22 +83,27 @@ class State(Generic[ASTNodeType]):
 
     @dataclass
     class Result:
-        data: SSAValue | None
+        """A proxy object to the result of the lowering process.
 
-        def expect(self) -> SSAValue:
-            if self.data is None:
-                raise DialectLoweringError("expected a value, but got None")
-            return self.data
+        Use `.data` to access the result of the lowering process.
+        Use `.expect_one()` to assert that the result is a single value.
+        """
+
+        data: tuple[SSAValue, ...]
+
+        def expect_one(self) -> SSAValue:
+            if len(self.data) == 1:
+                return self.data[0]
+            raise DialectLoweringError("expected a value, but got None")
 
     def lower(self, node: ASTNodeType):
         result = self.parent.visit(self, node)
         if isinstance(result, Statement):
-            if len(result._results) == 1:
-                result = result._results[0]
-            else:
-                raise DialectLoweringError(
-                    f"expected one result, but got {len(result._results)}"
-                )
+            return self.Result(tuple(result._results))
+        elif result is None:
+            return self.Result(tuple())
+        elif isinstance(result, SSAValue):
+            return self.Result((result,))
         return self.Result(result)
 
     def get_literal(self, value) -> SSAValue:
@@ -180,7 +185,7 @@ class State(Generic[ASTNodeType]):
             entr_block=entr_block,
             curr_block=entr_block,
             next_block=next_block or Block(),
-            globals=globals or {},
+            globals=globals or self.current_frame.globals,
             capture_callback=capture_callback,
         )
         self.push_frame(frame)

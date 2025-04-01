@@ -12,7 +12,7 @@ from kirin.exceptions import DialectLoweringError
 
 if TYPE_CHECKING:
     from kirin import ir
-    from kirin.lowering.state import LoweringState
+    from kirin.lowering2.state import State
 
 
 class FromPythonAST(ABC):
@@ -21,13 +21,13 @@ class FromPythonAST(ABC):
     def names(self) -> list[str]:  # show the name without lower_
         return [name[6:] for name in dir(self) if name.startswith("lower_")]
 
-    def lower(self, state: LoweringState, node: ast.AST) -> ir.SSAValue | None:
+    def lower(self, state: State[ast.AST], node: ast.AST) -> ir.SSAValue | None:
         """Entry point of dialect specific lowering."""
         return getattr(self, f"lower_{node.__class__.__name__}", self.unreachable)(
             state, node
         )
 
-    def unreachable(self, state: LoweringState, node: ast.AST) -> ir.SSAValue | None:
+    def unreachable(self, state: State[ast.AST], node: ast.AST) -> ir.SSAValue | None:
         raise DialectLoweringError(f"unreachable reached for {node.__class__.__name__}")
 
 

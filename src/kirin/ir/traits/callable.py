@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin.ir.traits.abc import Trait
@@ -12,7 +12,7 @@ StmtType = TypeVar("StmtType", bound="Statement")
 
 
 @dataclass(frozen=True)
-class CallableStmtInterface(Trait[StmtType]):
+class CallableStmtInterface(Trait["Statement"], ABC, Generic[StmtType]):
     """A trait that indicates that a statement is a callable statement.
 
     A callable statement is a statement that can be called as a function.
@@ -20,19 +20,19 @@ class CallableStmtInterface(Trait[StmtType]):
 
     @classmethod
     @abstractmethod
-    def get_callable_region(cls, stmt: "StmtType") -> "Region":
+    def get_callable_region(cls, stmt: "Statement") -> "Region":
         """Returns the body of the callable region"""
         ...
 
 
 @dataclass(frozen=True)
-class HasSignature(Trait[StmtType], ABC):
+class HasSignature(Trait["Statement"], ABC):
     """A trait that indicates that a statement has a function signature
     attribute.
     """
 
     @classmethod
-    def get_signature(cls, stmt: StmtType):
+    def get_signature(cls, stmt: "Statement"):
         signature: Signature | None = stmt.attributes.get("signature")  # type: ignore
         if signature is None:
             raise ValueError(f"Statement {stmt.name} does not have a function type")
@@ -40,10 +40,10 @@ class HasSignature(Trait[StmtType], ABC):
         return signature
 
     @classmethod
-    def set_signature(cls, stmt: StmtType, signature: "Signature"):
+    def set_signature(cls, stmt: "Statement", signature: "Signature"):
         stmt.attributes["signature"] = signature
 
-    def verify(self, stmt: StmtType):
+    def verify(self, stmt: "Statement"):
         from kirin.dialects.func.attrs import Signature
 
         signature = self.get_signature(stmt)

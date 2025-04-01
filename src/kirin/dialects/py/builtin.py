@@ -12,7 +12,7 @@ This dialect maps `ast.Call` nodes of builtin functions to the `Abs` and `Sum` s
 
 from ast import Call
 
-from kirin import ir, types, interp, lowering
+from kirin import ir, types, interp, lowering2
 from kirin.decl import info, statement
 
 dialect = ir.Dialect("py.builtin")
@@ -23,7 +23,7 @@ T = types.TypeVar("T", bound=types.Int | types.Float)
 @statement(dialect=dialect)
 class Abs(ir.Statement):
     name = "abs"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering2.FromPythonCall()})
     value: ir.SSAValue = info.argument(T, print=False)
     result: ir.ResultValue = info.result(T)
 
@@ -31,27 +31,19 @@ class Abs(ir.Statement):
 @statement(dialect=dialect)
 class Sum(ir.Statement):
     name = "sum"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering2.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Any, print=False)
     result: ir.ResultValue = info.result(types.Any)
 
 
 @dialect.register
-class Lowering(lowering.FromPythonAST):
+class Lowering(lowering2.FromPythonAST):
 
-    def lower_Call_abs(
-        self, state: lowering.LoweringState, node: Call
-    ) -> lowering.Result:
-        return lowering.Result(
-            state.append_stmt(Abs(state.visit(node.args[0]).expect_one()))
-        )
+    def lower_Call_abs(self, state: lowering2.State, node: Call) -> lowering2.Result:
+        return state.current_frame.push(Abs(state.lower(node.args[0]).expect_one()))
 
-    def lower_Call_sum(
-        self, state: lowering.LoweringState, node: Call
-    ) -> lowering.Result:
-        return lowering.Result(
-            state.append_stmt(Sum(state.visit(node.args[0]).expect_one()))
-        )
+    def lower_Call_sum(self, state: lowering2.State, node: Call) -> lowering2.Result:
+        return state.current_frame.push(Sum(state.lower(node.args[0]).expect_one()))
 
 
 @dialect.register
