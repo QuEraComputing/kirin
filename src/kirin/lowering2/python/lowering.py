@@ -317,7 +317,9 @@ class PythonLowering(LoweringABC[ast.AST]):
                 markup=True,
                 highlight=False,
             )
-            console.print(f"[red]  {type(err).__name__}: {"\n  ".join(err.args)}[/red]")
+            console.print(
+                f"[red]  {type(err).__name__}: {"\n" + "  ".join(err.args)}[/red]"
+            )
             for lineno, line in enumerate(lines, begin):
                 line = " " * self.hint_indent + line[code_indent:]
                 if self.hint_lineno:
