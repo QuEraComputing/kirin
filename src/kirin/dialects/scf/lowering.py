@@ -1,7 +1,6 @@
 import ast
 
 from kirin import ir, types, lowering2
-from kirin.exceptions import DialectLoweringError
 from kirin.dialects.py.unpack import unpacking
 
 from .stmts import For, Yield, IfElse
@@ -43,7 +42,9 @@ class Lowering(lowering2.FromPythonAST):
                     body_yields.append(body_frame[name])
                     value = frame.get(name)
                     if value is None:
-                        raise DialectLoweringError(f"expected value for {name}")
+                        raise lowering2.DialectLoweringError(
+                            f"expected value for {name}"
+                        )
                     else_yields.append(value)
 
         if not (
@@ -79,7 +80,9 @@ class Lowering(lowering2.FromPythonAST):
 
         def new_block_arg_if_inside_loop(frame: lowering2.Frame, capture: ir.SSAValue):
             if not capture.name:
-                raise DialectLoweringError("unexpected loop variable captured")
+                raise lowering2.DialectLoweringError(
+                    "unexpected loop variable captured"
+                )
             yields.append(capture.name)
             return frame.curr_block.args.append_from(capture.type, capture.name)
 
@@ -110,7 +113,7 @@ class Lowering(lowering2.FromPythonAST):
         for name in yields:
             value = state.current_frame.get(name)
             if value is None:
-                raise DialectLoweringError(f"expected value for {name}")
+                raise lowering2.DialectLoweringError(f"expected value for {name}")
             initializers.append(value)
         stmt = For(iter_, body_frame.curr_region, *initializers)
 
