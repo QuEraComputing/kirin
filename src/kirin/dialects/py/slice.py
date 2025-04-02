@@ -11,7 +11,7 @@ This dialect provides a `Slice` statement that represents a slice object in Pyth
 import ast
 from dataclasses import dataclass
 
-from kirin import ir, types, interp, lowering2, exceptions
+from kirin import ir, types, interp, lowering2
 from kirin.decl import info, statement
 from kirin.dialects.py.constant import Constant
 
@@ -112,6 +112,6 @@ def _lower_slice(state: lowering2.State, node: ast.Call) -> lowering2.Result:
         stop = state.lower(node.args[1]).expect_one()
         step = state.lower(node.args[2]).expect_one()
     else:
-        raise exceptions.DialectLoweringError("slice() takes 1-3 arguments")
+        raise lowering2.DialectLoweringError("slice() takes 1-3 arguments")
 
     return state.current_frame.push(Slice(start, stop, step))

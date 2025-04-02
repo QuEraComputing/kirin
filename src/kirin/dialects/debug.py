@@ -2,7 +2,7 @@ import ast
 
 import rich
 
-from kirin import ir, decl, types, interp, lowering2, exceptions
+from kirin import ir, decl, types, interp, lowering2
 
 dialect = ir.Dialect("debug")
 
@@ -13,7 +13,7 @@ class InfoLowering(lowering2.FromPythonCall):
         self, stmt: type, state: lowering2.State, node: ast.Call
     ) -> lowering2.Result:
         if len(node.args) == 0:
-            raise exceptions.DialectLoweringError(
+            raise lowering2.DialectLoweringError(
                 "info() requires at least one argument"
             )
 

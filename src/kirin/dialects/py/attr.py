@@ -11,7 +11,7 @@ This dialect maps `ast.Attribute` nodes to the `GetAttr` statement.
 
 import ast
 
-from kirin import ir, interp, lowering2, exceptions
+from kirin import ir, interp, lowering2
 from kirin.decl import info, statement
 
 dialect = ir.Dialect("py.attr")
@@ -43,7 +43,7 @@ class Lowering(lowering2.FromPythonAST):
         from kirin.dialects.py import Constant
 
         if not isinstance(node.ctx, ast.Load):
-            raise exceptions.DialectLoweringError(
+            raise lowering2.DialectLoweringError(
                 f"unsupported attribute context {node.ctx}"
             )
 

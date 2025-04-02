@@ -42,8 +42,10 @@ class LoweringABC(ABC, Generic[ASTNodeType]):
     def run(
         self,
         stmt: ASTNodeType,
+        *,
         source: str | None = None,
         globals: dict[str, Any] | None = None,
+        file: str | None = None,
         lineno_offset: int = 0,
         col_offset: int = 0,
         compactify: bool = True,

@@ -11,7 +11,7 @@ This dialects maps Python assignment syntax.
 
 import ast
 
-from kirin import ir, types, interp, lowering2, exceptions
+from kirin import ir, types, interp, lowering2
 from kirin.decl import info, statement
 from kirin.print import Printer
 
@@ -93,6 +93,6 @@ class Lowering(lowering2.FromPythonAST):
                             stmt = SetItem(obj=obj, index=slice, value=value)
                             current_frame.push(stmt)
                         case _:
-                            raise exceptions.DialectLoweringError(
+                            raise lowering2.DialectLoweringError(
                                 f"unsupported target {target}"
                             )

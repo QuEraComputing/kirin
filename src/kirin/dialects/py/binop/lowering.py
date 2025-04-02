@@ -1,6 +1,6 @@
 import ast
 
-from kirin import lowering2, exceptions
+from kirin import lowering2
 
 from . import stmts
 from ._dialect import dialect
@@ -16,5 +16,5 @@ class Lowering(lowering2.FromPythonAST):
         if op := getattr(stmts, node.op.__class__.__name__, None):
             stmt = op(lhs=lhs, rhs=rhs)
         else:
-            raise exceptions.DialectLoweringError(f"unsupported binop {node.op}")
+            raise lowering2.DialectLoweringError(f"unsupported binop {node.op}")
         return state.current_frame.push(stmt)
