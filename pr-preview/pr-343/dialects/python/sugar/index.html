@@ -7,16 +7,18 @@
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.dialects.py.indexing.dialect class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">dialect</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>dialect</span> <span class=o>=</span> <span class=n>Dialect</span><span class=p>(</span><span class=s1>&#39;py.indexing&#39;</span><span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.indexing.Concrete class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">Concrete</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>Concrete</span><span class=p>()</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.MethodTable" href="../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable">MethodTable</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.Concrete.getindex class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getindex</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getindex</span><span class=p>(</span><span class=n>interp</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>101</span>
-<span class=normal>102</span>
-<span class=normal>103</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 99</span>
+<span class=normal>100</span>
+<span class=normal>101</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
 <span class=k>def</span> <span class=nf>getindex</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>interp</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>):</span>
     <span class=k>return</span> <span class=p>(</span><span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>obj</span><span class=p>)[</span><span class=n>frame</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>stmt</span><span class=o>.</span><span class=n>index</span><span class=p>)],)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.indexing.ConstProp class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">ConstProp</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>ConstProp</span><span class=p>()</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.interp.MethodTable" href="../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable">MethodTable</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.ConstProp.getitem class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem</span><span class=p>(</span>
     <span class=n>_</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Propagate</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Frame</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>200</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>198</span>
+<span class=normal>199</span>
+<span class=normal>200</span>
 <span class=normal>201</span>
 <span class=normal>202</span>
 <span class=normal>203</span>
@@ -35,9 +37,7 @@
 <span class=normal>216</span>
 <span class=normal>217</span>
 <span class=normal>218</span>
-<span class=normal>219</span>
-<span class=normal>220</span>
-<span class=normal>221</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
+<span class=normal>219</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
 <span class=k>def</span> <span class=nf>getitem</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>_</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Propagate</span><span class=p>,</span>
@@ -100,9 +100,7 @@
 <span class=normal>90</span>
 <span class=normal>91</span>
 <span class=normal>92</span>
-<span class=normal>93</span>
-<span class=normal>94</span>
-<span class=normal>95</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Subscript</span><span class=p>(</span>
+<span class=normal>93</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Subscript</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Subscript</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=n>value</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>value</span><span class=p>)</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>
@@ -110,9 +108,7 @@
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Load</span><span class=p>):</span>
         <span class=n>stmt</span> <span class=o>=</span> <span class=n>GetItem</span><span class=p>(</span><span class=n>obj</span><span class=o>=</span><span class=n>value</span><span class=p>,</span> <span class=n>index</span><span class=o>=</span><span class=nb>slice</span><span class=p>)</span>
     <span class=k>else</span><span class=p>:</span>
-        <span class=k>raise</span> <span class=n>lowering</span><span class=o>.</span><span class=n>DialectLoweringError</span><span class=p>(</span>
-            <span class=sa>f</span><span class=s2>&quot;unsupported subscript context </span><span class=si>{</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=si>}</span><span class=s2>&quot;</span>
-        <span class=p>)</span>
+        <span class=k>raise</span> <span class=n>lowering</span><span class=o>.</span><span class=n>BuildError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;unsupported subscript context </span><span class=si>{</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>)</span>
     <span class=k>return</span> <span class=n>state</span><span class=o>.</span><span class=n>current_frame</span><span class=o>.</span><span class=n>push</span><span class=p>(</span><span class=n>stmt</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.indexing.PyGetItemLike class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">PyGetItemLike</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>PyGetItemLike</span><span class=p>()</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.GetItemLike" href="#kirin.dialects.py.indexing.GetItemLike">GetItemLike</a>[<a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.PyGetItemLikeStmt" href="#kirin.dialects.py.indexing.PyGetItemLikeStmt">PyGetItemLikeStmt</a>]</code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.PyGetItemLike.get_index class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_index</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_index</span><span class=p>(</span><span class=n>stmt</span><span class=p>:</span> <span class=n>PyGetItemLikeStmt</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span>
@@ -139,14 +135,14 @@
     <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span>
     <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../reference/kirin/rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code>, <code><span title="typing.Generic">Generic</span>[<a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.GetItemLikeStmt" href="#kirin.dialects.py.indexing.GetItemLikeStmt">GetItemLikeStmt</a>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>233</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../reference/kirin/rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code>, <code><span title="typing.Generic">Generic</span>[<a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.GetItemLikeStmt" href="#kirin.dialects.py.indexing.GetItemLikeStmt">GetItemLikeStmt</a>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>231</span>
+<span class=normal>232</span>
+<span class=normal>233</span>
 <span class=normal>234</span>
 <span class=normal>235</span>
 <span class=normal>236</span>
 <span class=normal>237</span>
-<span class=normal>238</span>
-<span class=normal>239</span>
-<span class=normal>240</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span> <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>):</span>
+<span class=normal>238</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span> <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>):</span>
     <span class=n>trait</span> <span class=o>=</span> <span class=n>stmt_type</span><span class=o>.</span><span class=n>get_trait</span><span class=p>(</span><span class=n>GetItemLike</span><span class=p>)</span>
     <span class=k>if</span> <span class=n>trait</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
         <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>stmt_type</span><span class=si>}</span><span class=s2> does not have GetItemLike trait&quot;</span><span class=p>)</span>
@@ -158,7 +154,9 @@
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.obj_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">obj_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>obj_type</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>=</span> <span class=n>obj_type</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.target_stmt_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">target_stmt_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>target_stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>]</span> <span class=o>=</span> <span class=n>stmt_type</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.rewrite_Statement class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">rewrite_Statement</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>rewrite_Statement</span><span class=p>(</span><span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>242</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>240</span>
+<span class=normal>241</span>
+<span class=normal>242</span>
 <span class=normal>243</span>
 <span class=normal>244</span>
 <span class=normal>245</span>
@@ -166,9 +164,7 @@
 <span class=normal>247</span>
 <span class=normal>248</span>
 <span class=normal>249</span>
-<span class=normal>250</span>
-<span class=normal>251</span>
-<span class=normal>252</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
+<span class=normal>250</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>GetItem</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>RewriteResult</span><span class=p>()</span>
 
@@ -186,7 +182,9 @@
     <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>],</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>109</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>107</span>
+<span class=normal>108</span>
+<span class=normal>109</span>
 <span class=normal>110</span>
 <span class=normal>111</span>
 <span class=normal>112</span>
@@ -199,9 +197,7 @@
 <span class=normal>119</span>
 <span class=normal>120</span>
 <span class=normal>121</span>
-<span class=normal>122</span>
-<span class=normal>123</span>
-<span class=normal>124</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
+<span class=normal>122</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
 <span class=k>def</span> <span class=nf>getitem</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
@@ -223,7 +219,9 @@
     <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
     <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>126</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>124</span>
+<span class=normal>125</span>
+<span class=normal>126</span>
 <span class=normal>127</span>
 <span class=normal>128</span>
 <span class=normal>129</span>
@@ -238,9 +236,7 @@
 <span class=normal>138</span>
 <span class=normal>139</span>
 <span class=normal>140</span>
-<span class=normal>141</span>
-<span class=normal>142</span>
-<span class=normal>143</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple</span><span class=p>(</span>
+<span class=normal>141</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
@@ -264,7 +260,9 @@
     <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
     <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>145</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>143</span>
+<span class=normal>144</span>
+<span class=normal>145</span>
 <span class=normal>146</span>
 <span class=normal>147</span>
 <span class=normal>148</span>
@@ -279,9 +277,7 @@
 <span class=normal>157</span>
 <span class=normal>158</span>
 <span class=normal>159</span>
-<span class=normal>160</span>
-<span class=normal>161</span>
-<span class=normal>162</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_index</span><span class=p>(</span>
+<span class=normal>160</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_index</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
@@ -305,7 +301,9 @@
     <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>,</span>
     <span class=n>index</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>164</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>162</span>
+<span class=normal>163</span>
+<span class=normal>164</span>
 <span class=normal>165</span>
 <span class=normal>166</span>
 <span class=normal>167</span>
@@ -327,9 +325,7 @@
 <span class=normal>183</span>
 <span class=normal>184</span>
 <span class=normal>185</span>
-<span class=normal>186</span>
-<span class=normal>187</span>
-<span class=normal>188</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_slice</span><span class=p>(</span>
+<span class=normal>186</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_slice</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>interp</span><span class=p>:</span> <span class=n>TypeInference</span><span class=p>,</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=n>GetItem</span><span class=p>,</span>
@@ -355,11 +351,11 @@
     <span class=k>else</span><span class=p>:</span>
         <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Tuple</span><span class=p>[</span><span class=n>types</span><span class=o>.</span><span class=n>Vararg</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>getitem_tuple_union</span><span class=p>(</span><span class=n>obj</span><span class=p>))],)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.TypeInfer.getitem_tuple_union class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">getitem_tuple_union</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>getitem_tuple_union</span><span class=p>(</span><span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>190</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>188</span>
+<span class=normal>189</span>
+<span class=normal>190</span>
 <span class=normal>191</span>
-<span class=normal>192</span>
-<span class=normal>193</span>
-<span class=normal>194</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_union</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>):</span>
+<span class=normal>192</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>getitem_tuple_union</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>obj</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>Generic</span><span class=p>):</span>
     <span class=k>if</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span><span class=p>:</span>
         <span class=k>return</span> <span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span><span class=o>*</span><span class=n>obj</span><span class=o>.</span><span class=n>vars</span><span class=p>,</span> <span class=n>obj</span><span class=o>.</span><span class=n>vararg</span><span class=o>.</span><span class=n>typ</span><span class=p>)</span>
     <span class=k>else</span><span class=p>:</span>
@@ -399,17 +395,13 @@
 <span class=normal>51</span>
 <span class=normal>52</span>
 <span class=normal>53</span>
-<span class=normal>54</span>
-<span class=normal>55</span>
-<span class=normal>56</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Attribute</span><span class=p>(</span>
+<span class=normal>54</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_Attribute</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Attribute</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=kn>from</span> <span class=nn>kirin.dialects.py</span> <span class=kn>import</span> <span class=n>Constant</span>
 
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Load</span><span class=p>):</span>
-        <span class=k>raise</span> <span class=n>lowering</span><span class=o>.</span><span class=n>DialectLoweringError</span><span class=p>(</span>
-            <span class=sa>f</span><span class=s2>&quot;unsupported attribute context </span><span class=si>{</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=si>}</span><span class=s2>&quot;</span>
-        <span class=p>)</span>
+        <span class=k>raise</span> <span class=n>lowering</span><span class=o>.</span><span class=n>BuildError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;unsupported attribute context </span><span class=si>{</span><span class=n>node</span><span class=o>.</span><span class=n>ctx</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>)</span>
 
     <span class=c1># NOTE: eagerly load global variables</span>
     <span class=n>value</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>get_global</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>no_raise</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
