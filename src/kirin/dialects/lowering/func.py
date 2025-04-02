@@ -130,7 +130,7 @@ class Lowering(lowering2.FromPythonAST):
         try:
             t = state.get_global(node).data
             return types.hint2type(t)
-        except:  # noqa: E722
+        except Exception as e:  # noqa: E722
             raise lowering2.DialectLoweringError(
                 f"expect a type hint, got {ast.unparse(node)}"
-            )
+            ) from e

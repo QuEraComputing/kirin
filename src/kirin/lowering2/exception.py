@@ -1,13 +1,20 @@
 import sys
+import types
 
 
 class DialectLoweringError(Exception):
     """Base class for all dialect lowering errors."""
 
-    pass
+    def __init__(self, hint: str, *msgs: object):
+        super().__init__(hint, *msgs)
+
+    @property
+    def hint(self) -> str:
+        """Return the hint message."""
+        return self.args[0]
 
 
-def exception_handler(exc_type, exc_value, exc_tb, tb_offset=None):
+def exception_handler(exc_type, exc_value, exc_tb: types.TracebackType):
     """Custom exception handler to format and print exceptions."""
     if issubclass(exc_type, DialectLoweringError):
         print(exc_value, file=sys.stderr)

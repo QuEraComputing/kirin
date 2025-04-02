@@ -18,7 +18,7 @@ CallbackFn = Callable[["Frame", SSAValue], SSAValue]
 class Frame(Generic[Stmt]):
     state: State
     """lowering state"""
-    parent: Optional[Frame]
+    parent: Optional[Frame] = field(default=None, init=False)
     """parent frame, if any"""
     stream: StmtStream[Stmt]
     """stream of statements"""

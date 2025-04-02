@@ -21,7 +21,7 @@ class GlobalExprEval(ast.NodeVisitor):
 
     def generic_visit(self, node: ast.AST) -> Any:
         raise GlobalEvalError(
-            f"Cannot lower global {node.__class__.__name__} node: {node}"
+            f"Cannot lower global {node.__class__.__name__} node: {ast.dump(node)}"
         )
 
     def visit_Name(self, node: ast.Name) -> Any:
@@ -79,3 +79,6 @@ class GlobalExprEval(ast.NodeVisitor):
             raise GlobalEvalError(
                 f"Exception in global call: {e} for {func}({args}, {keywords})"
             ) from e
+
+    def visit_Tuple(self, node: ast.Tuple) -> Any:
+        return tuple(self.visit(elt) for elt in node.elts)

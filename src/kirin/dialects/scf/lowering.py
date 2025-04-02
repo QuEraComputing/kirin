@@ -19,14 +19,12 @@ class Lowering(lowering2.FromPythonAST):
             then_cond = body_frame.curr_block.args.append_from(types.Bool, cond.name)
             if cond.name:
                 body_frame.defs[cond.name] = then_cond
-            state.push_frame(body_frame)
             body_frame.exhaust()
 
         with state.frame(node.orelse) as else_frame:
             else_cond = else_frame.curr_block.args.append_from(types.Bool, cond.name)
             if cond.name:
                 else_frame.defs[cond.name] = else_cond
-            state.push_frame(else_frame)
             else_frame.exhaust()
 
         yield_names: list[str] = []
@@ -104,7 +102,7 @@ class Lowering(lowering2.FromPythonAST):
                 body_frame.curr_block.last_stmt is None
                 or not body_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
             ):
-                body_frame.append_stmt(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore
+                body_frame.push(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore
 
         initializers: list[ir.SSAValue] = []
         for name in yields:

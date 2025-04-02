@@ -40,6 +40,8 @@ class State(Generic[ASTNodeType]):
     "source info of the current node"
     lines: list[str]
     "source lines of the code being lowered"
+    file: str | None = None
+    "file name of the current node"
     lineno_offset: int = 0
     "lineno offset at the beginning of the source"
     col_offset: int = 0
@@ -131,6 +133,7 @@ class State(Generic[ASTNodeType]):
         return self.parent.lower_global(self, node)
 
     def push_frame(self, frame: Frame):
+        assert frame is not self._current_frame, "Frame already pushed"
         frame.parent = self._current_frame
         self._current_frame = frame
         return frame
@@ -177,7 +180,6 @@ class State(Generic[ASTNodeType]):
 
         frame = Frame(
             state=self,
-            parent=parent or self._current_frame,
             stream=stmts,
             curr_region=region or Region(entr_block),
             entr_block=entr_block,

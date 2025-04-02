@@ -232,8 +232,15 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
                         block.stmts.append(
                             cf.Branch(arguments=(), successor=body_frame.next_block)
                         )
+                for block in body_frame.curr_region.blocks:
+                    if block.last_stmt is None or not block.last_stmt.has_trait(
+                        ir.IsTerminator
+                    ):
+                        block.stmts.append(
+                            cf.Branch(arguments=(), successor=body_frame.next_block)
+                        )
         else:
-            with state.frame(body) as body_frame:
+            with state.frame(body, finalize_next=False) as body_frame:
                 body_frame.exhaust()
                 if len(body_frame.curr_region.blocks) != 1:
                     raise DialectLoweringError(
@@ -243,21 +250,10 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
                     cf.Branch(arguments=(), successor=body_frame.next_block)
                 )
 
-        if region_info.multi:  # branch to exit block if not terminated
-            for block in body_frame.curr_region.blocks:
-                if block.last_stmt is None or not block.last_stmt.has_trait(
-                    ir.IsTerminator
-                ):
-                    block.stmts.append(
-                        cf.Branch(arguments=(), successor=body_frame.next_block)
+                if len(body_frame.curr_region.blocks) != 1:
+                    raise DialectLoweringError(
+                        f"Expected exactly one block in region {region_name}"
                     )
-            state.pop_frame()
-        else:
-            if len(body_frame.curr_region.blocks) != 1:
-                raise DialectLoweringError(
-                    f"Expected exactly one block in region {region_name}"
-                )
-            state.pop_frame(finalize_next=False)
 
         args, kwargs = self.lower_Call_inputs(stmt, state, item.context_expr)
         kwargs[region_name] = body_frame.curr_region

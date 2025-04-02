@@ -66,12 +66,18 @@ class PythonLowering(LoweringABC[ast.AST]):
         self,
         func: Callable,
         *,
+        globals: dict[str, Any] | None = None,
         lineno_offset: int = 0,
         col_offset: int = 0,
         compactify: bool = True,
     ):
+        file = inspect.getfile(func)
         source = textwrap.dedent(inspect.getsource(func))
-        globals = func.__globals__
+        if globals:
+            globals.update(func.__globals__)
+        else:
+            globals = func.__globals__
+
         try:
             nonlocals = inspect.getclosurevars(func).nonlocals
         except Exception:
@@ -79,8 +85,9 @@ class PythonLowering(LoweringABC[ast.AST]):
         globals.update(nonlocals)
         return self.run(
             ast.parse(source).body[0],
-            source,
+            source=source,
             globals=globals,
+            file=file,
             lineno_offset=lineno_offset,
             col_offset=col_offset,
             compactify=compactify,
@@ -89,8 +96,10 @@ class PythonLowering(LoweringABC[ast.AST]):
     def run(
         self,
         stmt: ast.AST,
+        *,
         source: str | None = None,
         globals: dict[str, Any] | None = None,
+        file: str | None = None,
         lineno_offset: int = 0,
         col_offset: int = 0,
         compactify: bool = True,
@@ -99,6 +108,7 @@ class PythonLowering(LoweringABC[ast.AST]):
         state = State(
             self,
             source=SourceInfo.from_ast(stmt, lineno_offset, col_offset),
+            file=file,
             lines=source.splitlines(),
             lineno_offset=lineno_offset,
             col_offset=col_offset,
@@ -110,11 +120,11 @@ class PythonLowering(LoweringABC[ast.AST]):
             except DialectLoweringError as e:
                 if self.stacktrace:
                     raise Exception(
-                        f"{e.args[0]}\n\n{self.error_hint(state, e.args[0])}",
+                        f"{e.args[0]}\n\n{self.error_hint(state, e)}",
                         *e.args[1:],
                     ) from e
                 else:
-                    e.args = (self.error_hint(state, e.args[0]),)
+                    e.args = (self.error_hint(state, e),)
                     raise e
 
             region = frame.curr_region
@@ -286,7 +296,7 @@ class PythonLowering(LoweringABC[ast.AST]):
             f" for {global_callee.__name__}"
         )
 
-    def error_hint(self, state: State[ast.AST], msg: str) -> str:
+    def error_hint(self, state: State[ast.AST], err: DialectLoweringError) -> str:
         begin = max(0, state.source.lineno - self.max_lines - state.lineno_offset)
         end = max(
             max(state.source.lineno + self.max_lines, state.source.end_lineno or 0)
@@ -302,6 +312,12 @@ class PythonLowering(LoweringABC[ast.AST]):
         console = Console(force_terminal=True)
         with console.capture() as capture:
             console.print()
+            console.print(
+                f"[dim]{state.file or 'stdin'}:{state.source.lineno}[/dim]",
+                markup=True,
+                highlight=False,
+            )
+            console.print(f"[red]  {type(err).__name__}: {"\n  ".join(err.args)}[/red]")
             for lineno, line in enumerate(lines, begin):
                 line = " " * self.hint_indent + line[code_indent:]
                 if self.hint_lineno:
@@ -309,17 +325,21 @@ class PythonLowering(LoweringABC[ast.AST]):
                         line = f"{state.source.lineno}[dim]│[/dim]" + line
                     else:
                         line = "[dim] " * (error_lineno_len) + "│[/dim]" + line
-                console.print(line, markup=True, highlight=False)
+                console.print("  " + line, markup=True, highlight=False)
                 if lineno == error_lineno:
                     console.print(
-                        self.__hint_line(state, code_indent, error_lineno_len, msg),
+                        "  "
+                        + self.__hint_line(
+                            state, code_indent, error_lineno_len, err.hint
+                        ),
                         markup=True,
                         highlight=False,
                     )
 
             if end == error_lineno:
                 console.print(
-                    self.__hint_line(state, code_indent, error_lineno_len, msg),
+                    "  "
+                    + self.__hint_line(state, code_indent, error_lineno_len, err.hint),
                     markup=True,
                     highlight=False,
                 )
