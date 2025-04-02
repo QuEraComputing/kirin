@@ -8,7 +8,7 @@ import ast
 from abc import ABC
 from typing import TYPE_CHECKING
 
-from kirin.exceptions import DialectLoweringError
+from kirin.lowering2.exception import DialectLoweringError
 
 if TYPE_CHECKING:
     from kirin import ir

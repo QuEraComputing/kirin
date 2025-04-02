@@ -16,7 +16,6 @@ from ast import Call
 
 from kirin import ir, types, interp, lowering2
 from kirin.decl import info, statement
-from kirin.exceptions import DialectLoweringError
 
 dialect = ir.Dialect("py.iterable")
 
@@ -69,18 +68,18 @@ class Lowering(lowering2.FromPythonAST):
 
     def lower_Call_iter(self, state: lowering2.State, node: Call) -> lowering2.Result:
         if len(node.args) != 1:
-            raise DialectLoweringError("iter() takes exactly 1 argument")
+            raise lowering2.DialectLoweringError("iter() takes exactly 1 argument")
         return state.current_frame.push(
             Iter(state.lower(node.args[0]).expect_one()),
         )
 
     def lower_Call_next(self, state: lowering2.State, node: Call) -> lowering2.Result:
         if len(node.args) == 2:
-            raise DialectLoweringError(
+            raise lowering2.DialectLoweringError(
                 "next() does not throw StopIteration inside kernel"
             )
         if len(node.args) != 1:
-            raise DialectLoweringError("next() takes exactly 1 argument")
+            raise lowering2.DialectLoweringError("next() takes exactly 1 argument")
 
         return state.current_frame.push(
             Next(state.lower(node.args[0]).expect_one()),

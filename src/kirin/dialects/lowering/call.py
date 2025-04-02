@@ -2,7 +2,6 @@ import ast
 
 from kirin import ir, types, lowering2
 from kirin.dialects import func
-from kirin.exceptions import DialectLoweringError
 
 dialect = ir.Dialect("lowering.call")
 
@@ -36,7 +35,9 @@ class Lowering(lowering2.FromPythonAST):
         args: list[ir.SSAValue] = []
         for arg in node.args:
             if isinstance(arg, ast.Starred):  # TODO: support *args
-                raise DialectLoweringError("starred arguments are not supported")
+                raise lowering2.DialectLoweringError(
+                    "starred arguments are not supported"
+                )
             else:
                 args.append(state.lower(arg).expect_one())
 
