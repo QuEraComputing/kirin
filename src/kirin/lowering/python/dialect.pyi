@@ -1,15 +1,22 @@
+from __future__ import annotations
+
 import ast
 import sys
+from abc import ABC
 
 from kirin.ir import Method, SSAValue
+from kirin.ir.attrs import types
 from kirin.lowering.abc import Result
 from kirin.lowering.state import State
 
-class FromPythonAST:
+class FromPythonAST(ABC):
     @property
     def names(self) -> list[str]: ...
     def lower(self, state: State[ast.AST], node: ast.AST) -> Result: ...
     def unreachable(self, state: State[ast.AST], node: ast.AST) -> Result: ...
+    def get_hint(
+        self, state: State[ast.AST], node: ast.expr | None
+    ) -> types.TypeAttribute: ...
     def lower_Module(self, state: State[ast.AST], node: ast.Module) -> Result: ...
     def lower_Interactive(
         self, state: State[ast.AST], node: ast.Interactive

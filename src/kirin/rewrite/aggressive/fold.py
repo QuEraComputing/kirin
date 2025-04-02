@@ -12,6 +12,7 @@ from kirin.rewrite.getfield import InlineGetField
 from kirin.rewrite.compactify import CFGCompactify
 from kirin.rewrite.wrap_const import WrapConst
 from kirin.rewrite.call2invoke import Call2Invoke
+from kirin.rewrite.type_assert import InlineTypeAssert
 
 
 @dataclass
@@ -28,6 +29,7 @@ class Fold(RewriteRule):
                 Fixpoint(
                     Walk(
                         Chain(
+                            InlineTypeAssert(),
                             InlineGetItem(),
                             InlineGetField(),
                             DeadCodeElimination(),

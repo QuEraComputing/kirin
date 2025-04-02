@@ -49,6 +49,31 @@ class SetItem(ir.Statement):
     index: ir.SSAValue = info.argument(print=False)
 
 
+@statement(dialect=dialect)
+class SetAttribute(ir.Statement):
+    name = "setattr"
+    traits = frozenset({lowering.FromPythonCall()})
+    obj: ir.SSAValue = info.argument(print=False)
+    attr: str = info.attribute()
+    value: ir.SSAValue = info.argument(print=False)
+
+
+@statement(dialect=dialect)
+class TypeAssert(ir.Statement):
+    traits = frozenset({lowering.FromPythonCall()})
+    got: ir.SSAValue = info.argument(print=False)
+    expected: types.TypeAttribute = info.attribute()
+    result: ir.ResultValue = info.result()
+
+    def __init__(self, got: ir.SSAValue, *, expected: types.TypeAttribute):
+        super().__init__(
+            args=(got,),
+            attributes={"expected": expected},
+            result_types=(expected,),
+            args_slice={"got": 0},
+        )
+
+
 @dialect.register
 class Concrete(interp.MethodTable):
 
@@ -59,7 +84,37 @@ class Concrete(interp.MethodTable):
     @interp.impl(SetItem)
     def setindex(self, interp, frame: interp.Frame, stmt: SetItem):
         frame.get(stmt.obj)[frame.get(stmt.index)] = frame.get(stmt.value)
-        return (None,)
+
+    @interp.impl(SetAttribute)
+    def set_attribute(self, interp, frame: interp.Frame, stmt: SetAttribute):
+        obj = frame.get(stmt.obj)
+        value = frame.get(stmt.value)
+        setattr(obj, stmt.attr, value)
+
+    # NOTE: we don't do much runtime type checking here, object with generic
+    # types will unlikely work here.
+    # TODO: consider runtime type checking by boxing the value
+    @interp.impl(TypeAssert)
+    def type_assert(self, interp_, frame: interp.Frame, stmt: TypeAssert):
+        got = frame.get(stmt.got)
+        got_type = types.PyClass(type(got))
+        if not got_type.is_subseteq(stmt.expected):
+            raise interp.WrapException(
+                TypeError(f"Expected {stmt.expected}, got {got_type}")
+            )
+        return (frame.get(stmt.got),)
+
+
+@dialect.register(key="typeinfer")
+class TypeInfer(interp.MethodTable):
+    @interp.impl(TypeAssert)
+    def type_assert(
+        self, interp_, frame: interp.Frame[types.TypeAttribute], stmt: TypeAssert
+    ):
+        got = frame.get(stmt.got)
+        if got.is_subseteq(stmt.expected):
+            return (got.meet(stmt.expected),)
+        return (types.Bottom,)
 
 
 @dialect.register
@@ -79,16 +134,43 @@ class Lowering(lowering.FromPythonAST):
                 current_frame.defs[lhs_name] = current_frame.push(stmt).result
             case _:
                 for target, value in zip(node.targets, result.data):
-                    match target:
-                        # NOTE: if the name exists new ssa value will be
-                        # used in the future to shadow the old one
-                        case ast.Name(name, ast.Store()):
-                            value.name = name
-                            current_frame.defs[name] = value
-                        case ast.Subscript(obj, slice):
-                            obj = state.lower(obj).expect_one()
-                            slice = state.lower(slice).expect_one()
-                            stmt = SetItem(obj=obj, index=slice, value=value)
-                            current_frame.push(stmt)
-                        case _:
-                            raise lowering.BuildError(f"unsupported target {target}")
+                    self.assign_item(state, target, value)
+
+    def lower_AnnAssign(
+        self, state: lowering.State, node: ast.AnnAssign
+    ) -> lowering.Result:
+        type_hint = self.get_hint(state, node.annotation)
+        value = state.lower(node.value).expect_one()
+        stmt = state.current_frame.push(TypeAssert(got=value, expected=type_hint))
+        self.assign_item(state, node.target, stmt.result)
+
+    def lower_AugAssign(
+        self, state: lowering.State, node: ast.AugAssign
+    ) -> lowering.Result:
+        self.assign_item(state, node.target, state.lower(node.value).expect_one())
+
+    @staticmethod
+    def assign_item(state: lowering.State, target, value: ir.SSAValue):
+        current_frame = state.current_frame
+        match target:
+            case ast.Name(name, ast.Store()):
+                value.name = name
+                current_frame.defs[name] = value
+            case ast.Attribute(obj, attr, ast.Store()):
+                obj = state.lower(obj).expect_one()
+                stmt = SetAttribute(obj, value, attr=attr)
+                current_frame.push(stmt)
+            case ast.Subscript(obj, slice, ast.Store()):
+                obj = state.lower(obj).expect_one()
+                slice = state.lower(slice).expect_one()
+                stmt = SetItem(obj=obj, index=slice, value=value)
+                current_frame.push(stmt)
+            case _:
+                raise lowering.BuildError(f"unsupported target {target}")
+
+    @staticmethod
+    def assert_assign_value_type(value: ir.SSAValue, type_hint: types.TypeAttribute):
+        value_type = value.type.meet(type_hint)
+        if value_type is value_type.bottom():
+            raise lowering.BuildError(f"Cannot assign {value.type} to {type_hint}")
+        return value_type

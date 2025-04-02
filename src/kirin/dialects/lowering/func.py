@@ -115,16 +115,3 @@ class Lowering(lowering.FromPythonAST):
 
         if node.posonlyargs:
             raise lowering.BuildError("positional-only arguments are not supported")
-
-    @staticmethod
-    def get_hint(state: lowering.State, node: ast.expr | None):
-        if node is None:
-            return types.Any
-
-        try:
-            t = state.get_global(node).data
-            return types.hint2type(t)
-        except Exception as e:  # noqa: E722
-            raise lowering.BuildError(
-                f"expect a type hint, got {ast.unparse(node)}"
-            ) from e
