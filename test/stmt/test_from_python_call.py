@@ -136,8 +136,8 @@ def test_from_python_call():
     assert stmt.xxx_property == "xxx_property"
     assert stmt.xxx_attribute is False  # type: ignore
 
-    with pytest.raises(lowering.PythonSyntaxError):
+    with pytest.raises(lowering.BuildError):
         lower.python_function(non_const)
 
-    with pytest.raises(lowering.PythonSyntaxError):
+    with pytest.raises(lowering.BuildError):
         lower.python_function(no_group)

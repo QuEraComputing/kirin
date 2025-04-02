@@ -89,9 +89,7 @@ class Lowering(lowering.FromPythonAST):
         if isinstance(node.ctx, ast.Load):
             stmt = GetItem(obj=value, index=slice)
         else:
-            raise lowering.PythonSyntaxError(
-                f"unsupported subscript context {node.ctx}"
-            )
+            raise lowering.BuildError(f"unsupported subscript context {node.ctx}")
         return state.current_frame.push(stmt)
 
 

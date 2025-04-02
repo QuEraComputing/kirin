@@ -19,7 +19,7 @@ from kirin.source import SourceInfo
 from .abc import ASTNodeType
 from .frame import Frame, CallbackFn
 from .stream import StmtStream
-from .exception import PythonSyntaxError
+from .exception import BuildError
 
 if TYPE_CHECKING:
     from .abc import LoweringABC
@@ -94,7 +94,7 @@ class State(Generic[ASTNodeType]):
         def expect_one(self) -> SSAValue:
             if len(self.data) == 1:
                 return self.data[0]
-            raise PythonSyntaxError("expected a value, but got None")
+            raise BuildError("expected a value, but got None")
 
     def lower(self, node: ASTNodeType):
         result = self.parent.visit(self, node)

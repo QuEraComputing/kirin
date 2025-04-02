@@ -1,7 +1,7 @@
 from .abc import Result as Result, LoweringABC as LoweringABC
 from .frame import Frame as Frame
 from .state import State as State
-from .exception import PythonSyntaxError as PythonSyntaxError
+from .exception import BuildError as BuildError
 from .python.traits import (
     FromPythonCall as FromPythonCall,
     FromPythonWith as FromPythonWith,

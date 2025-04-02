@@ -70,7 +70,7 @@ def unpacking(state: lowering.State, node: ast.expr, value: ir.SSAValue):
         value.name = node.id
         return
     elif not isinstance(node, ast.Tuple):
-        raise lowering.PythonSyntaxError(f"unsupported unpack node {node}")
+        raise lowering.BuildError(f"unsupported unpack node {node}")
 
     names: list[str | None] = []
     continue_unpack: list[int] = []

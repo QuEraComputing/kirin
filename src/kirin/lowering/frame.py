@@ -6,7 +6,7 @@ from dataclasses import field, dataclass
 from kirin.ir import Block, Region, SSAValue, Statement
 
 from .stream import Stmt, StmtStream
-from .exception import PythonSyntaxError
+from .exception import BuildError
 
 if TYPE_CHECKING:
     from .state import State
@@ -58,13 +58,13 @@ class Frame(Generic[Stmt]):
         elif isinstance(node, Statement):
             return self._push_stmt(node)
         else:
-            raise PythonSyntaxError(f"Unsupported type {type(node)} in push()")
+            raise BuildError(f"Unsupported type {type(node)} in push()")
 
     def _push_stmt(self, stmt: StmtType) -> StmtType:
         if not stmt.dialect:
-            raise PythonSyntaxError(f"unexpected builtin statement {stmt.name}")
+            raise BuildError(f"unexpected builtin statement {stmt.name}")
         elif stmt.dialect not in self.state.parent.dialects:
-            raise PythonSyntaxError(
+            raise BuildError(
                 f"Unsupported dialect `{stmt.dialect.name}` in statement {stmt.name}"
             )
         self.curr_block.stmts.append(stmt)
@@ -131,14 +131,14 @@ class Frame(Generic[Stmt]):
             SSAValue: the value of the variable
 
         Raises:
-            DialectLoweringError: if the variable is not found in the scope,
+            lowering.BuildError: if the variable is not found in the scope,
                 or if the variable has multiple possible values.
         """
         value = self.defs.get(name)
         if isinstance(value, SSAValue):
             return value
         else:
-            raise PythonSyntaxError(f"Variable {name} not found in scope")
+            raise BuildError(f"Variable {name} not found in scope")
 
     def exhaust(self):
         """Exhaust the current stream and return the remaining statements."""

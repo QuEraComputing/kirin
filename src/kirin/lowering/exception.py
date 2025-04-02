@@ -2,7 +2,7 @@ import sys
 import types
 
 
-class PythonSyntaxError(Exception):
+class BuildError(Exception):
     """Base class for all dialect lowering errors."""
 
     def __init__(self, hint: str, *msgs: object):
@@ -16,7 +16,7 @@ class PythonSyntaxError(Exception):
 
 def exception_handler(exc_type, exc_value, exc_tb: types.TracebackType):
     """Custom exception handler to format and print exceptions."""
-    if issubclass(exc_type, PythonSyntaxError):
+    if issubclass(exc_type, BuildError):
         print(exc_value, file=sys.stderr)
         return
 
@@ -29,8 +29,8 @@ sys.excepthook = exception_handler
 
 
 def custom_exc(shell, etype, evalue, tb, tb_offset=None):
-    if issubclass(etype, PythonSyntaxError):
-        # Handle DialectLoweringError
+    if issubclass(etype, BuildError):
+        # Handle BuildError exceptions
         print(evalue, file=sys.stderr)
         return
     shell.showtraceback((etype, evalue, tb), tb_offset=tb_offset)

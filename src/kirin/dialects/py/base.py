@@ -19,12 +19,12 @@ class PythonLowering(lowering.FromPythonAST):
         if isinstance(node.ctx, ast.Load):
             value = state.current_frame.get(name)
             if value is None:
-                raise lowering.PythonSyntaxError(f"{name} is not defined")
+                raise lowering.BuildError(f"{name} is not defined")
             return value
         elif isinstance(node.ctx, ast.Store):
-            raise lowering.PythonSyntaxError("unhandled store operation")
+            raise lowering.BuildError("unhandled store operation")
         else:  # Del
-            raise lowering.PythonSyntaxError("unhandled del operation")
+            raise lowering.BuildError("unhandled del operation")
 
     def lower_Expr(self, state: lowering.State, node: ast.Expr) -> lowering.Result:
         return state.parent.visit(state, node.value)

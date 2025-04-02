@@ -16,5 +16,5 @@ class Lowering(lowering.FromPythonAST):
         if op := getattr(stmts, node.op.__class__.__name__, None):
             stmt = op(lhs=lhs, rhs=rhs)
         else:
-            raise lowering.PythonSyntaxError(f"unsupported binop {node.op}")
+            raise lowering.BuildError(f"unsupported binop {node.op}")
         return state.current_frame.push(stmt)

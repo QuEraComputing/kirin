@@ -15,4 +15,4 @@ class Lowering(lowering.FromPythonAST):
         if op := getattr(stmts, node.op.__class__.__name__, None):
             return state.current_frame.push(op(state.lower(node.operand).expect_one()))
         else:
-            raise lowering.PythonSyntaxError(f"unsupported unary operator {node.op}")
+            raise lowering.BuildError(f"unsupported unary operator {node.op}")

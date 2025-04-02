@@ -68,18 +68,18 @@ class Lowering(lowering.FromPythonAST):
 
     def lower_Call_iter(self, state: lowering.State, node: Call) -> lowering.Result:
         if len(node.args) != 1:
-            raise lowering.PythonSyntaxError("iter() takes exactly 1 argument")
+            raise lowering.BuildError("iter() takes exactly 1 argument")
         return state.current_frame.push(
             Iter(state.lower(node.args[0]).expect_one()),
         )
 
     def lower_Call_next(self, state: lowering.State, node: Call) -> lowering.Result:
         if len(node.args) == 2:
-            raise lowering.PythonSyntaxError(
+            raise lowering.BuildError(
                 "next() does not throw StopIteration inside kernel"
             )
         if len(node.args) != 1:
-            raise lowering.PythonSyntaxError("next() takes exactly 1 argument")
+            raise lowering.BuildError("next() takes exactly 1 argument")
 
         return state.current_frame.push(
             Next(state.lower(node.args[0]).expect_one()),

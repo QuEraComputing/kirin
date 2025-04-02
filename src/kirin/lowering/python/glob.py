@@ -6,10 +6,10 @@ from typing import Any
 from dataclasses import dataclass
 
 from kirin.lowering.frame import Frame
-from kirin.lowering.exception import PythonSyntaxError
+from kirin.lowering.exception import BuildError
 
 
-class GlobalEvalError(PythonSyntaxError):
+class GlobalEvalError(BuildError):
     """Exception raised when a global expression cannot be evaluated."""
 
     pass

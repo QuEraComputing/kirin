@@ -9,7 +9,7 @@ from kirin import ir
 from kirin.decl import fields
 from kirin.lowering.abc import Result
 from kirin.lowering.state import State
-from kirin.lowering.exception import PythonSyntaxError
+from kirin.lowering.exception import BuildError
 
 ASTNode = TypeVar("ASTNode", bound=ast.AST)
 StmtType = TypeVar("StmtType", bound="ir.Statement")
@@ -42,7 +42,7 @@ class PythonLoweringTrait(ir.Trait[ir.Statement], Generic[StmtType, ASTNode]):
             - The second dictionary contains the keyword arguments and their values.
 
         Raises:
-            DialectLoweringError: If the Python call cannot be lowered to the statement.
+            lowering.BuildError: If the Python call cannot be lowered to the statement.
         """
         fs = fields(stmt)
         stmt_std_arg_names = fs.std_args.keys()
@@ -55,11 +55,11 @@ class PythonLoweringTrait(ir.Trait[ir.Statement], Generic[StmtType, ASTNode]):
             cls.__parse_arg(state, stmt_group_arg_names, args, name, value)
         for kw in node.keywords:
             if not isinstance(kw.arg, str):
-                raise PythonSyntaxError("Expected string for keyword argument name")
+                raise BuildError("Expected string for keyword argument name")
 
             arg: str = kw.arg
             if arg in node.args:
-                raise PythonSyntaxError(
+                raise BuildError(
                     f"Keyword argument {arg} is already present in positional arguments"
                 )
             elif arg in stmt_std_arg_names or arg in stmt_kw_args_name:
@@ -69,7 +69,7 @@ class PythonLoweringTrait(ir.Trait[ir.Statement], Generic[StmtType, ASTNode]):
                     isinstance(kw.value, ast.Name)
                     and state.current_frame.get_local(kw.value.id) is not None
                 ):
-                    raise PythonSyntaxError(
+                    raise BuildError(
                         f"Expected global/constant value for attribute or property {arg}"
                     )
                 global_value = state.get_global(kw.value)
@@ -81,13 +81,13 @@ class PythonLoweringTrait(ir.Trait[ir.Statement], Generic[StmtType, ASTNode]):
                             get_origin(decl.annotation) or decl.annotation
                         )
                 else:
-                    raise PythonSyntaxError(f"Unexpected attribute or property {arg}")
+                    raise BuildError(f"Unexpected attribute or property {arg}")
             else:
-                raise PythonSyntaxError(f"Unexpected keyword argument {arg}")
+                raise BuildError(f"Unexpected keyword argument {arg}")
 
         for name in stmt_required_names:
             if name not in args and name not in kwargs:
-                raise PythonSyntaxError(f"Missing required argument {name}")
+                raise BuildError(f"Missing required argument {name}")
 
         return args, kwargs
 
@@ -102,7 +102,7 @@ class PythonLoweringTrait(ir.Trait[ir.Statement], Generic[StmtType, ASTNode]):
     ):
         if name in group_names:
             if not isinstance(value, ast.Tuple):
-                raise PythonSyntaxError(f"Expected tuple for group argument {name}")
+                raise BuildError(f"Expected tuple for group argument {name}")
             target[name] = tuple(state.lower(elem).expect_one() for elem in value.elts)
         else:
             target[name] = state.lower(value).expect_one()
@@ -160,7 +160,7 @@ class FromPythonRangeLike(FromPythonCall[StatementType]):
             stop = state.lower(node.args[1]).expect_one()
             step = state.lower(node.args[2]).expect_one()
         else:
-            raise PythonSyntaxError("range() takes 1-3 arguments")
+            raise BuildError("range() takes 1-3 arguments")
 
         return state.current_frame.push(stmt(start, stop, step))  # type: ignore
 
@@ -206,16 +206,14 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
 
         fs = fields(stmt)
         if len(fs.regions) != 1:
-            raise PythonSyntaxError(
-                "Expected exactly one region in statement declaration"
-            )
+            raise BuildError("Expected exactly one region in statement declaration")
 
         if len(node.items) != 1:
-            raise PythonSyntaxError("Expected exactly one item in statement")
+            raise BuildError("Expected exactly one item in statement")
 
         item, body = node.items[0], node.body
         if not isinstance(item.context_expr, ast.Call):
-            raise PythonSyntaxError(
+            raise BuildError(
                 f"Expected context expression to be a call for with {stmt.name}"
             )
 
@@ -241,7 +239,7 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
             with state.frame(body, finalize_next=False) as body_frame:
                 body_frame.exhaust()
                 if len(body_frame.curr_region.blocks) != 1:
-                    raise PythonSyntaxError(
+                    raise BuildError(
                         f"Expected exactly one block in region {region_name}"
                     )
                 body_frame.curr_region.blocks[0].stmts.append(
@@ -249,7 +247,7 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
                 )
 
                 if len(body_frame.curr_region.blocks) != 1:
-                    raise PythonSyntaxError(
+                    raise BuildError(
                         f"Expected exactly one block in region {region_name}"
                     )
 
@@ -259,7 +257,7 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
         if len(results) == 0:
             return
         elif len(results) > 1:
-            raise PythonSyntaxError(
+            raise BuildError(
                 f"Expected exactly one result or no result from statement {stmt.name}"
             )
 

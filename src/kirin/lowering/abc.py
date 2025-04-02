@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from kirin.ir import SSAValue, Statement, DialectGroup
 
-from .exception import PythonSyntaxError
+from .exception import BuildError
 
 if TYPE_CHECKING:
     from .state import State
@@ -65,7 +65,7 @@ class LoweringABC(ABC, Generic[ASTNodeType]):
                 This is equivalent to returning `stmt.results[0]`.
             None: If the node cannot be assigned to a variable syntax-wise.
         Raises:
-            DialectLoweringError: if the node cannot be lowered.
+            lowering.BuildError: if the node cannot be lowered.
         """
         ...
 
@@ -80,7 +80,7 @@ class LoweringABC(ABC, Generic[ASTNodeType]):
 
         def expect(self, typ: type[ExpectT]) -> ExpectT:
             if not isinstance(self.data, typ):
-                raise PythonSyntaxError(f"expected {typ}, got {type(self.data)}")
+                raise BuildError(f"expected {typ}, got {type(self.data)}")
             return self.data
 
     @abstractmethod
@@ -107,5 +107,5 @@ class LoweringABC(ABC, Generic[ASTNodeType]):
         """
         try:
             return self.lower_global(state, node)
-        except PythonSyntaxError:
+        except BuildError:
             return None

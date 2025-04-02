@@ -48,7 +48,7 @@ class PythonLowering(lowering.FromPythonAST):
             case ast.Or():
                 boolop = Or
             case _:
-                raise lowering.PythonSyntaxError(f"unsupported boolop {node.op}")
+                raise lowering.BuildError(f"unsupported boolop {node.op}")
 
         for value in node.values[1:]:
             lhs = state.current_frame.push(

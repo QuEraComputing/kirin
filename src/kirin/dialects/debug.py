@@ -13,7 +13,7 @@ class InfoLowering(lowering.FromPythonCall):
         self, stmt: type, state: lowering.State, node: ast.Call
     ) -> lowering.Result:
         if len(node.args) == 0:
-            raise lowering.PythonSyntaxError("info() requires at least one argument")
+            raise lowering.BuildError("info() requires at least one argument")
 
         msg = state.lower(node.args[0]).expect_one()
         if len(node.args) > 1:

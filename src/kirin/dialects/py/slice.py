@@ -112,6 +112,6 @@ def _lower_slice(state: lowering.State, node: ast.Call) -> lowering.Result:
         stop = state.lower(node.args[1]).expect_one()
         step = state.lower(node.args[2]).expect_one()
     else:
-        raise lowering.PythonSyntaxError("slice() takes 1-3 arguments")
+        raise lowering.BuildError("slice() takes 1-3 arguments")
 
     return state.current_frame.push(Slice(start, stop, step))

@@ -26,7 +26,7 @@ def test_closure():
 
         return inner
 
-    with pytest.raises(lowering.PythonSyntaxError):
+    with pytest.raises(lowering.BuildError):
         lower.python_function(will_error)
 
 

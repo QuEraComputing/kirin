@@ -35,7 +35,7 @@ class Lowering(lowering.FromPythonAST):
         args: list[ir.SSAValue] = []
         for arg in node.args:
             if isinstance(arg, ast.Starred):  # TODO: support *args
-                raise lowering.PythonSyntaxError("starred arguments are not supported")
+                raise lowering.BuildError("starred arguments are not supported")
             else:
                 args.append(state.lower(arg).expect_one())
 
