@@ -45,7 +45,6 @@ def test_nested_loop_with_if():
         return x
 
     frame, ret = prop.run_analysis(main)
-    main.print(analysis=frame.entries)
     assert isinstance(ret, const.Value)
     assert ret.data == 3
     assert frame.frame_is_not_pure is False

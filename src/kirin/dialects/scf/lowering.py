@@ -15,13 +15,13 @@ class Lowering(lowering2.FromPythonAST):
         cond = state.lower(node.test).expect_one()
         frame = state.current_frame
 
-        with state.frame(node.body) as body_frame:
+        with state.frame(node.body, finalize_next=False) as body_frame:
             then_cond = body_frame.curr_block.args.append_from(types.Bool, cond.name)
             if cond.name:
                 body_frame.defs[cond.name] = then_cond
             body_frame.exhaust()
 
-        with state.frame(node.orelse) as else_frame:
+        with state.frame(node.orelse, finalize_next=False) as else_frame:
             else_cond = else_frame.curr_block.args.append_from(types.Bool, cond.name)
             if cond.name:
                 else_frame.defs[cond.name] = else_cond
@@ -84,7 +84,9 @@ class Lowering(lowering2.FromPythonAST):
             return frame.curr_block.args.append_from(capture.type, capture.name)
 
         with state.frame(
-            node.body, capture_callback=new_block_arg_if_inside_loop
+            node.body,
+            capture_callback=new_block_arg_if_inside_loop,
+            finalize_next=False,
         ) as body_frame:
             loop_var = body_frame.curr_block.args.append_from(types.Any)
             unpacking(state, node.target, loop_var)
