@@ -1,4 +1,4 @@
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 
 from ._dialect import dialect
@@ -8,7 +8,7 @@ T = types.TypeVar("T")
 
 @statement
 class UnaryOp(ir.Statement):
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(T, print=False)
     result: ir.ResultValue = info.result(T)
 

@@ -16,15 +16,15 @@ py = ir.Dialect("lowering.range.py")
 class PyLowering(lowering.FromPythonAST):
 
     def lower_Call_range(
-        self, state: lowering.LoweringState, node: ast.Call
+        self, state: lowering.State, node: ast.Call
     ) -> lowering.Result:
-        return ir.FromPythonRangeLike().lower(PyRange, state, node)
+        return lowering.FromPythonRangeLike().lower(PyRange, state, node)
 
 
 @ilist.register
 class IListLowering(lowering.FromPythonAST):
 
     def lower_Call_range(
-        self, state: lowering.LoweringState, node: ast.Call
+        self, state: lowering.State, node: ast.Call
     ) -> lowering.Result:
-        return ir.FromPythonRangeLike().lower(IListRange, state, node)
+        return lowering.FromPythonRangeLike().lower(IListRange, state, node)

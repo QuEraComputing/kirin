@@ -13,7 +13,7 @@ T = TypeVar("T")
 if TYPE_CHECKING:
     from kirin.types import PyClass
     from kirin.interp.table import MethodTable
-    from kirin.lowering.dialect import FromPythonAST
+    from kirin.lowering.python.dialect import FromPythonAST
 
 
 # TODO: add an option to generate default lowering at dialect construction
@@ -45,7 +45,7 @@ class Dialect:
     )
 
     def __post_init__(self) -> None:
-        from kirin.lowering.dialect import NoSpecialLowering
+        from kirin.lowering.python.dialect import NoSpecialLowering
 
         self.lowering["default"] = NoSpecialLowering()
 
@@ -92,7 +92,7 @@ class Dialect:
 
         """
         from kirin.interp.table import MethodTable
-        from kirin.lowering.dialect import FromPythonAST
+        from kirin.lowering.python.dialect import FromPythonAST
 
         if key is None:
             key = "main"

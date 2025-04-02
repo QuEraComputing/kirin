@@ -9,11 +9,7 @@ There are also some basic traits that are provided for convenience, such as
 `IsolatedFromAbove`.
 """
 
-from .abc import (
-    Trait as Trait,
-    RegionTrait as RegionTrait,
-    PythonLoweringTrait as PythonLoweringTrait,
-)
+from .abc import Trait as Trait, RegionTrait as RegionTrait
 from .basic import (
     Pure as Pure,
     HasParent as HasParent,
@@ -28,12 +24,4 @@ from .callable import (
     HasSignature as HasSignature,
     CallableStmtInterface as CallableStmtInterface,
 )
-from .lowering.call import (
-    FromPythonCall as FromPythonCall,
-    FromPythonRangeLike as FromPythonRangeLike,
-)
 from .region.ssacfg import SSACFGRegion as SSACFGRegion
-from .lowering.context import (
-    FromPythonWith as FromPythonWith,
-    FromPythonWithSingleItem as FromPythonWithSingleItem,
-)

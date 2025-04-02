@@ -2,27 +2,25 @@ import ast
 
 import rich
 
-from kirin import ir, decl, types, interp, lowering, exceptions
+from kirin import ir, decl, types, interp, lowering
 
 dialect = ir.Dialect("debug")
 
 
-class InfoLowering(ir.FromPythonCall):
+class InfoLowering(lowering.FromPythonCall):
 
     def lower(
-        self, stmt: type, state: lowering.LoweringState, node: ast.Call
+        self, stmt: type, state: lowering.State, node: ast.Call
     ) -> lowering.Result:
         if len(node.args) == 0:
-            raise exceptions.DialectLoweringError(
-                "info() requires at least one argument"
-            )
+            raise lowering.BuildError("info() requires at least one argument")
 
-        msg = state.visit(node.args[0]).expect_one()
+        msg = state.lower(node.args[0]).expect_one()
         if len(node.args) > 1:
-            inputs = tuple(state.visit(arg).expect_one() for arg in node.args[1:])
+            inputs = tuple(state.lower(arg).expect_one() for arg in node.args[1:])
         else:
             inputs = ()
-        return lowering.Result(state.append_stmt(Info(msg=msg, inputs=inputs)))
+        state.current_frame.push(Info(msg=msg, inputs=inputs))
 
 
 @decl.statement(dialect=dialect)

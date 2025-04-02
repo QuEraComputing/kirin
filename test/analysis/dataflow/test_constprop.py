@@ -1,4 +1,4 @@
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.analysis import const
@@ -211,7 +211,7 @@ dummy_dialect = ir.Dialect("dummy")
 @statement(dialect=dummy_dialect)
 class DummyStatement(ir.Statement):
     name = "dummy"
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
 
 
 def test_intraprocedure_side_effect():
@@ -280,7 +280,7 @@ def test_closure_prop():
     @statement(dialect=dialect)
     class DummyStmt2(ir.Statement):
         name = "dummy2"
-        traits = frozenset({ir.FromPythonCall()})
+        traits = frozenset({lowering.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
         result: ir.ResultValue = info.result(types.Int)
 

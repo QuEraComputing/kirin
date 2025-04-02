@@ -41,19 +41,18 @@ class Assert(ir.Statement):
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
-    def lower_Assert(
-        self, state: lowering.LoweringState, node: ast.Assert
-    ) -> lowering.Result:
+    def lower_Assert(self, state: lowering.State, node: ast.Assert) -> lowering.Result:
         from kirin.dialects.py.constant import Constant
 
-        cond = state.visit(node.test).expect_one()
+        cond = state.lower(node.test).expect_one()
         if node.msg:
-            message = state.visit(node.msg).expect_one()
-            state.append_stmt(Assert(condition=cond, message=message))
+            message = state.lower(node.msg).expect_one()
+            state.current_frame.push(Assert(condition=cond, message=message))
         else:
-            message_stmt = state.append_stmt(Constant(""))
-            state.append_stmt(Assert(condition=cond, message=message_stmt.result))
-        return lowering.Result()
+            message_stmt = state.current_frame.push(Constant(""))
+            state.current_frame.push(
+                Assert(condition=cond, message=message_stmt.result)
+            )
 
 
 @dialect.register

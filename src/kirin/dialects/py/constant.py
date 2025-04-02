@@ -26,7 +26,7 @@ T = TypeVar("T", covariant=True)
 @statement(dialect=dialect)
 class Constant(ir.Statement, Generic[T]):
     name = "constant"
-    traits = frozenset({ir.Pure(), ir.ConstantLike(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), ir.ConstantLike(), lowering.FromPythonCall()})
     value: ir.Data[T] = info.attribute()
     result: ir.ResultValue = info.result()
 
@@ -61,9 +61,11 @@ class Constant(ir.Statement, Generic[T]):
 class Lowering(lowering.FromPythonAST):
 
     def lower_Constant(
-        self, state: lowering.LoweringState, node: ast.Constant
+        self, state: lowering.State, node: ast.Constant
     ) -> lowering.Result:
-        return lowering.Result(state.append_stmt(Constant(node.value)))
+        return state.current_frame.push(
+            Constant(node.value),
+        )
 
 
 @dialect.register

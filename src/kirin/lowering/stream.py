@@ -27,9 +27,6 @@ class StmtStream(Generic[Stmt]):
     def peek(self):
         return self.stmts[self.cursor]
 
-    def has_next(self):
-        return self.cursor < len(self.stmts)
-
     def split(self) -> "StmtStream":
         cursor = self.cursor
         self.cursor = len(self.stmts)
@@ -49,5 +46,5 @@ class StmtStream(Generic[Stmt]):
         self.cursor += 1
         return stmt
 
-    def is_empty(self):
-        return self.cursor == len(self.stmts)
+    def __bool__(self):
+        return self.cursor < len(self.stmts)

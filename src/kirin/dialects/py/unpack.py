@@ -14,7 +14,6 @@ import ast
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
-from kirin.exceptions import DialectLoweringError
 
 dialect = ir.Dialect("py.unpack")
 
@@ -65,13 +64,13 @@ class TypeInfer(interp.MethodTable):
         return tuple(types.Any for _ in stmt.names)
 
 
-def unpacking(state: lowering.LoweringState, node: ast.expr, value: ir.SSAValue):
+def unpacking(state: lowering.State, node: ast.expr, value: ir.SSAValue):
     if isinstance(node, ast.Name):
         state.current_frame.defs[node.id] = value
         value.name = node.id
         return
     elif not isinstance(node, ast.Tuple):
-        raise DialectLoweringError(f"unsupported unpack node {node}")
+        raise lowering.BuildError(f"unsupported unpack node {node}")
 
     names: list[str | None] = []
     continue_unpack: list[int] = []
@@ -81,7 +80,7 @@ def unpacking(state: lowering.LoweringState, node: ast.expr, value: ir.SSAValue)
         else:
             names.append(None)
             continue_unpack.append(idx)
-    stmt = state.append_stmt(Unpack(value, tuple(names)))
+    stmt = state.current_frame.push(Unpack(value, tuple(names)))
     for name, result in zip(names, stmt.results):
         if name is not None:
             state.current_frame.defs[name] = result

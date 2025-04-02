@@ -136,8 +136,8 @@ def test_cfg_pass_around():
         else:
             pass
 
-    lower = lowering.Lowering(basic_no_opt)
-    code = lower.run(main, compactify=False)
+    lower = lowering.Python(basic_no_opt)
+    code = lower.python_function(main, compactify=False)
     assert isinstance(code, func.Function)
 
     cfg = CFG(code.body)

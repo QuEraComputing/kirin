@@ -23,7 +23,7 @@ T = types.TypeVar("T", bound=types.Int | types.Float)
 @statement(dialect=dialect)
 class Abs(ir.Statement):
     name = "abs"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(T, print=False)
     result: ir.ResultValue = info.result(T)
 
@@ -31,7 +31,7 @@ class Abs(ir.Statement):
 @statement(dialect=dialect)
 class Sum(ir.Statement):
     name = "sum"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Any, print=False)
     result: ir.ResultValue = info.result(types.Any)
 
@@ -39,19 +39,11 @@ class Sum(ir.Statement):
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
-    def lower_Call_abs(
-        self, state: lowering.LoweringState, node: Call
-    ) -> lowering.Result:
-        return lowering.Result(
-            state.append_stmt(Abs(state.visit(node.args[0]).expect_one()))
-        )
+    def lower_Call_abs(self, state: lowering.State, node: Call) -> lowering.Result:
+        return state.current_frame.push(Abs(state.lower(node.args[0]).expect_one()))
 
-    def lower_Call_sum(
-        self, state: lowering.LoweringState, node: Call
-    ) -> lowering.Result:
-        return lowering.Result(
-            state.append_stmt(Sum(state.visit(node.args[0]).expect_one()))
-        )
+    def lower_Call_sum(self, state: lowering.State, node: Call) -> lowering.Result:
+        return state.current_frame.push(Sum(state.lower(node.args[0]).expect_one()))
 
 
 @dialect.register

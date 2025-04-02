@@ -1,9 +1,8 @@
-from kirin import types
+from kirin import types, lowering
 from kirin.dialects import cf, py, func
-from kirin.lowering import Lowering
 from kirin.dialects.lowering import func as func_lowering
 
-lowering = Lowering([cf, func, py.base, py.list, py.assign, func_lowering])
+lower = lowering.Python([cf, func, py.base, py.list, py.assign, func_lowering])
 
 
 def test_empty_list():
@@ -12,7 +11,7 @@ def test_empty_list():
         x = []
         return x
 
-    code = lowering.run(empty_list)
+    code = lower.python_function(empty_list)
 
     list_stmt = code.body.blocks[0].stmts.at(0)  # type: ignore
 

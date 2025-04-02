@@ -1,6 +1,6 @@
 # type: ignore
 
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic, basic_no_opt
 from kirin.dialects.py import cmp
@@ -11,7 +11,7 @@ dialect = ir.Dialect("dummy2")
 @statement(dialect=dialect)
 class DummyStmt2(ir.Statement):
     name = "dummy2"
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Int)
     option: ir.PyAttr[str] = info.attribute()
     result: ir.ResultValue = info.result(types.Int)

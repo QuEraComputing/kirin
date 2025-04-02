@@ -11,7 +11,7 @@ This dialects maps Python assignment syntax.
 
 import ast
 
-from kirin import ir, types, interp, lowering, exceptions
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
 
@@ -23,7 +23,7 @@ T = types.TypeVar("T")
 @statement(dialect=dialect)
 class Alias(ir.Statement):
     name = "alias"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(T)
     target: ir.PyAttr[str] = info.attribute()
     result: ir.ResultValue = info.result(T)
@@ -43,7 +43,7 @@ class Alias(ir.Statement):
 @statement(dialect=dialect)
 class SetItem(ir.Statement):
     name = "setitem"
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     value: ir.SSAValue = info.argument(print=False)
     index: ir.SSAValue = info.argument(print=False)
@@ -65,26 +65,20 @@ class Concrete(interp.MethodTable):
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
-    def lower_Assign(
-        self, state: lowering.LoweringState, node: ast.Assign
-    ) -> lowering.Result:
-        results: lowering.Result = state.visit(node.value)
-        assert len(node.targets) == len(
-            results
-        ), "number of targets and results do not match"
-
+    def lower_Assign(self, state: lowering.State, node: ast.Assign) -> lowering.Result:
+        result = state.lower(node.value)
         current_frame = state.current_frame
         match node:
             case ast.Assign(
                 targets=[ast.Name(lhs_name, ast.Store())], value=ast.Name(_, ast.Load())
             ):
                 stmt = Alias(
-                    value=results[0], target=ir.PyAttr(lhs_name)
+                    value=result.data[0], target=ir.PyAttr(lhs_name)
                 )  # NOTE: this is guaranteed to be one result
                 stmt.result.name = lhs_name
-                current_frame.defs[lhs_name] = state.append_stmt(stmt).result
+                current_frame.defs[lhs_name] = current_frame.push(stmt).result
             case _:
-                for target, value in zip(node.targets, results.values):
+                for target, value in zip(node.targets, result.data):
                     match target:
                         # NOTE: if the name exists new ssa value will be
                         # used in the future to shadow the old one
@@ -92,12 +86,9 @@ class Lowering(lowering.FromPythonAST):
                             value.name = name
                             current_frame.defs[name] = value
                         case ast.Subscript(obj, slice):
-                            obj = state.visit(obj).expect_one()
-                            slice = state.visit(slice).expect_one()
+                            obj = state.lower(obj).expect_one()
+                            slice = state.lower(slice).expect_one()
                             stmt = SetItem(obj=obj, index=slice, value=value)
-                            state.append_stmt(stmt)
+                            current_frame.push(stmt)
                         case _:
-                            raise exceptions.DialectLoweringError(
-                                f"unsupported target {target}"
-                            )
-        return lowering.Result()  # python assign does not have value
+                            raise lowering.BuildError(f"unsupported target {target}")

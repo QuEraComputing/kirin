@@ -19,7 +19,7 @@ dialect = ir.Dialect("py.len")
 @statement(dialect=dialect)
 class Len(ir.Statement):
     name = "len"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Any)
     result: ir.ResultValue = info.result(types.Int)
 
@@ -49,9 +49,5 @@ class ConstProp(interp.MethodTable):
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
-    def lower_Call_len(
-        self, state: lowering.LoweringState, node: ast.Call
-    ) -> lowering.Result:
-        return lowering.Result(
-            state.append_stmt(Len(value=state.visit(node.args[0]).expect_one()))
-        )
+    def lower_Call_len(self, state: lowering.State, node: ast.Call) -> lowering.Result:
+        return state.current_frame.push(Len(state.lower(node.args[0]).expect_one()))

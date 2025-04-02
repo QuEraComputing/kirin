@@ -2,7 +2,6 @@ import ast
 
 from kirin import ir, types, lowering
 from kirin.dialects import cf, func
-from kirin.exceptions import DialectLoweringError
 
 dialect = ir.Dialect("lowering.func")
 
@@ -10,20 +9,18 @@ dialect = ir.Dialect("lowering.func")
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
-    def lower_Return(
-        self, state: lowering.LoweringState, node: ast.Return
-    ) -> lowering.Result:
+    def lower_Return(self, state: lowering.State, node: ast.Return) -> lowering.Result:
         if node.value is None:
-            stmt = func.Return(state.append_stmt(func.ConstantNone()).result)
-            state.append_stmt(stmt)
+            state.current_frame.push(
+                func.Return(state.current_frame.push(func.ConstantNone()).result)
+            )
         else:
-            result = state.visit(node.value).expect_one()
+            result = state.lower(node.value).expect_one()
             stmt = func.Return(result)
-            state.append_stmt(stmt)
-        return lowering.Result()
+            state.current_frame.push(stmt)
 
     def lower_FunctionDef(
-        self, state: lowering.LoweringState, node: ast.FunctionDef
+        self, state: lowering.State[ast.AST], node: ast.FunctionDef
     ) -> lowering.Result:
         self.assert_simple_arguments(node.args)
         signature = func.Signature(
@@ -59,49 +56,46 @@ class Lowering(lowering.FromPythonAST):
                 entr_block.stmts.append(stmt)
             return stmt.result
 
-        func_frame = state.push_frame(
-            lowering.Frame.from_stmts(
-                node.body,
-                state,
-                entr_block=entr_block,
-                globals=frame.globals,
-                capture_callback=callback,
-            )
-        )
-        func_frame.defs.update(entries)
-        state.exhaust()
+        with state.frame(
+            node.body, entr_block=entr_block, capture_callback=callback
+        ) as func_frame:
+            func_frame.defs.update(entries)
+            func_frame.exhaust()
 
-        for block in func_frame.curr_region.blocks:
-            if not block.last_stmt or not block.last_stmt.has_trait(ir.IsTerminator):
-                block.stmts.append(
-                    cf.Branch(arguments=(), successor=func_frame.next_block)
-                )
+            for block in func_frame.curr_region.blocks:
+                if not block.last_stmt or not block.last_stmt.has_trait(
+                    ir.IsTerminator
+                ):
+                    block.stmts.append(
+                        cf.Branch(arguments=(), successor=func_frame.next_block)
+                    )
 
-        none_stmt = func.ConstantNone()
-        rtrn_stmt = func.Return(none_stmt.result)
-        func_frame.next_block.stmts.append(none_stmt)
-        func_frame.next_block.stmts.append(rtrn_stmt)
-        state.pop_frame()
+            none_stmt = func.ConstantNone()
+            rtrn_stmt = func.Return(none_stmt.result)
+            func_frame.next_block.stmts.append(none_stmt)
+            func_frame.next_block.stmts.append(rtrn_stmt)
 
         if state.current_frame.parent is None:  # toplevel function
-            stmt = frame.append_stmt(
+            # TODO: allow a return value from function
+            # and assign it to the function symbol
+            frame.push(
                 func.Function(
                     sym_name=node.name,
                     signature=signature,
                     body=func_frame.curr_region,
                 )
             )
-            return lowering.Result(stmt)
+            return
 
         if node.decorator_list:
-            raise DialectLoweringError(
+            raise lowering.BuildError(
                 "decorators are not supported on nested functions"
             )
 
         # nested function, lookup unknown variables
         first_stmt = func_frame.curr_region.blocks[0].first_stmt
         if first_stmt is None:
-            raise DialectLoweringError("empty function body")
+            raise lowering.BuildError("empty function body")
 
         captured = [value for value in func_frame.captures.values()]
         lambda_stmt = func.Lambda(
@@ -111,24 +105,26 @@ class Lowering(lowering.FromPythonAST):
             body=func_frame.curr_region,
         )
         lambda_stmt.result.name = node.name
+        frame.push(lambda_stmt)
         # NOTE: Python automatically assigns the lambda to the name
-        frame.defs[node.name] = frame.append_stmt(lambda_stmt).result
-        return lowering.Result(lambda_stmt)
+        frame.defs[node.name] = lambda_stmt.result
 
     def assert_simple_arguments(self, node: ast.arguments) -> None:
         if node.kwonlyargs:
-            raise DialectLoweringError("keyword-only arguments are not supported")
+            raise lowering.BuildError("keyword-only arguments are not supported")
 
         if node.posonlyargs:
-            raise DialectLoweringError("positional-only arguments are not supported")
+            raise lowering.BuildError("positional-only arguments are not supported")
 
     @staticmethod
-    def get_hint(state: lowering.LoweringState, node: ast.expr | None):
+    def get_hint(state: lowering.State, node: ast.expr | None):
         if node is None:
             return types.Any
 
         try:
-            t = state.get_global(node).unwrap()
+            t = state.get_global(node).data
             return types.hint2type(t)
-        except:  # noqa: E722
-            raise DialectLoweringError(f"expect a type hint, got {ast.unparse(node)}")
+        except Exception as e:  # noqa: E722
+            raise lowering.BuildError(
+                f"expect a type hint, got {ast.unparse(node)}"
+            ) from e

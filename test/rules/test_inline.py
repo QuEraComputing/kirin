@@ -1,5 +1,5 @@
 # type: ignore
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 from kirin.passes import Fold
 from kirin.prelude import basic_no_opt
@@ -94,7 +94,7 @@ def test_inline_single_entry():
     @statement(dialect=dialect)
     class DummyStmtWithSiteEffect(ir.Statement):
         name = "dummy2"
-        traits = frozenset({ir.FromPythonCall()})
+        traits = frozenset({lowering.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
         option: str = info.attribute()
         # result: ir.ResultValue = info.result(types.Int)
@@ -131,7 +131,7 @@ def test_inline_non_foldable_closure():
     @statement(dialect=dialect)
     class DummyStmt2(ir.Statement):
         name = "dummy2"
-        traits = frozenset({ir.FromPythonCall()})
+        traits = frozenset({lowering.FromPythonCall()})
         value: ir.SSAValue = info.argument(types.Int)
         option: str = info.attribute()
         result: ir.ResultValue = info.result(types.Int)
