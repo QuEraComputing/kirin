@@ -1,4 +1,4 @@
-from kirin import ir, types, lowering
+from kirin import ir, types, lowering2
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Chain, Fixpoint, compactify
 from kirin.analysis import CFG
@@ -136,8 +136,8 @@ def test_cfg_pass_around():
         else:
             pass
 
-    lower = lowering.Lowering(basic_no_opt)
-    code = lower.run(main, compactify=False)
+    lower = lowering2.PythonLowering(basic_no_opt)
+    code = lower.python_function(main, compactify=False)
     assert isinstance(code, func.Function)
 
     cfg = CFG(code.body)

@@ -301,6 +301,7 @@ class PythonLowering(LoweringABC[ast.AST]):
 
         console = Console(force_terminal=True)
         with console.capture() as capture:
+            console.print()
             for lineno, line in enumerate(lines, begin):
                 line = " " * self.hint_indent + line[code_indent:]
                 if self.hint_lineno:
