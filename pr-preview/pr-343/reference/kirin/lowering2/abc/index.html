@@ -6,9 +6,7 @@
 </code></pre></div> <div class="doc doc-contents "> <p>dialects to lower to</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.lowering2.abc.LoweringABC.lower_global class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_global</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_global</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>],</span> <span class=n>node</span><span class=p>:</span> <span class=n>ASTNodeType</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>LoweringABC</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Transform a given global expression to a SSAValue.</p> <p>This method is overridden by the subclass to transform a given global AST expression to a value as <code>LoweringABC.Result</code>.</p> <p>The subclass must implement this method to transform a given global AST expression to a SSAValue.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering2/abc.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>84</span>
-<span class=normal>85</span>
-<span class=normal>86</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Transform a given global expression to a SSAValue.</p> <p>This method is overridden by the subclass to transform a given global AST expression to a value as <code>LoweringABC.Result</code>.</p> <p>The subclass must implement this method to transform a given global AST expression to a SSAValue.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering2/abc.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>86</span>
 <span class=normal>87</span>
 <span class=normal>88</span>
 <span class=normal>89</span>
@@ -18,7 +16,9 @@
 <span class=normal>93</span>
 <span class=normal>94</span>
 <span class=normal>95</span>
-<span class=normal>96</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
+<span class=normal>96</span>
+<span class=normal>97</span>
+<span class=normal>98</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
 <span class=k>def</span> <span class=nf>lower_global</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>],</span> <span class=n>node</span><span class=p>:</span> <span class=n>ASTNodeType</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>LoweringABC</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
@@ -34,9 +34,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.lowering2.abc.LoweringABC.lower_global_no_raise class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_global_no_raise</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_global_no_raise</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>],</span> <span class=n>node</span><span class=p>:</span> <span class=n>ASTNodeType</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>LoweringABC</span><span class=o>.</span><span class=n>Result</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Transform a given global expression to a SSAValue.</p> <p>This method can be overridden by the subclass to transform a given global AST expression to a SSAValue.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering2/abc.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 98</span>
-<span class=normal> 99</span>
-<span class=normal>100</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Transform a given global expression to a SSAValue.</p> <p>This method can be overridden by the subclass to transform a given global AST expression to a SSAValue.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering2/abc.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>100</span>
 <span class=normal>101</span>
 <span class=normal>102</span>
 <span class=normal>103</span>
@@ -45,7 +43,9 @@
 <span class=normal>106</span>
 <span class=normal>107</span>
 <span class=normal>108</span>
-<span class=normal>109</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_global_no_raise</span><span class=p>(</span>
+<span class=normal>109</span>
+<span class=normal>110</span>
+<span class=normal>111</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_global_no_raise</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>],</span> <span class=n>node</span><span class=p>:</span> <span class=n>ASTNodeType</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>LoweringABC</span><span class=o>.</span><span class=n>Result</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Transform a given global expression to a SSAValue.</span>
@@ -60,9 +60,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.lowering2.abc.LoweringABC.visit class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">visit</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>visit</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>],</span> <span class=n>node</span><span class=p>:</span> <span class=n>ASTNodeType</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Entry point of AST visitors.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>state</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.lowering2.state.State" href="../state/#kirin.lowering2.state.State">State</a>[<span title="kirin.lowering2.abc.ASTNodeType">ASTNodeType</span>]</code> </td> <td> <div class=doc-md-description> <p>lowering state</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>node</code> </td> <td> <code><span title="kirin.lowering2.abc.ASTNodeType">ASTNodeType</span></code> </td> <td> <div class=doc-md-description> <p>AST node to be lowered</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p>Returns: SSAValue: if the node can be assigned to a variable syntax-wise, what is the <code>SSAValue</code>. Statement: if the node is a single statement that has a single result value. This is equivalent to returning <code>stmt.results[0]</code>. None: If the node cannot be assigned to a variable syntax-wise. Raises: DialectLoweringError: if the node cannot be lowered.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering2/abc.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>52</span>
-<span class=normal>53</span>
-<span class=normal>54</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Entry point of AST visitors.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>state</code> </td> <td> <code><a class="autorefs autorefs-internal" title="kirin.lowering2.state.State" href="../state/#kirin.lowering2.state.State">State</a>[<span title="kirin.lowering2.abc.ASTNodeType">ASTNodeType</span>]</code> </td> <td> <div class=doc-md-description> <p>lowering state</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>node</code> </td> <td> <code><span title="kirin.lowering2.abc.ASTNodeType">ASTNodeType</span></code> </td> <td> <div class=doc-md-description> <p>AST node to be lowered</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p>Returns: SSAValue: if the node can be assigned to a variable syntax-wise, what is the <code>SSAValue</code>. Statement: if the node is a single statement that has a single result value. This is equivalent to returning <code>stmt.results[0]</code>. None: If the node cannot be assigned to a variable syntax-wise. Raises: DialectLoweringError: if the node cannot be lowered.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering2/abc.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>54</span>
 <span class=normal>55</span>
 <span class=normal>56</span>
 <span class=normal>57</span>
@@ -76,7 +74,9 @@
 <span class=normal>65</span>
 <span class=normal>66</span>
 <span class=normal>67</span>
-<span class=normal>68</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
+<span class=normal>68</span>
+<span class=normal>69</span>
+<span class=normal>70</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@abstractmethod</span>
 <span class=k>def</span> <span class=nf>visit</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>],</span> <span class=n>node</span><span class=p>:</span> <span class=n>ASTNodeType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Entry point of AST visitors.</span>
 
