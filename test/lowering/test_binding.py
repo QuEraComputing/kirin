@@ -1,9 +1,9 @@
-from kirin import lowering2
+from kirin import lowering
 from kirin.prelude import basic_no_opt
 from kirin.dialects import math
 
 
-@lowering2.wraps(math.stmts.sin)
+@lowering.wraps(math.stmts.sin)
 def sin(value: float) -> float: ...
 
 

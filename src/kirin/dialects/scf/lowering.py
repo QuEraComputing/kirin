@@ -1,6 +1,6 @@
 import ast
 
-from kirin import ir, types, lowering2
+from kirin import ir, types, lowering
 from kirin.dialects.py.unpack import unpacking
 
 from .stmts import For, Yield, IfElse
@@ -8,9 +8,9 @@ from ._dialect import dialect
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
-    def lower_If(self, state: lowering2.State, node: ast.If) -> lowering2.Result:
+    def lower_If(self, state: lowering.State, node: ast.If) -> lowering.Result:
         cond = state.lower(node.test).expect_one()
         frame = state.current_frame
 
@@ -42,7 +42,7 @@ class Lowering(lowering2.FromPythonAST):
                     body_yields.append(body_frame[name])
                     value = frame.get(name)
                     if value is None:
-                        raise lowering2.DialectLoweringError(
+                        raise lowering.DialectLoweringError(
                             f"expected value for {name}"
                         )
                     else_yields.append(value)
@@ -72,17 +72,15 @@ class Lowering(lowering2.FromPythonAST):
             frame.defs[name] = result
         state.current_frame.push(stmt)
 
-    def lower_For(self, state: lowering2.State, node: ast.For) -> lowering2.Result:
+    def lower_For(self, state: lowering.State, node: ast.For) -> lowering.Result:
         iter_ = state.lower(node.iter).expect_one()
 
         yields: list[str] = []
         parent_frame = state.current_frame
 
-        def new_block_arg_if_inside_loop(frame: lowering2.Frame, capture: ir.SSAValue):
+        def new_block_arg_if_inside_loop(frame: lowering.Frame, capture: ir.SSAValue):
             if not capture.name:
-                raise lowering2.DialectLoweringError(
-                    "unexpected loop variable captured"
-                )
+                raise lowering.DialectLoweringError("unexpected loop variable captured")
             yields.append(capture.name)
             return frame.curr_block.args.append_from(capture.type, capture.name)
 
@@ -113,7 +111,7 @@ class Lowering(lowering2.FromPythonAST):
         for name in yields:
             value = state.current_frame.get(name)
             if value is None:
-                raise lowering2.DialectLoweringError(f"expected value for {name}")
+                raise lowering.DialectLoweringError(f"expected value for {name}")
             initializers.append(value)
         stmt = For(iter_, body_frame.curr_region, *initializers)
 

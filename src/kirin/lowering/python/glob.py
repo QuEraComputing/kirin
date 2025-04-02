@@ -5,8 +5,8 @@ import builtins
 from typing import Any
 from dataclasses import dataclass
 
-from kirin.lowering2.frame import Frame
-from kirin.lowering2.exception import DialectLoweringError
+from kirin.lowering.frame import Frame
+from kirin.lowering.exception import DialectLoweringError
 
 
 class GlobalEvalError(DialectLoweringError):

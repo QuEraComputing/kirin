@@ -11,10 +11,10 @@ from rich.console import Console
 
 from kirin import ir
 from kirin.source import SourceInfo
-from kirin.lowering2.abc import Result, LoweringABC
-from kirin.lowering2.state import State
-from kirin.lowering2.exception import DialectLoweringError
-from kirin.lowering2.python.dialect import FromPythonAST
+from kirin.lowering.abc import Result, LoweringABC
+from kirin.lowering.state import State
+from kirin.lowering.exception import DialectLoweringError
+from kirin.lowering.python.dialect import FromPythonAST
 
 from .glob import GlobalExprEval
 from .traits import FromPythonCall, FromPythonWithSingleItem

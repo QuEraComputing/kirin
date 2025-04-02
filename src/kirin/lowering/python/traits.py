@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 from kirin import ir
 from kirin.decl import fields
-from kirin.lowering2.abc import Result
-from kirin.lowering2.state import State
-from kirin.lowering2.exception import DialectLoweringError
+from kirin.lowering.abc import Result
+from kirin.lowering.state import State
+from kirin.lowering.exception import DialectLoweringError
 
 ASTNode = TypeVar("ASTNode", bound=ast.AST)
 StmtType = TypeVar("StmtType", bound="ir.Statement")

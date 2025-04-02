@@ -1,4 +1,4 @@
-from kirin import ir, lowering2
+from kirin import ir, lowering
 from kirin.decl import info, statement
 from kirin.prelude import python_no_opt
 from kirin.dialects import cf, py, func
@@ -8,7 +8,7 @@ dialect = ir.Dialect("test")
 
 @statement(dialect=dialect)
 class Adjoint(ir.Statement):
-    traits = frozenset({lowering2.FromPythonWithSingleItem()})
+    traits = frozenset({lowering.FromPythonWithSingleItem()})
     body: ir.Region = info.region()
     result: ir.ResultValue = info.result()
 
@@ -21,7 +21,7 @@ def with_example(x):
 
 
 def test_with_lowering():
-    lower = lowering2.PythonLowering(
+    lower = lowering.PythonLowering(
         python_no_opt.union([cf, func, dialect]), stacktrace=True
     )
     code = lower.python_function(with_example)

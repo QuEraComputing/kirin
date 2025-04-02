@@ -14,7 +14,7 @@ This dialect maps `iter()` and `next()` calls to the `Iter` and `Next` statement
 
 from ast import Call
 
-from kirin import ir, types, interp, lowering2
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 
 dialect = ir.Dialect("py.iterable")
@@ -64,22 +64,22 @@ class TypeInfer(interp.MethodTable):
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
-    def lower_Call_iter(self, state: lowering2.State, node: Call) -> lowering2.Result:
+    def lower_Call_iter(self, state: lowering.State, node: Call) -> lowering.Result:
         if len(node.args) != 1:
-            raise lowering2.DialectLoweringError("iter() takes exactly 1 argument")
+            raise lowering.DialectLoweringError("iter() takes exactly 1 argument")
         return state.current_frame.push(
             Iter(state.lower(node.args[0]).expect_one()),
         )
 
-    def lower_Call_next(self, state: lowering2.State, node: Call) -> lowering2.Result:
+    def lower_Call_next(self, state: lowering.State, node: Call) -> lowering.Result:
         if len(node.args) == 2:
-            raise lowering2.DialectLoweringError(
+            raise lowering.DialectLoweringError(
                 "next() does not throw StopIteration inside kernel"
             )
         if len(node.args) != 1:
-            raise lowering2.DialectLoweringError("next() takes exactly 1 argument")
+            raise lowering.DialectLoweringError("next() takes exactly 1 argument")
 
         return state.current_frame.push(
             Next(state.lower(node.args[0]).expect_one()),

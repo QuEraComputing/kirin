@@ -1,17 +1,15 @@
 import ast
 
-from kirin import ir, types, lowering2
+from kirin import ir, types, lowering
 from kirin.dialects import cf, func
 
 dialect = ir.Dialect("lowering.func")
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
-    def lower_Return(
-        self, state: lowering2.State, node: ast.Return
-    ) -> lowering2.Result:
+    def lower_Return(self, state: lowering.State, node: ast.Return) -> lowering.Result:
         if node.value is None:
             state.current_frame.push(
                 func.Return(state.current_frame.push(func.ConstantNone()).result)
@@ -22,8 +20,8 @@ class Lowering(lowering2.FromPythonAST):
             state.current_frame.push(stmt)
 
     def lower_FunctionDef(
-        self, state: lowering2.State[ast.AST], node: ast.FunctionDef
-    ) -> lowering2.Result:
+        self, state: lowering.State[ast.AST], node: ast.FunctionDef
+    ) -> lowering.Result:
         self.assert_simple_arguments(node.args)
         signature = func.Signature(
             inputs=tuple(
@@ -45,7 +43,7 @@ class Lowering(lowering2.FromPythonAST):
         for arg, type in zip(node.args.args, signature.inputs):
             entries[arg.arg] = entr_block.args.append_from(type, arg.arg)
 
-        def callback(frame: lowering2.Frame, value: ir.SSAValue):
+        def callback(frame: lowering.Frame, value: ir.SSAValue):
             first_stmt = entr_block.first_stmt
             stmt = func.GetField(obj=fn_self, field=len(frame.captures) - 1)
             if value.name:
@@ -90,14 +88,14 @@ class Lowering(lowering2.FromPythonAST):
             return
 
         if node.decorator_list:
-            raise lowering2.DialectLoweringError(
+            raise lowering.DialectLoweringError(
                 "decorators are not supported on nested functions"
             )
 
         # nested function, lookup unknown variables
         first_stmt = func_frame.curr_region.blocks[0].first_stmt
         if first_stmt is None:
-            raise lowering2.DialectLoweringError("empty function body")
+            raise lowering.DialectLoweringError("empty function body")
 
         captured = [value for value in func_frame.captures.values()]
         lambda_stmt = func.Lambda(
@@ -113,17 +111,17 @@ class Lowering(lowering2.FromPythonAST):
 
     def assert_simple_arguments(self, node: ast.arguments) -> None:
         if node.kwonlyargs:
-            raise lowering2.DialectLoweringError(
+            raise lowering.DialectLoweringError(
                 "keyword-only arguments are not supported"
             )
 
         if node.posonlyargs:
-            raise lowering2.DialectLoweringError(
+            raise lowering.DialectLoweringError(
                 "positional-only arguments are not supported"
             )
 
     @staticmethod
-    def get_hint(state: lowering2.State, node: ast.expr | None):
+    def get_hint(state: lowering.State, node: ast.expr | None):
         if node is None:
             return types.Any
 
@@ -131,6 +129,6 @@ class Lowering(lowering2.FromPythonAST):
             t = state.get_global(node).data
             return types.hint2type(t)
         except Exception as e:  # noqa: E722
-            raise lowering2.DialectLoweringError(
+            raise lowering.DialectLoweringError(
                 f"expect a type hint, got {ast.unparse(node)}"
             ) from e

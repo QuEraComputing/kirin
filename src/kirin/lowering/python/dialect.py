@@ -8,11 +8,11 @@ import ast
 from abc import ABC
 from typing import TYPE_CHECKING
 
-from kirin.lowering2.exception import DialectLoweringError
+from kirin.lowering.exception import DialectLoweringError
 
 if TYPE_CHECKING:
     from kirin import ir
-    from kirin.lowering2.state import State
+    from kirin.lowering.state import State
 
 
 class FromPythonAST(ABC):

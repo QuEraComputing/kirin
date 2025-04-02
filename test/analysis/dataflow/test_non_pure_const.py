@@ -1,4 +1,4 @@
-from kirin import ir, types, lowering2
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.analysis import const
@@ -9,7 +9,7 @@ dialect = ir.Dialect("mwe")
 @statement(dialect=dialect)
 class SideEffect(ir.Statement):
     name = "side_effect"
-    traits = frozenset({lowering2.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(types.Int)
 
 

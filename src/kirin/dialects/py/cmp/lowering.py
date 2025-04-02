@@ -1,6 +1,6 @@
 import ast
 
-from kirin import ir, lowering2
+from kirin import ir, lowering
 from kirin.dialects.py import boolop
 
 from . import stmts
@@ -8,11 +8,11 @@ from ._dialect import dialect
 
 
 @dialect.register
-class PythonLowering(lowering2.FromPythonAST):
+class PythonLowering(lowering.FromPythonAST):
 
     def lower_Compare(
-        self, state: lowering2.State, node: ast.Compare
-    ) -> lowering2.Result:
+        self, state: lowering.State, node: ast.Compare
+    ) -> lowering.Result:
         # NOTE: a key difference here is we need to lower
         # the multi-argument comparison operators into binary operators
         # since low-level comparision operators are binary + we need a static
@@ -28,7 +28,7 @@ class PythonLowering(lowering2.FromPythonAST):
             if cls := getattr(stmts, op.__class__.__name__, None):
                 stmt: stmts.Cmp = cls(lhs=lhs, rhs=rhs)
             else:
-                raise lowering2.DialectLoweringError(
+                raise lowering.DialectLoweringError(
                     f"unsupported compare operator {op}"
                 )
             state.current_frame.push(stmt)

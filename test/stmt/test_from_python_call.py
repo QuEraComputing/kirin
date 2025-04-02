@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from kirin import ir, types, lowering2
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 from kirin.prelude import python_no_opt
 from kirin.dialects import func
@@ -15,7 +15,7 @@ dialect = ir.Dialect("test")
 @statement(dialect=dialect, repr=True)
 class DummyStatement(ir.Statement):
     name = "dummy"
-    traits = frozenset({ir.Pure(), ir.ConstantLike(), lowering2.FromPythonCall()})
+    traits = frozenset({ir.Pure(), ir.ConstantLike(), lowering.FromPythonCall()})
 
     # args
     noinfo: ir.SSAValue
@@ -107,7 +107,7 @@ def no_group(
 
 def test_from_python_call():
     assert DummyStatement.dialect is dialect
-    lower = lowering2.PythonLowering(python_no_opt.data.union([func, dialect]))
+    lower = lowering.PythonLowering(python_no_opt.data.union([func, dialect]))
 
     func_ = dummy
     code = lower.python_function(func_)
@@ -136,8 +136,8 @@ def test_from_python_call():
     assert stmt.xxx_property == "xxx_property"
     assert stmt.xxx_attribute is False  # type: ignore
 
-    with pytest.raises(lowering2.DialectLoweringError):
+    with pytest.raises(lowering.DialectLoweringError):
         lower.python_function(non_const)
 
-    with pytest.raises(lowering2.DialectLoweringError):
+    with pytest.raises(lowering.DialectLoweringError):
         lower.python_function(no_group)

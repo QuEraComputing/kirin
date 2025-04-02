@@ -1,8 +1,8 @@
-from kirin import lowering2
+from kirin import lowering
 from kirin.prelude import python_no_opt
 from kirin.dialects import cf, func
 
-lower = lowering2.PythonLowering(python_no_opt)
+lower = lowering.PythonLowering(python_no_opt)
 
 
 def test_pass():

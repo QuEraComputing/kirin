@@ -13,7 +13,7 @@ This dialect maps `ast.Assert` nodes to the `Assert` statement.
 
 import ast
 
-from kirin import ir, types, interp, lowering2
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.emit import EmitStrFrame, julia
 from kirin.print import Printer
@@ -39,11 +39,9 @@ class Assert(ir.Statement):
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
-    def lower_Assert(
-        self, state: lowering2.State, node: ast.Assert
-    ) -> lowering2.Result:
+    def lower_Assert(self, state: lowering.State, node: ast.Assert) -> lowering.Result:
         from kirin.dialects.py.constant import Constant
 
         cond = state.lower(node.test).expect_one()

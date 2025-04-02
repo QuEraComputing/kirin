@@ -18,7 +18,7 @@ from abc import abstractmethod
 from typing import Generic, TypeVar
 from dataclasses import dataclass
 
-from kirin import ir, types, interp, lowering2
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.analysis import const
 from kirin.rewrite.abc import RewriteRule, RewriteResult
@@ -72,24 +72,24 @@ class Subscript(ir.Statement):
 @statement(dialect=dialect)
 class GetItem(Subscript):
     name = "getitem"
-    traits = frozenset({ir.Pure(), PyGetItemLike(), lowering2.FromPythonCall()})
+    traits = frozenset({ir.Pure(), PyGetItemLike(), lowering.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     index: ir.SSAValue = info.argument(print=False)
     result: ir.ResultValue = info.result(types.Any)
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
     def lower_Subscript(
-        self, state: lowering2.State, node: ast.Subscript
-    ) -> lowering2.Result:
+        self, state: lowering.State, node: ast.Subscript
+    ) -> lowering.Result:
         value = state.lower(node.value).expect_one()
         slice = state.lower(node.slice).expect_one()
         if isinstance(node.ctx, ast.Load):
             stmt = GetItem(obj=value, index=slice)
         else:
-            raise lowering2.DialectLoweringError(
+            raise lowering.DialectLoweringError(
                 f"unsupported subscript context {node.ctx}"
             )
         return state.current_frame.push(stmt)

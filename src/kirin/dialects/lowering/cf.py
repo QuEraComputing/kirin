@@ -2,28 +2,26 @@
 
 import ast
 
-from kirin import ir, types, lowering2
+from kirin import ir, types, lowering
 from kirin.dialects import cf, py
 
 dialect = ir.Dialect("lowering.cf")
 
 
 @dialect.register
-class CfLowering(lowering2.FromPythonAST):
+class CfLowering(lowering.FromPythonAST):
 
-    def lower_Pass(self, state: lowering2.State, node: ast.Pass):
+    def lower_Pass(self, state: lowering.State, node: ast.Pass):
         state.current_frame.push(
             cf.Branch(arguments=(), successor=state.current_frame.next_block)
         )
 
-    def lower_For(self, state: lowering2.State, node: ast.For) -> lowering2.Result:
+    def lower_For(self, state: lowering.State, node: ast.For) -> lowering.Result:
         yields: list[str] = []
 
-        def new_block_arg_if_inside_loop(frame: lowering2.Frame, capture: ir.SSAValue):
+        def new_block_arg_if_inside_loop(frame: lowering.Frame, capture: ir.SSAValue):
             if not capture.name:
-                raise lowering2.DialectLoweringError(
-                    "unexpected loop variable captured"
-                )
+                raise lowering.DialectLoweringError("unexpected loop variable captured")
             yields.append(capture.name)
             return frame.entr_block.args.append_from(capture.type, capture.name)
 
@@ -75,7 +73,7 @@ class CfLowering(lowering2.FromPythonAST):
             input = frame.curr_block.args.append_from(arg.type, name)
             frame.defs[name] = input
 
-    def lower_If(self, state: lowering2.State, node: ast.If) -> lowering2.Result:
+    def lower_If(self, state: lowering.State, node: ast.If) -> lowering.Result:
         cond = state.lower(node.test).expect_one()
         frame = state.current_frame
         before_block = frame.curr_block
@@ -124,7 +122,7 @@ class CfLowering(lowering2.FromPythonAST):
             if value := if_frame.get(name):
                 if_args.append(value)
             else:
-                raise lowering2.DialectLoweringError(
+                raise lowering.DialectLoweringError(
                     f"undefined variable {name} in if branch"
                 )
 
@@ -133,7 +131,7 @@ class CfLowering(lowering2.FromPythonAST):
             if value := else_frame.get(name):
                 else_args.append(value)
             else:
-                raise lowering2.DialectLoweringError(
+                raise lowering.DialectLoweringError(
                     f"undefined variable {name} in else branch"
                 )
 
@@ -161,7 +159,7 @@ class CfLowering(lowering2.FromPythonAST):
         frame.defs.update(after_frame.defs)
         frame.jump_next_block()
 
-    def branch_next_if_not_terminated(self, frame: lowering2.Frame):
+    def branch_next_if_not_terminated(self, frame: lowering.Frame):
         """Branch to the next block if the current block is not terminated.
 
         This must be used after exhausting the current frame and before popping the frame.
@@ -173,7 +171,7 @@ class CfLowering(lowering2.FromPythonAST):
                 cf.Branch(arguments=(), successor=frame.next_block)
             )
 
-    def current_block_terminated(self, frame: lowering2.Frame):
+    def current_block_terminated(self, frame: lowering.Frame):
         return frame.curr_block.last_stmt and frame.curr_block.last_stmt.has_trait(
             ir.IsTerminator
         )

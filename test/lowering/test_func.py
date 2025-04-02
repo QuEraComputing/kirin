@@ -1,17 +1,17 @@
 import pytest
 
-from kirin import ir, types, lowering2
+from kirin import ir, types, lowering
 from kirin.prelude import python_no_opt
 from kirin.dialects import cf, func
 
-lowering = lowering2.PythonLowering(python_no_opt)
+lower = lowering.PythonLowering(python_no_opt)
 
 
 def test_basic_func():
     def single(n):
         return n + 1
 
-    code = lowering.python_function(single)
+    code = lower.python_function(single)
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
     assert isinstance(code.body.blocks[0].last_stmt, func.Return)
@@ -19,7 +19,7 @@ def test_basic_func():
     def single_2(n):
         return n + 1, n + 2
 
-    code = lowering.python_function(single_2)
+    code = lower.python_function(single_2)
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
     assert isinstance(code.body.blocks[0].last_stmt, func.Return)
@@ -32,7 +32,7 @@ def test_recursive_func():
             return 0
         return recursive(n - 1)
 
-    code = lowering.python_function(recursive)
+    code = lower.python_function(recursive)
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 3
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
@@ -47,16 +47,16 @@ def test_invalid_func_call():
     def undefined(n):
         return foo(n - 1)  # type: ignore # noqa: F821
 
-    with pytest.raises(lowering2.DialectLoweringError):
-        lowering.python_function(undefined)
+    with pytest.raises(lowering.DialectLoweringError):
+        lower.python_function(undefined)
 
     def calling_python(n):
         return print(n)
 
     with pytest.raises(
-        lowering2.DialectLoweringError,
+        lowering.DialectLoweringError,
     ):
-        lowering.python_function(calling_python)
+        lower.python_function(calling_python)
 
 
 def test_func_call():
@@ -66,9 +66,9 @@ def test_func_call():
     def caller(n):
         return callee(n)
 
-    code = lowering.python_function(callee)
-    callee = ir.Method(None, callee, "callee", ["n"], lowering.dialects, code)
-    code = lowering.python_function(caller, globals={"callee": callee})
+    code = lower.python_function(callee)
+    callee = ir.Method(None, callee, "callee", ["n"], lower.dialects, code)
+    code = lower.python_function(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)
@@ -83,9 +83,9 @@ def test_func_kw_call():
     def caller(n, m):  # type: ignore
         return callee(n=n, m=m)
 
-    code = lowering.python_function(callee)
-    callee = ir.Method(None, callee, "callee", ["n", "m"], lowering.dialects, code)
-    code = lowering.python_function(caller, globals={"callee": callee})
+    code = lower.python_function(callee)
+    callee = ir.Method(None, callee, "callee", ["n", "m"], lower.dialects, code)
+    code = lower.python_function(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)
@@ -95,7 +95,7 @@ def test_func_kw_call():
     def caller(n, m):
         return callee(n, m=m)
 
-    code = lowering.python_function(caller, globals={"callee": callee})
+    code = lower.python_function(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)

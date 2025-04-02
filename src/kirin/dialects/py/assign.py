@@ -11,7 +11,7 @@ This dialects maps Python assignment syntax.
 
 import ast
 
-from kirin import ir, types, interp, lowering2
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
 
@@ -23,7 +23,7 @@ T = types.TypeVar("T")
 @statement(dialect=dialect)
 class Alias(ir.Statement):
     name = "alias"
-    traits = frozenset({ir.Pure(), lowering2.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     value: ir.SSAValue = info.argument(T)
     target: ir.PyAttr[str] = info.attribute()
     result: ir.ResultValue = info.result(T)
@@ -43,7 +43,7 @@ class Alias(ir.Statement):
 @statement(dialect=dialect)
 class SetItem(ir.Statement):
     name = "setitem"
-    traits = frozenset({lowering2.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
     obj: ir.SSAValue = info.argument(print=False)
     value: ir.SSAValue = info.argument(print=False)
     index: ir.SSAValue = info.argument(print=False)
@@ -63,11 +63,9 @@ class Concrete(interp.MethodTable):
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
-    def lower_Assign(
-        self, state: lowering2.State, node: ast.Assign
-    ) -> lowering2.Result:
+    def lower_Assign(self, state: lowering.State, node: ast.Assign) -> lowering.Result:
         result = state.lower(node.value)
         current_frame = state.current_frame
         match node:
@@ -93,6 +91,6 @@ class Lowering(lowering2.FromPythonAST):
                             stmt = SetItem(obj=obj, index=slice, value=value)
                             current_frame.push(stmt)
                         case _:
-                            raise lowering2.DialectLoweringError(
+                            raise lowering.DialectLoweringError(
                                 f"unsupported target {target}"
                             )

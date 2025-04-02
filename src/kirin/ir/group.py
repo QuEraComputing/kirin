@@ -20,8 +20,8 @@ from kirin.ir.method import Method
 from kirin.exceptions import CompilerError
 
 if TYPE_CHECKING:
+    from kirin.lowering import PythonLowering
     from kirin.registry import Registry
-    from kirin.lowering2 import PythonLowering
     from kirin.ir.dialect import Dialect
 
 PassParams = ParamSpec("PassParams")
@@ -67,7 +67,7 @@ class DialectGroup(Generic[PassParams]):
             self.run_pass_gen = run_pass
             self.run_pass = run_pass(self)
 
-        from kirin.lowering2 import PythonLowering
+        from kirin.lowering import PythonLowering
 
         self.lowering = PythonLowering(self)
 

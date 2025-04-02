@@ -1,4 +1,4 @@
-from kirin import lowering2
+from kirin import lowering
 from kirin.prelude import basic_no_opt
 from kirin.dialects import cf, func
 
@@ -14,8 +14,8 @@ def test_issue_337():
                 count = count + 300
         return count
 
-    lowering = lowering2.PythonLowering(basic_no_opt)
-    code = lowering.python_function(test_if_inside_for, compactify=True)
+    lower = lowering.PythonLowering(basic_no_opt)
+    code = lower.python_function(test_if_inside_for, compactify=True)
     assert isinstance(code, func.Function)
     loop_last_block = code.body.blocks[4]
     count_5 = loop_last_block.args[0]

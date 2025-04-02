@@ -12,7 +12,7 @@ This dialect maps `ast.BoolOp` nodes to the `And` and `Or` statements.
 
 import ast
 
-from kirin import ir, types, interp, lowering2
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.emit.julia import EmitJulia, EmitStrFrame
 
@@ -21,7 +21,7 @@ dialect = ir.Dialect("py.boolop")
 
 @statement
 class BoolOp(ir.Statement):
-    traits = frozenset({ir.Pure(), lowering2.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     lhs: ir.SSAValue = info.argument(print=False)
     rhs: ir.SSAValue = info.argument(print=False)
     result: ir.ResultValue = info.result(types.Bool)
@@ -38,11 +38,9 @@ class Or(BoolOp):
 
 
 @dialect.register
-class PythonLowering(lowering2.FromPythonAST):
+class PythonLowering(lowering.FromPythonAST):
 
-    def lower_BoolOp(
-        self, state: lowering2.State, node: ast.BoolOp
-    ) -> lowering2.Result:
+    def lower_BoolOp(self, state: lowering.State, node: ast.BoolOp) -> lowering.Result:
         lhs = state.lower(node.values[0]).expect_one()
         match node.op:
             case ast.And():
@@ -50,7 +48,7 @@ class PythonLowering(lowering2.FromPythonAST):
             case ast.Or():
                 boolop = Or
             case _:
-                raise lowering2.DialectLoweringError(f"unsupported boolop {node.op}")
+                raise lowering.DialectLoweringError(f"unsupported boolop {node.op}")
 
         for value in node.values[1:]:
             lhs = state.current_frame.push(

@@ -2,11 +2,11 @@ from functools import partial
 
 import pytest
 
-from kirin import lowering2
+from kirin import lowering
 from kirin.prelude import python_no_opt
 from kirin.dialects import cf, func
 
-lower = lowering2.PythonLowering(python_no_opt)
+lower = lowering.PythonLowering(python_no_opt)
 
 
 def test_closure():
@@ -26,7 +26,7 @@ def test_closure():
 
         return inner
 
-    with pytest.raises(lowering2.DialectLoweringError):
+    with pytest.raises(lowering.DialectLoweringError):
         lower.python_function(will_error)
 
 

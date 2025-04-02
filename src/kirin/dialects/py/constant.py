@@ -13,7 +13,7 @@ This dialect maps `ast.Constant` nodes to the `Constant` statement.
 import ast
 from typing import Generic, TypeVar
 
-from kirin import ir, types, interp, lowering2, exceptions
+from kirin import ir, types, interp, lowering, exceptions
 from kirin.decl import info, statement
 from kirin.print import Printer
 from kirin.emit.julia import EmitJulia, EmitStrFrame
@@ -26,7 +26,7 @@ T = TypeVar("T", covariant=True)
 @statement(dialect=dialect)
 class Constant(ir.Statement, Generic[T]):
     name = "constant"
-    traits = frozenset({ir.Pure(), ir.ConstantLike(), lowering2.FromPythonCall()})
+    traits = frozenset({ir.Pure(), ir.ConstantLike(), lowering.FromPythonCall()})
     value: ir.Data[T] = info.attribute()
     result: ir.ResultValue = info.result()
 
@@ -58,11 +58,11 @@ class Constant(ir.Statement, Generic[T]):
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
     def lower_Constant(
-        self, state: lowering2.State, node: ast.Constant
-    ) -> lowering2.Result:
+        self, state: lowering.State, node: ast.Constant
+    ) -> lowering.Result:
         return state.current_frame.push(
             Constant(node.value),
         )

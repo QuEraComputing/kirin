@@ -11,7 +11,7 @@ This dialect provides a `Slice` statement that represents a slice object in Pyth
 import ast
 from dataclasses import dataclass
 
-from kirin import ir, types, interp, lowering2
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.dialects.py.constant import Constant
 
@@ -19,11 +19,11 @@ dialect = ir.Dialect("py.slice")
 
 
 @dataclass(frozen=True)
-class SliceLowering(lowering2.FromPythonCall["Slice"]):
+class SliceLowering(lowering.FromPythonCall["Slice"]):
 
     def lower(
-        self, stmt: type["Slice"], state: lowering2.State, node: ast.Call
-    ) -> lowering2.Result:
+        self, stmt: type["Slice"], state: lowering.State, node: ast.Call
+    ) -> lowering.Result:
         return _lower_slice(state, node)
 
 
@@ -77,9 +77,9 @@ class Concrete(interp.MethodTable):
 
 
 @dialect.register
-class Lowering(lowering2.FromPythonAST):
+class Lowering(lowering.FromPythonAST):
 
-    def lower_Slice(self, state: lowering2.State, node: ast.Slice) -> lowering2.Result:
+    def lower_Slice(self, state: lowering.State, node: ast.Slice) -> lowering.Result:
         def value_or_none(expr: ast.expr | None) -> ir.SSAValue:
             if expr is not None:
                 return state.lower(expr).expect_one()
@@ -93,12 +93,12 @@ class Lowering(lowering2.FromPythonAST):
         return state.current_frame.push(Slice(start=lower, stop=upper, step=step))
 
     def lower_Call_slice(
-        self, state: lowering2.State, node: ast.Call
-    ) -> lowering2.Result:
+        self, state: lowering.State, node: ast.Call
+    ) -> lowering.Result:
         return _lower_slice(state, node)
 
 
-def _lower_slice(state: lowering2.State, node: ast.Call) -> lowering2.Result:
+def _lower_slice(state: lowering.State, node: ast.Call) -> lowering.Result:
     if len(node.args) == 1:
         start = state.lower(ast.Constant(None)).expect_one()
         stop = state.lower(node.args[0]).expect_one()
@@ -112,6 +112,6 @@ def _lower_slice(state: lowering2.State, node: ast.Call) -> lowering2.Result:
         stop = state.lower(node.args[1]).expect_one()
         step = state.lower(node.args[2]).expect_one()
     else:
-        raise lowering2.DialectLoweringError("slice() takes 1-3 arguments")
+        raise lowering.DialectLoweringError("slice() takes 1-3 arguments")
 
     return state.current_frame.push(Slice(start, stop, step))

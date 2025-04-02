@@ -11,7 +11,7 @@ This module contains the dialect for the Python unpack semantics, including:
 
 import ast
 
-from kirin import ir, types, interp, lowering2
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
 
@@ -64,13 +64,13 @@ class TypeInfer(interp.MethodTable):
         return tuple(types.Any for _ in stmt.names)
 
 
-def unpacking(state: lowering2.State, node: ast.expr, value: ir.SSAValue):
+def unpacking(state: lowering.State, node: ast.expr, value: ir.SSAValue):
     if isinstance(node, ast.Name):
         state.current_frame.defs[node.id] = value
         value.name = node.id
         return
     elif not isinstance(node, ast.Tuple):
-        raise lowering2.DialectLoweringError(f"unsupported unpack node {node}")
+        raise lowering.DialectLoweringError(f"unsupported unpack node {node}")
 
     names: list[str | None] = []
     continue_unpack: list[int] = []
