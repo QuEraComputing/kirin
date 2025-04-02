@@ -2,7 +2,7 @@ from kirin import lowering
 from kirin.prelude import basic_no_opt
 from kirin.dialects import cf, func
 
-lower = lowering.PythonLowering(basic_no_opt)
+lower = lowering.Python(basic_no_opt)
 
 
 def test_simple_loop():

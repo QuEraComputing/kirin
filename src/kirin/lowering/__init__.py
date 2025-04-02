@@ -10,4 +10,4 @@ from .python.traits import (
 )
 from .python.binding import wraps as wraps
 from .python.dialect import FromPythonAST as FromPythonAST
-from .python.lowering import PythonLowering as PythonLowering
+from .python.lowering import Python as Python

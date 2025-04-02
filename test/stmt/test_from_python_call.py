@@ -107,7 +107,7 @@ def no_group(
 
 def test_from_python_call():
     assert DummyStatement.dialect is dialect
-    lower = lowering.PythonLowering(python_no_opt.data.union([func, dialect]))
+    lower = lowering.Python(python_no_opt.data.union([func, dialect]))
 
     func_ = dummy
     code = lower.python_function(func_)

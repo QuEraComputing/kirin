@@ -20,7 +20,7 @@ from kirin.ir.method import Method
 from kirin.exceptions import CompilerError
 
 if TYPE_CHECKING:
-    from kirin.lowering import PythonLowering
+    from kirin.lowering import Python
     from kirin.registry import Registry
     from kirin.ir.dialect import Dialect
 
@@ -48,7 +48,7 @@ class DialectGroup(Generic[PassParams]):
     run_pass: RunPass[PassParams] | None = None
     """the function that runs the passes on the method."""
 
-    lowering: PythonLowering = field(init=False, repr=False)
+    lowering: Python = field(init=False, repr=False)
     """the lowering object used to lower the method."""
 
     def __init__(
@@ -67,9 +67,9 @@ class DialectGroup(Generic[PassParams]):
             self.run_pass_gen = run_pass
             self.run_pass = run_pass(self)
 
-        from kirin.lowering import PythonLowering
+        from kirin.lowering import Python
 
-        self.lowering = PythonLowering(self)
+        self.lowering = Python(self)
 
     def __iter__(self):
         return iter(self.data)

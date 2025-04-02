@@ -3,7 +3,7 @@ from kirin.prelude import basic_no_opt
 from kirin.dialects import func
 from kirin.analysis.cfg import CFG
 
-lower = lowering.PythonLowering(basic_no_opt)
+lower = lowering.Python(basic_no_opt)
 
 
 def deadblock(x):

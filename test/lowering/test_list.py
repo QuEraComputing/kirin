@@ -2,7 +2,7 @@ from kirin import types, lowering
 from kirin.dialects import cf, py, func
 from kirin.dialects.lowering import func as func_lowering
 
-lower = lowering.PythonLowering([cf, func, py.base, py.list, py.assign, func_lowering])
+lower = lowering.Python([cf, func, py.base, py.list, py.assign, func_lowering])
 
 
 def test_empty_list():

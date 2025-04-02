@@ -22,7 +22,7 @@ from .binding import Binding
 
 
 @dataclass
-class PythonLowering(LoweringABC[ast.AST]):
+class Python(LoweringABC[ast.AST]):
     """Python lowering transform.
 
     This class is used to lower Python AST nodes to IR statements via
