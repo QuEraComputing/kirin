@@ -13,7 +13,7 @@ from kirin import ir
 from kirin.source import SourceInfo
 from kirin.lowering.abc import Result, LoweringABC
 from kirin.lowering.state import State
-from kirin.lowering.exception import DialectLoweringError
+from kirin.lowering.exception import PythonSyntaxError
 from kirin.lowering.python.dialect import FromPythonAST
 
 from .glob import GlobalExprEval
@@ -117,7 +117,7 @@ class Python(LoweringABC[ast.AST]):
         with state.frame([stmt], parent=None, globals=globals) as frame:
             try:
                 self.visit(state, stmt)
-            except DialectLoweringError as e:
+            except PythonSyntaxError as e:
                 if self.stacktrace:
                     raise Exception(
                         f"{e.args[0]}\n\n{self.error_hint(state, e)}",
@@ -159,9 +159,7 @@ class Python(LoweringABC[ast.AST]):
         return getattr(self, f"visit_{name}", self.generic_visit)(state, node)
 
     def generic_visit(self, state: State[ast.AST], node: ast.AST) -> Result:
-        raise DialectLoweringError(
-            f"Cannot lower {node.__class__.__name__} node: {node}"
-        )
+        raise PythonSyntaxError(f"Cannot lower {node.__class__.__name__} node: {node}")
 
     def visit_Call(self, state: State[ast.AST], node: ast.Call) -> Result:
         if hasattr(node.func, "lineno"):
@@ -191,7 +189,7 @@ class Python(LoweringABC[ast.AST]):
                 dialect_lowering = self.registry[name]
                 return getattr(dialect_lowering, f"lower_{name}")(state, node)
             else:
-                raise DialectLoweringError(
+                raise PythonSyntaxError(
                     f"`lower_{name}` is not implemented for builtin function `{global_callee.__name__}`."
                 )
 
@@ -199,17 +197,17 @@ class Python(LoweringABC[ast.AST]):
         # local value that shadows the global value
         try:
             return self.visit_Call_local(state, node)
-        except DialectLoweringError:
+        except PythonSyntaxError:
             # symbol exist in global, but not ir.Statement, not found in locals either
             # this means the symbol is referring to an external uncallable object
             # try to hint the user
             if inspect.isfunction(global_callee):
-                raise DialectLoweringError(
+                raise PythonSyntaxError(
                     f"unsupported callee: {repr(global_callee)}."
                     "Are you trying to call a python function? This is not supported."
                 )
             else:  # well not much we can do, can't hint
-                raise DialectLoweringError(
+                raise PythonSyntaxError(
                     f"unsupported callee type: {repr(global_callee)}"
                 )
 
@@ -231,7 +229,7 @@ class Python(LoweringABC[ast.AST]):
         if f"Call_{global_callee.__name__}" in self.registry:
             methods = self.registry[f"Call_{global_callee.__name__}"]
             return getattr(methods, f"lower_Call_{global_callee.__name__}")(state, node)
-        raise DialectLoweringError(
+        raise PythonSyntaxError(
             f"`lower_Call_{global_callee.__name__}` not implemented by any dialect"
             f" for {global_callee.__name__}"
         )
@@ -240,18 +238,18 @@ class Python(LoweringABC[ast.AST]):
         self, state: State[ast.AST], node: ast.Call, global_callee: type[ir.Statement]
     ):
         if global_callee.dialect is None:
-            raise DialectLoweringError(
+            raise PythonSyntaxError(
                 f"unsupported dialect `None` for {global_callee.name}"
             )
 
         if global_callee.dialect not in self.dialects.data:
-            raise DialectLoweringError(
+            raise PythonSyntaxError(
                 f"unsupported dialect `{global_callee.dialect.name}`"
             )
 
         if (trait := global_callee.get_trait(FromPythonCall)) is not None:
             return trait.lower(global_callee, state, node)
-        raise DialectLoweringError(
+        raise PythonSyntaxError(
             f"invalid call syntax for {global_callee.__name__}, "
             f"expected FromPythonCall trait to be implemented"
             f" for {global_callee.__name__}"
@@ -264,39 +262,39 @@ class Python(LoweringABC[ast.AST]):
             return self.registry["Call_global_method"].lower_Call_global_method(
                 state, global_callee, node
             )
-        raise DialectLoweringError("`lower_Call_global_method` not implemented")
+        raise PythonSyntaxError("`lower_Call_global_method` not implemented")
 
     def visit_Call_local(self, state: State[ast.AST], node: ast.Call) -> Result:
         callee = state.lower(node.func).expect_one()
         if "Call_local" in self.registry:
             return self.registry["Call_local"].lower_Call_local(state, callee, node)
-        raise DialectLoweringError("`lower_Call_local` not implemented")
+        raise PythonSyntaxError("`lower_Call_local` not implemented")
 
     def visit_With(self, state: State[ast.AST], node: ast.With) -> Result:
         if len(node.items) != 1:
-            raise DialectLoweringError("expected exactly one item in with statement")
+            raise PythonSyntaxError("expected exactly one item in with statement")
 
         item = node.items[0]
         if not isinstance(item.context_expr, ast.Call):
-            raise DialectLoweringError("expected context expression to be a call")
+            raise PythonSyntaxError("expected context expression to be a call")
 
         global_callee = state.get_global(item.context_expr.func).data
         if not issubclass(global_callee, ir.Statement):
-            raise DialectLoweringError(
+            raise PythonSyntaxError(
                 f"expected context expression to be a statement, got {global_callee}"
             )
 
         if trait := global_callee.get_trait(FromPythonWithSingleItem):
             return trait.lower(global_callee, state, node)
 
-        raise DialectLoweringError(
+        raise PythonSyntaxError(
             f"invalid with syntax for {global_callee.__name__}, "
             f"expected FromPythonWithSingleItem trait"
             " to be implemented"
             f" for {global_callee.__name__}"
         )
 
-    def error_hint(self, state: State[ast.AST], err: DialectLoweringError) -> str:
+    def error_hint(self, state: State[ast.AST], err: PythonSyntaxError) -> str:
         begin = max(0, state.source.lineno - self.max_lines - state.lineno_offset)
         end = max(
             max(state.source.lineno + self.max_lines, state.source.end_lineno or 0)

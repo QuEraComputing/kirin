@@ -28,9 +28,7 @@ class PythonLowering(lowering.FromPythonAST):
             if cls := getattr(stmts, op.__class__.__name__, None):
                 stmt: stmts.Cmp = cls(lhs=lhs, rhs=rhs)
             else:
-                raise lowering.DialectLoweringError(
-                    f"unsupported compare operator {op}"
-                )
+                raise lowering.PythonSyntaxError(f"unsupported compare operator {op}")
             state.current_frame.push(stmt)
             cmp_results.append(stmt.result)
             lhs = rhs

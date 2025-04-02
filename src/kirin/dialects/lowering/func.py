@@ -88,14 +88,14 @@ class Lowering(lowering.FromPythonAST):
             return
 
         if node.decorator_list:
-            raise lowering.DialectLoweringError(
+            raise lowering.PythonSyntaxError(
                 "decorators are not supported on nested functions"
             )
 
         # nested function, lookup unknown variables
         first_stmt = func_frame.curr_region.blocks[0].first_stmt
         if first_stmt is None:
-            raise lowering.DialectLoweringError("empty function body")
+            raise lowering.PythonSyntaxError("empty function body")
 
         captured = [value for value in func_frame.captures.values()]
         lambda_stmt = func.Lambda(
@@ -111,12 +111,10 @@ class Lowering(lowering.FromPythonAST):
 
     def assert_simple_arguments(self, node: ast.arguments) -> None:
         if node.kwonlyargs:
-            raise lowering.DialectLoweringError(
-                "keyword-only arguments are not supported"
-            )
+            raise lowering.PythonSyntaxError("keyword-only arguments are not supported")
 
         if node.posonlyargs:
-            raise lowering.DialectLoweringError(
+            raise lowering.PythonSyntaxError(
                 "positional-only arguments are not supported"
             )
 
@@ -129,6 +127,6 @@ class Lowering(lowering.FromPythonAST):
             t = state.get_global(node).data
             return types.hint2type(t)
         except Exception as e:  # noqa: E722
-            raise lowering.DialectLoweringError(
+            raise lowering.PythonSyntaxError(
                 f"expect a type hint, got {ast.unparse(node)}"
             ) from e

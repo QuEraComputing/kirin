@@ -8,7 +8,7 @@ import ast
 from abc import ABC
 from typing import TYPE_CHECKING
 
-from kirin.lowering.exception import DialectLoweringError
+from kirin.lowering.exception import PythonSyntaxError
 
 if TYPE_CHECKING:
     from kirin import ir
@@ -28,7 +28,7 @@ class FromPythonAST(ABC):
         )
 
     def unreachable(self, state: State[ast.AST], node: ast.AST) -> ir.SSAValue | None:
-        raise DialectLoweringError(f"unreachable reached for {node.__class__.__name__}")
+        raise PythonSyntaxError(f"unreachable reached for {node.__class__.__name__}")
 
 
 class NoSpecialLowering(FromPythonAST):

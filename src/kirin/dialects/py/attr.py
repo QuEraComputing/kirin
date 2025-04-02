@@ -43,7 +43,7 @@ class Lowering(lowering.FromPythonAST):
         from kirin.dialects.py import Constant
 
         if not isinstance(node.ctx, ast.Load):
-            raise lowering.DialectLoweringError(
+            raise lowering.PythonSyntaxError(
                 f"unsupported attribute context {node.ctx}"
             )
 

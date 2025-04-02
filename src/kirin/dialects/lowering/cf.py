@@ -21,7 +21,7 @@ class CfLowering(lowering.FromPythonAST):
 
         def new_block_arg_if_inside_loop(frame: lowering.Frame, capture: ir.SSAValue):
             if not capture.name:
-                raise lowering.DialectLoweringError("unexpected loop variable captured")
+                raise lowering.PythonSyntaxError("unexpected loop variable captured")
             yields.append(capture.name)
             return frame.entr_block.args.append_from(capture.type, capture.name)
 
@@ -122,7 +122,7 @@ class CfLowering(lowering.FromPythonAST):
             if value := if_frame.get(name):
                 if_args.append(value)
             else:
-                raise lowering.DialectLoweringError(
+                raise lowering.PythonSyntaxError(
                     f"undefined variable {name} in if branch"
                 )
 
@@ -131,7 +131,7 @@ class CfLowering(lowering.FromPythonAST):
             if value := else_frame.get(name):
                 else_args.append(value)
             else:
-                raise lowering.DialectLoweringError(
+                raise lowering.PythonSyntaxError(
                     f"undefined variable {name} in else branch"
                 )
 

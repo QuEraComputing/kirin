@@ -47,14 +47,14 @@ def test_invalid_func_call():
     def undefined(n):
         return foo(n - 1)  # type: ignore # noqa: F821
 
-    with pytest.raises(lowering.DialectLoweringError):
+    with pytest.raises(lowering.PythonSyntaxError):
         lower.python_function(undefined)
 
     def calling_python(n):
         return print(n)
 
     with pytest.raises(
-        lowering.DialectLoweringError,
+        lowering.PythonSyntaxError,
     ):
         lower.python_function(calling_python)
 

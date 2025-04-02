@@ -42,9 +42,7 @@ class Lowering(lowering.FromPythonAST):
                     body_yields.append(body_frame[name])
                     value = frame.get(name)
                     if value is None:
-                        raise lowering.DialectLoweringError(
-                            f"expected value for {name}"
-                        )
+                        raise lowering.PythonSyntaxError(f"expected value for {name}")
                     else_yields.append(value)
 
         if not (
@@ -80,7 +78,7 @@ class Lowering(lowering.FromPythonAST):
 
         def new_block_arg_if_inside_loop(frame: lowering.Frame, capture: ir.SSAValue):
             if not capture.name:
-                raise lowering.DialectLoweringError("unexpected loop variable captured")
+                raise lowering.PythonSyntaxError("unexpected loop variable captured")
             yields.append(capture.name)
             return frame.curr_block.args.append_from(capture.type, capture.name)
 
@@ -111,7 +109,7 @@ class Lowering(lowering.FromPythonAST):
         for name in yields:
             value = state.current_frame.get(name)
             if value is None:
-                raise lowering.DialectLoweringError(f"expected value for {name}")
+                raise lowering.PythonSyntaxError(f"expected value for {name}")
             initializers.append(value)
         stmt = For(iter_, body_frame.curr_region, *initializers)
 

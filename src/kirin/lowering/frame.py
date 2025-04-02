@@ -6,7 +6,7 @@ from dataclasses import field, dataclass
 from kirin.ir import Block, Region, SSAValue, Statement
 
 from .stream import Stmt, StmtStream
-from .exception import DialectLoweringError
+from .exception import PythonSyntaxError
 
 if TYPE_CHECKING:
     from .state import State
@@ -58,13 +58,13 @@ class Frame(Generic[Stmt]):
         elif isinstance(node, Statement):
             return self._push_stmt(node)
         else:
-            raise DialectLoweringError(f"Unsupported type {type(node)} in push()")
+            raise PythonSyntaxError(f"Unsupported type {type(node)} in push()")
 
     def _push_stmt(self, stmt: StmtType) -> StmtType:
         if not stmt.dialect:
-            raise DialectLoweringError(f"unexpected builtin statement {stmt.name}")
+            raise PythonSyntaxError(f"unexpected builtin statement {stmt.name}")
         elif stmt.dialect not in self.state.parent.dialects:
-            raise DialectLoweringError(
+            raise PythonSyntaxError(
                 f"Unsupported dialect `{stmt.dialect.name}` in statement {stmt.name}"
             )
         self.curr_block.stmts.append(stmt)
@@ -138,7 +138,7 @@ class Frame(Generic[Stmt]):
         if isinstance(value, SSAValue):
             return value
         else:
-            raise DialectLoweringError(f"Variable {name} not found in scope")
+            raise PythonSyntaxError(f"Variable {name} not found in scope")
 
     def exhaust(self):
         """Exhaust the current stream and return the remaining statements."""

@@ -91,6 +91,6 @@ class Lowering(lowering.FromPythonAST):
                             stmt = SetItem(obj=obj, index=slice, value=value)
                             current_frame.push(stmt)
                         case _:
-                            raise lowering.DialectLoweringError(
+                            raise lowering.PythonSyntaxError(
                                 f"unsupported target {target}"
                             )

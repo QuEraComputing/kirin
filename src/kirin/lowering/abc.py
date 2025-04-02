@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from kirin.ir import SSAValue, Statement, DialectGroup
 
-from .exception import DialectLoweringError
+from .exception import PythonSyntaxError
 
 if TYPE_CHECKING:
     from .state import State
@@ -80,7 +80,7 @@ class LoweringABC(ABC, Generic[ASTNodeType]):
 
         def expect(self, typ: type[ExpectT]) -> ExpectT:
             if not isinstance(self.data, typ):
-                raise DialectLoweringError(f"expected {typ}, got {type(self.data)}")
+                raise PythonSyntaxError(f"expected {typ}, got {type(self.data)}")
             return self.data
 
     @abstractmethod
@@ -107,5 +107,5 @@ class LoweringABC(ABC, Generic[ASTNodeType]):
         """
         try:
             return self.lower_global(state, node)
-        except DialectLoweringError:
+        except PythonSyntaxError:
             return None
