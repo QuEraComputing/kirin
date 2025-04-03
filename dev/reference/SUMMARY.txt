@@ -199,6 +199,7 @@
         * [getitem](kirin/rewrite/getitem.md)
         * [inline](kirin/rewrite/inline.md)
         * [result](kirin/rewrite/result.md)
+        * [type_assert](kirin/rewrite/type_assert.md)
         * [walk](kirin/rewrite/walk.md)
         * [wrap_const](kirin/rewrite/wrap_const.md)
     * [source](kirin/source.md)
