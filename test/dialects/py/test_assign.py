@@ -1,7 +1,9 @@
+from typing import Literal
+
 from kirin import types
 from kirin.prelude import basic, basic_no_opt
 from kirin.analysis import TypeInference
-from kirin.dialects import py, func
+from kirin.dialects import py, func, ilist
 
 
 @basic_no_opt
@@ -29,3 +31,19 @@ def test_typeinfer_simplify_assert():
 
     stmt = simplify.callable_region.blocks[0].stmts.at(0)
     assert isinstance(stmt, func.Return)
+
+
+def test_list_assign():
+    @basic_no_opt.add(ilist)
+    def list_assign():
+        xs: ilist.IList[float, Literal[3]] = ilist.IList([1, 2, 3], elem=types.Float)
+        return xs
+
+    stmt = list_assign.callable_region.blocks[0].stmts.at(3)
+    assert isinstance(stmt, ilist.New)
+    assert stmt.elem_type.is_equal(types.Float)
+    assert stmt.result.type.is_equal(ilist.IListType[types.Float, types.Literal(3)])
+
+    stmt = list_assign.callable_region.blocks[0].stmts.at(4)
+    assert isinstance(stmt, py.assign.TypeAssert)
+    assert stmt.expected.is_equal(ilist.IListType[types.Float, types.Literal(3)])

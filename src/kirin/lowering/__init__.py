@@ -9,5 +9,5 @@ from .python.traits import (
     FromPythonWithSingleItem as FromPythonWithSingleItem,
 )
 from .python.binding import wraps as wraps
-from .python.dialect import FromPythonAST as FromPythonAST
+from .python.dialect import FromPythonAST as FromPythonAST, akin as akin
 from .python.lowering import Python as Python

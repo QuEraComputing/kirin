@@ -40,7 +40,6 @@ class Lowering(lowering.FromPythonAST):
     def lower_Attribute(
         self, state: lowering.State, node: ast.Attribute
     ) -> lowering.Result:
-        from kirin.dialects.py import Constant
 
         if not isinstance(node.ctx, ast.Load):
             raise lowering.BuildError(f"unsupported attribute context {node.ctx}")
@@ -48,7 +47,7 @@ class Lowering(lowering.FromPythonAST):
         # NOTE: eagerly load global variables
         value = state.get_global(node, no_raise=True)
         if value is not None:
-            return state.current_frame.push(Constant(value.data))
+            return state.lower(ast.Constant(value.data)).expect_one()
 
         value = state.lower(node.value).expect_one()
         return state.current_frame.push(GetAttr(obj=value, attrname=node.attr))

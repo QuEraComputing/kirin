@@ -25,25 +25,22 @@ class Range(ir.Statement):
 class New(ir.Statement):
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     values: tuple[ir.SSAValue, ...] = info.argument(ElemT)
+    elem_type: types.TypeAttribute = info.attribute()
     result: ir.ResultValue = info.result(IListType[ElemT])
 
     def __init__(
         self,
         values: Sequence[ir.SSAValue],
+        elem_type: types.TypeAttribute | None = None,
     ) -> None:
-        # get elem type
-        if not values:
+        if not elem_type:
             elem_type = types.Any
-        else:
-            elem_type = values[0].type
-            for v in values:
-                elem_type = elem_type.join(v.type)
-
         result_type = IListType[elem_type, types.Literal(len(values))]
         super().__init__(
             args=values,
             result_types=(result_type,),
             args_slice={"values": slice(0, len(values))},
+            attributes={"elem_type": elem_type},
         )
 
 

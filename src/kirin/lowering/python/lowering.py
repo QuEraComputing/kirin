@@ -11,10 +11,10 @@ from rich.console import Console
 
 from kirin import ir
 from kirin.source import SourceInfo
+from kirin.registry import LoweringRegistry
 from kirin.lowering.abc import Result, LoweringABC
 from kirin.lowering.state import State
 from kirin.lowering.exception import BuildError
-from kirin.lowering.python.dialect import FromPythonAST
 
 from .glob import GlobalExprEval
 from .traits import FromPythonCall, FromPythonWithSingleItem
@@ -34,7 +34,7 @@ class Python(LoweringABC[ast.AST]):
         and the source information to the visitor methods.
     """
 
-    registry: dict[str, FromPythonAST]
+    registry: LoweringRegistry
     max_lines: int = 3
     hint_indent: int = 2
     hint_lineno: bool = True
@@ -154,8 +154,8 @@ class Python(LoweringABC[ast.AST]):
                 node, state.lineno_offset, state.col_offset
             )
         name = node.__class__.__name__
-        if name in self.registry:
-            return self.registry[name].lower(state, node)
+        if name in self.registry.ast_table:
+            return self.registry.ast_table[name].lower(state, node)
         return getattr(self, f"visit_{name}", self.generic_visit)(state, node)
 
     def generic_visit(self, state: State[ast.AST], node: ast.AST) -> Result:
@@ -178,21 +178,17 @@ class Python(LoweringABC[ast.AST]):
 
         if isinstance(global_callee, ir.Method):
             return self.visit_Call_Method(state, node, global_callee)
-        elif inspect.isclass(global_callee):
-            return self.visit_Call_Class(state, node, global_callee)
-        elif inspect.isbuiltin(global_callee):
-            name = f"Call_{global_callee.__name__}"
-            if "Call_builtins" in self.registry:
-                dialect_lowering = self.registry["Call_builtins"]
-                return dialect_lowering.lower_Call_builtins(state, node)
-            elif name in self.registry:
-                dialect_lowering = self.registry[name]
-                return getattr(dialect_lowering, f"lower_{name}")(state, node)
-            else:
-                raise BuildError(
-                    f"`lower_{name}` is not implemented for builtin function `{global_callee.__name__}`."
-                )
+        elif inspect.isclass(global_callee) and issubclass(global_callee, ir.Statement):
+            return self.visit_Call_Class_Statement(state, node, global_callee)
+        else:
+            return self.visit_Call_table(state, node, global_callee)
 
+    def visit_Call_table(self, state: State[ast.AST], node: ast.Call, global_callee):
+        if method := self.registry.callee_table.get(global_callee):
+            return method(state, node)
+        return self.visit_Call_generic(state, node, global_callee)
+
+    def visit_Call_generic(self, state: State[ast.AST], node: ast.Call, global_callee):
         # symbol exist in global, but not ir.Statement, it may refer to a
         # local value that shadows the global value
         try:
@@ -207,30 +203,12 @@ class Python(LoweringABC[ast.AST]):
                     "Are you trying to call a python function? This is not supported."
                 )
             else:  # well not much we can do, can't hint
-                raise BuildError(f"unsupported callee type: {repr(global_callee)}")
-
-    def visit_Call_Class(
-        self, state: State[ast.AST], node: ast.Call, global_callee: type
-    ):
-        if issubclass(global_callee, ir.Statement):
-            return self.visit_Call_Class_Statement(state, node, global_callee)
-        else:
-            return getattr(
-                self,
-                f"visit_Call_Class_{global_callee.__name__}",
-                self.visit_Call_Class_generic,
-            )(state, node, global_callee)
-
-    def visit_Call_Class_generic(
-        self, state: State[ast.AST], node: ast.Call, global_callee: type
-    ) -> Result:
-        if f"Call_{global_callee.__name__}" in self.registry:
-            methods = self.registry[f"Call_{global_callee.__name__}"]
-            return getattr(methods, f"lower_Call_{global_callee.__name__}")(state, node)
-        raise BuildError(
-            f"`lower_Call_{global_callee.__name__}` not implemented by any dialect"
-            f" for {global_callee.__name__}"
-        )
+                raise BuildError(
+                    f"unsupported call to {repr(global_callee)}, "
+                    "expected a kernel function (Method), "
+                    "wrapped statement (Binding) or a supported Python function"
+                    f", got {type(global_callee)}"
+                )
 
     def visit_Call_Class_Statement(
         self, state: State[ast.AST], node: ast.Call, global_callee: type[ir.Statement]
@@ -252,16 +230,18 @@ class Python(LoweringABC[ast.AST]):
     def visit_Call_Method(
         self, state: State[ast.AST], node: ast.Call, global_callee: ir.Method
     ) -> Result:
-        if "Call_global_method" in self.registry:
-            return self.registry["Call_global_method"].lower_Call_global_method(
-                state, global_callee, node
-            )
+        if "Call_global_method" in self.registry.ast_table:
+            return self.registry.ast_table[
+                "Call_global_method"
+            ].lower_Call_global_method(state, global_callee, node)
         raise BuildError("`lower_Call_global_method` not implemented")
 
     def visit_Call_local(self, state: State[ast.AST], node: ast.Call) -> Result:
         callee = state.lower(node.func).expect_one()
-        if "Call_local" in self.registry:
-            return self.registry["Call_local"].lower_Call_local(state, callee, node)
+        if "Call_local" in self.registry.ast_table:
+            return self.registry.ast_table["Call_local"].lower_Call_local(
+                state, callee, node
+            )
         raise BuildError("`lower_Call_local` not implemented")
 
     def visit_With(self, state: State[ast.AST], node: ast.With) -> Result:

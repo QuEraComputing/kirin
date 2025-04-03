@@ -49,5 +49,6 @@ class ConstProp(interp.MethodTable):
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
+    @lowering.akin(len)
     def lower_Call_len(self, state: lowering.State, node: ast.Call) -> lowering.Result:
         return state.current_frame.push(Len(state.lower(node.args[0]).expect_one()))

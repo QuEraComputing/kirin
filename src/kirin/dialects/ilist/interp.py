@@ -17,12 +17,7 @@ class IListInterpreter(MethodTable):
 
     @impl(New)
     def new(self, interp, frame: Frame, stmt: New):
-        elem_type = types.Any
-        if stmt.values:
-            elem_type = stmt.values[0].type
-            for each in stmt.values[1:]:
-                elem_type = elem_type.join(each.type)
-        return (IList(list(frame.get_values(stmt.values)), elem=elem_type),)
+        return (IList(list(frame.get_values(stmt.values)), elem=stmt.elem_type),)
 
     @impl(Len, types.PyClass(IList))
     def len(self, interp, frame: Frame, stmt: Len):

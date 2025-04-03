@@ -39,9 +39,11 @@ class Sum(ir.Statement):
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
+    @lowering.akin(abs)
     def lower_Call_abs(self, state: lowering.State, node: Call) -> lowering.Result:
         return state.current_frame.push(Abs(state.lower(node.args[0]).expect_one()))
 
+    @lowering.akin(sum)
     def lower_Call_sum(self, state: lowering.State, node: Call) -> lowering.Result:
         return state.current_frame.push(Sum(state.lower(node.args[0]).expect_one()))
 
