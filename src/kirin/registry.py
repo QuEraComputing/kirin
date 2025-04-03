@@ -1,13 +1,19 @@
 from typing import TYPE_CHECKING, Callable, Iterable
 from dataclasses import dataclass
 
+from kirin.lowering.python.dialect import FromPythonAST
+
 if TYPE_CHECKING:
+    import ast
+
+    from kirin import lowering
     from kirin.ir import Attribute
     from kirin.ir.group import DialectGroup
     from kirin.ir.nodes import Statement
     from kirin.lowering import FromPythonAST
     from kirin.interp.impl import Signature
     from kirin.interp.table import MethodTable
+    from kirin.lowering.python.dialect import LoweringTransform
 
 
 @dataclass
@@ -35,6 +41,23 @@ class AttributeImpl:
 
 
 @dataclass
+class CallLoweringFunction:
+    parent: "FromPythonAST"
+    func: "LoweringTransform"
+
+    def __call__(
+        self, state: "lowering.State[ast.AST]", node: "ast.Call"
+    ) -> "lowering.Result":
+        return self.func(self.parent, state, node)
+
+
+@dataclass
+class LoweringRegistry:
+    ast_table: dict[str, FromPythonAST]
+    callee_table: dict[object, CallLoweringFunction]
+
+
+@dataclass
 class InterpreterRegistry:
     attributes: dict[type["Attribute"], "AttributeImpl"]
     statements: dict["Signature", "StatementImpl"]
@@ -47,7 +70,7 @@ class Registry:
     dialects: "DialectGroup"
     """The dialect group to build the registry from."""
 
-    def ast(self, keys: Iterable[str]) -> dict[str, "FromPythonAST"]:
+    def ast(self, keys: Iterable[str]) -> LoweringRegistry:
         """select the dialect lowering interpreters for the given key.
 
         Args:
@@ -57,6 +80,7 @@ class Registry:
             a map of dialects to their lowering interpreters
         """
         ret: dict[str, "FromPythonAST"] = {}
+        callee_table: dict[object, CallLoweringFunction] = {}
         from_ast = None
         for dialect in self.dialects.data:
             for key in keys:
@@ -69,11 +93,17 @@ class Registry:
                 raise KeyError(f"Lowering not found for {msg}")
 
             for name in from_ast.names:
+                if name.startswith("lower_Call_"):
+                    continue  # ignore the Call nodes
                 if name in ret:
                     raise KeyError(f"Lowering {name} already exists")
-
                 ret[name] = from_ast
-        return ret
+
+            for obj, trans in from_ast.callee_table.items():
+                if obj in callee_table:
+                    raise KeyError(f"Lowering {obj} already exists")
+                callee_table[obj] = CallLoweringFunction(from_ast, trans.func)
+        return LoweringRegistry(ret, callee_table)
 
     def interpreter(self, keys: Iterable[str]):
         """select the dialect interpreter for the given key.

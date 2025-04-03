@@ -92,6 +92,7 @@ class Lowering(lowering.FromPythonAST):
 
         return state.current_frame.push(Slice(start=lower, stop=upper, step=step))
 
+    @lowering.akin(slice)
     def lower_Call_slice(
         self, state: lowering.State, node: ast.Call
     ) -> lowering.Result:

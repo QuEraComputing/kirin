@@ -15,6 +15,7 @@ py = ir.Dialect("lowering.range.py")
 @py.register
 class PyLowering(lowering.FromPythonAST):
 
+    @lowering.akin(range)
     def lower_Call_range(
         self, state: lowering.State, node: ast.Call
     ) -> lowering.Result:
@@ -24,6 +25,7 @@ class PyLowering(lowering.FromPythonAST):
 @ilist.register
 class IListLowering(lowering.FromPythonAST):
 
+    @lowering.akin(range)
     def lower_Call_range(
         self, state: lowering.State, node: ast.Call
     ) -> lowering.Result:

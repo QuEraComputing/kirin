@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 
 from kirin.ir import Method, HasSignature
-from kirin.rewrite import Walk
+from kirin.rewrite import Walk, Chain
 from kirin.passes.abc import Pass
 from kirin.rewrite.abc import RewriteResult
 from kirin.dialects.func import Signature
 from kirin.analysis.typeinfer import TypeInference
 from kirin.rewrite.apply_type import ApplyType
+from kirin.rewrite.type_assert import InlineTypeAssert
 
 
 @dataclass
@@ -20,6 +21,8 @@ class TypeInfer(Pass):
         if trait := mt.code.get_trait(HasSignature):
             trait.set_signature(mt.code, Signature(mt.arg_types, return_type))
 
-        result = Walk(ApplyType(frame.entries)).rewrite(mt.code)
+        result = Chain(
+            Walk(ApplyType(frame.entries)), Walk(InlineTypeAssert())
+        ).rewrite(mt.code)
         mt.inferred = True
         return result

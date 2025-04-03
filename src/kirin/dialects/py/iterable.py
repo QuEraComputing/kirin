@@ -66,6 +66,7 @@ class TypeInfer(interp.MethodTable):
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
+    @lowering.akin(iter)
     def lower_Call_iter(self, state: lowering.State, node: Call) -> lowering.Result:
         if len(node.args) != 1:
             raise lowering.BuildError("iter() takes exactly 1 argument")
@@ -73,6 +74,7 @@ class Lowering(lowering.FromPythonAST):
             Iter(state.lower(node.args[0]).expect_one()),
         )
 
+    @lowering.akin(next)
     def lower_Call_next(self, state: lowering.State, node: Call) -> lowering.Result:
         if len(node.args) == 2:
             raise lowering.BuildError(

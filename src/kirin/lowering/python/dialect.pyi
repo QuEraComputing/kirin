@@ -1,15 +1,42 @@
+from __future__ import annotations
+
 import ast
 import sys
+from abc import ABC
+from typing import Any, Callable, ClassVar, TypeAlias
+from dataclasses import dataclass
 
 from kirin.ir import Method, SSAValue
+from kirin.ir.attrs import types
 from kirin.lowering.abc import Result
 from kirin.lowering.state import State
 
-class FromPythonAST:
+LoweringTransform: TypeAlias = Callable[[Any, State[ast.AST], ast.Call], Result]
+
+@dataclass
+class Transform:
+    objs: tuple[Callable, ...]
+    func: LoweringTransform
+
+@dataclass
+class akin:
+    obj: Callable
+
+    def __call__(
+        self,
+        func: LoweringTransform | Transform,
+    ) -> Transform: ...
+
+class FromPythonAST(ABC):
+    callee_table: ClassVar[dict[object, Transform]]
+
     @property
     def names(self) -> list[str]: ...
     def lower(self, state: State[ast.AST], node: ast.AST) -> Result: ...
     def unreachable(self, state: State[ast.AST], node: ast.AST) -> Result: ...
+    def get_hint(
+        self, state: State[ast.AST], node: ast.expr | None
+    ) -> types.TypeAttribute: ...
     def lower_Module(self, state: State[ast.AST], node: ast.Module) -> Result: ...
     def lower_Interactive(
         self, state: State[ast.AST], node: ast.Interactive
@@ -67,16 +94,9 @@ class FromPythonAST:
     def lower_YieldFrom(self, state: State[ast.AST], node: ast.YieldFrom) -> Result: ...
     def lower_Compare(self, state: State[ast.AST], node: ast.Compare) -> Result: ...
     def lower_Call(self, state: State[ast.AST], node: ast.Call) -> Result: ...
-    def lower_Call_builtins(self, state: State[ast.AST], node: ast.Call) -> Result: ...
     def lower_Call_global_method(
         self, state: State[ast.AST], method: Method, node: ast.Call
     ) -> Result: ...
-    def lower_Call_statement(self, state: State[ast.AST], node: ast.Call) -> Result: ...
-    def lower_Call_slice(self, state: State[ast.AST], node: ast.Call) -> Result: ...
-    def lower_Call_range(self, state: State[ast.AST], node: ast.Call) -> Result: ...
-    def lower_Call_len(self, state: State[ast.AST], node: ast.Call) -> Result: ...
-    def lower_Call_iter(self, state: State[ast.AST], node: ast.Call) -> Result: ...
-    def lower_Call_next(self, state: State[ast.AST], node: ast.Call) -> Result: ...
     def lower_Call_local(
         self, state: State[ast.AST], callee: SSAValue, node: ast.Call
     ) -> Result: ...
