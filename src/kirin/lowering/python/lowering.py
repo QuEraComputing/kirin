@@ -167,7 +167,7 @@ class Python(LoweringABC[ast.AST]):
                 node.func, state.lineno_offset, state.col_offset
             )
 
-        global_callee_result = self.lower_global_no_raise(state, node.func)
+        global_callee_result = state.get_global(node.func, no_raise=True)
         if global_callee_result is None:
             return self.visit_Call_local(state, node)
 
@@ -253,6 +253,9 @@ class Python(LoweringABC[ast.AST]):
             raise BuildError("expected context expression to be a call")
 
         global_callee = state.get_global(item.context_expr.func).data
+        if isinstance(global_callee, Binding):
+            global_callee = global_callee.parent
+
         if not issubclass(global_callee, ir.Statement):
             raise BuildError(
                 f"expected context expression to be a statement, got {global_callee}"
