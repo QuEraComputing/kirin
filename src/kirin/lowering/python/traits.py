@@ -242,9 +242,6 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
                     raise BuildError(
                         f"Expected exactly one block in region {region_name}"
                     )
-                body_frame.curr_region.blocks[0].stmts.append(
-                    cf.Branch(arguments=(), successor=body_frame.next_block)
-                )
 
                 if len(body_frame.curr_region.blocks) != 1:
                     raise BuildError(
