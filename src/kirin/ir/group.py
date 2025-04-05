@@ -204,12 +204,10 @@ class DialectGroup(Generic[PassParams]):
                         f"overwriting function definition of `{py_func.__name__}`"
                     )
 
-                lineno_offset = call_site_frame.f_lineno
+                lineno_offset = call_site_frame.f_lineno - 1
                 file = call_site_frame.f_code.co_filename
 
-            code = self.lowering.python_function(
-                py_func, lineno_offset=lineno_offset - 1
-            )
+            code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
             mt = Method(
                 mod=inspect.getmodule(py_func),
                 py_func=py_func,
@@ -217,6 +215,7 @@ class DialectGroup(Generic[PassParams]):
                 arg_names=["#self#"] + inspect.getfullargspec(py_func).args,
                 dialects=self,
                 code=code,
+                lineno_offset=lineno_offset,
                 file=file,
             )
             if doc := inspect.getdoc(py_func):

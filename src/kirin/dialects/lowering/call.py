@@ -12,8 +12,10 @@ class Lowering(lowering.FromPythonAST):
     def lower_Call_local(
         self, state: lowering.State, callee: ir.SSAValue, node: ast.Call
     ) -> lowering.Result:
+        source = state.source
         args, keywords = self.__lower_Call_args_kwargs(state, node)
         stmt = func.Call(callee, args, kwargs=keywords)
+        stmt.source = source
         return state.current_frame.push(stmt)
 
     def lower_Call_global_method(
@@ -22,9 +24,11 @@ class Lowering(lowering.FromPythonAST):
         method: ir.Method,
         node: ast.Call,
     ) -> lowering.Result:
+        source = state.source
         args, keywords = self.__lower_Call_args_kwargs(state, node)
         stmt = func.Invoke(args, callee=method, kwargs=keywords)
         stmt.result.type = method.return_type or types.Any
+        stmt.source = source
         return state.current_frame.push(stmt)
 
     def __lower_Call_args_kwargs(

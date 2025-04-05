@@ -2,5 +2,6 @@
 from kirin import ir
 
 from . import types as types
+from .exception import enable_stracetrace, disable_stracetrace
 
-__all__ = ["ir", "types"]
+__all__ = ["ir", "types", "enable_stracetrace", "disable_stracetrace"]
