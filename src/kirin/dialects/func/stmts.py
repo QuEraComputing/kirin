@@ -84,6 +84,21 @@ class Call(Statement):
     def print_impl(self, printer: Printer) -> None:
         pprint_calllike(self, printer.state.ssa_id[self.callee], printer)
 
+    def typecheck(self) -> None:
+        if not self.callee.type.is_subseteq(types.MethodType):
+            if self.callee.type.is_subseteq(types.PyClass(type(lambda x: x))):
+                raise VerificationError(
+                    self,
+                    f"callee must be a method type, got {self.callee.type}"
+                    ", did you call a Python function directly? consider"
+                    " decorating it with kernel decorator",
+                )
+            raise VerificationError(
+                self,
+                f"callee must be a method type, got {self.callee.type}"
+                ", did you forget to decorate the function with kernel decorator?",
+            )
+
 
 @statement(dialect=dialect)
 class ConstantNone(Statement):
