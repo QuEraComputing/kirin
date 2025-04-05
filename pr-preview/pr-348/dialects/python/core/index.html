@@ -337,18 +337,18 @@
     <span class=n>target</span><span class=p>,</span>
     <span class=n>result</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=o>.</span><span class=n>Result</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>171</span>
-<span class=normal>172</span>
-<span class=normal>173</span>
-<span class=normal>174</span>
-<span class=normal>175</span>
-<span class=normal>176</span>
-<span class=normal>177</span>
-<span class=normal>178</span>
-<span class=normal>179</span>
-<span class=normal>180</span>
-<span class=normal>181</span>
-<span class=normal>182</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>184</span>
+<span class=normal>185</span>
+<span class=normal>186</span>
+<span class=normal>187</span>
+<span class=normal>188</span>
+<span class=normal>189</span>
+<span class=normal>190</span>
+<span class=normal>191</span>
+<span class=normal>192</span>
+<span class=normal>193</span>
+<span class=normal>194</span>
+<span class=normal>195</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>assign_item</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>result</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=o>.</span><span class=n>Result</span><span class=p>):</span>
     <span class=k>match</span> <span class=n>target</span><span class=p>:</span>
         <span class=k>case</span> <span class=n>ast</span><span class=o>.</span><span class=n>Tuple</span><span class=p>(</span><span class=n>elts</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Store</span><span class=p>()):</span>
@@ -363,24 +363,24 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.assign.Lowering.assign_item_value class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">assign_item_value</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>assign_item_value</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>152</span>
-<span class=normal>153</span>
-<span class=normal>154</span>
-<span class=normal>155</span>
-<span class=normal>156</span>
-<span class=normal>157</span>
-<span class=normal>158</span>
-<span class=normal>159</span>
-<span class=normal>160</span>
-<span class=normal>161</span>
-<span class=normal>162</span>
-<span class=normal>163</span>
-<span class=normal>164</span>
-<span class=normal>165</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>165</span>
 <span class=normal>166</span>
 <span class=normal>167</span>
 <span class=normal>168</span>
-<span class=normal>169</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>169</span>
+<span class=normal>170</span>
+<span class=normal>171</span>
+<span class=normal>172</span>
+<span class=normal>173</span>
+<span class=normal>174</span>
+<span class=normal>175</span>
+<span class=normal>176</span>
+<span class=normal>177</span>
+<span class=normal>178</span>
+<span class=normal>179</span>
+<span class=normal>180</span>
+<span class=normal>181</span>
+<span class=normal>182</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>assign_item_value</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>):</span>
     <span class=n>current_frame</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>current_frame</span>
     <span class=k>match</span> <span class=n>target</span><span class=p>:</span>
@@ -452,10 +452,36 @@
 </code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>147</span>
 <span class=normal>148</span>
 <span class=normal>149</span>
-<span class=normal>150</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_AugAssign</span><span class=p>(</span>
+<span class=normal>150</span>
+<span class=normal>151</span>
+<span class=normal>152</span>
+<span class=normal>153</span>
+<span class=normal>154</span>
+<span class=normal>155</span>
+<span class=normal>156</span>
+<span class=normal>157</span>
+<span class=normal>158</span>
+<span class=normal>159</span>
+<span class=normal>160</span>
+<span class=normal>161</span>
+<span class=normal>162</span>
+<span class=normal>163</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>lower_AugAssign</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>AugAssign</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
-    <span class=bp>self</span><span class=o>.</span><span class=n>assign_item_value</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>node</span><span class=o>.</span><span class=n>target</span><span class=p>,</span> <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>value</span><span class=p>)</span><span class=o>.</span><span class=n>expect_one</span><span class=p>())</span>
+    <span class=k>match</span> <span class=n>node</span><span class=o>.</span><span class=n>target</span><span class=p>:</span>
+        <span class=k>case</span> <span class=n>ast</span><span class=o>.</span><span class=n>Name</span><span class=p>(</span><span class=n>name</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Store</span><span class=p>()):</span>
+            <span class=n>rhs</span> <span class=o>=</span> <span class=n>ast</span><span class=o>.</span><span class=n>Name</span><span class=p>(</span><span class=n>name</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Load</span><span class=p>())</span>
+        <span class=k>case</span> <span class=n>ast</span><span class=o>.</span><span class=n>Attribute</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>attr</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Store</span><span class=p>()):</span>
+            <span class=n>rhs</span> <span class=o>=</span> <span class=n>ast</span><span class=o>.</span><span class=n>Attribute</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>attr</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Load</span><span class=p>())</span>
+        <span class=k>case</span> <span class=n>ast</span><span class=o>.</span><span class=n>Subscript</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=nb>slice</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Store</span><span class=p>()):</span>
+            <span class=n>rhs</span> <span class=o>=</span> <span class=n>ast</span><span class=o>.</span><span class=n>Subscript</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=nb>slice</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Load</span><span class=p>())</span>
+        <span class=k>case</span><span class=w> </span><span class=k>_</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=n>lowering</span><span class=o>.</span><span class=n>BuildError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;unsupported target </span><span class=si>{</span><span class=n>node</span><span class=o>.</span><span class=n>target</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>)</span>
+    <span class=bp>self</span><span class=o>.</span><span class=n>assign_item_value</span><span class=p>(</span>
+        <span class=n>state</span><span class=p>,</span>
+        <span class=n>node</span><span class=o>.</span><span class=n>target</span><span class=p>,</span>
+        <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=o>.</span><span class=n>BinOp</span><span class=p>(</span><span class=n>rhs</span><span class=p>,</span> <span class=n>node</span><span class=o>.</span><span class=n>op</span><span class=p>,</span> <span class=n>node</span><span class=o>.</span><span class=n>value</span><span class=p>))</span><span class=o>.</span><span class=n>expect_one</span><span class=p>(),</span>
+    <span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.assign.SetAttribute class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">SetAttribute</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-kirin-statement"><code>kirin-statement</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>SetAttribute</span><span class=p>(</span>
     <span class=n>obj</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span> <span class=o>*</span><span class=p>,</span> <span class=n>attr</span><span class=p>:</span> <span class=nb>str</span>
 <span class=p>)</span>
