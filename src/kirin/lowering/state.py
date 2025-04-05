@@ -160,7 +160,6 @@ class State(Generic[ASTNodeType]):
     def frame(
         self,
         stmts: Sequence[ASTNodeType] | StmtStream[ASTNodeType],
-        parent: Optional["Frame"] = None,
         region: Optional[Region] = None,
         entr_block: Optional[Block] = None,
         next_block: Optional[Block] = None,
@@ -174,6 +173,7 @@ class State(Generic[ASTNodeType]):
             stmts = StmtStream(stmts)
 
         region = region or Region()
+        region.source = self.source
 
         entr_block = entr_block or Block()
         region.blocks.append(entr_block)

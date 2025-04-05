@@ -9,8 +9,8 @@ from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue, ResultValue
 from kirin.ir.use import Use
 from kirin.ir.traits import Trait
-from kirin.exceptions import TypeCheckError, VerificationError
 from kirin.ir.attrs.abc import Attribute
+from kirin.ir.exception import TypeCheckError, ValidationError
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import MutableSequenceView
 from kirin.ir.nodes.block import Block
@@ -151,7 +151,6 @@ class Statement(IRNode["Block"]):
     _name_args_slice: dict[str, int | slice] = field(
         init=False, repr=False, default_factory=dict
     )
-    source: SourceInfo | None = field(default=None, init=False, repr=False)
 
     @property
     def parent_stmt(self) -> Statement | None:
@@ -726,8 +725,10 @@ class Statement(IRNode["Block"]):
     def verify(self) -> None:
         try:
             self.check()
+        except ValidationError as e:
+            raise e
         except Exception as e:
-            raise VerificationError(self, err=e) from e
+            raise ValidationError(self, *e.args) from e
 
     def verify_type(self) -> None:
         """Verify the type of the statement.
@@ -737,5 +738,7 @@ class Statement(IRNode["Block"]):
         """
         try:
             self.check_type()
+        except TypeCheckError as e:
+            raise e
         except Exception as e:
-            raise TypeCheckError(self, err=e) from e
+            raise TypeCheckError(self, *e.args) from e

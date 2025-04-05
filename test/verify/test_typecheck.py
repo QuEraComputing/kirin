@@ -1,8 +1,8 @@
 import pytest
 
+from kirin import ir
 from kirin.prelude import basic
 from kirin.dialects import math
-from kirin.exceptions import TypeCheckError
 
 
 @basic(verify=False, typeinfer=False)
@@ -12,5 +12,5 @@ def check_type_err(a, b):
 
 
 def test_check_type():
-    with pytest.raises(TypeCheckError):
+    with pytest.raises(ir.TypeCheckError):
         check_type_err.code.verify_type()

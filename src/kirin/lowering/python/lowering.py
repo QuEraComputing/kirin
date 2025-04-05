@@ -114,7 +114,7 @@ class Python(LoweringABC[ast.AST]):
             col_offset=col_offset,
         )
 
-        with state.frame([stmt], parent=None, globals=globals) as frame:
+        with state.frame([stmt], globals=globals) as frame:
             try:
                 self.visit(state, stmt)
             except BuildError as e:

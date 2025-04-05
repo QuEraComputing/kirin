@@ -5,7 +5,7 @@ from types import ModuleType
 from dataclasses import field, dataclass
 
 from kirin.ir.traits import HasSignature, CallableStmtInterface
-from kirin.exceptions import VerificationError
+from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
 from kirin.ir.attrs.types import Generic
@@ -91,7 +91,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
         """verify the method body."""
         try:
             self.code.verify()
-        except VerificationError as e:
+        except ValidationError as e:
             msg = f'File "{self.file}"'
             if isinstance(e.node, Statement):
                 if e.node.source:

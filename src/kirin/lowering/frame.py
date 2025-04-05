@@ -79,6 +79,7 @@ class Frame(Generic[Stmt]):
         """
         self.curr_region.blocks.append(block)
         self.curr_block = block
+        block.source = self.state.source
         return block
 
     def jump_next_block(self):

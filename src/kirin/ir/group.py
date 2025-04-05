@@ -17,7 +17,7 @@ from dataclasses import field, dataclass
 from collections.abc import Iterable
 
 from kirin.ir.method import Method
-from kirin.exceptions import CompilerError
+from kirin.ir.exception import CompilerError
 
 if TYPE_CHECKING:
     from kirin.lowering import Python

@@ -1,6 +1,6 @@
 from typing import Any
 
-from kirin.exceptions import VerificationError
+from kirin.ir.exception import ValidationError
 from kirin.decl.emit.init import BaseModifier
 
 from ._create_fn import create_fn
@@ -8,11 +8,11 @@ from ._set_new_attribute import set_new_attribute
 
 
 class EmitVerify(BaseModifier):
-    _VERIFICATION_ERROR = "_kirin_VerificationError"
+    _VERIFICATION_ERROR = "_kirin_ValidationError"
 
     def emit_verify(self):
         verify_locals: dict[str, Any] = {
-            self._VERIFICATION_ERROR: VerificationError,
+            self._VERIFICATION_ERROR: ValidationError,
         }
         body: list[str] = []
         for name in self.fields.blocks.keys():

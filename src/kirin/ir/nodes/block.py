@@ -8,7 +8,8 @@ from typing_extensions import Self
 
 from kirin.print import Printer
 from kirin.ir.ssa import SSAValue, BlockArgument, DeletedSSAValue
-from kirin.exceptions import VerificationError
+from kirin.source import SourceInfo
+from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import View, MutableSequenceView
 
@@ -254,6 +255,8 @@ class Block(IRNode["Region"]):
         self,
         stmts: Sequence[Statement] = (),
         argtypes: Iterable[TypeAttribute] = (),
+        *,
+        source: SourceInfo | None = None,
     ):
         """
         Args:
@@ -261,6 +264,7 @@ class Block(IRNode["Region"]):
             argtypes (Iterable[TypeAttribute], optional): The type of the block arguments. Defaults to ().
         """
         super().__init__()
+        self.source = source
         self._args = tuple(
             BlockArgument(self, i, argtype) for i, argtype in enumerate(argtypes)
         )
@@ -445,12 +449,12 @@ class Block(IRNode["Region"]):
         """Verify the correctness of the Block.
 
         Raises:
-            VerificationError: If the Block is not correct.
+            IRValidationError: If the Block is not correct.
         """
         from kirin.ir.nodes.stmt import Region
 
         if not isinstance(self.parent, Region):
-            raise VerificationError(self, "Parent is not a region")
+            raise ValidationError(self, "Parent is not a region")
 
         for stmt in self.stmts:
             stmt.verify()
@@ -459,7 +463,7 @@ class Block(IRNode["Region"]):
         """Verify the types of the Block.
 
         Raises:
-            VerificationError: If the Block is not correct.
+            IRValidationError: If the Block is not correct.
         """
         for stmt in self.stmts:
             stmt.verify_type()

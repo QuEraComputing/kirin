@@ -17,7 +17,6 @@ from kirin.ir import (
 )
 from kirin.decl import info, statement
 from kirin.ir.ssa import SSAValue
-from kirin.exceptions import VerificationError
 from kirin.print.printer import Printer
 from kirin.dialects.func.attrs import Signature, MethodType
 from kirin.dialects.func.dialect import dialect
@@ -142,18 +141,12 @@ class Return(Statement):
             printer.plain_print(" ")
             printer.print_seq(self.args, delim=", ")
 
-    def verify(self) -> None:
-        if not self.args:
-            raise VerificationError(
-                self, "return statement must have at least one value"
-            )
-
-        if len(self.args) > 1:
-            raise VerificationError(
-                self,
-                "return statement must have at most one value"
-                ", wrap multiple values in a tuple",
-            )
+    def check(self) -> None:
+        assert self.args, "return statement must have at least one value"
+        assert len(self.args) <= 1, (
+            "return statement must have at most one value"
+            ", wrap multiple values in a tuple"
+        )
 
 
 @statement(dialect=dialect)
@@ -174,9 +167,8 @@ class Lambda(Statement):
     body: Region = info.region(multi=True)
     result: ResultValue = info.result(MethodType)
 
-    def verify(self) -> None:
-        if self.body.blocks.isempty():
-            raise VerificationError(self, "lambda body must not be empty")
+    def check(self) -> None:
+        assert self.body.blocks, "lambda body must not be empty"
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):
@@ -231,16 +223,13 @@ class Invoke(Statement):
     def print_impl(self, printer: Printer) -> None:
         pprint_calllike(self, self.callee.sym_name, printer)
 
-    def verify(self) -> None:
+    def check(self) -> None:
         if self.kwargs:
             for name in self.kwargs:
-                if name not in self.callee.arg_names:
-                    raise VerificationError(
-                        self,
-                        f"method {self.callee.sym_name} does not have argument {name}",
-                    )
+                assert (
+                    name in self.callee.arg_names
+                ), f"method {self.callee.sym_name} does not have argument {name}"
         elif len(self.callee.arg_names) - 1 != len(self.args):
-            raise VerificationError(
-                self,
-                f"expected {len(self.callee.arg_names)} arguments, got {len(self.args)}",
+            raise ValueError(
+                f"expected {len(self.callee.arg_names)} arguments, got {len(self.args)}"
             )
