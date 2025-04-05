@@ -26,8 +26,8 @@ class CommonSubexpressionElimination(RewriteRule):
             )
             if hash_value in seen:
                 old_stmt = seen[hash_value]
-                for result in stmt._results:
-                    result.replace_by(old_stmt._results[0])
+                for result, old_result in zip(stmt._results, old_stmt.results):
+                    result.replace_by(old_result)
                 stmt.delete()
                 return RewriteResult(has_done_something=True)
             else:
