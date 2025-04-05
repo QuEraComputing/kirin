@@ -207,7 +207,9 @@ class DialectGroup(Generic[PassParams]):
                 lineno_offset = call_site_frame.f_lineno
                 file = call_site_frame.f_code.co_filename
 
-            code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
+            code = self.lowering.python_function(
+                py_func, lineno_offset=lineno_offset - 1
+            )
             mt = Method(
                 mod=inspect.getmodule(py_func),
                 py_func=py_func,
