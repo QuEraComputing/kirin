@@ -147,7 +147,20 @@ class Lowering(lowering.FromPythonAST):
     def lower_AugAssign(
         self, state: lowering.State, node: ast.AugAssign
     ) -> lowering.Result:
-        self.assign_item_value(state, node.target, state.lower(node.value).expect_one())
+        match node.target:
+            case ast.Name(name, ast.Store()):
+                rhs = ast.Name(name, ast.Load())
+            case ast.Attribute(obj, attr, ast.Store()):
+                rhs = ast.Attribute(obj, attr, ast.Load())
+            case ast.Subscript(obj, slice, ast.Store()):
+                rhs = ast.Subscript(obj, slice, ast.Load())
+            case _:
+                raise lowering.BuildError(f"unsupported target {node.target}")
+        self.assign_item_value(
+            state,
+            node.target,
+            state.lower(ast.BinOp(rhs, node.op, node.value)).expect_one(),
+        )
 
     @classmethod
     def assign_item_value(cls, state: lowering.State, target, value: ir.SSAValue):

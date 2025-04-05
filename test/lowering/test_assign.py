@@ -40,3 +40,19 @@ def test_chain_assign_setattr():
     assert stmt.obj.name == "y"
     assert stmt.attr == "z"
     assert stmt.value.name == "x"
+
+
+def test_aug_assign():
+    @dummy_dialect
+    def aug_assign(y):
+        y += 1
+        return y
+
+    y = aug_assign.callable_region.blocks[0].args[1]
+    const = aug_assign.callable_region.blocks[0].stmts.at(0)
+    assert isinstance(const, py.Constant)
+    assert const.value.unwrap() == 1
+    add = aug_assign.callable_region.blocks[0].stmts.at(1)
+    assert isinstance(add, py.binop.Add)
+    assert add.lhs is y
+    assert add.rhs is const.result
