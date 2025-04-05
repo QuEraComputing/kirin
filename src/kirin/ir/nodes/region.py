@@ -315,11 +315,6 @@ class Region(IRNode["Statement"]):
         printer.print_newline()
         printer.plain_print("}")
 
-    def typecheck(self) -> None:
-        """Checking the types of the Statments of Blocks in the Region."""
-        for block in self.blocks:
-            block.typecheck()
-
     def verify(self) -> None:
         """Verify the correctness of the Region.
 
@@ -335,3 +330,7 @@ class Region(IRNode["Statement"]):
 
         for block in self.blocks:
             block.verify()
+
+    def verify_type(self) -> None:
+        for block in self.blocks:
+            block.verify_type()

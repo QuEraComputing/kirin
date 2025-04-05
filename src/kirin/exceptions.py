@@ -22,11 +22,18 @@ class CompilerError(Exception):
     pass
 
 
-class VerificationError(Exception):
-    def __init__(self, node: "IRNode", *messages: str) -> None:
+class ForwardedError(Exception):
+    def __init__(
+        self, node: "IRNode", *messages: str, err: Exception | None = None
+    ) -> None:
         super().__init__(*messages)
         self.node = node
+        self.err = err
 
 
-class DuplicatedDefinitionError(Exception):
+class VerificationError(ForwardedError):
+    pass
+
+
+class TypeCheckError(ForwardedError):
     pass

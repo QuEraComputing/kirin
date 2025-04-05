@@ -14,7 +14,7 @@ from kirin.decl.emit.verify import EmitVerify
 from kirin.decl.scan_fields import ScanFields
 from kirin.decl.emit.dialect import EmitDialect
 from kirin.decl.emit.property import EmitProperty
-from kirin.decl.emit.typecheck import EmitTypeCheck
+from kirin.decl.emit.check_type import EmitCheckType
 
 
 class StatementDecl(
@@ -27,7 +27,7 @@ class StatementDecl(
     EmitRepr,
     EmitTraits,
     EmitVerify,
-    EmitTypeCheck,
+    EmitCheckType,
 ):
     pass
 

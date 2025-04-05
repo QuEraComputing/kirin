@@ -441,11 +441,6 @@ class Block(IRNode["Region"]):
                 printer.print_newline()
                 printer.print_stmt(stmt)
 
-    def typecheck(self) -> None:
-        """Checking the types of the Statments in the Block."""
-        for stmt in self.stmts:
-            stmt.typecheck()
-
     def verify(self) -> None:
         """Verify the correctness of the Block.
 
@@ -459,3 +454,12 @@ class Block(IRNode["Region"]):
 
         for stmt in self.stmts:
             stmt.verify()
+
+    def verify_type(self) -> None:
+        """Verify the types of the Block.
+
+        Raises:
+            VerificationError: If the Block is not correct.
+        """
+        for stmt in self.stmts:
+            stmt.verify_type()
