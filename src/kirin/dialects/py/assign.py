@@ -162,6 +162,13 @@ class Lowering(lowering.FromPythonAST):
             state.lower(ast.BinOp(rhs, node.op, node.value)).expect_one(),
         )
 
+    def lower_NamedExpr(
+        self, state: lowering.State, node: ast.NamedExpr
+    ) -> lowering.Result:
+        value = state.lower(node.value).expect_one()
+        self.assign_item_value(state, node.target, value)
+        return value
+
     @classmethod
     def assign_item_value(cls, state: lowering.State, target, value: ir.SSAValue):
         current_frame = state.current_frame

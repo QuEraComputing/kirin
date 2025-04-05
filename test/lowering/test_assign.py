@@ -1,7 +1,7 @@
 from kirin import ir, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
-from kirin.dialects import py
+from kirin.dialects import cf, py
 
 dialect = ir.Dialect("test")
 
@@ -56,3 +56,20 @@ def test_aug_assign():
     assert isinstance(add, py.binop.Add)
     assert add.lhs is y
     assert add.rhs is const.result
+
+
+def test_named_expr():
+
+    @dummy_dialect
+    def named_expr(y):
+        if y := y + 1:
+            return y
+        return y
+
+    stmt = named_expr.callable_region.blocks[0].stmts.at(1)
+    y = named_expr.callable_region.blocks[0].args[1]
+    assert isinstance(stmt, py.binop.Add)
+    assert stmt.lhs is y
+    br = named_expr.callable_region.blocks[0].stmts.at(2)
+    assert isinstance(br, cf.ConditionalBranch)
+    assert stmt.result is br.cond
