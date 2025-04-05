@@ -300,7 +300,7 @@ class Python(LoweringABC[ast.AST]):
                     if lineno == error_lineno:
                         line = f"{state.source.lineno}[dim]│[/dim]" + line
                     else:
-                        line = "[dim] " * (error_lineno_len) + "│[/dim]" + line
+                        line = "[dim]" + " " * (error_lineno_len) + "│[/dim]" + line
                 console.print("  " + line, markup=True, highlight=False)
                 if lineno == error_lineno:
                     console.print(
