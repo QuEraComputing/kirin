@@ -1,6 +1,6 @@
 from typing import Any
 
-from kirin.exceptions import VerificationError
+from kirin.ir.exception import ValidationError
 from kirin.decl.emit.init import BaseModifier
 
 from ._create_fn import create_fn
@@ -8,11 +8,11 @@ from ._set_new_attribute import set_new_attribute
 
 
 class EmitCheckType(BaseModifier):
-    _VERIFICATION_ERROR = "_kirin_VerificationError"
+    _VERIFICATION_ERROR = "_kirin_IRValidationError"
 
     def emit_check_type(self):
         check_type_locals: dict[str, Any] = {
-            self._VERIFICATION_ERROR: VerificationError,
+            self._VERIFICATION_ERROR: ValidationError,
         }
         body: list[str] = []
         for name, f in self.fields.args.items():
@@ -46,10 +46,10 @@ class EmitCheckType(BaseModifier):
             )
 
         for name in self.fields.blocks.keys():
-            body.append(f"{self._self_name}.{name}.check_type()")
+            body.append(f"{self._self_name}.{name}.verify_type()")
 
         for name, f in self.fields.regions.items():
-            body.append(f"{self._self_name}.{name}.check_type()")
+            body.append(f"{self._self_name}.{name}.verify_type()")
 
         # NOTE: we still need to generate this because it is abstract
         if not body:

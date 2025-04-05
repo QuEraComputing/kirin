@@ -7,8 +7,6 @@ from types import ModuleType
 from typing import Any, Callable, Iterable
 from dataclasses import dataclass
 
-from rich.console import Console
-
 from kirin import ir
 from kirin.source import SourceInfo
 from kirin.registry import LoweringRegistry
@@ -37,7 +35,7 @@ class Python(LoweringABC[ast.AST]):
     registry: LoweringRegistry
     max_lines: int = 3
     hint_indent: int = 2
-    hint_lineno: bool = True
+    hint_show_lineno: bool = True
     stacktrace: bool = False
     """If True, print the stacktrace of the error."""
 
@@ -59,7 +57,7 @@ class Python(LoweringABC[ast.AST]):
         self.max_lines = max_lines
         self.registry = self.dialects.registry.ast(keys=keys or ["main", "default"])
         self.hint_indent = hint_indent
-        self.hint_lineno = hint_lineno
+        self.hint_show_lineno = hint_lineno
         self.stacktrace = stacktrace
 
     def python_function(
@@ -114,17 +112,23 @@ class Python(LoweringABC[ast.AST]):
             col_offset=col_offset,
         )
 
-        with state.frame([stmt], parent=None, globals=globals) as frame:
+        with state.frame([stmt], globals=globals) as frame:
             try:
                 self.visit(state, stmt)
             except BuildError as e:
+                hint = state.error_hint(
+                    e,
+                    max_lines=self.max_lines,
+                    indent=self.hint_indent,
+                    show_lineno=self.hint_show_lineno,
+                )
                 if self.stacktrace:
                     raise Exception(
-                        f"{e.args[0]}\n\n{self.error_hint(state, e)}",
+                        f"{e.args[0]}\n\n{hint}",
                         *e.args[1:],
                     ) from e
                 else:
-                    e.args = (self.error_hint(state, e),)
+                    e.args = (hint,)
                     raise e
 
             region = frame.curr_region
@@ -270,74 +274,3 @@ class Python(LoweringABC[ast.AST]):
             " to be implemented"
             f" for {global_callee.__name__}"
         )
-
-    def error_hint(self, state: State[ast.AST], err: BuildError) -> str:
-        begin = max(0, state.source.lineno - self.max_lines - state.lineno_offset)
-        end = max(
-            max(state.source.lineno + self.max_lines, state.source.end_lineno or 0)
-            - state.lineno_offset,
-            0,
-        )
-        end = min(len(state.lines), end)  # make sure end is within bounds
-        lines = state.lines[begin:end]
-        error_lineno = state.source.lineno - state.lineno_offset - 1
-        error_lineno_len = len(str(state.source.lineno))
-        code_indent = min(map(self.__get_indent, lines), default=0)
-
-        console = Console(force_terminal=True)
-        with console.capture() as capture:
-            console.print()
-            console.print(
-                f"[dim]{state.file or 'stdin'}:{state.source.lineno}[/dim]",
-                markup=True,
-                highlight=False,
-            )
-            emsg = "\n  ".join(err.args)
-            console.print(f"[red]  {type(err).__name__}: {emsg}[/red]")
-            for lineno, line in enumerate(lines, begin):
-                line = " " * self.hint_indent + line[code_indent:]
-                if self.hint_lineno:
-                    if lineno == error_lineno:
-                        line = f"{state.source.lineno}[dim]│[/dim]" + line
-                    else:
-                        line = "[dim]" + " " * (error_lineno_len) + "│[/dim]" + line
-                console.print("  " + line, markup=True, highlight=False)
-                if lineno == error_lineno:
-                    console.print(
-                        "  "
-                        + self.__hint_line(
-                            state, code_indent, error_lineno_len, err.hint
-                        ),
-                        markup=True,
-                        highlight=False,
-                    )
-
-            if end == error_lineno:
-                console.print(
-                    "  "
-                    + self.__hint_line(state, code_indent, error_lineno_len, err.hint),
-                    markup=True,
-                    highlight=False,
-                )
-
-        return capture.get()
-
-    def __hint_line(
-        self, state: State[ast.AST], code_indent: int, error_lineno_len: int, msg: str
-    ) -> str:
-        hint = " " * (state.source.col_offset - code_indent)
-        if state.source.end_col_offset:
-            hint += "^" * (state.source.end_col_offset - state.source.col_offset)
-        else:
-            hint += "^"
-
-        hint = " " * self.hint_indent + "[red]" + hint + " error: " + msg + "[/red]"
-        if self.hint_lineno:
-            hint = " " * error_lineno_len + "[dim]│[/dim]" + hint
-        return hint
-
-    @staticmethod
-    def __get_indent(line: str) -> int:
-        if len(line) == 0:
-            return int(1e9)  # very large number
-        return len(line) - len(line.lstrip())

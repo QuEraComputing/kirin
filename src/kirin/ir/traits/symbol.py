@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
-from kirin.exceptions import VerificationError
 from kirin.ir.attrs.py import PyAttr
+from kirin.ir.exception import ValidationError
 from kirin.ir.traits.abc import Trait
 
 if TYPE_CHECKING:
@@ -45,13 +45,13 @@ class SymbolTable(Trait["Statement"]):
 
     def verify(self, stmt: Statement):
         if len(stmt.regions) != 1:
-            raise VerificationError(
+            raise ValidationError(
                 stmt,
                 f"Statement {stmt.name} with SymbolTable trait must have exactly one region",
             )
 
         if len(stmt.regions[0].blocks) != 1:
-            raise VerificationError(
+            raise ValidationError(
                 stmt,
                 f"Statement {stmt.name} with SymbolTable trait must have exactly one block",
             )

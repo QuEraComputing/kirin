@@ -1,23 +1,5 @@
-from kirin import types
-from kirin.ir import (
-    Pure,
-    Method,
-    Region,
-    HasParent,
-    MaybePure,
-    Statement,
-    ResultValue,
-    ConstantLike,
-    HasSignature,
-    IsTerminator,
-    SSACFGRegion,
-    IsolatedFromAbove,
-    SymbolOpInterface,
-    CallableStmtInterface,
-)
+from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.ir.ssa import SSAValue
-from kirin.exceptions import VerificationError
 from kirin.print.printer import Printer
 from kirin.dialects.func.attrs import Signature, MethodType
 from kirin.dialects.func.dialect import dialect
@@ -25,29 +7,29 @@ from kirin.dialects.func.dialect import dialect
 from .._pprint_helper import pprint_calllike
 
 
-class FuncOpCallableInterface(CallableStmtInterface["Function"]):
+class FuncOpCallableInterface(ir.CallableStmtInterface["Function"]):
 
     @classmethod
-    def get_callable_region(cls, stmt: "Function") -> Region:
+    def get_callable_region(cls, stmt: "Function") -> ir.Region:
         return stmt.body
 
 
 @statement(dialect=dialect)
-class Function(Statement):
+class Function(ir.Statement):
     name = "func"
     traits = frozenset(
         {
-            IsolatedFromAbove(),
-            SymbolOpInterface(),
-            HasSignature(),
+            ir.IsolatedFromAbove(),
+            ir.SymbolOpInterface(),
+            ir.HasSignature(),
             FuncOpCallableInterface(),
-            SSACFGRegion(),
+            ir.SSACFGRegion(),
         }
     )
     sym_name: str = info.attribute()
     """The symbol name of the function."""
     signature: Signature = info.attribute()
-    body: Region = info.region(multi=True)
+    body: ir.Region = info.region(multi=True)
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):
@@ -71,14 +53,14 @@ class Function(Statement):
 
 
 @statement(dialect=dialect)
-class Call(Statement):
+class Call(ir.Statement):
     name = "call"
-    traits = frozenset({MaybePure()})
+    traits = frozenset({ir.MaybePure()})
     # not a fixed type here so just any
-    callee: SSAValue = info.argument()
-    inputs: tuple[SSAValue, ...] = info.argument()
+    callee: ir.SSAValue = info.argument()
+    inputs: tuple[ir.SSAValue, ...] = info.argument()
     kwargs: tuple[str, ...] = info.attribute(default_factory=lambda: ())
-    result: ResultValue = info.result()
+    result: ir.ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 
     def print_impl(self, printer: Printer) -> None:
@@ -87,19 +69,21 @@ class Call(Statement):
     def check_type(self) -> None:
         if not self.callee.type.is_subseteq(types.MethodType):
             if self.callee.type.is_subseteq(types.PyClass(type(lambda x: x))):
-                raise TypeError(
-                    f"callee must be a method type, got {self.callee.type}"
-                    ", did you call a Python function directly? consider"
-                    " decorating it with kernel decorator",
+                raise ir.TypeCheckError(
+                    self,
+                    f"callee must be a method type, got {self.callee.type}",
+                    help="did you call a Python function directly? "
+                    "consider decorating it with kernel decorator",
                 )
-            raise TypeError(
-                f"callee must be a method type, got {self.callee.type}"
-                ", did you forget to decorate the function with kernel decorator?",
+            raise ir.TypeCheckError(
+                self,
+                f"callee must be a method type, got {self.callee.type}",
+                help="did you forget to decorate the function with kernel decorator?",
             )
 
 
 @statement(dialect=dialect)
-class ConstantNone(Statement):
+class ConstantNone(ir.Statement):
     """A constant None value.
 
     This is mainly used to represent the None return value of a function
@@ -107,20 +91,20 @@ class ConstantNone(Statement):
     """
 
     name = "const.none"
-    traits = frozenset({Pure(), ConstantLike()})
-    result: ResultValue = info.result(types.NoneType)
+    traits = frozenset({ir.Pure(), ir.ConstantLike()})
+    result: ir.ResultValue = info.result(types.NoneType)
 
 
 @statement(dialect=dialect, init=False)
-class Return(Statement):
+class Return(ir.Statement):
     name = "return"
-    traits = frozenset({IsTerminator(), HasParent((Function,))})
-    value: SSAValue = info.argument()
+    traits = frozenset({ir.IsTerminator(), ir.HasParent((Function,))})
+    value: ir.SSAValue = info.argument()
 
-    def __init__(self, value_or_stmt: SSAValue | Statement | None = None) -> None:
-        if isinstance(value_or_stmt, SSAValue):
+    def __init__(self, value_or_stmt: ir.SSAValue | ir.Statement | None = None) -> None:
+        if isinstance(value_or_stmt, ir.SSAValue):
             args = [value_or_stmt]
-        elif isinstance(value_or_stmt, Statement):
+        elif isinstance(value_or_stmt, ir.Statement):
             if len(value_or_stmt._results) == 1:
                 args = [value_or_stmt._results[0]]
             else:
@@ -142,41 +126,34 @@ class Return(Statement):
             printer.plain_print(" ")
             printer.print_seq(self.args, delim=", ")
 
-    def verify(self) -> None:
-        if not self.args:
-            raise VerificationError(
-                self, "return statement must have at least one value"
-            )
-
-        if len(self.args) > 1:
-            raise VerificationError(
-                self,
-                "return statement must have at most one value"
-                ", wrap multiple values in a tuple",
-            )
+    def check(self) -> None:
+        assert self.args, "return statement must have at least one value"
+        assert len(self.args) <= 1, (
+            "return statement must have at most one value"
+            ", wrap multiple values in a tuple"
+        )
 
 
 @statement(dialect=dialect)
-class Lambda(Statement):
+class Lambda(ir.Statement):
     name = "lambda"
     traits = frozenset(
         {
-            Pure(),
-            HasSignature(),
-            SymbolOpInterface(),
+            ir.Pure(),
+            ir.HasSignature(),
+            ir.SymbolOpInterface(),
             FuncOpCallableInterface(),
-            SSACFGRegion(),
+            ir.SSACFGRegion(),
         }
     )
     sym_name: str = info.attribute()
     signature: Signature = info.attribute()
-    captured: tuple[SSAValue, ...] = info.argument()
-    body: Region = info.region(multi=True)
-    result: ResultValue = info.result(MethodType)
+    captured: tuple[ir.SSAValue, ...] = info.argument()
+    body: ir.Region = info.region(multi=True)
+    result: ir.ResultValue = info.result(MethodType)
 
-    def verify(self) -> None:
-        if self.body.blocks.isempty():
-            raise VerificationError(self, "lambda body must not be empty")
+    def check(self) -> None:
+        assert self.body.blocks, "lambda body must not be empty"
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):
@@ -200,13 +177,13 @@ class Lambda(Statement):
 
 
 @statement(dialect=dialect)
-class GetField(Statement):
+class GetField(ir.Statement):
     name = "getfield"
-    traits = frozenset({Pure()})
-    obj: SSAValue = info.argument(MethodType)
+    traits = frozenset({ir.Pure()})
+    obj: ir.SSAValue = info.argument(MethodType)
     field: int = info.attribute()
     # NOTE: mypy somehow doesn't understand default init=False
-    result: ResultValue = info.result(init=False)
+    result: ir.ResultValue = info.result(init=False)
 
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self)
@@ -219,28 +196,25 @@ class GetField(Statement):
 
 
 @statement(dialect=dialect)
-class Invoke(Statement):
+class Invoke(ir.Statement):
     name = "invoke"
-    traits = frozenset({MaybePure()})
-    callee: Method = info.attribute()
-    inputs: tuple[SSAValue, ...] = info.argument()
+    traits = frozenset({ir.MaybePure()})
+    callee: ir.Method = info.attribute()
+    inputs: tuple[ir.SSAValue, ...] = info.argument()
     kwargs: tuple[str, ...] = info.attribute()
-    result: ResultValue = info.result()
+    result: ir.ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 
     def print_impl(self, printer: Printer) -> None:
         pprint_calllike(self, self.callee.sym_name, printer)
 
-    def verify(self) -> None:
+    def check(self) -> None:
         if self.kwargs:
             for name in self.kwargs:
-                if name not in self.callee.arg_names:
-                    raise VerificationError(
-                        self,
-                        f"method {self.callee.sym_name} does not have argument {name}",
-                    )
+                assert (
+                    name in self.callee.arg_names
+                ), f"method {self.callee.sym_name} does not have argument {name}"
         elif len(self.callee.arg_names) - 1 != len(self.args):
-            raise VerificationError(
-                self,
-                f"expected {len(self.callee.arg_names)} arguments, got {len(self.args)}",
+            raise ValueError(
+                f"expected {len(self.callee.arg_names)} arguments, got {len(self.args)}"
             )

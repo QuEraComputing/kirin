@@ -9,7 +9,6 @@ from kirin import ir, types, interp
 from kirin.decl import info, statement
 from kirin.print import Printer
 from kirin.analysis import TypeInference
-from kirin.exceptions import VerificationError
 
 from ._pprint_helper import pprint_calllike
 
@@ -49,12 +48,12 @@ class Invoke(ir.Statement):
         if self.kwargs:
             for name in self.kwargs:
                 if name not in self.callee:
-                    raise VerificationError(
+                    raise ir.ValidationError(
                         self,
                         f"method {self.callee} does not have argument {name}",
                     )
         elif len(self.callee) - 1 != len(self.args):
-            raise VerificationError(
+            raise ir.ValidationError(
                 self,
                 f"expected {len(self.callee)} arguments, got {len(self.args)}",
             )

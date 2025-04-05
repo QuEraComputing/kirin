@@ -6,7 +6,8 @@ from dataclasses import field, dataclass
 from typing_extensions import Self
 
 from kirin.ir.ssa import SSAValue
-from kirin.exceptions import VerificationError
+from kirin.source import SourceInfo
+from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import MutableSequenceView
 from kirin.ir.nodes.block import Block
@@ -98,6 +99,8 @@ class Region(IRNode["Statement"]):
         self,
         blocks: Block | Iterable[Block] = (),
         parent: Statement | None = None,
+        *,
+        source: SourceInfo | None = None,
     ):
         """Initialize a Region object.
 
@@ -105,6 +108,8 @@ class Region(IRNode["Statement"]):
             blocks (Block | Iterable[Block], optional): A single [`Block`][kirin.ir.Block] object or an iterable of Block objects. Defaults to ().
             parent (Statement | None, optional): The parent [`Statement`][kirin.ir.Statement] object. Defaults to None.
         """
+        super().__init__()
+        self.source = source
         self._blocks = []
         self._block_idx = {}
         self.parent_node = parent
@@ -319,12 +324,12 @@ class Region(IRNode["Statement"]):
         """Verify the correctness of the Region.
 
         Raises:
-            VerificationError: If the Region is not correct.
+            IRValidationError: If the Region is not correct.
         """
         from kirin.ir.nodes.stmt import Statement
 
         if not isinstance(self.parent_node, Statement):
-            raise VerificationError(
+            raise ValidationError(
                 self, "expect Region to have a parent of type Statement"
             )
 

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar, Iterator
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from typing_extensions import Self
 
 from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue
+from kirin.source import SourceInfo
 
 if TYPE_CHECKING:
     from kirin.ir.nodes.stmt import Statement
@@ -25,6 +26,8 @@ class IRNode(Generic[ParentType], ABC, Printable):
         This object is pretty printable via
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
+
+    source: SourceInfo | None = field(default=None, init=False, repr=False)
 
     def assert_parent(self, type_: type[IRNode], parent) -> None:
         assert (

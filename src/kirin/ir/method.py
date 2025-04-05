@@ -1,11 +1,17 @@
+import sys
 import typing
+import inspect
+import textwrap
 from types import ModuleType
 
 # from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
+from rich.console import Console
+
+from kirin.exception import NoPythonStackTrace
 from kirin.ir.traits import HasSignature, CallableStmtInterface
-from kirin.exceptions import VerificationError
+from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
 from kirin.ir.attrs.types import Generic
@@ -29,6 +35,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
     # values contained if closure
     fields: tuple = field(default_factory=tuple)  # own
     file: str = ""
+    lineno_offset: int = 0
     inferred: bool = False
     """if typeinfer has been run on this method
     """
@@ -87,22 +94,6 @@ class Method(Printable, typing.Generic[Param, RetType]):
     def print_impl(self, printer: Printer) -> None:
         return printer.print(self.code)
 
-    def verify(self) -> None:
-        """verify the method body."""
-        try:
-            self.code.verify()
-        except VerificationError as e:
-            msg = f'File "{self.file}"'
-            if isinstance(e.node, Statement):
-                if e.node.source:
-                    msg += f", line {e.node.source.lineno}"
-                msg += f", in {e.node.name}"
-
-            msg += f":\n    Verification failed for {self.sym_name}: {e.args[0]}"
-            raise Exception(msg) from e
-        self.verified = True
-        return
-
     def similar(self, dialects: typing.Optional["DialectGroup"] = None):
         return Method(
             self.mod,
@@ -116,3 +107,59 @@ class Method(Printable, typing.Generic[Param, RetType]):
             self.inferred,
             self.verified,
         )
+
+    def verify(self) -> None:
+        """verify the method body.
+
+        This will raise a ValidationError if the method body is not valid.
+        This will also set the `verified` attribute to True.
+        """
+        try:
+            self.code.verify()
+        except ValidationError as e:
+            self.__postprocess_validation_error(e)
+        self.verified = True
+
+    def verify_type(self) -> None:
+        """verify the method type.
+
+        This will raise a ValidationError if the method type is not valid.
+        This will also set the `verified` attribute to True.
+        """
+        if self.verified:
+            return
+
+        # NOTE: verify the method body
+        self.verify()
+
+        try:
+            self.code.verify_type()
+        except ValidationError as e:
+            self.__postprocess_validation_error(e)
+
+    def __postprocess_validation_error(self, e: ValidationError):
+        console = Console(force_terminal=True, file=sys.stderr)
+        printer = Printer(console=console)
+        # NOTE: populate the printer with the method body
+        with printer.string_io():
+            printer.print(self.code)
+
+        with printer.string_io() as io:
+            printer.print(e.node)
+            node_str = io.getvalue()
+
+        node_str = "\n".join(["  " + each_line for each_line in node_str.splitlines()])
+        msg = f"Incorrect IR:\n    {node_str}\n\n"
+        if e.node.source and self.py_func:  # print hint if we have a source
+            msg += "\nSource Traceback:"
+            source = textwrap.dedent(inspect.getsource(self.py_func))
+            msg += e.node.source.error_hint(
+                source.splitlines(),
+                e,
+                file=self.file,
+                lineno_offset=self.lineno_offset,
+            )
+        else:
+            msg += "\nNo source available"
+            msg += "\nError: " + str(e)
+        raise NoPythonStackTrace(msg) from e

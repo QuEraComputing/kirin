@@ -68,7 +68,8 @@ class Frame(Generic[Stmt]):
                 f"Unsupported dialect `{stmt.dialect.name}` in statement {stmt.name}"
             )
         self.curr_block.stmts.append(stmt)
-        stmt.source = self.state.source
+        if stmt.source is None:
+            stmt.source = self.state.source
         return stmt
 
     def _push_block(self, block: Block):
@@ -79,6 +80,8 @@ class Frame(Generic[Stmt]):
         """
         self.curr_region.blocks.append(block)
         self.curr_block = block
+        if block.source is None:
+            block.source = self.state.source
         return block
 
     def jump_next_block(self):
