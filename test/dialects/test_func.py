@@ -1,7 +1,7 @@
 import pytest
 
 from kirin.prelude import structural_no_opt
-from kirin.exceptions import VerificationError
+from kirin.exceptions import TypeCheckError
 
 
 def test_python_func():
@@ -12,8 +12,8 @@ def test_python_func():
     def dumm(x):
         return some_func(x)
 
-    with pytest.raises(VerificationError):
-        dumm.code.typecheck()
+    with pytest.raises(TypeCheckError):
+        dumm.code.verify_type()
 
     some_staff = ""
 
@@ -21,5 +21,5 @@ def test_python_func():
     def dumm2(x):
         return some_staff(x)  # type: ignore
 
-    with pytest.raises(VerificationError):
-        dumm.code.typecheck()
+    with pytest.raises(TypeCheckError):
+        dumm.code.verify_type()
