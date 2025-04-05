@@ -133,8 +133,8 @@ class Lowering(lowering.FromPythonAST):
                 stmt.result.name = lhs_name
                 current_frame.defs[lhs_name] = current_frame.push(stmt).result
             case _:
-                for target, value in zip(node.targets, result.data):
-                    self.assign_item(state, target, value)
+                for target in node.targets:
+                    self.assign_item(state, target, result)
 
     def lower_AnnAssign(
         self, state: lowering.State, node: ast.AnnAssign
@@ -142,15 +142,33 @@ class Lowering(lowering.FromPythonAST):
         type_hint = self.get_hint(state, node.annotation)
         value = state.lower(node.value).expect_one()
         stmt = state.current_frame.push(TypeAssert(got=value, expected=type_hint))
-        self.assign_item(state, node.target, stmt.result)
+        self.assign_item_value(state, node.target, stmt.result)
 
     def lower_AugAssign(
         self, state: lowering.State, node: ast.AugAssign
     ) -> lowering.Result:
-        self.assign_item(state, node.target, state.lower(node.value).expect_one())
+        match node.target:
+            case ast.Name(name, ast.Store()):
+                rhs = ast.Name(name, ast.Load())
+            case ast.Attribute(obj, attr, ast.Store()):
+                rhs = ast.Attribute(obj, attr, ast.Load())
+            case ast.Subscript(obj, slice, ast.Store()):
+                rhs = ast.Subscript(obj, slice, ast.Load())
+        self.assign_item_value(
+            state,
+            node.target,
+            state.lower(ast.BinOp(rhs, node.op, node.value)).expect_one(),
+        )
 
-    @staticmethod
-    def assign_item(state: lowering.State, target, value: ir.SSAValue):
+    def lower_NamedExpr(
+        self, state: lowering.State, node: ast.NamedExpr
+    ) -> lowering.Result:
+        value = state.lower(node.value).expect_one()
+        self.assign_item_value(state, node.target, value)
+        return value
+
+    @classmethod
+    def assign_item_value(cls, state: lowering.State, target, value: ir.SSAValue):
         current_frame = state.current_frame
         match target:
             case ast.Name(name, ast.Store()):
@@ -168,9 +186,15 @@ class Lowering(lowering.FromPythonAST):
             case _:
                 raise lowering.BuildError(f"unsupported target {target}")
 
-    @staticmethod
-    def assert_assign_value_type(value: ir.SSAValue, type_hint: types.TypeAttribute):
-        value_type = value.type.meet(type_hint)
-        if value_type is value_type.bottom():
-            raise lowering.BuildError(f"Cannot assign {value.type} to {type_hint}")
-        return value_type
+    @classmethod
+    def assign_item(cls, state: lowering.State, target, result: lowering.State.Result):
+        match target:
+            case ast.Tuple(elts, ast.Store()):
+                if len(elts) != len(result.data):
+                    raise lowering.BuildError(
+                        f"tuple assignment length mismatch: {len(elts)} != {len(result.data)}"
+                    )
+                for target, value in zip(elts, result.data):
+                    cls.assign_item_value(state, target, value)
+            case _:
+                cls.assign_item_value(state, target, result.expect_one())
