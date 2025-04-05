@@ -1,3 +1,5 @@
+import pytest
+
 from kirin import ir, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
@@ -26,6 +28,13 @@ def test_multi_result():
     assert isinstance(stmt, MultiResult)
     assert stmt.result_a.name == "x"
     assert stmt.result_b.name == "y"
+
+    with pytest.raises(lowering.BuildError):
+
+        @dummy_dialect
+        def multi_assign_error():
+            (x, y, z) = MultiResult()  # type: ignore
+            return x, y, z
 
 
 def test_chain_assign_setattr():
