@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import ClassVar
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from kirin.ir import Method, DialectGroup
 from kirin.rewrite.abc import RewriteResult
@@ -24,6 +24,7 @@ class Pass(ABC):
 
     name: ClassVar[str]
     dialects: DialectGroup
+    no_raise: bool = field(default=False, kw_only=True)
 
     def __call__(self, mt: Method) -> RewriteResult:
         result = self.unsafe_run(mt)
