@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from kirin.ir.attrs import types
 from kirin.lowering.abc import Result
 from kirin.lowering.exception import BuildError
+from kirin.lowering.python.glob import GlobalEvalError
 
 if TYPE_CHECKING:
     from kirin.lowering.state import State
@@ -83,6 +84,9 @@ class FromPythonAST(ABC):
         try:
             t = state.get_global(node).data
             return types.hint2type(t)
+        except GlobalEvalError as e:
+            state.source = e.source.offset(state.lineno_offset, state.col_offset)
+            raise e
         except Exception as e:  # noqa: E722
             raise BuildError(f"expect a type hint, got {ast.unparse(node)}") from e
 

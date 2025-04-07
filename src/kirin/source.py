@@ -22,6 +22,21 @@ class SourceInfo:
             end_col_offset + col_offset if end_col_offset is not None else None,
         )
 
+    def offset(self, lineno_offset: int = 0, col_offset: int = 0):
+        """Offset the source info by the given offsets.
+
+        Args:
+            lineno_offset (int): The line number offset.
+            col_offset (int): The column offset.
+        """
+        self.lineno += lineno_offset
+        self.col_offset += col_offset
+        if self.end_lineno is not None:
+            self.end_lineno += lineno_offset
+        if self.end_col_offset is not None:
+            self.end_col_offset += col_offset
+        return self
+
     def error_hint(
         self,
         lines: list[str],
