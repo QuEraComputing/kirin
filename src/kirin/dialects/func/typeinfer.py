@@ -63,7 +63,8 @@ class TypeInfer(MethodTable):
             return (types.Bottom,)
 
         resolve = TypeResolution()
-        resolve.solve(args, types.Tuple[*frame.get_values(stmt.inputs)])
+        # NOTE: we are not using [...] below to be compatible with 3.10
+        resolve.solve(args, types.Tuple.where(frame.get_values(stmt.inputs)))
         return (resolve.substitute(result),)
 
     @impl(Invoke)
