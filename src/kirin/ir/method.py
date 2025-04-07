@@ -138,7 +138,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
             self.__postprocess_validation_error(e)
 
     def __postprocess_validation_error(self, e: ValidationError):
-        console = Console(force_terminal=True, file=sys.stderr)
+        console = Console(force_terminal=True, force_jupyter=False, file=sys.stderr)
         printer = Printer(console=console)
         # NOTE: populate the printer with the method body
         with printer.string_io():
