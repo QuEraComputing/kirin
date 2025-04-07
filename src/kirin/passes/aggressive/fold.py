@@ -28,7 +28,7 @@ class Fold(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
         result = RewriteResult()
-        frame, _ = self.constprop.run_analysis(mt)
+        frame, _ = self.constprop.run_analysis(mt, no_raise=self.no_raise)
         result = Walk(WrapConst(frame)).rewrite(mt.code).join(result)
         rule = Chain(
             ConstantFold(),
