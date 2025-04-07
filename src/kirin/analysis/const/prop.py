@@ -67,7 +67,7 @@ class Propagate(ForwardExtra[Frame, Result]):
         if method is not None:
             value = method(self._interp, _frame, stmt)
         else:
-            return (Unknown(),)
+            return tuple(Unknown() for _ in stmt.results)
         match value:
             case tuple():
                 return tuple(Value(each) for each in value)
