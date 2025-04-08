@@ -50,7 +50,7 @@ class State(Generic[ASTNodeType]):
     "current frame being lowered"
 
     def __repr__(self) -> str:
-        return f"lowering.State({self.current_frame})"
+        return f"lowering.State(current_frame={self._current_frame})"
 
     @property
     def code(self):
@@ -178,6 +178,11 @@ class State(Generic[ASTNodeType]):
         entr_block = entr_block or Block()
         region.blocks.append(entr_block)
 
+        if self._current_frame is not None:
+            globals = globals or self.current_frame.globals
+        else:
+            globals = globals or {}
+
         frame = Frame(
             state=self,
             stream=stmts,
@@ -185,7 +190,7 @@ class State(Generic[ASTNodeType]):
             entr_block=entr_block,
             curr_block=entr_block,
             next_block=next_block or Block(),
-            globals=globals or self.current_frame.globals,
+            globals=globals,
             capture_callback=capture_callback,
         )
         self.push_frame(frame)

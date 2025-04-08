@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, TypeAlias
 from dataclasses import dataclass
 
-from kirin.ir import SSAValue, Statement, DialectGroup
+from kirin.ir import Region, SSAValue, Statement, DialectGroup
 
 from .exception import BuildError
 
@@ -49,7 +49,7 @@ class LoweringABC(ABC, Generic[ASTNodeType]):
         lineno_offset: int = 0,
         col_offset: int = 0,
         compactify: bool = True,
-    ) -> Statement: ...
+    ) -> Region: ...
 
     @abstractmethod
     def visit(self, state: State[ASTNodeType], node: ASTNodeType) -> Result:

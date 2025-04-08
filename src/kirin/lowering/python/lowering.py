@@ -81,7 +81,7 @@ class Python(LoweringABC[ast.AST]):
         except Exception:
             nonlocals = {}
         globals.update(nonlocals)
-        return self.run(
+        region = self.run(
             ast.parse(source).body[0],
             source=source,
             globals=globals,
@@ -90,6 +90,13 @@ class Python(LoweringABC[ast.AST]):
             col_offset=col_offset,
             compactify=compactify,
         )
+        if not region.blocks:
+            raise ValueError("No block generated")
+
+        code = region.blocks[0].first_stmt
+        if code is None:
+            raise ValueError("No code generated")
+        return code
 
     def run(
         self,
@@ -101,7 +108,7 @@ class Python(LoweringABC[ast.AST]):
         lineno_offset: int = 0,
         col_offset: int = 0,
         compactify: bool = True,
-    ) -> ir.Statement:
+    ) -> ir.Region:
         source = source or ast.unparse(stmt)
         state = State(
             self,
@@ -132,18 +139,12 @@ class Python(LoweringABC[ast.AST]):
                     raise e
 
             region = frame.curr_region
-            if not region.blocks:
-                raise ValueError("No block generated")
-
-            code = region.blocks[0].first_stmt
-            if code is None:
-                raise ValueError("No code generated")
 
         if compactify:
             from kirin.rewrite import Walk, CFGCompactify
 
-            Walk(CFGCompactify()).rewrite(code)
-        return code
+            Walk(CFGCompactify()).rewrite(region)
+        return region
 
     def lower_literal(self, state: State[ast.AST], value) -> ir.SSAValue:
         return state.lower(ast.Constant(value=value)).expect_one()

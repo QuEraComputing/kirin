@@ -65,7 +65,7 @@ class Frame(Generic[Stmt]):
             raise BuildError(f"unexpected builtin statement {stmt.name}")
         elif stmt.dialect not in self.state.parent.dialects:
             raise BuildError(
-                f"Unsupported dialect `{stmt.dialect.name}` in statement {stmt.name}"
+                f"Unsupported dialect `{stmt.dialect.name}` from statement {stmt.name}"
             )
         self.curr_block.stmts.append(stmt)
         if stmt.source is None:
