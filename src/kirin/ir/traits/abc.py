@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
-    from kirin.ir import Block, Region, Statement  # noqa: F401
+    from kirin.ir import Block, Region, Attribute, Statement
     from kirin.graph import Graph
 
 
@@ -17,6 +17,22 @@ class Trait(ABC, Generic[IRNodeType]):
     """Base class for all statement traits."""
 
     def verify(self, node: IRNodeType):
+        pass
+
+
+@dataclass(frozen=True)
+class AttrTrait(Trait["Attribute"]):
+    """Base class for all attribute traits."""
+
+    def verify(self, node: "Attribute"):
+        pass
+
+
+@dataclass(frozen=True)
+class StmtTrait(Trait["Statement"], ABC):
+    """Base class for all statement traits."""
+
+    def verify(self, node: "Statement"):
         pass
 
 
