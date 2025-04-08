@@ -3,14 +3,14 @@ from dataclasses import dataclass
 
 from kirin.ir.nodes.stmt import Statement
 
-from .abc import Trait
+from .abc import StmtTrait
 
 if TYPE_CHECKING:
     from kirin.ir import Statement
 
 
 @dataclass(frozen=True)
-class Pure(Trait["Statement"]):
+class Pure(StmtTrait):
     """A trait that indicates that a statement is pure, i.e., it has no side
     effects.
     """
@@ -19,7 +19,7 @@ class Pure(Trait["Statement"]):
 
 
 @dataclass(frozen=True)
-class MaybePure(Trait["Statement"]):
+class MaybePure(StmtTrait):
     """A trait that indicates the statement may be pure,
     i.e., a call statement can be pure if the callee is pure.
     """
@@ -48,7 +48,7 @@ class MaybePure(Trait["Statement"]):
 
 
 @dataclass(frozen=True)
-class ConstantLike(Trait["Statement"]):
+class ConstantLike(StmtTrait):
     """A trait that indicates that a statement is constant-like, i.e., it
     represents a constant value.
     """
@@ -57,7 +57,7 @@ class ConstantLike(Trait["Statement"]):
 
 
 @dataclass(frozen=True)
-class IsTerminator(Trait["Statement"]):
+class IsTerminator(StmtTrait):
     """A trait that indicates that a statement is a terminator, i.e., it
     terminates a block.
     """
@@ -66,19 +66,19 @@ class IsTerminator(Trait["Statement"]):
 
 
 @dataclass(frozen=True)
-class NoTerminator(Trait["Statement"]):
+class NoTerminator(StmtTrait):
     """A trait that indicates that the region of a statement has no terminator."""
 
     pass
 
 
 @dataclass(frozen=True)
-class IsolatedFromAbove(Trait["Statement"]):
+class IsolatedFromAbove(StmtTrait):
     pass
 
 
 @dataclass(frozen=True)
-class HasParent(Trait["Statement"]):
+class HasParent(StmtTrait):
     """A trait that indicates that a statement has a parent
     statement.
     """
