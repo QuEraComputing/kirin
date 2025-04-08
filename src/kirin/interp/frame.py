@@ -125,6 +125,19 @@ class Frame(FrameABC[ValueType]):
 
     ExpectedType = TypeVar("ExpectedType")
 
+    def get_casted(self, key: SSAValue, type_: type[ExpectedType]) -> ExpectedType:
+        """Same as [`get`][kirin.interp.frame.Frame.get] except it
+        forces the linter to think the value is of the expected type.
+
+        Args:
+            key(SSAValue): The key to get the value for.
+            type_(type): The expected type.
+
+        Returns:
+            ExpectedType: The value.
+        """
+        return self.get(key)  # type: ignore
+
     def get_typed(self, key: SSAValue, type_: type[ExpectedType]) -> ExpectedType:
         """Similar to [`get`][kirin.interp.frame.Frame.get] but also checks the type.
 
