@@ -26,12 +26,7 @@
     <span class=n>indent</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>0</span><span class=p>,</span>
     <span class=n>show_lineno</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>str</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Generate an error hint for the given error. Args: e (Exception): The error to generate a hint for. If the error object has a <code>help</code> attribute, it will be used as the help message at the location of the error. max_lines (int): The maximum number of lines to show in the hint. indent (int): The indentation level for the hint. show_lineno (bool): Whether to show the line number in the hint. Returns: str: The generated error hint.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering/state.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>197</span>
-<span class=normal>198</span>
-<span class=normal>199</span>
-<span class=normal>200</span>
-<span class=normal>201</span>
-<span class=normal>202</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Generate an error hint for the given error. Args: e (Exception): The error to generate a hint for. If the error object has a <code>help</code> attribute, it will be used as the help message at the location of the error. max_lines (int): The maximum number of lines to show in the hint. indent (int): The indentation level for the hint. show_lineno (bool): Whether to show the line number in the hint. Returns: str: The generated error hint.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering/state.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>202</span>
 <span class=normal>203</span>
 <span class=normal>204</span>
 <span class=normal>205</span>
@@ -56,7 +51,12 @@
 <span class=normal>224</span>
 <span class=normal>225</span>
 <span class=normal>226</span>
-<span class=normal>227</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>error_hint</span><span class=p>(</span>
+<span class=normal>227</span>
+<span class=normal>228</span>
+<span class=normal>229</span>
+<span class=normal>230</span>
+<span class=normal>231</span>
+<span class=normal>232</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>error_hint</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>e</span><span class=p>:</span> <span class=ne>Exception</span><span class=p>,</span>
     <span class=o>*</span><span class=p>,</span>
@@ -132,7 +132,12 @@
 <span class=normal>192</span>
 <span class=normal>193</span>
 <span class=normal>194</span>
-<span class=normal>195</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@contextmanager</span>
+<span class=normal>195</span>
+<span class=normal>196</span>
+<span class=normal>197</span>
+<span class=normal>198</span>
+<span class=normal>199</span>
+<span class=normal>200</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@contextmanager</span>
 <span class=k>def</span> <span class=nf>frame</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>stmts</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>]</span> <span class=o>|</span> <span class=n>StmtStream</span><span class=p>[</span><span class=n>ASTNodeType</span><span class=p>],</span>
@@ -154,6 +159,11 @@
     <span class=n>entr_block</span> <span class=o>=</span> <span class=n>entr_block</span> <span class=ow>or</span> <span class=n>Block</span><span class=p>()</span>
     <span class=n>region</span><span class=o>.</span><span class=n>blocks</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>entr_block</span><span class=p>)</span>
 
+    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_current_frame</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=nb>globals</span> <span class=o>=</span> <span class=nb>globals</span> <span class=ow>or</span> <span class=bp>self</span><span class=o>.</span><span class=n>current_frame</span><span class=o>.</span><span class=n>globals</span>
+    <span class=k>else</span><span class=p>:</span>
+        <span class=nb>globals</span> <span class=o>=</span> <span class=nb>globals</span> <span class=ow>or</span> <span class=p>{}</span>
+
     <span class=n>frame</span> <span class=o>=</span> <span class=n>Frame</span><span class=p>(</span>
         <span class=n>state</span><span class=o>=</span><span class=bp>self</span><span class=p>,</span>
         <span class=n>stream</span><span class=o>=</span><span class=n>stmts</span><span class=p>,</span>
@@ -161,7 +171,7 @@
         <span class=n>entr_block</span><span class=o>=</span><span class=n>entr_block</span><span class=p>,</span>
         <span class=n>curr_block</span><span class=o>=</span><span class=n>entr_block</span><span class=p>,</span>
         <span class=n>next_block</span><span class=o>=</span><span class=n>next_block</span> <span class=ow>or</span> <span class=n>Block</span><span class=p>(),</span>
-        <span class=nb>globals</span><span class=o>=</span><span class=nb>globals</span> <span class=ow>or</span> <span class=bp>self</span><span class=o>.</span><span class=n>current_frame</span><span class=o>.</span><span class=n>globals</span><span class=p>,</span>
+        <span class=nb>globals</span><span class=o>=</span><span class=nb>globals</span><span class=p>,</span>
         <span class=n>capture_callback</span><span class=o>=</span><span class=n>capture_callback</span><span class=p>,</span>
     <span class=p>)</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>push_frame</span><span class=p>(</span><span class=n>frame</span><span class=p>)</span>
