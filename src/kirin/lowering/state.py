@@ -36,15 +36,15 @@ class State(Generic[ASTNodeType]):
 
     parent: LoweringABC[ASTNodeType]
     """the parent lowering transform"""
-    source: SourceInfo
+    source: SourceInfo | None = field(default=None, kw_only=True)
     "source info of the current node"
-    lines: list[str]
+    lines: list[str] = field(default_factory=list, kw_only=True)
     "source lines of the code being lowered"
-    file: str | None = None
+    file: str | None = field(default=None, kw_only=True)
     "file name of the current node"
-    lineno_offset: int = 0
+    lineno_offset: int = field(default=0, kw_only=True)
     "lineno offset at the beginning of the source"
-    col_offset: int = 0
+    col_offset: int = field(default=0, kw_only=True)
     "column offset at the beginning of the source"
     _current_frame: Frame | None = field(default=None, init=False, repr=False)
     "current frame being lowered"
@@ -213,6 +213,9 @@ class State(Generic[ASTNodeType]):
         Returns:
             str: The generated error hint.
         """
+        if self.source is None:
+            return str(e)
+
         return self.source.error_hint(
             self.lines,
             e,
