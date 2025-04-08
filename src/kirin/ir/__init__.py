@@ -24,8 +24,10 @@ from kirin.ir.method import Method as Method
 from kirin.ir.traits import (
     Pure as Pure,
     Trait as Trait,
+    AttrTrait as AttrTrait,
     HasParent as HasParent,
     MaybePure as MaybePure,
+    StmtTrait as StmtTrait,
     RegionTrait as RegionTrait,
     SymbolTable as SymbolTable,
     ConstantLike as ConstantLike,

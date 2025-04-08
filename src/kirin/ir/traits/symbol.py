@@ -5,14 +5,14 @@ from dataclasses import dataclass
 
 from kirin.ir.attrs.py import PyAttr
 from kirin.ir.exception import ValidationError
-from kirin.ir.traits.abc import Trait
+from kirin.ir.traits.abc import StmtTrait
 
 if TYPE_CHECKING:
     from kirin.ir import Statement
 
 
 @dataclass(frozen=True)
-class SymbolOpInterface(Trait["Statement"]):
+class SymbolOpInterface(StmtTrait):
     """A trait that indicates that a statement is a symbol operation.
 
     A symbol operation is a statement that has a symbol name attribute.
@@ -34,7 +34,7 @@ class SymbolOpInterface(Trait["Statement"]):
 
 
 @dataclass(frozen=True)
-class SymbolTable(Trait["Statement"]):
+class SymbolTable(StmtTrait):
     """
     Statement with SymbolTable trait can only have one region with one block.
     """

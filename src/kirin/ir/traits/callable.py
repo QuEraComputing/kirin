@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
-from kirin.ir.traits.abc import Trait
+from kirin.ir.traits.abc import StmtTrait
 
 if TYPE_CHECKING:
     from kirin.ir import Region, Statement
@@ -12,7 +12,7 @@ StmtType = TypeVar("StmtType", bound="Statement")
 
 
 @dataclass(frozen=True)
-class CallableStmtInterface(Trait["Statement"], ABC, Generic[StmtType]):
+class CallableStmtInterface(StmtTrait, ABC, Generic[StmtType]):
     """A trait that indicates that a statement is a callable statement.
 
     A callable statement is a statement that can be called as a function.
@@ -26,7 +26,7 @@ class CallableStmtInterface(Trait["Statement"], ABC, Generic[StmtType]):
 
 
 @dataclass(frozen=True)
-class HasSignature(Trait["Statement"], ABC):
+class HasSignature(StmtTrait, ABC):
     """A trait that indicates that a statement has a function signature
     attribute.
     """

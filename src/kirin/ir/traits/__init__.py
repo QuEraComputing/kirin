@@ -9,7 +9,12 @@ There are also some basic traits that are provided for convenience, such as
 `IsolatedFromAbove`.
 """
 
-from .abc import Trait as Trait, RegionTrait as RegionTrait
+from .abc import (
+    Trait as Trait,
+    AttrTrait as AttrTrait,
+    StmtTrait as StmtTrait,
+    RegionTrait as RegionTrait,
+)
 from .basic import (
     Pure as Pure,
     HasParent as HasParent,
