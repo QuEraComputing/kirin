@@ -110,7 +110,7 @@ class Dialect:
             elif issubclass(node, MethodTable):
                 if key in self.interps:
                     raise ValueError(
-                        f"Cannot register {node} to Dialect, key {key} exists"
+                        f"Cannot register {node} to Dialect, key {key} exists in {self}"
                     )
                 self.interps[key] = node()
             elif issubclass(node, FromPythonAST):

@@ -23,9 +23,14 @@ class GlobalExprEval(ast.NodeVisitor):
     frame: Frame
 
     def generic_visit(self, node: ast.AST) -> Any:
+        if isinstance(node, ast.AST):
+            raise GlobalEvalError(
+                node,
+                f"Cannot lower global {node.__class__.__name__} node: {ast.dump(node)}",
+            )
         raise GlobalEvalError(
             node,
-            f"Cannot lower global {node.__class__.__name__} node: {ast.dump(node)}",
+            f"Unexpected global `{node.__class__.__name__}` node: {repr(node)} is not an AST node",
         )
 
     def visit_Name(self, node: ast.Name) -> Any:
