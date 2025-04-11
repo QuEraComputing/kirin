@@ -1,10 +1,12 @@
-import numpy as np
 from numbers import Number
 
-from kirin import types, ir, lowering
-from kirin.decl import statement, info
+import numpy as np
+
+from kirin import ir, types, lowering
+from kirin.decl import info, statement
 
 from .dialect import dialect_
+
 
 @statement
 class PauliOperator(ir.Statement):
@@ -17,9 +19,11 @@ class PauliOperator(ir.Statement):
 class X(PauliOperator):
     pass
 
+
 @statement(dialect=dialect_)
 class Y(PauliOperator):
     pass
+
 
 @statement(dialect=dialect_)
 class Z(PauliOperator):
