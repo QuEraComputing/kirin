@@ -1,21 +1,21 @@
 # Pauli Matrix Algebra
 
-In this example, we'll implement a simple dialect that allows you to write simple mathematical expressions using the [Pauli matrices](https://en.wikipedia.org/wiki/Pauli_matrices) $\sigma_x, \sigma_y$ and $\sigma_z$.
+In this example, we'll implement a simple dialect that allows you to write mathematical expressions using the [Pauli matrices](https://en.wikipedia.org/wiki/Pauli_matrices) $\sigma_x, \sigma_y$ and $\sigma_z$.
 We'll add some basic rewriting routines so that the IR is symbolically rewritten using the basic relations
 
-```math
+$$
 \sigma_i \sigma_j = \epsilon_{ijk} \sigma_k,
-```
+$$
 
 and
 
-```math
+$$
 \sigma_i^2 = \mathbb{I_2}
-```
+$$
 
-Given these simple relations, you can rewrite longer expressions at compile time, such that the resulting code that is executed becomes much simpler and the number of matrix operations that need to be performed is reduced.
+Given these relations, you can rewrite longer expressions at compile time, such that the resulting code that is executed becomes much simpler and the number of matrix operations that need to be performed is reduced.
 
-We'll start out with simple definitions and then add more features to it as we go along.
+We'll start out with the basic definitions and then add more features to it as we go along.
 
 
 ## Defining the dialect
@@ -120,9 +120,9 @@ func.func basic_example() -> !Any {
 
 Ideally, we'd like the IR to be rewritten, such that the result will just be
 
-```math
+$$
 \sigma_x \sigma_y = i \sigma_z
-```
+$$
 
 In the following, we'll add a corresponding rewrite pass to our Pauli DSL.
 
@@ -150,7 +150,7 @@ class RewritePauliMult(abc.RewriteRule):
 
         if not isinstance(node.lhs.owner, PauliOperator) and not isinstance(node.rhs.owner, PauliOperator):  # (2)!
             return result.RewriteResult()
-        
+
         if isinstance(node.lhs.owner, py.Constant): # (3)!
             new_op = self.number_pauli_mult(node.lhs.owner, node.rhs.owner)
             node.replace_by(new_op)
@@ -194,7 +194,7 @@ Now, let's have a look at the actual rewriting methods.
     def number_pauli_mult(lhs: py.Constant, rhs: PauliOperator) -> PauliOperator:
         num = lhs.value.unwrap() * rhs.pre_factor
         return type(rhs)(pre_factor=num)  # (1)!
-    
+
     @staticmethod
     def pauli_pauli_mult(lhs: PauliOperator, rhs: PauliOperator) -> PauliOperator:
         num = rhs.pre_factor * lhs.pre_factor
@@ -204,10 +204,10 @@ Now, let's have a look at the actual rewriting methods.
 
         if isinstance(lhs, type(rhs)):
             return Id(pre_factor=num)
-        
+
         if isinstance(lhs, Id):  # (3)!
             return type(rhs)(pre_factor=num)
-        
+
         if isinstance(rhs, Id):
             return type(lhs)(pre_factor=num)
 
@@ -228,7 +228,7 @@ Now, let's have a look at the actual rewriting methods.
                 return X(pre_factor=-1j * num)
             elif isinstance(rhs, X):
                 return Y(pre_factor=1j * num)
-        
+
         raise RuntimeError("How on earth did we end up here?")  # (5)!
 
 ```
@@ -258,7 +258,7 @@ from kirin.rewrite import Walk
 def pauli_mul_opt(self):
     def run_pass(mt):
         Walk(RewritePauliMult()).rewrite(mt.code)
-    
+
     return run_pass
 
 
@@ -304,7 +304,7 @@ def pauli_mul_opt_fold(self):
     def run_pass(mt):
         Walk(RewritePauliMult()).rewrite(mt.code)
         fold_pass(mt)  # (1)!
-    
+
     return run_pass
 
 
@@ -414,7 +414,7 @@ class RewriteDistributeMult(abc.RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> result.RewriteResult:
         if not isinstance(node, py.binop.Mult):  # (1)!
             return result.RewriteResult()
-        
+
         if isinstance(node.lhs.owner, py.binop.Add):  # (2)!
             m1 = py.binop.Mult(node.lhs.owner.lhs, node.rhs)  # (3)!
             m2 = py.binop.Mult(node.lhs.owner.rhs, node.rhs)
@@ -425,7 +425,7 @@ class RewriteDistributeMult(abc.RewriteRule):
             a = py.binop.Add(m1.result, m2.result)  # (5)!
             node.replace_by(a)  # (6)!
             return result.RewriteResult(has_done_something=True)
-        
+
         if isinstance(node.rhs.owner, py.binop.Add):
             m1 = py.binop.Mult(node.lhs, node.rhs.owner.lhs)
             m2 = py.binop.Mult(node.lhs, node.rhs.owner.rhs)
@@ -436,7 +436,7 @@ class RewriteDistributeMult(abc.RewriteRule):
             a = py.binop.Add(m1.result, m2.result)
             node.replace_by(a)
             return result.RewriteResult(has_done_something=True)
-        
+
         return result.RewriteResult()
 ```
 
@@ -616,11 +616,11 @@ class PauliMethods(MethodTable):
     @impl(Y)
     def y(self, interp, frame, stmt: Y):
         return (self.Y_mat * stmt.pre_factor, )
-    
+
     @impl(Z)
     def z(self, interp, frame, stmt: Z):
         return (self.Z_mat * stmt.pre_factor, )
-    
+
     @impl(Id)
     def id(self, interp, frame, stmt: Id):
         return (self.Id_mat * stmt.pre_factor, )

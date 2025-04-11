@@ -145,6 +145,7 @@ plugins:
 
 extra_css:
   - stylesheets/extra.css
+  - https://unpkg.com/katex@0/dist/katex.min.css
 
 markdown_extensions:
   - abbr
@@ -159,6 +160,8 @@ markdown_extensions:
   - pymdownx.tilde
   - pymdownx.tabbed:
       alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
 
 copyright: Copyright &copy; 2024 Kirin contributors
 
@@ -170,3 +173,8 @@ extra:
       link: https://x.com/QueraComputing
     - icon: fontawesome/brands/linkedin
       link: https://www.linkedin.com/company/quera-computing-inc/
+
+extra_javascript:
+  - scripts/katex.js
+  - https://unpkg.com/katex@0/dist/katex.min.js
+  - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
