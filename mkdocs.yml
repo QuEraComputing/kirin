@@ -35,6 +35,7 @@ nav:
         - Advanced Rewriting: cookbook/foodlang/cf_rewrite.md
         - Food Pricing Analysis Pass: cookbook/foodlang/analysis.md
         - Receipt Codegen: cookbook/foodlang/codegen.md
+      - Pauli Algebra: cookbook/paulilang/pauli.md
 
   - Blog:
     - blog/index.md
