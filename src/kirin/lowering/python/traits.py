@@ -130,7 +130,7 @@ class FromPythonCall(PythonLoweringTrait[StatementType, ast.Call]):
         args, kwargs = self.lower_Call_inputs(stmt, state, node)
         return state.current_frame.push(stmt(*args.values(), **kwargs))
 
-    def verify(self, node: StatementType):
+    def verify(self, node: ir.Statement):
         assert len(node.regions) == 0, "FromPythonCall statements cannot have regions"
         assert (
             len(node.successors) == 0
@@ -264,13 +264,13 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
             state.current_frame.defs[result.name] = result
         return
 
-    def verify(self, stmt: ir.Statement):
+    def verify(self, node: ir.Statement):
         assert (
-            len(stmt.regions) == 1
+            len(node.regions) == 1
         ), "FromPythonWithSingleItem statements must have one region"
         assert (
-            len(stmt.successors) == 0
+            len(node.successors) == 0
         ), "FromPythonWithSingleItem statements cannot have successors"
         assert (
-            len(stmt.results) <= 1
+            len(node.results) <= 1
         ), "FromPythonWithSingleItem statements can have at most one result"

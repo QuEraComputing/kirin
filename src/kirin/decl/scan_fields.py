@@ -101,7 +101,9 @@ class ScanFields(BaseModifier):
         return f
 
     def _post_init_field(self, f: Field, guess: type | None):
-        if isinstance(f, ArgumentField) and is_subhint(guess, tuple[ir.SSAValue, ...]):
+        if isinstance(f, ArgumentField) and (
+            guess and is_subhint(guess, tuple[ir.SSAValue, ...])
+        ):
             f.group = True
         # try to narrow the type based on the guess
         elif isinstance(f, AttributeField):

@@ -11,7 +11,7 @@ L = TypeVar("L")
 
 
 @dataclass
-class IList(ir.Data[Sequence[T]], Generic[T, L]):
+class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
     """A simple immutable list."""
 
     data: Sequence[T]
@@ -63,22 +63,25 @@ class IList(ir.Data[Sequence[T]], Generic[T, L]):
         return iter(self.data)
 
     @overload
-    def __getitem__(self, index: slice) -> "IList[T, Any]": ...
+    def __getitem__(self, index: int) -> T: ...
 
     @overload
-    def __getitem__(self, index: int) -> T: ...
+    def __getitem__(self, index: slice) -> "IList[T, Any]": ...
 
     def __getitem__(self, index: int | slice) -> T | "IList[T, Any]":
         if isinstance(index, slice):
             return IList(self.data[index])
         return self.data[index]
 
+    def __contains__(self, item: object) -> bool:
+        return item in self.data
+
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, IList):
             return False
         return self.data == value.data
 
-    def unwrap(self) -> "IList[T, L]":
+    def unwrap(self) -> Sequence[T]:
         return self
 
     def print_impl(self, printer: Printer) -> None:

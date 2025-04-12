@@ -154,6 +154,8 @@ class Lowering(lowering.FromPythonAST):
                 rhs = ast.Attribute(obj, attr, ast.Load())
             case ast.Subscript(obj, slice, ast.Store()):
                 rhs = ast.Subscript(obj, slice, ast.Load())
+            case _:
+                raise lowering.BuildError(f"unsupported target {node.target}")
         self.assign_item_value(
             state,
             node.target,
