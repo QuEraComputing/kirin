@@ -20,7 +20,7 @@ class CallableStmtInterface(StmtTrait, ABC, Generic[StmtType]):
 
     @classmethod
     @abstractmethod
-    def get_callable_region(cls, stmt: "Statement") -> "Region":
+    def get_callable_region(cls, stmt: "StmtType") -> "Region":
         """Returns the body of the callable region"""
         ...
 

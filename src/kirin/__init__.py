@@ -1,7 +1,5 @@
 # re-exports the public API of the kirin package
-from kirin import ir
-
-from . import types as types
+from . import ir as ir, types as types, lowering as lowering
 from .exception import enable_stracetrace, disable_stracetrace
 
-__all__ = ["ir", "types", "enable_stracetrace", "disable_stracetrace"]
+__all__ = ["ir", "types", "lowering", "enable_stracetrace", "disable_stracetrace"]
