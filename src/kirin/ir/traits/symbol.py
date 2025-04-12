@@ -25,10 +25,10 @@ class SymbolOpInterface(StmtTrait):
             raise ValueError(f"Statement {stmt.name} does not have a symbol name")
         return sym_name
 
-    def verify(self, stmt: Statement):
+    def verify(self, node: Statement):
         from kirin.types import String
 
-        sym_name = self.get_sym_name(stmt)
+        sym_name = self.get_sym_name(node)
         if not (isinstance(sym_name, PyAttr) and sym_name.type.is_subseteq(String)):
             raise ValueError(f"Symbol name {sym_name} is not a string attribute")
 
@@ -43,17 +43,17 @@ class SymbolTable(StmtTrait):
     def walk(stmt: Statement):
         return stmt.regions[0].blocks[0].stmts
 
-    def verify(self, stmt: Statement):
-        if len(stmt.regions) != 1:
+    def verify(self, node: Statement):
+        if len(node.regions) != 1:
             raise ValidationError(
-                stmt,
-                f"Statement {stmt.name} with SymbolTable trait must have exactly one region",
+                node,
+                f"Statement {node.name} with SymbolTable trait must have exactly one region",
             )
 
-        if len(stmt.regions[0].blocks) != 1:
+        if len(node.regions[0].blocks) != 1:
             raise ValidationError(
-                stmt,
-                f"Statement {stmt.name} with SymbolTable trait must have exactly one block",
+                node,
+                f"Statement {node.name} with SymbolTable trait must have exactly one block",
             )
 
         # TODO: check uniqueness of symbol names
