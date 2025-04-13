@@ -29,6 +29,7 @@ class Derived(Base):
 
 
 def test_union():
+    assert Union({}) is BottomType()
     assert PyClass(int) | PyClass(float) == Union(PyClass(int), PyClass(float))
     assert Union(PyClass(int), PyClass(int)) == PyClass(int)
     assert Union(PyClass(int), PyClass(float)) == Union(PyClass(int), PyClass(float))
