@@ -90,6 +90,12 @@ class BoundedLattice(Lattice[BoundedLatticeType]):
 class UnionMeta(LatticeMeta):
     """Meta class for union types. It simplifies the union if possible."""
 
+    def __init__(self, name, bases, attrs):
+        super().__init__(name, bases, attrs)
+        if not issubclass(base := bases[0], BoundedLattice):
+            raise TypeError(f"Union must inherit from Lattice, got {bases[0]}")
+        self._bottom = base.bottom()
+
     def __call__(
         self,
         typ: Iterable[LatticeType] | LatticeType,
@@ -125,4 +131,6 @@ class UnionMeta(LatticeMeta):
         if len(params) == 1:
             return params[0]
 
+        if len(params) == 0:
+            return self._bottom
         return super(UnionMeta, self).__call__(*params)
