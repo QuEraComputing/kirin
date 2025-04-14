@@ -2,11 +2,11 @@ import numpy as np
 
 from kirin.interp import MethodTable, impl
 
-from .dialect import dialect_
 from .stmts import X, Y, Z, Id
+from .dialect import _dialect
 
 
-@dialect_.register
+@_dialect.register
 class PauliMethods(MethodTable):
     X_mat = np.array([[0, 1], [1, 0]])
     Y_mat = np.array([[0, -1j], [1j, 0]])
