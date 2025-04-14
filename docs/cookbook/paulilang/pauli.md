@@ -66,7 +66,7 @@ class Id(PauliOperator):
 
 
 1. Define the actual dialect to which we want to register our statements.
-2. Notice how we are not registering the `PauliOperator`. That's because we don't actually want users to create an instant of it since it serves just as an abstract type. This is similar to how a user cannot create a number of abstract type `Number`, it's always a type such as `float` or `int`.
+2. Notice how we are not registering the `PauliOperator`. That's because we don't actually want users to create an instant of it since it serves just as a base type. This is similar to how a user cannot create a number of base type `Number`, it's always a type such as `float` or `int`.
 3. All Pauli matrices will be pure since they can only return an object of one type. They are also created by a simple call.
 4. In addition to the actual matrix, our Pauli operator statements will also have a pre-factor that's just a number. This makes rewriting easier later, read on for more details.
 5. Concrete statements have to be registered to our dialect.
