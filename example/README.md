@@ -6,6 +6,7 @@ This folder contains examples of how to use the Kirin library. Each example is a
 
 - `simple.py`: A simple example that demonstrates how to create a simple Kirin dialect group and its kernel.
 - `food`: A more sophisticated example but without any domain specifics. It demonstrates how to create a new Kirin dialect and combine it with existing dialects with custom analysis and rewrites.
+- `pauli`: An example that implements a dialect with rewrites that simplifies products of Pauli matrices.
 
 ## Examples outside this folder with more domain-specific contents
 
