@@ -689,6 +689,15 @@ class Statement(IRNode["Block"]):
                 return t
         return None
 
+    @classmethod
+    def get_present_trait(cls, trait: type[TraitType]) -> TraitType:
+        """Just like get_trait, but expects the trait to be there.
+        Useful for linter checks, when you know the trait is present."""
+        for t in cls.traits:
+            if isinstance(t, trait):
+                return t
+        raise ValueError(f"Trait {trait} not present in statement {cls}")
+
     def expect_one_result(self) -> ResultValue:
         """Check if the statement contain only one result, and return it"""
         if len(self._results) != 1:
