@@ -68,24 +68,18 @@ class Method(Printable, typing.Generic[Param, RetType]):
     @property
     def self_type(self):
         """Return the type of the self argument of the method."""
-        trait = self.code.get_trait(HasSignature)
-        if trait is None:
-            raise ValueError("Method body must implement HasSignature")
+        trait = self.code.get_present_trait(HasSignature)
         signature = trait.get_signature(self.code)
         return Generic(Method, Generic(tuple, *signature.inputs), signature.output)
 
     @property
     def callable_region(self):
-        trait = self.code.get_trait(CallableStmtInterface)
-        if trait is None:
-            raise ValueError("Method body must implement CallableStmtInterface")
+        trait = self.code.get_present_trait(CallableStmtInterface)
         return trait.get_callable_region(self.code)
 
     @property
     def return_type(self):
-        trait = self.code.get_trait(HasSignature)
-        if trait is None:
-            raise ValueError("Method body must implement HasSignature")
+        trait = self.code.get_present_trait(HasSignature)
         return trait.get_signature(self.code).output
 
     def __repr__(self) -> str:
