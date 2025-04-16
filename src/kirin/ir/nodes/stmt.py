@@ -146,6 +146,9 @@ class Statement(IRNode["Block"]):
     _next_stmt: Statement | None = field(default=None, init=False, repr=False)
     _prev_stmt: Statement | None = field(default=None, init=False, repr=False)
 
+    source: SourceInfo | None = field(default=None, init=False, repr=False)
+    """The source information of the Statement for debugging/stacktracing."""
+
     # NOTE: This is only for syntax sugar to provide
     # access to args via the properties
     _name_args_slice: dict[str, int | slice] = field(

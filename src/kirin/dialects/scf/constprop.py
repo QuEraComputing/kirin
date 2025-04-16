@@ -83,11 +83,9 @@ class DialectConstProp(interp.MethodTable):
         cond: const.Value,
         body: ir.Region,
     ):
-        with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-            body_frame.entries.update(frame.entries)
-            body_frame.set(body.blocks[0].args[0], cond)
-            results = interp_.run_ssacfg_region(body_frame, body)
-        return body_frame, results
+        with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+            results = interp_.run_ssacfg_region(body_frame, body, (cond,))
+            return body_frame, results
 
     @interp.impl(For)
     def for_loop(
@@ -116,17 +114,12 @@ class DialectConstProp(interp.MethodTable):
             )
 
         loop_vars = frame.get_values(stmt.initializers)
-        body_block = stmt.body.blocks[0]
-        block_args = body_block.args
 
         for value in iterable.data:
-            with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-                body_frame.entries.update(frame.entries)
-                body_frame.set_values(
-                    block_args,
-                    (const.Value(value),) + loop_vars,
+            with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+                loop_vars = interp_.run_ssacfg_region(
+                    body_frame, stmt.body, (const.Value(value),) + loop_vars
                 )
-                loop_vars = interp_.run_ssacfg_region(body_frame, stmt.body)
 
             if body_frame.frame_is_not_pure:
                 frame_is_not_pure = True

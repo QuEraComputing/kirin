@@ -45,9 +45,10 @@ class TypeInfer(absint.Methods):
             frame.worklist.append(interp.Successor(body_block, item, *loop_vars))
             return  # if terminate is Return, there is no result
 
-        with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-            body_frame.entries.update(frame.entries)
-            loop_vars_ = interp_.run_ssacfg_region(body_frame, stmt.body)
+        with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+            loop_vars_ = interp_.run_ssacfg_region(
+                body_frame, stmt.body, (iterable,) + loop_vars
+            )
 
         frame.entries.update(body_frame.entries)
         if isinstance(loop_vars_, interp.ReturnValue):

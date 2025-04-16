@@ -69,7 +69,7 @@ class ForwardExtra(
             # so we don't need to copy the frames.
             if not no_raise:
                 raise e
-            return self.new_frame(method.code), self.lattice.bottom()
+            return self.state.current_frame, self.lattice.bottom()
         finally:
             self._eval_lock = False
             sys.setrecursionlimit(current_recursion_limit)
@@ -103,5 +103,7 @@ class Forward(ForwardExtra[ForwardFrame[LatticeElemType], LatticeElemType], ABC)
     [`ForwardExtra`][kirin.analysis.forward.ForwardExtra] instead.
     """
 
-    def new_frame(self, code: ir.Statement) -> ForwardFrame[LatticeElemType]:
-        return ForwardFrame.from_func_like(code)
+    def initialize_frame(
+        self, code: ir.Statement, *, has_parent_access: bool = False
+    ) -> ForwardFrame[LatticeElemType]:
+        return ForwardFrame(code, has_parent_access=has_parent_access)

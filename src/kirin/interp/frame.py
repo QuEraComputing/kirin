@@ -4,7 +4,7 @@ from dataclasses import field, dataclass
 
 from typing_extensions import Self
 
-from kirin.ir import SSAValue, Statement
+from kirin.ir import Block, SSAValue, Statement
 
 from .exceptions import InterpreterError
 
@@ -13,17 +13,35 @@ ValueType = TypeVar("ValueType")
 
 @dataclass
 class FrameABC(ABC, Generic[ValueType]):
-    """Abstract base class for interpreter frame."""
+    """Abstract base class for the IR interpreter frame.
 
-    code: Statement
-    """func statement being interpreted.
+    While the IR is in SSA form which does not have the need
+    of scoping, the frame is still useful to keep track of the
+    current statement being interpreted and the call stack. As
+    well as various other interpreter state based on the specific
+    interpreter implementation.
+
+    This base class provides the minimum interface for the
+    interpreter frame.
     """
 
-    @classmethod
-    @abstractmethod
-    def from_func_like(cls, code: Statement) -> Self:
-        """Create a new frame for the given method."""
-        ...
+    code: Statement
+    """statement whose region is being interpreted, e.g a function.
+    """
+    parent: Self | None = field(default=None, kw_only=True, compare=True, repr=False)
+    """Parent frame.
+    """
+    has_parent_access: bool = field(default=False, kw_only=True, compare=True)
+    """If we have access to the entries of the parent frame."""
+
+    current_stmt: Statement | None = field(
+        default=None, init=False, compare=False, repr=False
+    )
+    """Current statement being interpreted."""
+    current_block: Block | None = field(
+        default=None, init=False, compare=False, repr=False
+    )
+    """Current block being interpreted."""
 
     @abstractmethod
     def get(self, key: SSAValue) -> ValueType:
@@ -72,22 +90,12 @@ class FrameABC(ABC, Generic[ValueType]):
         for key, value in zip(keys, values):
             self.set(key, value)
 
-    @abstractmethod
-    def set_stmt(self, stmt: Statement) -> Self:
-        """Set the current statement."""
-        ...
-
 
 @dataclass
 class Frame(FrameABC[ValueType]):
     """Interpreter frame."""
 
-    lino: int = 0
-    stmt: Statement | None = None
-    """statement being interpreted.
-    """
-
-    globals: dict[str, Any] = field(default_factory=dict)
+    globals: dict[str, Any] = field(default_factory=dict, kw_only=True)
     """Global variables this frame has access to.
     """
 
@@ -95,14 +103,9 @@ class Frame(FrameABC[ValueType]):
     # this is because we are validating e.g SSA value pointing
     # to other blocks separately. This avoids the need
     # to have a separate frame for each block.
-    entries: dict[SSAValue, ValueType] = field(default_factory=dict)
+    entries: dict[SSAValue, ValueType] = field(default_factory=dict, kw_only=True)
     """SSA values and their corresponding values.
     """
-
-    @classmethod
-    def from_func_like(cls, code: Statement) -> Self:
-        """Create a new frame for the given statement."""
-        return cls(code=code)
 
     def get(self, key: SSAValue) -> ValueType:
         """Get the value for the given [`SSAValue`][kirin.ir.SSAValue].
@@ -119,7 +122,10 @@ class Frame(FrameABC[ValueType]):
         err = InterpreterError(f"SSAValue {key} not found")
         value = self.entries.get(key, err)
         if isinstance(value, InterpreterError):
-            raise err
+            if self.has_parent_access and self.parent:
+                return self.parent.get(key)
+            else:
+                raise err
         else:
             return value
 
@@ -158,7 +164,3 @@ class Frame(FrameABC[ValueType]):
 
     def set(self, key: SSAValue, value: ValueType) -> None:
         self.entries[key] = value
-
-    def set_stmt(self, stmt: Statement) -> Self:
-        self.stmt = stmt
-        return self

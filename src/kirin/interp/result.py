@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from kirin.ir.traits import SymbolOpInterface, CallableStmtInterface
 
 from .frame import FrameABC
+from .state import InterpreterState
 from .exceptions import WrapException
 
 ValueType = TypeVar("ValueType")
@@ -29,19 +30,28 @@ class Result(Generic[ValueType]):
 @dataclass
 class Err(Result[ValueType], Generic[FrameType, ValueType]):
     exception: Exception
-    frames: list[FrameType]
+    state: InterpreterState[FrameType]
 
-    def __init__(self, exception: Exception, frames: list[FrameType]):
+    def __init__(self, exception: Exception, state: InterpreterState[FrameType]):
         super().__init__()
         self.exception = exception
-        self.frames = frames
+        self.state = state
 
     def __repr__(self) -> str:
         return f"Err({self.exception.__class__.__name__}: {self.exception})"
 
     def print_stack(self):
         """Print the stack trace of the error."""
-        top_method_code = self.frames[0].code
+        frame = self.state.current_frame
+        if frame is None:
+            raise ValueError("No current frame available")
+
+        frames: list[FrameType] = []
+        while frame is not None:
+            frames.append(frame)
+            frame = frame.parent
+
+        top_method_code = frames[0].code
         if (call_trait := top_method_code.get_trait(CallableStmtInterface)) is None:
             raise ValueError(f"Method code {top_method_code} is not callable")
 
@@ -63,7 +73,7 @@ class Err(Result[ValueType], Generic[FrameType, ValueType]):
         )
         print("Traceback (most recent call last):")
         print(f"  {name}({args})")
-        for frame in reversed(self.frames):
+        for frame in reversed(frames):
             if frame.code:
                 frame.code.print()
         print(f"{self.exception.__class__.__name__}: {self.exception}")

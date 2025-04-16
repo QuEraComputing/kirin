@@ -18,12 +18,12 @@ class JuliaMethodTable(MethodTable):
         self, interp: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Function
     ):
         fn_args = stmt.body.blocks[0].args[1:]
-        argnames = frame.get_values(fn_args)
+        argnames = tuple(interp.ssa_id[arg] for arg in fn_args)
         argtypes = tuple(interp.emit_attribute(x.type) for x in fn_args)
         args = [f"{name}::{type}" for name, type in zip(argnames, argtypes)]
         interp.write(f"function {stmt.sym_name}({', '.join(args)})")
         frame.indent += 1
-        interp.run_ssacfg_region(frame, stmt.body)
+        interp.run_ssacfg_region(frame, stmt.body, (stmt.sym_name,) + argnames)
         frame.indent -= 1
         interp.writeln(frame, "end")
         return ()
@@ -63,12 +63,11 @@ class JuliaMethodTable(MethodTable):
         self, interp: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Lambda
     ):
         args = tuple(interp.ssa_id[x] for x in stmt.body.blocks[0].args[1:])
-        frame.set_values(stmt.body.blocks[0].args, args)
-        frame.set_values((stmt.body.blocks[0].args[0],), (stmt.sym_name,))
+        frame.set_values(stmt.body.blocks[0].args, (stmt.sym_name,) + args)
         frame.captured[stmt.body.blocks[0].args[0]] = frame.get_values(stmt.captured)
         interp.writeln(frame, f"function {stmt.sym_name}({', '.join(args[1:])})")
         frame.indent += 1
-        interp.run_ssacfg_region(frame, stmt.body)
+        interp.run_ssacfg_region(frame, stmt.body, args)
         frame.indent -= 1
         interp.writeln(frame, "end")
         return (stmt.sym_name,)
