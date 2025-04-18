@@ -7,7 +7,7 @@ from kirin.dialects import py, ilist
 
 def test():
     rule = rewrite.Fixpoint(
-        rewrite.Walk(rewrite.Chain(rewrite.InferLen(), rewrite.ConstantFold()))
+        rewrite.Walk(rewrite.Chain(ilist.rewrite.HintLen(), rewrite.ConstantFold()))
     )
 
     @basic

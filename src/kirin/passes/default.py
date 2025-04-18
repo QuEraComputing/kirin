@@ -1,6 +1,5 @@
 from dataclasses import field, dataclass
 
-from kirin.passes import HintConst, TypeInfer
 from kirin.dialects import ilist
 from kirin.ir.method import Method
 from kirin.passes.fold import Fold
@@ -8,6 +7,8 @@ from kirin.rewrite.abc import RewriteResult
 from kirin.passes.aggressive import Fold as AggressiveFold
 
 from .abc import Pass
+from .typeinfer import TypeInfer
+from .hint_const import HintConst
 
 
 @dataclass
