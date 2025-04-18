@@ -173,7 +173,7 @@ class Dialect:
         self.rules.canonicalize.append(rule())
         return rule
 
-    def inference(self, rule: type[RewriteRule]) -> type[RewriteRule]:
+    def post_inference(self, rule: type[RewriteRule]) -> type[RewriteRule]:
         """Register a rewrite rule to the inference pass.
         Usually, this is used to register a rule that requires
         type inference to be run first.

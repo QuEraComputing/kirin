@@ -8,7 +8,7 @@ from kirin.dialects.ilist.runtime import IList
 from .._dialect import dialect
 
 
-@dialect.inference
+@dialect.post_inference
 class List2IList(RewriteRule):
 
     def rewrite_Block(self, node: ir.Block) -> RewriteResult:

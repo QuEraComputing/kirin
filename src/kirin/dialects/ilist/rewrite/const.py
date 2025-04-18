@@ -9,7 +9,7 @@ from ..runtime import IList
 from .._dialect import dialect
 
 
-@dialect.inference
+@dialect.post_inference
 class ConstList2IList(RewriteRule):
     """Rewrite type annotation for SSAValue with constant `IList`
     in `Hinted` type. This should be run after constant folding and

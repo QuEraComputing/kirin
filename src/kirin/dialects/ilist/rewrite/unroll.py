@@ -10,7 +10,7 @@ from kirin.dialects.py.indexing import GetItem
 from .._dialect import dialect
 
 
-@dialect.inference
+@dialect.post_inference
 class Unroll(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:

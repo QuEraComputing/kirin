@@ -7,7 +7,7 @@ from kirin.dialects.ilist.stmts import IListType
 from .._dialect import dialect
 
 
-@dialect.inference
+@dialect.post_inference
 class HintLen(RewriteRule):
 
     def _get_collection_len(self, collection: ir.SSAValue):
