@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
 from kirin.ir import IRNode
-from kirin.rewrite.abc import RewriteRule
-from kirin.rewrite.result import RewriteResult
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 
 @dataclass

@@ -1,6 +1,5 @@
 from kirin import ir, types
-from kirin.rewrite.abc import RewriteRule
-from kirin.rewrite.result import RewriteResult
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.py.tuple import New as TupleNew
 from kirin.dialects.func.stmts import Call
 from kirin.dialects.ilist.stmts import Map, New, Scan, Foldl, Foldr, ForEach, IListType

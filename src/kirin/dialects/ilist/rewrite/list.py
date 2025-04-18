@@ -1,7 +1,6 @@
 from kirin import ir, types
 from kirin.dialects.py import constant
-from kirin.rewrite.abc import RewriteRule
-from kirin.rewrite.result import RewriteResult
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.ilist.stmts import IListType
 from kirin.dialects.ilist.runtime import IList
 

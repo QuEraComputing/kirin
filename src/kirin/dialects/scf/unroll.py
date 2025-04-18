@@ -1,8 +1,7 @@
 from kirin import ir
 from kirin.analysis import const
 from kirin.dialects import func
-from kirin.rewrite.abc import RewriteRule
-from kirin.rewrite.result import RewriteResult
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.py.constant import Constant
 
 from .stmts import For, Yield, IfElse

@@ -1,7 +1,7 @@
 from kirin import ir, types
 from kirin.rewrite import Walk, Chain, Fixpoint
 from kirin.passes.abc import Pass
-from kirin.rewrite.result import RewriteResult
+from kirin.rewrite.abc import RewriteResult
 from kirin.dialects.ilist.rewrite import List2IList, ConstList2IList
 
 

@@ -1,6 +1,5 @@
 from kirin import ir
-from kirin.rewrite.abc import RewriteRule
-from kirin.rewrite.result import RewriteResult
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 from .stmts import For, Yield, IfElse
 from ._dialect import dialect
