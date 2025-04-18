@@ -4,7 +4,10 @@ from kirin.dialects import py
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.ilist.stmts import IListType
 
+from .._dialect import dialect
 
+
+@dialect.inference
 class HintLen(RewriteRule):
 
     def _get_collection_len(self, collection: ir.SSAValue):

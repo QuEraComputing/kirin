@@ -7,7 +7,10 @@ from kirin.dialects.ilist.stmts import Map, New, Scan, Foldl, Foldr, ForEach, IL
 from kirin.dialects.py.constant import Constant
 from kirin.dialects.py.indexing import GetItem
 
+from .._dialect import dialect
 
+
+@dialect.inference
 class Unroll(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:

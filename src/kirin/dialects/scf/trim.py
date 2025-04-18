@@ -3,8 +3,10 @@ from kirin.rewrite.abc import RewriteRule
 from kirin.rewrite.result import RewriteResult
 
 from .stmts import For, Yield, IfElse
+from ._dialect import dialect
 
 
+@dialect.canonicalize
 class UnusedYield(RewriteRule):
     """Trim unused results from `For` and `IfElse` statements."""
 

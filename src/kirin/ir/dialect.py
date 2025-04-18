@@ -12,8 +12,17 @@ T = TypeVar("T")
 
 if TYPE_CHECKING:
     from kirin.types import PyClass
+    from kirin.rewrite.abc import RewriteRule
     from kirin.interp.table import MethodTable
     from kirin.lowering.python.dialect import FromPythonAST
+
+
+@dataclass
+class Rules:
+    canonicalize: list[RewriteRule] = field(default_factory=list, init=True)
+    """A collection of rules for Canonicalize pass."""
+    inference: list[RewriteRule] = field(default_factory=list, init=True)
+    """A collection of rules for Inference pass."""
 
 
 # TODO: add an option to generate default lowering at dialect construction
@@ -40,6 +49,8 @@ class Dialect:
     """A dictionary of registered method table in the dialect."""
     lowering: dict[str, FromPythonAST] = field(default_factory=dict, init=True)
     """A dictionary of registered python lowering implmentations in the dialect."""
+    rules: Rules = field(default_factory=Rules, init=True)
+    """A collection of rewrite rules for the dialect."""
     python_types: dict[tuple[str, str], "PyClass"] = field(
         default_factory=dict, init=True
     )
@@ -152,3 +163,23 @@ class Dialect:
 
         else:
             raise ValueError(f"Cannot register {node} to Dialect")
+
+    def canonicalize(self, rule: type[RewriteRule]) -> type[RewriteRule]:
+        """Register a rewrite rule to the canonicalization pass.
+
+        Args:
+            rule (RewriteRule): The rewrite rule to register.
+        """
+        self.rules.canonicalize.append(rule())
+        return rule
+
+    def inference(self, rule: type[RewriteRule]) -> type[RewriteRule]:
+        """Register a rewrite rule to the inference pass.
+        Usually, this is used to register a rule that requires
+        type inference to be run first.
+
+        Args:
+            rule (RewriteRule): The rewrite rule to register.
+        """
+        self.rules.inference.append(rule())
+        return rule

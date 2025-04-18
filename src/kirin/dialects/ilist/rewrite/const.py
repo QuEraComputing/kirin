@@ -6,8 +6,10 @@ from kirin.dialects.py.constant import Constant
 
 from ..stmts import IListType
 from ..runtime import IList
+from .._dialect import dialect
 
 
+@dialect.inference
 class ConstList2IList(RewriteRule):
     """Rewrite type annotation for SSAValue with constant `IList`
     in `Hinted` type. This should be run after constant folding and
