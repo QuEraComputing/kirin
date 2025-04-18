@@ -1,18 +1,11 @@
-from functools import cached_property
-
 from kirin import ir, types
 from kirin.analysis import const
 from kirin.dialects import py
 from kirin.rewrite.abc import RewriteRule, RewriteResult
+from kirin.dialects.ilist.stmts import IListType
 
 
-class InferLen(RewriteRule):
-
-    @cached_property
-    def IListType(self):
-        from kirin.dialects import ilist
-
-        return ilist.IListType
+class HintLen(RewriteRule):
 
     def _get_collection_len(self, collection: ir.SSAValue):
         coll_type = collection.type
@@ -21,7 +14,7 @@ class InferLen(RewriteRule):
             return None
 
         if (
-            coll_type.is_subseteq(self.IListType)
+            coll_type.is_subseteq(IListType)
             and isinstance(coll_type.vars[1], types.Literal)
             and isinstance(coll_type.vars[1].data, int)
         ):

@@ -6,7 +6,7 @@ basic dialects provided by the `kirin.dialects` module.
 from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group
-from kirin.passes import aggressive
+from kirin.passes import Default
 from kirin.dialects import cf, scf, func, math, ilist, lowering
 from kirin.dialects.py import (
     cmp,
@@ -26,8 +26,6 @@ from kirin.dialects.py import (
     iterable,
     assertion,
 )
-from kirin.passes.fold import Fold
-from kirin.passes.typeinfer import TypeInfer
 
 
 @dialect_group(
@@ -142,10 +140,6 @@ def basic(self):
     main.print() # main is a Method!
     ```
     """
-    fold_pass = Fold(self)
-    ilist_desugar = ilist.IListDesugar(self)
-    aggressive_fold_pass = aggressive.Fold(self)
-    typeinfer_pass = TypeInfer(self)
 
     def run_pass(
         mt: Annotated[Method, Doc("The method to run pass on.")],
@@ -163,20 +157,17 @@ def basic(self):
         aggressive: Annotated[
             bool, Doc("run aggressive folding passes if `fold=True`")
         ] = False,
+        no_raise: Annotated[bool, Doc("do not raise exception during analysis")] = True,
     ) -> None:
-        if verify:
-            mt.verify()
-
-        ilist_desugar.fixpoint(mt)
-
-        if fold:
-            if aggressive:
-                aggressive_fold_pass.fixpoint(mt)
-            else:
-                fold_pass(mt)
-
-        if typeinfer:
-            typeinfer_pass(mt)
+        default_pass = Default(
+            self,
+            verify=verify,
+            fold=fold,
+            aggressive=aggressive,
+            typeinfer=typeinfer,
+            no_raise=no_raise,
+        )
+        default_pass(mt)
 
     return run_pass
 
@@ -221,16 +212,34 @@ def structural_no_opt(self):
     )
 )
 def structural(self):
-    """Structural kernel without optimization passes."""
-    typeinfer_pass = TypeInfer(self)
+    """Structural kernel with optimization passes."""
 
     def run_pass(
-        method: Method, *, verify: bool = True, typeinfer: bool = True
+        mt: Annotated[Method, Doc("The method to run pass on.")],
+        *,
+        verify: Annotated[
+            bool, Doc("run `verify` before running passes, default is `True`")
+        ] = True,
+        typeinfer: Annotated[
+            bool,
+            Doc(
+                "run type inference and apply the inferred type to IR, default `False`"
+            ),
+        ] = False,
+        fold: Annotated[bool, Doc("run folding passes")] = True,
+        aggressive: Annotated[
+            bool, Doc("run aggressive folding passes if `fold=True`")
+        ] = False,
+        no_raise: Annotated[bool, Doc("do not raise exception during analysis")] = True,
     ) -> None:
-        if verify:
-            method.verify()
-
-        if typeinfer:
-            typeinfer_pass(method)
+        default_pass = Default(
+            self,
+            verify=verify,
+            fold=fold,
+            aggressive=aggressive,
+            typeinfer=typeinfer,
+            no_raise=no_raise,
+        )
+        default_pass(mt)
 
     return run_pass

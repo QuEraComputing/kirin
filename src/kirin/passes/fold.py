@@ -1,29 +1,32 @@
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from kirin.ir import Method, SSACFGRegion
 from kirin.rewrite import (
     Walk,
     Chain,
     Fixpoint,
-    WrapConst,
     Call2Invoke,
     ConstantFold,
     CFGCompactify,
     InlineGetItem,
     DeadCodeElimination,
 )
-from kirin.analysis import const
 from kirin.passes.abc import Pass
 from kirin.rewrite.abc import RewriteResult
+
+from .hint_const import HintConst
 
 
 @dataclass
 class Fold(Pass):
+    hint_const: HintConst = field(init=False)
+
+    def __post_init__(self):
+        self.hint_const = HintConst(self.dialects)
+        self.hint_const.no_raise = self.no_raise
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
-        constprop = const.Propagate(self.dialects)
-        frame, _ = constprop.run_analysis(mt, no_raise=self.no_raise)
-        result = Walk(WrapConst(frame)).rewrite(mt.code)
+        result = self.hint_const.unsafe_run(mt)
         result = (
             Fixpoint(
                 Walk(

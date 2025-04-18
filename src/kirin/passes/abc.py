@@ -24,7 +24,7 @@ class Pass(ABC):
 
     name: ClassVar[str]
     dialects: DialectGroup
-    no_raise: bool = field(default=False, kw_only=True)
+    no_raise: bool = field(default=True, kw_only=True)
 
     def __call__(self, mt: Method) -> RewriteResult:
         result = self.unsafe_run(mt)
@@ -38,7 +38,7 @@ class Pass(ABC):
             result = result_.join(result)
             if not result.has_done_something:
                 break
-        mt.code.verify()
+        mt.verify()
         return result
 
     @abstractmethod

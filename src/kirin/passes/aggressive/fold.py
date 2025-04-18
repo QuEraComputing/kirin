@@ -6,8 +6,6 @@ from kirin.rewrite import (
     Chain,
     Inline,
     Fixpoint,
-    InferLen,
-    WrapConst,
     Call2Invoke,
     ConstantFold,
     CFGCompactify,
@@ -15,22 +13,21 @@ from kirin.rewrite import (
     InlineGetField,
     DeadCodeElimination,
 )
-from kirin.analysis import const
 from kirin.ir.method import Method
 from kirin.rewrite.abc import RewriteResult
+from kirin.passes.hint_const import HintConst
 
 
 @dataclass
 class Fold(Pass):
-    constprop: const.Propagate = field(init=False)
+    hint_const: HintConst = field(init=False)
 
     def __post_init__(self):
-        self.constprop = const.Propagate(self.dialects)
+        self.hint_const = HintConst(self.dialects)
+        self.hint_const.no_raise = self.no_raise
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
-        result = RewriteResult()
-        frame, _ = self.constprop.run_analysis(mt, no_raise=self.no_raise)
-        result = Walk(Chain(WrapConst(frame), InferLen())).rewrite(mt.code).join(result)
+        result = self.hint_const.unsafe_run(mt)
         rule = Chain(
             ConstantFold(),
             Call2Invoke(),

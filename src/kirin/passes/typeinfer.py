@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from kirin.ir import Method, HasSignature
 from kirin.rewrite import Walk, Chain
@@ -8,23 +8,35 @@ from kirin.dialects.func import Signature
 from kirin.analysis.typeinfer import TypeInference
 from kirin.rewrite.apply_type import ApplyType
 from kirin.rewrite.type_assert import InlineTypeAssert
+from kirin.dialects.ilist.rewrite import HintLen
+
+from .hint_const import HintConst
 
 
 @dataclass
 class TypeInfer(Pass):
+    hint_const: HintConst = field(init=False)
 
     def __post_init__(self):
         self.infer = TypeInference(self.dialects)
+        self.hint_const = HintConst(self.dialects)
+        self.hint_const.no_raise = self.no_raise
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
+        result = self.hint_const.unsafe_run(mt)
         frame, return_type = self.infer.run_analysis(
             mt, mt.arg_types, no_raise=self.no_raise
         )
         if trait := mt.code.get_trait(HasSignature):
             trait.set_signature(mt.code, Signature(mt.arg_types, return_type))
 
-        result = Chain(
-            Walk(ApplyType(frame.entries)), Walk(InlineTypeAssert())
-        ).rewrite(mt.code)
+        result = (
+            Chain(
+                Walk(ApplyType(frame.entries)),
+                Walk(Chain(InlineTypeAssert(), HintLen())),
+            )
+            .rewrite(mt.code)
+            .join(result)
+        )
         mt.inferred = True
         return result
