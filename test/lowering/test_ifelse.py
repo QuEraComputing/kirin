@@ -1,15 +1,15 @@
+from kirin import lowering
 from kirin.prelude import python_no_opt
 from kirin.dialects import cf, func
-from kirin.lowering import Lowering
 
-lowering = Lowering(python_no_opt)
+lower = lowering.Python(python_no_opt)
 
 
 def test_pass():
     def nobody():
         pass
 
-    code = lowering.run(nobody)
+    code = lower.python_function(nobody)
     assert isinstance(code, func.Function)
     assert isinstance(code.body.blocks[-1].last_stmt, func.Return)
 
@@ -19,7 +19,7 @@ def test_pass():
         else:
             pass
 
-    code = lowering.run(branch_pass)
+    code = lower.python_function(branch_pass)
     code.print()
     assert isinstance(code, func.Function)
     assert isinstance(code.body.blocks[0].last_stmt, func.Return)
@@ -32,7 +32,7 @@ def test_basic_ifelse():
         else:
             return n
 
-    code = lowering.run(single)
+    code = lower.python_function(single)
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 3
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
@@ -47,7 +47,7 @@ def test_basic_ifelse():
         else:
             return n
 
-    code = lowering.run(single_2)
+    code = lower.python_function(single_2)
     code.print()
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 3
@@ -63,7 +63,7 @@ def test_basic_ifelse():
         else:
             n = n + 2
 
-    code = lowering.run(single_3)
+    code = lower.python_function(single_3)
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 4
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
@@ -79,7 +79,7 @@ def test_basic_ifelse():
         if n == 0:
             n = n + 1
 
-    code = lowering.run(single_4)
+    code = lower.python_function(single_4)
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 3
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
@@ -100,7 +100,7 @@ def test_recursive_ifelse():
             else:
                 return n
 
-    code = lowering.run(multi)
+    code = lower.python_function(multi)
     code.print()
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 5

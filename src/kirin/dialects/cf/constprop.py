@@ -9,7 +9,7 @@ class DialectConstProp(MethodTable):
 
     @impl(Branch)
     def branch(self, interp: const.Propagate, frame: const.Frame, stmt: Branch):
-        interp.state.current_frame().worklist.append(
+        interp.state.current_frame.worklist.append(
             Successor(stmt.successor, *frame.get_values(stmt.arguments))
         )
         return ()
@@ -21,7 +21,7 @@ class DialectConstProp(MethodTable):
         frame: const.Frame,
         stmt: ConditionalBranch,
     ):
-        frame = interp.state.current_frame()
+        frame = interp.state.current_frame
         cond = frame.get(stmt.cond)
         if isinstance(cond, const.Value):
             else_successor = Successor(

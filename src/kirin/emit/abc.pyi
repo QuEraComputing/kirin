@@ -15,10 +15,14 @@ FrameType = TypeVar("FrameType", bound=EmitFrame)
 
 class EmitABC(interp.BaseInterpreter[FrameType, ValueType]):
     def run_callable_region(
-        self, frame: FrameType, code: ir.Statement, region: ir.Region
+        self,
+        frame: FrameType,
+        code: ir.Statement,
+        region: ir.Region,
+        args: tuple[ValueType, ...],
     ) -> ValueType: ...
     def run_ssacfg_region(
-        self, frame: FrameType, region: ir.Region
+        self, frame: FrameType, region: ir.Region, args: tuple[ValueType, ...]
     ) -> tuple[ValueType, ...]: ...
     def emit_attribute(self, attr: ir.Attribute) -> ValueType: ...
     def emit_type_Any(self, attr: types.AnyType) -> ValueType: ...

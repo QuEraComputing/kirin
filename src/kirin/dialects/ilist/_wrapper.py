@@ -1,6 +1,6 @@
 import typing
 
-from kirin.lowering import wraps
+from kirin import lowering
 
 from . import stmts
 from .runtime import IList
@@ -25,18 +25,18 @@ def range(start: int, stop: int) -> IList[int, typing.Any]: ...
 def range(start: int, stop: int, step: int) -> IList[int, typing.Any]: ...
 
 
-@wraps(stmts.Range)
+@lowering.wraps(stmts.Range)
 def range(start: int, stop: int, step: int) -> IList[int, typing.Any]: ...
 
 
-@wraps(stmts.Map)
+@lowering.wraps(stmts.Map)
 def map(
     fn: typing.Callable[[ElemT], OutElemT],
     collection: IList[ElemT, LenT] | list[ElemT],
 ) -> IList[OutElemT, LenT]: ...
 
 
-@wraps(stmts.Foldr)
+@lowering.wraps(stmts.Foldr)
 def foldr(
     fn: typing.Callable[[ElemT, OutElemT], OutElemT],
     collection: IList[ElemT, LenT] | list[ElemT],
@@ -44,7 +44,7 @@ def foldr(
 ) -> OutElemT: ...
 
 
-@wraps(stmts.Foldl)
+@lowering.wraps(stmts.Foldl)
 def foldl(
     fn: typing.Callable[[OutElemT, ElemT], OutElemT],
     collection: IList[ElemT, LenT] | list[ElemT],
@@ -52,7 +52,7 @@ def foldl(
 ) -> OutElemT: ...
 
 
-@wraps(stmts.Scan)
+@lowering.wraps(stmts.Scan)
 def scan(
     fn: typing.Callable[[OutElemT, ElemT], tuple[OutElemT, ResultT]],
     collection: IList[ElemT, LenT] | list[ElemT],
@@ -60,7 +60,7 @@ def scan(
 ) -> tuple[OutElemT, IList[ResultT, LenT]]: ...
 
 
-@wraps(stmts.ForEach)
+@lowering.wraps(stmts.ForEach)
 def for_each(
     fn: typing.Callable[[ElemT], typing.Any],
     collection: IList[ElemT, LenT] | list[ElemT],

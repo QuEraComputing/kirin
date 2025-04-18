@@ -56,9 +56,7 @@ class Methods(interp.MethodTable):
             frame.worklist.append(interp.Successor(body_block, frame.get(stmt.cond)))
             return
 
-        with interp_.state.new_frame(interp_.new_frame(stmt)) as body_frame:
-            body_frame.entries.update(frame.entries)
-            body_frame.set(body_block.args[0], frame.get(stmt.cond))
-            ret = interp_.run_ssacfg_region(body_frame, body)
+        with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+            ret = interp_.run_ssacfg_region(body_frame, body, (frame.get(stmt.cond),))
             frame.entries.update(body_frame.entries)
-            return ret
+        return ret

@@ -56,12 +56,15 @@ class EmitProperty(BaseModifier):
             body=[
                 f"s = {self._self_name}._name_args_slice['{f.name}']",
                 f"old = {self._self_name}.args[s]",
-                f"old.remove_use(Use({self._self_name}, s))",
-                f"value.add_use(Use({self._self_name}, s))",
+                f"old.remove_use(_ssa_Use({self._self_name}, s))",
+                f"value.add_use(_ssa_Use({self._self_name}, s))",
                 "self.args = (*self.args[:s], value, *self.args[s + 1:])",
             ],
             globals=self.globals,
-            locals={"_value_hint": ir.SSAValue},
+            locals={
+                "_value_hint": ir.SSAValue,
+                "_ssa_Use": ir.Use,
+            },
             return_type=None,
         )
 
@@ -71,17 +74,22 @@ class EmitProperty(BaseModifier):
             args=[self._self_name, "value: _value_hint"],
             body=[
                 f"s = {self._self_name}._name_args_slice['{f.name}']",
+                "assert s.step is None, 'cannot set group argument with step, consider set directly via `args` field'",
                 "start, stop = s.start, s.stop",
                 f"old = {self._self_name}.args[s]",
-                "a_range = range(start, stop, s.step or 1)",
+                "stop = stop or len(old)",
+                "a_range = range(start, stop, 1)",
                 "for i, arg in zip(a_range, old):",
-                f"    arg.remove_use(Use({self._self_name}, i))",
-                "for i, arg in zip(a_range, value):",
-                f"    arg.add_use(Use({self._self_name}, i))",
+                f"    arg.remove_use(_ssa_Use({self._self_name}, i))",
+                "for i, arg in enumerate(value):",
+                f"    arg.add_use(_ssa_Use({self._self_name}, start + i))",
                 f"{self._self_name}.args = (*{self._self_name}.args[:start], *value, *{self._self_name}.args[stop + 1:])",
             ],
             globals=self.globals,
-            locals={"_value_hint": tuple[ir.SSAValue, ...]},
+            locals={
+                "_value_hint": tuple[ir.SSAValue, ...],
+                "_ssa_Use": ir.Use,
+            },
             return_type=None,
         )
 

@@ -52,22 +52,24 @@ class Propagate(ForwardExtra[Frame, Result]):
         self._interp.initialize()
         return self
 
-    def new_frame(self, code: ir.Statement) -> Frame:
-        return Frame.from_func_like(code)
+    def initialize_frame(
+        self, code: ir.Statement, *, has_parent_access: bool = False
+    ) -> Frame:
+        return Frame(code, has_parent_access=has_parent_access)
 
-    def _try_eval_const_pure(
+    def try_eval_const_pure(
         self,
         frame: Frame,
         stmt: ir.Statement,
         values: tuple[Value, ...],
     ) -> interp.StatementResult[Result]:
-        _frame = self._interp.new_frame(frame.code)
+        _frame = self._interp.initialize_frame(frame.code)
         _frame.set_values(stmt.args, tuple(x.data for x in values))
         method = self._interp.lookup_registry(frame, stmt)
         if method is not None:
             value = method(self._interp, _frame, stmt)
         else:
-            return (Unknown(),)
+            return tuple(Unknown() for _ in stmt.results)
         match value:
             case tuple():
                 return tuple(Value(each) for each in value)
@@ -87,11 +89,11 @@ class Propagate(ForwardExtra[Frame, Result]):
         method = self.lookup_registry(frame, stmt)
         if method is None:
             if stmt.has_trait(ir.ConstantLike):
-                return self._try_eval_const_pure(frame, stmt, ())
+                return self.try_eval_const_pure(frame, stmt, ())
             elif stmt.has_trait(ir.Pure):
                 values = frame.get_values(stmt.args)
                 if types.is_tuple_of(values, Value):
-                    return self._try_eval_const_pure(frame, stmt, values)
+                    return self.try_eval_const_pure(frame, stmt, values)
 
             if stmt.has_trait(ir.Pure):
                 return (Unknown(),)  # no implementation but pure

@@ -152,6 +152,9 @@ class BlockArgument(SSAValue):
     def owner(self) -> Block:
         return self.block
 
+    def delete(self, safe: bool = True) -> None:
+        self.block.args.delete(self, safe=safe)
+
     def __hash__(self) -> int:
         return id(self)
 

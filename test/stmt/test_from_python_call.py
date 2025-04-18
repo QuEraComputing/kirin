@@ -2,12 +2,10 @@ from typing import Any
 
 import pytest
 
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 from kirin.prelude import python_no_opt
 from kirin.dialects import func
-from kirin.lowering import Lowering
-from kirin.exceptions import DialectLoweringError
 
 T = types.TypeVar("T")
 
@@ -17,7 +15,7 @@ dialect = ir.Dialect("test")
 @statement(dialect=dialect, repr=True)
 class DummyStatement(ir.Statement):
     name = "dummy"
-    traits = frozenset({ir.Pure(), ir.ConstantLike(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), ir.ConstantLike(), lowering.FromPythonCall()})
 
     # args
     noinfo: ir.SSAValue
@@ -109,9 +107,11 @@ def no_group(
 
 def test_from_python_call():
     assert DummyStatement.dialect is dialect
-    lowering = Lowering(python_no_opt.data.union([func, dialect]))
+    lower = lowering.Python(python_no_opt.data.union([func, dialect]))
 
-    code: func.Function = lowering.run(dummy)  # type: ignore
+    func_ = dummy
+    code = lower.python_function(func_)
+    assert isinstance(code, func.Function)
     block = code.body.blocks[0]
     stmt: DummyStatement = block.stmts.at(0)  # type: ignore
     assert stmt.noinfo is block.args[1]
@@ -123,7 +123,8 @@ def test_from_python_call():
     assert stmt.xxx_property == "xxx_property"
     assert stmt.xxx_attribute is False  # type: ignore
 
-    code: func.Function = lowering.run(dummy_2)  # type: ignore
+    code = lower.python_function(dummy_2)
+    assert isinstance(code, func.Function)
     block = code.body.blocks[0]
     stmt: DummyStatement = block.stmts.at(0)  # type: ignore
     assert stmt.noinfo is block.args[1]
@@ -135,8 +136,8 @@ def test_from_python_call():
     assert stmt.xxx_property == "xxx_property"
     assert stmt.xxx_attribute is False  # type: ignore
 
-    with pytest.raises(DialectLoweringError):
-        lowering.run(non_const)
+    with pytest.raises(lowering.BuildError):
+        lower.python_function(non_const)
 
-    with pytest.raises(DialectLoweringError):
-        lowering.run(no_group)
+    with pytest.raises(lowering.BuildError):
+        lower.python_function(no_group)

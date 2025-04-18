@@ -1,10 +1,11 @@
-## Food price/fee analysis
+## Food cost and Nap analysis
 
-In this section we will discuss on how to perform analysis of a kirin program. We will again use our `food` dialect example.
+In this section we will discuss on how to perform analysis of a Kirin program. We will again use our `food` dialect example.
 
 ### Goal
 
-Let's Consider the following program
+Let's consider the following program
+
 ```python
 @food
 def main2(x: int):
@@ -28,18 +29,17 @@ def main2(x: int):
     return x
 ```
 
-We would like to implement an forward dataflow analysis that walk through the program, and collect the price information of each statements.
+We would like to implement an forward dataflow analysis that walks through the program and collects the pricing information for each of the statements as well as how many times one has napped.
 
-### Define Lattice
-One of the important concept related to doing static analysis is the *Lattice* (See [Wiki:Lattice](https://en.wikipedia.org/wiki/Lattice_(order)) and [Lecture Note On Static Analysis](https://studwww.itu.dk/~brabrand/static.pdf) for further details)
+### Defining a Lattice
+One of the important concepts related to doing static analysis is the *Lattice* (See [Wiki:Lattice](https://en.wikipedia.org/wiki/Lattice_(order)) and [Lecture Notes On Static Analysis](https://studwww.itu.dk/~brabrand/static.pdf) for further details)
 A Lattice defines the partial order of the lattice element. An simple example is the type lattice.
 
 Let's now defines our `Item` lattice for the price analysis.
 
-First, a lattice always has top and bottom elements. In type lattice, the top element is `Any` and bottom element is `None`.
+First, a lattice always has `top` and `bottom` elements. In type lattice, the top element is `Any` and bottom element is `None`.
 
-
-Here, we define `AnyItem` as top and `NoItem` as bottom. In kirin, we can simply inherit the `BoundedLattice` from `kirin.lattice`. Kirin also provide some simple mixin with default implementation of the API such as `is_subseteq`, `join` and `meet` so you don't have to re-implement them.
+Here, we define `AnyItem` as `top` and `NoItem` as `bottom`. In Kirin, we can simply inherit the `BoundedLattice` from `kirin.lattice`. Kirin also provides some simple mixins with default implementations of the API such as `is_subseteq`, `join` and `meet` so you don't have to re-implement them.
 
 ```python
 from kirin.lattice import (
@@ -49,6 +49,8 @@ from kirin.lattice import (
     SimpleJoinMixin,
     SimpleMeetMixin,
 )
+from typing import final
+from dataclasses import dataclass
 
 @dataclass
 class Item(
@@ -73,7 +75,7 @@ class NotItem(Item, metaclass=SingletonMeta): # (1)!
     """The bottom of the lattice.
 
     Since the element is the same without any field,
-    we can use the SingletonMeta to make it a singleton by inherit the metaclass
+    we can use the SingletonMeta to make it a singleton by inheriting from the metaclass
 
     """
 
@@ -87,7 +89,7 @@ class AnyItem(Item, metaclass=SingletonMeta):
     """The top of the lattice.
 
     Since the element is the same without any field,
-    we can use the SingletonMeta to make it a singleton by inherit the metaclass
+    we can use the SingletonMeta to make it a singleton by inheriting from the metaclass
 
     """
 
@@ -96,7 +98,7 @@ class AnyItem(Item, metaclass=SingletonMeta):
 
 ```
 
-1. Notice that since `NotItem` and `AnyItem` does not have any properties, we can mark them as singleton to remove duplication copy of instances exist by inheriting `SingletonMeta` metaclass
+1. Notice that since `NotItem` and `AnyItem` do not have any properties, we can mark them as singletons to prohibit duplicate copies of instances by inheriting from the `SingletonMeta` metaclass.
 
 Next there are a few more lattice elements we want to define:
 
@@ -142,9 +144,9 @@ class ItemFood(Item): # (4)!
         return isinstance(other, ItemFood) and self.type == other.type
 ```
 
-1. `ItemServing` which contain information of the kind of food of the `Serving`, as well as the count
-2. `AtLeastXItem` which contain information of a constant type result value is a number that is least `x`. The `data` contain the lower-bound
-3. `ConstIntItem` which contain concrete number.
+1. `ItemServing` which contains information of the kind of food of the `Serving`, as well as the count
+2. `AtLeastXItem` which contains information of a constant type result value is a number that is least `x`. The `data` contain the lower-bound
+3. `ConstIntItem` which contains a concrete number.
 4. `ItemFood` which contains information of `Food`.
 
 
@@ -152,43 +154,19 @@ class ItemFood(Item): # (4)!
 
 Now we have defined our lattice. Let's move on to see how we can write an analysis pass, and get the analysis results.
 
-In kirin, the analysis pass is implemented with `AbstractInterpreter` (inspired by Julia). Kirin provides an simple forward dataflow analysis `Forward`. So we will use that.
+In Kirin, the analysis pass is implemented with `AbstractInterpreter` (inspired by the [Julia programming language](https://julialang.org/)). Kirin provides an simple forward dataflow analysis `Forward`. So we will use that.
 
-Here our analysis want to do two things.
+Here our analysis will do two things.
 
-1. Get all the analysis results as dictionary of SSAVAlue to lattice element.
-2. Count how many time one naps.
+1. Get all the analysis results as a dictionary of SSAValue to lattice elements.
+2. Count how many times one naps.
 
 ```python
-@dataclass
-class FeeAnalysis(Forward[latt.Item]): # (1)!
-    keys = ["food.fee"] # (2)!
-    lattice = latt.Item
-    nap_count: int = field(init=False)
+from kirin.analysis import Forward, ForwardFrame
+from kirin.interp import SpecialValue
+from kirin.ir import Method
 
-    def initialize(self): # (3)!
-        """Initialize the analysis pass.
-
-        The method is called before the analysis pass starts.
-
-        Note:
-            1. Here one is *required* to call the super().initialize() to initialize the analysis pass,
-            which clear all the previous analysis results and symbol tables.
-            2. Any additional initialization that belongs to the analysis should also be done here.
-            For example, in this case, we initialize the nap_count to 0.
-
-        """
-        super().initialize()
-        self.nap_count = 0
-        return self
-
-    def eval_stmt_fallback( # (4)!
-        self, frame: ForwardFrame[latt.Item, None], stmt: ir.Statement
-    ) -> tuple[latt.Item, ...] | interp.SpecialValue[latt.Item]:
-        return ()
-
-    def run_method(self, method: ir.Method, args: tuple[latt.Item, ...]) -> latt.Item: # (5)!
-        return self.run_callable(method.code, (self.lattice.bottom(),) + args)
+from dataclasses import field
 
 @dataclass
 class FeeAnalysis(Forward[Item]): # (1)!
@@ -203,9 +181,9 @@ class FeeAnalysis(Forward[Item]): # (1)!
 
         Note:
             1. Here one is *required* to call the super().initialize() to initialize the analysis pass,
-            which clear all the previous analysis results and symbol tables.
+            which clears all the previous analysis results and symbol tables.
             2. Any additional initialization that belongs to the analysis should also be done here.
-            For example, in this case, we initialize the nap_count to 0.
+            For example, in this case, we initialize the `nap_count` to 0.
 
         """
         super().initialize()
@@ -214,34 +192,37 @@ class FeeAnalysis(Forward[Item]): # (1)!
 
     def eval_stmt_fallback( # (4)!
         self, frame: ForwardFrame[Item], stmt: ir.Statement
-    ) -> tuple[Item, ...] | interp.SpecialValue[Item]:
+    ) -> tuple[Item, ...] | SpecialValue[Item]:
         return ()
 
-    def run_method(self, method: ir.Method, args: tuple[Item, ...]): # (5)!
+    def run_method(self, method: Method, args: tuple[Item, ...]) -> Item: # (5)!
         return self.run_callable(method.code, (self.lattice.bottom(),) + args)
-
 
 ```
 
-1. Interit from `Forward` with our customize lattice `Item`.
-2. The keys for the MethodTable. Remember that in kirin all the implmentation methods of a interpreter is implmeneted and registered to a `MethodTable`.
-3. `AbstractInterpreter` has a abstract method `initialize` which will be called everytime `run()` is called. We can overload this to reset the variable, so we can re-use this class instance.
-4. This method implement the *fallback* when interprete a statement that does not have implmenetation found in the method table. Here, we just return an empty tuple because we know all the statements that has return value will be implemented, so only statements without return value will be fallbacked.
-5. This method defines and customize how to run the `ir.Method`.
+1. Inherit from `Forward` with our custom lattice element `Item`.
+2. The keys for the MethodTable. Remember that in Kirin all the implementation methods of an interpreter are implemented and registered to a `MethodTable`.
+3. `AbstractInterpreter` has an abstract method `initialize` which will be called every time `run()` is called. We can overload this to reset the variable, so we can re-use this class instance.
+4. This method implements a *fallback* for when a statement is encountered that has no corresponding method for it in the `MethodTable`. Here, we just return an empty tuple because we know all the statements that have a return value will be implemented, so only statements without return values will have to fall back.
+5. This method defines and customizes how to run the `ir.Method`.
 
 Click the + logo to see more details.
 
 Now we want to implement how the statement gets run. This is the same as what we described when we mentioned the concrete interpreter.
 
-Note that each dialect can have multiple registered `MethodTable`, distinguished by `key`. The interpreter use `key` to find corresponding `MethodTable`s for each dialect in a dialect group.
+Note that each dialect can have multiple registered `MethodTable`s, distinguished by a `key`. The interpreter uses the `key` to find the corresponding `MethodTable`s for each dialect in a dialect group.
 
 Here, we use `key="food.fee"`
 
 First we need to implement for `Constant` statement in `py.constant` dialect. If its `int`, we return `ConstIntItem` lattice element. If its `Food`, we return `ItemFood`.
 
 ```python
+from kirin.dialects import py
+from kirin.interp import MethodTable
+from kirin.exceptions import InterpreterExit
+
 @py.constant.dialect.register(key="food.fee")
-class PyConstMethodTable(interp.MethodTable):
+class PyConstMethodTable(MethodTable):
 
     @interp.impl(py.constant.Constant)
     def const(
@@ -256,22 +237,23 @@ class PyConstMethodTable(interp.MethodTable):
             return (ItemFood(type=stmt.value.type),)
 
         else:
-            raise exceptions.InterpreterError(
+            raise InterpreterExit(
                 f"illegal constant type {type(stmt.value)}"
             )
 ```
 
 
-Next, since we allow `add` in the program, we also need to let abstract interpreter know how to interprete `binop.Add` statement, which is in `py.binop` dialect.
+Next, since we allow the `add` operation in the program (Note the `12 + x` and `10 + x` operations in used in instantiating `Cook`), we also need to let abstract interpreter know how to interpret the `binop.Add` statement, which is in the `py.binop` dialect.
+
 ```python
 @binop.dialect.register(key="food.fee")
-class PyBinOpMethodTable(interp.MethodTable):
+class PyBinOpMethodTable(MethodTable):
 
     @interp.impl(binop.Add)
     def add(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[Item],
+        frame: Frame[Item],
         stmt: binop.Add,
     ):
         left = frame.get(stmt.lhs)
@@ -285,25 +267,26 @@ class PyBinOpMethodTable(interp.MethodTable):
         return (out,)
 ```
 
-Finally, we need implementation for our food dialect Statements.
+Finally, we need an implementation for our food dialect statements.
+
 ```python
 @dialect.register(key="food.fee")
-class FoodMethodTable(interp.MethodTable):
+class FoodMethodTable(MethodTable):
 
-    @interp.impl(NewFood)
+    @impl(NewFood)
     def new_food(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[Item],
+        frame: Frame[Item],
         stmt: NewFood,
     ):
         return (ItemFood(type=stmt.type),)
 
-    @interp.impl(Cook)
+    @impl(Cook)
     def cook(
         self,
         interp: FeeAnalysis,
-        frame: interp.Frame[Item],
+        frame: Frame[Item],
         stmt: Cook,
     ):
         # food depends on the food type to have different charge:
@@ -315,7 +298,7 @@ class FoodMethodTable(interp.MethodTable):
 
         return (out,)
 
-    @interp.impl(Nap)
+    @impl(Nap)
     def nap(
         self,
         interp: FeeAnalysis,
@@ -327,7 +310,7 @@ class FoodMethodTable(interp.MethodTable):
 
 ```
 
-## Put it together:
+## Putting Everything Together
 
 ```python
 fee_analysis = FeeAnalysis(main2.dialects)

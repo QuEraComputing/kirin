@@ -1,7 +1,17 @@
 import sys
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Generic, TypeVar, ClassVar, Optional, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    TypeVar,
+    ClassVar,
+    Optional,
+    Sequence,
+    Generator,
+)
+from contextlib import contextmanager
 from dataclasses import field, dataclass
 
 from typing_extensions import Self, deprecated
@@ -12,7 +22,7 @@ from kirin.ir.method import Method
 from .impl import Signature
 from .frame import FrameABC
 from .state import InterpreterState
-from .value import ReturnValue, SpecialValue, StatementResult
+from .value import Successor, ReturnValue, SpecialValue, StatementResult
 from .result import Ok, Err, Result
 from .exceptions import InterpreterError
 
@@ -47,6 +57,9 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
     keys: ClassVar[list[str]]
     """The name of the interpreter to select from dialects by order.
+    """
+    Frame: ClassVar[type[FrameABC]] = field(init=False)
+    """The type of the frame to use for this interpreter.
     """
     void: ValueType = field(init=False)
     """What to return when the interpreter evaluates nothing.
@@ -97,6 +110,13 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         self.state: InterpreterState[FrameType] = InterpreterState()
         return self
 
+    @abstractmethod
+    def initialize_frame(
+        self, code: Statement, *, has_parent_access: bool = False
+    ) -> FrameType:
+        """Create a new frame for the given method."""
+        ...
+
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
         if ABC in cls.__bases__:
@@ -106,15 +126,6 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             raise TypeError(f"keys is not defined for class {cls.__name__}")
         if not hasattr(cls, "void"):
             raise TypeError(f"void is not defined for class {cls.__name__}")
-
-    @deprecated("use run instead")
-    def eval(
-        self,
-        mt: Method,
-        args: tuple[ValueType, ...],
-        kwargs: dict[str, ValueType] | None = None,
-    ) -> Result[ValueType]:
-        return self.run(mt, args, kwargs)
 
     def run(
         self,
@@ -147,7 +158,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         except InterpreterError as e:
             # NOTE: initialize will create new State
             # so we don't need to copy the frames.
-            return Err(e, self.state.frames)
+            return Err(e, self.state)
         finally:
             self._eval_lock = False
             sys.setrecursionlimit(current_recursion_limit)
@@ -160,12 +171,12 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
         Args:
             stmt (Statement): the statement to run.
-            args (tuple[ValueType]): the arguments to the statement.
+            args (tuple[ValueType, ...]): the arguments to the statement.
 
         Returns:
             StatementResult[ValueType]: the result of the statement.
         """
-        frame = self.new_frame(stmt)
+        frame = self.initialize_frame(stmt)
         self.state.push_frame(frame)
         frame.set_values(stmt.args, args)
         results = self.eval_stmt(frame, stmt)
@@ -184,7 +195,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
         Args:
             method (Method): the method to run.
-            args (tuple[ValueType]): the arguments to the method, does not include self.
+            args (tuple[ValueType, ...]): the arguments to the method, does not include self.
 
         Returns:
             ValueType: the result of the method.
@@ -198,30 +209,33 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
         Args:
             code (Statement): the statement to run.
-            args (tuple[ValueType]): the arguments to the statement,
+            args (tuple[ValueType, ...]): the arguments to the statement,
                 includes self if the corresponding callable region contains a self argument.
 
         Returns:
             ValueType: the result of the statement.
         """
-        if len(self.state.frames) >= self.max_depth:
-            return self.eval_recursion_limit(self.state.current_frame())
+        if self.state.depth >= self.max_depth:
+            return self.eval_recursion_limit(self.state.current_frame)
 
         interface = code.get_trait(traits.CallableStmtInterface)
         if interface is None:
             raise InterpreterError(f"statement {code.name} is not callable")
 
-        frame = self.new_frame(code)
+        frame = self.initialize_frame(code)
         self.state.push_frame(frame)
         body = interface.get_callable_region(code)
         if not body.blocks:
             return self.state.pop_frame(), self.void
-        frame.set_values(body.blocks[0].args, args)
-        results = self.run_callable_region(frame, code, body)
+        results = self.run_callable_region(frame, code, body, args)
         return self.state.pop_frame(), results
 
     def run_callable_region(
-        self, frame: FrameType, code: Statement, region: Region
+        self,
+        frame: FrameType,
+        code: Statement,
+        region: Region,
+        args: tuple[ValueType, ...],
     ) -> ValueType:
         """A hook defines how to run the callable region given
         the interpreter context. Frame should be pushed before calling
@@ -231,7 +245,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         Unlike a general region (or the MLIR convention), it always return a value
         to be compatible with the Python convention.
         """
-        results = self.run_ssacfg_region(frame, region)
+        results = self.run_ssacfg_region(frame, region, args)
         if isinstance(results, ReturnValue):
             return results.value
         elif not results:  # empty result or None
@@ -240,6 +254,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             f"callable region {code.name} does not return `ReturnValue`, got {results}"
         )
 
+    @deprecated("use run_succ instead")
     def run_block(self, frame: FrameType, block: Block) -> SpecialValue[ValueType]:
         """Run a block within the current frame.
 
@@ -252,10 +267,39 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         """
         ...
 
-    @abstractmethod
-    def new_frame(self, code: Statement) -> FrameType:
-        """Create a new frame for the given method."""
+    def run_succ(self, frame: FrameType, succ: Successor) -> SpecialValue[ValueType]:
+        """Run a successor within the current frame.
+        Args:
+            frame: the current frame.
+            succ: the successor to run.
+
+        Returns:
+            SpecialValue: the result of running the successor.
+        """
         ...
+
+    @contextmanager
+    def new_frame(
+        self, code: Statement, *, has_parent_access: bool = False
+    ) -> Generator[FrameType, Any, None]:
+        """Create a new frame for the given method and push it to the state.
+
+        Args:
+            code (Statement): the statement to run.
+
+        Keyword Args:
+            has_parent_access (bool): whether this frame has access to the
+                parent frame entries. Defaults to False.
+
+        This is a context manager that creates a new frame, push and pop
+        the frame automatically.
+        """
+        frame = self.initialize_frame(code, has_parent_access=has_parent_access)
+        self.state.push_frame(frame)
+        try:
+            yield frame
+        finally:
+            self.state.pop_frame()
 
     @staticmethod
     def get_args(
@@ -410,13 +454,14 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
     @abstractmethod
     def run_ssacfg_region(
-        self, frame: FrameType, region: Region
+        self, frame: FrameType, region: Region, args: tuple[ValueType, ...]
     ) -> tuple[ValueType, ...] | None | ReturnValue[ValueType]:
         """This implements how to run a region with MLIR SSA CFG convention.
 
         Args:
             frame: the current frame.
             region: the region to run.
+            args: the arguments to the region.
 
         Returns:
             tuple[ValueType, ...] | SpecialValue[ValueType]: the result of running the region.

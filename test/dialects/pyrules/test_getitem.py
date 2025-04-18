@@ -1,4 +1,4 @@
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk
@@ -28,7 +28,7 @@ class Register:
 @statement(dialect=dummy)
 class New(ir.Statement):
     name = "new"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     result: ir.ResultValue = info.result(types.PyClass(Register))
 
 

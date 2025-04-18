@@ -1,6 +1,6 @@
 from typing import Any
 
-from kirin.ir import Block, Region
+from kirin.ir import Region
 from kirin.ir.method import Method
 from kirin.ir.nodes.stmt import Statement
 
@@ -21,8 +21,10 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
     keys = ["main"]
     void = None
 
-    def new_frame(self, code: Statement) -> Frame[Any]:
-        return Frame.from_func_like(code)
+    def initialize_frame(
+        self, code: Statement, *, has_parent_access: bool = False
+    ) -> Frame[Any]:
+        return Frame(code, has_parent_access=has_parent_access)
 
     def run_method(
         self, method: Method, args: tuple[Any, ...]
@@ -30,14 +32,14 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
         return self.run_callable(method.code, (method,) + args)
 
     def run_ssacfg_region(
-        self, frame: Frame[Any], region: Region
+        self, frame: Frame[Any], region: Region, args: tuple[Any, ...]
     ) -> tuple[Any, ...] | None | ReturnValue[Any]:
         block = region.blocks[0]
-        while block is not None:
-            results = self.run_block(frame, block)
+        succ = Successor(block, *args)
+        while succ is not None:
+            results = self.run_succ(frame, succ)
             if isinstance(results, Successor):
-                block = results.block
-                frame.set_values(block.args, results.block_args)
+                succ = results
             elif isinstance(results, ReturnValue):
                 return results
             elif isinstance(results, YieldValue):
@@ -46,12 +48,13 @@ class Interpreter(BaseInterpreter[Frame[Any], Any]):
                 return results
         return None  # region without terminator returns empty tuple
 
-    def run_block(self, frame: Frame[Any], block: Block) -> SpecialValue[Any]:
-        for stmt in block.stmts:
+    def run_succ(self, frame: Frame[Any], succ: Successor) -> SpecialValue[Any]:
+        frame.current_block = succ.block
+        frame.set_values(succ.block.args, succ.block_args)
+        for stmt in succ.block.stmts:
             if self.consume_fuel() == self.FuelResult.Stop:
                 raise FuelExhaustedError("fuel exhausted")
-            frame.stmt = stmt
-            frame.lino = stmt.source.lineno if stmt.source else 0
+            frame.current_stmt = stmt
             stmt_results = self.eval_stmt(frame, stmt)
             if isinstance(stmt_results, tuple):
                 frame.set_values(stmt._results, stmt_results)

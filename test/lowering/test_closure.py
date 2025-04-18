@@ -2,12 +2,11 @@ from functools import partial
 
 import pytest
 
+from kirin import lowering
 from kirin.prelude import python_no_opt
 from kirin.dialects import cf, func
-from kirin.lowering import Lowering
-from kirin.exceptions import DialectLoweringError
 
-lowering = Lowering(python_no_opt)
+lower = lowering.Python(python_no_opt)
 
 
 def test_closure():
@@ -17,7 +16,7 @@ def test_closure():
 
         return inner
 
-    code = lowering.run(closure)
+    code = lower.python_function(closure)
     assert isinstance(code, func.Function)
 
     def will_error(x):
@@ -27,8 +26,8 @@ def test_closure():
 
         return inner
 
-    with pytest.raises(DialectLoweringError):
-        lowering.run(will_error)
+    with pytest.raises(lowering.BuildError):
+        lower.python_function(will_error)
 
 
 def test_closure_branch():
@@ -40,7 +39,7 @@ def test_closure_branch():
 
         return inner
 
-    code = lowering.run(closure_branch)
+    code = lower.python_function(closure_branch)
     code.print()
     assert isinstance(code, func.Function)
     first_block = code.body.blocks[0]

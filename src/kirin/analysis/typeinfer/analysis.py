@@ -26,11 +26,15 @@ class TypeInference(Forward[types.TypeAttribute]):
     lattice = types.TypeAttribute
 
     def run_analysis(
-        self, method: ir.Method, args: tuple[types.TypeAttribute, ...] | None = None
+        self,
+        method: ir.Method,
+        args: tuple[types.TypeAttribute, ...] | None = None,
+        *,
+        no_raise: bool = True,
     ) -> tuple[ForwardFrame[types.TypeAttribute], types.TypeAttribute]:
         if args is None:
             args = method.arg_types
-        return super().run_analysis(method, args)
+        return super().run_analysis(method, args, no_raise=no_raise)
 
     # NOTE: unlike concrete interpreter, instead of using type information
     # within the IR. Type inference will use the interpreted

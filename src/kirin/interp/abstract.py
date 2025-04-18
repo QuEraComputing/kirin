@@ -147,12 +147,10 @@ class AbstractInterpreter(
         return frame, self.lattice.bottom()
 
     def run_ssacfg_region(
-        self, frame: AbstractFrameType, region: Region
+        self, frame: AbstractFrameType, region: Region, args: tuple[ResultType, ...]
     ) -> tuple[ResultType, ...] | None | ReturnValue[ResultType]:
         result = None
-        frame.worklist.append(
-            Successor(region.blocks[0], *frame.get_values(region.blocks[0].args))
-        )
+        frame.worklist.append(Successor(region.blocks[0], *args))
         while (succ := frame.worklist.pop()) is not None:
             if succ.block in frame.visited:
                 if succ in frame.visited[succ.block]:
@@ -160,7 +158,7 @@ class AbstractInterpreter(
             else:
                 frame.visited[succ.block] = set()
             self.prehook_succ(frame, succ)
-            block_result = self.run_block(frame, succ)
+            block_result = self.run_succ(frame, succ)
             if len(frame.visited[succ.block]) < 128:
                 frame.visited[succ.block].add(succ)
             else:
@@ -178,16 +176,16 @@ class AbstractInterpreter(
             return result.values
         return result
 
-    def run_block(
+    def run_succ(
         self, frame: AbstractFrameType, succ: Successor
     ) -> SpecialValue[ResultType]:
+        frame.current_block = succ.block
         self.set_values(frame, succ.block.args, succ.block_args)
         for stmt in succ.block.stmts:
             if self.should_exec_stmt(stmt) is False:
                 continue
 
-            frame.stmt = stmt
-            frame.lino = stmt.source.lineno if stmt.source else 0
+            frame.current_stmt = stmt
             stmt_results = self.eval_stmt(frame, stmt)
             if isinstance(stmt_results, tuple):
                 self.set_values(frame, stmt._results, stmt_results)
@@ -211,18 +209,6 @@ class AbstractInterpreter(
     def join_results(
         self, old: tuple[ResultType], new: tuple[ResultType]
     ) -> tuple[ResultType]: ...
-    @overload
-    def join_results(
-        self,
-        old: tuple[ResultType, ...] | ReturnValue[ResultType] | None,
-        new: tuple[ResultType, ...] | ReturnValue[ResultType] | None,
-    ) -> tuple[ResultType, ...] | ReturnValue[ResultType] | None: ...
-    @overload
-    def join_results(
-        self,
-        old: ReturnValue[ResultType] | YieldValue[ResultType] | None,
-        new: ReturnValue[ResultType] | YieldValue[ResultType] | None,
-    ) -> ReturnValue[ResultType] | YieldValue[ResultType] | None: ...
     @overload
     def join_results(
         self, old: AbsIntResultType[ResultType], new: AbsIntResultType[ResultType]

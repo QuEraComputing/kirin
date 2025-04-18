@@ -1,9 +1,9 @@
+from kirin import lowering
 from kirin.prelude import basic_no_opt
 from kirin.dialects import func
-from kirin.lowering import Lowering
 from kirin.analysis.cfg import CFG
 
-lowering = Lowering(basic_no_opt)
+lower = lowering.Python(basic_no_opt)
 
 
 def deadblock(x):
@@ -15,7 +15,7 @@ def deadblock(x):
 
 
 def test_reachable():
-    code = lowering.run(deadblock, compactify=False)
+    code = lower.python_function(deadblock, compactify=False)
     assert isinstance(code, func.Function)
     cfg = CFG(code.body)
     assert code.body.blocks[-1] not in cfg.successors
@@ -29,7 +29,7 @@ def foo(x: int):  # type: ignore
 
 
 def test_foo_cfg():
-    code = lowering.run(foo, compactify=False)
+    code = lower.python_function(foo, compactify=False)
     assert isinstance(code, func.Function)
     cfg = CFG(code.body)
     assert code.body.blocks[0] in cfg.successors

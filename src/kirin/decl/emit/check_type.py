@@ -1,18 +1,18 @@
 from typing import Any
 
-from kirin.exceptions import VerificationError
+from kirin.ir.exception import ValidationError
 from kirin.decl.emit.init import BaseModifier
 
 from ._create_fn import create_fn
 from ._set_new_attribute import set_new_attribute
 
 
-class EmitTypeCheck(BaseModifier):
-    _VERIFICATION_ERROR = "_kirin_VerificationError"
+class EmitCheckType(BaseModifier):
+    _VERIFICATION_ERROR = "_kirin_IRValidationError"
 
-    def emit_typecheck(self):
-        typecheck_locals: dict[str, Any] = {
-            self._VERIFICATION_ERROR: VerificationError,
+    def emit_check_type(self):
+        check_type_locals: dict[str, Any] = {
+            self._VERIFICATION_ERROR: ValidationError,
         }
         body: list[str] = []
         for name, f in self.fields.args.items():
@@ -20,7 +20,7 @@ class EmitTypeCheck(BaseModifier):
                 continue
 
             value_type = f"_args_{f.name}_type"
-            typecheck_locals.update({value_type: f.type})
+            check_type_locals.update({value_type: f.type})
             if f.group:
                 body.extend(
                     (
@@ -40,16 +40,16 @@ class EmitTypeCheck(BaseModifier):
                 continue
 
             value_type = f"_results_{f.name}_type"
-            typecheck_locals.update({value_type: f.type})
+            check_type_locals.update({value_type: f.type})
             body.extend(
                 self._guard_ssa_type(f"{self._self_name}.{name}", name, value_type)
             )
 
         for name in self.fields.blocks.keys():
-            body.append(f"{self._self_name}.{name}.typecheck()")
+            body.append(f"{self._self_name}.{name}.verify_type()")
 
         for name, f in self.fields.regions.items():
-            body.append(f"{self._self_name}.{name}.typecheck()")
+            body.append(f"{self._self_name}.{name}.verify_type()")
 
         # NOTE: we still need to generate this because it is abstract
         if not body:
@@ -57,13 +57,13 @@ class EmitTypeCheck(BaseModifier):
 
         set_new_attribute(
             self.cls,
-            "typecheck",
+            "check_type",
             create_fn(
-                name="_kirin_decl_typecheck",
+                name="_kirin_decl_check_type",
                 args=[self._self_name],
                 body=body,
                 globals=self.globals,
-                locals=typecheck_locals,
+                locals=check_type_locals,
                 return_type=None,
             ),
         )

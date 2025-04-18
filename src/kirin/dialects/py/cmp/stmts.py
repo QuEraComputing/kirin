@@ -1,4 +1,4 @@
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 
 from ._dialect import dialect
@@ -6,7 +6,7 @@ from ._dialect import dialect
 
 @statement
 class Cmp(ir.Statement):
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     lhs: ir.SSAValue = info.argument()
     rhs: ir.SSAValue = info.argument()
     result: ir.ResultValue = info.result(types.Bool)

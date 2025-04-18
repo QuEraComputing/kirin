@@ -1,8 +1,8 @@
+from kirin import lowering
 from kirin.prelude import basic_no_opt
 from kirin.dialects import cf, func
-from kirin.lowering import Lowering
 
-lowering = Lowering(basic_no_opt)
+lower = lowering.Python(basic_no_opt)
 
 
 def test_simple_loop():
@@ -11,7 +11,7 @@ def test_simple_loop():
             for j in range(10):
                 x = x + i + j
 
-    code = lowering.run(simple_loop)
+    code = lower.python_function(simple_loop)
     assert isinstance(code, func.Function)
     assert isinstance(stmt := code.body.blocks[0].last_stmt, cf.ConditionalBranch)
     assert stmt.then_arguments[0] is code.body.blocks[0].args[1]
@@ -47,7 +47,7 @@ def test_branch_pass():
         else:
             pass
 
-    code = lowering.run(branch_pass)
+    code = lower.python_function(branch_pass)
     assert isinstance(code, func.Function)
     assert isinstance(code.body.blocks[0].last_stmt, func.Return)
     # code.print()
@@ -61,7 +61,7 @@ def test_side_effect():
         for i in range(10):
             reg[0] = i
 
-    code = lowering.run(side_effect)
+    code = lower.python_function(side_effect)
     assert isinstance(code, func.Function)
     assert isinstance(stmt := code.body.blocks[0].last_stmt, cf.ConditionalBranch)
     assert stmt.then_arguments[0] is code.body.blocks[0].stmts.at(-2).results[0]

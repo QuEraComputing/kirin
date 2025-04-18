@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 from types import ModuleType
 from typing import (
@@ -11,13 +13,14 @@ from typing import (
     overload,
 )
 from functools import update_wrapper
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 from collections.abc import Iterable
 
 from kirin.ir.method import Method
-from kirin.exceptions import CompilerError
+from kirin.ir.exception import CompilerError
 
 if TYPE_CHECKING:
+    from kirin.lowering import Python
     from kirin.registry import Registry
     from kirin.ir.dialect import Dialect
 
@@ -45,6 +48,9 @@ class DialectGroup(Generic[PassParams]):
     run_pass: RunPass[PassParams] | None = None
     """the function that runs the passes on the method."""
 
+    lowering: Python = field(init=False, repr=False)
+    """the lowering object used to lower the method."""
+
     def __init__(
         self,
         dialects: Iterable[Union["Dialect", ModuleType]],
@@ -60,6 +66,10 @@ class DialectGroup(Generic[PassParams]):
         else:
             self.run_pass_gen = run_pass
             self.run_pass = run_pass(self)
+
+        from kirin.lowering import Python
+
+        self.lowering = Python(self)
 
     def __iter__(self):
         return iter(self.data)
@@ -180,9 +190,6 @@ class DialectGroup(Generic[PassParams]):
         Returns:
             Method: the method created from the python function.
         """
-        from kirin.lowering import Lowering
-
-        emit_ir = Lowering(self)
 
         def wrapper(py_func: Callable) -> Method:
             if py_func.__name__ == "<lambda>":
@@ -200,7 +207,7 @@ class DialectGroup(Generic[PassParams]):
                 lineno_offset = call_site_frame.f_lineno - 1
                 file = call_site_frame.f_code.co_filename
 
-            code = emit_ir.run(py_func, lineno_offset=lineno_offset)
+            code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
             mt = Method(
                 mod=inspect.getmodule(py_func),
                 py_func=py_func,
@@ -208,6 +215,7 @@ class DialectGroup(Generic[PassParams]):
                 arg_names=["#self#"] + inspect.getfullargspec(py_func).args,
                 dialects=self,
                 code=code,
+                lineno_offset=lineno_offset,
                 file=file,
             )
             if doc := inspect.getdoc(py_func):

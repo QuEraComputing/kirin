@@ -1,4 +1,4 @@
-from typing import Iterable, cast
+from typing import Iterable
 
 from kirin import ir, types
 from kirin.interp import Frame, MethodTable, ReturnValue, impl
@@ -38,7 +38,7 @@ class TypeInfer(MethodTable):
     def call(self, interp: TypeInference, frame: Frame, stmt: Call):
         # give up on dynamic method calls
         mt = interp.maybe_const(stmt.callee, ir.Method)
-        if mt is None:
+        if mt is None:  # not a constant method
             return self._solve_method_type(interp, frame, stmt)
         return self._invoke_method(
             interp,
@@ -57,16 +57,14 @@ class TypeInfer(MethodTable):
 
         if len(mt_inferred.vars) != 2:
             return (types.Bottom,)
-
         args = mt_inferred.vars[0]
         result = mt_inferred.vars[1]
         if not args.is_subseteq(types.Tuple):
             return (types.Bottom,)
 
         resolve = TypeResolution()
-        args = cast(types.Generic, args)
-        for arg, value in zip(args.vars, frame.get_values(stmt.inputs)):
-            resolve.solve(arg, value)
+        # NOTE: we are not using [...] below to be compatible with 3.10
+        resolve.solve(args, types.Tuple.where(frame.get_values(stmt.inputs)))
         return (resolve.substitute(result),)
 
     @impl(Invoke)

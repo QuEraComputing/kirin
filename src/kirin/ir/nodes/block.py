@@ -7,8 +7,9 @@ from collections.abc import Sequence
 from typing_extensions import Self
 
 from kirin.print import Printer
-from kirin.ir.ssa import SSAValue, BlockArgument
-from kirin.exceptions import VerificationError
+from kirin.ir.ssa import SSAValue, BlockArgument, DeletedSSAValue
+from kirin.source import SourceInfo
+from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.base import IRNode
 from kirin.ir.nodes.view import View, MutableSequenceView
 
@@ -90,13 +91,16 @@ class BlockArguments(MutableSequenceView[tuple, "Block", BlockArgument]):
         Raises:
             ValueError: If the argument does not belong to the reference block.
         """
+        if safe and len(arg.uses) > 0:
+            raise ValueError("Cannot delete SSA value with uses")
+
         if arg.block is not self.node:
             raise ValueError("Attempt to delete an argument that is not in the block")
 
         for block_arg in self.field[arg.index + 1 :]:
             block_arg.index -= 1
         self.node._args = (*self.field[: arg.index], *self.field[arg.index + 1 :])
-        arg.delete(safe=safe)
+        arg.replace_by(DeletedSSAValue(arg))
 
     def __delitem__(self, idx: int) -> None:
         self.delete(self.field[idx])
@@ -251,6 +255,8 @@ class Block(IRNode["Region"]):
         self,
         stmts: Sequence[Statement] = (),
         argtypes: Iterable[TypeAttribute] = (),
+        *,
+        source: SourceInfo | None = None,
     ):
         """
         Args:
@@ -258,6 +264,7 @@ class Block(IRNode["Region"]):
             argtypes (Iterable[TypeAttribute], optional): The type of the block arguments. Defaults to ().
         """
         super().__init__()
+        self.source = source
         self._args = tuple(
             BlockArgument(self, i, argtype) for i, argtype in enumerate(argtypes)
         )
@@ -438,21 +445,25 @@ class Block(IRNode["Region"]):
                 printer.print_newline()
                 printer.print_stmt(stmt)
 
-    def typecheck(self) -> None:
-        """Checking the types of the Statments in the Block."""
-        for stmt in self.stmts:
-            stmt.typecheck()
-
     def verify(self) -> None:
         """Verify the correctness of the Block.
 
         Raises:
-            VerificationError: If the Block is not correct.
+            IRValidationError: If the Block is not correct.
         """
         from kirin.ir.nodes.stmt import Region
 
         if not isinstance(self.parent, Region):
-            raise VerificationError(self, "Parent is not a region")
+            raise ValidationError(self, "Parent is not a region")
 
         for stmt in self.stmts:
             stmt.verify()
+
+    def verify_type(self) -> None:
+        """Verify the types of the Block.
+
+        Raises:
+            IRValidationError: If the Block is not correct.
+        """
+        for stmt in self.stmts:
+            stmt.verify_type()

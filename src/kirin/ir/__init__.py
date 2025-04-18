@@ -23,6 +23,8 @@ from kirin.ir.nodes import (
 from kirin.ir.method import Method as Method
 from kirin.ir.traits import (
     Pure as Pure,
+    Trait as Trait,
+    AttrTrait as AttrTrait,
     HasParent as HasParent,
     MaybePure as MaybePure,
     StmtTrait as StmtTrait,
@@ -33,16 +35,17 @@ from kirin.ir.traits import (
     IsTerminator as IsTerminator,
     NoTerminator as NoTerminator,
     SSACFGRegion as SSACFGRegion,
-    FromPythonCall as FromPythonCall,
-    FromPythonWith as FromPythonWith,
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
-    FromPythonRangeLike as FromPythonRangeLike,
-    PythonLoweringTrait as PythonLoweringTrait,
     CallableStmtInterface as CallableStmtInterface,
-    FromPythonWithSingleItem as FromPythonWithSingleItem,
 )
 from kirin.ir.dialect import Dialect as Dialect
 from kirin.ir.attrs.py import PyAttr as PyAttr
 from kirin.ir.attrs.abc import Attribute as Attribute, AttributeMeta as AttributeMeta
+from kirin.ir.exception import (
+    HintedError as HintedError,
+    CompilerError as CompilerError,
+    TypeCheckError as TypeCheckError,
+    ValidationError as ValidationError,
+)
 from kirin.ir.attrs.data import Data as Data

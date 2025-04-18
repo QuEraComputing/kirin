@@ -1,6 +1,5 @@
 from kirin import ir, types
 from kirin.decl import info, statement
-from kirin.exceptions import VerificationError
 from kirin.print.printer import Printer
 
 from ._dialect import dialect
@@ -101,32 +100,32 @@ class IfElse(ir.Statement):
         from kirin.dialects.func import Return
 
         if len(self.then_body.blocks) != 1:
-            raise VerificationError(self, "then region must have a single block")
+            raise ir.ValidationError(self, "then region must have a single block")
 
         if len(self.else_body.blocks) != 1:
-            raise VerificationError(self, "else region must have a single block")
+            raise ir.ValidationError(self, "else region must have a single block")
 
         then_block = self.then_body.blocks[0]
         else_block = self.else_body.blocks[0]
         if len(then_block.args) != 1:
-            raise VerificationError(
+            raise ir.ValidationError(
                 self, "then block must have a single argument for condition"
             )
 
         if len(else_block.args) != 1:
-            raise VerificationError(
+            raise ir.ValidationError(
                 self, "else block must have a single argument for condition"
             )
 
         then_stmt = then_block.last_stmt
         else_stmt = else_block.last_stmt
         if then_stmt is None or not isinstance(then_stmt, (Yield, Return)):
-            raise VerificationError(
+            raise ir.ValidationError(
                 self, "then block must terminate with a yield or return"
             )
 
         if else_stmt is None or not isinstance(else_stmt, (Yield, Return)):
-            raise VerificationError(
+            raise ir.ValidationError(
                 self, "else block must terminate with a yield or return"
             )
 
@@ -163,17 +162,17 @@ class For(ir.Statement):
         from kirin.dialects.func import Return
 
         if len(self.body.blocks) != 1:
-            raise VerificationError(self, "for loop body must have a single block")
+            raise ir.ValidationError(self, "for loop body must have a single block")
 
         if len(self.body.blocks[0].args) != len(self.initializers) + 1:
-            raise VerificationError(
+            raise ir.ValidationError(
                 self,
                 "for loop body must have arguments for all initializers and the loop variable",
             )
 
         stmt = self.body.blocks[0].last_stmt
         if stmt is None or not isinstance(stmt, (Yield, Return)):
-            raise VerificationError(
+            raise ir.ValidationError(
                 self, "for loop body must terminate with a yield or return"
             )
 
@@ -181,12 +180,12 @@ class For(ir.Statement):
             return
 
         if len(stmt.values) != len(self.initializers):
-            raise VerificationError(
+            raise ir.ValidationError(
                 self,
                 "for loop body must have the same number of results as initializers",
             )
         if len(self.results) != len(stmt.values):
-            raise VerificationError(
+            raise ir.ValidationError(
                 self,
                 "for loop must have the same number of results as the yield in the body",
             )

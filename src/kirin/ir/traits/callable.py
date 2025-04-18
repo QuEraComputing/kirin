@@ -12,7 +12,7 @@ StmtType = TypeVar("StmtType", bound="Statement")
 
 
 @dataclass(frozen=True)
-class CallableStmtInterface(StmtTrait, Generic[StmtType]):
+class CallableStmtInterface(StmtTrait, ABC, Generic[StmtType]):
     """A trait that indicates that a statement is a callable statement.
 
     A callable statement is a statement that can be called as a function.
@@ -43,9 +43,9 @@ class HasSignature(StmtTrait, ABC):
     def set_signature(cls, stmt: "Statement", signature: "Signature"):
         stmt.attributes["signature"] = signature
 
-    def verify(self, stmt: "Statement"):
+    def verify(self, node: "Statement"):
         from kirin.dialects.func.attrs import Signature
 
-        signature = self.get_signature(stmt)
+        signature = self.get_signature(node)
         if not isinstance(signature, Signature):
             raise ValueError(f"{signature} is not a Signature attribute")

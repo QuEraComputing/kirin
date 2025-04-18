@@ -1,17 +1,17 @@
 ## Rewrite if-else control flow
 
-In the main page, we introduce a simple `food` dialect example, and described how to use kirin to define a simple compiler.
-In this section, we want to continue with this exampe, and consider a more compilcated rewrite pass
-that involves the build-in python dialect if-else control flow.
+In the main page, we introduce a simple `food` dialect example, and described how to use Kirin to define a simple compiler.
+In this section, we want to continue with this example, and consider a more complex rewrite pass
+that involves the built-in Python dialect `if-else` control flow.
 
 ### Goal
-When one get really really full, not only does one nap, we also would make random decision.
-Here specifically, We want to rewrite the existing `IfElse` statement defined in the existing `py` dialect into a customize `RandomBranch` statement we defined in our food dialect.
+When one gets really *really* full, not only does one want to take a nap, but sometimes one makes random decisions too.
+Here specifically, We want to rewrite the existing `IfElse` statement defined in the `py` dialect into a custom `RandomBranch` statement we will define in our food dialect.
 
-The execution of `RandomBranch`, as stated in its name, randomly execute a branch each time we run it.
+The execution of `RandomBranch`, as stated in its name, randomly executes a branch each time we run it.
 
 ### Define Custom RandomBranch statement
-Lets start by define our `RandomBranch` Statement:
+Lets start by defining our `RandomBranch` Statement:
 
 ```python
 from kirin.decl import statement, info
@@ -21,7 +21,7 @@ from kirin import ir, types
 class RandomBranch(ir.Statement):
     name = "random_br"
     traits = frozenset({ir.IsTerminator()}) # (1)!
-    cond: SSAValue = info.argument(types.Bool) # (2)!
+    cond: ir.SSAValue = info.argument(types.Bool) # (2)!
     then_arguments: tuple[ir.SSAValue, ...] = info.argument() # (3)!
     else_arguments: tuple[ir.SSAValue, ...] = info.argument() # (4)!
     then_successor: ir.Block = info.block() # (5)!
@@ -44,18 +44,20 @@ unlike a normal `if else` branching statement, it does not execute the branches 
 it randomly chooses one of the branches to execute. We will implement the execution behavior of this statement in the following.
 
 ### Implementation and MethodTable
-Recall in the introduction of food dialect we metioned about `MethodTable`. Now we have defined the statement, we will need to tell interpreter how to interprete this Statement we defined.
+Recall in the introduction of food dialect we introduced the `MethodTable`. Now that we have defined the `RandomBranch` statement, we will need to tell interpreter how to interpret it.
 
-Let's find the `FoodMethods` MethodTable that we defined and registered to `food` dialect previously:
+Let's find the `FoodMethods` MethodTable that we defined and registered to the `food` dialect previously. Note that as part of the previous imports we now pull in a `Successor` whose purpose will be explained below, as well as importing `randint` from Python's `random` module to introduce the random behavior we want:
+
 ```python
 from kirin.interp import Frame, Successor, Interpreter, MethodTable, impl
+from math import randint
 
 @dialect.register
 class FoodMethods(MethodTable):
     ...
 ```
 
-Now we want to also implement the execution method and then register to this method table:
+Now we want to also implement the execution method and then register it to this method table:
 
 ```python
     @impl(RandomBranch)
@@ -78,7 +80,7 @@ to pass to the block.
 ### Rewrite Python `if else` statement to `RandomBranch`
 
 Now we can define a rewrite pass that rewrites Python `if else` statement to `RandomBranch` statement.
-This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.RewriteRule] and implementing the
+This is done by defining a subclass of [`RewriteRule`][kirin.rewrite.abc.RewriteRule] and implementing the
 `rewrite_Statement` method. The `RewriteRule` class is a standard Python visitor on Kirin's IR.
 
 Here, we only need to implement the `rewrite_Statement` method to rewrite the `if else` statement to `RandomBranch`.
@@ -105,14 +107,16 @@ class RewriteToRandomBranch(RewriteRule):
         return RewriteResult(has_done_something=True) # (5)!
 ```
 
-1. Import the control flow dialect `cf` which is what Python `if else` statement compiles to by default in the `basic` dialect group.
+1. Import the control flow dialect `cf` which is what Python's `if else` statement compiles to by default in the `basic` dialect group.
 2. Import the `RewriteRule` class from the `rewrite` module.
-3. This is the signature of `rewrite_Statement` method. Your IDE should hint you the type signature so you can auto-complete it.
+3. This is the signature of `rewrite_Statement` method. Your IDE should hint the type signature so you can auto-complete it.
 4. Check if the statement is a `ConditionalBranch` statement. If it is not, return an empty `RewriteResult`.
 5. Replace the `ConditionalBranch` statement with a `RandomBranch` statement and return a `RewriteResult` that indicates the rewrite has been done. Every statement has a [`replace_by`][kirin.ir.Statement.replace_by] method that replaces the statement with another statement.
 
 
 ### Adding to the decorator
+
+Now we can incorporate our new rewrite rule as part of the function that defines the `@food` decorator!
 
 ```python
 from kirin.ir import dialect_group
@@ -122,10 +126,14 @@ from kirin.rewrite import Walk, Fixpoint
 @dialect_group(basic_no_opt.add(dialect))
 def food(self):
 
-    # some initialization if you need it
-    def run_pass(mt, hungry:bool=False, got_lost: bool=True): # (1)!
+    fold_pass = Fold(self)
 
-        if drunk:
+    def run_pass(mt, *, fold:bool = True, hungry:bool=False, got_lost: bool=True): # (1)!
+
+        if fold:
+            fold_pass(mt)
+        
+        if hungry:
             Walk(NewFoodAndNap()).rewrite(mt.code)
 
         if got_lost:
@@ -135,4 +143,4 @@ def food(self):
 ```
 
 1. Lets add an extra `got_lost` option to toggle this `RandomWalkBranch()` rewrite rule.
-2. The `Walk` will walk through the IR and apply the rule. The `Fixpoint` then repeatedly walk through the IR until there is nothing to rewrite.
+2. The `Walk` will walk through the IR and apply the rule. The `Fixpoint` then repeatedly walks through the IR until there is nothing to rewrite.

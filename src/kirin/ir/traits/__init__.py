@@ -10,9 +10,10 @@ There are also some basic traits that are provided for convenience, such as
 """
 
 from .abc import (
+    Trait as Trait,
+    AttrTrait as AttrTrait,
     StmtTrait as StmtTrait,
     RegionTrait as RegionTrait,
-    PythonLoweringTrait as PythonLoweringTrait,
 )
 from .basic import (
     Pure as Pure,
@@ -28,12 +29,4 @@ from .callable import (
     HasSignature as HasSignature,
     CallableStmtInterface as CallableStmtInterface,
 )
-from .lowering.call import (
-    FromPythonCall as FromPythonCall,
-    FromPythonRangeLike as FromPythonRangeLike,
-)
 from .region.ssacfg import SSACFGRegion as SSACFGRegion
-from .lowering.context import (
-    FromPythonWith as FromPythonWith,
-    FromPythonWithSingleItem as FromPythonWithSingleItem,
-)

@@ -18,16 +18,16 @@ class Concrete(interp.MethodTable):
             body = stmt.then_body
         else:
             body = stmt.else_body
-        return interp_.run_ssacfg_region(frame, body)
+        return interp_.run_ssacfg_region(frame, body, (cond,))
 
     @interp.impl(For)
     def for_loop(self, interpreter: interp.Interpreter, frame: interp.Frame, stmt: For):
         iterable = frame.get(stmt.iterable)
         loop_vars = frame.get_values(stmt.initializers)
-        block_args = stmt.body.blocks[0].args
         for value in iterable:
-            frame.set_values(block_args, (value,) + loop_vars)
-            loop_vars = interpreter.run_ssacfg_region(frame, stmt.body)
+            loop_vars = interpreter.run_ssacfg_region(
+                frame, stmt.body, (value,) + loop_vars
+            )
             if isinstance(loop_vars, interp.ReturnValue):
                 return loop_vars
             elif loop_vars is None:

@@ -13,7 +13,7 @@ This dialect maps `ast.Constant` nodes to the `Constant` statement.
 import ast
 from typing import Generic, TypeVar
 
-from kirin import ir, types, interp, lowering, exceptions
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
 from kirin.emit.julia import EmitJulia, EmitStrFrame
@@ -26,7 +26,7 @@ T = TypeVar("T", covariant=True)
 @statement(dialect=dialect)
 class Constant(ir.Statement, Generic[T]):
     name = "constant"
-    traits = frozenset({ir.Pure(), ir.ConstantLike(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), ir.ConstantLike(), lowering.FromPythonCall()})
     value: ir.Data[T] = info.attribute()
     result: ir.ResultValue = info.result()
 
@@ -42,15 +42,18 @@ class Constant(ir.Statement, Generic[T]):
     def print_impl(self, printer: Printer) -> None:
         printer.print_name(self)
         printer.plain_print(" ")
-        printer.plain_print(repr(self.value))
+        if isinstance(self.value, ir.PyAttr):
+            printer.plain_print(repr(self.value.data))
+        else:  # other attributes
+            printer.plain_print(repr(self.value))
         with printer.rich(style="comment"):
             printer.plain_print(" : ")
             printer.print(self.result.type)
 
-    def typecheck(self) -> None:
+    def check_type(self) -> None:
         if not isinstance(self.result.type, types.TypeAttribute):
-            raise exceptions.VerificationError(
-                self, f"Expected result type to be PyType, got {self.result.type}"
+            raise TypeError(
+                f"Expected result type to be PyType, got {self.result.type}"
             )
 
 
@@ -58,9 +61,11 @@ class Constant(ir.Statement, Generic[T]):
 class Lowering(lowering.FromPythonAST):
 
     def lower_Constant(
-        self, state: lowering.LoweringState, node: ast.Constant
+        self, state: lowering.State, node: ast.Constant
     ) -> lowering.Result:
-        return lowering.Result(state.append_stmt(Constant(node.value)))
+        return state.current_frame.push(
+            Constant(node.value),
+        )
 
 
 @dialect.register

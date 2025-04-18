@@ -21,7 +21,11 @@ FrameType = TypeVar("FrameType", bound=EmitFrame)
 class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
 
     def run_callable_region(
-        self, frame: FrameType, code: ir.Statement, region: ir.Region
+        self,
+        frame: FrameType,
+        code: ir.Statement,
+        region: ir.Region,
+        args: tuple[ValueType, ...],
     ) -> ValueType:
         results = self.eval_stmt(frame, code)
         if isinstance(results, tuple):
@@ -32,12 +36,11 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
         raise interp.InterpreterError(f"Unexpected results {results}")
 
     def run_ssacfg_region(
-        self, frame: FrameType, region: ir.Region
+        self, frame: FrameType, region: ir.Region, args: tuple[ValueType, ...]
     ) -> tuple[ValueType, ...]:
-        frame.worklist.append(
-            interp.Successor(region.blocks[0], frame.get_values(region.blocks[0].args))
-        )
+        frame.worklist.append(interp.Successor(region.blocks[0], *args))
         while (succ := frame.worklist.pop()) is not None:
+            frame.set_values(succ.block.args, succ.block_args)
             block_header = self.emit_block(frame, succ.block)
             frame.block_ref[succ.block] = block_header
         return ()

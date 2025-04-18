@@ -1,9 +1,9 @@
+from kirin import lowering
 from kirin.prelude import basic_no_opt
 from kirin.dialects import math
-from kirin.lowering.binding import wraps
 
 
-@wraps(math.sin)
+@lowering.wraps(math.stmts.sin)
 def sin(value: float) -> float: ...
 
 
@@ -14,4 +14,4 @@ def main(x: float):
 
 def test_binding():
     stmt = main.callable_region.blocks[0].stmts.at(0)
-    assert isinstance(stmt, math.sin)
+    assert isinstance(stmt, math.stmts.sin)

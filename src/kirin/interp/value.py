@@ -1,4 +1,4 @@
-from typing import Tuple, Generic, TypeVar, TypeAlias, final
+from typing import Generic, TypeVar, TypeAlias, final
 from dataclasses import dataclass
 
 from kirin.ir import Block
@@ -51,7 +51,7 @@ class Successor(Generic[ValueType]):
     """Successor block from a statement evaluation."""
 
     block: Block
-    block_args: Tuple[ValueType, ...]
+    block_args: tuple[ValueType, ...]
 
     def __init__(self, block: Block, *block_args: ValueType):
         super().__init__()
