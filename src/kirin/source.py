@@ -1,4 +1,5 @@
 import ast
+import math
 import shutil
 import textwrap
 from dataclasses import dataclass
@@ -135,7 +136,8 @@ class SourceInfo:
         ret = " " * indent + "[red]" + ret
         if help:
             hint_indent = len(ret) - len("[ret]") + len(" help: ")
-            terminal_width = shutil.get_terminal_size().columns - hint_indent - 40
+            terminal_width = math.floor(shutil.get_terminal_size().columns * 0.7)
+            terminal_width = max(terminal_width - hint_indent, 10)
             wrapped = textwrap.fill(str(help), width=terminal_width)
             lines = wrapped.splitlines()
             ret += " help: " + lines[0] + "[/red]"
