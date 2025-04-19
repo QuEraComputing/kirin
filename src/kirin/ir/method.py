@@ -98,7 +98,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
             self.inferred,
         )
 
-    def verify(self) -> int:
+    def verify(self) -> None:
         """verify the method body.
 
         This will raise a ValidationError if the method body is not valid.
