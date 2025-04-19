@@ -127,7 +127,6 @@
         * [exceptions](kirin/interp/exceptions.md)
         * [frame](kirin/interp/frame.md)
         * [impl](kirin/interp/impl.md)
-        * [result](kirin/interp/result.md)
         * [state](kirin/interp/state.md)
         * [table](kirin/interp/table.md)
         * [value](kirin/interp/value.md)
