@@ -85,6 +85,9 @@ class Call(ir.Statement):
                     help="did you try to call a Python class method within a kernel? "
                     "consider rewriting it with a captured variable instead of calling it inside the kernel",
                 )
+
+            if self.callee.type is types.Any:
+                return
             raise ir.TypeCheckError(
                 self,
                 f"callee must be a method type, got {self.callee.type}",
