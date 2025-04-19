@@ -23,8 +23,7 @@ from .impl import Signature
 from .frame import FrameABC
 from .state import InterpreterState
 from .value import Successor, ReturnValue, SpecialValue, StatementResult
-from .result import Ok, Err, Result
-from .exceptions import InterpreterError
+from .exceptions import IntepreterExit, InterpreterError
 
 if TYPE_CHECKING:
     from kirin.registry import StatementImpl, InterpreterRegistry
@@ -132,7 +131,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         mt: Method,
         args: tuple[ValueType, ...],
         kwargs: dict[str, ValueType] | None = None,
-    ) -> Result[ValueType]:
+    ) -> ValueType:
         """Run a method. This is the main entry point of the interpreter.
 
         Args:
@@ -155,14 +154,14 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         args = self.get_args(mt.arg_names[len(args) + 1 :], args, kwargs)
         try:
             _, results = self.run_method(mt, args)
-        except InterpreterError as e:
+        except Exception as e:
             # NOTE: initialize will create new State
             # so we don't need to copy the frames.
-            return Err(e, self.state)
+            raise IntepreterExit(e, self.state) from e
         finally:
             self._eval_lock = False
             sys.setrecursionlimit(current_recursion_limit)
-        return Ok(results)
+        return results
 
     def run_stmt(
         self, stmt: Statement, args: tuple[ValueType, ...]

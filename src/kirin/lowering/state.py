@@ -228,5 +228,4 @@ class State(Generic[ASTNodeType]):
             indent=indent,
             show_lineno=show_lineno,
             max_lines=max_lines,
-            lineno_offset=self.lineno_offset,
         )

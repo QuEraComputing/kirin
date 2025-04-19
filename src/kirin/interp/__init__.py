@@ -34,6 +34,7 @@ from .abstract import (
 from .concrete import Interpreter as Interpreter
 from .exceptions import (
     WrapException as WrapException,
+    IntepreterExit as IntepreterExit,
     InterpreterError as InterpreterError,
     FuelExhaustedError as FuelExhaustedError,
 )

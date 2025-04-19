@@ -34,6 +34,8 @@ class FrameABC(ABC, Generic[ValueType]):
     has_parent_access: bool = field(default=False, kw_only=True, compare=True)
     """If we have access to the entries of the parent frame."""
 
+    lineno_offset: int = field(default=0, kw_only=True, compare=True)
+
     current_stmt: Statement | None = field(
         default=None, init=False, compare=False, repr=False
     )

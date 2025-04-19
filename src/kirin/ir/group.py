@@ -190,15 +190,15 @@ class DialectGroup(Generic[PassParams]):
         Returns:
             Method: the method created from the python function.
         """
+        frame = inspect.currentframe()
 
         def wrapper(py_func: Callable) -> Method:
             if py_func.__name__ == "<lambda>":
                 raise ValueError("Cannot compile lambda functions")
 
             lineno_offset, file = 0, ""
-            frame = inspect.currentframe()
-            if frame and frame.f_back is not None and frame.f_back.f_back is not None:
-                call_site_frame = frame.f_back.f_back
+            if frame and frame.f_back is not None:
+                call_site_frame = frame.f_back
                 if py_func.__name__ in call_site_frame.f_locals:
                     raise CompilerError(
                         f"overwriting function definition of `{py_func.__name__}`"

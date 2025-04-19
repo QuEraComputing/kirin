@@ -13,9 +13,17 @@ class SourceInfo:
     col_offset: int
     end_lineno: int | None
     end_col_offset: int | None
+    file: str | None = None
+    lineno_offset: int = 0
 
     @classmethod
-    def from_ast(cls, node: ast.AST, lineno_offset: int = 0, col_offset: int = 0):
+    def from_ast(
+        cls,
+        node: ast.AST,
+        lineno_offset: int = 0,
+        col_offset: int = 0,
+        file: str | None = None,
+    ):
         end_lineno = getattr(node, "end_lineno", None)
         end_col_offset = getattr(node, "end_col_offset", None)
         return cls(
@@ -23,6 +31,8 @@ class SourceInfo:
             getattr(node, "col_offset", 0) + col_offset,
             end_lineno + lineno_offset if end_lineno is not None else None,
             end_col_offset + col_offset if end_col_offset is not None else None,
+            file,
+            lineno_offset,
         )
 
     def offset(self, lineno_offset: int = 0, col_offset: int = 0):
@@ -49,7 +59,6 @@ class SourceInfo:
         indent: int = 2,
         show_lineno: bool = True,
         max_lines: int = 3,
-        lineno_offset: int = 0,
     ) -> str:
         """Generate a hint for the error.
 
@@ -68,14 +77,14 @@ class SourceInfo:
             str: The hint for the error.
         """
         help = getattr(err, "help", None)
-        begin = max(0, self.lineno - max_lines - lineno_offset)
+        begin = max(0, self.lineno - max_lines - self.lineno_offset)
         end = max(
-            max(self.lineno + max_lines, self.end_lineno or 0) - lineno_offset,
+            max(self.lineno + max_lines, self.end_lineno or 0) - self.lineno_offset,
             0,
         )
         end = min(len(lines), end)  # make sure end is within bounds
         lines = lines[begin:end]
-        error_lineno = self.lineno - lineno_offset - 1
+        error_lineno = self.lineno - self.lineno_offset - 1
         error_lineno_len = len(str(self.lineno))
         code_indent = min(map(self.__get_indent, lines), default=0)
 
@@ -160,3 +169,8 @@ class SourceInfo:
         if len(line) == 0:
             return int(1e9)  # very large number
         return len(line) - len(line.lstrip())
+
+    def __repr__(self) -> str:
+        return (
+            f'File "{self.file or "stdin"}", line {self.lineno}, col {self.col_offset}'
+        )

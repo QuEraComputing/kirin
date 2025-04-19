@@ -8,7 +8,7 @@ from kirin.emit.julia import EmitJulia
 def emit(fn: ir.Method):
     with io.StringIO() as file:
         emit_ = EmitJulia(basic_no_opt, file)
-        emit_.run(fn, tuple(fn.arg_names[1:])).expect()
+        emit_.run(fn, tuple(fn.arg_names[1:]))
         return file.getvalue()
 
 

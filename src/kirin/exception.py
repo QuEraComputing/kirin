@@ -2,6 +2,7 @@
 for the Kirin-based compilers.
 """
 
+import abc
 import sys
 import types
 
@@ -10,6 +11,12 @@ stacktrace = False
 
 class NoPythonStackTrace(Exception):
     pass
+
+
+class CustomStackTrace(Exception):
+
+    @abc.abstractmethod
+    def print_stacktrace(self) -> None: ...
 
 
 def enable_stracetrace():
@@ -28,6 +35,11 @@ def exception_handler(exc_type, exc_value, exc_tb: types.TracebackType):
     """Custom exception handler to format and print exceptions."""
     if not stacktrace and issubclass(exc_type, NoPythonStackTrace):
         print(exc_value, file=sys.stderr)
+        return
+
+    if not stacktrace and issubclass(exc_type, CustomStackTrace):
+        # Handle custom stack trace exceptions
+        exc_value.print_stacktrace()
         return
 
     # Call the default exception handler

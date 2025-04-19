@@ -7,9 +7,6 @@ def foo(x: int) -> int:
     return x + 1
 
 
-foo.code.print()
-
-
 @basic_no_opt
 def goo(x: int) -> int:
     return x + 1

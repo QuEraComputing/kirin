@@ -64,7 +64,7 @@ class ForwardExtra(
         sys.setrecursionlimit(self.max_python_recursion_depth)
         try:
             frame, ret = self.run_method(method, args)
-        except interp.InterpreterError as e:
+        except Exception as e:
             # NOTE: initialize will create new State
             # so we don't need to copy the frames.
             if not no_raise:

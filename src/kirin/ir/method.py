@@ -50,7 +50,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
             raise ValueError("Incorrect number of arguments")
         # NOTE: multi-return values will be wrapped in a tuple for Python
         interp = Interpreter(self.dialects)
-        return interp.run(self, args=args, kwargs=kwargs).expect()
+        return interp.run(self, args=args, kwargs=kwargs)
 
     @property
     def args(self):
@@ -141,7 +141,6 @@ class Method(Printable, typing.Generic[Param, RetType]):
                 source.splitlines(),
                 e,
                 file=self.file,
-                lineno_offset=self.lineno_offset,
             )
         else:
             msg += "\nNo source available"
