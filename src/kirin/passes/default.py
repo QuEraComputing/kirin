@@ -13,7 +13,7 @@ from .canonicalize import Canonicalize
 
 @dataclass
 class Default(Pass):
-    verify: bool = field(default=False, kw_only=True)
+    verify: bool = field(default=True, kw_only=True)
     fold: bool = field(default=True, kw_only=True)
     aggressive: bool = field(default=False, kw_only=True)
     typeinfer: bool = field(default=True, kw_only=True)
@@ -41,6 +41,8 @@ class Default(Pass):
         result = self.canonicalize.fixpoint(mt)
         if self.typeinfer:
             result = self.typeinfer_pass(mt).join(result)
+            if self.verify:
+                mt.verify_type()
 
         if self.fold:
             if self.aggressive:

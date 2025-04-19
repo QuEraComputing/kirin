@@ -152,7 +152,7 @@ def basic(self):
             Doc(
                 "run type inference and apply the inferred type to IR, default `False`"
             ),
-        ] = False,
+        ] = True,
         fold: Annotated[bool, Doc("run folding passes")] = True,
         aggressive: Annotated[
             bool, Doc("run aggressive folding passes if `fold=True`")
