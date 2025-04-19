@@ -59,6 +59,9 @@ exclude = [
 [tool.ruff.lint]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
+[tool.pyright]
+include = ["src"]
+
 [tool.coverage.run]
 include = ["src/kirin/*"]
 
