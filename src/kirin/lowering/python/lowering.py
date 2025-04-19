@@ -202,7 +202,7 @@ class Python(LoweringABC[ast.AST]):
             # symbol exist in global, but not ir.Statement, not found in locals either
             # this means the symbol is referring to an external uncallable object
             # try to hint the user
-            if inspect.isfunction(global_callee):
+            if inspect.isfunction(global_callee) or inspect.ismethod(global_callee):
                 raise BuildError(
                     f"unsupported callee: {repr(global_callee)}."
                     "Are you trying to call a python function? This is not supported."

@@ -1,3 +1,5 @@
+from types import MethodType as ClassMethodType, FunctionType
+
 from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
@@ -68,13 +70,24 @@ class Call(ir.Statement):
 
     def check_type(self) -> None:
         if not self.callee.type.is_subseteq(types.MethodType):
-            if self.callee.type.is_subseteq(types.PyClass(type(lambda x: x))):
+            if self.callee.type.is_subseteq(types.PyClass(FunctionType)):
                 raise ir.TypeCheckError(
                     self,
                     f"callee must be a method type, got {self.callee.type}",
                     help="did you call a Python function directly? "
                     "consider decorating it with kernel decorator",
                 )
+
+            if self.callee.type.is_subseteq(types.PyClass(ClassMethodType)):
+                raise ir.TypeCheckError(
+                    self,
+                    "callee must be a method type, got class method",
+                    help="did you try to call a Python class method within a kernel? "
+                    "consider rewriting it with a captured variable instead of calling it inside the kernel",
+                )
+
+            if self.callee.type is types.Any:
+                return
             raise ir.TypeCheckError(
                 self,
                 f"callee must be a method type, got {self.callee.type}",

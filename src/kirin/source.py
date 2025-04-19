@@ -1,4 +1,7 @@
 import ast
+import math
+import shutil
+import textwrap
 from dataclasses import dataclass
 
 from rich.console import Console
@@ -132,7 +135,22 @@ class SourceInfo:
 
         ret = " " * indent + "[red]" + ret
         if help:
-            ret += " help: " + str(help) + "[/red]"
+            hint_indent = len(ret) - len("[ret]") + len(" help: ")
+            terminal_width = math.floor(shutil.get_terminal_size().columns * 0.7)
+            terminal_width = max(terminal_width - hint_indent, 10)
+            wrapped = textwrap.fill(str(help), width=terminal_width)
+            lines = wrapped.splitlines()
+            ret += " help: " + lines[0] + "[/red]"
+            for line in lines[1:]:
+                ret += (
+                    "\n"
+                    + " " * (error_lineno_len + indent)
+                    + "[dim]│[/dim]"
+                    + " " * hint_indent
+                    + "[red]"
+                    + line
+                    + "[/red]"
+                )
         if show_lineno:
             ret = " " * error_lineno_len + "[dim]│[/dim]" + ret
         return ret

@@ -39,9 +39,6 @@ class Method(Printable, typing.Generic[Param, RetType]):
     inferred: bool = False
     """if typeinfer has been run on this method
     """
-    verified: bool = False
-    """if `code.verify` has been run on this method
-    """
 
     def __hash__(self) -> int:
         return id(self)
@@ -99,30 +96,23 @@ class Method(Printable, typing.Generic[Param, RetType]):
             self.fields,
             self.file,
             self.inferred,
-            self.verified,
         )
 
     def verify(self) -> None:
         """verify the method body.
 
         This will raise a ValidationError if the method body is not valid.
-        This will also set the `verified` attribute to True.
         """
         try:
             self.code.verify()
         except ValidationError as e:
             self.__postprocess_validation_error(e)
-        self.verified = True
 
     def verify_type(self) -> None:
         """verify the method type.
 
         This will raise a ValidationError if the method type is not valid.
-        This will also set the `verified` attribute to True.
         """
-        if self.verified:
-            return
-
         # NOTE: verify the method body
         self.verify()
 
