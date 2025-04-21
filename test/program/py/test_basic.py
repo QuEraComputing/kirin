@@ -4,7 +4,6 @@ import pytest
 # composite modules
 from aha import gaga, hoho
 
-from kirin.interp import IntepreterExit
 from kirin.prelude import basic_no_opt
 
 
@@ -138,7 +137,7 @@ def test_add(x):
     if x == 1:
         assert add(x) == (x + 1) + (x + 1) + (x + 1)
     else:
-        pytest.raises(IntepreterExit, lambda: add(x))
+        pytest.raises(AssertionError, lambda: add(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -146,7 +145,7 @@ def test_sub(x):
     if x == 1:
         assert sub(x) == (x + 1) - (x + 1) - (x + 1)
     else:
-        pytest.raises(IntepreterExit, lambda: sub(x))
+        pytest.raises(AssertionError, lambda: sub(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -154,7 +153,7 @@ def test_mul(x):
     if x == 1:
         assert mul(x) == (x + 1) * (x + 1) * (x + 1)
     else:
-        pytest.raises(IntepreterExit, lambda: mul(x))
+        pytest.raises(AssertionError, lambda: mul(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -162,7 +161,7 @@ def test_div(x):
     if x == 1:
         assert div(x) == (x + 1) / (x + 1) / (x + 1)
     else:
-        pytest.raises(IntepreterExit, lambda: div(x))
+        pytest.raises(AssertionError, lambda: div(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -170,7 +169,7 @@ def test_floordiv(x):
     if x == 1:
         assert floordiv(x) == (x + 1) // (x + 1) // (x + 1)
     else:
-        pytest.raises(IntepreterExit, lambda: floordiv(x))
+        pytest.raises(AssertionError, lambda: floordiv(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -178,7 +177,7 @@ def test_mod(x):
     if x == 1:
         assert mod(x) == (x + 1) % (x + 1) % (x + 1)
     else:
-        pytest.raises(IntepreterExit, lambda: mod(x))
+        pytest.raises(AssertionError, lambda: mod(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -186,7 +185,7 @@ def test_pow(x):
     if x == 1:
         assert pow(x) == (x + 1) ** (x + 1) ** (x + 1)
     else:
-        pytest.raises(IntepreterExit, lambda: pow(x))
+        pytest.raises(AssertionError, lambda: pow(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -194,7 +193,7 @@ def test_eq(x):
     if x == 1:
         assert eq(x) == ((x + 1) == (x + 1) == (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: eq(x))
+        pytest.raises(AssertionError, lambda: eq(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -202,7 +201,7 @@ def test_ne(x):
     if x == 1:
         assert ne(x) == ((x + 1) != (x + 1) != (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: ne(x))
+        pytest.raises(AssertionError, lambda: ne(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -210,7 +209,7 @@ def test_lt(x):
     if x == 1:
         assert lt(x) == ((x + 1) < (x + 1) < (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: lt(x))
+        pytest.raises(AssertionError, lambda: lt(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -218,7 +217,7 @@ def test_le(x):
     if x == 1:
         assert le(x) == ((x + 1) <= (x + 1) <= (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: le(x))
+        pytest.raises(AssertionError, lambda: le(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -226,7 +225,7 @@ def test_gt(x):
     if x == 1:
         assert gt(x) == ((x + 1) > (x + 1) > (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: gt(x))
+        pytest.raises(AssertionError, lambda: gt(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -234,7 +233,7 @@ def test_ge(x):
     if x == 1:
         assert ge(x) == ((x + 1) >= (x + 1) >= (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: ge(x))
+        pytest.raises(AssertionError, lambda: ge(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -242,7 +241,7 @@ def test_and(x):
     if x == 1:
         assert and_(x) == ((x + 1) and (x + 1) and (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: and_(x))
+        pytest.raises(AssertionError, lambda: and_(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -250,7 +249,7 @@ def test_or(x):
     if x == 1:
         assert or_(x) == ((x + 1) or (x + 1) or (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: or_(x))
+        pytest.raises(AssertionError, lambda: or_(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -258,7 +257,7 @@ def test_and_or(x):
     if x == 1:
         assert and_or(x) == ((x + 1) and (x + 1) or (x + 1))
     else:
-        pytest.raises(IntepreterExit, lambda: and_or(x))
+        pytest.raises(AssertionError, lambda: and_or(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])
@@ -266,7 +265,7 @@ def test_not(x):
     if x == 1:
         assert not_(x) == (not ((x + 1) == (x + 1) == (x + 1)))
     else:
-        pytest.raises(IntepreterExit, lambda: not_(x))
+        pytest.raises(AssertionError, lambda: not_(x))
 
 
 @pytest.mark.parametrize("x", [1, 2, 3])

@@ -43,7 +43,6 @@ from kirin.ir.dialect import Dialect as Dialect
 from kirin.ir.attrs.py import PyAttr as PyAttr
 from kirin.ir.attrs.abc import Attribute as Attribute, AttributeMeta as AttributeMeta
 from kirin.ir.exception import (
-    HintedError as HintedError,
     CompilerError as CompilerError,
     TypeCheckError as TypeCheckError,
     ValidationError as ValidationError,

@@ -1,13 +1,8 @@
-import sys
 import typing
-import inspect
-import textwrap
 from types import ModuleType
 
 # from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
-
-from rich.console import Console
 
 from kirin.ir.traits import HasSignature, CallableStmtInterface
 from kirin.ir.exception import ValidationError
@@ -34,7 +29,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
     # values contained if closure
     fields: tuple = field(default_factory=tuple)  # own
     file: str = ""
-    lineno_offset: int = 0
+    lineno_begin: int = 0
     inferred: bool = False
     """if typeinfer has been run on this method
     """
@@ -105,7 +100,8 @@ class Method(Printable, typing.Generic[Param, RetType]):
         try:
             self.code.verify()
         except ValidationError as e:
-            self.__postprocess_validation_error(e)
+            e.attach(self)
+            raise e
 
     def verify_type(self) -> None:
         """verify the method type.
@@ -118,30 +114,5 @@ class Method(Printable, typing.Generic[Param, RetType]):
         try:
             self.code.verify_type()
         except ValidationError as e:
-            self.__postprocess_validation_error(e)
-
-    def __postprocess_validation_error(self, e: ValidationError):
-        console = Console(force_terminal=True, force_jupyter=False, file=sys.stderr)
-        printer = Printer(console=console)
-        # NOTE: populate the printer with the method body
-        with printer.string_io():
-            printer.print(self.code)
-
-        with printer.string_io() as io:
-            printer.print(e.node)
-            node_str = io.getvalue()
-
-        node_str = "\n".join(["  " + each_line for each_line in node_str.splitlines()])
-        msg = f"Incorrect IR:\n    {node_str}\n\n"
-        if e.node.source and self.py_func:  # print hint if we have a source
-            msg += "\nSource Traceback:"
-            source = textwrap.dedent(inspect.getsource(self.py_func))
-            msg += e.node.source.error_hint(
-                source.splitlines(),
-                e,
-                file=self.file,
-            )
-        else:
-            msg += "\nNo source available"
-            msg += "\nError: " + str(e)
-        raise ValidationError(e.node, msg, *e.args, help=e.help) from e
+            e.attach(self)
+            raise e

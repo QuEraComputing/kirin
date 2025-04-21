@@ -1,9 +1,7 @@
-from kirin.exception import NoPythonStackTrace
+from kirin.exception import StaticCheckError
 
 
-class BuildError(NoPythonStackTrace):
+class BuildError(StaticCheckError):
     """Base class for all dialect lowering errors."""
 
-    def __init__(self, *msgs: object, help: str | None = None):
-        super().__init__(*msgs)
-        self.help = help
+    pass

@@ -1,7 +1,6 @@
 import pytest
 
 from kirin.prelude import basic_no_opt
-from kirin.interp.exceptions import IntepreterExit
 
 
 def test_basic():
@@ -61,7 +60,7 @@ def test_assert():
     assert multi(0) == 1
     assert multi(1) is None
 
-    with pytest.raises(IntepreterExit):
+    with pytest.raises(AssertionError):
         multi(2)
 
 

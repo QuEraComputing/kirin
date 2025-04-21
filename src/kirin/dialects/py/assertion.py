@@ -66,9 +66,9 @@ class Concrete(interp.MethodTable):
             return ()
 
         if stmt.message:
-            raise interp.WrapException(AssertionError(frame.get(stmt.message)))
+            raise AssertionError(frame.get(stmt.message))
         else:
-            raise interp.WrapException(AssertionError("Assertion failed"))
+            raise AssertionError("Assertion failed")
 
 
 @dialect.register(key="typeinfer")
