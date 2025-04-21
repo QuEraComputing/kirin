@@ -449,7 +449,7 @@ class Block(IRNode["Region"]):
         """Verify the correctness of the Block.
 
         Raises:
-            IRValidationError: If the Block is not correct.
+            ValidationError: If the Block is not correct.
         """
         from kirin.ir.nodes.stmt import Region
 
@@ -463,7 +463,7 @@ class Block(IRNode["Region"]):
         """Verify the types of the Block.
 
         Raises:
-            IRValidationError: If the Block is not correct.
+            ValidationError: If the Block is not correct.
         """
         for stmt in self.stmts:
             stmt.verify_type()

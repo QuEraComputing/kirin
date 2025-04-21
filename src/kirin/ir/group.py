@@ -17,7 +17,7 @@ from dataclasses import field, dataclass
 from collections.abc import Iterable
 
 from kirin.ir.method import Method
-from kirin.ir.exception import CompilerError
+from kirin.ir.exception import CompilerError, ValidationError
 
 if TYPE_CHECKING:
     from kirin.lowering import Python
@@ -215,14 +215,18 @@ class DialectGroup(Generic[PassParams]):
                 arg_names=["#self#"] + inspect.getfullargspec(py_func).args,
                 dialects=self,
                 code=code,
-                lineno_offset=lineno_offset,
+                lineno_begin=lineno_offset,
                 file=file,
             )
             if doc := inspect.getdoc(py_func):
                 mt.__doc__ = doc
 
             if self.run_pass is not None:
-                self.run_pass(mt, *args, **options)
+                try:
+                    self.run_pass(mt, *args, **options)
+                except ValidationError as e:
+                    e.attach(mt)
+                    raise e
             return mt
 
         if py_func is not None:
