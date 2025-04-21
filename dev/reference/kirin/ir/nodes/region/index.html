@@ -294,7 +294,7 @@
     <span class=k>for</span> <span class=n>block</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>blocks</span><span class=p>:</span>
         <span class=k>yield from</span> <span class=n>block</span><span class=o>.</span><span class=n>stmts</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Region.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>IRValidationError</code> </td> <td> <div class=doc-md-description> <p>If the Region is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>323</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Region.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title="kirin.ir.exception.ValidationError">ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Region is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>323</span>
 <span class=normal>324</span>
 <span class=normal>325</span>
 <span class=normal>326</span>
@@ -312,7 +312,7 @@
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Verify the correctness of the Region.</span>
 
 <span class=sd>    Raises:</span>
-<span class=sd>        IRValidationError: If the Region is not correct.</span>
+<span class=sd>        ValidationError: If the Region is not correct.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=kn>from</span> <span class=nn>kirin.ir.nodes.stmt</span> <span class=kn>import</span> <span class=n>Statement</span>
 

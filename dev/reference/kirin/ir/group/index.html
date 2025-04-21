@@ -116,7 +116,11 @@
 <span class=normal>227</span>
 <span class=normal>228</span>
 <span class=normal>229</span>
-<span class=normal>230</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__call__</span><span class=p>(</span>
+<span class=normal>230</span>
+<span class=normal>231</span>
+<span class=normal>232</span>
+<span class=normal>233</span>
+<span class=normal>234</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__call__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>py_func</span><span class=p>:</span> <span class=n>Callable</span><span class=p>[</span><span class=n>Param</span><span class=p>,</span> <span class=n>RetType</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=o>*</span><span class=n>args</span><span class=p>:</span> <span class=n>PassParams</span><span class=o>.</span><span class=n>args</span><span class=p>,</span>
@@ -157,14 +161,18 @@
             <span class=n>arg_names</span><span class=o>=</span><span class=p>[</span><span class=s2>&quot;#self#&quot;</span><span class=p>]</span> <span class=o>+</span> <span class=n>inspect</span><span class=o>.</span><span class=n>getfullargspec</span><span class=p>(</span><span class=n>py_func</span><span class=p>)</span><span class=o>.</span><span class=n>args</span><span class=p>,</span>
             <span class=n>dialects</span><span class=o>=</span><span class=bp>self</span><span class=p>,</span>
             <span class=n>code</span><span class=o>=</span><span class=n>code</span><span class=p>,</span>
-            <span class=n>lineno_offset</span><span class=o>=</span><span class=n>lineno_offset</span><span class=p>,</span>
+            <span class=n>lineno_begin</span><span class=o>=</span><span class=n>lineno_offset</span><span class=p>,</span>
             <span class=n>file</span><span class=o>=</span><span class=n>file</span><span class=p>,</span>
         <span class=p>)</span>
         <span class=k>if</span> <span class=n>doc</span> <span class=o>:=</span> <span class=n>inspect</span><span class=o>.</span><span class=n>getdoc</span><span class=p>(</span><span class=n>py_func</span><span class=p>):</span>
             <span class=n>mt</span><span class=o>.</span><span class=vm>__doc__</span> <span class=o>=</span> <span class=n>doc</span>
 
         <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
-            <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span><span class=p>(</span><span class=n>mt</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
+            <span class=k>try</span><span class=p>:</span>
+                <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span><span class=p>(</span><span class=n>mt</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
+            <span class=k>except</span> <span class=n>ValidationError</span> <span class=k>as</span> <span class=n>e</span><span class=p>:</span>
+                <span class=n>e</span><span class=o>.</span><span class=n>attach</span><span class=p>(</span><span class=n>mt</span><span class=p>)</span>
+                <span class=k>raise</span> <span class=n>e</span>
         <span class=k>return</span> <span class=n>mt</span>
 
     <span class=k>if</span> <span class=n>py_func</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
@@ -315,11 +323,7 @@
         <span class=k>pass</span>
 
     <span class=k>return</span> <span class=n>run_pass</span>
-</code></pre></div> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/group.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>233</span>
-<span class=normal>234</span>
-<span class=normal>235</span>
-<span class=normal>236</span>
-<span class=normal>237</span>
+</code></pre></div> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/group.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>237</span>
 <span class=normal>238</span>
 <span class=normal>239</span>
 <span class=normal>240</span>
@@ -350,7 +354,11 @@
 <span class=normal>265</span>
 <span class=normal>266</span>
 <span class=normal>267</span>
-<span class=normal>268</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>dialect_group</span><span class=p>(</span>
+<span class=normal>268</span>
+<span class=normal>269</span>
+<span class=normal>270</span>
+<span class=normal>271</span>
+<span class=normal>272</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>dialect_group</span><span class=p>(</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Union</span><span class=p>[</span><span class=s2>&quot;Dialect&quot;</span><span class=p>,</span> <span class=n>ModuleType</span><span class=p>]],</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Callable</span><span class=p>[[</span><span class=n>RunPassGen</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]],</span> <span class=n>DialectGroup</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Create a dialect group from the given dialects based on the</span>

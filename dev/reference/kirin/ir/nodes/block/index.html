@@ -197,7 +197,7 @@
 
     <span class=k>return</span> <span class=kc>True</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.block.Block.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>IRValidationError</code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>448</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title="kirin.ir.exception.ValidationError">ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>448</span>
 <span class=normal>449</span>
 <span class=normal>450</span>
 <span class=normal>451</span>
@@ -213,7 +213,7 @@
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Verify the correctness of the Block.</span>
 
 <span class=sd>    Raises:</span>
-<span class=sd>        IRValidationError: If the Block is not correct.</span>
+<span class=sd>        ValidationError: If the Block is not correct.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=kn>from</span> <span class=nn>kirin.ir.nodes.stmt</span> <span class=kn>import</span> <span class=n>Region</span>
 
@@ -223,7 +223,7 @@
     <span class=k>for</span> <span class=n>stmt</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>stmts</span><span class=p>:</span>
         <span class=n>stmt</span><span class=o>.</span><span class=n>verify</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.block.Block.verify_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify_type</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify_type</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Verify the types of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>IRValidationError</code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>462</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Verify the types of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title="kirin.ir.exception.ValidationError">ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>462</span>
 <span class=normal>463</span>
 <span class=normal>464</span>
 <span class=normal>465</span>
@@ -234,7 +234,7 @@
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Verify the types of the Block.</span>
 
 <span class=sd>    Raises:</span>
-<span class=sd>        IRValidationError: If the Block is not correct.</span>
+<span class=sd>        ValidationError: If the Block is not correct.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=k>for</span> <span class=n>stmt</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>stmts</span><span class=p>:</span>
         <span class=n>stmt</span><span class=o>.</span><span class=n>verify_type</span><span class=p>()</span>
