@@ -41,9 +41,10 @@ class ValidationError(StaticCheckError):
             map(lambda each_line: " " * 4 + each_line, node_str.splitlines())
         )
         if isinstance(self.node, Statement):
+            dialect = self.node.dialect.name if self.node.dialect else "<no dialect>"
             self.args += (
                 "when verifying the following statement",
-                f" `{self.node.dialect.name if self.node.dialect else "<no dialect>"}.{type(self.node).__name__}` at\n",
+                f" `{dialect}.{type(self.node).__name__}` at\n",
                 f"{node_str}\n",
             )
         else:
