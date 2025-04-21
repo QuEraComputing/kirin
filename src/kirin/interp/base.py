@@ -16,14 +16,14 @@ from dataclasses import field, dataclass
 
 from typing_extensions import Self, deprecated
 
-from kirin.ir import Block, Region, Statement, DialectGroup, traits
-from kirin.ir.method import Method
+from kirin.ir import Block, Method, Region, Statement, DialectGroup, traits
+from kirin.exception import KIRIN_INTERP_STATE
 
 from .impl import Signature
 from .frame import FrameABC
 from .state import InterpreterState
 from .value import Successor, ReturnValue, SpecialValue, StatementResult
-from .exceptions import IntepreterExit, InterpreterError
+from .exceptions import InterpreterError
 
 if TYPE_CHECKING:
     from kirin.registry import StatementImpl, InterpreterRegistry
@@ -155,9 +155,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         try:
             _, results = self.run_method(mt, args)
         except Exception as e:
-            # NOTE: initialize will create new State
-            # so we don't need to copy the frames.
-            raise IntepreterExit(e, self.state) from e
+            # NOTE: insert the interpreter state into the exception
+            # so we can print the stack trace
+            setattr(e, KIRIN_INTERP_STATE, self.state)
+            raise e
         finally:
             self._eval_lock = False
             sys.setrecursionlimit(current_recursion_limit)
@@ -175,12 +176,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
         Returns:
             StatementResult[ValueType]: the result of the statement.
         """
-        frame = self.initialize_frame(stmt)
-        self.state.push_frame(frame)
-        frame.set_values(stmt.args, args)
-        results = self.eval_stmt(frame, stmt)
-        self.state.pop_frame()
-        return results
+        with self.new_frame(stmt) as frame:
+            frame.set_values(stmt.args, args)
+            results = self.eval_stmt(frame, stmt)
+            return results
 
     @abstractmethod
     def run_method(

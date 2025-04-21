@@ -198,34 +198,3 @@ class State(Generic[ASTNodeType]):
             yield frame
         finally:
             self.pop_frame(finalize_next)
-
-    def error_hint(
-        self,
-        e: Exception,
-        *,
-        max_lines: int = 3,
-        indent: int = 0,
-        show_lineno: bool = True,
-    ) -> str:
-        """Generate an error hint for the given error.
-        Args:
-            e (Exception): The error to generate a hint for. If the error object
-                has a `help` attribute, it will be used as the help message at the
-                location of the error.
-            max_lines (int): The maximum number of lines to show in the hint.
-            indent (int): The indentation level for the hint.
-            show_lineno (bool): Whether to show the line number in the hint.
-        Returns:
-            str: The generated error hint.
-        """
-        if self.source is None:
-            return str(e)
-
-        return self.source.error_hint(
-            self.lines,
-            e,
-            file=self.file,
-            indent=indent,
-            show_lineno=show_lineno,
-            max_lines=max_lines,
-        )

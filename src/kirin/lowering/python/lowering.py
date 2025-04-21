@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from kirin import ir
 from kirin.source import SourceInfo
 from kirin.registry import LoweringRegistry
+from kirin.exception import StaticCheckError
 from kirin.lowering.abc import Result, LoweringABC
 from kirin.lowering.state import State
 from kirin.lowering.exception import BuildError
@@ -33,32 +34,18 @@ class Python(LoweringABC[ast.AST]):
     """
 
     registry: LoweringRegistry
-    max_lines: int = 3
-    hint_indent: int = 2
-    hint_show_lineno: bool = True
-    stacktrace: bool = False
-    """If True, print the stacktrace of the error."""
 
     def __init__(
         self,
         dialects: ir.DialectGroup | Iterable[ir.Dialect | ModuleType],
         *,
         keys: list[str] | None = None,
-        max_lines: int = 3,
-        hint_indent: int = 2,
-        hint_lineno: bool = True,
-        stacktrace: bool = False,
     ):
         if isinstance(dialects, ir.DialectGroup):
             self.dialects = dialects
         else:
             self.dialects = ir.DialectGroup(dialects)
-
-        self.max_lines = max_lines
         self.registry = self.dialects.registry.ast(keys=keys or ["main", "default"])
-        self.hint_indent = hint_indent
-        self.hint_show_lineno = hint_lineno
-        self.stacktrace = stacktrace
 
     def python_function(
         self,
@@ -112,7 +99,7 @@ class Python(LoweringABC[ast.AST]):
         source = source or ast.unparse(stmt)
         state = State(
             self,
-            source=SourceInfo.from_ast(stmt, lineno_offset, col_offset, file),
+            source=SourceInfo.from_ast(stmt, file),
             file=file,
             lines=source.splitlines(),
             lineno_offset=lineno_offset,
@@ -122,21 +109,16 @@ class Python(LoweringABC[ast.AST]):
         with state.frame([stmt], globals=globals) as frame:
             try:
                 self.visit(state, stmt)
-            except BuildError as e:
-                hint = state.error_hint(
-                    e,
-                    max_lines=self.max_lines,
-                    indent=self.hint_indent,
-                    show_lineno=self.hint_show_lineno,
-                )
-                if self.stacktrace:
-                    raise Exception(
-                        f"{e.args[0]}\n\n{hint}",
-                        *e.args[1:],
-                    ) from e
-                else:
-                    e.args = (hint,)
-                    raise e
+            except StaticCheckError as e:
+                if e.source is None:
+                    e.source = state.source
+                elif e.source.file is None:
+                    e.source.file = state.file
+
+                if e.source:
+                    e.source.offset(lineno_offset, col_offset)
+                e.lines = state.lines
+                raise e
 
             region = frame.curr_region
 
@@ -155,9 +137,7 @@ class Python(LoweringABC[ast.AST]):
     # Python AST visitor methods
     def visit(self, state: State[ast.AST], node: ast.AST) -> Result:
         if hasattr(node, "lineno"):
-            state.source = SourceInfo.from_ast(
-                node, state.lineno_offset, state.col_offset, state.file
-            )
+            state.source = SourceInfo.from_ast(node, state.file)
         name = node.__class__.__name__
         if name in self.registry.ast_table:
             return self.registry.ast_table[name].lower(state, node)
@@ -168,9 +148,7 @@ class Python(LoweringABC[ast.AST]):
 
     def visit_Call(self, state: State[ast.AST], node: ast.Call) -> Result:
         if hasattr(node.func, "lineno"):
-            state.source = SourceInfo.from_ast(
-                node.func, state.lineno_offset, state.col_offset, state.file
-            )
+            state.source = SourceInfo.from_ast(node.func, state.file)
 
         global_callee_result = state.get_global(node.func, no_raise=True)
         if global_callee_result is None:

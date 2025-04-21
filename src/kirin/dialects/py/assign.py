@@ -99,9 +99,7 @@ class Concrete(interp.MethodTable):
         got = frame.get(stmt.got)
         got_type = types.PyClass(type(got))
         if not got_type.is_subseteq(stmt.expected):
-            raise interp.WrapException(
-                TypeError(f"Expected {stmt.expected}, got {got_type}")
-            )
+            raise TypeError(f"Expected {stmt.expected}, got {got_type}")
         return (frame.get(stmt.got),)
 
 

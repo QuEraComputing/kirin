@@ -42,5 +42,5 @@ def main(x):
 
 def test_interp():
     interp_ = DummyInterpreter(basic)
-    with pytest.raises(interp.IntepreterExit):
+    with pytest.raises(interp.InterpreterError):
         interp_.run(main, (EmptyLattice(),))

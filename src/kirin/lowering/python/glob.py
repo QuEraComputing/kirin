@@ -13,7 +13,7 @@ from kirin.lowering.exception import BuildError
 class GlobalEvalError(BuildError):
     """Exception raised when a global expression cannot be evaluated."""
 
-    def __init__(self, node: ast.AST, *msgs: object, help: str | None = None):
+    def __init__(self, node: ast.AST, *msgs: str, help: str | None = None):
         super().__init__(*msgs, help=help)
         self.source = SourceInfo.from_ast(node)
 

@@ -324,7 +324,7 @@ class Region(IRNode["Statement"]):
         """Verify the correctness of the Region.
 
         Raises:
-            IRValidationError: If the Region is not correct.
+            ValidationError: If the Region is not correct.
         """
         from kirin.ir.nodes.stmt import Statement
 
