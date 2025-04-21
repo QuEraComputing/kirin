@@ -21,7 +21,7 @@ def with_example(x):
 
 
 def test_with_lowering():
-    lower = lowering.Python(python_no_opt.union([cf, func, dialect]), stacktrace=True)
+    lower = lowering.Python(python_no_opt.union([cf, func, dialect]))
     code = lower.python_function(with_example)
     code.print()
     assert isinstance(code, func.Function)
