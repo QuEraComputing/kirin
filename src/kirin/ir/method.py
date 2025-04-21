@@ -9,7 +9,6 @@ from dataclasses import field, dataclass
 
 from rich.console import Console
 
-from kirin.exception import NoPythonStackTrace
 from kirin.ir.traits import HasSignature, CallableStmtInterface
 from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.stmt import Statement
@@ -145,4 +144,4 @@ class Method(Printable, typing.Generic[Param, RetType]):
         else:
             msg += "\nNo source available"
             msg += "\nError: " + str(e)
-        raise NoPythonStackTrace(msg) from e
+        raise ValidationError(e.node, msg, *e.args, help=e.help) from e

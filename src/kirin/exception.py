@@ -34,7 +34,7 @@ def disable_stracetrace():
 def exception_handler(exc_type, exc_value, exc_tb: types.TracebackType):
     """Custom exception handler to format and print exceptions."""
     if not stacktrace and issubclass(exc_type, NoPythonStackTrace):
-        print(exc_value, file=sys.stderr)
+        print("".join(msg for msg in exc_value.args), file=sys.stderr)
         return
 
     if not stacktrace and issubclass(exc_type, CustomStackTrace):
