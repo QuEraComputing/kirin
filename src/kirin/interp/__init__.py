@@ -32,6 +32,11 @@ from .abstract import (
     AbstractInterpreter as AbstractInterpreter,
 )
 from .concrete import Interpreter as Interpreter
+from .undefined import (
+    Undefined as Undefined,
+    UndefinedType as UndefinedType,
+    is_undefined as is_undefined,
+)
 from .exceptions import (
     InterpreterError as InterpreterError,
     FuelExhaustedError as FuelExhaustedError,

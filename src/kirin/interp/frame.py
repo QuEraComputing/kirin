@@ -1,19 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar, Iterable
+from typing import Generic, TypeVar, Iterable
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
 
 from kirin.ir import Block, SSAValue, Statement
 
+from .undefined import Undefined, is_undefined
 from .exceptions import InterpreterError
 
+KeyType = TypeVar("KeyType")
 ValueType = TypeVar("ValueType")
 
 
 @dataclass
-class FrameABC(ABC, Generic[ValueType]):
-    """Abstract base class for the IR interpreter frame.
+class FrameABC(ABC, Generic[KeyType, ValueType]):
+    """Abstract base class for the IR interpreter's call frame.
 
     While the IR is in SSA form which does not have the need
     of scoping, the frame is still useful to keep track of the
@@ -46,12 +48,12 @@ class FrameABC(ABC, Generic[ValueType]):
     """Current block being interpreted."""
 
     @abstractmethod
-    def get(self, key: SSAValue) -> ValueType:
-        """Get the value for the given [`SSAValue`][kirin.ir.SSAValue] key.
+    def get(self, key: KeyType) -> ValueType:
+        """Get the value for the given key.
         See also [`get_values`][kirin.interp.frame.Frame.get_values].
 
         Args:
-            key(SSAValue): The key to get the value for.
+            key(KeyType): The key to get the value for.
 
         Returns:
             ValueType: The value.
@@ -59,34 +61,34 @@ class FrameABC(ABC, Generic[ValueType]):
         ...
 
     @abstractmethod
-    def set(self, key: SSAValue, value: ValueType) -> None:
-        """Set the value for the given [`SSAValue`][kirin.ir.SSAValue] key.
+    def set(self, key: KeyType, value: ValueType) -> None:
+        """Set the value for the given key.
         See also [`set_values`][kirin.interp.frame.Frame.set_values].
 
         Args:
-            key(SSAValue): The key to set the value for.
+            key(KeyType): The key to set the value for.
             value(ValueType): The value.
         """
         ...
 
-    def get_values(self, keys: Iterable[SSAValue]) -> tuple[ValueType, ...]:
-        """Get the values of the given [`SSAValue`][kirin.ir.SSAValue] keys.
+    def get_values(self, keys: Iterable[KeyType]) -> tuple[ValueType, ...]:
+        """Get the values of the given keys.
         See also [`get`][kirin.interp.frame.Frame.get].
 
         Args:
-            keys(Iterable[SSAValue]): The keys to get the values for.
+            keys(Iterable[KeyType]): The keys to get the values for.
 
         Returns:
             tuple[ValueType, ...]: The values.
         """
         return tuple(self.get(key) for key in keys)
 
-    def set_values(self, keys: Iterable[SSAValue], values: Iterable[ValueType]) -> None:
-        """Set the values of the given [`SSAValue`][kirin.ir.SSAValue] keys.
+    def set_values(self, keys: Iterable[KeyType], values: Iterable[ValueType]) -> None:
+        """Set the values of the given keys.
         This is a convenience method to set multiple values at once.
 
         Args:
-            keys(Iterable[SSAValue]): The keys to set the values for.
+            keys(Iterable[KeyType]): The keys to set the values for.
             values(Iterable[ValueType]): The values.
         """
         for key, value in zip(keys, values):
@@ -94,17 +96,7 @@ class FrameABC(ABC, Generic[ValueType]):
 
 
 @dataclass
-class Frame(FrameABC[ValueType]):
-    """Interpreter frame."""
-
-    globals: dict[str, Any] = field(default_factory=dict, kw_only=True)
-    """Global variables this frame has access to.
-    """
-
-    # NOTE: we are sharing the same frame within blocks
-    # this is because we are validating e.g SSA value pointing
-    # to other blocks separately. This avoids the need
-    # to have a separate frame for each block.
+class Frame(FrameABC[SSAValue, ValueType]):
     entries: dict[SSAValue, ValueType] = field(default_factory=dict, kw_only=True)
     """SSA values and their corresponding values.
     """
@@ -121,13 +113,12 @@ class Frame(FrameABC[ValueType]):
         Raises:
             InterpreterError: If the value is not found. This will be catched by the interpreter.
         """
-        err = InterpreterError(f"SSAValue {key} not found")
-        value = self.entries.get(key, err)
-        if isinstance(value, InterpreterError):
+        value = self.entries.get(key, Undefined)
+        if is_undefined(value):
             if self.has_parent_access and self.parent:
                 return self.parent.get(key)
             else:
-                raise err
+                raise InterpreterError(f"SSAValue {key} not found")
         else:
             return value
 
