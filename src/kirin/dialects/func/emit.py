@@ -15,17 +15,29 @@ class JuliaMethodTable(MethodTable):
 
     @impl(Function)
     def emit_function(
-        self, interp: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Function
+        self, emit: EmitJulia[IO_t], frame: emit.EmitStrFrame, stmt: Function
     ):
         fn_args = stmt.body.blocks[0].args[1:]
-        argnames = tuple(interp.ssa_id[arg] for arg in fn_args)
-        argtypes = tuple(interp.emit_attribute(x.type) for x in fn_args)
+        argnames = tuple(emit.ssa_id[arg] for arg in fn_args)
+        argtypes = tuple(emit.emit_attribute(x.type) for x in fn_args)
         args = [f"{name}::{type}" for name, type in zip(argnames, argtypes)]
-        interp.write(f"function {stmt.sym_name}({', '.join(args)})")
-        frame.indent += 1
-        interp.run_ssacfg_region(frame, stmt.body, (stmt.sym_name,) + argnames)
-        frame.indent -= 1
-        interp.writeln(frame, "end")
+        emit.write(f"function {stmt.sym_name}({', '.join(args)})")
+        with frame.set_indent(1):
+            for block in stmt.body.blocks:
+                block_id = emit.block_id[block]
+                frame.block_ref[block] = block_id
+                emit.newline(frame)
+                emit.write(f"@label {block_id};")
+
+                for each_stmt in block.stmts:
+                    results = emit.eval_stmt(frame, each_stmt)
+                    if isinstance(results, tuple):
+                        frame.set_values(each_stmt.results, results)
+                    elif results is not None:
+                        raise InterpreterError(
+                            f"Unexpected result {results} from statement {each_stmt.name}"
+                        )
+        emit.writeln(frame, "end")
         return ()
 
     @impl(Return)
@@ -66,9 +78,9 @@ class JuliaMethodTable(MethodTable):
         frame.set_values(stmt.body.blocks[0].args, (stmt.sym_name,) + args)
         frame.captured[stmt.body.blocks[0].args[0]] = frame.get_values(stmt.captured)
         interp.writeln(frame, f"function {stmt.sym_name}({', '.join(args[1:])})")
-        frame.indent += 1
+        frame.set_indent += 1
         interp.run_ssacfg_region(frame, stmt.body, args)
-        frame.indent -= 1
+        frame.set_indent -= 1
         interp.writeln(frame, "end")
         return (stmt.sym_name,)
 
