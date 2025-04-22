@@ -61,7 +61,7 @@ class Call(ir.Statement):
     # not a fixed type here so just any
     callee: ir.SSAValue = info.argument()
     inputs: tuple[ir.SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute(default_factory=lambda: ())
+    kwargs: tuple[str, ...] = info.attribute(default=())
     result: ir.ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 
@@ -214,7 +214,7 @@ class Invoke(ir.Statement):
     traits = frozenset({ir.MaybePure()})
     callee: ir.Method = info.attribute()
     inputs: tuple[ir.SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute()
+    kwargs: tuple[str, ...] = info.attribute(default=())
     result: ir.ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 
