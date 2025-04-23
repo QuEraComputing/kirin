@@ -23,7 +23,9 @@ class ConstPropMethods(MethodTable):
 
     @impl(Map)
     @impl(ForEach)
-    def one_args(self, interp_: const.Propagate, frame: const.Frame, stmt: Map):
+    def one_args(
+        self, interp_: const.Propagate, frame: const.Frame, stmt: ForEach | Map
+    ):
         fn, collection = frame.get(stmt.fn), frame.get(stmt.collection)
 
         # 1. if the function is a constant method, and the method is pure, then the map is pure

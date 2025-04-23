@@ -1,16 +1,9 @@
+from __future__ import annotations
+
 import sys
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    TypeVar,
-    ClassVar,
-    Optional,
-    Sequence,
-    Generator,
-)
+from typing import Any, Generic, TypeVar, ClassVar, Optional, Sequence, Generator
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
@@ -19,14 +12,11 @@ from typing_extensions import Self, deprecated
 from kirin.ir import Block, Method, Region, Statement, DialectGroup, traits
 from kirin.exception import KIRIN_INTERP_STATE
 
-from .impl import Signature
 from .frame import FrameABC
 from .state import InterpreterState
+from .table import Signature, BoundedDef
 from .value import Successor, ReturnValue, SpecialValue, StatementResult
 from .exceptions import InterpreterError
-
-if TYPE_CHECKING:
-    from kirin.registry import StatementImpl, InterpreterRegistry
 
 ValueType = TypeVar("ValueType")
 FrameType = TypeVar("FrameType", bound=FrameABC)
@@ -80,7 +70,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     """
 
     # global states
-    registry: "InterpreterRegistry" = field(init=False, compare=False)
+    registry: dict[Signature, BoundedDef] = field(init=False, compare=False)
     """The interpreter registry.
     """
     symbol_table: dict[str, Statement] = field(init=False, compare=False)
@@ -433,7 +423,7 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
 
     def lookup_registry(
         self, frame: FrameType, stmt: Statement
-    ) -> Optional["StatementImpl[Self, FrameType]"]:
+    ) -> Optional[BoundedDef]:
         """Lookup the statement implementation in the registry.
 
         Args:
@@ -444,10 +434,10 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
             Optional[StatementImpl]: the statement implementation if found, None otherwise.
         """
         sig = self.build_signature(frame, stmt)
-        if sig in self.registry.statements:
-            return self.registry.statements[sig]
-        elif (class_sig := Signature(stmt.__class__)) in self.registry.statements:
-            return self.registry.statements[class_sig]
+        if sig in self.registry:
+            return self.registry[sig]
+        elif (method := self.registry.get(Signature(stmt.__class__))) is not None:
+            return method
         return
 
     @abstractmethod

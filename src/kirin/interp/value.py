@@ -71,3 +71,5 @@ SpecialValue: TypeAlias = (
 """Special value for statement evaluation."""
 StatementResult: TypeAlias = tuple[ValueType, ...] | SpecialValue[ValueType]
 """Type alias for the result of a statement evaluation."""
+RegionResult: TypeAlias = tuple[ValueType, ...] | None | ReturnValue[ValueType]
+"""Type alias for the result of a region evaluation."""

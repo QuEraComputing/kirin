@@ -1,49 +1,23 @@
-from typing import TYPE_CHECKING, Callable, Iterable
-from dataclasses import dataclass
+from __future__ import annotations
 
-from kirin.lowering.python.dialect import FromPythonAST
+import inspect
+from typing import TYPE_CHECKING, Iterable
+from dataclasses import dataclass
 
 if TYPE_CHECKING:
     import ast
 
     from kirin import lowering
-    from kirin.ir import Attribute
     from kirin.ir.group import DialectGroup
-    from kirin.ir.nodes import Statement
     from kirin.lowering import FromPythonAST
-    from kirin.interp.impl import Signature
-    from kirin.interp.table import MethodTable
+    from kirin.interp.table import Signature, BoundedDef
     from kirin.lowering.python.dialect import LoweringTransform
 
 
 @dataclass
-class StatementImpl:
-    parent: "MethodTable"
-    impl: Callable
-
-    def __call__(self, interp, frame, stmt: "Statement"):
-        return self.impl(self.parent, interp, frame, stmt)
-
-    def __repr__(self) -> str:
-        return f"method impl `{self.impl.__name__}` in {repr(self.parent.__class__)}"
-
-
-@dataclass
-class AttributeImpl:
-    parent: "MethodTable"
-    impl: Callable
-
-    def __call__(self, interp, attr: "Attribute"):
-        return self.impl(self.parent, interp, attr)
-
-    def __repr__(self) -> str:
-        return f"attribute impl `{self.impl.__name__}` in {repr(self.parent.__class__)}"
-
-
-@dataclass
 class CallLoweringFunction:
-    parent: "FromPythonAST"
-    func: "LoweringTransform"
+    parent: FromPythonAST
+    func: LoweringTransform
 
     def __call__(
         self, state: "lowering.State[ast.AST]", node: "ast.Call"
@@ -55,12 +29,6 @@ class CallLoweringFunction:
 class LoweringRegistry:
     ast_table: dict[str, FromPythonAST]
     callee_table: dict[object, CallLoweringFunction]
-
-
-@dataclass
-class InterpreterRegistry:
-    attributes: dict[type["Attribute"], "AttributeImpl"]
-    statements: dict["Signature", "StatementImpl"]
 
 
 @dataclass
@@ -79,7 +47,7 @@ class Registry:
         Returns:
             a map of dialects to their lowering interpreters
         """
-        ret: dict[str, "FromPythonAST"] = {}
+        ret: dict[str, FromPythonAST] = {}
         callee_table: dict[object, CallLoweringFunction] = {}
         from_ast = None
         for dialect in self.dialects.data:
@@ -105,7 +73,7 @@ class Registry:
                 callee_table[obj] = CallLoweringFunction(from_ast, trans.func)
         return LoweringRegistry(ret, callee_table)
 
-    def interpreter(self, keys: Iterable[str]):
+    def interpreter(self, keys: Iterable[str]) -> dict["Signature", "BoundedDef"]:
         """select the dialect interpreter for the given key.
 
         Args:
@@ -115,8 +83,9 @@ class Registry:
             a map of statement signatures to their interpretation functions,
             and a map of dialects to their fallback interpreters.
         """
-        attributes: dict[type["Attribute"], "AttributeImpl"] = {}
-        table: dict["Signature", "StatementImpl"] = {}
+        from kirin.interp.table import BoundedDef
+
+        registry: dict[Signature, BoundedDef] = {}
         for dialect in self.dialects.data:
             dialect_table = None
             for key in keys:
@@ -124,12 +93,8 @@ class Registry:
                     continue
 
                 dialect_table = dialect.interps[key]
-                for sig, func in dialect_table.attribute.items():
-                    if sig not in attributes:
-                        attributes[sig] = AttributeImpl(dialect_table, func)
-
-                for sig, func in dialect_table.table.items():
-                    if sig not in table:
-                        table[sig] = StatementImpl(dialect_table, func)
-
-        return InterpreterRegistry(attributes, table)
+                for _, member in inspect.getmembers(dialect_table):
+                    if isinstance(member, BoundedDef):
+                        for sig in member.signature:
+                            registry[sig] = member
+        return registry

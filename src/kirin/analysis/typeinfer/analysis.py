@@ -3,7 +3,6 @@ from typing import TypeVar, final
 from kirin import ir, types, interp
 from kirin.decl import fields
 from kirin.analysis import const
-from kirin.interp.impl import Signature
 from kirin.analysis.forward import Forward, ForwardFrame
 
 from .solve import TypeResolution
@@ -41,7 +40,7 @@ class TypeInference(Forward[types.TypeAttribute]):
     # value (which is a type) to determine the method dispatch.
     def build_signature(
         self, frame: ForwardFrame[types.TypeAttribute], stmt: ir.Statement
-    ) -> Signature:
+    ) -> interp.Signature:
         _args = ()
         for x in frame.get_values(stmt.args):
             # TODO: remove this after we have multiple dispatch...
@@ -49,7 +48,7 @@ class TypeInference(Forward[types.TypeAttribute]):
                 _args += (x.body,)
             else:
                 _args += (x,)
-        return Signature(stmt.__class__, _args)
+        return interp.Signature(stmt.__class__, _args)
 
     def eval_stmt_fallback(
         self, frame: ForwardFrame[types.TypeAttribute], stmt: ir.Statement

@@ -17,5 +17,6 @@ def test_self_ref_closure():
         return self_ref_source
 
     infer = TypeInference(structural_no_opt)
-    _, ret = infer.run_analysis(should_work, (types.Int,))
+    frame, ret = infer.run_analysis(should_work, (types.Int,))
+    should_work.print(analysis=frame.entries)
     assert ret.is_equal(types.MethodType[types.Tuple[types.Any], types.NoneType])

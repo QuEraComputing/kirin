@@ -45,14 +45,16 @@ class EmitABC(interp.BaseInterpreter[FrameType, ValueType], ABC):
             frame.block_ref[succ.block] = block_header
         return ()
 
-    def emit_attribute(self, attr: ir.Attribute) -> ValueType:
+    def emit_attribute(self, frame: FrameType, attr: ir.Attribute) -> ValueType:
         return getattr(
             self, f"emit_type_{type(attr).__name__}", self.emit_attribute_fallback
-        )(attr)
+        )(frame, attr)
 
-    def emit_attribute_fallback(self, attr: ir.Attribute) -> ValueType:
-        if (method := self.registry.attributes.get(type(attr))) is not None:
-            return method(self, attr)
+    def emit_attribute_fallback(
+        self, frame: FrameType, attr: ir.Attribute
+    ) -> ValueType:
+        if (method := self.registry.get(interp.Signature(type(attr)))) is not None:
+            return method(self, frame, attr)
         raise NotImplementedError(f"Attribute {type(attr)} not implemented")
 
     def emit_stmt_begin(self, frame: FrameType, stmt: ir.Statement) -> None:
