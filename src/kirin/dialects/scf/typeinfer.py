@@ -21,7 +21,7 @@ class TypeInfer(absint.Methods):
         frame.set(
             stmt.cond, frame.get(stmt.cond).meet(types.Bool)
         )  # set cond backwards
-        return super().if_else(self, interp_, frame, stmt)
+        return super().if_else(interp_, frame, stmt)
 
     @interp.impl(For)
     def for_loop(
