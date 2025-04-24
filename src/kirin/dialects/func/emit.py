@@ -19,7 +19,7 @@ class JuliaMethodTable(MethodTable):
     ):
         fn_args = stmt.body.blocks[0].args[1:]
         argnames = tuple(interp.ssa_id[arg] for arg in fn_args)
-        argtypes = tuple(interp.emit_attribute(x.type) for x in fn_args)
+        argtypes = tuple(interp.emit_attribute(frame, x.type) for x in fn_args)
         args = [f"{name}::{type}" for name, type in zip(argnames, argtypes)]
         interp.write(f"function {stmt.sym_name}({', '.join(args)})")
         frame.indent += 1

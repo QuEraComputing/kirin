@@ -29,7 +29,7 @@ class EmitJulia(EmitStr[IO_t]):
         self.newline(frame)
         self.write(f"@label {block_id};")
 
-    def emit_type_PyClass(self, attr: PyClass) -> str:
+    def emit_type_PyClass(self, frame: EmitStrFrame, attr: PyClass) -> str:
         return self.PYTYPE_MAP.get(attr.typ, "Any")
 
     def write_assign(self, frame: EmitStrFrame, result: ir.SSAValue, *args):
@@ -54,7 +54,7 @@ class EmitJulia(EmitStr[IO_t]):
             ),
         )
 
-    def emit_type_PyAttr(self, attr: ir.PyAttr) -> str:
+    def emit_type_PyAttr(self, frame: EmitStrFrame, attr: ir.PyAttr) -> str:
         if isinstance(attr.data, (int, float)):
             return repr(attr.data)
         elif isinstance(attr.data, str):

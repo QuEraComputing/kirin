@@ -81,4 +81,4 @@ class JuliaTable(interp.MethodTable):
 
     @interp.impl(Constant)
     def emit_Constant(self, emit: EmitJulia, frame: EmitStrFrame, stmt: Constant):
-        return (emit.emit_attribute(stmt.value),)
+        return (emit.emit_attribute(frame, stmt.value),)
