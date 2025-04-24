@@ -129,6 +129,7 @@
         * [impl](kirin/interp/impl.md)
         * [state](kirin/interp/state.md)
         * [table](kirin/interp/table.md)
+        * [undefined](kirin/interp/undefined.md)
         * [value](kirin/interp/value.md)
     * [ir](kirin/ir/index.md)
         * [attrs](kirin/ir/attrs/index.md)
