@@ -88,4 +88,4 @@ class ForLoop(RewriteRule):
         for result, output in zip(node.results, loop_vars):
             result.replace_by(output)
         node.delete()
-        return RewriteResult(has_done_something=True)
+        return RewriteResult(has_done_something=True, terminated=True)
