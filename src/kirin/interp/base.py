@@ -47,9 +47,6 @@ class BaseInterpreter(ABC, Generic[FrameType, ValueType], metaclass=InterpreterM
     keys: ClassVar[list[str]]
     """The name of the interpreter to select from dialects by order.
     """
-    Frame: ClassVar[type[FrameABC]] = field(init=False)
-    """The type of the frame to use for this interpreter.
-    """
     void: ValueType = field(init=False)
     """What to return when the interpreter evaluates nothing.
     """
