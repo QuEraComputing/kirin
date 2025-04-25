@@ -46,10 +46,10 @@ class EmitCheckType(BaseModifier):
             )
 
         for name in self.fields.blocks.keys():
-            body.append(f"{self._self_name}.{name}.check_type()")
+            body.append(f"{self._self_name}.{name}.verify_type()")
 
         for name, f in self.fields.regions.items():
-            body.append(f"{self._self_name}.{name}.check_type()")
+            body.append(f"{self._self_name}.{name}.verify_type()")
 
         # NOTE: we still need to generate this because it is abstract
         if not body:

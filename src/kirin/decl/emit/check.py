@@ -7,7 +7,7 @@ from ._create_fn import create_fn
 from ._set_new_attribute import set_new_attribute
 
 
-class EmitVerify(BaseModifier):
+class EmitCheck(BaseModifier):
     _VERIFICATION_ERROR = "_kirin_ValidationError"
 
     def emit_check(self):
@@ -16,10 +16,10 @@ class EmitVerify(BaseModifier):
         }
         body: list[str] = []
         for name in self.fields.blocks.keys():
-            body.append(f"{self._self_name}.{name}.check()")
+            body.append(f"{self._self_name}.{name}.verify()")
 
         for name, f in self.fields.regions.items():
-            body.append(f"{self._self_name}.{name}.check()")
+            body.append(f"{self._self_name}.{name}.verify()")
             if not f.multi:
                 body.append(f"if len({self._self_name}.{name}.blocks) != 1:")
                 body.append(
@@ -31,7 +31,7 @@ class EmitVerify(BaseModifier):
             for trait in traits:
                 trait_obj = f"_kirin_check_trait_{trait.__class__.__name__}"
                 check_locals.update({trait_obj: trait})
-                body.append(f"{trait_obj}.check({self._self_name})")
+                body.append(f"{trait_obj}.verify({self._self_name})")
 
         # NOTE: we still need to generate this because it is abstract
         if not body:

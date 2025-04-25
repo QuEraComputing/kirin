@@ -9,7 +9,7 @@ from kirin.decl.verify import Verify
 from kirin.decl.emit.init import EmitInit
 from kirin.decl.emit.name import EmitName
 from kirin.decl.emit.repr import EmitRepr
-from kirin.decl.emit.check import EmitVerify
+from kirin.decl.emit.check import EmitCheck
 from kirin.decl.emit.traits import EmitTraits
 from kirin.decl.scan_fields import ScanFields
 from kirin.decl.emit.dialect import EmitDialect
@@ -26,7 +26,7 @@ class StatementDecl(
     EmitName,
     EmitRepr,
     EmitTraits,
-    EmitVerify,
+    EmitCheck,
     EmitCheckType,
 ):
     pass

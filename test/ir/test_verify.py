@@ -46,4 +46,4 @@ def test_invalid_type():
         InvalidType()
 
     with pytest.raises(Exception):
-        test.verify()
+        test.verify_type()
