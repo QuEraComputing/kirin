@@ -7,11 +7,11 @@ from ._create_fn import create_fn
 from ._set_new_attribute import set_new_attribute
 
 
-class EmitVerify(BaseModifier):
+class EmitCheck(BaseModifier):
     _VERIFICATION_ERROR = "_kirin_ValidationError"
 
-    def emit_verify(self):
-        verify_locals: dict[str, Any] = {
+    def emit_check(self):
+        check_locals: dict[str, Any] = {
             self._VERIFICATION_ERROR: ValidationError,
         }
         body: list[str] = []
@@ -29,8 +29,8 @@ class EmitVerify(BaseModifier):
 
         if (traits := getattr(self.cls, "traits", None)) is not None:
             for trait in traits:
-                trait_obj = f"_kirin_verify_trait_{trait.__class__.__name__}"
-                verify_locals.update({trait_obj: trait})
+                trait_obj = f"_kirin_check_trait_{trait.__class__.__name__}"
+                check_locals.update({trait_obj: trait})
                 body.append(f"{trait_obj}.verify({self._self_name})")
 
         # NOTE: we still need to generate this because it is abstract
@@ -39,13 +39,13 @@ class EmitVerify(BaseModifier):
 
         set_new_attribute(
             self.cls,
-            "verify",
+            "check",
             create_fn(
-                name="_kirin_decl_verify",
+                name="_kirin_decl_check",
                 args=[self._self_name],
                 body=body,
                 globals=self.globals,
-                locals=verify_locals,
+                locals=check_locals,
                 return_type=None,
             ),
         )

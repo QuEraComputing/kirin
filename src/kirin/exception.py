@@ -14,9 +14,10 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 
+from kirin.source import SourceInfo
+
 if TYPE_CHECKING:
     from kirin import interp
-    from kirin.source import SourceInfo
 
 KIRIN_INTERP_STATE = "__kirin_interp_state"
 KIRIN_PYTHON_STACKTRACE = os.environ.get("KIRIN_PYTHON_STACKTRACE", "0") == "1"
