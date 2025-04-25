@@ -10,16 +10,16 @@ from ._set_new_attribute import set_new_attribute
 class EmitVerify(BaseModifier):
     _VERIFICATION_ERROR = "_kirin_ValidationError"
 
-    def emit_verify(self):
-        verify_locals: dict[str, Any] = {
+    def emit_check(self):
+        check_locals: dict[str, Any] = {
             self._VERIFICATION_ERROR: ValidationError,
         }
         body: list[str] = []
         for name in self.fields.blocks.keys():
-            body.append(f"{self._self_name}.{name}.verify()")
+            body.append(f"{self._self_name}.{name}.check()")
 
         for name, f in self.fields.regions.items():
-            body.append(f"{self._self_name}.{name}.verify()")
+            body.append(f"{self._self_name}.{name}.check()")
             if not f.multi:
                 body.append(f"if len({self._self_name}.{name}.blocks) != 1:")
                 body.append(
@@ -29,9 +29,9 @@ class EmitVerify(BaseModifier):
 
         if (traits := getattr(self.cls, "traits", None)) is not None:
             for trait in traits:
-                trait_obj = f"_kirin_verify_trait_{trait.__class__.__name__}"
-                verify_locals.update({trait_obj: trait})
-                body.append(f"{trait_obj}.verify({self._self_name})")
+                trait_obj = f"_kirin_check_trait_{trait.__class__.__name__}"
+                check_locals.update({trait_obj: trait})
+                body.append(f"{trait_obj}.check({self._self_name})")
 
         # NOTE: we still need to generate this because it is abstract
         if not body:
@@ -39,13 +39,13 @@ class EmitVerify(BaseModifier):
 
         set_new_attribute(
             self.cls,
-            "verify",
+            "check",
             create_fn(
-                name="_kirin_decl_verify",
+                name="_kirin_decl_check",
                 args=[self._self_name],
                 body=body,
                 globals=self.globals,
-                locals=verify_locals,
+                locals=check_locals,
                 return_type=None,
             ),
         )
