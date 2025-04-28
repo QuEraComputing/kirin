@@ -656,7 +656,9 @@ class Statement(IRNode["Block"]):
                     delim=", ",
                 )
 
-    def get_attr_or_prop(self, key: str) -> Attribute | None:
+    def get_attribute(
+        self, key: str, default: Attribute | None = None
+    ) -> Attribute | None:
         """Get the attribute or property of the Statement.
 
         Args:
@@ -665,7 +667,7 @@ class Statement(IRNode["Block"]):
         Returns:
             Attribute | None: The attribute or property of the Statement.
         """
-        return self.attributes.get(key)
+        return self.attributes.get(key, default)
 
     @classmethod
     def has_trait(cls, trait_type: type[Trait["Statement"]]) -> bool:
