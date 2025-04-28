@@ -1,6 +1,6 @@
 from dataclasses import field, dataclass
 
-from kirin.ir import Method, SSACFGRegion
+from kirin.ir import HasCFG, Method
 from kirin.rewrite import (
     Walk,
     Chain,
@@ -42,7 +42,7 @@ class Fold(Pass):
             .join(result)
         )
 
-        if mt.code.has_trait(SSACFGRegion):
+        if mt.code.has_trait(HasCFG):
             result = Walk(CFGCompactify()).rewrite(mt.code).join(result)
 
         return Fixpoint(Walk(DeadCodeElimination())).rewrite(mt.code).join(result)

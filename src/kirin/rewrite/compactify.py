@@ -279,7 +279,7 @@ class CFGCompactify(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         result = RewriteResult()
-        if not (trait := node.get_trait(ir.SSACFGRegion)):
+        if not (trait := node.get_trait(ir.HasCFG)):
             return result
 
         for region in node.regions:

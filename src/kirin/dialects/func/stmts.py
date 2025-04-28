@@ -25,7 +25,7 @@ class Function(ir.Statement):
             ir.SymbolOpInterface(),
             ir.HasSignature(),
             FuncOpCallableInterface(),
-            ir.SSACFGRegion(),
+            ir.HasCFG(),
         }
     )
     sym_name: str = info.attribute()
@@ -156,7 +156,7 @@ class Lambda(ir.Statement):
             ir.HasSignature(),
             ir.SymbolOpInterface(),
             FuncOpCallableInterface(),
-            ir.SSACFGRegion(),
+            ir.HasCFG(),
         }
     )
     sym_name: str = info.attribute()

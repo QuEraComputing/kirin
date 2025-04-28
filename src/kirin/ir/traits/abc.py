@@ -40,8 +40,20 @@ GraphType = TypeVar("GraphType", bound="Graph[Block]")
 
 
 @dataclass(frozen=True)
-class RegionTrait(StmtTrait, Generic[GraphType]):
+class RegionGraph(StmtTrait, Generic[GraphType]):
     """A trait that indicates the properties of the statement's region."""
 
     @abstractmethod
     def get_graph(self, region: Region) -> GraphType: ...
+
+
+@dataclass(frozen=True)
+class RegionExecutionInterface(StmtTrait):
+    """A trait that indicates the execution convention of the statement's region.
+
+    For example, a region is SSA CFG if it follows SSA form and has a control flow graph.
+    This trait also indicates that there is an available implementation of the trait in each
+    interpreter.
+    """
+
+    pass

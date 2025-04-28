@@ -13,7 +13,8 @@ from .abc import (
     Trait as Trait,
     AttrTrait as AttrTrait,
     StmtTrait as StmtTrait,
-    RegionTrait as RegionTrait,
+    RegionGraph as RegionGraph,
+    RegionExecutionInterface as RegionExecutionInterface,
 )
 from .basic import (
     Pure as Pure,
@@ -29,4 +30,4 @@ from .callable import (
     HasSignature as HasSignature,
     CallableStmtInterface as CallableStmtInterface,
 )
-from .region.ssacfg import SSACFGRegion as SSACFGRegion
+from .region.ssacfg import SSACFG as SSACFG, HasCFG as HasCFG

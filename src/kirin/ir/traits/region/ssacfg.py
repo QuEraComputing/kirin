@@ -7,16 +7,21 @@ region has an SSACFG graph.
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
-from kirin.ir.traits.abc import RegionTrait
+from kirin.ir.traits.abc import RegionGraph, RegionExecutionInterface
 
 if TYPE_CHECKING:
     from kirin.ir import Region
 
 
 @dataclass(frozen=True)
-class SSACFGRegion(RegionTrait):
+class HasCFG(RegionGraph):
 
     def get_graph(self, region: "Region"):
         from kirin.analysis.cfg import CFG
 
         return CFG(region)
+
+
+@dataclass(frozen=True)
+class SSACFG(RegionExecutionInterface):
+    pass

@@ -30,7 +30,7 @@ ClassMethod: TypeAlias = Callable[
 
 @dataclass(frozen=True)
 class Signature:
-    head: type | ir.RegionTrait
+    head: type | ir.RegionExecutionInterface
     args: tuple = ()
 
 
@@ -102,7 +102,7 @@ class BoundedDef(Generic[MethodTableType, InterpreterType, FrameType, NodeType, 
 
 
 @overload
-def impl(head: ir.RegionTrait) -> Callable[
+def impl(head: ir.RegionExecutionInterface) -> Callable[
     [
         ClassMethod[
             MethodTableType,
@@ -192,7 +192,7 @@ def impl(head, *params):
     def wrapper(func: ClassMethod, /):
         return Def(Signature(head, params), func)
 
-    if isinstance(head, ir.RegionTrait) or issubclass(
+    if isinstance(head, ir.RegionExecutionInterface) or issubclass(
         head, (ir.Statement, ir.Attribute)
     ):
         return wrapper

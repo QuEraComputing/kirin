@@ -15,7 +15,7 @@ class IfElse(ir.Statement):
     """
 
     name = "if"
-    traits = frozenset({ir.MaybePure(), ir.SSACFGRegion()})
+    traits = frozenset({ir.MaybePure(), ir.HasCFG()})
     purity: bool = info.attribute(default=False)
     cond: ir.SSAValue = info.argument(types.Any)
     # NOTE: we don't enforce the type here
@@ -133,7 +133,7 @@ class IfElse(ir.Statement):
 @statement(dialect=dialect, init=False)
 class For(ir.Statement):
     name = "for"
-    traits = frozenset({ir.MaybePure(), ir.SSACFGRegion()})
+    traits = frozenset({ir.MaybePure(), ir.HasCFG()})
     purity: bool = info.attribute(default=False)
     iterable: ir.SSAValue = info.argument(types.Any)
     body: ir.Region = info.region(multi=False)
