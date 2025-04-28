@@ -8,7 +8,7 @@ from ._set_new_attribute import set_new_attribute
 
 
 class EmitCheckType(BaseModifier):
-    _VERIFICATION_ERROR = "_kirin_IRValidationError"
+    _VERIFICATION_ERROR = "_kirin_ValidationError"
 
     def emit_check_type(self):
         check_type_locals: dict[str, Any] = {

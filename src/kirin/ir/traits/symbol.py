@@ -19,7 +19,7 @@ class SymbolOpInterface(StmtTrait):
     """
 
     def get_sym_name(self, stmt: Statement) -> PyAttr[str]:
-        sym_name: PyAttr[str] | None = stmt.get_attr_or_prop("sym_name")  # type: ignore
+        sym_name: PyAttr[str] | None = stmt.get_attribute("sym_name")  # type: ignore
         # NOTE: unlike MLIR or xDSL we do not allow empty symbol names
         if sym_name is None:
             raise ValueError(f"Statement {stmt.name} does not have a symbol name")

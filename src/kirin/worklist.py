@@ -26,5 +26,5 @@ class WorkList(Generic[ElemType]):
 
     def pop(self) -> ElemType | None:
         if self._stack:
-            return self._stack.pop()
+            return self._stack.pop(0)
         return None
