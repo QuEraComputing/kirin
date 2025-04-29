@@ -7,12 +7,12 @@ from dataclasses import dataclass
 from kirin import ir, types
 
 if TYPE_CHECKING:
-    from .base import BaseInterpreter
+    from .abc import InterpreterABC
     from .frame import FrameABC
     from .value import RegionResult, StatementResult
 
 MethodTableType = TypeVar("MethodTableType", bound="MethodTable")
-InterpreterType = TypeVar("InterpreterType", bound="BaseInterpreter")
+InterpreterType = TypeVar("InterpreterType", bound="InterpreterABC")
 FrameType = TypeVar("FrameType", bound="FrameABC")
 ValueType = TypeVar("ValueType")
 Head = TypeVar("Head")
@@ -30,7 +30,7 @@ ClassMethod: TypeAlias = Callable[
 
 @dataclass(frozen=True)
 class Signature:
-    head: type | ir.RegionExecutionInterface
+    head: type | ir.RegionInterpretationTrait
     args: tuple = ()
 
 
@@ -102,7 +102,7 @@ class BoundedDef(Generic[MethodTableType, InterpreterType, FrameType, NodeType, 
 
 
 @overload
-def impl(head: ir.RegionExecutionInterface) -> Callable[
+def impl(head: ir.RegionInterpretationTrait) -> Callable[
     [
         ClassMethod[
             MethodTableType,
@@ -192,7 +192,7 @@ def impl(head, *params):
     def wrapper(func: ClassMethod, /):
         return Def(Signature(head, params), func)
 
-    if isinstance(head, ir.RegionExecutionInterface) or issubclass(
+    if isinstance(head, ir.RegionInterpretationTrait) or issubclass(
         head, (ir.Statement, ir.Attribute)
     ):
         return wrapper

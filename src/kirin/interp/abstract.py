@@ -1,18 +1,19 @@
-from abc import ABC
-from typing import TypeVar, Iterable, TypeAlias, overload
-from dataclasses import field, dataclass
+from __future__ import annotations
 
-from kirin.ir import Block, Region, SSAValue, Statement
+from abc import ABC
+from dataclasses import dataclass, field
+from typing import TypeVar, TypeAlias, overload
+
+from kirin import ir
 from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
-from kirin.interp.base import BaseInterpreter, InterpreterMeta
-from kirin.interp.frame import Frame
-from kirin.interp.value import Successor, YieldValue, ReturnValue, SpecialValue
-from kirin.interp.exceptions import InterpreterError
+
+from .abc import InterpreterABC
+from .frame import Frame
+from .value import Successor, YieldValue, ReturnValue
 
 ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
-
 AbsIntResultType: TypeAlias = (
     tuple[ResultType, ...] | None | ReturnValue[ResultType] | YieldValue[ResultType]
 )
@@ -27,25 +28,14 @@ class AbstractFrame(Frame[ResultType]):
     """
 
     worklist: WorkList[Successor[ResultType]] = field(default_factory=WorkList)
-    visited: dict[Block, set[Successor[ResultType]]] = field(default_factory=dict)
+    visited: dict[ir.Block, set[Successor[ResultType]]] = field(default_factory=dict)
 
 
 AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
 
-# TODO: support custom loop termination heurestics, e.g. max iteration, etc.
-# currently we may end up in infinite loop
-
-
-class AbstractInterpreterMeta(InterpreterMeta):
-    pass
-
 
 @dataclass
-class AbstractInterpreter(
-    BaseInterpreter[AbstractFrameType, ResultType],
-    ABC,
-    metaclass=AbstractInterpreterMeta,
-):
+class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
     """Abstract interpreter for the IR.
 
     This is a base class for implementing abstract interpreters for the IR.
@@ -82,140 +72,35 @@ class AbstractInterpreter(
                 f"missing lattice attribute in abstract interpreter class {cls}"
             )
         cls.void = cls.lattice.bottom()
+        cls.keys += ("abstract",)
         super().__init_subclass__()
 
-    def prehook_succ(self, frame: AbstractFrameType, succ: Successor):
-        """Hook called before processing a successor.
-
-        This method can be used to perform custom actions before processing
-        a successor. It is called before evaluating the statements in the block.
-
-        Args:
-            frame: The current frame of the interpreter.
-            succ: The successor to be processed.
-        """
-        return
-
-    def posthook_succ(self, frame: AbstractFrameType, succ: Successor):
-        """Hook called after processing a successor.
-
-        This method can be used to perform custom actions after processing
-        a successor. It is called after evaluating the statements in the block.
-
-        Args:
-            frame: The current frame of the interpreter.
-            succ: The successor that was processed.
-        """
-        return
-
-    def should_exec_stmt(self, stmt: Statement) -> bool:
-        """This method can be used to control which statements are executed
-        during the abstract interpretation. By default, all statements are
-        executed.
-
-        This method is useful when one wants to skip certain statements
-        during the abstract interpretation and is certain that the skipped
-        statements do not affect the final result. This would allow saving
-        computation time and memory by not evaluating the skipped statements
-        and their results.
-
-        Args:
-            stmt: The statement to be executed.
-
-        Returns:
-            True if the statement should be executed, False otherwise.
-        """
-        return True
-
-    def set_values(
-        self,
-        frame: AbstractFrameType,
-        ssa: Iterable[SSAValue],
-        results: Iterable[ResultType],
-    ):
-        """Set the abstract values for the given SSA values in the frame.
-
-        This method is used to customize how the abstract values are set in
-        the frame. By default, the abstract values are set directly in the
-        frame.
-        """
-        frame.set_values(ssa, results)
-
-    def eval_recursion_limit(
-        self, frame: AbstractFrameType
-    ) -> tuple[AbstractFrameType, ResultType]:
-        return frame, self.lattice.bottom()
-
-    def run_ssacfg_region(
-        self, frame: AbstractFrameType, region: Region, args: tuple[ResultType, ...]
-    ) -> tuple[ResultType, ...] | None | ReturnValue[ResultType]:
-        result = None
-        frame.worklist.append(Successor(region.blocks[0], *args))
-        while (succ := frame.worklist.pop()) is not None:
-            if succ.block in frame.visited:
-                if succ in frame.visited[succ.block]:
-                    continue
-            else:
-                frame.visited[succ.block] = set()
-            self.prehook_succ(frame, succ)
-            block_result = self.run_succ(frame, succ)
-            if len(frame.visited[succ.block]) < 128:
-                frame.visited[succ.block].add(succ)
-            else:
-                continue
-
-            if isinstance(block_result, Successor):
-                raise InterpreterError(
-                    "unexpected successor, successors should be in worklist"
-                )
-
-            result = self.join_results(result, block_result)
-            self.posthook_succ(frame, succ)
-
-        if isinstance(result, YieldValue):
-            return result.values
-        return result
-
-    def run_succ(
-        self, frame: AbstractFrameType, succ: Successor
-    ) -> SpecialValue[ResultType]:
-        frame.current_block = succ.block
-        self.set_values(frame, succ.block.args, succ.block_args)
-        for stmt in succ.block.stmts:
-            if self.should_exec_stmt(stmt) is False:
-                continue
-
-            frame.current_stmt = stmt
-            stmt_results = self.eval_stmt(frame, stmt)
-            if isinstance(stmt_results, tuple):
-                self.set_values(frame, stmt._results, stmt_results)
-            elif stmt_results is None:
-                continue  # empty result
-            else:  # terminate
-                return stmt_results
-        return None
-
     @overload
-    def join_results(self, old: None, new: None) -> None: ...
+    @staticmethod
+    def join_results(old: None, new: None) -> None: ...
     @overload
+    @staticmethod
     def join_results(
-        self, old: ReturnValue[ResultType], new: ReturnValue[ResultType]
+        old: ReturnValue[ResultType], new: ReturnValue[ResultType]
     ) -> ReturnValue[ResultType]: ...
     @overload
+    @staticmethod
     def join_results(
-        self, old: YieldValue[ResultType], new: YieldValue[ResultType]
+        old: YieldValue[ResultType], new: YieldValue[ResultType]
     ) -> YieldValue[ResultType]: ...
     @overload
+    @staticmethod
     def join_results(
-        self, old: tuple[ResultType], new: tuple[ResultType]
+        old: tuple[ResultType], new: tuple[ResultType]
     ) -> tuple[ResultType]: ...
     @overload
+    @staticmethod
     def join_results(
-        self, old: AbsIntResultType[ResultType], new: AbsIntResultType[ResultType]
+        old: AbsIntResultType[ResultType], new: AbsIntResultType[ResultType]
     ) -> AbsIntResultType[ResultType]: ...
 
+    @staticmethod
     def join_results(
-        self,
         old: AbsIntResultType[ResultType],
         new: AbsIntResultType[ResultType],
     ) -> AbsIntResultType[ResultType]:

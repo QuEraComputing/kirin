@@ -39,7 +39,7 @@ from kirin.ir.traits import (
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
     CallableStmtInterface as CallableStmtInterface,
-    RegionExecutionInterface as RegionExecutionInterface,
+    RegionInterpretationTrait as RegionInterpretationTrait,
 )
 from kirin.ir.dialect import Dialect as Dialect
 from kirin.ir.attrs.py import PyAttr as PyAttr

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
-    from kirin.ir import Block, Region, Attribute, Statement
+    from kirin import ir, interp
     from kirin.graph import Graph
 
 
@@ -21,22 +21,22 @@ class Trait(ABC, Generic[IRNodeType]):
 
 
 @dataclass(frozen=True)
-class AttrTrait(Trait["Attribute"]):
+class AttrTrait(Trait[ir.Attribute]):
     """Base class for all attribute traits."""
 
-    def verify(self, node: "Attribute"):
+    def verify(self, node: ir.Attribute):
         pass
 
 
 @dataclass(frozen=True)
-class StmtTrait(Trait["Statement"], ABC):
+class StmtTrait(Trait[ir.Statement], ABC):
     """Base class for all statement traits."""
 
-    def verify(self, node: "Statement"):
+    def verify(self, node: ir.Statement):
         pass
 
 
-GraphType = TypeVar("GraphType", bound="Graph[Block]")
+GraphType = TypeVar("GraphType", bound="Graph[ir.Block]")
 
 
 @dataclass(frozen=True)
@@ -44,11 +44,11 @@ class RegionGraph(StmtTrait, Generic[GraphType]):
     """A trait that indicates the properties of the statement's region."""
 
     @abstractmethod
-    def get_graph(self, region: Region) -> GraphType: ...
+    def get_graph(self, region: ir.Region) -> GraphType: ...
 
 
 @dataclass(frozen=True)
-class RegionExecutionInterface(StmtTrait):
+class RegionInterpretationTrait(StmtTrait):
     """A trait that indicates the execution convention of the statement's region.
 
     For example, a region is SSA CFG if it follows SSA form and has a control flow graph.
@@ -56,4 +56,13 @@ class RegionExecutionInterface(StmtTrait):
     interpreter.
     """
 
-    pass
+    ValueType = TypeVar("ValueType")
+
+    @abstractmethod
+    @classmethod
+    def set_region_input(
+        cls,
+        frame: interp.FrameABC[ir.SSAValue, ValueType],
+        region: ir.Region,
+        *inputs: ValueType,
+    ) -> None: ...

@@ -21,50 +21,42 @@ class TypeInference(Forward[types.TypeAttribute]):
     values.
     """
 
-    keys = ["typeinfer"]
+    keys = ("typeinfer",)
     lattice = types.TypeAttribute
 
-    def run_analysis(
-        self,
-        method: ir.Method,
-        args: tuple[types.TypeAttribute, ...] | None = None,
-        *,
-        no_raise: bool = True,
-    ) -> tuple[ForwardFrame[types.TypeAttribute], types.TypeAttribute]:
-        if args is None:
+    def run(self, method: ir.Method, *args, **kwargs):
+        if not args and not kwargs: # no args or kwargs
+            # use the method signature to get the args
             args = method.arg_types
-        return super().run_analysis(method, args, no_raise=no_raise)
+        return super().run(method, *args, **kwargs)
+
+    def method_self(self, method: ir.Method) -> types.TypeAttribute:
+        return method.self_type
+
+    def eval_fallback(
+        self, frame: ForwardFrame[types.TypeAttribute], node: ir.Statement
+    ) -> interp.StatementResult[types.TypeAttribute]:
+        resolve = TypeResolution()
+        fs = fields(node)
+        for f, value in zip(fs.args.values(), frame.get_values(node.args)):
+            resolve.solve(f.type, value)
+        for arg, f in zip(node.args, fs.args.values()):
+            frame.set(arg, frame.get(arg).meet(resolve.substitute(f.type)))
+        return tuple(resolve.substitute(result.type) for result in node.results)
 
     # NOTE: unlike concrete interpreter, instead of using type information
     # within the IR. Type inference will use the interpreted
     # value (which is a type) to determine the method dispatch.
     def build_signature(
-        self, frame: ForwardFrame[types.TypeAttribute], stmt: ir.Statement
+        self, frame: ForwardFrame[types.TypeAttribute], node: ir.Statement
     ) -> interp.Signature:
-        _args = ()
-        for x in frame.get_values(stmt.args):
-            # TODO: remove this after we have multiple dispatch...
+        argtypes = ()
+        for x in frame.get_values(node.args):
             if isinstance(x, types.Generic):
-                _args += (x.body,)
+                argtypes += (x.body,)
             else:
-                _args += (x,)
-        return interp.Signature(stmt.__class__, _args)
-
-    def eval_stmt_fallback(
-        self, frame: ForwardFrame[types.TypeAttribute], stmt: ir.Statement
-    ) -> tuple[types.TypeAttribute, ...] | interp.SpecialValue[types.TypeAttribute]:
-        resolve = TypeResolution()
-        fs = fields(stmt)
-        for f, value in zip(fs.args.values(), frame.get_values(stmt.args)):
-            resolve.solve(f.type, value)
-        for arg, f in zip(stmt.args, fs.args.values()):
-            frame.set(arg, frame.get(arg).meet(resolve.substitute(f.type)))
-        return tuple(resolve.substitute(result.type) for result in stmt.results)
-
-    def run_method(
-        self, method: ir.Method, args: tuple[types.TypeAttribute, ...]
-    ) -> tuple[ForwardFrame[types.TypeAttribute], types.TypeAttribute]:
-        return self.run_callable(method.code, (method.self_type,) + args)
+                argtypes += (x,)
+        return interp.Signature(type(node), argtypes)
 
     T = TypeVar("T")
 

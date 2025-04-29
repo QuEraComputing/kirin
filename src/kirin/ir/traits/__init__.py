@@ -14,7 +14,7 @@ from .abc import (
     AttrTrait as AttrTrait,
     StmtTrait as StmtTrait,
     RegionGraph as RegionGraph,
-    RegionExecutionInterface as RegionExecutionInterface,
+    RegionInterpretationTrait as RegionInterpretationTrait,
 )
 from .basic import (
     Pure as Pure,

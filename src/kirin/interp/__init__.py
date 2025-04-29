@@ -9,13 +9,13 @@ The interpreter framework is designed to be extensible and customizable. It
 provides a set of base classes and interfaces for implementing concrete and
 abstract interpreters:
 
-- [`BaseInterpreter`][kirin.interp.BaseInterpreter]: Base class for implementing concrete interpreters.
+- [`InterpreterABC`][kirin.interp.InterpreterABC]: Base class for implementing concrete interpreters.
 - [`AbstractInterpreter`][kirin.interp.AbstractInterpreter]: Base class for implementing abstract interpreters.
 - [`Frame`][kirin.interp.Frame]: Base class for interpreter frame.
 - [`MethodTable`][kirin.interp.MethodTable]: Method table for registering implementations of statements.
 """
 
-from .base import BaseInterpreter as BaseInterpreter
+from .abc import InterpreterABC as InterpreterABC
 from .frame import Frame as Frame, FrameABC as FrameABC
 from .state import InterpreterState as InterpreterState
 from .table import Signature as Signature, MethodTable as MethodTable, impl as impl

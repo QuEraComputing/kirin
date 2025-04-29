@@ -1,101 +1,57 @@
-import sys
-from abc import ABC
-from typing import TypeVar, Iterable
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Iterable, TypeVar
 from dataclasses import dataclass
 
-from kirin import ir, interp
-from kirin.interp import AbstractFrame, AbstractInterpreter
-from kirin.lattice import BoundedLattice
+from kirin import ir, interp, lattice
 
-ExtraType = TypeVar("ExtraType")
-LatticeElemType = TypeVar("LatticeElemType", bound=BoundedLattice)
+LatticeType = TypeVar("LatticeType", bound=lattice.BoundedLattice)
 
 
 @dataclass
-class ForwardFrame(AbstractFrame[LatticeElemType]):
-    pass
-
-
-ForwardFrameType = TypeVar("ForwardFrameType", bound=ForwardFrame)
-
-
-@dataclass
-class ForwardExtra(
-    AbstractInterpreter[ForwardFrameType, LatticeElemType],
-    ABC,
-):
-    """Abstract interpreter but record results for each SSA value.
-
-    Params:
-        LatticeElemType: The lattice element type.
-        ExtraType: The type of extra information to be stored in the frame.
-    """
-
-    def run_analysis(
-        self,
-        method: ir.Method,
-        args: tuple[LatticeElemType, ...] | None = None,
-        *,
-        no_raise: bool = True,
-    ) -> tuple[ForwardFrameType, LatticeElemType]:
-        """Run the forward dataflow analysis.
-
-        Args:
-            method(ir.Method): The method to analyze.
-            args(tuple[LatticeElemType]): The arguments to the method. Defaults to tuple of top values.
-
-        Keyword Args:
-            no_raise(bool): If True, return bottom values if the analysis fails. Defaults to True.
-
-        Returns:
-            ForwardFrameType: The results of the analysis contained in the frame.
-            LatticeElemType: The result of the analysis for the method return value.
-        """
-        args = args or tuple(self.lattice.top() for _ in method.args)
-
-        if self._eval_lock:
-            raise interp.InterpreterError(
-                "recursive eval is not allowed, use run_method instead"
-            )
-
-        self._eval_lock = True
-        self.initialize()
-        current_recursion_limit = sys.getrecursionlimit()
-        sys.setrecursionlimit(self.max_python_recursion_depth)
-        try:
-            frame, ret = self.run_method(method, args)
-        except Exception as e:
-            # NOTE: initialize will create new State
-            # so we don't need to copy the frames.
-            if not no_raise:
-                raise e
-            return self.state.current_frame, self.lattice.bottom()
-        finally:
-            self._eval_lock = False
-            sys.setrecursionlimit(current_recursion_limit)
-        return frame, ret
+class ForwardFrame(interp.AbstractFrame[LatticeType]):
 
     def set_values(
-        self,
-        frame: AbstractFrame[LatticeElemType],
-        ssa: Iterable[ir.SSAValue],
-        results: Iterable[LatticeElemType],
-    ):
-        """Set the abstract values for the given SSA values in the frame.
-
-        This method is used to customize how the abstract values are set in
-        the frame. By default, the abstract values are set directly in the
-        frame. This method is overridden to join the results if the SSA value
-        already exists in the frame.
-        """
-        for ssa_value, result in zip(ssa, results):
-            if ssa_value in frame.entries:
-                frame.entries[ssa_value] = frame.entries[ssa_value].join(result)
+        self, keys: Iterable[ir.SSAValue], values: Iterable[LatticeType]
+    ) -> None:
+        for ssa_value, result in zip(keys, values):
+            if ssa_value in self.entries:
+                self.entries[ssa_value] = self.entries[ssa_value].join(result)
             else:
-                frame.entries[ssa_value] = result
+                self.entries[ssa_value] = result
 
 
-class Forward(ForwardExtra[ForwardFrame[LatticeElemType], LatticeElemType], ABC):
+FrameType = TypeVar("FrameType", bound=ForwardFrame)
+
+
+@dataclass
+class ForwardExtra(interp.AbstractInterpreter[FrameType, LatticeType], ABC):
+    """Forward dataflow analysis but with custom frame for extra information/state
+    per call frame.
+
+    Params:
+        FrameType: The type of the frame used for the analysis.
+        LatticeType: The type of the lattice used for the analysis.
+    """
+
+    def run(self, method: ir.Method, *args, **kwargs):
+        return self.call(method, self.method_self(method), *args, **kwargs)
+
+    def run_no_raise(self, method: ir.Method, *args, **kwargs):
+        try:
+            return self.run(method, *args, **kwargs)
+        except Exception:
+            return self.state.current_frame, self.lattice.bottom()
+
+    @abstractmethod
+    def method_self(self, method: ir.Method) -> LatticeType:
+        """Return the self value for the given method."""
+        return self.lattice.top()
+
+
+@dataclass
+class Forward(ForwardExtra[ForwardFrame[LatticeType], LatticeType], ABC):
     """Forward dataflow analysis.
 
     This is the base class for forward dataflow analysis. If your analysis
@@ -104,6 +60,6 @@ class Forward(ForwardExtra[ForwardFrame[LatticeElemType], LatticeElemType], ABC)
     """
 
     def initialize_frame(
-        self, code: ir.Statement, *, has_parent_access: bool = False
-    ) -> ForwardFrame[LatticeElemType]:
-        return ForwardFrame(code, has_parent_access=has_parent_access)
+        self, node: ir.Statement, *, has_parent_access: bool = False
+    ) -> ForwardFrame[LatticeType]:
+        return ForwardFrame(node, has_parent_access=has_parent_access)

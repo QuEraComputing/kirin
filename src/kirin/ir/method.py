@@ -45,7 +45,8 @@ class Method(Printable, typing.Generic[Param, RetType]):
             raise ValueError("Incorrect number of arguments")
         # NOTE: multi-return values will be wrapped in a tuple for Python
         interp = Interpreter(self.dialects)
-        return interp.run(self, args=args, kwargs=kwargs)
+        _, ret = interp.run(self, *args, **kwargs)
+        return ret
 
     @property
     def args(self):

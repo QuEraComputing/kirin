@@ -32,7 +32,7 @@ class Propagate(ForwardExtra[Frame, Result]):
     the interpreter. This allows for custom handling of statements.
     """
 
-    keys = ["constprop"]
+    keys = ("constprop",)
     lattice = Result
 
     _interp: interp.Interpreter = field(init=False)
@@ -41,7 +41,6 @@ class Propagate(ForwardExtra[Frame, Result]):
         super().__post_init__()
         self._interp = interp.Interpreter(
             self.dialects,
-            fuel=self.fuel,
             debug=self.debug,
             max_depth=self.max_depth,
             max_python_recursion_depth=self.max_python_recursion_depth,
@@ -53,9 +52,9 @@ class Propagate(ForwardExtra[Frame, Result]):
         return self
 
     def initialize_frame(
-        self, code: ir.Statement, *, has_parent_access: bool = False
+        self, node: ir.Statement, *, has_parent_access: bool = False
     ) -> Frame:
-        return Frame(code, has_parent_access=has_parent_access)
+        return Frame(node, has_parent_access=has_parent_access)
 
     def try_eval_const_pure(
         self,
