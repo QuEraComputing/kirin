@@ -10,7 +10,7 @@ with this dialect.
 from kirin.dialects.cf import (
     emit as emit,
     constprop as constprop,
-    typeinfer as typeinfer,
+    abstract as abstract,
 )
 from kirin.dialects.cf.stmts import (
     Branch as Branch,

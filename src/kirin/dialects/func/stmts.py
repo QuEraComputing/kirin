@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from types import MethodType as ClassMethodType, FunctionType
 
 from kirin import ir, types
@@ -15,6 +17,14 @@ class FuncOpCallableInterface(ir.CallableStmtInterface["Function"]):
     def get_callable_region(cls, stmt: "Function") -> ir.Region:
         return stmt.body
 
+    @classmethod
+    def align_input_args(cls, stmt: Function, *args, **kwargs) -> tuple:
+        inputs = [*args]
+        for name in stmt.slots:
+            if name in kwargs:
+                inputs.append(kwargs[name])
+        return tuple(inputs)
+
 
 @statement(dialect=dialect)
 class Function(ir.Statement):
@@ -30,8 +40,12 @@ class Function(ir.Statement):
     )
     sym_name: str = info.attribute()
     """The symbol name of the function."""
+    slots: tuple[str, ...] = info.attribute(default=())
+    """The argument names of the function."""
     signature: Signature = info.attribute()
+    """The signature of the function at declaration."""
     body: ir.Region = info.region(multi=True)
+    """The body of the function."""
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):
@@ -39,9 +53,22 @@ class Function(ir.Statement):
             printer.plain_print(" ")
 
         with printer.rich(style="symbol"):
-            printer.plain_print(self.sym_name)
+            printer.plain_print("@", self.sym_name)
 
-        printer.print_seq(self.signature.inputs, prefix="(", suffix=")", delim=", ")
+        def print_arg(pair: tuple[str, types.TypeAttribute]):
+            with printer.rich(style="symbol"):
+                printer.plain_print(pair[0])
+            with printer.rich(style="black"):
+                printer.plain_print(" : ")
+                printer.print(pair[1])
+
+        printer.print_seq(
+            zip(self.slots, self.signature.inputs),
+            emit=print_arg,
+            prefix="(",
+            suffix=")",
+            delim=", ",
+        )
 
         with printer.rich(style="comment"):
             printer.plain_print(" -> ")
@@ -52,47 +79,6 @@ class Function(ir.Statement):
 
         with printer.rich(style="comment"):
             printer.plain_print(f" // func.func {self.sym_name}")
-
-
-@statement(dialect=dialect)
-class Call(ir.Statement):
-    name = "call"
-    traits = frozenset({ir.MaybePure()})
-    # not a fixed type here so just any
-    callee: ir.SSAValue = info.argument()
-    inputs: tuple[ir.SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute(default=())
-    result: ir.ResultValue = info.result()
-    purity: bool = info.attribute(default=False)
-
-    def print_impl(self, printer: Printer) -> None:
-        pprint_calllike(self, printer.state.ssa_id[self.callee], printer)
-
-    def check_type(self) -> None:
-        if not self.callee.type.is_subseteq(types.MethodType):
-            if self.callee.type.is_subseteq(types.PyClass(FunctionType)):
-                raise ir.TypeCheckError(
-                    self,
-                    f"callee must be a method type, got {self.callee.type}",
-                    help="did you call a Python function directly? "
-                    "consider decorating it with kernel decorator",
-                )
-
-            if self.callee.type.is_subseteq(types.PyClass(ClassMethodType)):
-                raise ir.TypeCheckError(
-                    self,
-                    "callee must be a method type, got class method",
-                    help="did you try to call a Python class method within a kernel? "
-                    "consider rewriting it with a captured variable instead of calling it inside the kernel",
-                )
-
-            if self.callee.type is types.Any:
-                return
-            raise ir.TypeCheckError(
-                self,
-                f"callee must be a method type, got {self.callee.type}",
-                help="did you forget to decorate the function with kernel decorator?",
-            )
 
 
 @statement(dialect=dialect)
@@ -160,7 +146,10 @@ class Lambda(ir.Statement):
         }
     )
     sym_name: str = info.attribute()
+    slots: tuple[str, ...] = info.attribute(default=())
+    """The argument names of the function."""
     signature: Signature = info.attribute()
+    """The signature of the function at declaration."""
     captured: tuple[ir.SSAValue, ...] = info.argument()
     body: ir.Region = info.region(multi=True)
     result: ir.ResultValue = info.result(MethodType)
@@ -209,12 +198,55 @@ class GetField(ir.Statement):
 
 
 @statement(dialect=dialect)
+class Call(ir.Statement):
+    name = "call"
+    traits = frozenset({ir.MaybePure()})
+    # not a fixed type here so just any
+    callee: ir.SSAValue = info.argument()
+    inputs: tuple[ir.SSAValue, ...] = info.argument()
+    kwargs: tuple[ir.SSAValue, ...] = info.argument()
+    keys: tuple[str, ...] = info.attribute(default=())
+    result: ir.ResultValue = info.result()
+    purity: bool = info.attribute(default=False)
+
+    def print_impl(self, printer: Printer) -> None:
+        pprint_calllike(self, printer.state.ssa_id[self.callee], printer)
+
+    def check_type(self) -> None:
+        if not self.callee.type.is_subseteq(types.MethodType):
+            if self.callee.type.is_subseteq(types.PyClass(FunctionType)):
+                raise ir.TypeCheckError(
+                    self,
+                    f"callee must be a method type, got {self.callee.type}",
+                    help="did you call a Python function directly? "
+                    "consider decorating it with kernel decorator",
+                )
+
+            if self.callee.type.is_subseteq(types.PyClass(ClassMethodType)):
+                raise ir.TypeCheckError(
+                    self,
+                    "callee must be a method type, got class method",
+                    help="did you try to call a Python class method within a kernel? "
+                    "consider rewriting it with a captured variable instead of calling it inside the kernel",
+                )
+
+            if self.callee.type is types.Any:
+                return
+            raise ir.TypeCheckError(
+                self,
+                f"callee must be a method type, got {self.callee.type}",
+                help="did you forget to decorate the function with kernel decorator?",
+            )
+
+
+@statement(dialect=dialect)
 class Invoke(ir.Statement):
     name = "invoke"
     traits = frozenset({ir.MaybePure()})
     callee: ir.Method = info.attribute()
     inputs: tuple[ir.SSAValue, ...] = info.argument()
-    kwargs: tuple[str, ...] = info.attribute(default=())
+    kwargs: tuple[ir.SSAValue, ...] = info.argument()
+    keys: tuple[str, ...] = info.attribute(default=())
     result: ir.ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 

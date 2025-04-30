@@ -13,8 +13,8 @@ class Lowering(lowering.FromPythonAST):
         self, state: lowering.State, callee: ir.SSAValue, node: ast.Call
     ) -> lowering.Result:
         source = state.source
-        args, keywords = self.__lower_Call_args_kwargs(state, node)
-        stmt = func.Call(callee, args, kwargs=keywords)
+        args, kwargs, keys = self.__lower_Call_args_kwargs(state, node)
+        stmt = func.Call(callee, args, kwargs, keys=keys)
         stmt.source = source
         return state.current_frame.push(stmt)
 
@@ -25,8 +25,8 @@ class Lowering(lowering.FromPythonAST):
         node: ast.Call,
     ) -> lowering.Result:
         source = state.source
-        args, keywords = self.__lower_Call_args_kwargs(state, node)
-        stmt = func.Invoke(args, callee=method, kwargs=keywords)
+        args, kwargs, keys = self.__lower_Call_args_kwargs(state, node)
+        stmt = func.Invoke(args, callee=method, kwargs=kwargs, keys=keys)
         stmt.result.type = method.return_type or types.Any
         stmt.source = source
         return state.current_frame.push(stmt)
@@ -43,9 +43,12 @@ class Lowering(lowering.FromPythonAST):
             else:
                 args.append(state.lower(arg).expect_one())
 
-        keywords = []
+        keys: list[str] = []
+        kwargs: list[ir.SSAValue] = []
         for kw in node.keywords:
-            keywords.append(kw.arg)
-            args.append(state.lower(kw.value).expect_one())
+            if kw.arg is None:
+                raise lowering.BuildError("keyword argument must have a name")
+            keys.append(kw.arg)
+            kwargs.append(state.lower(kw.value).expect_one())
 
-        return tuple(args), tuple(keywords)
+        return tuple(args), tuple(kwargs), tuple(keys)

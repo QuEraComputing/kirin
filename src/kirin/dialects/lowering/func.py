@@ -31,6 +31,7 @@ class Lowering(lowering.FromPythonAST):
         )
         frame = state.current_frame
 
+        slots = tuple(arg.arg for arg in node.args.args)
         entries: dict[str, ir.SSAValue] = {}
         entr_block = ir.Block()
         fn_self = entr_block.args.append_from(
@@ -81,6 +82,7 @@ class Lowering(lowering.FromPythonAST):
             frame.push(
                 func.Function(
                     sym_name=node.name,
+                    slots=slots,
                     signature=signature,
                     body=func_frame.curr_region,
                 )
@@ -97,10 +99,10 @@ class Lowering(lowering.FromPythonAST):
         if first_stmt is None:
             raise lowering.BuildError("empty function body")
 
-        captured = [value for value in func_frame.captures.values()]
         lambda_stmt = func.Lambda(
-            tuple(captured),
+            tuple(value for value in func_frame.captures.values()),
             sym_name=node.name,
+            slots=slots,
             signature=signature,
             body=func_frame.curr_region,
         )

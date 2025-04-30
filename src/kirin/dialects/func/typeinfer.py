@@ -68,7 +68,16 @@ class TypeInfer(MethodTable):
         return (resolve.substitute(result),)
 
     @impl(Invoke)
-    def invoke(self, interp: TypeInference, frame: Frame, stmt: Invoke):
+    def invoke(self, interp_: TypeInference, frame: Frame, stmt: Invoke):
+        inputs = frame.get_values(stmt.inputs)
+        args, kwargs = inputs[: len(stmt.kwargs)], inputs[len(stmt.kwargs) :]
+
+        interp_.call(
+            stmt.callee,
+            interp_.method_self(stmt.callee),
+            *args,
+            **{k: v for k, v in zip(stmt.kwargs, kwargs)},
+        )
         return self._invoke_method(
             interp,
             frame,
@@ -85,7 +94,8 @@ class TypeInfer(MethodTable):
         frame: Frame,
         mt: ir.Method,
         args: Iterable[ir.SSAValue],
-        values: tuple,
+        kwargs: Iterable[str],
+        values: tuple[types.TypeAttribute, ...],
     ):
         if mt.inferred:  # so we don't end up in infinite loop
             return (mt.return_type,)
@@ -100,6 +110,7 @@ class TypeInfer(MethodTable):
         # or runtime.
         # update the results with the narrowed types
         frame.set_values(args, inputs)
+        interp.call(mt, *inputs)
         _, ret = interp.run_method(mt, inputs)
         return (ret,)
 

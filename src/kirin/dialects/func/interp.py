@@ -17,23 +17,22 @@ class Interpreter(MethodTable):
     @impl(Call)
     def call(self, interp: concrete.Interpreter, frame: Frame, stmt: Call):
         mt: Method = frame.get(stmt.callee)
-        _, result = interp.run_method(
+        _, ret = interp.call(
+            mt.code,
             mt,
-            interp.permute_values(
-                mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
-            ),
+            *frame.get_values(stmt.inputs),
+            **{k: v for k, v in zip(stmt.keys, frame.get_values(stmt.kwargs))},
         )
-        return (result,)
+        return (ret,)
 
     @impl(Invoke)
     def invoke(self, interp: concrete.Interpreter, frame: Frame, stmt: Invoke):
-        _, result = interp.run_method(
+        _, ret = interp.call(
             stmt.callee,
-            interp.permute_values(
-                stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
-            ),
+            *frame.get_values(stmt.inputs),
+            **{k: v for k, v in zip(stmt.keys, frame.get_values(stmt.kwargs))},
         )
-        return (result,)
+        return (ret,)
 
     @impl(Return)
     def return_(self, interp: concrete.Interpreter, frame: Frame, stmt: Return):
