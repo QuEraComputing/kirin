@@ -5,17 +5,17 @@ region has an SSACFG graph.
 """
 
 from __future__ import annotations
-from abc import abstractmethod
+
 from typing import TYPE_CHECKING, TypeVar
 from dataclasses import dataclass
 
-from kirin.interp.frame import FrameABC
-from kirin.ir.nodes.region import Region
 from kirin.ir.ssa import SSAValue as SSAValue
+from kirin.interp.frame import FrameABC
 from kirin.ir.traits.abc import RegionGraph, RegionInterpretationTrait
+from kirin.ir.nodes.region import Region
 
 if TYPE_CHECKING:
-    from kirin import ir, interp
+    from kirin import ir
 
 
 @dataclass(frozen=True)

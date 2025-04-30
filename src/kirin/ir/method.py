@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 from types import ModuleType
 
@@ -23,7 +25,7 @@ RetType = typing.TypeVar("RetType")
 class Method(Printable, typing.Generic[Param, RetType]):
     mod: ModuleType | None  # ref
     py_func: typing.Callable[Param, RetType] | None  # ref
-    sym_name: str
+    sym_name: str | None
     arg_names: list[str]
     dialects: "DialectGroup"  # own
     code: Statement  # own, the corresponding IR, a func.func usually
@@ -76,7 +78,8 @@ class Method(Printable, typing.Generic[Param, RetType]):
         return trait.get_signature(self.code).output
 
     def __repr__(self) -> str:
-        return f'Method("{self.sym_name}")'
+        name = self.sym_name or "<lambda>"
+        return f'Method("{name}")'
 
     def print_impl(self, printer: Printer) -> None:
         return printer.print(self.code)
