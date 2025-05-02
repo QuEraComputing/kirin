@@ -96,10 +96,12 @@ class Propagate(ForwardExtra[Frame, Result]):
                     return self.try_eval_const_pure(frame, stmt, values)
 
             if stmt.has_trait(ir.Pure):
-                return (Unknown(),)  # no implementation but pure
+                return tuple(
+                    Unknown() for _ in stmt._results
+                )  # no implementation but pure
             # not pure, and no implementation, let's say it's not pure
             frame.frame_is_not_pure = True
-            return (Unknown(),)
+            return tuple(Unknown() for _ in stmt._results)
 
         ret = method(self, frame, stmt)
         if stmt.has_trait(ir.IsTerminator) or stmt.has_trait(ir.Pure):
