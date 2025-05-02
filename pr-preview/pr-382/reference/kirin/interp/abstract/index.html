@@ -21,8 +21,7 @@
     <span class=n>init</span><span class=o>=</span><span class=kc>False</span>
 <span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p>lattice type for the abstract interpreter.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.abstract.AbstractInterpreter.expect_const class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">expect_const</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>expect_const</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>T</span><span class=p>])</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Expect a constant value of a given type.</p> <p>If the value is not a constant or the constant is not of the given type, raise an <code>InterpreterError</code>.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/abstract.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>145</span>
-<span class=normal>146</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Expect a constant value of a given type.</p> <p>If the value is not a constant or the constant is not of the given type, raise an <code>InterpreterError</code>.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/abstract.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>146</span>
 <span class=normal>147</span>
 <span class=normal>148</span>
 <span class=normal>149</span>
@@ -31,7 +30,8 @@
 <span class=normal>152</span>
 <span class=normal>153</span>
 <span class=normal>154</span>
-<span class=normal>155</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>155</span>
+<span class=normal>156</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>expect_const</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>T</span><span class=p>]):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Expect a constant value of a given type.</span>
 
@@ -43,7 +43,8 @@
         <span class=k>raise</span> <span class=n>InterpreterError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;expected </span><span class=si>{</span><span class=n>type_</span><span class=si>}</span><span class=s2>, got </span><span class=si>{</span><span class=n>hint</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>)</span>
     <span class=k>return</span> <span class=n>hint</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.abstract.AbstractInterpreter.maybe_const class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">maybe_const</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>maybe_const</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>T</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>T</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get a constant value of a given type.</p> <p>If the value is not a constant or the constant is not of the given type, return <code>None</code>.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/abstract.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>134</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get a constant value of a given type.</p> <p>If the value is not a constant or the constant is not of the given type, return <code>None</code>.</p> <details class=quote> <summary>Source code in <code>src/kirin/interp/abstract.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>133</span>
+<span class=normal>134</span>
 <span class=normal>135</span>
 <span class=normal>136</span>
 <span class=normal>137</span>
@@ -52,13 +53,16 @@
 <span class=normal>140</span>
 <span class=normal>141</span>
 <span class=normal>142</span>
-<span class=normal>143</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>143</span>
+<span class=normal>144</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span> <span class=nf>maybe_const</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>T</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>T</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get a constant value of a given type.</span>
 
 <span class=sd>    If the value is not a constant or the constant is not of the given type, return</span>
 <span class=sd>    `None`.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
+    <span class=kn>from</span> <span class=nn>kirin.analysis.const.lattice</span> <span class=kn>import</span> <span class=n>Value</span>
+
     <span class=n>hint</span> <span class=o>=</span> <span class=n>value</span><span class=o>.</span><span class=n>hints</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=s2>&quot;const&quot;</span><span class=p>)</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>hint</span><span class=p>,</span> <span class=n>Value</span><span class=p>)</span> <span class=ow>and</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>hint</span><span class=o>.</span><span class=n>data</span><span class=p>,</span> <span class=n>type_</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>hint</span><span class=o>.</span><span class=n>data</span>
