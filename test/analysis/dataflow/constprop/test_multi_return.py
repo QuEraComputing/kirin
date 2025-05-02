@@ -21,6 +21,19 @@ class MultiReturnStatement(ir.Statement):
         )
 
 
+@statement(dialect=dialect)
+class MultiReturnNotPure(ir.Statement):
+    traits = frozenset({lowering.FromPythonCall()})
+    inputs: tuple[ir.SSAValue] = info.argument(types.Any)
+
+    def __init__(self, *args: ir.SSAValue):
+        super().__init__(
+            args=args,
+            result_types=tuple(arg.type for arg in args),
+            args_slice={"inputs": slice(None)},
+        )
+
+
 @ir.dialect_group(structural_no_opt.add(dialect))
 def dialect_group_test(self):
     fold = Fold(self)
@@ -40,6 +53,7 @@ def test_multi_return_default_prop():
         (b := py.Constant(2)),
         (res := MultiReturnStatement(a.result, b.result)),
         (return_result := ilist.New((res.results[0], res.results[1]))),
+        (res := MultiReturnNotPure(a.result, b.result)),
         (func.Return(return_result.result)),
     ]
 
