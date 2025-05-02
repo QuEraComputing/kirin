@@ -45,32 +45,27 @@ class TypeInference(Forward[types.TypeAttribute]):
         **kwargs: types.TypeAttribute,
     ) -> types.TypeAttribute:
         trait = node.get_present_trait(ir.CallableStmtInterface)
-        region_trait = node.get_present_trait(ir.RegionInterpretationTrait)
         args = trait.align_input_args(node, *args, **kwargs)
         region = trait.get_callable_region(node)
-        how = self.registry.get(interp.Signature(region_trait))
-
-        if how is None:
-            raise interp.InterpreterError(
-                f"Interpreter {self.__class__.__name__} does not "
-                f"support {node} using {trait} convention"
-            )
         if self.state.depth >= self.max_depth:
-            raise interp.StackOverflowError(
-                f"Interpreter {self.__class__.__name__} stack "
-                f"overflow at {self.state.depth}"
-            )
+            return self.recursion_limit_reached()
 
         if trait := node.get_trait(ir.HasSignature):
-            signature: Signature[types.TypeAttribute] = trait.get_signature(node)
-            args = tuple(input.meet(arg) for input, arg in zip(signature.inputs, args))
-            region_trait.set_region_input(frame, region, *args)
-            ret: types.TypeAttribute = how(self, frame, region)
-            ret = ret.meet(signature.output)
+            signature: Signature[types.TypeAttribute] | None = trait.get_signature(node)
+            args = (args[0],) + tuple(
+                input.meet(arg) for input, arg in zip(signature.inputs, args[1:])
+            )
         else:
-            region_trait.set_region_input(frame, region, *args)
-            ret: types.TypeAttribute = how(self, frame, region)
-        return ret
+            signature = None
+        ret = self.frame_call_region(frame, node, region, *args)
+
+        if isinstance(ret, interp.ReturnValue):
+            return ret.value if signature is None else ret.value.meet(signature.output)
+        elif not ret:  # empty result or None
+            return self.void if signature is None else self.void.meet(signature.output)
+        raise interp.InterpreterError(
+            f"callable region {node.name} does not return `ReturnValue`, got {ret}"
+        )
 
     def eval_fallback(
         self, frame: ForwardFrame[types.TypeAttribute], node: ir.Statement
