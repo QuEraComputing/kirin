@@ -73,11 +73,10 @@ class Propagate(ForwardExtra[Frame, Result]):
                 if types.is_tuple_of(values, Value):
                     return self.try_eval_const_pure(frame, node, values)
 
-            if node.has_trait(ir.Pure):
-                return (Unknown(),)  # no implementation but pure
-            # not pure, and no implementation, let's say it's not pure
-            frame.frame_is_not_pure = True
-            return (Unknown(),)
+            if not node.has_trait(ir.Pure):
+                # not pure, and no implementation, let's say it's not pure
+                frame.frame_is_not_pure = True
+            return tuple(Unknown() for _ in node._results)
 
         ret = method(self, frame, node)
         if node.has_trait(ir.IsTerminator) or node.has_trait(ir.Pure):
