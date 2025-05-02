@@ -18,6 +18,9 @@ from .table import Signature, BoundedDef
 from .value import Successor, ReturnValue, SpecialValue, StatementResult
 from .exceptions import InterpreterError
 
+if TYPE_CHECKING:
+    from kirin.registry import StatementImpl, InterpreterRegistry
+
 ValueType = TypeVar("ValueType")
 FrameType = TypeVar("FrameType", bound=FrameABC)
 

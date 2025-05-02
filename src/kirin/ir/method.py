@@ -4,6 +4,10 @@ from types import ModuleType
 # from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
+
+from kirin.ir.traits import HasSignature, CallableStmtInterface
+from kirin.ir.exception import ValidationError
+from kirin.ir.nodes.stmt import Statement
 from kirin.print.printer import Printer
 from kirin.print.printable import Printable
 
