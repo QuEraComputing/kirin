@@ -86,7 +86,14 @@ class SliceAttribute(ir.Data[slice]):
     step: int | None
 
     def __post_init__(self) -> None:
-        self.type = types.Slice[types.Int]
+        if self.start is None and self.step is None:
+            self.type = types.Slice[types.Literal(self.stop)]
+        else:
+            self.type = types.Slice3[
+                types.Literal(self.start),
+                types.Literal(self.stop),
+                types.Literal(self.step),
+            ]
 
     def unwrap(self):
         return slice(self.start, self.stop, self.step)
