@@ -14,7 +14,7 @@ def main_simplify_getitem(x: int):
 def test_getitem():
     before = main_simplify_getitem(1)
     constprop = const.Propagate(main_simplify_getitem.dialects)
-    frame, _ = constprop.run_analysis(main_simplify_getitem)
+    frame, _ = constprop.run(main_simplify_getitem)
     Fixpoint(Walk(WrapConst(frame))).rewrite(main_simplify_getitem.code)
     inline_getitem = InlineGetItem()
     Fixpoint(Walk(Chain([inline_getitem, DeadCodeElimination()]))).rewrite(

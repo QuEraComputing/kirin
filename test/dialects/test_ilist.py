@@ -189,7 +189,7 @@ def test_ilist_constprop():
         return _for_loop(values)  # type: ignore
 
     prop = const.Propagate(basic_no_opt)
-    frame, result = prop.run_analysis(main)
+    frame, result = prop.run(main)
     target_ssa = main.callable_region.blocks[0].stmts.at(-2).results[0]
     target = frame.entries[target_ssa]
     assert isinstance(target, const.Value)
@@ -214,7 +214,7 @@ def test_ilist_constprop():
         return foldl(values), foldr(values)
 
     prop = const.Propagate(basic_no_opt)
-    frame, result = prop.run_analysis(main2)
+    frame, result = prop.run(main2)
     target_ssa = main2.callable_region.blocks[0].stmts.at(-2).results[0]
     target = frame.entries[target_ssa]
     assert isinstance(target, const.Value)

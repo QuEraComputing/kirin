@@ -15,7 +15,7 @@ def main_simplify_alias(x: int):
 
 def test_alias_inline():
     constprop = const.Propagate(main_simplify_alias.dialects)
-    frame, ret = constprop.run_analysis(main_simplify_alias)
+    frame, ret = constprop.run(main_simplify_alias)
     Fixpoint(Walk(WrapConst(frame))).rewrite(main_simplify_alias.code)
     Fixpoint(Walk(Chain([InlineAlias(), DeadCodeElimination()]))).rewrite(
         main_simplify_alias.code
@@ -32,7 +32,7 @@ def simplify_alias_ref_const():
 
 def test_alias_inline2():
     constprop = const.Propagate(simplify_alias_ref_const.dialects)
-    frame, _ = constprop.run_analysis(simplify_alias_ref_const)
+    frame, _ = constprop.run(simplify_alias_ref_const)
     Fixpoint(Walk(WrapConst(frame))).rewrite(main_simplify_alias.code)
     Fixpoint(Walk(Chain([InlineAlias(), DeadCodeElimination()]))).rewrite(
         simplify_alias_ref_const.code

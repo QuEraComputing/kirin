@@ -17,9 +17,9 @@ def test_ann_assign():
     assert isinstance(stmt, py.assign.TypeAssert)
 
     typeinfer = TypeInference(basic_no_opt)
-    _, ret = typeinfer.run_analysis(main, (types.Int,))
+    _, ret = typeinfer.run(main, types.Int)
     assert ret.is_equal(types.Int)
-    _, ret = typeinfer.run_analysis(main, (types.Float,))
+    _, ret = typeinfer.run(main, types.Float)
     assert ret is ret.bottom()
 
 

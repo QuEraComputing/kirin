@@ -14,7 +14,7 @@ def test_untable_branch():
         return z
 
     infer = TypeInference(dialects=unstable.dialects)
-    frame, ret = infer.run_analysis(unstable, (types.Int,))
+    frame, ret = infer.run_no_raise(unstable, types.Int)
     assert ret == types.Union(types.Int, types.Float)
 
     def stmt_at(block_id, stmt_id) -> ir.Statement:

@@ -12,7 +12,7 @@ def test_inside_return_loop():
             return i
         return x
 
-    frame, ret = type_infer.run_analysis(simple_loop)
+    frame, ret = type_infer.run(simple_loop)
     assert ret.is_subseteq(types.Int | types.Float)
 
 
@@ -25,5 +25,5 @@ def test_simple_ifelse():
         else:
             return 0
 
-    frame, ret = type_infer.run_analysis(simple_ifelse)
+    frame, ret = type_infer.run(simple_ifelse)
     assert ret.is_subseteq(types.Bool | types.Int | types.NoneType)

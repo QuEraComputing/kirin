@@ -29,5 +29,5 @@ def test_worklist_bfs():
 
     # test.print()
     prop = const.Propagate(basic_no_opt)
-    frame, ret = prop.run_analysis(test)
+    frame, ret = prop.run(test)
     assert isinstance(ret, const.PartialLambda)

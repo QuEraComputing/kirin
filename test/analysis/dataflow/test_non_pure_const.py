@@ -29,13 +29,11 @@ def side_effect(pos: int):
 
 def test_non_pure_const():
     constprop = const.Propagate(basic_no_opt)
-    frame, ret = constprop.run_analysis(
+    frame, ret = constprop.run(
         recursion,
-        (
-            const.Value(side_effect),
-            const.Result.top(),
-            const.Result.top(),
-        ),
+        const.Value(side_effect),
+        const.Result.top(),
+        const.Result.top(),
     )
     # recursion.print(analysis=frame.entries)
     ret = frame.entries[recursion.callable_region.blocks[2].stmts.at(3).results[0]]

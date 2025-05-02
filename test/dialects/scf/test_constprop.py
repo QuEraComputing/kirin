@@ -13,7 +13,7 @@ def test_simple_loop():
             x = x + 1
         return x
 
-    frame, ret = prop.run_analysis(main)
+    frame, ret = prop.run(main)
     assert isinstance(ret, const.Value)
     assert ret.data == 2
     assert frame.frame_is_not_pure is False
@@ -28,7 +28,7 @@ def test_nested_loop():
                 x = x + 1
         return x
 
-    frame, ret = prop.run_analysis(main)
+    frame, ret = prop.run(main)
     assert isinstance(ret, const.Value)
     assert ret.data == 6
     assert frame.frame_is_not_pure is False
@@ -44,7 +44,7 @@ def test_nested_loop_with_if():
                     x = x + 1
         return x
 
-    frame, ret = prop.run_analysis(main)
+    frame, ret = prop.run(main)
     assert isinstance(ret, const.Value)
     assert ret.data == 3
     assert frame.frame_is_not_pure is False
@@ -63,7 +63,7 @@ def test_nested_loop_with_if_else():
                     x = x + 1
         return x
 
-    frame, ret = prop.run_analysis(main)
+    frame, ret = prop.run(main)
     assert isinstance(ret, const.Value)
     assert ret.data == 5
     assert frame.frame_is_not_pure is False
@@ -76,7 +76,7 @@ def test_inside_return():
             return i
         return x
 
-    frame, ret = prop.run_analysis(simple_loop)
+    frame, ret = prop.run(simple_loop)
     assert isinstance(ret, const.Value)
     assert ret.data == 0
 
@@ -90,7 +90,7 @@ def test_inside_return():
             return 0
 
     simple_ifelse.print()
-    frame, ret = prop.run_analysis(simple_ifelse)
+    frame, ret = prop.run(simple_ifelse)
     ifelse = simple_ifelse.callable_region.blocks[0].stmts.at(2)
     assert isinstance(ifelse, scf.IfElse)
     terminator = ifelse.then_body.blocks[0].last_stmt

@@ -22,7 +22,7 @@ def branch(x):
 def test_branch_elim():
     assert branch(1) == 4
     const_prop = const.Propagate(branch.dialects)
-    frame, ret = const_prop.run_analysis(branch)
+    frame, ret = const_prop.run(branch)
     Walk(Fixpoint(WrapConst(frame))).rewrite(branch.code)
     fold = ConstantFold()
     Fixpoint(Walk(fold)).rewrite(branch.code)
