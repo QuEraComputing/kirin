@@ -35,7 +35,18 @@
 <span class=normal>216</span>
 <span class=normal>217</span>
 <span class=normal>218</span>
-<span class=normal>219</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
+<span class=normal>219</span>
+<span class=normal>220</span>
+<span class=normal>221</span>
+<span class=normal>222</span>
+<span class=normal>223</span>
+<span class=normal>224</span>
+<span class=normal>225</span>
+<span class=normal>226</span>
+<span class=normal>227</span>
+<span class=normal>228</span>
+<span class=normal>229</span>
+<span class=normal>230</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>GetItem</span><span class=p>)</span>
 <span class=k>def</span> <span class=nf>getitem</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>_</span><span class=p>:</span> <span class=n>const</span><span class=o>.</span><span class=n>Propagate</span><span class=p>,</span>
@@ -48,7 +59,18 @@
         <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>Unknown</span><span class=p>(),)</span>
 
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>const</span><span class=o>.</span><span class=n>Value</span><span class=p>):</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>Value</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>data</span><span class=p>[</span><span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=p>]),)</span>
+        <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Data</span><span class=p>):</span>
+            <span class=n>index_value</span> <span class=o>=</span> <span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=o>.</span><span class=n>unwrap</span><span class=p>()</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>index_value</span> <span class=o>=</span> <span class=n>index</span><span class=o>.</span><span class=n>data</span>
+
+        <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=o>.</span><span class=n>data</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Data</span><span class=p>):</span>
+            <span class=n>obj_value</span> <span class=o>=</span> <span class=n>obj</span><span class=o>.</span><span class=n>data</span><span class=o>.</span><span class=n>unwrap</span><span class=p>()</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>obj_value</span> <span class=o>=</span> <span class=n>obj</span><span class=o>.</span><span class=n>data</span>
+
+        <span class=k>return</span> <span class=p>(</span><span class=n>const</span><span class=o>.</span><span class=n>Value</span><span class=p>(</span><span class=n>obj_value</span><span class=p>[</span><span class=n>index_value</span><span class=p>]),)</span>
+
     <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>const</span><span class=o>.</span><span class=n>PartialTuple</span><span class=p>):</span>
         <span class=n>obj</span> <span class=o>=</span> <span class=n>obj</span><span class=o>.</span><span class=n>data</span>
         <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>index</span><span class=o>.</span><span class=n>data</span><span class=p>,</span> <span class=nb>int</span><span class=p>)</span> <span class=ow>and</span> <span class=mi>0</span> <span class=o>&lt;=</span> <span class=n>index</span><span class=o>.</span><span class=n>data</span> <span class=o>&lt;</span> <span class=nb>len</span><span class=p>(</span><span class=n>obj</span><span class=p>):</span>
@@ -134,14 +156,14 @@
     <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span>
     <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../reference/kirin/rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code>, <code><span title="typing.Generic">Generic</span>[<a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.GetItemLikeStmt" href="#kirin.dialects.py.indexing.GetItemLikeStmt">GetItemLikeStmt</a>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>231</span>
-<span class=normal>232</span>
-<span class=normal>233</span>
-<span class=normal>234</span>
-<span class=normal>235</span>
-<span class=normal>236</span>
-<span class=normal>237</span>
-<span class=normal>238</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span> <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../reference/kirin/rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code>, <code><span title="typing.Generic">Generic</span>[<a class="autorefs autorefs-internal" title="kirin.dialects.py.indexing.GetItemLikeStmt" href="#kirin.dialects.py.indexing.GetItemLikeStmt">GetItemLikeStmt</a>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>242</span>
+<span class=normal>243</span>
+<span class=normal>244</span>
+<span class=normal>245</span>
+<span class=normal>246</span>
+<span class=normal>247</span>
+<span class=normal>248</span>
+<span class=normal>249</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>],</span> <span class=n>obj_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>):</span>
     <span class=n>trait</span> <span class=o>=</span> <span class=n>stmt_type</span><span class=o>.</span><span class=n>get_trait</span><span class=p>(</span><span class=n>GetItemLike</span><span class=p>)</span>
     <span class=k>if</span> <span class=n>trait</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
         <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;</span><span class=si>{</span><span class=n>stmt_type</span><span class=si>}</span><span class=s2> does not have GetItemLike trait&quot;</span><span class=p>)</span>
@@ -153,17 +175,17 @@
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.obj_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">obj_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>obj_type</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>=</span> <span class=n>obj_type</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-attribute"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.target_stmt_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">target_stmt_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=n>target_stmt_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>GetItemLikeStmt</span><span class=p>]</span> <span class=o>=</span> <span class=n>stmt_type</span>
 </code></pre></div> <div class="doc doc-contents "> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.indexing.RewriteGetItem.rewrite_Statement class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">rewrite_Statement</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>rewrite_Statement</span><span class=p>(</span><span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>240</span>
-<span class=normal>241</span>
-<span class=normal>242</span>
-<span class=normal>243</span>
-<span class=normal>244</span>
-<span class=normal>245</span>
-<span class=normal>246</span>
-<span class=normal>247</span>
-<span class=normal>248</span>
-<span class=normal>249</span>
-<span class=normal>250</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=quote> <summary>Source code in <code>src/kirin/dialects/py/indexing.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>251</span>
+<span class=normal>252</span>
+<span class=normal>253</span>
+<span class=normal>254</span>
+<span class=normal>255</span>
+<span class=normal>256</span>
+<span class=normal>257</span>
+<span class=normal>258</span>
+<span class=normal>259</span>
+<span class=normal>260</span>
+<span class=normal>261</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>rewrite_Statement</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>RewriteResult</span><span class=p>:</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>GetItem</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>RewriteResult</span><span class=p>()</span>
 
