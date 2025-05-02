@@ -1,11 +1,15 @@
-from typing import TypeVar, final
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, final
 
 from kirin import ir, types, interp
 from kirin.decl import fields
-from kirin.analysis import const
 from kirin.analysis.forward import Forward, ForwardFrame
 
 from .solve import TypeResolution
+
+if TYPE_CHECKING:
+    from kirin.dialects.func.attrs import Signature
 
 
 @final
@@ -25,13 +29,48 @@ class TypeInference(Forward[types.TypeAttribute]):
     lattice = types.TypeAttribute
 
     def run(self, method: ir.Method, *args, **kwargs):
-        if not args and not kwargs: # no args or kwargs
+        if not args and not kwargs:  # no args or kwargs
             # use the method signature to get the args
             args = method.arg_types
         return super().run(method, *args, **kwargs)
 
     def method_self(self, method: ir.Method) -> types.TypeAttribute:
         return method.self_type
+
+    def frame_call(
+        self,
+        frame: ForwardFrame[types.TypeAttribute],
+        node: ir.Statement,
+        *args: types.TypeAttribute,
+        **kwargs: types.TypeAttribute,
+    ) -> types.TypeAttribute:
+        trait = node.get_present_trait(ir.CallableStmtInterface)
+        region_trait = node.get_present_trait(ir.RegionInterpretationTrait)
+        args = trait.align_input_args(node, *args, **kwargs)
+        region = trait.get_callable_region(node)
+        how = self.registry.get(interp.Signature(region_trait))
+
+        if how is None:
+            raise interp.InterpreterError(
+                f"Interpreter {self.__class__.__name__} does not "
+                f"support {node} using {trait} convention"
+            )
+        if self.state.depth >= self.max_depth:
+            raise interp.StackOverflowError(
+                f"Interpreter {self.__class__.__name__} stack "
+                f"overflow at {self.state.depth}"
+            )
+
+        if trait := node.get_trait(ir.HasSignature):
+            signature: Signature[types.TypeAttribute] = trait.get_signature(node)
+            args = tuple(input.meet(arg) for input, arg in zip(signature.inputs, args))
+            region_trait.set_region_input(frame, region, *args)
+            ret: types.TypeAttribute = how(self, frame, region)
+            ret = ret.meet(signature.output)
+        else:
+            region_trait.set_region_input(frame, region, *args)
+            ret: types.TypeAttribute = how(self, frame, region)
+        return ret
 
     def eval_fallback(
         self, frame: ForwardFrame[types.TypeAttribute], node: ir.Statement
@@ -57,28 +96,3 @@ class TypeInference(Forward[types.TypeAttribute]):
             else:
                 argtypes += (x,)
         return interp.Signature(type(node), argtypes)
-
-    T = TypeVar("T")
-
-    @classmethod
-    def maybe_const(cls, value: ir.SSAValue, type_: type[T]) -> T | None:
-        """Get a constant value of a given type.
-
-        If the value is not a constant or the constant is not of the given type, return
-        `None`.
-        """
-        hint = value.hints.get("const")
-        if isinstance(hint, const.Value) and isinstance(hint.data, type_):
-            return hint.data
-
-    @classmethod
-    def expect_const(cls, value: ir.SSAValue, type_: type[T]):
-        """Expect a constant value of a given type.
-
-        If the value is not a constant or the constant is not of the given type, raise
-        an `InterpreterError`.
-        """
-        hint = cls.maybe_const(value, type_)
-        if hint is None:
-            raise interp.InterpreterError(f"expected {type_}, got {hint}")
-        return hint

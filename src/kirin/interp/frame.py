@@ -91,7 +91,7 @@ class FrameABC(ABC, Generic[KeyType, ValueType]):
             keys(Iterable[KeyType]): The keys to set the values for.
             values(Iterable[ValueType]): The values.
         """
-        for key, value in zip(keys, values):
+        for key, value in zip(keys, values, strict=True):
             self.set(key, value)
 
 

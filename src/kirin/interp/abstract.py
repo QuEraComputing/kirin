@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass, field
 from typing import TypeVar, TypeAlias, overload
+from dataclasses import field, dataclass
 
 from kirin import ir
 from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
+from kirin.analysis.const.lattice import Value
 
 from .abc import InterpreterABC
 from .frame import Frame
 from .value import Successor, YieldValue, ReturnValue
+from .exceptions import InterpreterError
 
 ResultType = TypeVar("ResultType", bound=BoundedLattice)
 WorkListType = TypeVar("WorkListType", bound=WorkList[Successor])
@@ -75,6 +77,10 @@ class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
         cls.keys += ("abstract",)
         super().__init_subclass__()
 
+    def recursion_limit_reached(self) -> ResultType:
+        return self.lattice.bottom()
+
+    # helper methods
     @overload
     @staticmethod
     def join_results(old: None, new: None) -> None: ...
@@ -122,3 +128,28 @@ class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
             return tuple(old_val.join(new_val) for old_val, new_val in zip(old, new))
         else:
             return None
+
+    T = TypeVar("T")
+
+    @classmethod
+    def maybe_const(cls, value: ir.SSAValue, type_: type[T]) -> T | None:
+        """Get a constant value of a given type.
+
+        If the value is not a constant or the constant is not of the given type, return
+        `None`.
+        """
+        hint = value.hints.get("const")
+        if isinstance(hint, Value) and isinstance(hint.data, type_):
+            return hint.data
+
+    @classmethod
+    def expect_const(cls, value: ir.SSAValue, type_: type[T]):
+        """Expect a constant value of a given type.
+
+        If the value is not a constant or the constant is not of the given type, raise
+        an `InterpreterError`.
+        """
+        hint = cls.maybe_const(value, type_)
+        if hint is None:
+            raise InterpreterError(f"expected {type_}, got {hint}")
+        return hint

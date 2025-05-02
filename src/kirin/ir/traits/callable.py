@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
@@ -25,9 +26,13 @@ class CallableStmtInterface(StmtTrait, ABC, Generic[StmtType]):
         """Returns the body of the callable region"""
         ...
 
+    ValueType = TypeVar("ValueType")
+
     @classmethod
     @abstractmethod
-    def align_input_args(cls, stmt: "StmtType", *args, **kwargs) -> tuple:
+    def align_input_args(
+        cls, stmt: "StmtType", *args: ValueType, **kwargs: ValueType
+    ) -> tuple[ValueType, ...]:
         """Permute the arguments and keyword arguments of the statement
         to match the execution order of the callable region input.
         """

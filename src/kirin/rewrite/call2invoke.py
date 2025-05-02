@@ -23,7 +23,12 @@ class Call2Invoke(RewriteRule):
         if not isinstance(mt.data, ir.Method):
             return RewriteResult()
 
-        stmt = Invoke(inputs=node.inputs, callee=mt.data, kwargs=node.kwargs)
+        method = mt.data
+        trait = method.code.get_present_trait(ir.CallableStmtInterface)
+        inputs = trait.align_input_args(
+            method.code, *node.inputs, **dict(zip(node.keys, node.kwargs))
+        )
+        stmt = Invoke(inputs=inputs, callee=mt.data)
         for result, new_result in zip(node.results, stmt.results):
             new_result.name = result.name
             new_result.type = result.type

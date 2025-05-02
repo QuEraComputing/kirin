@@ -1,7 +1,6 @@
 """A function dialect that is compatible with python semantics."""
 
 from kirin.dialects.func import (
-    emit as emit,
     interp as interp,
     constprop as constprop,
     typeinfer as typeinfer,
@@ -15,5 +14,6 @@ from kirin.dialects.func.stmts import (
     Function as Function,
     GetField as GetField,
     ConstantNone as ConstantNone,
+    FuncOpCallableInterface as FuncOpCallableInterface,
 )
-from kirin.dialects.func.dialect import dialect as dialect
+from kirin.dialects.func._dialect import dialect as dialect

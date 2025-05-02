@@ -139,7 +139,7 @@ def disable_stracetrace():
 
 
 def print_stacktrace(exception: Exception, state: interp.InterpreterState):
-    frame: interp.FrameABC | None = state.current_frame
+    frame: interp.FrameABC | None = state._current_frame
     print(
         "==== Python stacktrace has been disabled for simplicity, set KIRIN_PYTHON_STACKTRACE=1 to enable it ===="
     )

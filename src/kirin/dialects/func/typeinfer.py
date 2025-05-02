@@ -1,4 +1,4 @@
-from typing import Iterable
+from __future__ import annotations
 
 from kirin import ir, types
 from kirin.interp import Frame, MethodTable, ReturnValue, impl
@@ -12,7 +12,7 @@ from kirin.dialects.func.stmts import (
     GetField,
     ConstantNone,
 )
-from kirin.dialects.func.dialect import dialect
+from kirin.dialects.func._dialect import dialect
 
 
 # NOTE: a lot of the type infer rules are same as the builtin dialect
@@ -35,20 +35,22 @@ class TypeInfer(MethodTable):
         return ReturnValue(frame.get(stmt.value))
 
     @impl(Call)
-    def call(self, interp: TypeInference, frame: Frame, stmt: Call):
+    def call(self, interp_: TypeInference, frame: Frame, stmt: Call):
         # give up on dynamic method calls
-        mt = interp.maybe_const(stmt.callee, ir.Method)
+        mt = interp_.maybe_const(stmt.callee, ir.Method)
         if mt is None:  # not a constant method
-            return self._solve_method_type(interp, frame, stmt)
-        return self._invoke_method(
-            interp,
-            frame,
-            mt,
-            stmt.args[1:],
-            interp.permute_values(
-                mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
-            ),
+            return self._solve_method_type(interp_, frame, stmt)
+
+        if mt.inferred:  # so we don't end up in infinite loop
+            return (mt.return_type,)
+
+        _, ret = interp_.call(
+            mt.code,
+            interp_.method_self(mt),
+            *frame.get_values(stmt.inputs),
+            **{k: v for k, v in zip(stmt.keys, frame.get_values(stmt.kwargs))},
         )
+        return (ret,)
 
     def _solve_method_type(self, interp: TypeInference, frame: Frame, stmt: Call):
         mt_inferred = frame.get(stmt.callee)
@@ -69,59 +71,24 @@ class TypeInfer(MethodTable):
 
     @impl(Invoke)
     def invoke(self, interp_: TypeInference, frame: Frame, stmt: Invoke):
-        inputs = frame.get_values(stmt.inputs)
-        args, kwargs = inputs[: len(stmt.kwargs)], inputs[len(stmt.kwargs) :]
+        if stmt.callee.inferred:  # so we don't end up in infinite loop
+            return (stmt.callee.return_type,)
 
-        interp_.call(
-            stmt.callee,
+        _, ret = interp_.call(
+            stmt.callee.code,
             interp_.method_self(stmt.callee),
-            *args,
-            **{k: v for k, v in zip(stmt.kwargs, kwargs)},
+            *frame.get_values(stmt.inputs),
         )
-        return self._invoke_method(
-            interp,
-            frame,
-            stmt.callee,
-            stmt.inputs,
-            interp.permute_values(
-                stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
-            ),
-        )
-
-    def _invoke_method(
-        self,
-        interp: TypeInference,
-        frame: Frame,
-        mt: ir.Method,
-        args: Iterable[ir.SSAValue],
-        kwargs: Iterable[str],
-        values: tuple[types.TypeAttribute, ...],
-    ):
-        if mt.inferred:  # so we don't end up in infinite loop
-            return (mt.return_type,)
-
-        # NOTE: narrowing the argument type based on method signature
-        inputs = tuple(
-            typ.meet(input_typ) for typ, input_typ in zip(mt.arg_types, values)
-        )
-
-        # NOTE: we use lower bound here because function call contains an
-        # implicit type check at call site. This will be validated either compile time
-        # or runtime.
-        # update the results with the narrowed types
-        frame.set_values(args, inputs)
-        interp.call(mt, *inputs)
-        _, ret = interp.run_method(mt, inputs)
         return (ret,)
 
     @impl(Lambda)
     def lambda_(
         self, interp_: TypeInference, frame: Frame[types.TypeAttribute], stmt: Lambda
     ):
-        body_frame, ret = interp_.run_callable(
+        body_frame, ret = interp_.call(
             stmt,
-            (types.MethodType,)
-            + tuple(arg.type for arg in stmt.body.blocks[0].args[1:]),
+            types.MethodType,
+            *tuple(arg.type for arg in stmt.body.blocks[0].args[1:]),
         )
         argtypes = tuple(arg.type for arg in stmt.body.blocks[0].args[1:])
         ret = types.MethodType[[*argtypes], ret]

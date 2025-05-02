@@ -12,5 +12,8 @@ class HintConst(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
         constprop = const.Propagate(self.dialects)
-        frame, _ = constprop.run_analysis(mt, no_raise=self.no_raise)
+        if self.no_raise:
+            frame, _ = constprop.run_no_raise(mt)
+        else:
+            frame, _ = constprop.run(mt)
         return Walk(WrapConst(frame)).rewrite(mt.code)

@@ -10,12 +10,12 @@ from typing import TYPE_CHECKING, TypeVar
 from dataclasses import dataclass
 
 from kirin.ir.ssa import SSAValue as SSAValue
-from kirin.interp.frame import FrameABC
 from kirin.ir.traits.abc import RegionGraph, RegionInterpretationTrait
 from kirin.ir.nodes.region import Region
 
 if TYPE_CHECKING:
     from kirin import ir
+    from kirin.interp.frame import FrameABC
 
 
 @dataclass(frozen=True)

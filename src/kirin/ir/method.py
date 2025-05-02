@@ -9,7 +9,7 @@ from dataclasses import field, dataclass
 from kirin.print.printer import Printer
 from kirin.print.printable import Printable
 
-from .traits import HasSignature, CallableStmtInterface
+from .traits import HasSignature, SymbolOpInterface, CallableStmtInterface
 from .exception import ValidationError
 from .nodes.stmt import Statement
 from .attrs.types import Generic
@@ -23,19 +23,64 @@ RetType = typing.TypeVar("RetType")
 
 @dataclass
 class Method(Printable, typing.Generic[Param, RetType]):
-    mod: ModuleType | None  # ref
-    py_func: typing.Callable[Param, RetType] | None  # ref
-    sym_name: str | None
-    arg_names: list[str]
     dialects: "DialectGroup"  # own
+    """The dialects that creates the method. This should be a DialectGroup."""
     code: Statement  # own, the corresponding IR, a func.func usually
+    """The code of the method. This should be a statement with CallableStmtInterface trait."""
+    nargs: int
+    """The number of arguments of the method. 0 if no arguments."""
+    mod: ModuleType | None = None  # ref
+    """The module where the method is defined. None if no module."""
+    py_func: typing.Callable[Param, RetType] | None = None  # ref
+    """The original Python function. None if no Python function."""
+    sym_name: str | None = None
+    """The name of the method. None if no name."""
+    arg_names: list[str] | None = None
+    """The argument names of the callable statement. None if no keyword arguments allowed."""
     # values contained if closure
     fields: tuple = field(default_factory=tuple)  # own
+    """values captured in the method if it is a closure."""
     file: str = ""
+    """The file where the method is defined. Empty string if no file."""
     lineno_begin: int = 0
+    """The line number where the method is defined. 0 if no line number."""
     inferred: bool = False
     """if typeinfer has been run on this method
     """
+
+    def __init__(
+        self,
+        dialects: DialectGroup,
+        code: Statement,
+        *,
+        nargs: int | None = None,
+        mod: ModuleType | None = None,
+        py_func: typing.Callable[Param, RetType] | None = None,
+        sym_name: str | None = None,
+        arg_names: list[str] | None = None,
+        fields: tuple = (),
+        file: str = "",
+        lineno_begin: int = 0,
+        inferred: bool = False,
+    ):
+        trait = code.get_present_trait(CallableStmtInterface)
+        region = trait.get_callable_region(code)
+        if sym_name is None and (symbol_trait := code.get_trait(SymbolOpInterface)):
+            sym_name = symbol_trait.get_sym_name(code).data
+
+        self.dialects = dialects
+        self.code = code
+        self.nargs = nargs if nargs is not None else len(region.blocks[0].args)
+        self.mod = mod
+        self.py_func = py_func
+        self.sym_name = sym_name
+        self.arg_names = arg_names or [
+            arg.name or f"arg{i}" for i, arg in enumerate(region.blocks[0].args)
+        ]
+        self.fields = fields
+        self.file = file
+        self.lineno_begin = lineno_begin
+        self.inferred = inferred
 
     def __hash__(self) -> int:
         return id(self)
@@ -43,8 +88,10 @@ class Method(Printable, typing.Generic[Param, RetType]):
     def __call__(self, *args: Param.args, **kwargs: Param.kwargs) -> RetType:
         from kirin.interp.concrete import Interpreter
 
-        if len(args) + len(kwargs) != len(self.arg_names) - 1:
-            raise ValueError("Incorrect number of arguments")
+        if len(args) + len(kwargs) != self.nargs - 1:
+            raise ValueError(
+                f"Incorrect number of arguments, expected {self.nargs - 1}, got {len(args) + len(kwargs)}"
+            )
         # NOTE: multi-return values will be wrapped in a tuple for Python
         interp = Interpreter(self.dialects)
         _, ret = interp.run(self, *args, **kwargs)
@@ -86,15 +133,17 @@ class Method(Printable, typing.Generic[Param, RetType]):
 
     def similar(self, dialects: typing.Optional["DialectGroup"] = None):
         return Method(
-            self.mod,
-            self.py_func,
-            self.sym_name,
-            self.arg_names,
-            dialects or self.dialects,
-            self.code.from_stmt(self.code, regions=[self.callable_region.clone()]),
-            self.fields,
-            self.file,
-            self.inferred,
+            dialects=dialects or self.dialects,
+            code=self.code.from_stmt(self.code, regions=[self.callable_region.clone()]),
+            nargs=self.nargs,
+            mod=self.mod,
+            py_func=self.py_func,
+            sym_name=self.sym_name,
+            arg_names=self.arg_names,
+            fields=self.fields,
+            file=self.file,
+            lineno_begin=self.lineno_begin,
+            inferred=self.inferred,
         )
 
     def verify(self) -> None:

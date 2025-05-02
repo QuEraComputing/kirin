@@ -97,4 +97,5 @@ class Registry:
                     if isinstance(member, BoundedDef):
                         for sig in member.signature:
                             registry[sig] = member
+                break
         return registry

@@ -5,7 +5,7 @@ from kirin.dialects.cf.dialect import dialect
 
 
 @dialect.register(key="abstract")
-class TypeInfer(MethodTable):
+class AbstractMethodTable(MethodTable):
 
     @impl(Branch)
     def branch(self, interp: TypeInference, frame: AbstractFrame, stmt: Branch):

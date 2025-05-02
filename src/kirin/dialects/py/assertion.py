@@ -15,7 +15,6 @@ import ast
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
-from kirin.emit import EmitStrFrame, julia
 from kirin.print import Printer
 
 dialect = ir.Dialect("py.assert")
@@ -77,14 +76,3 @@ class TypeInfer(interp.MethodTable):
     @interp.impl(Assert)
     def assert_stmt(self, interp, frame, stmt: Assert):
         return (types.Bottom,)
-
-
-@dialect.register(key="emit.julia")
-class EmitJulia(interp.MethodTable):
-
-    @interp.impl(Assert)
-    def emit_assert(self, interp: julia.EmitJulia, frame: EmitStrFrame, stmt: Assert):
-        interp.writeln(
-            frame, f"@assert {frame.get(stmt.condition)} {frame.get(stmt.message)}"
-        )
-        return ()

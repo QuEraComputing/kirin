@@ -39,4 +39,5 @@ from .undefined import (
 from .exceptions import (
     InterpreterError as InterpreterError,
     FuelExhaustedError as FuelExhaustedError,
+    StackOverflowError as StackOverflowError,
 )

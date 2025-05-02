@@ -2,7 +2,8 @@ from kirin import ir, types
 from kirin.interp import MethodTable, ReturnValue, StatementResult, impl
 from kirin.analysis import const
 from kirin.dialects.func.stmts import Call, Invoke, Lambda, Return, GetField
-from kirin.dialects.func.dialect import dialect
+
+from ._dialect import dialect
 
 
 @dialect.register(key="constprop")
@@ -21,12 +22,11 @@ class DialectConstProp(MethodTable):
         # give up on dynamic method calls
         callee = frame.get(stmt.callee)
         if isinstance(callee, const.PartialLambda):
-            call_frame, ret = interp.run_callable(
+            call_frame, ret = interp.call(
                 callee.code,
-                (callee,)
-                + interp.permute_values(
-                    callee.argnames, frame.get_values(stmt.inputs), stmt.kwargs
-                ),
+                callee,
+                *frame.get_values(stmt.inputs),
+                **{k: v for k, v in zip(stmt.keys, frame.get_values(stmt.kwargs))},
             )
             if not call_frame.frame_is_not_pure:
                 frame.should_be_pure.add(stmt)
@@ -36,11 +36,11 @@ class DialectConstProp(MethodTable):
             return (const.Result.bottom(),)
 
         mt: ir.Method = callee.data
-        call_frame, ret = interp.run_method(
-            mt,
-            interp.permute_values(
-                mt.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
-            ),
+        call_frame, ret = interp.call(
+            mt.code,
+            interp.method_self(mt),
+            *frame.get_values(stmt.inputs),
+            **{k: v for k, v in zip(stmt.keys, frame.get_values(stmt.kwargs))},
         )
         if not call_frame.frame_is_not_pure:
             frame.should_be_pure.add(stmt)
@@ -53,11 +53,10 @@ class DialectConstProp(MethodTable):
         frame: const.Frame,
         stmt: Invoke,
     ) -> StatementResult[const.Result]:
-        invoke_frame, ret = interp.run_method(
-            stmt.callee,
-            interp.permute_values(
-                stmt.callee.arg_names, frame.get_values(stmt.inputs), stmt.kwargs
-            ),
+        invoke_frame, ret = interp.call(
+            stmt.callee.code,
+            interp.method_self(stmt.callee),
+            *frame.get_values(stmt.inputs),
         )
         if not invoke_frame.frame_is_not_pure:
             frame.should_be_pure.add(stmt)
@@ -68,17 +67,10 @@ class DialectConstProp(MethodTable):
         self, interp: const.Propagate, frame: const.Frame, stmt: Lambda
     ) -> StatementResult[const.Result]:
         captured = frame.get_values(stmt.captured)
-        arg_names = [
-            arg.name or str(idx) for idx, arg in enumerate(stmt.body.blocks[0].args)
-        ]
         if stmt.body.blocks and types.is_tuple_of(captured, const.Value):
             return (
                 const.Value(
                     ir.Method(
-                        mod=None,
-                        py_func=None,
-                        sym_name=stmt.sym_name,
-                        arg_names=arg_names,
                         dialects=interp.dialects,
                         code=stmt,
                         fields=tuple(each.data for each in captured),
@@ -88,7 +80,6 @@ class DialectConstProp(MethodTable):
 
         return (
             const.PartialLambda(
-                arg_names,
                 stmt,
                 tuple(each for each in captured),
             ),

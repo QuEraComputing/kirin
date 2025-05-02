@@ -26,7 +26,18 @@ class Lowering(lowering.FromPythonAST):
     ) -> lowering.Result:
         source = state.source
         args, kwargs, keys = self.__lower_Call_args_kwargs(state, node)
-        stmt = func.Invoke(args, callee=method, kwargs=kwargs, keys=keys)
+        inputs: list[ir.SSAValue] = [*args]
+        kwargs_ = {k: v for k, v in zip(keys, kwargs)}
+
+        if method.arg_names is None and keys:
+            raise lowering.BuildError("method has no argument names, cannot use kwargs")
+
+        if method.arg_names and keys:
+            for name in method.arg_names:
+                if name in keys:
+                    inputs.append(kwargs_[name])
+
+        stmt = func.Invoke(args, callee=method)
         stmt.result.type = method.return_type or types.Any
         stmt.source = source
         return state.current_frame.push(stmt)

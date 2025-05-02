@@ -14,7 +14,6 @@ import ast
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
-from kirin.emit.julia import EmitJulia, EmitStrFrame
 
 dialect = ir.Dialect("py.boolop")
 
@@ -67,15 +66,3 @@ class BoolOpMethod(interp.MethodTable):
     @interp.impl(Or)
     def or_(self, interp, frame: interp.Frame, stmt: Or):
         return (frame.get(stmt.lhs) or frame.get(stmt.rhs),)
-
-
-@dialect.register(key="emit.julia")
-class JuliaTable(interp.MethodTable):
-
-    @interp.impl(And)
-    def emit_And(self, emit: EmitJulia, frame: EmitStrFrame, stmt: And):
-        return emit.emit_binaryop(frame, "&&", stmt.lhs, stmt.rhs, stmt.result)
-
-    @interp.impl(Or)
-    def emit_Or(self, emit: EmitJulia, frame: EmitStrFrame, stmt: Or):
-        return emit.emit_binaryop(frame, "||", stmt.lhs, stmt.rhs, stmt.result)

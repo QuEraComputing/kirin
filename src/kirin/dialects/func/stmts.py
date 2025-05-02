@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from types import MethodType as ClassMethodType, FunctionType
+from typing import TypeVar
 
 from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
-from kirin.dialects.func.attrs import Signature, MethodType
-from kirin.dialects.func.dialect import dialect
 
-from .._pprint_helper import pprint_calllike
+from .attrs import Signature, MethodType
+from ._dialect import dialect
 
 
 class FuncOpCallableInterface(ir.CallableStmtInterface["Function"]):
@@ -17,8 +17,12 @@ class FuncOpCallableInterface(ir.CallableStmtInterface["Function"]):
     def get_callable_region(cls, stmt: "Function") -> ir.Region:
         return stmt.body
 
+    ValueType = TypeVar("ValueType")
+
     @classmethod
-    def align_input_args(cls, stmt: Function, *args, **kwargs) -> tuple:
+    def align_input_args(
+        cls, stmt: Function, *args: ValueType, **kwargs: ValueType
+    ) -> tuple[ValueType, ...]:
         inputs = [*args]
         for name in stmt.slots:
             if name in kwargs:
@@ -36,6 +40,7 @@ class Function(ir.Statement):
             ir.HasSignature(),
             FuncOpCallableInterface(),
             ir.HasCFG(),
+            ir.SSACFG(),
         }
     )
     sym_name: str = info.attribute()
@@ -82,58 +87,6 @@ class Function(ir.Statement):
 
 
 @statement(dialect=dialect)
-class ConstantNone(ir.Statement):
-    """A constant None value.
-
-    This is mainly used to represent the None return value of a function
-    to match Python semantics.
-    """
-
-    name = "const.none"
-    traits = frozenset({ir.Pure(), ir.ConstantLike()})
-    result: ir.ResultValue = info.result(types.NoneType)
-
-
-@statement(dialect=dialect, init=False)
-class Return(ir.Statement):
-    name = "return"
-    traits = frozenset({ir.IsTerminator(), ir.HasParent((Function,))})
-    value: ir.SSAValue = info.argument()
-
-    def __init__(self, value_or_stmt: ir.SSAValue | ir.Statement | None = None) -> None:
-        if isinstance(value_or_stmt, ir.SSAValue):
-            args = [value_or_stmt]
-        elif isinstance(value_or_stmt, ir.Statement):
-            if len(value_or_stmt._results) == 1:
-                args = [value_or_stmt._results[0]]
-            else:
-                raise ValueError(
-                    f"expected a single result, got {len(value_or_stmt._results)} results from {value_or_stmt.name}"
-                )
-        elif value_or_stmt is None:
-            args = []
-        else:
-            raise ValueError(f"expected SSAValue or Statement, got {value_or_stmt}")
-
-        super().__init__(args=args, args_slice={"value": 0})
-
-    def print_impl(self, printer: Printer) -> None:
-        with printer.rich(style="keyword"):
-            printer.print_name(self)
-
-        if self.args:
-            printer.plain_print(" ")
-            printer.print_seq(self.args, delim=", ")
-
-    def check(self) -> None:
-        assert self.args, "return statement must have at least one value"
-        assert len(self.args) <= 1, (
-            "return statement must have at most one value"
-            ", wrap multiple values in a tuple"
-        )
-
-
-@statement(dialect=dialect)
 class Lambda(ir.Statement):
     name = "lambda"
     traits = frozenset(
@@ -143,6 +96,7 @@ class Lambda(ir.Statement):
             ir.SymbolOpInterface(),
             FuncOpCallableInterface(),
             ir.HasCFG(),
+            ir.SSACFG(),
         }
     )
     sym_name: str = info.attribute()
@@ -198,6 +152,58 @@ class GetField(ir.Statement):
 
 
 @statement(dialect=dialect)
+class ConstantNone(ir.Statement):
+    """A constant None value.
+
+    This is mainly used to represent the None return value of a function
+    to match Python semantics.
+    """
+
+    name = "const.none"
+    traits = frozenset({ir.Pure(), ir.ConstantLike()})
+    result: ir.ResultValue = info.result(types.NoneType)
+
+
+@statement(dialect=dialect, init=False)
+class Return(ir.Statement):
+    name = "return"
+    traits = frozenset({ir.IsTerminator(), ir.HasParent((Function,))})
+    value: ir.SSAValue = info.argument()
+
+    def __init__(self, value_or_stmt: ir.SSAValue | ir.Statement | None = None) -> None:
+        if isinstance(value_or_stmt, ir.SSAValue):
+            args = [value_or_stmt]
+        elif isinstance(value_or_stmt, ir.Statement):
+            if len(value_or_stmt._results) == 1:
+                args = [value_or_stmt._results[0]]
+            else:
+                raise ValueError(
+                    f"expected a single result, got {len(value_or_stmt._results)} results from {value_or_stmt.name}"
+                )
+        elif value_or_stmt is None:
+            args = []
+        else:
+            raise ValueError(f"expected SSAValue or Statement, got {value_or_stmt}")
+
+        super().__init__(args=args, args_slice={"value": 0})
+
+    def print_impl(self, printer: Printer) -> None:
+        with printer.rich(style="keyword"):
+            printer.print_name(self)
+
+        if self.args:
+            printer.plain_print(" ")
+            printer.print_seq(self.args, delim=", ")
+
+    def check(self) -> None:
+        assert self.args, "return statement must have at least one value"
+        assert len(self.args) <= 1, (
+            "return statement must have at most one value"
+            ", wrap multiple values in a tuple"
+        )
+
+
+@statement(dialect=dialect)
 class Call(ir.Statement):
     name = "call"
     traits = frozenset({ir.MaybePure()})
@@ -210,7 +216,27 @@ class Call(ir.Statement):
     purity: bool = info.attribute(default=False)
 
     def print_impl(self, printer: Printer) -> None:
-        pprint_calllike(self, printer.state.ssa_id[self.callee], printer)
+        with printer.rich(style="red"):
+            printer.print_name(self)
+        printer.plain_print(" ")
+        printer.plain_print(printer.state.ssa_id[self.callee])
+
+        printer.plain_print("(")
+        printer.print_seq(self.inputs, delim=", ")
+        if self.kwargs and self.inputs:
+            printer.plain_print(", ")
+
+        kwargs = dict(zip(self.keys, self.kwargs))
+        printer.print_mapping(kwargs, delim=", ")
+        printer.plain_print(")")
+
+        with printer.rich(style="comment"):
+            printer.plain_print(" : ")
+            printer.print_seq(
+                [result.type for result in self._results],
+                delim=", ",
+            )
+            printer.plain_print(f" maybe_pure={self.purity}")
 
     def check_type(self) -> None:
         if not self.callee.type.is_subseteq(types.MethodType):
@@ -245,21 +271,29 @@ class Invoke(ir.Statement):
     traits = frozenset({ir.MaybePure()})
     callee: ir.Method = info.attribute()
     inputs: tuple[ir.SSAValue, ...] = info.argument()
-    kwargs: tuple[ir.SSAValue, ...] = info.argument()
-    keys: tuple[str, ...] = info.attribute(default=())
     result: ir.ResultValue = info.result()
     purity: bool = info.attribute(default=False)
 
     def print_impl(self, printer: Printer) -> None:
-        pprint_calllike(self, self.callee.sym_name, printer)
+        with printer.rich(style="red"):
+            printer.print_name(self)
+        printer.plain_print(" ")
+        printer.plain_print(self.callee.sym_name)
+
+        printer.plain_print("(")
+        printer.print_seq(self.inputs, delim=", ")
+        printer.plain_print(")")
+
+        with printer.rich(style="comment"):
+            printer.plain_print(" : ")
+            printer.print_seq(
+                [result.type for result in self._results],
+                delim=", ",
+            )
+            printer.plain_print(f" maybe_pure={self.purity}")
 
     def check(self) -> None:
-        if self.kwargs:
-            for name in self.kwargs:
-                assert (
-                    name in self.callee.arg_names
-                ), f"method {self.callee.sym_name} does not have argument {name}"
-        elif len(self.callee.arg_names) - 1 != len(self.args):
+        if self.callee.nargs - 1 != len(self.args):
             raise ValueError(
-                f"expected {len(self.callee.arg_names)} arguments, got {len(self.args)}"
+                f"expected {self.callee.nargs - 1} arguments, got {len(self.args)}"
             )

@@ -21,7 +21,7 @@ class Trait(ABC, Generic[IRNodeType]):
 
 
 @dataclass(frozen=True)
-class AttrTrait(Trait[ir.Attribute]):
+class AttrTrait(Trait["ir.Attribute"]):
     """Base class for all attribute traits."""
 
     def verify(self, node: ir.Attribute):
@@ -29,7 +29,7 @@ class AttrTrait(Trait[ir.Attribute]):
 
 
 @dataclass(frozen=True)
-class StmtTrait(Trait[ir.Statement], ABC):
+class StmtTrait(Trait["ir.Statement"], ABC):
     """Base class for all statement traits."""
 
     def verify(self, node: ir.Statement):
@@ -58,8 +58,8 @@ class RegionInterpretationTrait(StmtTrait):
 
     ValueType = TypeVar("ValueType")
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def set_region_input(
         cls,
         frame: interp.FrameABC[ir.SSAValue, ValueType],

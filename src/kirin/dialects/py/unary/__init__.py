@@ -14,7 +14,6 @@ This dialect maps `ast.UnaryOp` nodes to the `UAdd`, `USub`, `Not`, and `Invert`
 """
 
 from . import (
-    julia as julia,
     interp as interp,
     lowering as lowering,
     constprop as constprop,

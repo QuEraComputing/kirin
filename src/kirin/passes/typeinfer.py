@@ -25,9 +25,11 @@ class TypeInfer(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
         result = self.hint_const.unsafe_run(mt)
-        frame, return_type = self.infer.run_analysis(
-            mt, mt.arg_types, no_raise=self.no_raise
-        )
+        if self.no_raise:
+            frame, return_type = self.infer.run_no_raise(mt, *mt.arg_types)
+        else:
+            frame, return_type = self.infer.run(mt, *mt.arg_types)
+
         if trait := mt.code.get_trait(HasSignature):
             trait.set_signature(mt.code, Signature(mt.arg_types, return_type))
 

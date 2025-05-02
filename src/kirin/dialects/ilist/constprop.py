@@ -17,7 +17,7 @@ class ConstPropMethods(MethodTable):
         method_code: ir.Statement,
         args: tuple[const.Result, ...],
     ):
-        method_frame, _ = constprop.run_callable(method_code, args)
+        method_frame, _ = constprop.call(method_code, *args)
         if not method_frame.frame_is_not_pure:
             frame.should_be_pure.add(stmt)
 

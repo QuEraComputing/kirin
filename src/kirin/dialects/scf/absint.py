@@ -1,4 +1,8 @@
-from kirin import ir, interp
+from __future__ import annotations
+
+from typing import TypeVar
+
+from kirin import ir, interp, lattice
 from kirin.analysis import const
 from kirin.dialects import func
 
@@ -43,10 +47,13 @@ class Methods(interp.MethodTable):
             case _:
                 return interp_.join_results(then_results, else_results)
 
+    FrameType = TypeVar("FrameType", bound=interp.AbstractFrame)
+    ValueType = TypeVar("ValueType", bound=lattice.BoundedLattice)
+
     def _infer_if_else_cond(
         self,
-        interp_: interp.AbstractInterpreter,
-        frame: interp.AbstractFrame,
+        interp_: interp.AbstractInterpreter[FrameType, ValueType],
+        frame: FrameType,
         stmt: IfElse,
         body: ir.Region,
     ):
@@ -55,8 +62,4 @@ class Methods(interp.MethodTable):
         if isinstance(body_term, func.Return):
             frame.worklist.append(interp.Successor(body_block, frame.get(stmt.cond)))
             return
-
-        with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
-            ret = interp_.run_ssacfg_region(body_frame, body, (frame.get(stmt.cond),))
-            frame.entries.update(body_frame.entries)
-        return ret
+        return interp_.frame_call_region(frame, stmt, body, frame.get(stmt.cond))

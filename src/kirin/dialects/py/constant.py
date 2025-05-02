@@ -16,7 +16,6 @@ from typing import Generic, TypeVar
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
-from kirin.emit.julia import EmitJulia, EmitStrFrame
 
 dialect = ir.Dialect("py.constant")
 
@@ -74,11 +73,3 @@ class Concrete(interp.MethodTable):
     @interp.impl(Constant)
     def constant(self, interp, frame: interp.Frame, stmt: Constant):
         return (stmt.value.unwrap(),)
-
-
-@dialect.register(key="emit.julia")
-class JuliaTable(interp.MethodTable):
-
-    @interp.impl(Constant)
-    def emit_Constant(self, emit: EmitJulia, frame: EmitStrFrame, stmt: Constant):
-        return (emit.emit_attribute(frame, stmt.value),)

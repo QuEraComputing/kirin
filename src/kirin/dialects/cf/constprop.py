@@ -5,7 +5,7 @@ from kirin.dialects.cf.dialect import dialect
 
 
 @dialect.register(key="constprop")
-class DialectConstProp(MethodTable):
+class ConstPropMethodTable(MethodTable):
 
     @impl(Branch)
     def branch(self, interp: const.Propagate, frame: const.Frame, stmt: Branch):

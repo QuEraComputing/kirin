@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Iterable, TypeVar
+from typing import TypeVar, Iterable
 from dataclasses import dataclass
 
 from kirin import ir, interp, lattice
@@ -35,19 +35,23 @@ class ForwardExtra(interp.AbstractInterpreter[FrameType, LatticeType], ABC):
         LatticeType: The type of the lattice used for the analysis.
     """
 
-    def run(self, method: ir.Method, *args, **kwargs):
+    def run(self, method: ir.Method, *args: LatticeType, **kwargs: LatticeType):
+        if not args and not kwargs:  # empty args and kwargs
+            args = tuple(self.lattice.top() for _ in method.args)
         return self.call(method, self.method_self(method), *args, **kwargs)
 
-    def run_no_raise(self, method: ir.Method, *args, **kwargs):
+    def run_no_raise(
+        self, method: ir.Method, *args: LatticeType, **kwargs: LatticeType
+    ):
         try:
             return self.run(method, *args, **kwargs)
         except Exception:
-            return self.state.current_frame, self.lattice.bottom()
+            return self.initialize_frame(method.code), self.lattice.bottom()
 
     @abstractmethod
     def method_self(self, method: ir.Method) -> LatticeType:
         """Return the self value for the given method."""
-        return self.lattice.top()
+        ...
 
 
 @dataclass

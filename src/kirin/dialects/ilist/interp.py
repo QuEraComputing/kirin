@@ -25,13 +25,13 @@ class IListInterpreter(MethodTable):
 
     @impl(Add, types.PyClass(IList), types.PyClass(IList))
     def add(self, interp, frame: Frame, stmt: Add):
-        lhs, rhs = frame.get(stmt.lhs), frame.get(stmt.rhs)
-        return (IList(lhs.data + rhs.data, elem=lhs.elem.join(rhs.elem)),)
+        lhs, rhs = frame.get_casted(stmt.lhs, IList), frame.get_casted(stmt.rhs, IList)
+        return (IList([*lhs.data, *rhs.data], elem=lhs.elem.join(rhs.elem)),)
 
     @impl(Push)
     def push(self, interp, frame: Frame, stmt: Push):
-        lst = frame.get(stmt.lst)
-        return (IList(lst.data + [frame.get(stmt.value)], elem=lst.elem),)
+        lst = frame.get_casted(stmt.lst, IList)
+        return (IList([*lst.data, frame.get(stmt.value)], elem=lst.elem),)
 
     @impl(Map)
     def map(self, interp: Interpreter, frame: Frame, stmt: Map):
@@ -40,7 +40,7 @@ class IListInterpreter(MethodTable):
         ret = []
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            _, item = interp.run_method(fn, (elem,))
+            _, item = interp.call(fn.code, fn, elem)
             ret.append(item)
         return (IList(ret, elem=fn.return_type),)
 
@@ -54,7 +54,7 @@ class IListInterpreter(MethodTable):
         ys = []
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            _, (carry, y) = interp.run_method(fn, (carry, elem))
+            _, (carry, y) = interp.call(fn.code, fn, carry, elem)
             ys.append(y)
 
         if (
@@ -68,11 +68,15 @@ class IListInterpreter(MethodTable):
 
     @impl(Foldr)
     def foldr(self, interp: Interpreter, frame: Frame, stmt: Foldr):
-        return self.fold(interp, frame, stmt, reversed(frame.get(stmt.collection).data))
+        return self.fold(
+            interp, frame, stmt, reversed(frame.get_casted(stmt.collection, IList).data)
+        )
 
     @impl(Foldl)
     def foldl(self, interp: Interpreter, frame: Frame, stmt: Foldl):
-        return self.fold(interp, frame, stmt, frame.get(stmt.collection).data)
+        return self.fold(
+            interp, frame, stmt, frame.get_casted(stmt.collection, IList).data
+        )
 
     def fold(self, interp: Interpreter, frame: Frame, stmt: Foldr | Foldl, coll):
         fn: ir.Method = frame.get(stmt.fn)
@@ -81,7 +85,7 @@ class IListInterpreter(MethodTable):
         acc = init
         for elem in coll:
             # NOTE: assume fn has been type checked
-            _, acc = interp.run_method(fn, (acc, elem))
+            _, acc = interp.call(fn.code, fn, acc, elem)
         return (acc,)
 
     @impl(ForEach)
@@ -90,5 +94,5 @@ class IListInterpreter(MethodTable):
         coll: IList = frame.get(stmt.collection)
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            interp.run_method(fn, (elem,))
+            interp.call(fn.code, fn, elem)
         return (None,)

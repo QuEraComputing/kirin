@@ -145,11 +145,11 @@ def recurse():
 
 def test_constprop():
     infer = const.Propagate(basic_no_opt)
-    frame, ret = infer.run_analysis(main)
+    frame, ret = infer.run(main)
     assert ret == const.Value((3, 4))
     assert len(frame.entries) == 3
 
-    frame, ret = infer.run_analysis(goo)
+    frame, ret = infer.run(goo)
     assert ret == const.PartialTuple((const.Value(3), const.Unknown()))
     assert len(frame.entries) == 6
     block = goo.callable_region.blocks[0]
@@ -159,12 +159,12 @@ def test_constprop():
         (const.Value(3), const.Unknown())
     )
 
-    _, ret = infer.run_analysis(bar)
+    _, ret = infer.run(bar)
     assert ret == const.Value(3)
 
-    _, ret = infer.run_analysis(foo)
+    _, ret = infer.run(foo)
     assert ret == const.Unknown()
-    _, ret = infer.run_analysis(recurse)
+    _, ret = infer.run(recurse)
     assert ret == const.Value((0, 0, 0))
 
 
@@ -193,13 +193,11 @@ def _for_loop_test_constp(
 
 def test_issue_40():
     constprop = const.Propagate(basic_no_opt)
-    frame, ret = constprop.run_analysis(
+    frame, ret = constprop.run(
         _for_loop_test_constp,
-        (
-            const.Value(0),
-            const.Value(()),
-            const.Value(5),
-        ),
+        const.Value(0),
+        const.Value(()),
+        const.Value(5),
     )
     assert isinstance(ret, const.Value)
     assert ret.data == _for_loop_test_constp(cntr=0, x=(), n_range=5)
@@ -229,7 +227,7 @@ def test_intraprocedure_side_effect():
             return x
 
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
-    frame, ret = constprop.run_analysis(side_effect_intraprocedure)
+    frame, ret = constprop.run(side_effect_intraprocedure)
     new_tuple = (
         side_effect_intraprocedure.callable_region.blocks[2].stmts.at(3).results[0]
     )
@@ -254,7 +252,7 @@ def test_interprocedure_true_branch():
             return cond
 
     constprop = const.Propagate(basic_no_opt.add(dummy_dialect))
-    frame, ret = constprop.run_analysis(side_effect_true_branch_const)
+    frame, ret = constprop.run(side_effect_true_branch_const)
     assert isinstance(ret, const.Unknown)  # instead of NotPure
     true_branch = side_effect_true_branch_const.callable_region.blocks[1]
     assert frame.entries[true_branch.stmts.at(0).results[0]] == const.Value(None)
@@ -269,7 +267,7 @@ def test_non_pure_recursion():
         return x
 
     constprop = const.Propagate(basic_no_opt)
-    frame, _ = constprop.run_analysis(for_loop_append)
+    frame, _ = constprop.run(for_loop_append)
     stmt = for_loop_append.callable_region.blocks[1].stmts.at(3)
     assert isinstance(frame.entries[stmt.results[0]], const.Unknown)
 
@@ -312,7 +310,7 @@ def test_closure_prop():
         return x()
 
     constprop = const.Propagate(basic_no_opt.add(dialect))
-    frame, ret = constprop.run_analysis(main)
+    frame, ret = constprop.run(main)
     main.print(analysis=frame.entries)
     stmt = main.callable_region.blocks[0].stmts.at(3)
     call_result = frame.entries[stmt.results[0]]
@@ -326,7 +324,7 @@ def test_closure_prop():
         return x()
 
     constprop = const.Propagate(basic_no_opt.add(dialect))
-    frame, _ = constprop.run_analysis(main2)
+    frame, _ = constprop.run(main2)
     main2.print(analysis=frame.entries)
     stmt = main2.callable_region.blocks[0].stmts.at(3)
     call_result = frame.entries[stmt.results[0]]
@@ -347,7 +345,7 @@ def test_issue_300():
         return my_ps_impl()
 
     prop = const.Propagate(basic_no_opt)
-    frame, ret = prop.run_analysis(my_ps2)
+    frame, ret = prop.run(my_ps2)
     invoke = my_ps2.callable_region.blocks[0].stmts.at(0)
     call = my_ps2.callable_region.blocks[0].stmts.at(1)
     assert invoke in frame.should_be_pure

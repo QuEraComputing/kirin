@@ -1,3 +1,4 @@
+from typing import final
 from dataclasses import field, dataclass
 
 from kirin import ir, types, interp
@@ -14,6 +15,7 @@ class Frame(ForwardFrame[Result]):
     """If we hit any non-pure statement."""
 
 
+@final
 @dataclass
 class Propagate(ForwardExtra[Frame, Result]):
     """Forward dataflow analysis for constant propagation.
@@ -56,6 +58,38 @@ class Propagate(ForwardExtra[Frame, Result]):
     ) -> Frame:
         return Frame(node, has_parent_access=has_parent_access)
 
+    def method_self(self, method: ir.Method) -> Result:
+        return Value(method)
+
+    def frame_eval(
+        self, frame: Frame, node: ir.Statement
+    ) -> interp.StatementResult[Result]:
+        method = self.lookup_registry(frame, node)
+        if method is None:
+            if node.has_trait(ir.ConstantLike):
+                return self.try_eval_const_pure(frame, node, ())
+            elif node.has_trait(ir.Pure):
+                values = frame.get_values(node.args)
+                if types.is_tuple_of(values, Value):
+                    return self.try_eval_const_pure(frame, node, values)
+
+            if node.has_trait(ir.Pure):
+                return (Unknown(),)  # no implementation but pure
+            # not pure, and no implementation, let's say it's not pure
+            frame.frame_is_not_pure = True
+            return (Unknown(),)
+
+        ret = method(self, frame, node)
+        if node.has_trait(ir.IsTerminator) or node.has_trait(ir.Pure):
+            return ret
+        elif not node.has_trait(ir.MaybePure):  # cannot be pure at all
+            frame.frame_is_not_pure = True
+        elif (
+            node not in frame.should_be_pure
+        ):  # implementation cannot decide if it's pure
+            frame.frame_is_not_pure = True
+        return ret
+
     def try_eval_const_pure(
         self,
         frame: Frame,
@@ -81,37 +115,3 @@ class Propagate(ForwardExtra[Frame, Result]):
                     block,
                     *tuple(Value(each) for each in args),
                 )
-
-    def eval_stmt(
-        self, frame: Frame, stmt: ir.Statement
-    ) -> interp.StatementResult[Result]:
-        method = self.lookup_registry(frame, stmt)
-        if method is None:
-            if stmt.has_trait(ir.ConstantLike):
-                return self.try_eval_const_pure(frame, stmt, ())
-            elif stmt.has_trait(ir.Pure):
-                values = frame.get_values(stmt.args)
-                if types.is_tuple_of(values, Value):
-                    return self.try_eval_const_pure(frame, stmt, values)
-
-            if stmt.has_trait(ir.Pure):
-                return (Unknown(),)  # no implementation but pure
-            # not pure, and no implementation, let's say it's not pure
-            frame.frame_is_not_pure = True
-            return (Unknown(),)
-
-        ret = method(self, frame, stmt)
-        if stmt.has_trait(ir.IsTerminator) or stmt.has_trait(ir.Pure):
-            return ret
-        elif not stmt.has_trait(ir.MaybePure):  # cannot be pure at all
-            frame.frame_is_not_pure = True
-        elif (
-            stmt not in frame.should_be_pure
-        ):  # implementation cannot decide if it's pure
-            frame.frame_is_not_pure = True
-        return ret
-
-    def run_method(
-        self, method: ir.Method, args: tuple[Result, ...]
-    ) -> tuple[Frame, Result]:
-        return self.run_callable(method.code, (Value(method),) + args)

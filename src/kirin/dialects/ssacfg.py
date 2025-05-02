@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TypeVar
+
 from kirin import ir, interp, lattice
 
 dialect = ir.Dialect("ssacfg")
@@ -51,11 +52,10 @@ class Abstract(interp.MethodTable):
             interp.Successor(node.blocks[0], *frame.get_values(node.blocks[0].args))
         )
         while (succ := frame.worklist.pop()) is not None:
-            if succ.block in frame.visited:
-                if succ in frame.visited[succ.block]:
-                    continue
-            else:
-                frame.visited[succ.block] = set()
+            visited = frame.visited.setdefault(succ.block, set())
+            if succ in visited:
+                continue
+
             block_result = self.run_succ(interp_, frame, succ)
             if len(frame.visited[succ.block]) < 128:
                 frame.visited[succ.block].add(succ)

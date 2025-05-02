@@ -7,7 +7,7 @@ from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group
 from kirin.passes import Default
-from kirin.dialects import cf, scf, func, math, ilist, lowering
+from kirin.dialects import cf, scf, func, math, ilist, ssacfg, lowering
 from kirin.dialects.py import (
     cmp,
     len,
@@ -30,6 +30,7 @@ from kirin.dialects.py import (
 
 @dialect_group(
     [
+        ssacfg,
         base,
         binop,
         cmp,

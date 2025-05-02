@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from kirin import ir, interp
+from kirin import interp
 from kirin.analysis import const
 from kirin.dialects import func
 
@@ -37,22 +37,27 @@ class DialectConstProp(interp.MethodTable):
                 body = stmt.then_body
             else:
                 body = stmt.else_body
-            body_frame, ret = self._prop_const_cond_ifelse(
-                interp_, frame, stmt, cond, body
-            )
+
+            with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+                ret = interp_.frame_call_region(body_frame, stmt, body, cond)
             frame.entries.update(body_frame.entries)
+
             if not body_frame.frame_is_not_pure and not isinstance(
                 body.blocks[0].last_stmt, func.Return
             ):
                 frame.should_be_pure.add(stmt)
             return ret
         else:
-            then_frame, then_results = self._prop_const_cond_ifelse(
-                interp_, frame, stmt, const.Value(True), stmt.then_body
-            )
-            else_frame, else_results = self._prop_const_cond_ifelse(
-                interp_, frame, stmt, const.Value(False), stmt.else_body
-            )
+            with interp_.new_frame(stmt, has_parent_access=True) as then_frame:
+                then_results = interp_.frame_call_region(
+                    then_frame, stmt, stmt.then_body, const.Value(True)
+                )
+
+            with interp_.new_frame(stmt, has_parent_access=True) as else_frame:
+                else_results = interp_.frame_call_region(
+                    else_frame, stmt, stmt.else_body, const.Value(False)
+                )
+
             # NOTE: then_frame and else_frame do not change
             # parent frame variables value except cond
             frame.entries.update(then_frame.entries)
@@ -74,18 +79,6 @@ class DialectConstProp(interp.MethodTable):
                     frame.should_be_pure.add(stmt)
                 ret = interp_.join_results(then_results, else_results)
         return ret
-
-    def _prop_const_cond_ifelse(
-        self,
-        interp_: const.Propagate,
-        frame: const.Frame,
-        stmt: IfElse,
-        cond: const.Value,
-        body: ir.Region,
-    ):
-        with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
-            results = interp_.run_ssacfg_region(body_frame, body, (cond,))
-            return body_frame, results
 
     @interp.impl(For)
     def for_loop(
@@ -117,8 +110,8 @@ class DialectConstProp(interp.MethodTable):
 
         for value in iterable.data:
             with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
-                loop_vars = interp_.run_ssacfg_region(
-                    body_frame, stmt.body, (const.Value(value),) + loop_vars
+                loop_vars = interp_.frame_call_region(
+                    body_frame, stmt, stmt.body, const.Value(value), *loop_vars
                 )
 
             if body_frame.frame_is_not_pure:

@@ -8,22 +8,21 @@ if TYPE_CHECKING:
 
 
 def pprint_calllike(
-    invoke_or_call: "Statement", callee: str, printer: "Printer"
+    invoke_or_call: "Statement", callee: str | None, printer: "Printer"
 ) -> None:
     with printer.rich(style="red"):
         printer.print_name(invoke_or_call)
     printer.plain_print(" ")
 
     n_total = len(invoke_or_call.args)
-    printer.plain_print(callee)
+    printer.plain_print(callee or "<unknown>")
     if (inputs := getattr(invoke_or_call, "inputs", None)) is None:
         raise ValueError(f"{invoke_or_call} does not have inputs")
 
     if not isinstance(inputs, tuple):
         raise ValueError(f"inputs of {invoke_or_call} is not a tuple")
 
-    if (kwargs := getattr(invoke_or_call, "kwargs", None)) is None:
-        raise ValueError(f"{invoke_or_call} does not have kwargs")
+    kwargs = getattr(invoke_or_call, "kwargs", None)
 
     if not isinstance(kwargs, tuple):
         raise ValueError(f"kwargs of {invoke_or_call} is not a tuple")

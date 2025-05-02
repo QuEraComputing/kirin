@@ -167,9 +167,23 @@ class PartialLambda(PartialConst):
     This represents a closure with captured variables.
     """
 
-    argnames: list[str]
     code: ir.Statement
     captured: tuple[Result, ...]
+    argnames: list[str]
+
+    def __init__(
+        self,
+        code: ir.Statement,
+        captured: tuple[Result, ...],
+        argnames: list[str] | None = None,
+    ):
+        trait = code.get_present_trait(ir.CallableStmtInterface)
+        region = trait.get_callable_region(code)
+        self.argnames = argnames or [
+            arg.name or f"arg_{idx}" for idx, arg in enumerate(region.blocks[0].args)
+        ]
+        self.code = code
+        self.captured = captured
 
     def __hash__(self) -> int:
         return hash((self.argnames, self.code, self.captured))
@@ -196,9 +210,9 @@ class PartialLambda(PartialConst):
             return self.bottom()  # err
 
         return PartialLambda(
-            self.argnames,
             self.code,
             tuple(x.join(y) for x, y in zip(self.captured, other.captured)),
+            self.argnames,
         )
 
     def meet(self, other: Result) -> Result:
@@ -212,7 +226,7 @@ class PartialLambda(PartialConst):
             return Unknown()
 
         return PartialLambda(
-            self.argnames,
             self.code,
             tuple(x.meet(y) for x, y in zip(self.captured, other.captured)),
+            self.argnames,
         )

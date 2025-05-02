@@ -208,15 +208,17 @@ class DialectGroup(Generic[PassParams]):
                 file = call_site_frame.f_code.co_filename
 
             code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
+            arg_names = ["#self#"] + inspect.getfullargspec(py_func).args
             mt = Method(
+                dialects=self,
+                code=code,
+                nargs=len(arg_names),
                 mod=inspect.getmodule(py_func),
                 py_func=py_func,
                 sym_name=py_func.__name__,
-                arg_names=["#self#"] + inspect.getfullargspec(py_func).args,
-                dialects=self,
-                code=code,
-                lineno_begin=lineno_offset,
+                arg_names=arg_names,
                 file=file,
+                lineno_begin=lineno_offset,
             )
             if doc := inspect.getdoc(py_func):
                 mt.__doc__ = doc

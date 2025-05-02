@@ -17,7 +17,6 @@ import ast
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.analysis import const
-from kirin.emit.julia import EmitJulia, EmitStrFrame
 from kirin.dialects.eltype import ElType
 from kirin.dialects.py.binop import Add
 
@@ -90,16 +89,4 @@ class Lowering(lowering.FromPythonAST):
     def lower_Tuple(self, state: lowering.State, node: ast.Tuple) -> lowering.Result:
         return state.current_frame.push(
             New(tuple(state.lower(elem).expect_one() for elem in node.elts))
-        )
-
-
-@dialect.register(key="emit.julia")
-class JuliaTable(interp.MethodTable):
-
-    @interp.impl(New)
-    def emit_NewTuple(self, emit: EmitJulia, frame: EmitStrFrame, stmt: New):
-        return (
-            emit.write_assign(
-                frame, stmt.result, "(" + ", ".join(frame.get_values(stmt.args)) + ")"
-            ),
         )
