@@ -113,7 +113,6 @@
     * [interp](kirin/interp/index.md)
         * [abc](kirin/interp/abc.md)
         * [abstract](kirin/interp/abstract.md)
-        * [base](kirin/interp/base.md)
         * [concrete](kirin/interp/concrete.md)
         * [exceptions](kirin/interp/exceptions.md)
         * [frame](kirin/interp/frame.md)
