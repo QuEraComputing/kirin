@@ -99,7 +99,7 @@ class Propagate(ForwardExtra[Frame, Result]):
             # it should return the number of Unknowns equal to each result
             if stmt.has_trait(ir.Pure):
                 return tuple(
-                    [Unknown() for result in stmt.results]
+                    Unknown() for result in stmt.results
                 )  # no implementation but pure
             # not pure, and no implementation, let's say it's not pure
             frame.frame_is_not_pure = True
