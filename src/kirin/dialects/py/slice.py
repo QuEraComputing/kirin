@@ -13,7 +13,6 @@ from dataclasses import dataclass
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
-from kirin.analysis import const
 from kirin.print.printer import Printer
 from kirin.dialects.py.constant import Constant
 
@@ -64,20 +63,6 @@ class Slice(ir.Statement):
         )
 
 
-@dialect.register
-class Concrete(interp.MethodTable):
-
-    @interp.impl(Slice)
-    def _slice(self, interp, frame: interp.Frame, stmt: Slice):
-        start, stop, step = frame.get_values(stmt.args)
-        if start is None and step is None:
-            return (slice(stop),)
-        elif step is None:
-            return (slice(start, stop),)
-        else:
-            return (slice(start, stop, step),)
-
-
 @dataclass
 class SliceAttribute(ir.Data[slice]):
 
@@ -105,21 +90,18 @@ class SliceAttribute(ir.Data[slice]):
         return printer.plain_print(f"slice({self.start}, {self.stop}, {self.step})")
 
 
-@dialect.register(key="constprop")
-class ConstProp(interp.MethodTable):
+@dialect.register
+class Concrete(interp.MethodTable):
 
     @interp.impl(Slice)
-    def _slice_const_prop(self, interp, frame: interp.Frame, stmt: Slice):
+    def _slice(self, interp, frame: interp.Frame, stmt: Slice):
         start, stop, step = frame.get_values(stmt.args)
-        match (start, stop, step):
-            case (
-                const.Value(start_data),
-                const.Value(stop_data),
-                const.Value(step_data),
-            ):
-                return (const.Value(SliceAttribute(start_data, stop_data, step_data)),)
-            case _:
-                return (const.Unknown(),)
+        if start is None and step is None:
+            return (SliceAttribute(None, stop, None),)
+        elif step is None:
+            return (SliceAttribute(start, stop, None),)
+        else:
+            return (SliceAttribute(start, stop, step),)
 
 
 @dialect.register
