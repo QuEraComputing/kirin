@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
+from dataclasses import dataclass
 
 from kirin import ir
 
 from .abc import InterpreterABC
 from .frame import Frame
 
+
 @dataclass
 class Interpreter(InterpreterABC[Frame[Any], Any]):
     keys = ("main",)
     void = None
 
-    def initialize_frame(self, node: ir.Statement, *, has_parent_access: bool = False) -> Frame[Any]:
+    def initialize_frame(
+        self, node: ir.Statement, *, has_parent_access: bool = False
+    ) -> Frame[Any]:
         """Initialize the frame for the given node."""
         return Frame(node, has_parent_access=has_parent_access)
 

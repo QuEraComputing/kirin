@@ -1,9 +1,9 @@
 # type: ignore
+from emit import EmitReceptMain
 from group import food
 from stmts import Eat, Nap, Cook, NewFood
 from recept import FeeAnalysis
 
-from emit import EmitReceptMain
 from interp import FoodMethods as FoodMethods
 from lattice import AtLeastXItem
 from rewrite import NewFoodAndNap
