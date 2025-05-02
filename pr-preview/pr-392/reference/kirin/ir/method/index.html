@@ -15,16 +15,16 @@
 </code></pre></div> <div class="doc doc-contents "> <p>Return the arguments of the method. (excluding self)</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.method.Method.inferred class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">inferred</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>inferred</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 </code></pre></div> <div class="doc doc-contents "> <p>if typeinfer has been run on this method</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.method.Method.self_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">self_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-property"><code>property</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>self_type</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Return the type of the self argument of the method.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.method.Method.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>verify the method body.</p> <p>This will raise a ValidationError if the method body is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 96</span>
-<span class=normal> 97</span>
-<span class=normal> 98</span>
-<span class=normal> 99</span>
-<span class=normal>100</span>
+</code></pre></div> <div class="doc doc-contents "> <p>verify the method body.</p> <p>This will raise a ValidationError if the method body is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>100</span>
 <span class=normal>101</span>
 <span class=normal>102</span>
 <span class=normal>103</span>
 <span class=normal>104</span>
-<span class=normal>105</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>105</span>
+<span class=normal>106</span>
+<span class=normal>107</span>
+<span class=normal>108</span>
+<span class=normal>109</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;verify the method body.</span>
 
 <span class=sd>    This will raise a ValidationError if the method body is not valid.</span>
@@ -35,11 +35,7 @@
         <span class=n>e</span><span class=o>.</span><span class=n>attach</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
         <span class=k>raise</span> <span class=n>e</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.method.Method.verify_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify_type</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify_type</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>verify the method type.</p> <p>This will raise a ValidationError if the method type is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>107</span>
-<span class=normal>108</span>
-<span class=normal>109</span>
-<span class=normal>110</span>
-<span class=normal>111</span>
+</code></pre></div> <div class="doc doc-contents "> <p>verify the method type.</p> <p>This will raise a ValidationError if the method type is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>111</span>
 <span class=normal>112</span>
 <span class=normal>113</span>
 <span class=normal>114</span>
@@ -47,7 +43,11 @@
 <span class=normal>116</span>
 <span class=normal>117</span>
 <span class=normal>118</span>
-<span class=normal>119</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>119</span>
+<span class=normal>120</span>
+<span class=normal>121</span>
+<span class=normal>122</span>
+<span class=normal>123</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;verify the method type.</span>
 
 <span class=sd>    This will raise a ValidationError if the method type is not valid.</span>
