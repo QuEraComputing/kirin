@@ -45,6 +45,8 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
 
     registry: dict[Signature, BoundedDef] = field(init=False, compare=False)
     """The registry of implementations"""
+    symbol_table: dict[str, ir.Statement] = field(init=False, compare=False)
+    """The symbol table of the interpreter."""
     state: InterpreterState[FrameType] = field(init=False, compare=False)
     """The interpreter state."""
     __eval_lock: bool = field(default=False, init=False, repr=False)
@@ -62,6 +64,7 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
 
     def __post_init__(self) -> None:
         self.registry = self.dialects.registry.interpreter(keys=self.keys)
+        self.symbol_table = self.dialects.symbol_table
 
     def initialize(self) -> Self:
         self.state = InterpreterState()
@@ -109,6 +112,13 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
                 f"Interpreter {self.__class__.__name__} is already evaluating, "
                 f"consider calling the bare `method.code` instead of the method"
             )
+
+        if node.nargs != len(args) + len(kwargs):
+            raise InterpreterError(
+                f"Method {node} called with {len(args) + len(kwargs)} "
+                f"arguments, expected {node.nargs}"
+            )
+
         self.__eval_lock = True
         self.initialize()
         current_recursion_limit = sys.getrecursionlimit()
@@ -137,6 +147,8 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         corresponding implementation of its callable region execution convention in
         the interpreter.
         """
+        if entry := node.get_trait(ir.EntryPointInterface):
+            node = self.symbol_table[entry.get_entry_point_symbol(node)]
         trait = node.get_present_trait(ir.CallableStmtInterface)
         args = trait.align_input_args(node, *args, **kwargs)
         region = trait.get_callable_region(node)

@@ -38,6 +38,7 @@ from kirin.ir.traits import (
     NoTerminator as NoTerminator,
     IsolatedFromAbove as IsolatedFromAbove,
     SymbolOpInterface as SymbolOpInterface,
+    EntryPointInterface as EntryPointInterface,
     CallableStmtInterface as CallableStmtInterface,
     RegionInterpretationTrait as RegionInterpretationTrait,
 )

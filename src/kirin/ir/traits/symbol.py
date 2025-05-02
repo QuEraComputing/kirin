@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from abc import abstractmethod
+from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin.ir.attrs.py import PyAttr
@@ -41,7 +42,9 @@ class SymbolTable(StmtTrait):
 
     @staticmethod
     def walk(stmt: Statement):
-        return stmt.regions[0].blocks[0].stmts
+        for stmt in stmt.regions[0].blocks[0].stmts:
+            if stmt.has_trait(SymbolOpInterface):
+                yield stmt
 
     def verify(self, node: Statement):
         if len(node.regions) != 1:
@@ -57,3 +60,31 @@ class SymbolTable(StmtTrait):
             )
 
         # TODO: check uniqueness of symbol names
+
+
+StmtType = TypeVar("StmtType", bound="Statement")
+
+
+@dataclass(frozen=True)
+class EntryPointInterface(StmtTrait, Generic[StmtType]):
+    """A trait that indicates that a module-like statement has an entry point.
+
+    An entry point is a statement that has a symbol name attribute and is
+    the first statement in the module.
+
+    When interpreting statements with this trait, the interpreter will
+    look for the entry point and start calling the module from there.
+    """
+
+    @abstractmethod
+    def get_entry_point_symbol(self, stmt: StmtType) -> str: ...
+
+    @abstractmethod
+    def get_entry_point(self, stmt: StmtType) -> Statement: ...
+
+    def verify(self, node: Statement):
+        if not node.has_trait(SymbolOpInterface):
+            raise ValidationError(
+                node,
+                f"Statement {node.name} with EntryPointInterface trait must have a symbol name",
+            )

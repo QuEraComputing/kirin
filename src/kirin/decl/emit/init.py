@@ -137,7 +137,10 @@ class EmitInit(BaseModifier):
                 raise ValueError("unexpected default")
             return f"{f.name}:{self._hint_name(f)}{default}"
         elif isinstance(f, info.ArgumentField):  # arguments are always required
-            return f"{f.name}:{self._hint_name(f)}"
+            if f.group:
+                return f"{f.name}:{self._hint_name(f)} = ()"
+            else:
+                return f"{f.name}:{self._hint_name(f)}"
         elif isinstance(f, info.ResultField):
             raise ValueError("result fields are not allowed in __init__")
         elif isinstance(f, info.RegionField):

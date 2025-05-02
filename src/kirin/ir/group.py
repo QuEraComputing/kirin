@@ -17,12 +17,13 @@ from dataclasses import field, dataclass
 from collections.abc import Iterable
 
 from kirin.ir.method import Method
+from kirin.ir.traits import SymbolTable, SymbolOpInterface
 from kirin.ir.exception import CompilerError, ValidationError
 
 if TYPE_CHECKING:
+    from kirin.ir import Dialect, Statement
     from kirin.lowering import Python
     from kirin.registry import Registry
-    from kirin.ir.dialect import Dialect
 
 PassParams = ParamSpec("PassParams")
 RunPass = Callable[Concatenate[Method, PassParams], None]
@@ -51,6 +52,10 @@ class DialectGroup(Generic[PassParams]):
     lowering: Python = field(init=False, repr=False)
     """the lowering object used to lower the method."""
 
+    symbol_table: dict[str, Statement] = field(
+        default_factory=dict, init=False, repr=False
+    )
+
     def __init__(
         self,
         dialects: Iterable[Union["Dialect", ModuleType]],
@@ -70,6 +75,7 @@ class DialectGroup(Generic[PassParams]):
         from kirin.lowering import Python
 
         self.lowering = Python(self)
+        self.symbol_table = {}
 
     def __iter__(self):
         return iter(self.data)
@@ -229,11 +235,31 @@ class DialectGroup(Generic[PassParams]):
                 except ValidationError as e:
                     e.attach(mt)
                     raise e
+
+            self.update_symbol_table(mt)
             return mt
 
         if py_func is not None:
             return wrapper(py_func)
         return wrapper
+
+    def update_symbol_table(self, method: Method) -> None:
+        trait = method.code.get_trait(SymbolTable)
+        if trait is None:
+            return
+
+        for stmt in method.code.walk():
+            trait = stmt.get_trait(SymbolOpInterface)
+            if trait is None:
+                continue
+
+            name = trait.get_sym_name(stmt).unwrap()
+            if name in self.symbol_table:
+                raise ValidationError(
+                    stmt,
+                    f"duplicate symbol `{name}` in dialect group",
+                )
+            self.symbol_table[name] = stmt
 
 
 def dialect_group(

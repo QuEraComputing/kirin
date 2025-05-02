@@ -80,6 +80,7 @@ def argument(
     type: types.TypeAttribute = types.Any,
     *,
     print: bool = True,
+    default: Any = MISSING,
     kw_only: bool = False,
     alias: Optional[str] = None,
 ) -> Any:
@@ -91,6 +92,7 @@ def argument(
         kw_only(bool): if `True`, this argument is keyword-only.
         alias(Optional[str]): an alias for the argument name in the `__init__` method.
     """
+    assert default is MISSING or default == (), "default value must be MISSING or ()"
     return ArgumentField(
         type=type,
         print=print,

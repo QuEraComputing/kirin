@@ -25,7 +25,11 @@ from .basic import (
     NoTerminator as NoTerminator,
     IsolatedFromAbove as IsolatedFromAbove,
 )
-from .symbol import SymbolTable as SymbolTable, SymbolOpInterface as SymbolOpInterface
+from .symbol import (
+    SymbolTable as SymbolTable,
+    SymbolOpInterface as SymbolOpInterface,
+    EntryPointInterface as EntryPointInterface,
+)
 from .callable import (
     HasSignature as HasSignature,
     CallableStmtInterface as CallableStmtInterface,

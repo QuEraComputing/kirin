@@ -669,6 +669,49 @@ class Statement(IRNode["Block"]):
         """
         return self.attributes.get(key, default)
 
+    AttributeType = TypeVar("AttributeType", bound=Attribute)
+
+    def get_attribute_casted(
+        self,
+        key: str,
+        expect: type[AttributeType],
+        default: AttributeType | None = None,
+    ) -> AttributeType | None:
+        """Get the attribute or property of the Statement.
+
+        Args:
+            key (str): The key of the attribute or property.
+            expect (type[AttributeType]): The expected type of the attribute.
+            default (Attribute | None, optional): The default value to return if the attribute is not found. Defaults to None.
+
+        Returns:
+            AttributeType: The attribute or property of the Statement.
+        """
+        return self.get_attribute(key, default)  # type: ignore
+
+    def get_attribute_typed(
+        self,
+        key: str,
+        expect: type[AttributeType],
+        default: AttributeType | None = None,
+    ) -> AttributeType | None:
+        """Get the attribute or property of the Statement.
+
+        Args:
+            key (str): The key of the attribute or property.
+            expect (type[AttributeType]): The expected type of the attribute.
+            default (Attribute | None, optional): The default value to return if the attribute is not found. Defaults to None.
+
+        Returns:
+            AttributeType: The attribute or property of the Statement.
+        """
+        attr = self.get_attribute(key, None)
+        if attr is None:
+            return default
+        if not isinstance(attr, expect):
+            raise TypeError(f"Expected {expect}, got {type(attr)}")
+        return attr
+
     @classmethod
     def has_trait(cls, trait_type: type[Trait["Statement"]]) -> bool:
         """Check if the Statement has a specific trait.

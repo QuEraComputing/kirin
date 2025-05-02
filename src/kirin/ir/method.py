@@ -9,7 +9,12 @@ from dataclasses import field, dataclass
 from kirin.print.printer import Printer
 from kirin.print.printable import Printable
 
-from .traits import HasSignature, SymbolOpInterface, CallableStmtInterface
+from .traits import (
+    HasSignature,
+    SymbolOpInterface,
+    EntryPointInterface,
+    CallableStmtInterface,
+)
 from .exception import ValidationError
 from .nodes.stmt import Statement
 from .attrs.types import Generic
@@ -63,10 +68,16 @@ class Method(Printable, typing.Generic[Param, RetType]):
         lineno_begin: int = 0,
         inferred: bool = False,
     ):
-        trait = code.get_present_trait(CallableStmtInterface)
-        region = trait.get_callable_region(code)
-        if sym_name is None and (symbol_trait := code.get_trait(SymbolOpInterface)):
-            sym_name = symbol_trait.get_sym_name(code).data
+        callable_node = code
+        if entry_point := code.get_trait(EntryPointInterface):
+            callable_node = entry_point.get_entry_point(code)
+
+        trait = callable_node.get_present_trait(CallableStmtInterface)
+        region = trait.get_callable_region(callable_node)
+        if sym_name is None and (
+            symbol_trait := callable_node.get_trait(SymbolOpInterface)
+        ):
+            sym_name = symbol_trait.get_sym_name(callable_node).data
 
         self.dialects = dialects
         self.code = code
