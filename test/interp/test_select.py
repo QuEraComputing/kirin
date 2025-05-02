@@ -11,18 +11,18 @@ from kirin.ir.nodes.stmt import Statement
 from kirin.analysis.forward import Forward, ForwardFrame
 
 
-@dataclass(init=False)
+@dataclass
 class DummyInterpreter(Forward[EmptyLattice]):
-    keys = ["test_interp"]
+    keys = ("test_interp",)
     lattice = EmptyLattice
 
-    def run_method(self, method: Method, args: tuple[EmptyLattice, ...]):
-        return self.run_callable(method.code, (EmptyLattice(),) + args)
+    def method_self(self, method: Method) -> EmptyLattice:
+        return EmptyLattice()
 
-    def eval_stmt_fallback(
-        self, frame: ForwardFrame[EmptyLattice], stmt: Statement
-    ) -> tuple[EmptyLattice, ...] | interp.SpecialValue[EmptyLattice]:
-        ret = super().eval_stmt_fallback(frame, stmt)
+    def eval_fallback(
+        self, frame: ForwardFrame[EmptyLattice], node: Statement
+    ) -> interp.StatementResult[EmptyLattice]:
+        ret = super().eval_fallback(frame, node)
         print("fallback: ", ret)
         return ret
 
@@ -42,5 +42,8 @@ def main(x):
 
 def test_interp():
     interp_ = DummyInterpreter(basic)
-    with pytest.raises(interp.InterpreterError):
-        interp_.run(main, (EmptyLattice(),))
+    with pytest.raises(NotImplementedError):
+        interp_.run(main, EmptyLattice())
+
+    interp_ = DummyInterpreter(basic)
+    interp_.run_no_raise(main, EmptyLattice())

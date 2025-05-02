@@ -95,4 +95,4 @@ class IListInterpreter(MethodTable):
         for elem in coll.data:
             # NOTE: assume fn has been type checked
             interp.call(fn.code, fn, elem)
-        return (None,)
+        return

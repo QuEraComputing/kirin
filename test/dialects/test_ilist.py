@@ -219,3 +219,25 @@ def test_ilist_constprop():
     target = frame.entries[target_ssa]
     assert isinstance(target, const.Value)
     assert target.data == (6, 6)
+
+
+rule = rewrite.Fixpoint(rewrite.Walk(ilist.rewrite.Unroll()))
+xs = ilist.IList([1, 2, 3])
+
+
+@basic
+def map(xs: ilist.IList[int, Literal[3]]):
+    return ilist.map(add1, xs)
+
+
+@basic_no_opt
+def foreach(xs: ilist.IList[int, Literal[3]]):
+    ilist.for_each(add1, xs)
+
+
+map_before = map(xs)
+foreach_before = foreach(xs)
+rule.rewrite(map.code)
+rule.rewrite(foreach.code)
+map_after = map(xs)
+foreach_after = foreach(xs)

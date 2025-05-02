@@ -49,7 +49,7 @@ class Unroll(RewriteRule):
             index.insert_before(node)
             elt = GetItem(node.collection, index.result)
             elt.insert_before(node)
-            fn_call = Call(node.fn, (elt.result,))
+            fn_call = Call(node.fn, (elt.result,), ())
             fn_call.insert_before(node)
             new_elems.append(fn_call.result)
 
@@ -72,7 +72,7 @@ class Unroll(RewriteRule):
             index = Constant(elem_idx)
             # index.result.name = f"idx_{elem_idx}"
             elt = GetItem(node.collection, index.result)
-            fn_call = Call(node.fn, (carry, elt.result))
+            fn_call = Call(node.fn, (carry, elt.result), ())
             carry_stmt = GetItem(fn_call.result, index_0.result)
             y_stmt = GetItem(fn_call.result, index_1.result)
             carry = carry_stmt.result
@@ -109,7 +109,7 @@ class Unroll(RewriteRule):
             elt = GetItem(node.collection, index.result)
             elt.insert_before(node)
 
-            acc_stmt = Call(node.fn, (acc, elt.result))
+            acc_stmt = Call(node.fn, (acc, elt.result), ())
             acc_stmt.insert_before(node)
             acc = acc_stmt.result
 
@@ -126,7 +126,7 @@ class Unroll(RewriteRule):
             index.insert_before(node)
             elt = GetItem(node.collection, index.result)
             elt.insert_before(node)
-            fn_call = Call(node.fn, (elt.result,))
+            fn_call = Call(node.fn, (elt.result,), ())
             fn_call.insert_before(node)
 
         node.delete()

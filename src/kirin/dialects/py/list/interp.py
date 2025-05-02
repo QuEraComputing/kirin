@@ -18,4 +18,4 @@ class ListMethods(interp.MethodTable):
 
     @interp.impl(Append)
     def append(self, interp, frame: interp.Frame, stmt: Append):
-        return (frame.get(stmt.list_).append(frame.get(stmt.value)),)
+        frame.get(stmt.list_).append(frame.get(stmt.value))

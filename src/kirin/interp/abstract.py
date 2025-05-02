@@ -7,7 +7,6 @@ from dataclasses import field, dataclass
 from kirin import ir
 from kirin.lattice import BoundedLattice
 from kirin.worklist import WorkList
-from kirin.analysis.const.lattice import Value
 
 from .abc import InterpreterABC
 from .frame import Frame
@@ -138,6 +137,8 @@ class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
         If the value is not a constant or the constant is not of the given type, return
         `None`.
         """
+        from kirin.analysis.const.lattice import Value
+
         hint = value.hints.get("const")
         if isinstance(hint, Value) and isinstance(hint.data, type_):
             return hint.data
