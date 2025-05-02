@@ -27,7 +27,7 @@ def test_module():
         body=ir.Region(
             ir.Block(
                 [
-                    x := module.Invoke((), callee="foo"),
+                    x := module.Invoke((), (), callee="foo"),
                     func.Return(x.result),
                 ],
                 argtypes=(types.Any,),

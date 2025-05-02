@@ -79,7 +79,7 @@ class Invoke(ir.Statement):
     traits = frozenset({ir.MaybePure()})
     callee: str = info.attribute()
     inputs: tuple[ir.SSAValue, ...] = info.argument()
-    kwargs: tuple[ir.SSAValue, ...] = info.argument(default=())
+    kwargs: tuple[ir.SSAValue, ...] = info.argument()
     keys: tuple[str, ...] = info.attribute(default=())
     result: ir.ResultValue = info.result()
     purity: bool = info.attribute(default=False)
