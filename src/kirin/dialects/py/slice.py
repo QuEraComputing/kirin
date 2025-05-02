@@ -13,6 +13,8 @@ from dataclasses import dataclass
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
+from kirin.analysis import const
+from kirin.print.printer import Printer
 from kirin.dialects.py.constant import Constant
 
 dialect = ir.Dialect("py.slice")
@@ -74,6 +76,43 @@ class Concrete(interp.MethodTable):
             return (slice(start, stop),)
         else:
             return (slice(start, stop, step),)
+
+
+@dataclass
+class SliceAttribute(ir.Data[slice]):
+
+    start: int | None
+    stop: int | None
+    step: int | None
+
+    def __post_init__(self) -> None:
+        self.type = types.Slice[types.Int]
+
+    def unwrap(self):
+        return slice(self.start, self.stop, self.step)
+
+    def __hash__(self):
+        return hash((type(self), slice, self.start, self.stop, self.step))
+
+    def print_impl(self, printer: Printer) -> None:
+        return printer.plain_print(f"slice({self.start}, {self.stop}, {self.step})")
+
+
+@dialect.register(key="constprop")
+class ConstProp(interp.MethodTable):
+
+    @interp.impl(Slice)
+    def _slice_const_prop(self, interp, frame: interp.Frame, stmt: Slice):
+        start, stop, step = frame.get_values(stmt.args)
+        match (start, stop, step):
+            case (
+                const.Value(start_data),
+                const.Value(stop_data),
+                const.Value(step_data),
+            ):
+                return (const.Value(SliceAttribute(start_data, stop_data, step_data)),)
+            case _:
+                return (const.Unknown(),)
 
 
 @dialect.register

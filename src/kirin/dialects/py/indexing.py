@@ -208,7 +208,18 @@ class ConstProp(interp.MethodTable):
             return (const.Unknown(),)
 
         if isinstance(obj, const.Value):
-            return (const.Value(obj.data[index.data]),)
+            if isinstance(index.data, ir.Data):
+                index_value = index.data.unwrap()
+            else:
+                index_value = index.data
+
+            if isinstance(obj.data, ir.Data):
+                obj_value = obj.data.unwrap()
+            else:
+                obj_value = obj.data
+
+            return (const.Value(obj_value[index_value]),)
+
         elif isinstance(obj, const.PartialTuple):
             obj = obj.data
             if isinstance(index.data, int) and 0 <= index.data < len(obj):
