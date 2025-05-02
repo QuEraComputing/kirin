@@ -141,7 +141,7 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         *args: ValueType,
         **kwargs: ValueType,
     ) -> ValueType:
-        """Call a given callable node with the given arguments in a new frame.
+        """Call a given callable node with the given arguments in a given frame.
 
         This method is used to call a node that has a callable trait and a
         corresponding implementation of its callable region execution convention in
