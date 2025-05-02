@@ -37,7 +37,7 @@ class Lowering(lowering.FromPythonAST):
                 if name in keys:
                     inputs.append(kwargs_[name])
 
-        stmt = func.Invoke(args, callee=method)
+        stmt = func.Invoke(tuple(inputs), callee=method)
         stmt.result.type = method.return_type or types.Any
         stmt.source = source
         return state.current_frame.push(stmt)

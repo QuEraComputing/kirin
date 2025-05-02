@@ -67,7 +67,9 @@ def test_func_call():
         return callee(n)
 
     code = lower.python_function(callee)
-    callee = ir.Method(None, callee, "callee", ["n"], lower.dialects, code)
+    callee = ir.Method(
+        dialects=lower.dialects, code=code, py_func=callee, sym_name="callee"
+    )
     code = lower.python_function(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
@@ -84,20 +86,27 @@ def test_func_kw_call():
         return callee(n=n, m=m)
 
     code = lower.python_function(callee)
-    callee = ir.Method(None, callee, "callee", ["n", "m"], lower.dialects, code)
+    callee = ir.Method(
+        dialects=lower.dialects,
+        code=code,
+        py_func=callee,
+        sym_name="callee",
+        arg_names=["n", "m"],
+    )
     code = lower.python_function(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)
     assert isinstance(stmt, func.Invoke)
-    assert stmt.kwargs == ("n", "m")
 
     def caller(n, m):
-        return callee(n, m=m)
+        return callee(m=m, n=n)
 
     code = lower.python_function(caller, globals={"callee": callee})
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 1
     stmt = code.body.blocks[0].stmts.at(0)
     assert isinstance(stmt, func.Invoke)
-    assert stmt.kwargs == ("m",)
+    assert len(stmt.inputs) == 2
+    assert stmt.inputs[0] is code.body.blocks[0].args[1]
+    assert stmt.inputs[1] is code.body.blocks[0].args[2]
