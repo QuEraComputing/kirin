@@ -18,9 +18,8 @@ class CallGraph(Printable):
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
 
-    defs: dict[str, ir.Method] = field(default_factory=dict)
     """Mapping from symbol names to methods."""
-    backedges: dict[str, set[str]] = field(default_factory=dict)
+    backedges: dict[ir.Method, set[ir.Method]] = field(default_factory=dict)
     """Mapping from symbol names to backedges."""
 
     def __init__(self, mt: ir.Method):
@@ -29,26 +28,25 @@ class CallGraph(Printable):
         self.__build(mt)
 
     def __build(self, mt: ir.Method):
-        self.defs[mt.sym_name] = mt
         for stmt in mt.callable_region.walk():
             if isinstance(stmt, func.Invoke):
-                backedges = self.backedges.setdefault(stmt.callee.sym_name, set())
-                backedges.add(mt.sym_name)
+                backedges = self.backedges.setdefault(stmt.callee, set())
+                backedges.add(mt)
                 self.__build(stmt.callee)
 
-    def get_neighbors(self, node: str) -> Iterable[str]:
+    def get_neighbors(self, node: ir.Method) -> Iterable[ir.Method]:
         """Get the neighbors of a node in the call graph."""
         return self.backedges.get(node, ())
 
-    def get_edges(self) -> Iterable[tuple[str, str]]:
+    def get_edges(self) -> Iterable[tuple[ir.Method, ir.Method]]:
         """Get the edges of the call graph."""
         for node, neighbors in self.backedges.items():
             for neighbor in neighbors:
                 yield node, neighbor
 
-    def get_nodes(self) -> Iterable[str]:
+    def get_nodes(self) -> Iterable[ir.Method]:
         """Get the nodes of the call graph."""
-        return self.defs.keys()
+        return self.backedges.keys()
 
     def print_impl(self, printer: Printer) -> None:
         for idx, (caller, callee) in enumerate(self.backedges.items()):

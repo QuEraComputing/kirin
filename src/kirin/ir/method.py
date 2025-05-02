@@ -79,6 +79,10 @@ class Method(Printable, typing.Generic[Param, RetType]):
         ):
             sym_name = symbol_trait.get_sym_name(callable_node).data
 
+        assert (
+            len(region.blocks[0].args) > 0
+        ), "Method must have at least have a self argument"
+
         self.dialects = dialects
         self.code = code
         self.nargs = nargs if nargs is not None else len(region.blocks[0].args)

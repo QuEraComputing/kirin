@@ -30,7 +30,7 @@ def efg(a, b):
 def test_callgraph():
     graph = CallGraph(efg)
     graph.print()
-    assert "cde" in graph.get_neighbors("abc")
-    assert "defg" in graph.get_neighbors("abc")
-    assert "cde" in graph.get_neighbors("abc")
-    assert "defg" in graph.get_neighbors("abc")
+    assert cde in graph.get_neighbors(abc)
+    assert defg in graph.get_neighbors(abc)
+    assert cde in graph.get_neighbors(abc)
+    assert defg in graph.get_neighbors(abc)

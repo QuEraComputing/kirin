@@ -61,9 +61,7 @@ class DialectGroup(Generic[PassParams]):
         dialects: Iterable[Union["Dialect", ModuleType]],
         run_pass: RunPassGen[PassParams] | None = None,
     ):
-        def identity(code: Method):
-            pass
-
+        self.symbol_table = {}
         self.data = frozenset(self.map_module(dialect) for dialect in dialects)
         if run_pass is None:
             self.run_pass_gen = None
@@ -75,7 +73,6 @@ class DialectGroup(Generic[PassParams]):
         from kirin.lowering import Python
 
         self.lowering = Python(self)
-        self.symbol_table = {}
 
     def __iter__(self):
         return iter(self.data)

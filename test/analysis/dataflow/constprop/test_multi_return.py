@@ -43,12 +43,12 @@ def test_multi_return_default_prop():
         (func.Return(return_result.result)),
     ]
 
-    body = ir.Region(ir.Block(stmts))
+    body = ir.Region(ir.Block(stmts, argtypes=(types.Any,)))
     func_code = func.Function(
         sym_name="test", signature=func.Signature((), types.Any), body=body
     )
     mt = ir.Method(dialects=dialect_group_test, code=func_code)
-    frame, return_result = const.Propagate(dialect_group_test).run_no_raise(mt)
+    frame, return_result = const.Propagate(dialect_group_test).run(mt)
 
     assert frame.entries[res.results[0]] == const.Unknown()
     assert frame.entries[res.results[1]] == const.Unknown()
