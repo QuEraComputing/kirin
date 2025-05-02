@@ -165,6 +165,14 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         )
 
     def recursion_limit_reached(self) -> ValueType:
+        """Handle the recursion limit reached.
+
+        This method is called when the maximum depth of the interpreter stack
+        when calling a callable node is reached. By default a `StackOverflowError`
+        is raised. Overload this method to provide a custom behavior, e.g. in
+        the case of abstract interpreter, the recursion limit returns a bottom
+        value.
+        """
         raise StackOverflowError(
             f"Interpreter {self.__class__.__name__} stack "
             f"overflow at {self.state.depth}"
@@ -177,6 +185,24 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         region: ir.Region,
         *args: ValueType,
     ) -> RegionResult:
+        """Call a given callable region with the given arguments in a given frame.
+
+        This method is used to call a region that has a callable trait and a
+        corresponding implementation of its callable region execution convention in
+        the interpreter.
+
+        Args:
+            frame: the frame to call the region in
+            node: the node to call the region on
+            region: the region to call
+            args: the arguments to pass to the region
+
+        Returns:
+            RegionResult: the result of the call
+
+        Raises:
+            InterpreterError: if cannot find a matching implementation for the region.
+        """
         region_trait = node.get_present_trait(ir.RegionInterpretationTrait)
         how = self.registry.get(Signature(region_trait))
         if how is None:
@@ -191,7 +217,21 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
     def new_frame(
         self, node: ir.Statement, *, has_parent_access: bool = False
     ) -> Generator[FrameType, Any, None]:
-        """Create a new frame for the given node."""
+        """Create a new frame for the given node.
+
+        This method is used to create a new call frame for the given node. The
+        frame is pushed on the stack and popped when the context manager
+        is exited. The frame is initialized with the given node and the
+        given arguments.
+
+        Args:
+            node: the node to create the frame for
+            has_parent_access: if the frame has access to the parent frame entries
+                (default: False)
+
+        Returns:
+            Generator[FrameType, Any, None]: the frame
+        """
         frame = self.initialize_frame(node, has_parent_access=has_parent_access)
         self.state.push_frame(frame)
         try:
