@@ -26,7 +26,7 @@ PyRangeIterType = types.PyClass(type(iter(range(0))))
 class Iter(ir.Statement):
     """This is equivalent to `iter(value)` in Python."""
 
-    traits = frozenset({ir.Pure()})
+    traits = frozenset({})
     value: ir.SSAValue = info.argument(types.Any)
     iter: ir.ResultValue = info.result(types.Any)
 
