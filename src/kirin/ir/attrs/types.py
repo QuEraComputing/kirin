@@ -547,5 +547,8 @@ def hint2type(hint) -> TypeAttribute:
     args = typing.get_args(hint)
     params = []
     for arg in args:
-        params.append(hint2type(arg))
+        if isinstance(arg, typing.Sequence):
+            params.append([hint2type(elem) for elem in arg])
+        else:
+            params.append(hint2type(arg))
     return Generic(body, *params)
