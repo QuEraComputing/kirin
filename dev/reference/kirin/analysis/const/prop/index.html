@@ -52,8 +52,7 @@
 <span class=normal>87</span>
 <span class=normal>88</span>
 <span class=normal>89</span>
-<span class=normal>90</span>
-<span class=normal>91</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>frame_eval</span><span class=p>(</span>
+<span class=normal>90</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>frame_eval</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>Result</span><span class=p>]:</span>
     <span class=n>method</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>lookup_registry</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>node</span><span class=p>)</span>
@@ -65,11 +64,10 @@
             <span class=k>if</span> <span class=n>types</span><span class=o>.</span><span class=n>is_tuple_of</span><span class=p>(</span><span class=n>values</span><span class=p>,</span> <span class=n>Value</span><span class=p>):</span>
                 <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>try_eval_const_pure</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>node</span><span class=p>,</span> <span class=n>values</span><span class=p>)</span>
 
-        <span class=k>if</span> <span class=n>node</span><span class=o>.</span><span class=n>has_trait</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Pure</span><span class=p>):</span>
-            <span class=k>return</span> <span class=p>(</span><span class=n>Unknown</span><span class=p>(),)</span>  <span class=c1># no implementation but pure</span>
-        <span class=c1># not pure, and no implementation, let&#39;s say it&#39;s not pure</span>
-        <span class=n>frame</span><span class=o>.</span><span class=n>frame_is_not_pure</span> <span class=o>=</span> <span class=kc>True</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>Unknown</span><span class=p>(),)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>node</span><span class=o>.</span><span class=n>has_trait</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Pure</span><span class=p>):</span>
+            <span class=c1># not pure, and no implementation, let&#39;s say it&#39;s not pure</span>
+            <span class=n>frame</span><span class=o>.</span><span class=n>frame_is_not_pure</span> <span class=o>=</span> <span class=kc>True</span>
+        <span class=k>return</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>Unknown</span><span class=p>()</span> <span class=k>for</span> <span class=n>_</span> <span class=ow>in</span> <span class=n>node</span><span class=o>.</span><span class=n>_results</span><span class=p>)</span>
 
     <span class=n>ret</span> <span class=o>=</span> <span class=n>method</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>,</span> <span class=n>node</span><span class=p>)</span>
     <span class=k>if</span> <span class=n>node</span><span class=o>.</span><span class=n>has_trait</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>IsTerminator</span><span class=p>)</span> <span class=ow>or</span> <span class=n>node</span><span class=o>.</span><span class=n>has_trait</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Pure</span><span class=p>):</span>
