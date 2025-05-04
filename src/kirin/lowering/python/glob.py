@@ -100,3 +100,6 @@ class GlobalExprEval(ast.NodeVisitor):
 
     def visit_Tuple(self, node: ast.Tuple) -> Any:
         return tuple(self.visit(elt) for elt in node.elts)
+
+    def visit_List(self, node: ast.List) -> Any:
+        return [self.visit(elt) for elt in node.elts]
