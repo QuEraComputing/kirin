@@ -1,6 +1,6 @@
 [project]
 name = "kirin-toolchain"
-version = "0.17.5"
+version = "0.17.6"
 description = "The Kirin Toolchain for building compilers and interpreters."
 authors = [{ name = "Roger-luo", email = "rluo@quera.com" }]
 dependencies = [
