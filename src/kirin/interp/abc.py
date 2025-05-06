@@ -128,7 +128,7 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
 
     @contextmanager
     def eval_context(self):
-        """Context manager to set the recursion limit.
+        """Context manager to set the recursion limit and initialize the interpreter.
 
         This context manager sets the recursion limit to the maximum depth of
         the interpreter stack. It is used to prevent stack overflow when calling

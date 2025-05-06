@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import IO, TypeVar, Generic
+
+from typing import IO, Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin import ir, interp
@@ -35,8 +36,8 @@ class EmitJulia(EmitABC[JuliaFrame, str], Generic[IO_t]):
         if isinstance(node, ir.Method):
             node = node.code
 
-        with self.new_frame(node) as frame:
-            self.frame_eval(frame, node)
+        with self.eval_context():
+            self.eval(node)
         self.io.flush()
 
     def emit_attribute(self, frame: JuliaFrame, node: ir.Statement) -> str:
