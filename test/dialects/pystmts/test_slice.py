@@ -1,6 +1,6 @@
 from kirin import types
 from kirin.prelude import basic_no_opt
-from kirin.dialects import py
+from kirin.dialects import py, ilist
 from kirin.dialects.py.slice import SliceAttribute
 
 
@@ -64,3 +64,13 @@ def test_slice_attr():
 
 def test_slice_attr_hash():
     assert hash(SliceAttribute(0, 20, None)) == hash((SliceAttribute, 0, 20, None))
+
+
+def test_slice_get_index():
+    @basic_no_opt
+    def test():
+        x = slice(0, 20, None)
+        y = range(40)
+        return y[x]
+
+    assert test() == ilist.IList(range(0, 20, 1))
