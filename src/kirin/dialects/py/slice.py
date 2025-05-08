@@ -84,7 +84,7 @@ class SliceAttribute(ir.Data[slice]):
         return slice(self.start, self.stop, self.step)
 
     def __hash__(self):
-        return hash((type(self), slice, self.start, self.stop, self.step))
+        return hash((type(self), self.start, self.stop, self.step))
 
     def print_impl(self, printer: Printer) -> None:
         return printer.plain_print(f"slice({self.start}, {self.stop}, {self.step})")
