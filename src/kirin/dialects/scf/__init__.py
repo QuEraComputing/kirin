@@ -12,6 +12,7 @@ This dialect depends on the following dialects:
 
 from . import (
     trim as trim,
+    _julia as _julia,
     absint as absint,
     interp as interp,
     unroll as unroll,
