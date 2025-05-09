@@ -129,21 +129,21 @@ AttributeType = TypeVar("AttributeType", bound=ir.Attribute)
 
 
 @overload
-def impl(head: AttributeType) -> Callable[
+def impl(head: type[AttributeType]) -> Callable[
     [
         ClassMethod[
             MethodTableType,
             InterpreterType,
             FrameType,
             AttributeType,
-            RegionResult[ValueType],
+            ValueType,
         ]
         | Def[
             MethodTableType,
             InterpreterType,
             FrameType,
             AttributeType,
-            RegionResult[ValueType],
+            ValueType,
         ]
     ],
     Def[
@@ -151,7 +151,7 @@ def impl(head: AttributeType) -> Callable[
         InterpreterType,
         FrameType,
         AttributeType,
-        RegionResult[ValueType],
+        ValueType,
     ],
 ]: ...
 

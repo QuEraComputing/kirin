@@ -6,7 +6,7 @@ lowering rules for `ast.Name` and `ast.Expr`.
 
 import ast
 
-from kirin import ir, lowering
+from kirin import ir, interp, lowering
 
 dialect = ir.Dialect("py.base")
 
@@ -28,3 +28,11 @@ class PythonLowering(lowering.FromPythonAST):
 
     def lower_Expr(self, state: lowering.State, node: ast.Expr) -> lowering.Result:
         return state.parent.visit(state, node.value)
+
+
+@dialect.register(key="emit.julia")
+class PyAttrMethod(interp.MethodTable):
+
+    @interp.impl(ir.PyAttr)
+    def py_attr(self, interp, frame: interp.Frame, node: ir.PyAttr):
+        return repr(node.data)

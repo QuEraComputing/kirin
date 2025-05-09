@@ -11,6 +11,6 @@ This dialect maps `ast.Compare` nodes to the `Eq`, `NotEq`, `Lt`, `LtE`,
 `Gt`, `GtE`, `Is`, and `IsNot` statements.
 """
 
-from . import interp as interp, lowering as lowering
+from . import _julia as _julia, interp as interp, lowering as lowering
 from .stmts import *  # noqa: F403
 from ._dialect import dialect as dialect

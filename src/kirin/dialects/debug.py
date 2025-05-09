@@ -2,7 +2,7 @@ import ast
 
 import rich
 
-from kirin import ir, decl, types, interp, lowering
+from kirin import ir, decl, emit, types, interp, lowering
 
 dialect = ir.Dialect("debug")
 
@@ -66,3 +66,12 @@ class ConcreteMethods(interp.MethodTable):
         rich.print(
             "[dim]└───────────────────────────────────────────────────────────────[/dim]"
         )
+
+
+@dialect.register(key="emit.julia")
+class JuliaEmit(interp.MethodTable):
+    @interp.impl(Info)
+    def info(self, emit: emit.Julia, frame: emit.JuliaFrame, stmt: Info):
+        msg = frame.get(stmt.msg)
+        inputs = " ".join(frame.get(input) for input in stmt.inputs)
+        frame.write_line(f'@info "{msg[1:-1]}" {inputs}'.strip())

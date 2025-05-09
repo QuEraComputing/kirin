@@ -17,3 +17,5 @@ from kirin.dialects.func.stmts import (
     FuncOpCallableInterface as FuncOpCallableInterface,
 )
 from kirin.dialects.func._dialect import dialect as dialect
+
+from . import _julia as _julia

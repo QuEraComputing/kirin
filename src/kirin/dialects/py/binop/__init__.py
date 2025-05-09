@@ -13,6 +13,11 @@ This dialect maps `ast.BinOp` nodes to the `Add`, `Sub`, `Mult`, `Div`, `FloorDi
 `Mod`, `Pow`, `LShift`, `RShift`, `BitOr`, `BitXor`, and `BitAnd` statements.
 """
 
-from . import interp as interp, lowering as lowering, typeinfer as typeinfer
+from . import (
+    _julia as _julia,
+    interp as interp,
+    lowering as lowering,
+    typeinfer as typeinfer,
+)
 from .stmts import *  # noqa: F403
 from ._dialect import dialect as dialect

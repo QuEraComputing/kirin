@@ -104,6 +104,10 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         with self.new_frame(node) as frame:
             return frame, self.frame_call(frame, node, *args, **kwargs)
 
+    def eval(self, node: ir.Statement) -> tuple[FrameType, StatementResult[ValueType]]:
+        with self.new_frame(node) as frame:
+            return frame, self.frame_eval(frame, node)
+
     def __call_method(
         self, node: ir.Method, *args: ValueType, **kwargs: ValueType
     ) -> tuple[FrameType, ValueType]:
@@ -119,12 +123,30 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
                 f"arguments, expected {node.nargs}"
             )
 
+        with self.eval_context():
+            return self.call(node.code, *args, **kwargs)
+
+    @contextmanager
+    def eval_context(self):
+        """Context manager to set the recursion limit and initialize the interpreter.
+
+        This context manager sets the recursion limit to the maximum depth of
+        the interpreter stack. It is used to prevent stack overflow when calling
+        recursive functions.
+        """
+        if self.__eval_lock:
+            raise InterpreterError(
+                f"Interpreter {self.__class__.__name__} is already evaluating, "
+                f"consider calling the bare `method.code` instead of the method"
+                f" or use the bare `frame_call`/`frame_eval` methods"
+            )
+
         self.__eval_lock = True
         self.initialize()
         current_recursion_limit = sys.getrecursionlimit()
         sys.setrecursionlimit(self.max_python_recursion_depth)
         try:
-            return self.call(node.code, *args, **kwargs)
+            yield self.max_python_recursion_depth
         except Exception as e:
             # NOTE: insert the interpreter state into the exception
             # so we can print the stack trace

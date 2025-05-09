@@ -10,10 +10,12 @@ This module contains the dialect for the Python `constant` statement, including:
 This dialect maps `ast.Constant` nodes to the `Constant` statement.
 """
 
+from __future__ import annotations
+
 import ast
 from typing import Generic, TypeVar
 
-from kirin import ir, types, interp, lowering
+from kirin import ir, emit, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
 
@@ -73,3 +75,11 @@ class Concrete(interp.MethodTable):
     @interp.impl(Constant)
     def constant(self, interp, frame: interp.Frame, stmt: Constant):
         return (stmt.value.unwrap(),)
+
+
+@dialect.register(key="emit.julia")
+class Julia(interp.MethodTable):
+
+    @interp.impl(Constant)
+    def constant(self, emit: emit.Julia, frame: emit.JuliaFrame, stmt: Constant):
+        return (emit.get_attribute(frame, stmt.value),)

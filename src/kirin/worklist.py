@@ -15,8 +15,11 @@ class WorkList(Generic[ElemType]):
 
     _stack: list[ElemType] = field(default_factory=list, init=False)
 
-    def is_empty(self) -> bool:
-        return len(self._stack) == 0
+    def __len__(self) -> int:
+        return len(self._stack)
+
+    def __bool__(self) -> bool:
+        return bool(self._stack)
 
     def append(self, item: ElemType) -> None:
         self._stack.append(item)

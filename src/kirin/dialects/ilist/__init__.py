@@ -6,6 +6,7 @@ to Python's built-in list type.
 """
 
 from . import (
+    _julia as _julia,
     interp as interp,
     rewrite as rewrite,
     lowering as lowering,
