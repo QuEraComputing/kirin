@@ -15,10 +15,10 @@ function _callable_julia_like(ssa_x, ssa_y)
             ssa_2 = (ssa_i_3 == 0)
             if ssa_2
                 ssa_3 = ssa_2
-                @info "'Hello'"
+                @info "Hello"
             else
                 ssa_4 = ssa_2
-                @info "'World'"
+                @info "World"
             end
             ssa_i_1 = ssa_i_3
             ssa_i_2 = ssa_i_3
@@ -31,7 +31,7 @@ function _callable_julia_like(ssa_x, ssa_y)
     return ssa_6
 end
 
-function _callable_some_arith_1(ssa_x, ssa_y)
+function _callable_some_arith(ssa_x, ssa_y)
     @label block_0
     ssa_0 = (ssa_x + ssa_y)
     return ssa_0

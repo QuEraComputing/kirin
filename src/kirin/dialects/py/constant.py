@@ -82,4 +82,4 @@ class Julia(interp.MethodTable):
 
     @interp.impl(Constant)
     def constant(self, emit: emit.Julia, frame: emit.JuliaFrame, stmt: Constant):
-        return (emit.emit_attribute(frame, stmt.value),)
+        return (emit.get_attribute(frame, stmt.value),)

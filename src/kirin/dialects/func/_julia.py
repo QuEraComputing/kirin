@@ -29,15 +29,17 @@ class Julia(interp.MethodTable):
             emit.callable_to_emit.append(node.callee.code)
             func_name = emit.callables.add(node.callee.code)
 
-        args = ", ".join(frame.get(arg) for arg in node.args)
-        frame.write_line(f"{frame.ssa[node.result]} = {func_name}({args})")
+        _, call_expr = emit.call(
+            node.callee.code, func_name, *frame.get_values(node.args)
+        )
+        frame.write_line(f"{frame.ssa[node.result]} = {call_expr}")
         return (frame.ssa[node.result],)
 
     @interp.impl(Function)
     def function(
-        self, emit: emit.Julia[IO_t], frame: emit.JuliaFrame[IO_t], node: Function
+        self, emit_: emit.Julia[IO_t], frame: emit.JuliaFrame[IO_t], node: Function
     ):
-        func_name = emit.callables.add(node)
+        func_name = emit_.callables[node]
         frame.set(node.body.blocks[0].args[0], func_name)
         argnames_: list[str] = []
         for arg in node.body.blocks[0].args[1:]:
@@ -55,7 +57,7 @@ class Julia(interp.MethodTable):
 
                 for stmt in block.stmts:
                     frame.current_stmt = stmt
-                    stmt_results = emit.frame_eval(frame, stmt)
+                    stmt_results = emit_.frame_eval(frame, stmt)
 
                     match stmt_results:
                         case tuple():

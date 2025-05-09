@@ -98,6 +98,7 @@ class Julia(EmitABC[JuliaFrame, str], Generic[IO_t]):
             node = node.code
 
         with self.eval_context():
+            self.callables.add(node)
             self.callable_to_emit.append(node)
             while self.callable_to_emit:
                 callable = self.callable_to_emit.pop()
@@ -107,7 +108,12 @@ class Julia(EmitABC[JuliaFrame, str], Generic[IO_t]):
                 self.io.flush()
         return
 
-    def emit_attribute(self, frame: JuliaFrame, node: ir.Attribute) -> str:
+    def frame_call(
+        self, frame: JuliaFrame, node: ir.Statement, *args: str, **kwargs: str
+    ) -> str:
+        return f"{args[0]}({', '.join(args[1:])})"
+
+    def get_attribute(self, frame: JuliaFrame, node: ir.Attribute) -> str:
         method = self.registry.get(interp.Signature(type(node)))
         if method is None:
             raise ValueError(f"Method not found for node: {node}")

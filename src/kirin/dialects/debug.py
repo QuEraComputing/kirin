@@ -74,4 +74,4 @@ class JuliaEmit(interp.MethodTable):
     def info(self, emit: emit.Julia, frame: emit.JuliaFrame, stmt: Info):
         msg = frame.get(stmt.msg)
         inputs = " ".join(frame.get(input) for input in stmt.inputs)
-        frame.write_line(f'@info "{msg}" {inputs}')
+        frame.write_line(f'@info "{msg[1:-1]}" {inputs}')
