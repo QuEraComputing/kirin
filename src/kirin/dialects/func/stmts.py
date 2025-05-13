@@ -51,6 +51,8 @@ class Function(ir.Statement):
     """The signature of the function at declaration."""
     body: ir.Region = info.region(multi=True)
     """The body of the function."""
+    result: ir.ResultValue = info.result(MethodType)
+    """The result of the function."""
 
     def print_impl(self, printer: Printer) -> None:
         with printer.rich(style="keyword"):
