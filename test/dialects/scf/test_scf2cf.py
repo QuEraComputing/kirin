@@ -193,7 +193,3 @@ def test_scf2cf_for_1():
         basic.run_pass(expected_test, typeinfer=True, fold=False)
 
     assert expected_test.callable_region.is_structurally_equal(test.callable_region)
-
-
-if __name__ == "__main__":
-    test_scf2cf_for_1()
