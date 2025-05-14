@@ -1,7 +1,7 @@
 from kirin import ir, types
-from kirin.prelude import structural
+from kirin.prelude import basic, structural
 from kirin.rewrite import Walk
-from kirin.dialects import cf, py, func
+from kirin.dialects import cf, py, func, ilist
 from kirin.dialects.scf import scf2cf
 
 
@@ -18,6 +18,7 @@ def test_scf2cf_if_1():
 
     rule = Walk(scf2cf.ScfToCfRule())
     rule.rewrite(test.code)
+    test = test.similar(basic)
 
     excpected_callable_region = ir.Region(
         [
@@ -71,13 +72,13 @@ def test_scf2cf_if_1():
     )
 
     expected_test = ir.Method(
-        dialects=structural,
+        dialects=basic,
         code=expected_code,
     )
 
-    if structural.run_pass is not None:
-        structural.run_pass(expected_test, typeinfer=True)
-        structural.run_pass(test, typeinfer=True)
+    if basic.run_pass is not None:
+        basic.run_pass(expected_test, typeinfer=True)
+        basic.run_pass(test, typeinfer=True)
 
     assert expected_test.callable_region.is_structurally_equal(test.callable_region)
 
@@ -92,11 +93,107 @@ def test_scf2cf_for_1():
 
         return j
 
-    test.print()
-
     rule = Walk(scf2cf.ScfToCfRule())
     rule.rewrite(test.code)
+    test = test.similar(basic)
+
+    expected_callable_region = ir.Region(
+        [
+            entry_block := ir.Block(),
+            body_block := ir.Block(),
+            exit_block := ir.Block(),
+        ]
+    )
+
+    entry_block.args.append_from(types.MethodType, "self")
+    entry_block.stmts.append(j_start := py.Constant(value=0))
+    j_start.result.name = "j"
+    entry_block.stmts.append(iter_start := py.Constant(value=0))
+    entry_block.stmts.append(iter_end := py.Constant(value=10))
+    entry_block.stmts.append(iter_step := py.Constant(value=1))
+    entry_block.stmts.append(
+        range_stmt := ilist.stmts.Range(
+            start=iter_start.result,
+            stop=iter_end.result,
+            step=iter_step.result,
+        )
+    )
+    entry_block.stmts.append(iterable_stmt := py.iterable.Iter(range_stmt.result))
+    entry_block.stmts.append(none_stmt := func.ConstantNone())
+    entry_block.stmts.append(
+        first_iter := py.iterable.Next(iterable_stmt.expect_one_result())
+    )
+    entry_block.stmts.append(
+        loop_cmp := py.cmp.Is(first_iter.expect_one_result(), none_stmt.result)
+    )
+    entry_block.stmts.append(
+        cf.ConditionalBranch(
+            cond=loop_cmp.result,
+            then_arguments=(j_start.result, j_start.result),
+            then_successor=exit_block,
+            else_arguments=(
+                first_iter.expect_one_result(),
+                j_start.result,
+                j_start.result,
+            ),
+            else_successor=body_block,
+        )
+    )
+
+    body_block.args.append_from(types.Any, "iter")
+    body_block.args.append_from(types.Int, "j")
+    body_block.args.append_from(types.Int, "j")
+
+    body_block.stmts.append(one_stmt := py.Constant(value=1))
+    body_block.stmts.append(
+        j_add := py.binop.Add(
+            lhs=body_block.args[1],
+            rhs=one_stmt.result,
+        )
+    )
+    body_block.stmts.append(
+        next_iter := py.iterable.Next(iterable_stmt.expect_one_result())
+    )
+    body_block.stmts.append(
+        loop_cmp := py.cmp.Is(next_iter.expect_one_result(), none_stmt.result)
+    )
+    body_block.stmts.append(
+        cf.ConditionalBranch(
+            cond=loop_cmp.result,
+            then_arguments=(j_add.result, j_add.result),
+            then_successor=exit_block,
+            else_arguments=(next_iter.expect_one_result(), j_add.result, j_add.result),
+            else_successor=body_block,
+        )
+    )
+
+    exit_block.args.append_from(types.Int, "j")
+    exit_block.args.append_from(types.Int, "j")
+    exit_block.stmts.append(func.Return(exit_block.args[1]))
+
+    expected_code = func.Function(
+        sym_name="test",
+        slots=(),
+        signature=func.Signature(
+            output=types.Int,
+            inputs=(),
+        ),
+        body=expected_callable_region,
+    )
+
+    expected_test = ir.Method(
+        dialects=basic,
+        code=expected_code,
+    )
 
     test.print()
 
-    assert False
+    if basic.run_pass is not None:
+        basic.run_pass(test, typeinfer=True, fold=False)
+        basic.run_pass(expected_test, typeinfer=True, fold=False)
+
+    assert expected_test.callable_region.is_structurally_equal(test.callable_region)
+
+
+if __name__ == "__main__":
+    test_scf2cf_for_1()

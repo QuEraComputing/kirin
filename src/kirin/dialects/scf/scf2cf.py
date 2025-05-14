@@ -90,7 +90,7 @@ class ScfToCfRule(RewriteRule):
                 cond=loop_cmp.result,
                 then_arguments=tuple(stmt.initializers),
                 then_successor=curr_block,
-                else_arguments=(next_stmt.expect_one_result(),) + tuple(stmt.results),
+                else_arguments=(next_stmt.expect_one_result(),) + tuple(stmt.args),
                 else_successor=body_block,
             )
         )
