@@ -56,7 +56,6 @@ class ScfToCfRule(RewriteRule):
         node.blocks.insert(block_idx, curr_block)
         node.blocks.insert(block_idx, else_block)
         node.blocks.insert(block_idx, then_block)
-        node.blocks.insert(block_idx, entry_block)
 
         curr_stmt = stmt
         next_stmt = stmt.prev_stmt
