@@ -50,6 +50,9 @@ class Attribute(ABC, Printable, metaclass=AttributeMeta):
     @abstractmethod
     def __hash__(self) -> int: ...
 
+    @abstractmethod
+    def __eq__(self, value: object) -> bool: ...
+
     @classmethod
     def has_trait(cls, trait_type: type[Trait["Attribute"]]) -> bool:
         """Check if the Statement has a specific trait.
