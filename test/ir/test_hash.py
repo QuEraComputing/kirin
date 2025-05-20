@@ -1,5 +1,6 @@
 from kirin import ir
 
+
 def test_hash():
     # Test hash collision for PyAttr with different values
     # This is a regression test for issue #1234
