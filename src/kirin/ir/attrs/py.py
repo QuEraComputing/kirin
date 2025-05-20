@@ -34,14 +34,14 @@ class PyAttr(Data[T]):
         else:
             self.type = pytype
 
-    def __hash__(self):
-        # Fix hash(-1) == hash(-2) collision
-        # assume maximum is 8 bytes == 64 bits
-        if isinstance(self.data, int):
-            return hash(self.data.to_bytes(signed=True, byteorder="big", length=8))
-        elif isinstance(self.data, float):
-            return hash(self.data.hex())
-        return hash(self.data) + hash(self.type)
+    def __hash__(self) -> int:
+        return hash((self.type, self.data))
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, PyAttr):
+            return False
+
+        return self.type == value.type and self.data == value.data
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(repr(self.data))
