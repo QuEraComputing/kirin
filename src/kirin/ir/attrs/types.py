@@ -351,13 +351,19 @@ class TypeVar(TypeAttribute):
 
 
 @typing.final
-@dataclass(eq=False)
+@dataclass
 class Vararg(Attribute):
     name = "Vararg"
     typ: TypeAttribute
 
     def __hash__(self) -> int:
         return hash((Vararg, self.typ))
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, Vararg):
+            return False
+
+        return self.typ == value.typ
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("*")
