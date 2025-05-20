@@ -9,3 +9,8 @@ def test_hash():
     b = ir.PyAttr(-2)
     assert hash(a) != hash(b)
     assert hash(a.data) == hash(b.data)
+
+    a = ir.PyAttr(-1.0)
+    b = ir.PyAttr(-2.0)
+    assert hash(a) != hash(b)
+    assert hash(a.data) == hash(b.data)
