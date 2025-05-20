@@ -170,6 +170,7 @@ class Frame(FrameABC[SSAValue, ValueType]):
         return self.get(key)  # type: ignore
 
     ExpectedType = TypeVar("ExpectedType")
+
     def get_typed(self, key: SSAValue, type_: type[ExpectedType]) -> ExpectedType:
         """Similar to [`get`][kirin.interp.frame.Frame.get] but also checks the type.
 
