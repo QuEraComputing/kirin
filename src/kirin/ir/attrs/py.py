@@ -38,7 +38,7 @@ class PyAttr(Data[T]):
         # Fix hash(-1) == hash(-2) collision
         # assume maximum is 8 bytes == 64 bits
         if isinstance(self.data, int):
-            return hash(self.data.to_bytes(signed=True, length=8))
+            return hash(self.data.to_bytes(signed=True, byteorder="big", length=8))
         elif isinstance(self.data, float):
             return hash(self.data.hex())
         return hash(self.data) + hash(self.type)
