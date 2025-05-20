@@ -35,6 +35,9 @@ class PyAttr(Data[T]):
             self.type = pytype
 
     def __hash__(self):
+        # Fix hash(-1) == hash(-2) collision
+        if isinstance(self.data, int):
+            return self.data
         return hash(self.data) + hash(self.type)
 
     def print_impl(self, printer: Printer) -> None:
