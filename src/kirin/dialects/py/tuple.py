@@ -49,6 +49,17 @@ class Concrete(interp.MethodTable):
 @dialect.register(key="typeinfer")
 class TypeInfer(interp.MethodTable):
 
+    @interp.impl(New)
+    def new_tuple(
+        self,
+        interp,
+        frame: interp.Frame[types.TypeAttribute],
+        stmt: New,
+    ):
+        arg_types = frame.get_values(stmt.args)
+        # arg_types should already be kirin compatible
+        return (types.Generic(tuple, *arg_types),)
+
     @interp.impl(ElType, types.PyClass(tuple))
     def eltype_tuple(self, interp, frame: interp.Frame, stmt: ElType):
         tuple_type = frame.get(stmt.container)
