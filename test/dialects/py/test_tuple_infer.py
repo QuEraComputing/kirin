@@ -23,8 +23,6 @@ def test_tuple_type_infer():
     typeinfer = TypeInference(structural)
     frame, _ = typeinfer.run(test)
 
-    test.print()
-
     assert [frame.entries[result] for result in results_at(test, 0, 1)] == [
         ktypes.Generic(tuple, ktypes.Bool, ktypes.Bool)
     ]
