@@ -200,29 +200,45 @@ class DialectGroup(Generic[PassParams]):
                 raise ValueError("Cannot compile lambda functions")
 
             lineno_offset, file = 0, ""
+            mt = None
             if frame and frame.f_back is not None:
                 call_site_frame = frame.f_back
                 if py_func.__name__ in call_site_frame.f_locals:
-                    raise CompilerError(
-                        f"overwriting function definition of `{py_func.__name__}`"
-                    )
+                    mt = call_site_frame.f_locals[py_func.__name__]
+                    if not isinstance(mt, Method):
+                        raise CompilerError(
+                            f"`{py_func.__name__}` is already defined in the current scope and is not a Method."
+                        )
 
                 lineno_offset = call_site_frame.f_lineno - 1
                 file = call_site_frame.f_code.co_filename
 
             code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
             arg_names = ["#self#"] + inspect.getfullargspec(py_func).args
-            mt = Method(
-                dialects=self,
-                code=code,
-                nargs=len(arg_names),
-                mod=inspect.getmodule(py_func),
-                py_func=py_func,
-                sym_name=py_func.__name__,
-                arg_names=arg_names,
-                file=file,
-                lineno_begin=lineno_offset,
-            )
+
+            if mt:
+                mt.mod = inspect.getmodule(py_func)
+                mt.dialects = self
+                mt.code = code
+                mt.py_func = py_func
+                mt.nargs = len(arg_names)
+                mt.arg_names = arg_names
+                mt.sym_name = py_func.__name__
+                mt.file = file
+                mt.lineno_begin = lineno_offset
+            else:
+                mt = Method(
+                    dialects=self,
+                    code=code,
+                    nargs=len(arg_names),
+                    mod=inspect.getmodule(py_func),
+                    py_func=py_func,
+                    sym_name=py_func.__name__,
+                    arg_names=arg_names,
+                    file=file,
+                    lineno_begin=lineno_offset,
+                )
+
             if doc := inspect.getdoc(py_func):
                 mt.__doc__ = doc
 

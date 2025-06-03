@@ -1,4 +1,5 @@
 from kirin.ir import DialectGroup
+from kirin.prelude import basic
 from kirin.dialects import cf, func
 from kirin.dialects.py import base
 
@@ -45,3 +46,21 @@ def test_discard():
     assert "DialectGroup(" in target_b_repr
     assert base.dialect.name in target_b_repr
     assert cf.dialect.name in target_b_repr
+
+
+def test_overwrite():
+    @basic
+    def foo(x):  # type: ignore
+        return x * 2
+
+    @basic
+    def main(x):
+        return x + foo(x)
+
+    assert main(2) == 6
+
+    @basic
+    def foo(x):  # noqa: F811
+        return x * 3
+
+    assert main(2) == 8
