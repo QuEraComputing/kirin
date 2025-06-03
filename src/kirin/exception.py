@@ -161,6 +161,9 @@ def exception_handler(exc_type, exc_value, exc_tb: types.TracebackType):
     if not KIRIN_PYTHON_STACKTRACE and issubclass(exc_type, StaticCheckError):
         console = Console(force_terminal=True)
         with console.capture() as capture:
+            console.print(
+                "==== Python stacktrace has been disabled for simplicity, set KIRIN_PYTHON_STACKTRACE=1 to enable it ===="
+            )
             console.print(f"[bold red]{exc_type.__name__}:[/bold red]", end="")
         print(capture.get(), *exc_value.args, file=sys.stderr)
         print("Source Traceback:", file=sys.stderr)

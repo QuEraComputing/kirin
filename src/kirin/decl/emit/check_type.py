@@ -45,9 +45,6 @@ class EmitCheckType(BaseModifier):
                 self._guard_ssa_type(f"{self._self_name}.{name}", name, value_type)
             )
 
-        for name in self.fields.blocks.keys():
-            body.append(f"{self._self_name}.{name}.verify_type()")
-
         for name, f in self.fields.regions.items():
             body.append(f"{self._self_name}.{name}.verify_type()")
 
