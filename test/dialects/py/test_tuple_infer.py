@@ -21,7 +21,7 @@ def test_tuple_type_infer():
         return (a[0], x)
 
     typeinfer = TypeInference(structural)
-    frame, _ = typeinfer.run(test)
+    frame, _ = typeinfer.run_analysis(test)
 
     assert [frame.entries[result] for result in results_at(test, 0, 1)] == [
         ktypes.Generic(tuple, ktypes.Bool, ktypes.Bool)
