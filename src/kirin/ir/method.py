@@ -10,6 +10,7 @@ from kirin.print.printer import Printer
 from kirin.print.printable import Printable
 
 from .traits import (
+    StaticCall,
     HasSignature,
     SymbolOpInterface,
     EntryPointInterface,
@@ -52,6 +53,9 @@ class Method(Printable, typing.Generic[Param, RetType]):
     inferred: bool = False
     """if typeinfer has been run on this method
     """
+    backedges: set[Method] = field(init=False, repr=False)
+    """Cache for the backedges. (who calls this method)"""
+    run_passes: typing.Callable[[Method], None] | None = field(init=False, repr=False)
 
     def __init__(
         self,
@@ -96,6 +100,9 @@ class Method(Printable, typing.Generic[Param, RetType]):
         self.file = file
         self.lineno_begin = lineno_begin
         self.inferred = inferred
+        self.backedges = set()
+        self.update_backedges()
+        self.run_passes = None
 
     def __hash__(self) -> int:
         return id(self)
@@ -185,3 +192,13 @@ class Method(Printable, typing.Generic[Param, RetType]):
         except ValidationError as e:
             e.attach(self)
             raise e
+
+    def update_backedges(self):
+        """Update the backedges of callee methods. (if they are static calls)"""
+        for stmt in self.code.walk():
+            trait = stmt.get_trait(StaticCall)
+            if not trait:
+                continue
+
+            callee = trait.get_callee(stmt)
+            callee.backedges.add(self)

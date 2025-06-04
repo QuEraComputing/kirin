@@ -1,5 +1,6 @@
 from kirin.ir import DialectGroup
 from kirin.prelude import basic
+from kirin.analysis import const
 from kirin.dialects import cf, func
 from kirin.dialects.py import base
 
@@ -64,3 +65,22 @@ def test_overwrite():
         return x * 3
 
     assert main(2) == 8
+
+
+def test_recompile():
+    @basic
+    def foo(x):  # type: ignore
+        return x * 2
+
+    @basic(fold=True)
+    def main(x):
+        return x + foo(x)
+
+    ret = main.callable_region.blocks[0].stmts.at(0).results[0]
+    assert isinstance(ret.hints.get("const"), const.Unknown)
+
+    @basic
+    def foo(x):  # noqa: F811
+        return 3
+
+    assert isinstance(ret.hints.get("const"), const.Value)

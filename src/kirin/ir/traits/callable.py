@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from kirin.ir.traits.abc import StmtTrait
 
 if TYPE_CHECKING:
-    from kirin.ir import Region, Statement
+    from kirin.ir import Method, Region, Statement
     from kirin.dialects.func.attrs import Signature
 
 StmtType = TypeVar("StmtType", bound="Statement")
@@ -63,3 +63,12 @@ class HasSignature(StmtTrait, ABC):
         signature = self.get_signature(node)
         if not isinstance(signature, Signature):
             raise ValueError(f"{signature} is not a Signature attribute")
+
+
+class StaticCall(StmtTrait, ABC, Generic[StmtType]):
+
+    @classmethod
+    @abstractmethod
+    def get_callee(cls, stmt: StmtType) -> "Method":
+        """Returns the callee of the static call statement."""
+        ...

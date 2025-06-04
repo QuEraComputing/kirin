@@ -31,6 +31,7 @@ from .symbol import (
     EntryPointInterface as EntryPointInterface,
 )
 from .callable import (
+    StaticCall as StaticCall,
     HasSignature as HasSignature,
     CallableStmtInterface as CallableStmtInterface,
 )

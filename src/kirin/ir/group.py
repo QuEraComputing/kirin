@@ -226,6 +226,9 @@ class DialectGroup(Generic[PassParams]):
                 mt.sym_name = py_func.__name__
                 mt.file = file
                 mt.lineno_begin = lineno_offset
+                mt.run_passes = self.run_pass
+                mt.update_backedges()  # update the callee
+                self.recompile_callers(mt)
             else:
                 mt = Method(
                     dialects=self,
@@ -242,19 +245,30 @@ class DialectGroup(Generic[PassParams]):
             if doc := inspect.getdoc(py_func):
                 mt.__doc__ = doc
 
-            if self.run_pass is not None:
-                try:
-                    self.run_pass(mt, *args, **options)
-                except ValidationError as e:
-                    e.attach(mt)
-                    raise e
+            def run_pass(mt: Method) -> None:
+                if self.run_pass is not None:
+                    try:
+                        self.run_pass(mt, *args, **options)
+                    except ValidationError as e:
+                        e.attach(mt)
+                        raise e
 
+            mt.run_passes = run_pass
+            run_pass(mt)
             self.update_symbol_table(mt)
             return mt
 
         if py_func is not None:
             return wrapper(py_func)
         return wrapper
+
+    def recompile_callers(self, method: Method) -> None:
+        for caller in method.backedges:
+            if caller.run_passes:
+                caller.run_passes(caller)
+            # propagate the changes to all callers
+            caller.dialects.recompile_callers(caller)
+        return
 
     def update_symbol_table(self, method: Method) -> None:
         trait = method.code.get_trait(SymbolTable)

@@ -30,6 +30,7 @@ from kirin.ir.traits import (
     HasParent as HasParent,
     MaybePure as MaybePure,
     StmtTrait as StmtTrait,
+    StaticCall as StaticCall,
     RegionGraph as RegionGraph,
     SymbolTable as SymbolTable,
     ConstantLike as ConstantLike,

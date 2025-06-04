@@ -30,6 +30,13 @@ class FuncOpCallableInterface(ir.CallableStmtInterface["Function"]):
         return tuple(inputs)
 
 
+class InvokeCall(ir.StaticCall["Invoke"]):
+
+    @classmethod
+    def get_callee(cls, stmt: Invoke) -> ir.Method:
+        return stmt.callee
+
+
 @statement(dialect=dialect)
 class Function(ir.Statement):
     name = "func"
@@ -270,7 +277,7 @@ class Call(ir.Statement):
 @statement(dialect=dialect)
 class Invoke(ir.Statement):
     name = "invoke"
-    traits = frozenset({ir.MaybePure()})
+    traits = frozenset({ir.MaybePure(), InvokeCall()})
     callee: ir.Method = info.attribute()
     inputs: tuple[ir.SSAValue, ...] = info.argument()
     result: ir.ResultValue = info.result()
