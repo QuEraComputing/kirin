@@ -136,7 +136,13 @@
 <span class=normal>254</span>
 <span class=normal>255</span>
 <span class=normal>256</span>
-<span class=normal>257</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__call__</span><span class=p>(</span>
+<span class=normal>257</span>
+<span class=normal>258</span>
+<span class=normal>259</span>
+<span class=normal>260</span>
+<span class=normal>261</span>
+<span class=normal>262</span>
+<span class=normal>263</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__call__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>py_func</span><span class=p>:</span> <span class=n>Callable</span><span class=p>[</span><span class=n>Param</span><span class=p>,</span> <span class=n>RetType</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
     <span class=o>*</span><span class=n>args</span><span class=p>:</span> <span class=n>PassParams</span><span class=o>.</span><span class=n>args</span><span class=p>,</span>
@@ -185,6 +191,9 @@
             <span class=n>mt</span><span class=o>.</span><span class=n>sym_name</span> <span class=o>=</span> <span class=n>py_func</span><span class=o>.</span><span class=vm>__name__</span>
             <span class=n>mt</span><span class=o>.</span><span class=n>file</span> <span class=o>=</span> <span class=n>file</span>
             <span class=n>mt</span><span class=o>.</span><span class=n>lineno_begin</span> <span class=o>=</span> <span class=n>lineno_offset</span>
+            <span class=n>mt</span><span class=o>.</span><span class=n>run_passes</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span>
+            <span class=n>mt</span><span class=o>.</span><span class=n>update_backedges</span><span class=p>()</span>  <span class=c1># update the callee</span>
+            <span class=bp>self</span><span class=o>.</span><span class=n>recompile_callers</span><span class=p>(</span><span class=n>mt</span><span class=p>)</span>
         <span class=k>else</span><span class=p>:</span>
             <span class=n>mt</span> <span class=o>=</span> <span class=n>Method</span><span class=p>(</span>
                 <span class=n>dialects</span><span class=o>=</span><span class=bp>self</span><span class=p>,</span>
@@ -201,13 +210,16 @@
         <span class=k>if</span> <span class=n>doc</span> <span class=o>:=</span> <span class=n>inspect</span><span class=o>.</span><span class=n>getdoc</span><span class=p>(</span><span class=n>py_func</span><span class=p>):</span>
             <span class=n>mt</span><span class=o>.</span><span class=vm>__doc__</span> <span class=o>=</span> <span class=n>doc</span>
 
-        <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
-            <span class=k>try</span><span class=p>:</span>
-                <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span><span class=p>(</span><span class=n>mt</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
-            <span class=k>except</span> <span class=n>ValidationError</span> <span class=k>as</span> <span class=n>e</span><span class=p>:</span>
-                <span class=n>e</span><span class=o>.</span><span class=n>attach</span><span class=p>(</span><span class=n>mt</span><span class=p>)</span>
-                <span class=k>raise</span> <span class=n>e</span>
+        <span class=k>def</span> <span class=nf>run_pass</span><span class=p>(</span><span class=n>mt</span><span class=p>:</span> <span class=n>Method</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+                <span class=k>try</span><span class=p>:</span>
+                    <span class=bp>self</span><span class=o>.</span><span class=n>run_pass</span><span class=p>(</span><span class=n>mt</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>options</span><span class=p>)</span>
+                <span class=k>except</span> <span class=n>ValidationError</span> <span class=k>as</span> <span class=n>e</span><span class=p>:</span>
+                    <span class=n>e</span><span class=o>.</span><span class=n>attach</span><span class=p>(</span><span class=n>mt</span><span class=p>)</span>
+                    <span class=k>raise</span> <span class=n>e</span>
 
+        <span class=n>mt</span><span class=o>.</span><span class=n>run_passes</span> <span class=o>=</span> <span class=n>run_pass</span>
+        <span class=n>run_pass</span><span class=p>(</span><span class=n>mt</span><span class=p>)</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>update_symbol_table</span><span class=p>(</span><span class=n>mt</span><span class=p>)</span>
         <span class=k>return</span> <span class=n>mt</span>
 
@@ -359,21 +371,7 @@
         <span class=k>pass</span>
 
     <span class=k>return</span> <span class=n>run_pass</span>
-</code></pre></div> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/group.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>278</span>
-<span class=normal>279</span>
-<span class=normal>280</span>
-<span class=normal>281</span>
-<span class=normal>282</span>
-<span class=normal>283</span>
-<span class=normal>284</span>
-<span class=normal>285</span>
-<span class=normal>286</span>
-<span class=normal>287</span>
-<span class=normal>288</span>
-<span class=normal>289</span>
-<span class=normal>290</span>
-<span class=normal>291</span>
-<span class=normal>292</span>
+</code></pre></div> </details> <details class=quote> <summary>Source code in <code>src/kirin/ir/group.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>292</span>
 <span class=normal>293</span>
 <span class=normal>294</span>
 <span class=normal>295</span>
@@ -394,7 +392,21 @@
 <span class=normal>310</span>
 <span class=normal>311</span>
 <span class=normal>312</span>
-<span class=normal>313</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>dialect_group</span><span class=p>(</span>
+<span class=normal>313</span>
+<span class=normal>314</span>
+<span class=normal>315</span>
+<span class=normal>316</span>
+<span class=normal>317</span>
+<span class=normal>318</span>
+<span class=normal>319</span>
+<span class=normal>320</span>
+<span class=normal>321</span>
+<span class=normal>322</span>
+<span class=normal>323</span>
+<span class=normal>324</span>
+<span class=normal>325</span>
+<span class=normal>326</span>
+<span class=normal>327</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>dialect_group</span><span class=p>(</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Union</span><span class=p>[</span><span class=s2>&quot;Dialect&quot;</span><span class=p>,</span> <span class=n>ModuleType</span><span class=p>]],</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Callable</span><span class=p>[[</span><span class=n>RunPassGen</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]],</span> <span class=n>DialectGroup</span><span class=p>[</span><span class=n>PassParams</span><span class=p>]]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Create a dialect group from the given dialects based on the</span>
