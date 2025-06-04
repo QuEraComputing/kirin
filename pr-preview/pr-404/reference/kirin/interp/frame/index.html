@@ -49,21 +49,64 @@
             <span class=k>raise</span> <span class=n>InterpreterError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;SSAValue </span><span class=si>{</span><span class=n>key</span><span class=si>}</span><span class=s2> not found&quot;</span><span class=p>)</span>
     <span class=k>else</span><span class=p>:</span>
         <span class=k>return</span> <span class=n>value</span>
-</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.frame.Frame.get_casted class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_casted</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_casted</span><span class=p>(</span>
-    <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>ExpectedType</span><span class=p>]</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ExpectedType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Same as <a class="autorefs autorefs-internal" href="#kirin.interp.frame.Frame.get"><code>get</code></a> except it forces the linter to think the value is of the expected type.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key(SSAValue)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The key to get the value for.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>type_(type)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The expected type.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ExpectedType</code></td> <td> <code><span title="kirin.interp.frame.Frame.ExpectedType">ExpectedType</span></code> </td> <td> <div class=doc-md-description> <p>The value.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>127</span>
-<span class=normal>128</span>
-<span class=normal>129</span>
-<span class=normal>130</span>
-<span class=normal>131</span>
-<span class=normal>132</span>
-<span class=normal>133</span>
-<span class=normal>134</span>
-<span class=normal>135</span>
-<span class=normal>136</span>
-<span class=normal>137</span>
-<span class=normal>138</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_casted</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>ExpectedType</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>ExpectedType</span><span class=p>:</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.frame.Frame.get_casted class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_casted</span> </h3> <div class=doc-overloads> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_casted</span><span class=p>(</span><span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>AType</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_casted</span><span class=p>(</span>
+    <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>]]</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>AType</span> <span class=o>|</span> <span class=n>BType</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_casted</span><span class=p>(</span>
+    <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span>
+    <span class=n>type_</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>CType</span><span class=p>]],</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>AType</span> <span class=o>|</span> <span class=n>BType</span> <span class=o>|</span> <span class=n>CType</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_casted</span><span class=p>(</span>
+    <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span>
+    <span class=n>type_</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span>
+        <span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>CType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>DType</span><span class=p>]</span>
+    <span class=p>],</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>AType</span> <span class=o>|</span> <span class=n>BType</span> <span class=o>|</span> <span class=n>CType</span> <span class=o>|</span> <span class=n>DType</span>
+</code></pre></div> </div> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_casted</span><span class=p>(</span>
+    <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span>
+    <span class=n>type_</span><span class=p>:</span> <span class=p>(</span>
+        <span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>]</span>
+        <span class=o>|</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>]]</span>
+        <span class=o>|</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>CType</span><span class=p>]]</span>
+        <span class=o>|</span> <span class=nb>tuple</span><span class=p>[</span>
+            <span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span>
+            <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>],</span>
+            <span class=nb>type</span><span class=p>[</span><span class=n>CType</span><span class=p>],</span>
+            <span class=nb>type</span><span class=p>[</span><span class=n>DType</span><span class=p>],</span>
+        <span class=p>]</span>
+    <span class=p>),</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>AType</span> <span class=o>|</span> <span class=n>BType</span> <span class=o>|</span> <span class=n>CType</span> <span class=o>|</span> <span class=n>DType</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Same as <a class="autorefs autorefs-internal" href="#kirin.interp.frame.Frame.get"><code>get</code></a> except it forces the linter to think the value is of the expected type.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key(SSAValue)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The key to get the value for.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>type_(type)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The expected type.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ExpectedType</code></td> <td> <code><span title="kirin.interp.frame.Frame.AType">AType</span> | <span title="kirin.interp.frame.Frame.BType">BType</span> | <span title="kirin.interp.frame.Frame.CType">CType</span> | <span title="kirin.interp.frame.Frame.DType">DType</span></code> </td> <td> <div class=doc-md-description> <p>The value.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>150</span>
+<span class=normal>151</span>
+<span class=normal>152</span>
+<span class=normal>153</span>
+<span class=normal>154</span>
+<span class=normal>155</span>
+<span class=normal>156</span>
+<span class=normal>157</span>
+<span class=normal>158</span>
+<span class=normal>159</span>
+<span class=normal>160</span>
+<span class=normal>161</span>
+<span class=normal>162</span>
+<span class=normal>163</span>
+<span class=normal>164</span>
+<span class=normal>165</span>
+<span class=normal>166</span>
+<span class=normal>167</span>
+<span class=normal>168</span>
+<span class=normal>169</span>
+<span class=normal>170</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_casted</span><span class=p>(</span>
+    <span class=bp>self</span><span class=p>,</span>
+    <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span>
+    <span class=n>type_</span><span class=p>:</span> <span class=p>(</span>
+        <span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>]</span>
+        <span class=o>|</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>]]</span>
+        <span class=o>|</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>CType</span><span class=p>]]</span>
+        <span class=o>|</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>AType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>BType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>CType</span><span class=p>],</span> <span class=nb>type</span><span class=p>[</span><span class=n>DType</span><span class=p>]]</span>
+    <span class=p>),</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>AType</span> <span class=o>|</span> <span class=n>BType</span> <span class=o>|</span> <span class=n>CType</span> <span class=o>|</span> <span class=n>DType</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Same as [`get`][kirin.interp.frame.Frame.get] except it</span>
 <span class=sd>    forces the linter to think the value is of the expected type.</span>
 
@@ -78,23 +121,23 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.frame.Frame.get_typed class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_typed</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_typed</span><span class=p>(</span>
     <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>ExpectedType</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ExpectedType</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Similar to <a class="autorefs autorefs-internal" href="#kirin.interp.frame.Frame.get"><code>get</code></a> but also checks the type.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key(SSAValue)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The key to get the value for.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>type_(type)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The expected type.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ExpectedType</code></td> <td> <code><span title="kirin.interp.frame.Frame.ExpectedType">ExpectedType</span></code> </td> <td> <div class=doc-md-description> <p>The value.</p> </div> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.interp.exceptions.InterpreterError" href="../exceptions/#kirin.interp.exceptions.InterpreterError">InterpreterError</a></code> </td> <td> <div class=doc-md-description> <p>If the value is not of the expected type.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>140</span>
-<span class=normal>141</span>
-<span class=normal>142</span>
-<span class=normal>143</span>
-<span class=normal>144</span>
-<span class=normal>145</span>
-<span class=normal>146</span>
-<span class=normal>147</span>
-<span class=normal>148</span>
-<span class=normal>149</span>
-<span class=normal>150</span>
-<span class=normal>151</span>
-<span class=normal>152</span>
-<span class=normal>153</span>
-<span class=normal>154</span>
-<span class=normal>155</span>
-<span class=normal>156</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_typed</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>ExpectedType</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>ExpectedType</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Similar to <a class="autorefs autorefs-internal" href="#kirin.interp.frame.Frame.get"><code>get</code></a> but also checks the type.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key(SSAValue)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The key to get the value for.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>type_(type)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The expected type.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>ExpectedType</code></td> <td> <code><span title="kirin.interp.frame.Frame.ExpectedType">ExpectedType</span></code> </td> <td> <div class=doc-md-description> <p>The value.</p> </div> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.interp.exceptions.InterpreterError" href="../exceptions/#kirin.interp.exceptions.InterpreterError">InterpreterError</a></code> </td> <td> <div class=doc-md-description> <p>If the value is not of the expected type.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>174</span>
+<span class=normal>175</span>
+<span class=normal>176</span>
+<span class=normal>177</span>
+<span class=normal>178</span>
+<span class=normal>179</span>
+<span class=normal>180</span>
+<span class=normal>181</span>
+<span class=normal>182</span>
+<span class=normal>183</span>
+<span class=normal>184</span>
+<span class=normal>185</span>
+<span class=normal>186</span>
+<span class=normal>187</span>
+<span class=normal>188</span>
+<span class=normal>189</span>
+<span class=normal>190</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_typed</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>type_</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>ExpectedType</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=n>ExpectedType</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Similar to [`get`][kirin.interp.frame.Frame.get] but also checks the type.</span>
 
 <span class=sd>    Args:</span>
@@ -112,8 +155,8 @@
         <span class=k>raise</span> <span class=n>InterpreterError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;expected </span><span class=si>{</span><span class=n>type_</span><span class=si>}</span><span class=s2>, got </span><span class=si>{</span><span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>)</span>
     <span class=k>return</span> <span class=n>value</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.interp.frame.Frame.set class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">set</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nb>set</span><span class=p>(</span><span class=nf>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Set the value for the given key. See also <a class="autorefs autorefs-internal" href="#kirin.interp.frame.FrameABC.set_values"><code>set_values</code></a>.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key(KeyType)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The key to set the value for.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>value(ValueType)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The value.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>158</span>
-<span class=normal>159</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>set</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Set the value for the given key. See also <a class="autorefs autorefs-internal" href="#kirin.interp.frame.FrameABC.set_values"><code>set_values</code></a>.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>key(KeyType)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The key to set the value for.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>value(ValueType)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>The value.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/interp/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>192</span>
+<span class=normal>193</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>set</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>entries</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>value</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h2 id=kirin.interp.frame.FrameABC class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">FrameABC</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>FrameABC</span><span class=p>(</span>
     <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span>
