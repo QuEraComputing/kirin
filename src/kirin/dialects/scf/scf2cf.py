@@ -89,7 +89,8 @@ class ScfToCfRule(RewriteRule):
                 cond=loop_cmp.result,
                 then_arguments=tuple(stmt.initializers),
                 then_successor=curr_block,
-                else_arguments=(next_stmt.expect_one_result(),) + tuple(stmt.args),
+                else_arguments=(next_stmt.expect_one_result(),)
+                + tuple(stmt.initializers),
                 else_successor=body_block,
             )
         )
@@ -110,11 +111,11 @@ class ScfToCfRule(RewriteRule):
             last_stmt.replace_by(
                 cf.ConditionalBranch(
                     cond=loop_cmp.result,
-                    then_arguments=(next_stmt.expect_one_result(),)
+                    else_arguments=(next_stmt.expect_one_result(),)
                     + tuple(last_stmt.args),
-                    then_successor=curr_block,
-                    else_arguments=tuple(last_stmt.args),
                     else_successor=body_block,
+                    then_arguments=tuple(last_stmt.args),
+                    then_successor=curr_block,
                 )
             )
 

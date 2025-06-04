@@ -118,6 +118,7 @@ def test_scf2cf_for_1():
             step=iter_step.result,
         )
     )
+    range_stmt.result.type = ilist.IListType[types.Int, types.Literal(10)]
     entry_block.stmts.append(iterable_stmt := py.iterable.Iter(range_stmt.result))
     entry_block.stmts.append(none_stmt := func.ConstantNone())
     entry_block.stmts.append(
@@ -140,7 +141,7 @@ def test_scf2cf_for_1():
         )
     )
 
-    body_block.args.append_from(types.Any, "iter")
+    body_block.args.append_from(types.Int, "i")
     body_block.args.append_from(types.Int, "j")
     body_block.args.append_from(types.Int, "j")
 
@@ -151,6 +152,8 @@ def test_scf2cf_for_1():
             rhs=one_stmt.result,
         )
     )
+    j_add.result.name = "j"
+    j_add.result.type = types.Int
     body_block.stmts.append(
         next_iter := py.iterable.Next(iterable_stmt.expect_one_result())
     )
@@ -175,7 +178,7 @@ def test_scf2cf_for_1():
         sym_name="test",
         slots=(),
         signature=func.Signature(
-            output=types.Int,
+            output=types.Literal(10),
             inputs=(),
         ),
         body=expected_callable_region,
@@ -187,9 +190,14 @@ def test_scf2cf_for_1():
     )
 
     test.print()
+    expected_test.print()
 
     if basic.run_pass is not None:
         basic.run_pass(test, typeinfer=True, fold=False)
         basic.run_pass(expected_test, typeinfer=True, fold=False)
 
     assert expected_test.callable_region.is_structurally_equal(test.callable_region)
+
+
+if __name__ == "__main__":
+    test_scf2cf_for_1()
