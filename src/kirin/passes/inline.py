@@ -13,11 +13,11 @@ def aggresive(x: ir.IRNode) -> bool:
 
 @dataclass
 class InlinePass(Pass):
-    herustic: Callable[[ir.IRNode], bool] = field(default=aggresive)
+    heuristic: Callable[[ir.IRNode], bool] = field(default=aggresive)
 
     def unsafe_run(self, mt: ir.Method) -> RewriteResult:
 
-        result = Walk(Inline(heuristic=self.herustic)).rewrite(mt.code)
+        result = Walk(Inline(heuristic=self.heuristic)).rewrite(mt.code)
         result = Walk(CFGCompactify()).rewrite(mt.code).join(result)
 
         # dce

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Iterable
+from typing import Generic, TypeVar, Iterable, overload
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
@@ -122,9 +122,41 @@ class Frame(FrameABC[SSAValue, ValueType]):
         else:
             return value
 
-    ExpectedType = TypeVar("ExpectedType")
+    AType = TypeVar("AType")
+    BType = TypeVar("BType")
+    CType = TypeVar("CType")
+    DType = TypeVar("DType")
 
-    def get_casted(self, key: SSAValue, type_: type[ExpectedType]) -> ExpectedType:
+    @overload
+    def get_casted(self, key: SSAValue, type_: type[AType]) -> AType: ...
+
+    @overload
+    def get_casted(
+        self, key: SSAValue, type_: tuple[type[AType], type[BType]]
+    ) -> AType | BType: ...
+
+    @overload
+    def get_casted(
+        self, key: SSAValue, type_: tuple[type[AType], type[BType], type[CType]]
+    ) -> AType | BType | CType: ...
+
+    @overload
+    def get_casted(
+        self,
+        key: SSAValue,
+        type_: tuple[type[AType], type[BType], type[CType], type[DType]],
+    ) -> AType | BType | CType | DType: ...
+
+    def get_casted(
+        self,
+        key: SSAValue,
+        type_: (
+            type[AType]
+            | tuple[type[AType], type[BType]]
+            | tuple[type[AType], type[BType], type[CType]]
+            | tuple[type[AType], type[BType], type[CType], type[DType]]
+        ),
+    ) -> AType | BType | CType | DType:
         """Same as [`get`][kirin.interp.frame.Frame.get] except it
         forces the linter to think the value is of the expected type.
 
@@ -136,6 +168,8 @@ class Frame(FrameABC[SSAValue, ValueType]):
             ExpectedType: The value.
         """
         return self.get(key)  # type: ignore
+
+    ExpectedType = TypeVar("ExpectedType")
 
     def get_typed(self, key: SSAValue, type_: type[ExpectedType]) -> ExpectedType:
         """Similar to [`get`][kirin.interp.frame.Frame.get] but also checks the type.

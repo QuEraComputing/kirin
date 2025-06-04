@@ -31,7 +31,7 @@ def test_inline_pass_custom_heru():
         y = inline_func(x)
         return y + 1
 
-    inline = InlinePass(main_inline_pass2.dialects, herustic=lambda x: False)
+    inline = InlinePass(main_inline_pass2.dialects, heuristic=lambda x: False)
     a = main_inline_pass2(1)
     main_inline_pass2.code.print()
     inline(main_inline_pass2)
