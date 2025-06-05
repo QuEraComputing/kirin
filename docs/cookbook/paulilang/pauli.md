@@ -633,7 +633,7 @@ print(cool_example())  # (2)!
 1. Register an implementation for the statement `X()`.
 2. Notice that we are actually *calling* the function this time.
 
-And, sure enough, when running the code, we now obtain a $2x2$ matrix:
+And, sure enough, when running the code, we now obtain a 2 x 2 matrix:
 
 ```python
 [[ 2.+2.j -2.+2.j]
