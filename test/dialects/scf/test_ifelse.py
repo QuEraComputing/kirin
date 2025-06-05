@@ -1,4 +1,5 @@
 from kirin import ir
+from kirin.passes import Fold
 from kirin.prelude import python_basic
 from kirin.dialects import scf, func, lowering
 
@@ -22,24 +23,69 @@ def kernel(self):
     return run_pass
 
 
-@kernel
-def main(x):
-    if x > 0:
-        y = x + 1
-        z = y + 1
-        return z
-    else:
-        y = x + 2
-        z = y + 2
+def test_basic_if_else():
+    @kernel
+    def main(x):
+        if x > 0:
+            y = x + 1
+            z = y + 1
+            return z
+        else:
+            y = x + 2
+            z = y + 2
 
-    if x < 0:
-        y = y + 3
-        z = y + 3
-    else:
-        y = x + 4
-        z = y + 4
-    return y, z
+        if x < 0:
+            y = y + 3
+            z = y + 3
+        else:
+            y = x + 4
+            z = y + 4
+        return y, z
+
+    main.print()
+    print(main(1))
 
 
-main.print()
-# print(main(1))
+def test_if_else_defs():
+
+    @kernel
+    def main(n: int):
+        x = 0
+
+        if x == n:
+            x = 1
+        else:
+            y = 2  # noqa: F841
+
+        return x
+
+    main.print()
+
+    # make sure fold doesn't remove the nested def
+    main2 = main.similar(kernel)
+    Fold(main2.dialects)(main2)
+
+    main2.print()
+
+    @kernel
+    def main_elif(n: int):
+        x = 0
+
+        if x == n:
+            x = 3
+        elif x == n + 1:
+            x = 4
+
+        return x
+
+    main_elif.print()
+
+    main_elif2 = main_elif.similar(kernel)
+    Fold(main_elif2.dialects)(main_elif2)
+
+    main_elif2.print()
+
+    assert main_elif2.code.is_equal(main2.code)
+
+
+# test_if_else_defs()

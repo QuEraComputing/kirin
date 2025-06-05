@@ -29,21 +29,18 @@ class Lowering(lowering.FromPythonAST):
         yield_names: list[str] = []
         body_yields: list[ir.SSAValue] = []
         else_yields: list[ir.SSAValue] = []
-        if node.orelse:
-            for name in body_frame.defs.keys():
-                if name in else_frame.defs:
-                    yield_names.append(name)
-                    body_yields.append(body_frame[name])
-                    else_yields.append(else_frame[name])
-        else:
-            for name in body_frame.defs.keys():
-                if name in frame.defs:
-                    yield_names.append(name)
-                    body_yields.append(body_frame[name])
-                    value = frame.get(name)
-                    if value is None:
-                        raise lowering.BuildError(f"expected value for {name}")
-                    else_yields.append(value)
+        for name in body_frame.defs.keys():
+            if name in else_frame.defs:
+                yield_names.append(name)
+                body_yields.append(body_frame[name])
+                else_yields.append(else_frame[name])
+            elif name in frame.defs:
+                yield_names.append(name)
+                body_yields.append(body_frame[name])
+                value = frame.get(name)
+                if value is None:
+                    raise lowering.BuildError(f"expected value for {name}")
+                else_yields.append(value)
 
         if not (
             body_frame.curr_block.last_stmt
