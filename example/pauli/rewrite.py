@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from kirin import ir
-from kirin.rewrite import abc, result
+from kirin.rewrite import abc
 from kirin.dialects import py
 
 from .stmts import X, Y, Z, Id, PauliOperator
@@ -9,34 +9,34 @@ from .stmts import X, Y, Z, Id, PauliOperator
 
 @dataclass
 class RewritePauliMult(abc.RewriteRule):
-    def rewrite_Statement(self, node: ir.Statement) -> result.RewriteResult:
+    def rewrite_Statement(self, node: ir.Statement) -> abc.RewriteResult:
         if not isinstance(node, py.binop.Mult):
-            return result.RewriteResult()
+            return abc.RewriteResult()
 
         if not isinstance(node.lhs.owner, PauliOperator) and not isinstance(
             node.rhs.owner, PauliOperator
         ):
-            return result.RewriteResult()
+            return abc.RewriteResult()
 
         if isinstance(node.lhs.owner, py.Constant):
             assert isinstance(node.rhs.owner, PauliOperator)  # make the linter happy
             new_op = self.number_pauli_mult(node.lhs.owner, node.rhs.owner)
             node.replace_by(new_op)
-            return result.RewriteResult(has_done_something=True)
+            return abc.RewriteResult(has_done_something=True)
         elif isinstance(node.rhs.owner, py.Constant):
             assert isinstance(node.lhs.owner, PauliOperator)  # make the linter happy
             new_op = self.number_pauli_mult(node.rhs.owner, node.lhs.owner)
             node.replace_by(new_op)
-            return result.RewriteResult(has_done_something=True)
+            return abc.RewriteResult(has_done_something=True)
 
         if not isinstance(node.lhs.owner, PauliOperator) or not isinstance(
             node.rhs.owner, PauliOperator
         ):
-            return result.RewriteResult()
+            return abc.RewriteResult()
 
         new_op = self.pauli_pauli_mult(node.lhs.owner, node.rhs.owner)
         node.replace_by(new_op)
-        return result.RewriteResult(has_done_something=True)
+        return abc.RewriteResult(has_done_something=True)
 
     @staticmethod
     def number_pauli_mult(lhs: py.Constant, rhs: PauliOperator) -> PauliOperator:

@@ -138,35 +138,35 @@ Since we want to rewrite statements of our dialect, the entry point we define in
 ```python
 from dataclasses import dataclass
 
-from kirin.rewrite import abc, result
+from kirin.rewrite import abc
 from kirin.dialects import py
 
 
 @dataclass
 class RewritePauliMult(abc.RewriteRule):
-    def rewrite_Statement(self, node: ir.Statement) -> result.RewriteResult:
+    def rewrite_Statement(self, node: ir.Statement) -> abc.RewriteResult:
         if not isinstance(node, py.binop.Mult):  # (1)!
-            return result.RewriteResult()
+            return abc.RewriteResult()
 
         if not isinstance(node.lhs.owner, PauliOperator) and not isinstance(node.rhs.owner, PauliOperator):  # (2)!
-            return result.RewriteResult()
+            return abc.RewriteResult()
 
         if isinstance(node.lhs.owner, py.Constant): # (3)!
             new_op = self.number_pauli_mult(node.lhs.owner, node.rhs.owner)
             node.replace_by(new_op)
-            return result.RewriteResult(has_done_something=True)
+            return abc.RewriteResult(has_done_something=True)
         elif isinstance(node.rhs.owner, py.Constant): # (4)!
             new_op = self.number_pauli_mult(node.rhs.owner, node.lhs.owner)
             node.replace_by(new_op)
-            return result.RewriteResult(has_done_something=True)
+            return abc.RewriteResult(has_done_something=True)
 
 
         if not isinstance(node.lhs.owner, PauliOperator) or not isinstance(node.rhs.owner, PauliOperator):  # (5)!
-                return result.RewriteResult()
+                return abc.RewriteResult()
 
         new_op = self.pauli_pauli_mult(node.lhs.owner, node.rhs.owner)  #(6)!
         node.replace_by(new_op)
-        return result.RewriteResult(has_done_something=True)
+        return abc.RewriteResult(has_done_something=True)
 
     ...
 ```
@@ -411,9 +411,9 @@ The basic principle is the same as before.
 ```python
 @dataclass
 class RewriteDistributeMult(abc.RewriteRule):
-    def rewrite_Statement(self, node: ir.Statement) -> result.RewriteResult:
+    def rewrite_Statement(self, node: ir.Statement) -> abc.RewriteResult:
         if not isinstance(node, py.binop.Mult):  # (1)!
-            return result.RewriteResult()
+            return abc.RewriteResult()
 
         if isinstance(node.lhs.owner, py.binop.Add):  # (2)!
             m1 = py.binop.Mult(node.lhs.owner.lhs, node.rhs)  # (3)!
@@ -424,7 +424,7 @@ class RewriteDistributeMult(abc.RewriteRule):
 
             a = py.binop.Add(m1.result, m2.result)  # (5)!
             node.replace_by(a)  # (6)!
-            return result.RewriteResult(has_done_something=True)
+            return abc.RewriteResult(has_done_something=True)
 
         if isinstance(node.rhs.owner, py.binop.Add):
             m1 = py.binop.Mult(node.lhs, node.rhs.owner.lhs)
@@ -435,9 +435,9 @@ class RewriteDistributeMult(abc.RewriteRule):
 
             a = py.binop.Add(m1.result, m2.result)
             node.replace_by(a)
-            return result.RewriteResult(has_done_something=True)
+            return abc.RewriteResult(has_done_something=True)
 
-        return result.RewriteResult()
+        return abc.RewriteResult()
 ```
 
 1. Again, we want to make sure we're looking at a multiplication.
@@ -675,7 +675,7 @@ Amazing.
 
 But, wait:
 if constant folding can evaluate additions, couldn't it also evaluate multiplications?
-Wouldn't the make our multiplication rewrite pass obsolete?
+Wouldn't that make our multiplication rewrite pass obsolete?
 Sort of:
 this would mean that you still evaluate a whole bunch of matrix products, just at compile time rather than at runtime.
 Our rewriting pass, instead uses a symbolic approach to rewrite multiplications without the need to actually evaluate a matrix multiplication.
