@@ -19,6 +19,17 @@ from .hint_const import HintConst
 
 @dataclass
 class Fold(Pass):
+    """
+    Pass that runs a number of small optimization rewrites.
+
+    Specifically, the following rewrites are chained:
+
+    - `ConstantFold`
+    - `InlineGetItem`
+    - `Call2Invoke`
+    - `DeadCodeElimination`
+    """
+
     hint_const: HintConst = field(init=False)
 
     def __post_init__(self):
