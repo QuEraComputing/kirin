@@ -1,5 +1,7 @@
 """Bindings for built-in types."""
 
+import numbers
+
 from kirin.ir.method import Method
 from kirin.ir.attrs.types import (
     Union as Union,
@@ -20,6 +22,7 @@ Bottom = BottomType()
 Int = PyClass(int)
 Float = PyClass(float)
 Complex = PyClass(complex)
+Number = PyClass(numbers.Number)
 String = PyClass(str)
 Bool = PyClass(bool)
 NoneType = PyClass(type(None))
