@@ -37,11 +37,17 @@
 <span class=normal>176</span>
 <span class=normal>177</span>
 <span class=normal>178</span>
-<span class=normal>179</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>exception_handler</span><span class=p>(</span><span class=n>exc_type</span><span class=p>,</span> <span class=n>exc_value</span><span class=p>,</span> <span class=n>exc_tb</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TracebackType</span><span class=p>):</span>
+<span class=normal>179</span>
+<span class=normal>180</span>
+<span class=normal>181</span>
+<span class=normal>182</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>exception_handler</span><span class=p>(</span><span class=n>exc_type</span><span class=p>,</span> <span class=n>exc_value</span><span class=p>,</span> <span class=n>exc_tb</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TracebackType</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Custom exception handler to format and print exceptions.&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=n>KIRIN_PYTHON_STACKTRACE</span> <span class=ow>and</span> <span class=nb>issubclass</span><span class=p>(</span><span class=n>exc_type</span><span class=p>,</span> <span class=n>StaticCheckError</span><span class=p>):</span>
         <span class=n>console</span> <span class=o>=</span> <span class=n>Console</span><span class=p>(</span><span class=n>force_terminal</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
         <span class=k>with</span> <span class=n>console</span><span class=o>.</span><span class=n>capture</span><span class=p>()</span> <span class=k>as</span> <span class=n>capture</span><span class=p>:</span>
+            <span class=n>console</span><span class=o>.</span><span class=n>print</span><span class=p>(</span>
+                <span class=s2>&quot;==== Python stacktrace has been disabled for simplicity, set KIRIN_PYTHON_STACKTRACE=1 to enable it ====&quot;</span>
+            <span class=p>)</span>
             <span class=n>console</span><span class=o>.</span><span class=n>print</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;[bold red]</span><span class=si>{</span><span class=n>exc_type</span><span class=o>.</span><span class=vm>__name__</span><span class=si>}</span><span class=s2>:[/bold red]&quot;</span><span class=p>,</span> <span class=n>end</span><span class=o>=</span><span class=s2>&quot;&quot;</span><span class=p>)</span>
         <span class=nb>print</span><span class=p>(</span><span class=n>capture</span><span class=o>.</span><span class=n>get</span><span class=p>(),</span> <span class=o>*</span><span class=n>exc_value</span><span class=o>.</span><span class=n>args</span><span class=p>,</span> <span class=n>file</span><span class=o>=</span><span class=n>sys</span><span class=o>.</span><span class=n>stderr</span><span class=p>)</span>
         <span class=nb>print</span><span class=p>(</span><span class=s2>&quot;Source Traceback:&quot;</span><span class=p>,</span> <span class=n>file</span><span class=o>=</span><span class=n>sys</span><span class=o>.</span><span class=n>stderr</span><span class=p>)</span>
