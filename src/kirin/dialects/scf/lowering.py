@@ -14,10 +14,6 @@ class Lowering(lowering.FromPythonAST):
         cond = state.lower(node.test).expect_one()
         frame = state.current_frame
 
-        # NOTE: make sure to keep definitions from outer scope
-        if frame.parent is not None:
-            frame.defs.update(frame.parent.defs)
-
         with state.frame(node.body, finalize_next=False) as body_frame:
             then_cond = body_frame.curr_block.args.append_from(types.Bool, cond.name)
             if cond.name:
@@ -42,6 +38,14 @@ class Lowering(lowering.FromPythonAST):
                 yield_names.append(name)
                 body_yields.append(body_frame[name])
                 value = frame.get(name)
+                if value is None:
+                    raise lowering.BuildError(f"expected value for {name}")
+                else_yields.append(value)
+            elif frame.parent is not None and name in frame.parent.defs:
+                # NOTE: check outer frame definitions too
+                yield_names.append(name)
+                body_yields.append(body_frame[name])
+                value = frame.parent.get(name)
                 if value is None:
                     raise lowering.BuildError(f"expected value for {name}")
                 else_yields.append(value)
