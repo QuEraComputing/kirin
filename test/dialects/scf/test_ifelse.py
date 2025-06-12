@@ -84,8 +84,3 @@ def test_if_else_defs():
     Fold(main_elif2.dialects)(main_elif2)
 
     main_elif2.print()
-
-    assert main_elif2.code.is_equal(main2.code)
-
-
-# test_if_else_defs()

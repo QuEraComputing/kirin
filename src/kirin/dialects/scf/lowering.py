@@ -14,6 +14,10 @@ class Lowering(lowering.FromPythonAST):
         cond = state.lower(node.test).expect_one()
         frame = state.current_frame
 
+        # NOTE: make sure to keep definitions from outer scope
+        if frame.parent is not None:
+            frame.defs.update(frame.parent.defs)
+
         with state.frame(node.body, finalize_next=False) as body_frame:
             then_cond = body_frame.curr_block.args.append_from(types.Bool, cond.name)
             if cond.name:
