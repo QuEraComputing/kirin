@@ -10,6 +10,22 @@ from ._dialect import dialect
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
+    @staticmethod
+    def _frame_or_any_parent_has_def(frame, name) -> ir.SSAValue | None:
+        # NOTE: this recursively checks all parents of the current frame for the
+        # def. Required for nested if statements that e.g. assign to variables
+        # defined in outer scope
+        if frame is None:
+            return None
+
+        if name in frame.defs:
+            value = frame.get(name)
+            if value is None:
+                raise lowering.BuildError(f"expected value for {name}")
+            return value
+
+        return Lowering._frame_or_any_parent_has_def(frame.parent, name)
+
     def lower_If(self, state: lowering.State, node: ast.If) -> lowering.Result:
         cond = state.lower(node.test).expect_one()
         frame = state.current_frame
@@ -29,21 +45,15 @@ class Lowering(lowering.FromPythonAST):
         yield_names: list[str] = []
         body_yields: list[ir.SSAValue] = []
         else_yields: list[ir.SSAValue] = []
-        if node.orelse:
-            for name in body_frame.defs.keys():
-                if name in else_frame.defs:
-                    yield_names.append(name)
-                    body_yields.append(body_frame[name])
-                    else_yields.append(else_frame[name])
-        else:
-            for name in body_frame.defs.keys():
-                if name in frame.defs:
-                    yield_names.append(name)
-                    body_yields.append(body_frame[name])
-                    value = frame.get(name)
-                    if value is None:
-                        raise lowering.BuildError(f"expected value for {name}")
-                    else_yields.append(value)
+        for name in body_frame.defs.keys():
+            if name in else_frame.defs:
+                yield_names.append(name)
+                body_yields.append(body_frame[name])
+                else_yields.append(else_frame[name])
+            elif (value := self._frame_or_any_parent_has_def(frame, name)) is not None:
+                yield_names.append(name)
+                body_yields.append(body_frame[name])
+                else_yields.append(value)
 
         if not (
             body_frame.curr_block.last_stmt
