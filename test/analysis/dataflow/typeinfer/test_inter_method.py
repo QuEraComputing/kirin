@@ -10,12 +10,12 @@ def foo(x: int):
         return x - 1.0
 
 
-@basic(typeinfer=True)
+@basic(typeinfer=True, no_raise=False)
 def main(x: int):
     return foo(x)
 
 
-@basic(typeinfer=True)
+@basic(typeinfer=True, no_raise=False)
 def moo(x):
     return foo(x)
 
@@ -28,3 +28,18 @@ def test_inter_method_infer():
     assert foo.arg_types[0] == types.Int
     assert foo.inferred is False
     assert foo.return_type is types.Any
+
+
+def test_infer_if_return():
+    from kirin.prelude import structural
+
+    @structural(typeinfer=True, fold=True, no_raise=False)
+    def test(b: bool):
+        if b:
+            return False
+        else:
+            b = not b
+
+        return b
+
+    test.print()
