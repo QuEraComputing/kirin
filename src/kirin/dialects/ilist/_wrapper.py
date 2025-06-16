@@ -65,3 +65,7 @@ def for_each(
     fn: typing.Callable[[ElemT], typing.Any],
     collection: IList[ElemT, LenT] | list[ElemT],
 ) -> None: ...
+
+
+@lowering.wraps(stmts.Any)
+def any(collection: IList[bool, LenT] | list[bool]) -> bool: ...

@@ -75,3 +75,22 @@ def test_scan_wrapper():
         10 + 1 + 1 + 1 + 3,
         10 + 1 + 1 + 1 + 1 + 4,
     ]
+
+
+def test_any_wrapper():
+
+    @basic
+    def test_any():
+        ls = [True, False, False]
+        return ls, ilist.any(ls)
+
+    test_any.print()
+
+    assert test_any()[1]
+
+    @basic
+    def test_any2():
+        ls = [False, False]
+        return ilist.any(ls)
+
+    assert not test_any2()

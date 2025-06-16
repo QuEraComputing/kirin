@@ -112,3 +112,10 @@ class ForEach(ir.Statement):
     purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(types.Generic(ir.Method, [ElemT], types.NoneType))
     collection: ir.SSAValue = info.argument(IListType[ElemT])
+
+
+@statement(dialect=dialect)
+class Any(ir.Statement):
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    collection: ir.SSAValue = info.argument(IListType[types.Bool, ListLen])
+    result: ir.ResultValue = info.result(types.Bool)
