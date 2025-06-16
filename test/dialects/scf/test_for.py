@@ -1,7 +1,7 @@
 import pytest
 
 from kirin import ir, types, rewrite
-from kirin.prelude import python_basic
+from kirin.prelude import python_basic, structural_no_opt
 from kirin.dialects import py, scf, func, ilist, lowering
 
 
@@ -95,3 +95,20 @@ def test_unused_loop_vars():
     assert len(loop.initializers) == 1
     assert len(loop.body.blocks[0].args) == 2
     # assert main(5) == 4
+
+
+def test_body_with_no_yield():
+
+    @structural_no_opt
+    def julia_like(x: int, y: int):
+        for i in range(x):
+            i == 0
+        return x + y
+
+    julia_like.print()
+
+    for_stmt = next(
+        stmt for stmt in julia_like.callable_region.stmts() if isinstance(stmt, scf.For)
+    )
+    for_body_stmts = list(for_stmt.body.stmts())
+    assert isinstance(for_body_stmts[-1], scf.Yield)
