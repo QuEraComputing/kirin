@@ -77,20 +77,36 @@ def test_scan_wrapper():
     ]
 
 
-def test_any_wrapper():
+def test_any_all_wrapper():
 
     @basic
-    def test_any():
+    def test_any_all():
         ls = [True, False, False]
-        return ls, ilist.any(ls)
+        return ls, ilist.any(ls), ilist.all(ls)
 
-    test_any.print()
+    test_any_all.print()
 
-    assert test_any()[1]
+    ls, any_val, all_val = test_any_all()
+
+    assert isinstance(ls, ilist.IList)
+    assert ls.data == [True, False, False]
+    assert any_val
+    assert not all_val
 
     @basic
-    def test_any2():
+    def test_any_all2():
         ls = [False, False]
-        return ilist.any(ls)
+        return ilist.any(ls), ilist.all(ls)
 
-    assert not test_any2()
+    any_val, all_val = test_any_all2()
+    assert not any_val
+    assert not all_val
+
+    @basic
+    def test_any_all3():
+        ls = [True, True, True, True, True]
+        return ilist.any(ls), ilist.all(ls)
+
+    any_val, all_val = test_any_all3()
+    assert any_val
+    assert all_val

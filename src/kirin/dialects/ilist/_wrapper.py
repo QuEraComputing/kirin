@@ -69,3 +69,7 @@ def for_each(
 
 @lowering.wraps(stmts.Any)
 def any(collection: IList[bool, LenT] | list[bool]) -> bool: ...
+
+
+@lowering.wraps(stmts.All)
+def all(collection: IList[bool, LenT] | list[bool]) -> bool: ...

@@ -27,6 +27,7 @@ from .passes import IListDesugar as IListDesugar
 from .runtime import IList as IList
 from ._dialect import dialect as dialect
 from ._wrapper import (  # careful this is not the builtin range
+    all as all,
     any as any,
     map as map,
     scan as scan,
