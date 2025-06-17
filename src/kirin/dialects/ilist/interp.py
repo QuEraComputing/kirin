@@ -3,7 +3,7 @@ from kirin.interp import Frame, Interpreter, MethodTable, impl
 from kirin.dialects.py.len import Len
 from kirin.dialects.py.binop import Add
 
-from .stmts import Map, New, Push, Scan, Foldl, Foldr, Range, ForEach
+from .stmts import Map, New, Push, Scan, Foldl, Foldr, Range, Sorted, ForEach
 from .runtime import IList
 from ._dialect import dialect
 
@@ -96,3 +96,11 @@ class IListInterpreter(MethodTable):
             # NOTE: assume fn has been type checked
             interp.call(fn.code, fn, elem)
         return
+
+    @impl(Sorted)
+    def sorted(self, inter: Interpreter, frame: Frame, stmt: Sorted):
+        key = frame.get(stmt.key)
+        reverse: bool = frame.get(stmt.reverse)
+        coll: IList = frame.get(stmt.collection)
+
+        return (IList(data=sorted(coll.data, key=key, reverse=reverse)),)

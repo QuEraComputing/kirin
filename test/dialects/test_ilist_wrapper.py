@@ -75,3 +75,46 @@ def test_scan_wrapper():
         10 + 1 + 1 + 1 + 3,
         10 + 1 + 1 + 1 + 1 + 4,
     ]
+
+
+def test_sorted():
+    def key_test(a: int) -> int:
+        return a
+
+    @basic
+    def main():
+        ls = [2, 3, 1, 5, 4]
+        return (
+            ilist.sorted(ls),
+            ilist.sorted(ls, key=key_test),
+            ilist.sorted(ls, reverse=True),
+        )
+
+    main.print()
+
+    ls1, ls2, ls3 = main()
+    assert ls1.data == [1, 2, 3, 4, 5]
+    assert ls2.data == ls1.data
+    assert ls3.data == [5, 4, 3, 2, 1]
+
+    def first(x: tuple[str, int]) -> str:
+        return x[0]
+
+    def second(x: tuple[str, int]) -> int:
+        return x[1]
+
+    @basic
+    def main2():
+        ls = [("a", 4), ("b", 3), ("c", 1)]
+        return (
+            ilist.sorted(ls, key=first),
+            ilist.sorted(ls, key=second),
+            ilist.sorted(ls, key=second, reverse=True),
+        )
+
+    main2.print()
+
+    ls1, ls2, ls3 = main2()
+    assert ls1.data == [("a", 4), ("b", 3), ("c", 1)]
+    assert ls3.data == ls1.data
+    assert ls2.data == [("c", 1), ("b", 3), ("a", 4)]
