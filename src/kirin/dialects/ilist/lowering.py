@@ -55,7 +55,7 @@ class PythonLowering(lowering.FromPythonAST):
 @dataclass(frozen=True)
 class SortedLowering(lowering.FromPythonCall["ilist.Sorted"]):
     """
-    Cusotm lowering for Sorted to deal with optional arguments `key=None` and `reverse=False`
+    Custom lowering for Sorted to deal with optional arguments `key=None` and `reverse=False`
     """
 
     def lower(
