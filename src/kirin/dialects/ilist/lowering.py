@@ -64,7 +64,9 @@ class SortedLowering(lowering.FromPythonCall["ilist.Sorted"]):
         args = node.args
 
         if len(args) != 1:
-            raise lowering.BuildError(f"Expected single argument in sorted, got {args}")
+            raise lowering.BuildError(
+                f"Expected single argument in sorted, got {len(args)}"
+            )
         collection = state.lower(args[0]).expect_one()
 
         key = None
