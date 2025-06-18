@@ -129,6 +129,7 @@ class All(ir.Statement):
     result: ir.ResultValue = info.result(types.Bool)
 
 
+@statement(dialect=dialect)
 class Sorted(ir.Statement):
     traits = frozenset({ir.MaybePure(), SortedLowering()})
     purity: bool = info.attribute(default=False)
