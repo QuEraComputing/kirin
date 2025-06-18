@@ -98,12 +98,17 @@ class Lowering(lowering.FromPythonAST):
                     yields.append(name)
                     body_frame.curr_block.args.append_from(value.type, name)
 
-            # NOTE: this frame won't have phi nodes
-            if yields and (
+            body_has_no_terminator = (
                 body_frame.curr_block.last_stmt is None
                 or not body_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
-            ):
+            )
+
+            # NOTE: this frame won't have phi nodes
+            if yields and body_has_no_terminator:
                 body_frame.push(Yield(*[body_frame.defs[name] for name in yields]))  # type: ignore
+            elif body_has_no_terminator:
+                # NOTE: no yields, but also no terminator, add empty yield
+                body_frame.push(Yield())
 
         initializers: list[ir.SSAValue] = []
         for name in yields:

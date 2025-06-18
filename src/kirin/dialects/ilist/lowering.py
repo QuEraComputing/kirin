@@ -1,6 +1,8 @@
 import ast
+from dataclasses import dataclass
 
 from kirin import types, lowering
+from kirin.dialects import py
 
 from . import stmts as ilist
 from ._dialect import dialect
@@ -48,3 +50,43 @@ class PythonLowering(lowering.FromPythonAST):
             return state.current_frame.push(stmt)
         else:
             return self.lower_List(state, value)
+
+
+@dataclass(frozen=True)
+class SortedLowering(lowering.FromPythonCall["ilist.Sorted"]):
+    """
+    Custom lowering for Sorted to deal with optional arguments `key=None` and `reverse=False`
+    """
+
+    def lower(
+        self, stmt: type["ilist.Sorted"], state: lowering.State[ast.AST], node: ast.Call
+    ) -> lowering.Result:
+        args = node.args
+
+        if len(args) != 1:
+            raise lowering.BuildError(
+                f"Expected single argument in sorted, got {len(args)}"
+            )
+        collection = state.lower(args[0]).expect_one()
+
+        key = None
+        reverse = None
+        for kwarg in node.keywords:
+            if kwarg.arg == "key":
+                key = state.lower(kwarg.value).expect_one()
+            elif kwarg.arg == "reverse":
+                reverse = state.lower(kwarg.value).expect_one()
+            else:
+                raise lowering.BuildError(
+                    f"Got unexpected keyword argument in sorted {kwarg.arg}"
+                )
+
+        if key is None:
+            key = state.current_frame.push(py.Constant(None)).result
+
+        if reverse is None:
+            reverse = state.current_frame.push(py.Constant(False)).result
+
+        return state.current_frame.push(
+            stmt(collection=collection, key=key, reverse=reverse)
+        )

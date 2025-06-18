@@ -5,6 +5,7 @@ from kirin.decl import info, statement
 
 from .runtime import IList
 from ._dialect import dialect
+from .lowering import SortedLowering
 
 ElemT = types.TypeVar("ElemT")
 ListLen = types.TypeVar("ListLen")
@@ -126,3 +127,14 @@ class All(ir.Statement):
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     collection: ir.SSAValue = info.argument(IListType[types.Bool, ListLen])
     result: ir.ResultValue = info.result(types.Bool)
+
+
+class Sorted(ir.Statement):
+    traits = frozenset({ir.MaybePure(), SortedLowering()})
+    purity: bool = info.attribute(default=False)
+    collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
+    key: ir.SSAValue = info.argument(
+        types.Union((types.Generic(ir.Method, [ElemT], ElemT), types.NoneType))
+    )
+    reverse: ir.SSAValue = info.argument(types.Bool)
+    result: ir.ResultValue = info.result(IListType[ElemT, ListLen])
