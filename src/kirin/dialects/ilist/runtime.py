@@ -15,10 +15,35 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
     """A simple immutable list."""
 
     data: Sequence[T]
-    elem: types.TypeAttribute = types.Any
+    elem: types.TypeAttribute 
 
-    def __post_init__(self):
+
+    def __init__(self, data: Sequence[T], elem: types.TypeAttribute | None = None):
+        self.data = data
+        
+        if elem is None:
+            # try to auto resolve it
+            self.elem = self._infer_type()
+        else:
+            self.elem = elem
+
+        
         self.type = types.Generic(IList, self.elem, types.Literal(len(self.data)))
+
+    def _infer_type(self) -> types.TypeAttribute:
+        """Infer the type of the IList by iterate over elements"""
+        out = types.NoneType
+
+        for data_elem in self.data:
+            if isinstance(data_elem, ir.Data):
+                data_elem_type = data_elem.type
+            else:
+                data_elem_type = types.PyClass(type(data_elem))
+
+            out = out.join(data_elem_type)
+        
+        return out.join(types.Any)
+    
 
     def __hash__(self) -> int:
         return id(self)  # do not hash the data
