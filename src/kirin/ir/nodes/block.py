@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self, Iterable, Iterator
+from typing import TYPE_CHECKING, Iterable, Iterator
 from dataclasses import field, dataclass
 from collections.abc import Sequence
+
+from typing_extensions import Self
 
 from kirin.print import Printer
 from kirin.ir.ssa import SSAValue, BlockArgument, DeletedSSAValue

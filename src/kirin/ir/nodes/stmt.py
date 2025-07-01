@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self, Mapping, TypeVar, ClassVar, Iterator, Sequence
+from typing import TYPE_CHECKING, Mapping, TypeVar, ClassVar, Iterator, Sequence
 from dataclasses import field, dataclass
+
+from typing_extensions import Self
 
 from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue, ResultValue
