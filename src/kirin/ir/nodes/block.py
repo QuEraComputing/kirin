@@ -369,7 +369,7 @@ class Block(IRNode["Region"]):
         for stmt in self.stmts:
             stmt.delete(safe=safe)
 
-    def is_structurally_equal(
+    def is_structurally_equal(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         other: Self,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,

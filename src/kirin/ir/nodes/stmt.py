@@ -537,7 +537,7 @@ class Statement(IRNode["Block"]):
         if include_self and region_first:
             yield self
 
-    def is_structurally_equal(
+    def is_structurally_equal(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         other: Self,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
