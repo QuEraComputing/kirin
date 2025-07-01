@@ -62,4 +62,10 @@ class Methods(interp.MethodTable):
         if isinstance(body_term, func.Return):
             frame.worklist.append(interp.Successor(body_block, frame.get(stmt.cond)))
             return
-        return interp_.frame_call_region(frame, stmt, body, frame.get(stmt.cond))
+
+        with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+            ret = interp_.frame_call_region(
+                body_frame, stmt, body, frame.get(stmt.cond)
+            )
+            frame.entries.update(body_frame.entries)
+            return ret
