@@ -201,5 +201,7 @@
         * [wrap_const](kirin/rewrite/wrap_const.md)
     * [source](kirin/source.md)
     * [symbol_table](kirin/symbol_table.md)
+    * [test](kirin/test/index.md)
+        * [statements](kirin/test/statements.md)
     * [types](kirin/types.md)
     * [worklist](kirin/worklist.md)
