@@ -1,6 +1,7 @@
+import random
+
 import kirin.prelude
-from kirin.dialects import random as kirin_random, ilist
-import random 
+from kirin.dialects import ilist, random as kirin_random
 
 
 def test_random():
@@ -18,9 +19,8 @@ def test_random():
         return out
 
     out: ilist.IList = rnd_main()
-    
-    assert out.data == expected
 
+    assert out.data == expected
 
 
 def test_randint():
@@ -37,9 +37,8 @@ def test_randint():
         return out
 
     out: ilist.IList = rndint_main()
-    
-    assert out.data == expected
 
+    assert out.data == expected
 
 
 def test_uniform():
