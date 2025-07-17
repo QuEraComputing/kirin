@@ -1,6 +1,6 @@
 import pytest
 
-from kirin.test import assert_statements_same
+from kirin.testing import assert_statements_same
 from kirin.dialects import py
 
 
