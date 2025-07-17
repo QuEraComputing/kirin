@@ -7,7 +7,7 @@ from typing_extensions import Doc, Annotated
 
 from kirin.ir import Method, dialect_group
 from kirin.passes import Default
-from kirin.dialects import cf, scf, func, math, ilist, ssacfg, lowering
+from kirin.dialects import cf, scf, func, math, random, ilist, ssacfg, lowering
 from kirin.dialects.py import (
     cmp,
     len,
@@ -68,6 +68,7 @@ def python_basic(self):
             lowering.call,
             lowering.range.ilist,
             math,
+            random, 
         ]
     )
 )
@@ -88,6 +89,7 @@ def python_no_opt(self):
             cf,
             func,
             math,
+            random, 
             lowering.cf,
             lowering.func,
             lowering.call,
@@ -182,6 +184,7 @@ def basic(self):
             cf,
             func,
             math,
+            random, 
             lowering.func,
             lowering.call,
             lowering.range.ilist,
@@ -206,6 +209,7 @@ def structural_no_opt(self):
             cf,
             func,
             math,
+            random,
             lowering.func,
             lowering.call,
             lowering.range.ilist,
