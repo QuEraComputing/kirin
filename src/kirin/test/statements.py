@@ -3,6 +3,7 @@
 from typing import List
 
 from kirin.ir import Method, Statement
+from kirin.dialects import func
 
 
 def assert_statements_same(
@@ -28,6 +29,8 @@ def assert_statements_same(
     ), "Arguments have different lengths"
     if check_args:
         for arg_1, arg_2 in zip(statement_1.args.field, statement_2.args.field):
+            assert isinstance(arg_1.owner, Statement)
+            assert isinstance(arg_2.owner, Statement)
             assert_statements_same(arg_1.owner, arg_2.owner, check_args=True)
 
 
@@ -46,6 +49,7 @@ def assert_structurally_same(
         debug (bool): Pretty-print statements in method until fail.
     """
 
+    assert isinstance(method.code, func.Function)
     new_stmts = list(method.code.body.blocks[0].stmts)
     assert len(new_stmts) == len(expected_stmts), "Methods different lengths"
     for new_stmt, expected_stmt in zip(new_stmts, expected_stmts):
