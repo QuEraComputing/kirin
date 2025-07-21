@@ -105,6 +105,7 @@
             * [constprop](kirin/dialects/scf/constprop.md)
             * [interp](kirin/dialects/scf/interp.md)
             * [lowering](kirin/dialects/scf/lowering.md)
+            * [scf2cf](kirin/dialects/scf/scf2cf.md)
             * [stmts](kirin/dialects/scf/stmts.md)
             * [trim](kirin/dialects/scf/trim.md)
             * [typeinfer](kirin/dialects/scf/typeinfer.md)
