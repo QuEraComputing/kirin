@@ -54,6 +54,7 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "example/quantum/script.py",  # Ignore specific file
 ]
 
 [tool.ruff.lint]
