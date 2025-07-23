@@ -1,8 +1,11 @@
+# type: ignore
+
 # [section]
 from enum import Enum
 from typing import ClassVar
 from dataclasses import dataclass
 from qulacs import QuantumState
+
 
 # this could be your own class implementing the runtime in whatever way you want
 @dataclass
@@ -13,7 +16,6 @@ class Qubit:
     def __init__(self):
         self.id = Qubit.count
         Qubit.count += 1
-
 
 
 # some your own classes
@@ -63,6 +65,7 @@ class CX(ir.Statement):
     state: ir.SSAValue = info.argument(StateType)
     control: ir.SSAValue = info.argument(QubitType)
     target: ir.SSAValue = info.argument(QubitType)
+
 
 @statement(dialect=dialect)
 class CZ(ir.Statement):
@@ -149,7 +152,6 @@ def main(state: QuantumState):
     return
 
 
-
 main.print()
 
 # Ok but this doesn't work yet, I cannot run it
@@ -176,7 +178,9 @@ class MethodTable(interp.MethodTable):
         state = frame.get_casted(
             stmt.state, QuantumState
         )  # assume state is QuantumState at runtime
-        qubit = frame.get_casted(stmt.qubit, Qubit)  # we assume qubits are Qubit at runtime
+        qubit = frame.get_casted(
+            stmt.qubit, Qubit
+        )  # we assume qubits are Qubit at runtime
         gate.X(qubit.id).update_quantum_state(state)
 
     @interp.impl(H)
@@ -228,22 +232,20 @@ print(state.get_vector())
 
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
+
 class CX2CZ(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, CX):
             return RewriteResult()
-        
+
         H(node.state, node.target).insert_before(node)
         node.replace_by(
-            cz_node := CZ(
-                state=node.state,
-                control=node.control,
-                target=node.target
-            )
+            cz_node := CZ(state=node.state, control=node.control, target=node.target)
         )
         H(node.state, node.target).insert_after(cz_node)
         return RewriteResult(has_done_something=True)
+
 
 from kirin.rewrite import Walk
 
