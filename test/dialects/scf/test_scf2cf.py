@@ -63,7 +63,6 @@ def test_scf2cf_if_1():
 
     expected_code = func.Function(
         sym_name="test",
-        slots=("b",),
         signature=func.Signature(
             output=types.Bool,
             inputs=(types.Bool,),
@@ -74,6 +73,10 @@ def test_scf2cf_if_1():
     expected_test = ir.Method(
         dialects=basic,
         code=expected_code,
+        mod=None,
+        py_func=None,
+        sym_name="expected_test",
+        arg_names=[],
     )
 
     if basic.run_pass is not None:
@@ -176,7 +179,6 @@ def test_scf2cf_for_1():
 
     expected_code = func.Function(
         sym_name="test",
-        slots=(),
         signature=func.Signature(
             output=types.Literal(10),
             inputs=(),
@@ -187,6 +189,10 @@ def test_scf2cf_for_1():
     expected_test = ir.Method(
         dialects=basic,
         code=expected_code,
+        mod=None,
+        py_func=None,
+        sym_name="expected_test",
+        arg_names=[],
     )
 
     test.print()

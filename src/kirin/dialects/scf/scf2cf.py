@@ -175,11 +175,7 @@ class ScfToCfRule(RewriteRule):
         return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if (
-            isinstance(node, (For, IfElse))
-            or not node.has_trait(ir.HasCFG)
-            and not node.has_trait(ir.SSACFG)
-        ):
+        if isinstance(node, (For, IfElse)):
             # do not do rewrite in scf regions
             return RewriteResult()
 
