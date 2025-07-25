@@ -47,6 +47,7 @@
             * [rewrite](kirin/dialects/ilist/rewrite/index.md)
                 * [const](kirin/dialects/ilist/rewrite/const.md)
                 * [hint_len](kirin/dialects/ilist/rewrite/hint_len.md)
+                * [inline_getitem](kirin/dialects/ilist/rewrite/inline_getitem.md)
                 * [list](kirin/dialects/ilist/rewrite/list.md)
                 * [unroll](kirin/dialects/ilist/rewrite/unroll.md)
             * [runtime](kirin/dialects/ilist/runtime.md)
