@@ -11,7 +11,7 @@ class InlineGetItem(abc.RewriteRule):
 
     For example if we have an `ilist.New` statement with a list of items,
     and we can infer that the index used in `py.GetItem` is constant and within bounds,
-    we replace the `py.GetItem` with the ssa values in the list when the index is an integer
+    we replace the `py.GetItem` with the ssa value in the list when the index is an integer
     or with a new `ilist.New` statement containing the sliced items when the index is a slice.
 
     """
