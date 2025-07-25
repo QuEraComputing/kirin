@@ -164,7 +164,7 @@ def test_ilist_range():
     assert const_range() == ilist.IList(range(0, 3))
 
 
-def test_inline_get_item():
+def test_inline_get_item_integer():
     items = tuple(ir.TestValue() for _ in range(2))
 
     test_block = ir.Block(
@@ -196,6 +196,30 @@ def test_inline_get_item():
         ]
     )
 
+    assert test_block.is_equal(expected_block)
+
+
+def test_inline_getitem_slice():
+    values = tuple(ir.TestValue() for _ in range(6))
+    test_block = ir.Block(
+        [
+            qreg := ilist.New(values=values),
+            slice_value := py.Constant(slice(2, 5, 1)),
+            py.GetItem(obj=qreg.result, index=slice_value.result),
+        ]
+    )
+    slice_value.result.hints["const"] = const.Value(slice(2, 5, 1))
+
+    rule = rewrite.Walk(ilist.rewrite.InlineGetItem())
+    rule.rewrite(test_block)
+
+    expected_block = ir.Block(
+        [
+            qreg := ilist.New(values=values),
+            slice_value := py.Constant(slice(2, 5, 1)),
+            ilist.New(values=(values[2], values[3], values[4])),
+        ]
+    )
     assert test_block.is_equal(expected_block)
 
 
