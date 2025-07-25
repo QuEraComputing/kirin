@@ -7,6 +7,15 @@ from ..stmts import New
 
 
 class InlineGetItem(abc.RewriteRule):
+    """Rewrite rule to inline GetItem statements for IList.
+
+    For example if we have an `ilist.New` statement with a list of items,
+    and we can infer that the index used in `py.GetItem` is constant and within bounds,
+    we replace the `py.GetItem` with the ssa values in the list when the index is an integer
+    or with a new `ilist.New` statement containing the sliced items when the index is a slice.
+
+    """
+
     def rewrite_Statement(self, node: ir.Statement) -> abc.RewriteResult:
         if not isinstance(node, py.GetItem) or not isinstance(
             stmt := node.obj.owner, New

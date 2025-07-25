@@ -3,6 +3,7 @@ from typing import Any, Literal
 from kirin import ir, types, rewrite
 from kirin.passes import aggressive
 from kirin.prelude import basic_no_opt, python_basic
+from kirin.analysis import const
 from kirin.dialects import py, func, ilist, lowering
 from kirin.passes.typeinfer import TypeInfer
 
@@ -161,6 +162,41 @@ def test_ilist_range():
         return range(0, 3)
 
     assert const_range() == ilist.IList(range(0, 3))
+
+
+def test_inline_get_item():
+    items = tuple(ir.TestValue() for _ in range(2))
+
+    test_block = ir.Block(
+        [
+            qreg := ilist.New(values=items),
+            idx := py.Constant(0),
+            qubit_stmt := py.GetItem(obj=qreg.result, index=idx.result),
+            ilist.New(values=(qubit_stmt.result,)),
+            idx1 := py.Constant(10),
+            qubit_stmt := py.GetItem(obj=qreg.result, index=idx1.result),
+            ilist.New(values=(qubit_stmt.result,)),
+        ]
+    )
+
+    idx.result.hints["const"] = const.Value(0)
+    idx1.result.hints["const"] = const.Value(10)
+    rule = rewrite.Walk(ilist.rewrite.InlineGetItem())
+    rule.rewrite(test_block)
+
+    expected_block = ir.Block(
+        [
+            qreg := ilist.New(values=items),
+            idx := py.Constant(0),
+            qubit_stmt := py.GetItem(obj=qreg.result, index=idx.result),
+            ilist.New(values=(items[0],)),
+            idx1 := py.Constant(10),
+            qubit_stmt := py.GetItem(obj=qreg.result, index=idx1.result),
+            ilist.New(values=(qubit_stmt.result,)),
+        ]
+    )
+
+    assert test_block.is_equal(expected_block)
 
 
 def test_ilist_constprop():
