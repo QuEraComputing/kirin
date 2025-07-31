@@ -123,7 +123,7 @@ class Lowering(lowering.FromPythonAST):
             initializers.append(value)
         stmt = For(iter_, body_frame.curr_region, *initializers)
 
-        for name, result in zip(yields, stmt.results):
+        for name, result in zip(reversed(yields), reversed(stmt.results)):
             state.current_frame.defs[name] = result
             result.name = name
         state.current_frame.push(stmt)
