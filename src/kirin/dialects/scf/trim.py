@@ -34,13 +34,24 @@ class UnusedYield(RewriteRule):
             for block in region.blocks:
                 if not isinstance(block.last_stmt, Yield):
                     continue
-
+                # remove unused results from the yield statement
                 block.last_stmt.args = [block.last_stmt.args[idx] for idx in uses]
 
         if isinstance(node, For):
-            for idx, block_arg in enumerate(node.body.blocks[0].args[1:]):
-                if idx not in uses:
-                    block_arg.replace_by(node.initializers[idx])
-                    block_arg.delete()
+            # replace the block arguments at the unused indices with the initializers
+            # this works because the initializers are coming from the parent region of the For
+            not_used = set(range(len(node.initializers))) - uses
+            block = node.body.blocks[0]
+            args_to_delete: list[ir.BlockArgument] = []
+            for idx in not_used:
+                block_arg = block.args[idx + 1]
+                block_arg.replace_by(node.initializers[idx])
+                args_to_delete.append(block_arg)
+
+            for arg in args_to_delete:
+                arg.delete()
+
+            # remove the unused initializers from the initializers inputs
             node.initializers = tuple(node.initializers[idx] for idx in uses)
+
         return RewriteResult(has_done_something=True)
