@@ -94,7 +94,70 @@ def test_unused_loop_vars():
     assert isinstance(loop, scf.For)
     assert len(loop.initializers) == 1
     assert len(loop.body.blocks[0].args) == 2
-    # assert main(5) == 4
+    assert main(5) == 5
+
+
+def test_unused_loop_vars_adding_ints():
+    @python_basic.union(
+        [func, scf, py.unpack, lowering.func, ilist, lowering.range.ilist]
+    )
+    def main(n: int):
+        x = 0
+        for i in range(n):
+            x += i
+        return x
+
+    rule = scf.trim.UnusedYield()
+    rewrite.Walk(rule).rewrite(main.code)
+    loop = main.callable_region.blocks[0].stmts.at(-2)
+    assert isinstance(loop, scf.For)
+    assert len(loop.initializers) == 1
+    assert len(loop.body.blocks[0].args) == 2
+    assert main(4) == 6
+
+
+def test_unused_loop_vars_sum_ilist():
+    @python_basic.union(
+        [func, scf, py.unpack, lowering.func, ilist, lowering.range.ilist]
+    )
+    def main():
+        data = [1, 2, 3]
+        total = 0
+        for value in data:
+            total += value
+        return total
+
+    rule = scf.trim.UnusedYield()
+    rewrite.Walk(rule).rewrite(main.code)
+    loop = main.callable_region.blocks[0].stmts.at(-2)
+    assert isinstance(loop, scf.For)
+    assert len(loop.initializers) == 1
+    assert len(loop.body.blocks[0].args) == 2
+    assert main() == 6
+
+
+def test_unused_loop_vars_multiple_mutations():
+    @python_basic.union(
+        [func, scf, py.unpack, lowering.func, ilist, lowering.range.ilist]
+    )
+    def main(n: int):
+        """Sum integers from 0 to n - 1"""
+        total = 0
+        total_2 = 0
+
+        for value in range(n):
+            total += value
+            total_2 += 2 * total
+        return total, total_2
+
+    rule = scf.trim.UnusedYield()
+    rewrite.Walk(rule).rewrite(main.code)
+
+    loop = main.callable_region.blocks[0].stmts.at(-3)
+    assert isinstance(loop, scf.For)
+    assert len(loop.initializers) == 2
+    assert len(loop.body.blocks[0].args) == 3
+    assert main(4) == (6, 20)
 
 
 def test_body_with_no_yield():

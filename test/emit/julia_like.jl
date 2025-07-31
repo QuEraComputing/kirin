@@ -26,7 +26,7 @@ function _callable_julia_like(ssa_x, ssa_y)
         ssa_y_1 = ssa_y_3
         ssa_y_2 = ssa_y_3
     end
-    ssa_5 = (ssa_x + ssa_y_2)
+    ssa_5 = (ssa_x + ssa_y_1)
     ssa_6 = _callable_some_arith(ssa_5, 4.0)
     return ssa_6
 end

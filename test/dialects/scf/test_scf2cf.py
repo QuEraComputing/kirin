@@ -172,7 +172,7 @@ def test_scf2cf_for_1():
 
     exit_block.args.append_from(types.Int, "j")
     exit_block.args.append_from(types.Int, "j")
-    exit_block.stmts.append(func.Return(exit_block.args[1]))
+    exit_block.stmts.append(func.Return(exit_block.args[0]))
 
     expected_code = func.Function(
         sym_name="test",
