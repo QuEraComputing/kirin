@@ -40,14 +40,9 @@ class DialectConstProp(interp.MethodTable):
             with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
                 ret = interp_.frame_call_region(body_frame, stmt, body, cond)
             frame.entries.update(body_frame.entries)
-
             frame.frame_is_not_pure = (
                 frame.frame_is_not_pure or body_frame.frame_is_not_pure
             )
-            if not frame.frame_is_not_pure:
-                frame.should_be_pure.add(stmt)
-
-            return ret
         else:
             with interp_.new_frame(stmt, has_parent_access=True) as then_frame:
                 then_results = interp_.frame_call_region(
@@ -70,19 +65,21 @@ class DialectConstProp(interp.MethodTable):
                 or then_frame.frame_is_not_pure
                 or else_frame.frame_is_not_pure
             )
-            if not frame.frame_is_not_pure:
-                frame.should_be_pure.add(stmt)
             # TODO: pick the non-return value
             if isinstance(then_results, interp.ReturnValue) and isinstance(
                 else_results, interp.ReturnValue
             ):
-                return interp.ReturnValue(then_results.value.join(else_results.value))
+                ret = interp.ReturnValue(then_results.value.join(else_results.value))
             elif isinstance(then_results, interp.ReturnValue):
                 ret = else_results
             elif isinstance(else_results, interp.ReturnValue):
                 ret = then_results
             else:
                 ret = interp_.join_results(then_results, else_results)
+
+        if not frame.frame_is_not_pure:
+            frame.should_be_pure.add(stmt)
+
         return ret
 
     @interp.impl(For)
