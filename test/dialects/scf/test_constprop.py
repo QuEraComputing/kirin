@@ -104,7 +104,7 @@ def test_inside_return():
     assert value.data == 0
 
 
-def test_purity():
+def test_purity_1():
 
     @structural_no_opt
     def test_func(src: ilist.IList[float, Any]):
@@ -116,6 +116,52 @@ def test_purity():
                 return 1.0
             else:
                 return 2.0
+
+        return ilist.map(inner, ilist.range(len(src)))
+
+    frame, ret = prop.run(test_func)
+
+    assert not frame.frame_is_not_pure, "function should be pure"
+
+
+def test_purity_2():
+
+    @structural_no_opt
+    def test_func(src: ilist.IList[float, Any]):
+
+        def inner(i: int):
+            value = 0.0
+            if src[i] < 0:
+                value = 0.0
+            elif src[i] < 1.0:
+                return 1.0
+            else:
+                value = 2.0
+
+            return value
+
+        return ilist.map(inner, ilist.range(len(src)))
+
+    frame, ret = prop.run(test_func)
+
+    assert not frame.frame_is_not_pure, "function should be pure"
+
+
+def test_purity_3():
+
+    @structural_no_opt
+    def test_func(src: ilist.IList[float, Any]):
+
+        def inner(i: int):
+            value = 0.0
+            if src[i] < 0:
+                value = 0.0
+            elif src[i] < 1.0:
+                return 1.0
+            else:
+                return 2.0
+
+            return value
 
         return ilist.map(inner, ilist.range(len(src)))
 
