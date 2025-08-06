@@ -2,7 +2,6 @@ from collections.abc import Iterable
 
 from kirin import interp
 from kirin.analysis import const
-from kirin.dialects import func
 
 from .stmts import For, Yield, IfElse
 from ._dialect import dialect
@@ -42,10 +41,12 @@ class DialectConstProp(interp.MethodTable):
                 ret = interp_.frame_call_region(body_frame, stmt, body, cond)
             frame.entries.update(body_frame.entries)
 
-            if not body_frame.frame_is_not_pure and not isinstance(
-                body.blocks[0].last_stmt, func.Return
-            ):
+            frame.frame_is_not_pure = (
+                frame.frame_is_not_pure or body_frame.frame_is_not_pure
+            )
+            if not frame.frame_is_not_pure:
                 frame.should_be_pure.add(stmt)
+
             return ret
         else:
             with interp_.new_frame(stmt, has_parent_access=True) as then_frame:

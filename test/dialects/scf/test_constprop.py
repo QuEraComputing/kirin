@@ -168,3 +168,67 @@ def test_purity_3():
     frame, ret = prop.run(test_func)
 
     assert not frame.frame_is_not_pure, "function should be pure"
+
+
+def test_purity_4():
+
+    @structural_no_opt
+    def test_func(src: list[float]):
+
+        if True:
+            return src
+        else:
+            src.append(2.0)
+            return src
+
+    frame, ret = prop.run(test_func)
+
+    assert not frame.frame_is_not_pure, "function should be pure"
+
+
+def test_purity_5():
+
+    @structural_no_opt
+    def test_func(src: list[float]):
+
+        if False:
+            src.append(2.0)
+
+        return src
+
+    frame, ret = prop.run(test_func)
+
+    assert not frame.frame_is_not_pure, "function should be pure"
+
+
+def test_purity_6():
+
+    @structural_no_opt
+    def test_func(src: list[float]):
+
+        if True:
+            return src
+        else:
+            src.append(2.0)
+
+        return src
+
+    frame, ret = prop.run(test_func)
+
+    assert not frame.frame_is_not_pure, "function should be pure"
+
+
+def test_purity_7():
+
+    @structural_no_opt
+    def test_func(src: list[float], cond: bool):
+
+        if cond:
+            src.append(2.0)
+            return src
+        else:
+            return src
+
+    frame, ret = prop.run(test_func)
+
+    assert frame.frame_is_not_pure, "function should not be pure"
