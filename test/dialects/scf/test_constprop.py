@@ -1,6 +1,8 @@
+from typing import Any
+
 from kirin.prelude import structural_no_opt
 from kirin.analysis import const
-from kirin.dialects import scf, func
+from kirin.dialects import scf, func, ilist
 
 prop = const.Propagate(structural_no_opt)
 
@@ -100,3 +102,23 @@ def test_inside_return():
     assert isinstance(terminator, func.Return)
     assert isinstance(value := frame.entries[terminator.value], const.Value)
     assert value.data == 0
+
+
+def test_purity():
+
+    @structural_no_opt
+    def test_func(src: ilist.IList[float, Any]):
+
+        def inner(i: int):
+            if src[i] < 0:
+                return 0.0
+            elif src[i] < 1.0:
+                return 1.0
+            else:
+                return 2.0
+
+        return ilist.map(inner, ilist.range(len(src)))
+
+    frame, ret = prop.run(test_func)
+
+    assert not frame.frame_is_not_pure, "function should be pure"

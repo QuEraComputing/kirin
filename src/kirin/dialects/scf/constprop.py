@@ -62,6 +62,15 @@ class DialectConstProp(interp.MethodTable):
             # parent frame variables value except cond
             frame.entries.update(then_frame.entries)
             frame.entries.update(else_frame.entries)
+            # update frame purity
+            # if either frame is not pure, then the whole if-else is not pure
+            frame.frame_is_not_pure = (
+                frame.frame_is_not_pure
+                or then_frame.frame_is_not_pure
+                or else_frame.frame_is_not_pure
+            )
+            if not frame.frame_is_not_pure:
+                frame.should_be_pure.add(stmt)
             # TODO: pick the non-return value
             if isinstance(then_results, interp.ReturnValue) and isinstance(
                 else_results, interp.ReturnValue
@@ -72,11 +81,6 @@ class DialectConstProp(interp.MethodTable):
             elif isinstance(else_results, interp.ReturnValue):
                 ret = then_results
             else:
-                if not (
-                    then_frame.frame_is_not_pure is True
-                    or else_frame.frame_is_not_pure is True
-                ):
-                    frame.should_be_pure.add(stmt)
                 ret = interp_.join_results(then_results, else_results)
         return ret
 
