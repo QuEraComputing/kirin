@@ -232,3 +232,25 @@ def test_purity_7():
     frame, ret = prop.run(test_func)
 
     assert frame.frame_is_not_pure, "function should not be pure"
+
+
+def test_purity_8():
+
+    @structural_no_opt
+    def test_func(src: ilist.IList[float, Any], dst: ilist.IList[float, Any]):
+        assert len(src) == len(dst), "src and dst must have the same length"
+
+        def inner(i: int):
+            value = src[i]
+            if src[i] < dst[i]:
+                value = dst[i] - 3.0
+            elif src[i] > dst[i]:
+                return dst[i] + 3.0
+
+            return value
+
+        return ilist.map(inner, ilist.range(len(src)))
+
+    frame, ret = prop.run(test_func)
+
+    assert frame.frame_is_not_pure, "function should be pure"
