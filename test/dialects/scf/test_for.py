@@ -170,10 +170,8 @@ def test_body_with_no_yield():
             i == 0
         return x + y
 
-    julia_like.print()
-
     for_stmt = next(
         stmt for stmt in julia_like.callable_region.stmts() if isinstance(stmt, scf.For)
     )
     for_body_stmts = list(for_stmt.body.stmts())
-    assert isinstance(for_body_stmts[-1], scf.Yield)
+    assert not isinstance(for_body_stmts[-1], scf.Yield)

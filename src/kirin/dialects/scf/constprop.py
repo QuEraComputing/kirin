@@ -2,7 +2,6 @@ from collections.abc import Iterable
 
 from kirin import ir, interp
 from kirin.analysis import const
-from kirin.dialects import func
 
 from .stmts import For, Yield, IfElse
 from ._dialect import dialect
@@ -41,11 +40,9 @@ class DialectConstProp(interp.MethodTable):
                 interp_, frame, stmt, cond, body
             )
             frame.entries.update(body_frame.entries)
-            if not body_frame.frame_is_not_pure and not isinstance(
-                body.blocks[0].last_stmt, func.Return
-            ):
-                frame.should_be_pure.add(stmt)
-            return ret
+            frame.frame_is_not_pure = (
+                frame.frame_is_not_pure or body_frame.frame_is_not_pure
+            )
         else:
             then_frame, then_results = self._prop_const_cond_ifelse(
                 interp_, frame, stmt, const.Value(True), stmt.then_body
@@ -57,22 +54,28 @@ class DialectConstProp(interp.MethodTable):
             # parent frame variables value except cond
             frame.entries.update(then_frame.entries)
             frame.entries.update(else_frame.entries)
+            # update frame purity
+            # if either frame is not pure, then the whole if-else is not pure
+            frame.frame_is_not_pure = (
+                frame.frame_is_not_pure
+                or then_frame.frame_is_not_pure
+                or else_frame.frame_is_not_pure
+            )
             # TODO: pick the non-return value
             if isinstance(then_results, interp.ReturnValue) and isinstance(
                 else_results, interp.ReturnValue
             ):
-                return interp.ReturnValue(then_results.value.join(else_results.value))
+                ret = interp.ReturnValue(then_results.value.join(else_results.value))
             elif isinstance(then_results, interp.ReturnValue):
                 ret = else_results
             elif isinstance(else_results, interp.ReturnValue):
                 ret = then_results
             else:
-                if not (
-                    then_frame.frame_is_not_pure is True
-                    or else_frame.frame_is_not_pure is True
-                ):
-                    frame.should_be_pure.add(stmt)
                 ret = interp_.join_results(then_results, else_results)
+
+        if not frame.frame_is_not_pure:
+            frame.should_be_pure.add(stmt)
+
         return ret
 
     def _prop_const_cond_ifelse(
