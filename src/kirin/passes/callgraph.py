@@ -45,19 +45,22 @@ class CallGraphPass(passes.Pass):
     rule: RewriteRule
     """The rule to apply to each function in the call graph."""
 
-    def methods_on_callgraph(self, mt: ir.Method) -> set[ir.Method]:
+    @staticmethod
+    def methods_on_callgraph(mt: ir.Method) -> set[ir.Method]:
 
         callees = {mt}
         stack = [mt]
 
         while stack:
             current_mt = stack.pop()
+
+            if current_mt in callees:
+                continue
+
             for stmt in current_mt.callable_region.walk():
-                if isinstance(stmt, Invoke):
-                    callee = stmt.callee
-                    if callee not in callees:
-                        callees.add(callee)
-                        stack.append(callee)
+                if isinstance(stmt, Invoke) and (callee := stmt.callee) not in callees:
+                    callees.add(callee)
+                    stack.append(callee)
 
         return callees
 
