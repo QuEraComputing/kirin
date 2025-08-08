@@ -29,7 +29,18 @@ class ReplaceMethods(RewriteRule):
 
 @dataclass
 class CallGraphPass(passes.Pass):
-    """Copy all functions in the call graph and apply a rule to each of them."""
+    """Copy all functions in the call graph and apply a rule to each of them.
+
+
+    Usage:
+        rule = Walk(SomeRewriteRule())
+        pass_ = CallGraphPass(rule=rule, dialects=...)
+        pass_(some_method)
+
+    Note: This pass modifies the input method in place, but copies
+    all methods invoked within it before applying the rule to them.
+
+    """
 
     rule: RewriteRule
     """The rule to apply to each function in the call graph."""
