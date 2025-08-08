@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from kirin import ir, passes, rewrite
 from kirin.rewrite.abc import RewriteRule, RewriteResult
@@ -45,18 +45,25 @@ class CallGraphPass(passes.Pass):
     rule: RewriteRule
     """The rule to apply to each function in the call graph."""
 
+    fold_pass: passes.Fold = field(init=False)
+
+    def __post_init__(self):
+        self.fold_pass = passes.Fold(self.dialects, no_raise=self.no_raise)
+
     @staticmethod
     def methods_on_callgraph(mt: ir.Method) -> set[ir.Method]:
 
         callees = {mt}
         stack = [mt]
+        visited = set()
 
         while stack:
             current_mt = stack.pop()
 
-            if current_mt in callees:
+            if current_mt in visited:
                 continue
 
+            visited.add(current_mt)
             for stmt in current_mt.callable_region.walk():
                 if isinstance(stmt, Invoke) and (callee := stmt.callee) not in callees:
                     callees.add(callee)
@@ -80,6 +87,6 @@ class CallGraphPass(passes.Pass):
         if result.has_done_something:
             for _, new_mt in mt_map.items():
                 rewrite.Walk(ReplaceMethods(mt_map)).rewrite(new_mt.code)
-                passes.Fold(self.dialects, no_raise=self.no_raise)(new_mt)
+                self.fold_pass(new_mt)
 
         return result
