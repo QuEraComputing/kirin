@@ -1,10 +1,8 @@
 from dataclasses import dataclass
 
-from kirin import ir, passes
-from kirin.rewrite import Walk
+from kirin import ir, passes, rewrite
 from kirin.rewrite.abc import RewriteRule, RewriteResult
-
-from ..stmts import Invoke
+from kirin.dialects.func.stmts import Invoke
 
 
 @dataclass
@@ -19,7 +17,11 @@ class ReplaceMethods(RewriteRule):
             return RewriteResult()
 
         node.replace_by(
-            Invoke.from_stmt(node, attributes={"callee": ir.PyAttr(new_callee)})
+            Invoke(
+                inputs=node.inputs,
+                callee=new_callee,
+                purity=node.purity,
+            )
         )
 
         return RewriteResult(has_done_something=True)
@@ -63,7 +65,7 @@ class CallGraphPass(passes.Pass):
 
         if result.has_done_something:
             for _, new_mt in mt_map.items():
-                Walk(ReplaceMethods(mt_map)).rewrite(new_mt.code)
-                passes.Fold(self.dialects)(new_mt)
+                rewrite.Walk(ReplaceMethods(mt_map)).rewrite(new_mt.code)
+                passes.Fold(self.dialects, no_raise=self.no_raise)(new_mt)
 
         return result
