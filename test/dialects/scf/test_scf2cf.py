@@ -102,19 +102,21 @@ def test_scf2cf_for_1():
 
     expected_callable_region = ir.Region(
         [
+            curr_block := ir.Block(),
             entry_block := ir.Block(),
             body_block := ir.Block(),
             exit_block := ir.Block(),
         ]
     )
 
-    entry_block.args.append_from(types.MethodType, "self")
-    entry_block.stmts.append(j_start := py.Constant(value=0))
+    curr_block.args.append_from(types.MethodType, "self")
+    curr_block.stmts.append(j_start := py.Constant(value=0))
+
     j_start.result.name = "j"
-    entry_block.stmts.append(iter_start := py.Constant(value=0))
-    entry_block.stmts.append(iter_end := py.Constant(value=10))
-    entry_block.stmts.append(iter_step := py.Constant(value=1))
-    entry_block.stmts.append(
+    curr_block.stmts.append(iter_start := py.Constant(value=0))
+    curr_block.stmts.append(iter_end := py.Constant(value=10))
+    curr_block.stmts.append(iter_step := py.Constant(value=1))
+    curr_block.stmts.append(
         range_stmt := ilist.stmts.Range(
             start=iter_start.result,
             stop=iter_end.result,
@@ -122,11 +124,17 @@ def test_scf2cf_for_1():
         )
     )
     range_stmt.result.type = ilist.IListType[types.Int, types.Literal(10)]
+    curr_block.stmts.append(
+        cf.Branch(
+            arguments=(),
+            successor=entry_block,
+        )
+    )
     entry_block.stmts.append(iterable_stmt := py.iterable.Iter(range_stmt.result))
-    entry_block.stmts.append(none_stmt := func.ConstantNone())
     entry_block.stmts.append(
         first_iter := py.iterable.Next(iterable_stmt.expect_one_result())
     )
+    entry_block.stmts.append(none_stmt := func.ConstantNone())
     entry_block.stmts.append(
         loop_cmp := py.cmp.Is(first_iter.expect_one_result(), none_stmt.result)
     )
@@ -160,6 +168,7 @@ def test_scf2cf_for_1():
     body_block.stmts.append(
         next_iter := py.iterable.Next(iterable_stmt.expect_one_result())
     )
+    body_block.stmts.append(none_stmt := func.ConstantNone())
     body_block.stmts.append(
         loop_cmp := py.cmp.Is(next_iter.expect_one_result(), none_stmt.result)
     )
