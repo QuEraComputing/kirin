@@ -16,7 +16,7 @@ def test_scf2cf_if_1():
 
         return b
 
-    rule = Walk(scf2cf.IfElseRule())
+    rule = Walk(scf2cf.ScfToCfRule())
     rule.rewrite(test.code)
     test = test.similar(basic)
 
@@ -93,7 +93,7 @@ def test_scf2cf_for_1():
 
         return j
 
-    rule = Walk(scf2cf.ForRule())
+    rule = Walk(scf2cf.ScfToCfRule())
     rule.rewrite(test.code)
     test = test.similar(basic)
 

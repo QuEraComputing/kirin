@@ -1,3 +1,5 @@
+from dataclasses import field, dataclass
+
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
@@ -162,3 +164,18 @@ class IfElseRule(ScfRule):
 
         node.delete()
         return RewriteResult(has_done_something=True)
+
+
+@dataclass
+class ScfToCfRule(RewriteRule):
+
+    for_rule: ForRule = field(default_factory=ForRule, init=False)
+    if_else_rule: IfElseRule = field(default_factory=IfElseRule, init=False)
+
+    def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
+        if isinstance(node, For):
+            return self.for_rule.rewrite_Statement(node)
+        elif isinstance(node, IfElse):
+            return self.if_else_rule.rewrite_Statement(node)
+        else:
+            return RewriteResult()
