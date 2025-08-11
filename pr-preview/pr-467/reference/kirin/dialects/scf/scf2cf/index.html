@@ -2,7 +2,7 @@
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.scf.scf2cf.ScfRule.get_curr_blk_info class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_curr_blk_info</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_curr_blk_info</span><span class=p>(</span>
     <span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span> <span class=nb>int</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get the current block, region and its index in the region.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/scf2cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>43</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get the current region and the block index of the node in the region.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/scf2cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>43</span>
 <span class=normal>44</span>
 <span class=normal>45</span>
 <span class=normal>46</span>
@@ -12,7 +12,7 @@
 <span class=normal>50</span>
 <span class=normal>51</span>
 <span class=normal>52</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_curr_blk_info</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span> <span class=nb>int</span><span class=p>]:</span>
-<span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the current block, region and its index in the region.&quot;&quot;&quot;</span>
+<span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the current region and the block index of the node in the region.&quot;&quot;&quot;</span>
     <span class=n>curr_block</span> <span class=o>=</span> <span class=n>node</span><span class=o>.</span><span class=n>parent_block</span>
     <span class=n>region</span> <span class=o>=</span> <span class=n>node</span><span class=o>.</span><span class=n>parent_region</span>
 
