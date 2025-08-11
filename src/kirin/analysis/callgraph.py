@@ -29,7 +29,10 @@ class CallGraph(Printable):
         self.__build(mt)
 
     def __build(self, mt: ir.Method):
-        self.defs[mt.sym_name] = mt
+        if mt.sym_name in self.defs:
+            # Already processed this method
+            return
+
         for stmt in mt.callable_region.walk():
             if isinstance(stmt, func.Invoke):
                 backedges = self.backedges.setdefault(stmt.callee.sym_name, set())

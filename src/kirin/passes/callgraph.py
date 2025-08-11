@@ -1,6 +1,7 @@
 from dataclasses import field, dataclass
 
 from kirin import ir, passes, rewrite
+from kirin.analysis import CallGraph
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.func.stmts import Invoke
 
@@ -51,33 +52,13 @@ class CallGraphPass(passes.Pass):
     def __post_init__(self):
         self.fold_pass = passes.Fold(self.dialects, no_raise=self.no_raise)
 
-    @staticmethod
-    def methods_on_callgraph(mt: ir.Method) -> set[ir.Method]:
-
-        callees = {mt}
-        stack = [mt]
-        visited = set()
-
-        while stack:
-            current_mt = stack.pop()
-
-            if current_mt in visited:
-                continue
-
-            visited.add(current_mt)
-            for stmt in current_mt.callable_region.walk():
-                if isinstance(stmt, Invoke) and (callee := stmt.callee) not in callees:
-                    callees.add(callee)
-                    stack.append(callee)
-
-        return callees
-
     def unsafe_run(self, mt: ir.Method) -> RewriteResult:
         result = RewriteResult()
         mt_map = {}
 
-        subroutines = self.methods_on_callgraph(mt)
-        for original_mt in subroutines:
+        cg = CallGraph(mt)
+
+        for original_mt in cg.defs.values():
             if original_mt is mt:
                 new_mt = original_mt
             else:
