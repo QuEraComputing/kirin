@@ -41,7 +41,7 @@ class ScfRule(RewriteRule):
         return exit_block, entr_block
 
     def get_curr_blk_info(self, node: For | IfElse) -> tuple[ir.Region, int]:
-        """Get the current block, region and its index in the region."""
+        """Get the current region and the block index of the node in the region."""
         curr_block = node.parent_block
         region = node.parent_region
 
