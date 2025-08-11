@@ -69,7 +69,6 @@ class ForRule(ScfRule):
 
         # Get iterator from iterable object
         entr_block.stmts.append(iterable_stmt := Iter(node.iterable))
-        last_stmt = entr_block.last_stmt
         entr_block.stmts.append(next_stmt := Next(iterable_stmt.expect_one_result()))
         entr_block.stmts.append(const_none := ConstantNone())
         entr_block.stmts.append(
