@@ -360,13 +360,3 @@ class trunc(ir.Statement):
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
     result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
-
-
-@statement(dialect=dialect)
-class ulp(ir.Statement):
-    """ulp statement, wrapping the math.ulp function"""
-
-    name = "ulp"
-    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
