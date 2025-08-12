@@ -1,3 +1,4 @@
+import math as pymath
 from typing import TypeVar
 
 from kirin import lowering
@@ -5,6 +6,10 @@ from kirin.dialects import ilist
 
 from . import stmts as stmts, interp as interp
 from ._dialect import dialect as dialect
+
+pi = pymath.pi
+e = pymath.e
+tau = pymath.tau
 
 T = TypeVar("T")
 
@@ -157,7 +162,3 @@ def tanh(x: ilist.IList[float, T]) -> ilist.IList[float, T]: ...
 
 @lowering.wraps(stmts.trunc)
 def trunc(x: ilist.IList[float, T]) -> ilist.IList[float, T]: ...
-
-
-@lowering.wraps(stmts.ulp)
-def ulp(x: ilist.IList[float, T]) -> ilist.IList[float, T]: ...
