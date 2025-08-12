@@ -1,0 +1,148 @@
+from kirin import lowering
+
+from . import stmts as stmts, interp as interp
+from ._dialect import dialect as dialect
+
+
+@lowering.wraps(stmts.acos)
+def acos(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.asin)
+def asin(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.asinh)
+def asinh(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.atan)
+def atan(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.atan2)
+def atan2(y: float, x: float) -> float: ...
+
+
+@lowering.wraps(stmts.atanh)
+def atanh(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.ceil)
+def ceil(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.copysign)
+def copysign(x: float, y: float) -> float: ...
+
+
+@lowering.wraps(stmts.cos)
+def cos(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.cosh)
+def cosh(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.degrees)
+def degrees(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.erf)
+def erf(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.erfc)
+def erfc(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.exp)
+def exp(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.expm1)
+def expm1(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.fabs)
+def fabs(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.floor)
+def floor(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.fmod)
+def fmod(x: float, y: float) -> float: ...
+
+
+@lowering.wraps(stmts.gamma)
+def gamma(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.isfinite)
+def isfinite(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.isinf)
+def isinf(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.isnan)
+def isnan(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.lgamma)
+def lgamma(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.log10)
+def log10(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.log1p)
+def log1p(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.log2)
+def log2(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.pow)
+def pow(x: float, y: float) -> float: ...
+
+
+@lowering.wraps(stmts.radians)
+def radians(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.remainder)
+def remainder(x: float, y: float) -> float: ...
+
+
+@lowering.wraps(stmts.sin)
+def sin(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.sinh)
+def sinh(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.sqrt)
+def sqrt(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.tan)
+def tan(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.tanh)
+def tanh(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.trunc)
+def trunc(x: float) -> float: ...
+
+
+@lowering.wraps(stmts.ulp)
+def ulp(x: float) -> float: ...
