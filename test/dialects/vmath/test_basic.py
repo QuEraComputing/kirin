@@ -13,9 +13,10 @@ def acos_func(x):
 
 def test_acos():
     truth = np.acos(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        acos_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = acos_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -25,9 +26,10 @@ def asin_func(x):
 
 def test_asin():
     truth = np.asin(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        asin_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = asin_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -37,9 +39,10 @@ def asinh_func(x):
 
 def test_asinh():
     truth = np.asinh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        asinh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = asinh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -49,9 +52,10 @@ def atan_func(x):
 
 def test_atan():
     truth = np.atan(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        atan_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = atan_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -64,13 +68,13 @@ def test_atan2():
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
-    assert np.allclose(
-        atan2_func(
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-        ),
-        truth,
+    out = atan2_func(
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -80,9 +84,10 @@ def atanh_func(x):
 
 def test_atanh():
     truth = np.atanh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        atanh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = atanh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -92,9 +97,10 @@ def ceil_func(x):
 
 def test_ceil():
     truth = np.ceil(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        ceil_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = ceil_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -107,13 +113,13 @@ def test_copysign():
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
-    assert np.allclose(
-        copysign_func(
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-        ),
-        truth,
+    out = copysign_func(
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -123,9 +129,10 @@ def cos_func(x):
 
 def test_cos():
     truth = np.cos(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        cos_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = cos_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -135,9 +142,10 @@ def cosh_func(x):
 
 def test_cosh():
     truth = np.cosh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        cosh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = cosh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -147,9 +155,10 @@ def degrees_func(x):
 
 def test_degrees():
     truth = np.degrees(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        degrees_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = degrees_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -159,9 +168,10 @@ def erf_func(x):
 
 def test_erf():
     truth = special.erf(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        erf_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = erf_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -171,9 +181,10 @@ def erfc_func(x):
 
 def test_erfc():
     truth = special.erfc(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        erfc_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = erfc_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -183,9 +194,10 @@ def exp_func(x):
 
 def test_exp():
     truth = np.exp(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        exp_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = exp_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -195,9 +207,10 @@ def expm1_func(x):
 
 def test_expm1():
     truth = np.expm1(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        expm1_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = expm1_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -207,9 +220,10 @@ def fabs_func(x):
 
 def test_fabs():
     truth = np.fabs(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        fabs_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = fabs_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -219,9 +233,10 @@ def floor_func(x):
 
 def test_floor():
     truth = np.floor(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        floor_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = floor_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -234,13 +249,13 @@ def test_fmod():
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
-    assert np.allclose(
-        fmod_func(
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-        ),
-        truth,
+    out = fmod_func(
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -250,9 +265,10 @@ def gamma_func(x):
 
 def test_gamma():
     truth = special.gamma(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        gamma_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = gamma_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -262,9 +278,10 @@ def isfinite_func(x):
 
 def test_isfinite():
     truth = np.isfinite(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        isfinite_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = isfinite_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Bool
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -274,9 +291,10 @@ def isinf_func(x):
 
 def test_isinf():
     truth = np.isinf(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        isinf_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = isinf_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Bool
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -286,9 +304,10 @@ def isnan_func(x):
 
 def test_isnan():
     truth = np.isnan(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        isnan_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = isnan_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Bool
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -298,9 +317,10 @@ def lgamma_func(x):
 
 def test_lgamma():
     truth = special.loggamma(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        lgamma_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = lgamma_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -310,9 +330,10 @@ def log10_func(x):
 
 def test_log10():
     truth = np.log10(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        log10_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = log10_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -322,9 +343,10 @@ def log1p_func(x):
 
 def test_log1p():
     truth = np.log1p(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        log1p_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = log1p_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -334,9 +356,10 @@ def log2_func(x):
 
 def test_log2():
     truth = np.log2(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        log2_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = log2_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -349,13 +372,13 @@ def test_pow():
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
-    assert np.allclose(
-        pow_func(
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-        ),
-        truth,
+    out = pow_func(
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -365,9 +388,10 @@ def radians_func(x):
 
 def test_radians():
     truth = np.radians(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        radians_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = radians_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -380,13 +404,13 @@ def test_remainder():
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
-    assert np.allclose(
-        remainder_func(
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-            ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-        ),
-        truth,
+    out = remainder_func(
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
+        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -396,9 +420,10 @@ def sin_func(x):
 
 def test_sin():
     truth = np.sin(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        sin_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = sin_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -408,9 +433,10 @@ def sinh_func(x):
 
 def test_sinh():
     truth = np.sinh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        sinh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = sinh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -420,9 +446,10 @@ def sqrt_func(x):
 
 def test_sqrt():
     truth = np.sqrt(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        sqrt_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = sqrt_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -432,9 +459,10 @@ def tan_func(x):
 
 def test_tan():
     truth = np.tan(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        tan_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = tan_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -444,9 +472,10 @@ def tanh_func(x):
 
 def test_tanh():
     truth = np.tanh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        tanh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = tanh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
 
 
 @basic
@@ -456,6 +485,7 @@ def trunc_func(x):
 
 def test_trunc():
     truth = np.trunc(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
-    assert np.allclose(
-        trunc_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)), truth
-    )
+    out = trunc_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
