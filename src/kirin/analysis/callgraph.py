@@ -38,15 +38,15 @@ class CallGraph(Printable):
         """Get the name of the method, accounting for overlapping symbol names."""
         if mt in self.inv_defs:
             return self.inv_defs[mt]
-        else:
-            count = self.name_counts.setdefault(sym_name := mt.sym_name, 0)
-            if count > 0:  # this is needed to avoid breaking the previous logic
-                sym_name = f"{mt.sym_name}_{count + 1}"
-                self.name_counts[mt.sym_name] += 1
 
-            self.inv_defs[mt] = sym_name
-            self.defs[sym_name] = mt
-            return sym_name
+        count = self.name_counts.setdefault(mt.sym_name, 0)
+        # this is needed to avoid breaking the previous logic
+        sym_name = f"{mt.sym_name}_{count}" if count > 0 else mt.sym_name
+        self.name_counts[mt.sym_name] += 1
+
+        self.inv_defs[mt] = sym_name
+        self.defs[sym_name] = mt
+        return sym_name
 
     def __build(self, mt: ir.Method, visited: set[str]):
         """Build the call graph for the given method."""
