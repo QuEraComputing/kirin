@@ -6,7 +6,7 @@ from kirin.prelude import basic
 from kirin.dialects import ilist, vmath
 
 
-@basic
+@basic.union([vmath])
 def acos_func(x):
     return vmath.acos(x)
 
@@ -19,7 +19,7 @@ def test_acos():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def asin_func(x):
     return vmath.asin(x)
 
@@ -32,7 +32,7 @@ def test_asin():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def asinh_func(x):
     return vmath.asinh(x)
 
@@ -45,7 +45,7 @@ def test_asinh():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def atan_func(x):
     return vmath.atan(x)
 
@@ -58,7 +58,7 @@ def test_atan():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def atan2_func(y, x):
     return vmath.atan2(y, x)
 
@@ -77,7 +77,7 @@ def test_atan2():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def atanh_func(x):
     return vmath.atanh(x)
 
@@ -90,7 +90,7 @@ def test_atanh():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def ceil_func(x):
     return vmath.ceil(x)
 
@@ -103,7 +103,7 @@ def test_ceil():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def copysign_func(x, y):
     return vmath.copysign(x, y)
 
@@ -122,7 +122,7 @@ def test_copysign():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def cos_func(x):
     return vmath.cos(x)
 
@@ -135,7 +135,7 @@ def test_cos():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def cosh_func(x):
     return vmath.cosh(x)
 
@@ -148,7 +148,7 @@ def test_cosh():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def degrees_func(x):
     return vmath.degrees(x)
 
@@ -161,7 +161,7 @@ def test_degrees():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def erf_func(x):
     return vmath.erf(x)
 
@@ -174,7 +174,7 @@ def test_erf():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def erfc_func(x):
     return vmath.erfc(x)
 
@@ -187,7 +187,7 @@ def test_erfc():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def exp_func(x):
     return vmath.exp(x)
 
@@ -200,7 +200,7 @@ def test_exp():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def expm1_func(x):
     return vmath.expm1(x)
 
@@ -213,7 +213,7 @@ def test_expm1():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def fabs_func(x):
     return vmath.fabs(x)
 
@@ -226,7 +226,7 @@ def test_fabs():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def floor_func(x):
     return vmath.floor(x)
 
@@ -239,7 +239,7 @@ def test_floor():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def fmod_func(x, y):
     return vmath.fmod(x, y)
 
@@ -258,7 +258,7 @@ def test_fmod():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def gamma_func(x):
     return vmath.gamma(x)
 
@@ -271,7 +271,7 @@ def test_gamma():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def isfinite_func(x):
     return vmath.isfinite(x)
 
@@ -284,7 +284,7 @@ def test_isfinite():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def isinf_func(x):
     return vmath.isinf(x)
 
@@ -297,7 +297,7 @@ def test_isinf():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def isnan_func(x):
     return vmath.isnan(x)
 
@@ -310,7 +310,7 @@ def test_isnan():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def lgamma_func(x):
     return vmath.lgamma(x)
 
@@ -323,7 +323,7 @@ def test_lgamma():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def log10_func(x):
     return vmath.log10(x)
 
@@ -336,7 +336,7 @@ def test_log10():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def log1p_func(x):
     return vmath.log1p(x)
 
@@ -349,7 +349,7 @@ def test_log1p():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def log2_func(x):
     return vmath.log2(x)
 
@@ -362,7 +362,7 @@ def test_log2():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def pow_func(x, y):
     return vmath.pow(x, y)
 
@@ -381,7 +381,7 @@ def test_pow():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def radians_func(x):
     return vmath.radians(x)
 
@@ -394,7 +394,7 @@ def test_radians():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def remainder_func(x, y):
     return vmath.remainder(x, y)
 
@@ -413,7 +413,7 @@ def test_remainder():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def sin_func(x):
     return vmath.sin(x)
 
@@ -426,7 +426,7 @@ def test_sin():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def sinh_func(x):
     return vmath.sinh(x)
 
@@ -439,7 +439,7 @@ def test_sinh():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def sqrt_func(x):
     return vmath.sqrt(x)
 
@@ -452,7 +452,7 @@ def test_sqrt():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def tan_func(x):
     return vmath.tan(x)
 
@@ -465,7 +465,7 @@ def test_tan():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def tanh_func(x):
     return vmath.tanh(x)
 
@@ -478,7 +478,7 @@ def test_tanh():
     assert np.allclose(out, truth)
 
 
-@basic
+@basic.union([vmath])
 def trunc_func(x):
     return vmath.trunc(x)
 
