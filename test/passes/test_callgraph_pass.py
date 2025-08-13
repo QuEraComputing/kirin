@@ -44,5 +44,6 @@ def test_callgraph_pass():
 
     cg = CallGraph(main)
 
-    for mt in cg.defs.values():
-        assert isinstance(mt.callable_region.blocks[0].stmts.at(0), TestStmt)
+    for mts in cg.defs.values():
+        for mt in mts:
+            assert isinstance(mt.callable_region.blocks[0].stmts.at(0), TestStmt)

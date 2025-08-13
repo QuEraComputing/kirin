@@ -58,7 +58,8 @@ class CallGraphPass(passes.Pass):
 
         cg = CallGraph(mt)
 
-        for original_mt in cg.defs.values():
+        all_methods = set(sum(map(tuple, cg.defs.values()), ()))
+        for original_mt in all_methods:
             if original_mt is mt:
                 new_mt = original_mt
             else:

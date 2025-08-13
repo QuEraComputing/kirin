@@ -38,8 +38,7 @@ class CallGraph(Printable):
 
         for stmt in mt.callable_region.walk():
             if isinstance(stmt, func.Invoke):
-                backedges = self.backedges.setdefault(stmt.callee, set())
-                backedges.add(mt)
+                self.backedges.setdefault(stmt.callee, set()).add(mt)
                 if stmt.callee not in visited:
                     self.__build(stmt.callee, visited)
 
