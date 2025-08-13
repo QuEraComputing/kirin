@@ -18,58 +18,45 @@ class CallGraph(Printable):
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
 
-    defs: dict[str, ir.Method] = field(default_factory=dict)
+    defs: dict[str, set[ir.Method]] = field(default_factory=dict)
     """Mapping from symbol names to methods."""
-    backedges: dict[str, set[str]] = field(default_factory=dict)
+    backedges: dict[ir.Method, set[ir.Method]] = field(default_factory=dict)
     """Mapping from symbol names to backedges."""
-    name_counts: dict[str, int] = field(default_factory=dict)
-    """Mapping from symbol names to counts of how many times they have been used."""
-    inv_defs: dict[ir.Method, str] = field(default_factory=dict)
-    """Mapping from symbol names to methods, used for inverse lookups."""
 
     def __init__(self, mt: ir.Method):
         self.defs = {}
         self.backedges = {}
-        self.name_counts = {}
-        self.inv_defs = {}
         self.__build(mt, set([]))
 
-    def __get_symbol(self, mt: ir.Method) -> str:
-        """Get the name of the method, accounting for overlapping symbol names."""
-        if mt in self.inv_defs:
-            return self.inv_defs[mt]
-
-        count = self.name_counts.setdefault(mt.sym_name, 0)
-        # this is needed to avoid breaking the previous logic
-        sym_name = f"{mt.sym_name}_{count}" if count > 0 else mt.sym_name
-        self.name_counts[mt.sym_name] += 1
-
-        self.inv_defs[mt] = sym_name
-        self.defs[sym_name] = mt
-        return sym_name
-
-    def __build(self, mt: ir.Method, visited: set[str]):
+    def __build(self, mt: ir.Method, visited: set[ir.Method]):
         """Build the call graph for the given method."""
-        sym_name = self.__get_symbol(mt)
+        if mt in visited:
+            return
+
+        visited.add(mt)
+        self.defs.setdefault(mt.sym_name, set()).add(mt)
 
         for stmt in mt.callable_region.walk():
             if isinstance(stmt, func.Invoke):
-                callee_sym_name = self.__get_symbol(stmt.callee)
-                backedges = self.backedges.setdefault(callee_sym_name, set())
-                backedges.add(sym_name)
-                if callee_sym_name not in visited:
-                    visited.add(callee_sym_name)
+                backedges = self.backedges.setdefault(stmt.callee, set())
+                backedges.add(mt)
+                if stmt.callee not in visited:
                     self.__build(stmt.callee, visited)
 
     def get_neighbors(self, node: str) -> Iterable[str]:
         """Get the neighbors of a node in the call graph."""
-        return self.backedges.get(node, ())
+        mt_set = self.defs[node]
+        if len(mt_set) != 1:
+            raise ValueError(f"Node {node} has multiple definitions: {mt_set}")
+
+        (mt,) = mt_set
+        return (edge.sym_name for edge in self.backedges.get(mt, set()))
 
     def get_edges(self) -> Iterable[tuple[str, str]]:
         """Get the edges of the call graph."""
         for node, neighbors in self.backedges.items():
             for neighbor in neighbors:
-                yield node, neighbor
+                yield node.sym_name, neighbor.sym_name
 
     def get_nodes(self) -> Iterable[str]:
         """Get the nodes of the call graph."""
