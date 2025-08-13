@@ -57,7 +57,6 @@ with open(os.path.join(os.path.dirname(__file__), "stmts.py"), "w") as f:
             ]
         )
         ret_type = sig.return_annotation
-        print(ret_type)
         f.write(
             textwrap.dedent(
                 f"""
