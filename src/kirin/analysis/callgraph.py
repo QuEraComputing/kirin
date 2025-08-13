@@ -34,7 +34,7 @@ class CallGraph(Printable):
         self.inv_defs = {}
         self.__build(mt, set([]))
 
-    def __get_name(self, mt: ir.Method) -> str:
+    def __get_symbol(self, mt: ir.Method) -> str:
         """Get the name of the method, accounting for overlapping symbol names."""
         if mt in self.inv_defs:
             return self.inv_defs[mt]
@@ -50,11 +50,11 @@ class CallGraph(Printable):
 
     def __build(self, mt: ir.Method, visited: set[str]):
         """Build the call graph for the given method."""
-        sym_name = self.__get_name(mt)
+        sym_name = self.__get_symbol(mt)
 
         for stmt in mt.callable_region.walk():
             if isinstance(stmt, func.Invoke):
-                callee_sym_name = self.__get_name(stmt.callee)
+                callee_sym_name = self.__get_symbol(stmt.callee)
                 backedges = self.backedges.setdefault(callee_sym_name, set())
                 backedges.add(sym_name)
                 if callee_sym_name not in visited:
