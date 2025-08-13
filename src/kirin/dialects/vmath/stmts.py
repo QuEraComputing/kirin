@@ -4,7 +4,7 @@ from kirin.dialects import ilist
 
 from ._dialect import dialect
 
-T = types.TypeVar("T")
+ListLen = types.TypeVar("ListLen")
 
 
 @statement(dialect=dialect)
@@ -13,8 +13,8 @@ class acos(ir.Statement):
 
     name = "acos"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -23,8 +23,8 @@ class asin(ir.Statement):
 
     name = "asin"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -33,8 +33,8 @@ class asinh(ir.Statement):
 
     name = "asinh"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -43,8 +43,8 @@ class atan(ir.Statement):
 
     name = "atan"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -54,8 +54,8 @@ class atan2(ir.Statement):
     name = "atan2"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     y: ir.SSAValue = info.argument(types.Float)
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -64,8 +64,8 @@ class atanh(ir.Statement):
 
     name = "atanh"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -74,8 +74,8 @@ class ceil(ir.Statement):
 
     name = "ceil"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -84,9 +84,9 @@ class copysign(ir.Statement):
 
     name = "copysign"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
     y: ir.SSAValue = info.argument(types.Float)
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -95,8 +95,8 @@ class cos(ir.Statement):
 
     name = "cos"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -105,8 +105,8 @@ class cosh(ir.Statement):
 
     name = "cosh"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -115,8 +115,8 @@ class degrees(ir.Statement):
 
     name = "degrees"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -125,8 +125,8 @@ class erf(ir.Statement):
 
     name = "erf"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -135,8 +135,8 @@ class erfc(ir.Statement):
 
     name = "erfc"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -145,8 +145,8 @@ class exp(ir.Statement):
 
     name = "exp"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -155,8 +155,8 @@ class expm1(ir.Statement):
 
     name = "expm1"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -165,8 +165,8 @@ class fabs(ir.Statement):
 
     name = "fabs"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -175,8 +175,8 @@ class floor(ir.Statement):
 
     name = "floor"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -185,9 +185,9 @@ class fmod(ir.Statement):
 
     name = "fmod"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
     y: ir.SSAValue = info.argument(types.Float)
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -196,8 +196,8 @@ class gamma(ir.Statement):
 
     name = "gamma"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -206,8 +206,8 @@ class isfinite(ir.Statement):
 
     name = "isfinite"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Bool, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Bool, ListLen])
 
 
 @statement(dialect=dialect)
@@ -216,8 +216,8 @@ class isinf(ir.Statement):
 
     name = "isinf"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Bool, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Bool, ListLen])
 
 
 @statement(dialect=dialect)
@@ -226,8 +226,8 @@ class isnan(ir.Statement):
 
     name = "isnan"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Bool, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Bool, ListLen])
 
 
 @statement(dialect=dialect)
@@ -236,8 +236,8 @@ class lgamma(ir.Statement):
 
     name = "lgamma"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -246,8 +246,8 @@ class log10(ir.Statement):
 
     name = "log10"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -256,8 +256,8 @@ class log1p(ir.Statement):
 
     name = "log1p"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -266,8 +266,8 @@ class log2(ir.Statement):
 
     name = "log2"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -276,9 +276,9 @@ class pow(ir.Statement):
 
     name = "pow"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
     y: ir.SSAValue = info.argument(types.Float)
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -287,8 +287,8 @@ class radians(ir.Statement):
 
     name = "radians"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -297,9 +297,9 @@ class remainder(ir.Statement):
 
     name = "remainder"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
     y: ir.SSAValue = info.argument(types.Float)
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -308,8 +308,8 @@ class sin(ir.Statement):
 
     name = "sin"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -318,8 +318,8 @@ class sinh(ir.Statement):
 
     name = "sinh"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -328,8 +328,8 @@ class sqrt(ir.Statement):
 
     name = "sqrt"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -338,8 +338,8 @@ class tan(ir.Statement):
 
     name = "tan"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -348,8 +348,8 @@ class tanh(ir.Statement):
 
     name = "tanh"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
 
 
 @statement(dialect=dialect)
@@ -358,5 +358,5 @@ class trunc(ir.Statement):
 
     name = "trunc"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
-    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, T])
-    result: ir.ResultValue = info.result(ilist.IListType[types.Float, T])
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
