@@ -204,7 +204,7 @@ class isfinite(ir.Statement):
     name = "isfinite"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     x: ir.SSAValue = info.argument(types.Float)
-    result: ir.ResultValue = info.result(types.Float)
+    result: ir.ResultValue = info.result(types.Bool)
 
 
 @statement(dialect=dialect)
@@ -214,7 +214,7 @@ class isinf(ir.Statement):
     name = "isinf"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     x: ir.SSAValue = info.argument(types.Float)
-    result: ir.ResultValue = info.result(types.Float)
+    result: ir.ResultValue = info.result(types.Bool)
 
 
 @statement(dialect=dialect)
@@ -224,7 +224,7 @@ class isnan(ir.Statement):
     name = "isnan"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     x: ir.SSAValue = info.argument(types.Float)
-    result: ir.ResultValue = info.result(types.Float)
+    result: ir.ResultValue = info.result(types.Bool)
 
 
 @statement(dialect=dialect)

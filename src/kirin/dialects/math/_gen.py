@@ -56,8 +56,10 @@ with open(os.path.join(os.path.dirname(__file__), "stmts.py"), "w") as f:
                 for arg in sig.parameters.keys()
             ]
         )
-        ret_type = sig.return_annotation
-        print(ret_type)
+        if "is" in name:
+            ret_type = "types.Bool"
+        else:
+            ret_type = "types.Float"
         f.write(
             textwrap.dedent(
                 f"""
@@ -68,7 +70,7 @@ class {name}(ir.Statement):
     name = "{name}"
     traits = frozenset({{ir.Pure(), lowering2.FromPythonCall()}})
 {fields}
-    result: ir.ResultValue = info.result(types.Float)
+    result: ir.ResultValue = info.result({ret_type})
 """
             )
         )
@@ -118,11 +120,15 @@ with open(os.path.join(os.path.dirname(__file__), "__init__.py"), "w") as f:
     f.write("from kirin import lowering2\n")
 
     for name, obj, sig in builtin_math_functions():
+        if "is" in name:
+            ret_type = "bool"
+        else:
+            ret_type = "float"
         f.write(
             textwrap.dedent(
                 f"""
         @lowering2.wraps(stmts.{name})
-        def {name}({", ".join(f"{arg}: float" for arg in sig.parameters.keys())}) -> float: ...
+        def {name}({", ".join(f"{arg}: {ret_type}" for arg in sig.parameters.keys())}) -> {ret_type}: ...
         """
             )
         )
