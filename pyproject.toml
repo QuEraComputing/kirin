@@ -7,12 +7,15 @@ dependencies = [
     "rich>=13.7.1",
     "beartype>=0.17.2",
     "typing_extensions>=4.11.0",
-    "numpy>=2.2.6",
-    "scipy>=1.15.3",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
 
+[project.optional-dependencies]
+vmath = [
+    "numpy>=2.2.6",
+    "scipy>=1.15.3",
+]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
