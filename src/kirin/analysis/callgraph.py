@@ -18,33 +18,44 @@ class CallGraph(Printable):
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
 
-    defs: dict[str, ir.Method] = field(default_factory=dict)
+    defs: dict[str, set[ir.Method]] = field(default_factory=dict)
     """Mapping from symbol names to methods."""
-    backedges: dict[str, set[str]] = field(default_factory=dict)
+    backedges: dict[ir.Method, set[ir.Method]] = field(default_factory=dict)
     """Mapping from symbol names to backedges."""
 
     def __init__(self, mt: ir.Method):
         self.defs = {}
         self.backedges = {}
-        self.__build(mt)
+        self.__build(mt, set([]))
 
-    def __build(self, mt: ir.Method):
-        self.defs[mt.sym_name] = mt
+    def __build(self, mt: ir.Method, visited: set[ir.Method]):
+        """Build the call graph for the given method."""
+        if mt in visited:
+            return
+
+        visited.add(mt)
+        self.defs.setdefault(mt.sym_name, set()).add(mt)
+
         for stmt in mt.callable_region.walk():
             if isinstance(stmt, func.Invoke):
-                backedges = self.backedges.setdefault(stmt.callee.sym_name, set())
-                backedges.add(mt.sym_name)
-                self.__build(stmt.callee)
+                self.backedges.setdefault(stmt.callee, set()).add(mt)
+                if stmt.callee not in visited:
+                    self.__build(stmt.callee, visited)
 
     def get_neighbors(self, node: str) -> Iterable[str]:
         """Get the neighbors of a node in the call graph."""
-        return self.backedges.get(node, ())
+        mt_set = self.defs[node]
+        if len(mt_set) != 1:
+            raise ValueError(f"Node {node} has multiple definitions: {mt_set}")
+
+        (mt,) = mt_set
+        return (edge.sym_name for edge in self.backedges.get(mt, set()))
 
     def get_edges(self) -> Iterable[tuple[str, str]]:
         """Get the edges of the call graph."""
         for node, neighbors in self.backedges.items():
             for neighbor in neighbors:
-                yield node, neighbor
+                yield node.sym_name, neighbor.sym_name
 
     def get_nodes(self) -> Iterable[str]:
         """Get the nodes of the call graph."""
