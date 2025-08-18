@@ -125,9 +125,7 @@ def log2(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 
 
 @lowering.wraps(stmts.pow)
-def pow(
-    x: ilist.IList[float, ListLen], y: ilist.IList[float, ListLen]
-) -> ilist.IList[float, ListLen]: ...
+def pow(x: ilist.IList[float, ListLen], y: float) -> ilist.IList[float, ListLen]: ...
 
 
 @lowering.wraps(stmts.radians)
@@ -162,3 +160,15 @@ def tanh(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 
 @lowering.wraps(stmts.trunc)
 def trunc(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
+
+
+@lowering.wraps(stmts.scale)
+def scale(
+    value: float, x: ilist.IList[float, ListLen]
+) -> ilist.IList[float, ListLen]: ...
+
+
+@lowering.wraps(stmts.offset)
+def offset(
+    value: float, x: ilist.IList[float, ListLen]
+) -> ilist.IList[float, ListLen]: ...

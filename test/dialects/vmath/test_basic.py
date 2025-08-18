@@ -370,11 +370,11 @@ def pow_func(x, y):
 def test_pow():
     truth = np.pow(
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
+        3.33,
     )
     out = pow_func(
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
-        ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
+        3.33,
     )
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
@@ -486,6 +486,34 @@ def trunc_func(x):
 def test_trunc():
     truth = np.trunc(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     out = trunc_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+
+@basic.union([vmath])
+def scale_func(x, y):
+    return vmath.scale(value=y, x=x)
+
+
+def test_scale():
+    a = 3.3
+    truth = np.array(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)) * a
+    out = scale_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float), a)
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+
+@basic.union([vmath])
+def offset_func(x, y):
+    return vmath.offset(value=y, x=x)
+
+
+def test_offset():
+    a = 3.3
+    truth = np.array(ilist.IList([0.42, 0.87, 0.32], elem=types.Float)) + a
+    out = offset_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float), a)
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
     assert np.allclose(out, truth)
