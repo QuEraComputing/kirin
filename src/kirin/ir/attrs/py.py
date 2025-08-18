@@ -1,4 +1,5 @@
 from typing import TypeVar
+from functools import cached_property
 from dataclasses import dataclass
 
 from kirin.print import Printer
@@ -26,6 +27,24 @@ class PyAttr(Data[T]):
     name = "PyAttr"
     data: T
 
+    @cached_property
+    def _hashable(self) -> bool:
+        try:
+            # try to hash the attribute
+            hash(self.data)
+            return True
+        except TypeError:
+            # if not hashable, compare by identity
+            return False
+
+    @cached_property
+    def _hash_value(self) -> int:
+        # calculate hash value if hashable
+        if self._hashable:
+            return hash((self.type, self.data))
+        else:
+            return hash((self.type, id(self.data)))
+
     def __init__(self, data: T, pytype: TypeAttribute | None = None):
         self.data = data
 
@@ -35,13 +54,18 @@ class PyAttr(Data[T]):
             self.type = pytype
 
     def __hash__(self) -> int:
-        return hash((self.type, self.data))
+        # use cached hash value
+        return self._hash_value
 
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, PyAttr):
             return False
 
-        return self.type == value.type and self.data == value.data
+        if self._hashable:
+            return self.type == value.type and self.data == value.data
+        else:
+            # if not hashable, compare by identity
+            return self.type == value.type and self.data is value.data
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(repr(self.data))
