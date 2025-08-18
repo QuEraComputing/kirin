@@ -37,14 +37,6 @@ class PyAttr(Data[T]):
             # if not hashable, compare by identity
             return False
 
-    @cached_property
-    def _hash_value(self) -> int:
-        # calculate hash value if hashable
-        if self._hashable:
-            return hash((self.type, self.data))
-        else:
-            return hash((self.type, id(self.data)))
-
     def __init__(self, data: T, pytype: TypeAttribute | None = None):
         self.data = data
 
@@ -55,7 +47,10 @@ class PyAttr(Data[T]):
 
     def __hash__(self) -> int:
         # use cached hash value
-        return self._hash_value
+        if self._hashable:
+            return hash((self.type, self.data))
+        else:
+            return hash((self.type, id(self.data)))
 
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, PyAttr):
