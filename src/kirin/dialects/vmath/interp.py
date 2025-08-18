@@ -187,10 +187,11 @@ class MathMethodTable(MethodTable):
 
     @impl(stmts.pow)
     def pow(self, interp, frame: Frame, stmt: stmts.pow):
-        values = frame.get_values(stmt.args)
+        x = frame.get(stmt.x)
+        y = frame.get(stmt.y)
         return (
             ilist.IList(
-                np.pow(np.asarray(values[0]), np.asarray(values[1])).tolist(),
+                np.pow(np.asarray(x), y).tolist(),
                 elem=types.Float,
             ),
         )
@@ -243,3 +244,15 @@ class MathMethodTable(MethodTable):
         return (
             ilist.IList(np.trunc(np.asarray(values[0])).tolist(), elem=types.Float),
         )
+
+    @impl(stmts.scale)
+    def scale(self, interp, frame: Frame, stmt: stmts.scale):
+        a = frame.get(stmt.value)
+        x = frame.get(stmt.x)
+        return (ilist.IList((np.asarray(x) * a).tolist(), elem=types.Float),)
+
+    @impl(stmts.offset)
+    def offset(self, interp, frame: Frame, stmt: stmts.offset):
+        a = frame.get(stmt.value)
+        x = frame.get(stmt.x)
+        return (ilist.IList((np.asarray(x) + a).tolist(), elem=types.Float),)
