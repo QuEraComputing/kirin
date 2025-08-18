@@ -191,7 +191,7 @@ class MathMethodTable(MethodTable):
         y = frame.get(stmt.y)
         return (
             ilist.IList(
-                np.pow(np.asarray(x), y).tolist(),
+                np.power(np.asarray(x), y).tolist(),
                 elem=types.Float,
             ),
         )
