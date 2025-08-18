@@ -360,3 +360,25 @@ class trunc(ir.Statement):
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
     result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
+
+
+@statement(dialect=dialect)
+class scale(ir.Statement):
+    """scale with a scalar statement"""
+
+    name = "scale"
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    value: ir.SSAValue = info.argument(types.Float)
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
+
+
+@statement(dialect=dialect)
+class offset(ir.Statement):
+    """offset with a scalar statement"""
+
+    name = "offset"
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
+    value: ir.SSAValue = info.argument(types.Float)
+    result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
