@@ -25,7 +25,7 @@ class Info:
     _hashable: bool = field(init=False, repr=False)
 
     def __post_init__(self):
-        if _HASHABLE_SLICE and any(
+        if not _HASHABLE_SLICE and any(
             isinstance(attr, ir.PyAttr) and isinstance(attr.data, slice)
             for attr in self.attributes
         ):
