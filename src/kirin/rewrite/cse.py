@@ -41,7 +41,9 @@ class Info:
 
         if self._hashable:
             return (
-                self.head == other.head
+                self is other
+                or self._hashable
+                and self.head == other.head
                 and self.args == other.args
                 and self.attributes == other.attributes
                 and self.successors == other.successors
