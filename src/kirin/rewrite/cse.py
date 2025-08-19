@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import sys
+from dataclasses import field, dataclass
 
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
+
+_IS_PYTHON_310 = sys.version_info[0] == 3 and sys.version_info[1] == 10
 
 
 @dataclass
@@ -15,22 +18,31 @@ class Info:
     attributes: tuple[ir.Attribute, ...]
     successors: tuple[ir.Block, ...]
     regions: tuple[ir.Region, ...]
+    _hash: int = field(init=False, repr=False)
+    _hashable: bool = field(init=False, repr=False)
+
+    def __post_init__(self):
+        if _IS_PYTHON_310 and any(isinstance(attr, slice) for attr in self.attributes):
+            self._hash = id(self)
+            self._hashable = False
+        else:
+            self._hash = hash(
+                (id(self.head),)
+                + tuple(id(ssa) for ssa in self.args)
+                + tuple(hash(attr) for attr in self.attributes)
+                + tuple(id(succ) for succ in self.successors)
+                + tuple(id(region) for region in self.regions)
+            )
+            self._hashable = True
 
     def __hash__(self) -> int:
-        return hash(
-            (id(self.head),)
-            + tuple(id(ssa) for ssa in self.args)
-            + tuple(hash(attr) for attr in self.attributes)
-            + tuple(id(succ) for succ in self.successors)
-            + tuple(id(region) for region in self.regions)
-        )
+        return self._hash
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Info):
-            return False
-
-        return (
-            self.head == other.head
+        return self is other or (
+            self._hashable
+            and isinstance(other, Info)
+            and self.head == other.head
             and self.args == other.args
             and self.attributes == other.attributes
             and self.successors == other.successors
