@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import field, dataclass
 
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
-_IS_PYTHON_310 = sys.version_info[0] == 3 and sys.version_info[1] == 10
+try:
+    hash(slice(None))
+    _HASHABLE_SLICE = True
+except TypeError:
+    _HASHABLE_SLICE = False
 
 
 @dataclass
@@ -22,7 +25,10 @@ class Info:
     _hashable: bool = field(init=False, repr=False)
 
     def __post_init__(self):
-        if _IS_PYTHON_310 and any(isinstance(attr, slice) for attr in self.attributes):
+        if not _HASHABLE_SLICE and any(
+            isinstance(attr, ir.PyAttr) and isinstance(attr.data, slice)
+            for attr in self.attributes
+        ):
             self._hash = id(self)
             self._hashable = False
         else:
