@@ -1,7 +1,7 @@
 from kirin import ir, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
-from kirin.rewrite.cse import _IS_PYTHON_310, Info, CommonSubexpressionElimination
+from kirin.rewrite.cse import _HASHABLE_SLICE, Info, CommonSubexpressionElimination
 from kirin.rewrite.walk import Walk
 
 dialect = ir.Dialect("test")
@@ -40,7 +40,7 @@ def test_multi_result():
 def test_info():
     info_value = Info(ir.Statement, (), (ir.PyAttr(slice(None)),), (), ())
 
-    if _IS_PYTHON_310:
+    if _HASHABLE_SLICE:
         assert info_value._hashable is False
         assert info_value._hash == id(info_value)
     else:
