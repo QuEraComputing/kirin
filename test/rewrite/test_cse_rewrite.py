@@ -40,7 +40,7 @@ def test_multi_result():
 def test_info():
     info_value = Info(ir.Statement, (), (ir.PyAttr(slice(None)),), (), ())
 
-    if _HASHABLE_SLICE:
+    if not _HASHABLE_SLICE:
         assert info_value._hashable is False
         assert info_value._hash == id(info_value)
     else:
