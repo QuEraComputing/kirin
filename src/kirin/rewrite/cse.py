@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
@@ -15,27 +15,40 @@ class Info:
     attributes: tuple[ir.Attribute, ...]
     successors: tuple[ir.Block, ...]
     regions: tuple[ir.Region, ...]
+    _hash: int = field(init=False, repr=False)
+    _hashable: bool = field(init=False, repr=False)
+
+    def __post_init__(self):
+        try:
+            self._hash = hash(
+                (id(self.head),)
+                + tuple(id(ssa) for ssa in self.args)
+                + tuple(hash(attr) for attr in self.attributes)
+                + tuple(id(succ) for succ in self.successors)
+                + tuple(id(region) for region in self.regions)
+            )
+            self._hashable = True
+        except TypeError:
+            self._hashable = False
+            self._hash = id(self)
 
     def __hash__(self) -> int:
-        return hash(
-            (id(self.head),)
-            + tuple(id(ssa) for ssa in self.args)
-            + tuple(hash(attr) for attr in self.attributes)
-            + tuple(id(succ) for succ in self.successors)
-            + tuple(id(region) for region in self.regions)
-        )
+        return self._hash
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Info):
             return False
 
-        return (
-            self.head == other.head
-            and self.args == other.args
-            and self.attributes == other.attributes
-            and self.successors == other.successors
-            and self.regions == other.regions
-        )
+        if self._hashable:
+            return (
+                self.head == other.head
+                and self.args == other.args
+                and self.attributes == other.attributes
+                and self.successors == other.successors
+                and self.regions == other.regions
+            )
+        else:
+            return self is other
 
 
 @dataclass
