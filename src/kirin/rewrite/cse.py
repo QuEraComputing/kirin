@@ -22,7 +22,10 @@ class Info:
     _hashable: bool = field(init=False, repr=False)
 
     def __post_init__(self):
-        if _IS_PYTHON_310 and any(isinstance(attr, slice) for attr in self.attributes):
+        if _IS_PYTHON_310 and any(
+            isinstance(attr, ir.PyAttr) and isinstance(attr.data, slice)
+            for attr in self.attributes
+        ):
             self._hash = id(self)
             self._hashable = False
         else:
