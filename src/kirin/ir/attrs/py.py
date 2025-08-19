@@ -56,11 +56,12 @@ class PyAttr(Data[T]):
         if not isinstance(value, PyAttr):
             return False
 
-        if self._hashable:
-            return self.type == value.type and self.data == value.data
-        else:
-            # if not hashable, compare by identity
-            return self.type == value.type and self.data is value.data
+        return (
+            self.type == value.type
+            and self.data is value.data
+            or self._hashable
+            and self.data == value.data
+        )
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(repr(self.data))
