@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import field, dataclass
 
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
+
+_IS_PYTHON_310 = sys.version_info[0] == 3 and sys.version_info[1] == 10
 
 
 @dataclass
@@ -19,7 +22,10 @@ class Info:
     _hashable: bool = field(init=False, repr=False)
 
     def __post_init__(self):
-        try:
+        if _IS_PYTHON_310 and any(isinstance(attr, slice) for attr in self.attributes):
+            self._hash = id(self)
+            self._hashable = False
+        else:
             self._hash = hash(
                 (id(self.head),)
                 + tuple(id(ssa) for ssa in self.args)
@@ -28,9 +34,6 @@ class Info:
                 + tuple(id(region) for region in self.regions)
             )
             self._hashable = True
-        except TypeError:
-            self._hashable = False
-            self._hash = id(self)
 
     def __hash__(self) -> int:
         return self._hash
