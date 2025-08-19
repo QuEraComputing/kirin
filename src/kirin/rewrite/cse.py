@@ -39,18 +39,15 @@ class Info:
         if not isinstance(other, Info):
             return False
 
-        if self._hashable:
-            return (
-                self is other
-                or self._hashable
-                and self.head == other.head
-                and self.args == other.args
-                and self.attributes == other.attributes
-                and self.successors == other.successors
-                and self.regions == other.regions
-            )
-        else:
-            return self is other
+        return (
+            self is other
+            or self._hashable
+            and self.head == other.head
+            and self.args == other.args
+            and self.attributes == other.attributes
+            and self.successors == other.successors
+            and self.regions == other.regions
+        )
 
 
 @dataclass
