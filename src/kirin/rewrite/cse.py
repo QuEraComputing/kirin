@@ -36,12 +36,9 @@ class Info:
         return self._hash
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Info):
-            return False
-
-        return (
-            self is other
-            or self._hashable
+        return self is other or (
+            self._hashable
+            and isinstance(other, Info)
             and self.head == other.head
             and self.args == other.args
             and self.attributes == other.attributes
