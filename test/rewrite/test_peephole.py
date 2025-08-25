@@ -13,22 +13,30 @@ def peephole1(a: int):
 # add(mul(2, %a), %a) -> mul(3, %a)
 @basic_no_opt
 def peephole2(a: int):
-    x = (2 * a) + a
+    x = 2 * a + a
     return x
 
 
 # add(%a, mul(2, %a)) -> mul(3, %a)
 @basic_no_opt
 def peephole3(a: int):
-    x = a + (2 * a)
+    x = a + 2 * a
+    return x
+
+
+# add(%a, add(%a, mul(2, %a))) -> mul(4, %a)
+@basic_no_opt
+def peephole4(a: int):
+    x = a + a + 2 * a
     return x
 
 
 def aux(program):
-    before = program(5)
-    Fixpoint(Walk(PeepholeOptimize())).rewrite(program.code)
-    after = program(5)
-    assert before == after
+    for i in range(5):
+        before = program(i)
+        Fixpoint(Walk(PeepholeOptimize())).rewrite(program.code)
+        after = program(i)
+        assert before == after
 
 
 def test_peephole_opt1():
@@ -41,3 +49,7 @@ def test_peephole_opt2():
 
 def test_peephole_opt3():
     aux(peephole3)
+
+
+def test_peephole_opt4():
+    aux(peephole4)
