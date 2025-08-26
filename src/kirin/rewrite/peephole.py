@@ -10,7 +10,9 @@ class PeepholeOptimize(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         result_types = node.results.types
-        if not all(t in (types.Float, types.Int) for t in result_types):
+        if not all(
+            t.is_subseteq(types.Union(types.Float, types.Int)) for t in result_types
+        ):
             return RewriteResult(has_done_something=False)
 
         if isinstance(node, py.binop.Add):
@@ -37,10 +39,9 @@ class PeepholeOptimize(RewriteRule):
                 const_node := mult_node.lhs.owner, py.Constant
             ):
                 x = const_node.value.unwrap()
-                if isinstance(x, (int, float)):
-                    const_node.replace_by(py.Constant(x + 1))
-                    node.replace_by(py.binop.Mult(mult_node.lhs, node.lhs))
-                    mult_node.delete()
-                    return RewriteResult(has_done_something=True)
+                const_node.replace_by(py.Constant(x + 1))
+                node.replace_by(py.binop.Mult(mult_node.lhs, node.lhs))
+                mult_node.delete()
+                return RewriteResult(has_done_something=True)
 
         return RewriteResult(has_done_something=False)
