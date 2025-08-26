@@ -110,3 +110,18 @@ def test_if_else_defs():
 
     assert main_nested_if(3) == 4 == main_nested_if2(3)
     assert main_nested_if(10) == 0 == main_nested_if2(8)
+
+
+def test_def_only_else():
+    @kernel
+    def main(n: int):
+        c = 1.0
+        if n <= 0:
+            return 0.0
+        else:
+            c = 2.0
+        return c
+
+    main.print()
+    assert main(1) == 2.0
+    assert main(0) == 0.0

@@ -45,12 +45,27 @@ class Lowering(lowering.FromPythonAST):
         yield_names: list[str] = []
         body_yields: list[ir.SSAValue] = []
         else_yields: list[ir.SSAValue] = []
-        for name in body_frame.defs.keys():
-            if name in else_frame.defs:
+        all_names: set[str] = set(body_frame.defs.keys()) | (
+            set(else_frame.defs.keys())
+        )
+        for name in all_names:
+            if name in body_frame.defs and name in else_frame.defs:
                 yield_names.append(name)
                 body_yields.append(body_frame[name])
                 else_yields.append(else_frame[name])
-            elif (value := self._frame_or_any_parent_has_def(frame, name)) is not None:
+            elif (
+                name not in body_frame.defs
+                and (value := self._frame_or_any_parent_has_def(frame, name))
+                is not None
+            ):
+                yield_names.append(name)
+                body_yields.append(value)
+                else_yields.append(else_frame[name])
+            elif (
+                name not in else_frame.defs
+                and (value := self._frame_or_any_parent_has_def(frame, name))
+                is not None
+            ):
                 yield_names.append(name)
                 body_yields.append(body_frame[name])
                 else_yields.append(value)
