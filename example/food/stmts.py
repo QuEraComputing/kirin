@@ -1,21 +1,21 @@
 from attrs import Food, Serving
 from dialect import dialect
 
-from kirin import ir, types
+from kirin import ir, types, lowering
 from kirin.decl import info, statement
 
 
 @statement(dialect=dialect)
 class NewFood(ir.Statement):
     name = "new_food"
-    traits = frozenset({ir.Pure(), ir.FromPythonCall()})
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     type: str = info.attribute(types.String)
     result: ir.ResultValue = info.result(types.PyClass(Food))
 
 
 @statement(dialect=dialect)
 class Cook(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
     target: ir.SSAValue = info.argument(types.PyClass(Food))
     amount: ir.SSAValue = info.argument(types.Int)
     result: ir.ResultValue = info.result(types.PyClass(Serving))
@@ -23,13 +23,13 @@ class Cook(ir.Statement):
 
 @statement(dialect=dialect)
 class Eat(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
     target: ir.SSAValue = info.argument(types.PyClass(Serving))
 
 
 @statement(dialect=dialect)
 class Nap(ir.Statement):
-    traits = frozenset({ir.FromPythonCall()})
+    traits = frozenset({lowering.FromPythonCall()})
 
 
 @statement(dialect=dialect)
