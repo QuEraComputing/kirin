@@ -1,7 +1,7 @@
 from kirin import ir
 from kirin.prelude import basic
 from kirin.dialects.py.binop.stmts import Add, Mult
-from kirin.serialization.jsonserializer import JSONSerializer
+from kirin.serialization.binaryserializer import BinarySerializer
 
 
 @basic
@@ -12,7 +12,7 @@ def foo():
 def test_to_json():
     # foo.code.print()
     dialect = ir.Dialect(name="math", stmts=[Add, Mult])
-    serializer = JSONSerializer(dialects=dialect)
+    serializer = BinarySerializer(dialects=dialect)
     encoded = serializer.encode(foo)
     decoded = serializer.decode(encoded)
     # encoded_again = serializer.encode(decoded)

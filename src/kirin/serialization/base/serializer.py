@@ -316,6 +316,7 @@ class Serializer:
         if isinstance(attr, ir.PyAttr):
             out["style"] = "pyattr"
             out["data"] = self._ctx.runtime_serializer.encode(attr.data)
+            out["type"] = self._ctx.typeattr_serializer.encode(attr.type)
         elif isinstance(attr, ilist.IList):
             out["style"] = "ilist"
             out["data"] = self._ctx.runtime_serializer.encode(attr.data)
@@ -337,7 +338,10 @@ class Serializer:
 
         style = data.get("style")
         if style == "pyattr":
-            return ir.PyAttr(data=self._ctx.runtime_serializer.decode(data["data"]))
+            return ir.PyAttr(
+                data=self._ctx.runtime_serializer.decode(data["data"]),
+                pytype=self._ctx.typeattr_serializer.decode(data["type"]),
+            )
         elif style == "ilist":
             return ilist.IList(data=self._ctx.runtime_serializer.decode(data["data"]))
         elif style == "signature":
