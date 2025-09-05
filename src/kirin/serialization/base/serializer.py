@@ -12,7 +12,7 @@ class Serializer:
         ctx: SerializationContext | None = None,
         dialects: ir.Dialect | ir.DialectGroup | None = None,
     ):
-        self._ctx = ctx or SerializationContext()
+        self._ctx = SerializationContext() if ctx is None else ctx
         if dialects:
             if isinstance(dialects, ir.Dialect):
                 items = [dialects]
@@ -21,6 +21,47 @@ class Serializer:
 
             for d in items:
                 register_dialect(d)
+
+    def serialize(self, obj: object) -> dict[str, Any]:
+        match obj:
+            case ir.Method():
+                return self.serialize_method(obj)
+            case ir.BlockArgument():
+                return self.serialize_block_argument(obj)
+            case ir.Statement():
+                return self.serialize_statement(obj)
+            case ir.Region():
+                return self.serialize_region(obj)
+            case ir.Attribute():
+                return self.serialize_attribute(obj)
+            case ir.Block():
+                return self.serialize_block(obj)
+            case ir.ResultValue():
+                return self.serialize_result(obj)
+            case _:
+                raise ValueError(
+                    f"Unsupported object type {type(obj)} for serialization."
+                )
+
+    def deserialize(self, data: dict[str, Any], owner: ir.Statement = None) -> Any:
+        kind = data.get("kind")
+        match kind:
+            case "method":
+                return self.deserialize_method(data)
+            case "block-arg":
+                return self.deserialize_block_argument(data)
+            case "statement":
+                return self.deserialize_statement(data)
+            case "region":
+                return self.deserialize_region(data)
+            case "attribute":
+                return self.deserialize_attribute(data)
+            case "block":
+                return self.deserialize_block(data)
+            case "result-value":
+                return self.deserialize_result(data, owner=owner)
+            case _:
+                raise ValueError(f"Unsupported data kind {kind} for deserialization.")
 
     def serialize_method(self, mthd: ir.Method) -> dict[str, Any]:
         self._ctx.clear()
@@ -54,47 +95,6 @@ class Serializer:
             dialects=self._ctx.dialect_serializer.decode(data["dialects"]),
             code=self.deserialize(data["code"]),
         )
-
-    def serialize(self, obj: object) -> dict[str, Any]:
-        match obj:
-            case ir.BlockArgument():
-                return self.serialize_block_argument(obj)
-            # case ir.SSAValue():
-            #     return self.serialize_ssa_value(obj)
-            case ir.Statement():
-                return self.serialize_statement(obj)
-            case ir.Region():
-                return self.serialize_region(obj)
-            case ir.Attribute():
-                return self.serialize_attribute(obj)
-            case ir.Block():
-                return self.serialize_block(obj)
-            case ir.ResultValue():
-                return self.serialize_result(obj)
-            case _:
-                raise ValueError(
-                    f"Unsupported object type {type(obj)} for serialization."
-                )
-
-    def deserialize(self, data: dict[str, Any], owner: ir.Statement = None) -> Any:
-        kind = data.get("kind")
-        match kind:
-            case "block-arg":
-                return self.deserialize_block_argument(data)
-            # case "ssa-value":
-            #     return self.deserialize_ssa_value(data)
-            case "statement":
-                return self.deserialize_statement(data)
-            case "region":
-                return self.deserialize_region(data)
-            case "attribute":
-                return self.deserialize_attribute(data)
-            case "block":
-                return self.deserialize_block(data)
-            case "result-value":
-                return self.deserialize_result(data, owner=owner)
-            case _:
-                raise ValueError(f"Unsupported data kind {kind} for deserialization.")
 
     def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
         out = {

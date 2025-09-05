@@ -6,10 +6,10 @@ from kirin.serialization.base.serializer import Serializer
 
 class JSONSerializer(Serializer):
 
-    def encode(self, mthd: ir.Method) -> str:
-        data = super().serialize_method(mthd)
+    def encode(self, obj) -> str:
+        data = super().serialize(obj)
         return json.dumps(data, separators=(",", ":"), indent=2)
 
     def decode(self, payload: str) -> ir.Method:
         data = json.loads(payload)
-        return super().deserialize_method(data)
+        return super().deserialize(data)
