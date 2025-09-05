@@ -1,12 +1,13 @@
 from dataclasses import field, dataclass
 
+import kirin.serialization.base.impls as _impls
 from kirin import ir
-from kirin.serialization.base.utils.attr import (
+from kirin.serialization.base.registry import (
     DialectSerializer,
     RuntimeSerializer,
     TypeAttributeSerializer,
 )
-from kirin.serialization.base.utils.ssa_int_idtable import IntIdTable
+from kirin.serialization.base.ssa_int_idtable import IntIdTable
 
 
 @dataclass
@@ -19,7 +20,6 @@ class SerializationContext:
     )
     blk_idtable: IntIdTable[ir.Block] = field(default_factory=IntIdTable[ir.Block])
     region_idtable: IntIdTable[ir.Region] = field(default_factory=IntIdTable[ir.Region])
-
     runtime_serializer: RuntimeSerializer = field(default_factory=RuntimeSerializer)
     typeattr_serializer: TypeAttributeSerializer = field(
         default_factory=TypeAttributeSerializer
@@ -34,8 +34,5 @@ class SerializationContext:
         self.blk_idtable.clear()
         self.region_idtable.clear()
 
-    def get_or_assign_ssa_id(self, ssa_id: ir.SSAValue) -> int:
-        return self.ssa_idtable[ssa_id]
 
-    def get_or_assign_block_id(self, block_id: ir.Block) -> int:
-        return self.blk_idtable[block_id]
+assert _impls

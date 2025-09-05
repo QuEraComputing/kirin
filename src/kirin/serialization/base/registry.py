@@ -9,10 +9,16 @@ DIALECTS_LOOKUP = {}
 
 
 def register_dialect(dialect: ir.Dialect):
-    DIALECTS_LOOKUP[dialect.name] = (
-        dialect,
-        {stmt_cls.__name__: stmt_cls for stmt_cls in dialect.stmts},
-    )
+    stmt_map: dict[str, type] = {}
+    for stmt_cls in dialect.stmts:
+        # register under Python class name
+        stmt_map[stmt_cls.__name__] = stmt_cls
+        # also register under the statement's declared `name` if provided
+        stmt_declared_name = getattr(stmt_cls, "name", None)
+        if stmt_declared_name and stmt_declared_name != stmt_cls.__name__:
+            stmt_map[stmt_declared_name] = stmt_cls
+
+    DIALECTS_LOOKUP[dialect.name] = (dialect, stmt_map)
 
 
 def register_type(obj_type: type):
@@ -47,10 +53,6 @@ def runtime_register_decode(obj_type):
 
 @dataclass
 class DialectSerializer:
-    """
-    Serializer for dialects.
-    """
-
     def encode(self, obj: ir.Dialect | ir.DialectGroup):
         if isinstance(obj, ir.DialectGroup):
             return self.encode_dialect_group(obj)
@@ -136,10 +138,6 @@ class RuntimeSerializer:
 
 @dataclass
 class TypeAttributeSerializer:
-    """
-    Serializer for type attributes.
-    """
-
     def encode(self, obj: types.TypeAttribute):
         encode_content_method = getattr(self, f"_encode_{obj.__class__.__name__}", None)
         if not encode_content_method:
