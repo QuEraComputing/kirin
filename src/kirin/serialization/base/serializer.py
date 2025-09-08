@@ -1,26 +1,19 @@
 from typing import Any
 
-from kirin import ir
+from kirin import ir, types
 from kirin.dialects import func, ilist
 from kirin.serialization.base.context import SerializationContext
 from kirin.serialization.base.registry import DIALECTS_LOOKUP, register_dialect
 
 
 class Serializer:
+    _ctx: SerializationContext
+
     def __init__(
         self,
         ctx: SerializationContext | None = None,
-        dialects: ir.Dialect | ir.DialectGroup | None = None,
     ):
         self._ctx = SerializationContext() if ctx is None else ctx
-        if dialects:
-            if isinstance(dialects, ir.Dialect):
-                items = [dialects]
-            elif isinstance(dialects, ir.DialectGroup):
-                items = [d for d in dialects.data]
-
-            for d in items:
-                register_dialect(d)
 
     def serialize(self, obj: object) -> dict[str, Any]:
         match obj:
@@ -43,7 +36,9 @@ class Serializer:
                     f"Unsupported object type {type(obj)} for serialization."
                 )
 
-    def deserialize(self, data: dict[str, Any], owner: ir.Statement = None) -> Any:
+    def deserialize(
+        self, data: dict[str, Any], owner: ir.Statement | None = None
+    ) -> Any:
         kind = data.get("kind")
         match kind:
             case "method":
@@ -64,15 +59,7 @@ class Serializer:
                 raise ValueError(f"Unsupported data kind {kind} for deserialization.")
 
     def serialize_method(self, mthd: ir.Method) -> dict[str, Any]:
-        self._ctx.clear()
-        # Ensure all dialects referenced by the method are registered so
-        # DialectSerializer.encode can look them up. Methods may carry a
-        # Dialect or a DialectGroup containing multiple dialects.
-        try:
-            method_dialects = mthd.dialects
-        except AttributeError:
-            method_dialects = None
-
+        method_dialects = mthd.dialects
         if isinstance(method_dialects, ir.Dialect):
             register_dialect(method_dialects)
         elif isinstance(method_dialects, ir.DialectGroup):
@@ -87,6 +74,8 @@ class Serializer:
         }
 
     def deserialize_method(self, data: dict[str, Any]) -> ir.Method:
+        if data.get("kind") != "method":
+            raise ValueError("Invalid method data for deserialization.")
         return ir.Method(
             mod=None,
             py_func=None,
@@ -326,7 +315,15 @@ class Serializer:
                 self._ctx.typeattr_serializer.encode(arg) for arg in attr.inputs
             ]
             out["output"] = self._ctx.typeattr_serializer.encode(attr.output)
-
+        elif isinstance(attr, types.Generic):
+            out["style"] = "Generic"
+            out["data"] = self._ctx.typeattr_serializer.encode(attr)
+        elif isinstance(attr, types.AnyType):
+            out["style"] = "AnyType"
+            out["data"] = self._ctx.typeattr_serializer.encode(attr)
+        elif isinstance(attr, types.PyClass):
+            out["style"] = "PyClass"
+            out["data"] = self._ctx.typeattr_serializer.encode(attr)
         else:
             raise ValueError(f"Unsupported attribute type {type(attr)} for encoding.")
 
@@ -350,6 +347,8 @@ class Serializer:
             ]
             output = self._ctx.typeattr_serializer.decode(data["output"])
             return func.Signature(inputs=tuple(inputs), output=output)
+        elif style == "Generic" or style == "AnyType" or style == "PyClass":
+            return self._ctx.typeattr_serializer.decode(data["data"])
         else:
             raise ValueError(f"Unsupported attribute <{style}> for decoding.")
 

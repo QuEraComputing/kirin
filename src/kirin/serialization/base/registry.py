@@ -23,6 +23,7 @@ def register_dialect(dialect: ir.Dialect):
 
 def register_type(obj_type: type):
     RUNTIME_NAME2TYPE[obj_type.__name__] = obj_type
+    # RUNTIME_NAME2TYPE[obj_type.__name__.lower()] = obj_type
 
 
 def runtime_register_encode(obj_type):

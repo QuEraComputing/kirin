@@ -26,6 +26,9 @@ class SerializationContext:
     )
     dialect_serializer: DialectSerializer = field(default_factory=DialectSerializer)
 
+    Method_Lookup: dict[int, ir.Method] = field(default_factory=dict)
+    method_idtable: IntIdTable[ir.Method] = field(default_factory=IntIdTable[ir.Method])
+
     def clear(self) -> None:
         self.SSA_Lookup.clear()
         self.Block_Lookup.clear()
@@ -34,5 +37,4 @@ class SerializationContext:
         self.blk_idtable.clear()
         self.region_idtable.clear()
 
-
-assert _impls
+    assert _impls

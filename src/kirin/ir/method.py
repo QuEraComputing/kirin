@@ -201,4 +201,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
                 continue
 
             callee = trait.get_callee(stmt)
-            callee.backedges.add(self)
+            try:
+                callee.backedges.add(self)
+            except AttributeError:
+                raise AttributeError(f"Cannot add backedge to {callee}.")
