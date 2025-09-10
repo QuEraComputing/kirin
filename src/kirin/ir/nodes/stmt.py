@@ -563,7 +563,6 @@ class Statement(IRNode["Block"]):
             or len(self.successors) != len(other.successors)
             or self.attributes != other.attributes
         ):
-            print(self.attributes, other.attributes)
             return False
 
         if (

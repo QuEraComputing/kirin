@@ -23,11 +23,9 @@ def register_dialect(dialect: ir.Dialect):
 
 def register_type(obj_type: type):
     RUNTIME_NAME2TYPE[obj_type.__name__] = obj_type
-    # RUNTIME_NAME2TYPE[obj_type.__name__.lower()] = obj_type
 
 
 def runtime_register_encode(obj_type):
-
     def wrapper(func):
         if obj_type.__name__ in RUNTIME_ENCODE_LOOKUP:
             pass
@@ -40,7 +38,6 @@ def runtime_register_encode(obj_type):
 
 
 def runtime_register_decode(obj_type):
-
     def wrapper(func):
         if obj_type.__name__ in RUNTIME_DECODE_LOOKUP:
             pass
@@ -54,7 +51,7 @@ def runtime_register_decode(obj_type):
 
 @dataclass
 class DialectSerializer:
-    def encode(self, obj: ir.Dialect | ir.DialectGroup):
+    def encode(self, obj: ir.Dialect | ir.DialectGroup | None):
         if isinstance(obj, ir.DialectGroup):
             return self.encode_dialect_group(obj)
         elif isinstance(obj, ir.Dialect):
