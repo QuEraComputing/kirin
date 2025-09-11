@@ -5,6 +5,9 @@ from kirin import ir, types
 from kirin.dialects import func, ilist
 from kirin.serialization.base.context import SerializationContext
 from kirin.serialization.base.registry import (
+    mangle,  # <- import mangle so we can record mangled symbol in context
+)
+from kirin.serialization.base.registry import (
     DIALECTS_LOOKUP,
     DialectSerializer,
     RuntimeSerializer,
@@ -99,25 +102,32 @@ class Serializer:
         elif isinstance(method_dialects, ir.DialectGroup):
             for d in method_dialects.data:
                 register_dialect(d)
+
+        mangled = mangle(mthd.sym_name, mthd.arg_types)
+        self._ctx.method_to_symbol[mthd] = mangled
+
         return {
             "kind": "method",
             "sym_name": mthd.sym_name,
             "arg_names": mthd.arg_names,
             "dialects": self._dialect_serializer.encode(mthd.dialects),
             "code": self.serialize(mthd.code),
+            "mangled": mangled,
         }
 
     def deserialize_method(self, data: dict[str, Any]) -> ir.Method:
         if data.get("kind") != "method":
             raise ValueError("Invalid method data for deserialization.")
-        return ir.Method(
+        out = ir.Method(
             mod=None,
             py_func=None,
-            sym_name=data["sym_name"],
+            sym_name=data["mangled"],
             arg_names=data["arg_names"],
             dialects=self._dialect_serializer.decode(data["dialects"]),
             code=self.deserialize(data["code"]),
         )
+
+        return out
 
     def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
         dialects = stmt.dialect

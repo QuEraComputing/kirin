@@ -10,11 +10,13 @@ def foo(x: int, y: float):
 
 @basic
 def bar():
-    def goo():
+    def goo(x: int, y: int):
         return 42
 
-    def foo():
-        goo()
+    def foo(x: str, y: str):
+        return goo(1, 2)
+
+    return foo("hello", "world")
 
 
 @basic

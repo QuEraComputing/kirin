@@ -9,48 +9,58 @@ RUNTIME_NAME2TYPE = {}
 DIALECTS_LOOKUP = {}
 
 
-PREFIX = "_method_"
-SCOPE_SEP = "@"
+PREFIX = "_method_@"
 PARAM_SEP = "->"
-TYPE_MAP = {
-    "int": "i",
-    "str": "s",
-    "float": "f",
-    "bool": "b",
-    "NoneType": "n",
-    "list": "l",
-    "tuple": "t",
-    "dict": "d",
-}
+
+
+def get_str_from_type(typ: TypeAttribute) -> str:
+    repr_name = typ.__repr__() if hasattr(typ, "__repr__") else str(type(typ))
+    if repr_name in (
+        "int",
+        "str",
+        "float",
+        "bool",
+        "NoneType",
+        "list",
+        "tuple",
+        "dict",
+    ):
+        return repr_name
+    elif repr_name == "AnyType()":
+        return "Any"
+    elif repr_name.startswith("IList["):
+        return "IList"
+    elif repr_name.startswith("Method["):
+        return "Method"
+    else:
+        return "?"
 
 
 def mangle(
-    self,
     symbol_name: str | None,
-    scope: list[str | None] | None,
     param_types: tuple[TypeAttribute, ...],
 ) -> str:
-    mangled_name = self.PREFIX
-    if scope:
-        mangled_name = f"{mangled_name}{self.SCOPE_SEP}{self.SCOPE_SEP.join(scope)}"
-    mangled_name = f"{mangled_name}{self.SCOPE_SEP}{symbol_name}"
+
+    mangled_name = f"{PREFIX}{symbol_name}"
     if param_types:
         for typ in param_types:
-            if typ.__repr__() in self.TYPE_MAP:
-                mangled_name = (
-                    f"{mangled_name}{self.PARAM_SEP}{self.TYPE_MAP[typ.__repr__()]}"
-                )
-            else:
-                mangled_name = f"{mangled_name}{self.PARAM_SEP}x"
+            mangled_name += f"{PARAM_SEP}{get_str_from_type(typ)}"
     return mangled_name
 
 
-def demangle(self, mangled_name: str) -> str:
-    if not mangled_name.startswith(self.PREFIX):
-        raise ValueError(f"Invalid mangled name: {mangled_name}")
-    # reverse_type_map = {v: k for k, v in self.TYPE_MAP.items()}
+# def demangle(mangled_name: str) -> dict:
+#     if not mangled_name.startswith(PREFIX):
+#         raise ValueError(f"Invalid mangled name: {mangled_name}")
 
-    # parts = mangled_name[len(self.PREFIX) :].split(self.SCOPE_SEP)
+#     body = mangled_name[len(PREFIX) :]
+#     if body == "":
+#         raise ValueError(f"Invalid mangled name body: {body}")
+
+#     parts = body.split(PARAM_SEP)
+#     symbol_name = parts[0]
+#     param_codes = parts[1:] if len(parts) > 1 else []
+
+#     return {"symbol_name": symbol_name, "param_codes": param_codes}
 
 
 def register_dialect(dialect: ir.Dialect):
