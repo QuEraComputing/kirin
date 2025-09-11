@@ -14,7 +14,6 @@ class UnusedYield(RewriteRule):
         uses: list[int] = []
         results: list[ir.ResultValue] = []
         for idx, result in enumerate(node.results):
-            print(result)
             if result.uses:
                 uses.append(idx)
                 results.append(result)
