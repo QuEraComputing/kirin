@@ -14,6 +14,7 @@ class UnusedYield(RewriteRule):
         uses: list[int] = []
         results: list[ir.ResultValue] = []
         for idx, result in enumerate(node.results):
+            print(result)
             if result.uses:
                 uses.append(idx)
                 results.append(result)
@@ -22,7 +23,8 @@ class UnusedYield(RewriteRule):
         return any_unused, set(uses), results
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if not isinstance(node, (For, IfElse)):
+        if not isinstance(node, (For, IfElse)) or node.parent_node is None:
+            # no need to do anything if the node isn't in a block
             return RewriteResult()
 
         any_unused, uses, results = self.scan_unused(node)
