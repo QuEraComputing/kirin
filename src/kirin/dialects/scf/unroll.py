@@ -55,7 +55,7 @@ class PickIfElse(RewriteRule):
 class ForLoop(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if not isinstance(node, For):
+        if not isinstance(node, For) or isinstance(node.parent_stmt, (For, IfElse)):
             return RewriteResult()
 
         # TODO: support for PartialTuple and IList with known length
@@ -88,4 +88,4 @@ class ForLoop(RewriteRule):
         for result, output in zip(node.results, loop_vars):
             result.replace_by(output)
         node.delete()
-        return RewriteResult(has_done_something=True, terminated=True)
+        return RewriteResult(has_done_something=True)
