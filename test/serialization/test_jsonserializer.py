@@ -58,6 +58,6 @@ def test_to_json3():
     assert decoded.code.is_structurally_equal(main.code)
 
 
-# test_to_json1()
+test_to_json1()
 test_to_json2()
 # test_to_json3()

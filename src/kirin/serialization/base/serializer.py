@@ -104,8 +104,6 @@ class Serializer:
                 register_dialect(d)
 
         mangled = mangle(mthd.sym_name, mthd.arg_types)
-        self._ctx.method_to_symbol[mthd] = mangled
-
         return {
             "kind": "method",
             "sym_name": mthd.sym_name,
@@ -116,22 +114,28 @@ class Serializer:
         }
 
     def deserialize_method(self, data: dict[str, Any]) -> ir.Method:
+
         if data.get("kind") != "method":
             raise ValueError("Invalid method data for deserialization.")
         out = ir.Method(
             mod=None,
             py_func=None,
-            sym_name=data["mangled"],
+            sym_name=data["sym_name"],
             arg_names=data["arg_names"],
             dialects=self._dialect_serializer.decode(data["dialects"]),
             code=self.deserialize(data["code"]),
         )
-
+        mangled = mangle(out.sym_name, out.arg_types)
+        if mangled != data["mangled"]:
+            raise ValueError(
+                f"Mangled name mismatch: expected {data['mangled']}, got {mangled}"
+            )
+        self._ctx.Method_SymbolTable[mangled] = out
         return out
 
     def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
         dialects = stmt.dialect
-        return {
+        out = {
             "kind": "statement",
             "dialect": self._dialect_serializer.encode(dialects),
             "name": stmt.name,
@@ -142,6 +146,11 @@ class Serializer:
             "successors": [self.serialize(succ) for succ in stmt.successors],
             "_regions": [self.serialize(region) for region in stmt._regions],
         }
+        if isinstance(stmt, func.Invoke):
+            out["call_method"] = mangle(stmt.callee.sym_name, stmt.callee.arg_types)
+        else:
+            out["call_method"] = None
+        return out
 
     def deserialize_statement(self, data: dict[str, Any]) -> ir.Statement:
         if data.get("kind") != "statement":
@@ -181,6 +190,15 @@ class Serializer:
         # deal with :
         regions_data = data.get("_regions", [])
         _regions = [self.deserialize(region_data) for region_data in regions_data]
+
+        if isinstance(out, func.Invoke) and data.get("call_method"):
+            mangled_name = data["call_method"]
+            if mangled_name not in self._ctx.Method_SymbolTable:
+                raise ValueError(f"Method with mangled name {mangled_name} not found.")
+            else:
+                callee = self._ctx.Method_SymbolTable[mangled_name]
+                out.callee = callee
+
         # link parents:
         for region in _regions:
             if region.parent_node is None:
