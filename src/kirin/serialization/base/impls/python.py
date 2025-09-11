@@ -47,6 +47,8 @@ def decode_pystr(decoder: RuntimeSerializer, data):
 register_type(list)
 register_type(tuple)
 register_type(dict)
+register_type(range)
+register_type(slice)
 
 
 @runtime_register_encode(list)
@@ -83,3 +85,37 @@ def decode_pydict(decoder: RuntimeSerializer, data):
         decoder.decode(k): decoder.decode(v)
         for k, v in zip(data["keys"], data["values"])
     }
+
+
+@runtime_register_encode(range)
+def encode_pyrange(encoder: RuntimeSerializer, obj):
+    return {
+        "start": encoder.encode(obj.start),
+        "stop": encoder.encode(obj.stop),
+        "step": encoder.encode(obj.step),
+    }
+
+
+@runtime_register_decode(range)
+def decode_pyrange(decoder: RuntimeSerializer, data):
+    start = decoder.decode(data["start"])
+    stop = decoder.decode(data["stop"])
+    step = decoder.decode(data["step"])
+    return range(start, stop, step)
+
+
+@runtime_register_encode(slice)
+def encode_pyslice(encoder: RuntimeSerializer, obj):
+    return {
+        "start": encoder.encode(obj.start),
+        "stop": encoder.encode(obj.stop),
+        "step": encoder.encode(obj.step),
+    }
+
+
+@runtime_register_decode(slice)
+def decode_pyslice(decoder: RuntimeSerializer, data):
+    start = decoder.decode(int(data["start"]))
+    stop = decoder.decode(int(data["stop"]))
+    step = decoder.decode(int(data["step"]))
+    return slice(start, stop, step)

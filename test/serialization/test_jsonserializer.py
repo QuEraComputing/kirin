@@ -24,11 +24,11 @@ def main():
 
 
 def test_to_json1():
-    foo.code.print()
+    # foo.code.print()
     serializer = JSONSerializer()
     encoded = serializer.encode(foo)
     # foo.code.print()
-    print(encoded)
+    # print(encoded)
     decoded = serializer.decode(encoded)
     # decoded.code.print()
     assert decoded.code.is_structurally_equal(foo.code)
@@ -56,6 +56,6 @@ def test_to_json3():
     assert decoded.code.is_structurally_equal(main.code)
 
 
-test_to_json1()
-# test_to_json2()
+# test_to_json1()
+test_to_json2()
 # test_to_json3()

@@ -1,11 +1,56 @@
 from dataclasses import dataclass
 
 from kirin import ir, types
+from kirin.ir.attrs.types import TypeAttribute
 
 RUNTIME_ENCODE_LOOKUP = {}
 RUNTIME_DECODE_LOOKUP = {}
 RUNTIME_NAME2TYPE = {}
 DIALECTS_LOOKUP = {}
+
+
+PREFIX = "_method_"
+SCOPE_SEP = "@"
+PARAM_SEP = "->"
+TYPE_MAP = {
+    "int": "i",
+    "str": "s",
+    "float": "f",
+    "bool": "b",
+    "NoneType": "n",
+    "list": "l",
+    "tuple": "t",
+    "dict": "d",
+}
+
+
+def mangle(
+    self,
+    symbol_name: str | None,
+    scope: list[str | None] | None,
+    param_types: tuple[TypeAttribute, ...],
+) -> str:
+    mangled_name = self.PREFIX
+    if scope:
+        mangled_name = f"{mangled_name}{self.SCOPE_SEP}{self.SCOPE_SEP.join(scope)}"
+    mangled_name = f"{mangled_name}{self.SCOPE_SEP}{symbol_name}"
+    if param_types:
+        for typ in param_types:
+            if typ.__repr__() in self.TYPE_MAP:
+                mangled_name = (
+                    f"{mangled_name}{self.PARAM_SEP}{self.TYPE_MAP[typ.__repr__()]}"
+                )
+            else:
+                mangled_name = f"{mangled_name}{self.PARAM_SEP}x"
+    return mangled_name
+
+
+def demangle(self, mangled_name: str) -> str:
+    if not mangled_name.startswith(self.PREFIX):
+        raise ValueError(f"Invalid mangled name: {mangled_name}")
+    # reverse_type_map = {v: k for k, v in self.TYPE_MAP.items()}
+
+    # parts = mangled_name[len(self.PREFIX) :].split(self.SCOPE_SEP)
 
 
 def register_dialect(dialect: ir.Dialect):

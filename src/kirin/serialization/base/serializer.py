@@ -20,18 +20,25 @@ class Serializer:
         default_factory=TypeAttributeSerializer
     )
     _dialect_serializer: DialectSerializer = field(default_factory=DialectSerializer)
+    _block_reference_store: dict[int, ir.Block]
 
     def __init__(self):
         self._ctx = SerializationContext()
         self._runtime_serializer = RuntimeSerializer()
         self._typeattr_serializer = TypeAttributeSerializer()
         self._dialect_serializer = DialectSerializer()
+        self._block_reference_store = {}
 
     def encode(self, obj: object) -> dict[str, Any]:
-        return {"kind": "module", "symbol_table": None, "body": self.serialize(obj)}
+        out = {"kind": "module", "symbol_table": None, "body": self.serialize(obj)}
+        return out
 
     def decode(self, data: dict[str, Any]) -> Any:
         kind = data.get("kind")
+        self._block_reference_store = {}
+        for i in range(len(self._ctx.blk_idtable.lookup)):
+            x = ir.Block.__new__(ir.Block)
+            self._block_reference_store[i] = x
         match kind:
             case "module":
                 return self.deserialize(data["body"])
@@ -78,7 +85,7 @@ class Serializer:
                 return self.deserialize_region(data)
             case "attribute":
                 return self.deserialize_attribute(data)
-            case "block":
+            case "block" | "block_ref":
                 return self.deserialize_block(data)
             case "result-value":
                 return self.deserialize_result(data, owner=owner)
@@ -86,7 +93,6 @@ class Serializer:
                 raise ValueError(f"Unsupported data kind {kind} for deserialization.")
 
     def serialize_method(self, mthd: ir.Method) -> dict[str, Any]:
-        self._ctx.register_method_symbol(mthd)
         method_dialects = mthd.dialects
         if isinstance(method_dialects, ir.Dialect):
             register_dialect(method_dialects)
@@ -174,7 +180,8 @@ class Serializer:
         return out
 
     def serialize_block_argument(self, arg: ir.BlockArgument) -> dict[str, Any]:
-        return {
+
+        out = {
             "kind": "block-arg",
             "id": self._ctx.ssa_idtable[arg],
             "blk_id": self._ctx.blk_idtable[arg.owner],
@@ -182,13 +189,13 @@ class Serializer:
             "type": self._typeattr_serializer.encode(arg.type),
             "name": arg.name,
         }
+        return out
 
     def deserialize_block_argument(self, data: dict[str, Any]) -> ir.BlockArgument:
         if data.get("kind") != "block-arg":
             raise ValueError("Invalid SSA block argument data for decoding.")
 
         ssa_id = int(data["id"])
-
         # If this SSA id was already created earlier in the decode (e.g. the
         # same block-arg was referenced multiple times in the serialized
         # payload), return the existing object.
@@ -201,9 +208,13 @@ class Serializer:
             )
 
         block = self._ctx.Block_Lookup.get(int(data["blk_id"]))
-
         if block is None:
-            raise ValueError(f"Block with id {data['blk_id']} not found in lookup.")
+            block_id = int(data["blk_id"])
+            if block_id in self._block_reference_store:
+                block = self._block_reference_store.pop(block_id)
+                self._ctx.Block_Lookup[block_id] = block
+            else:
+                raise ValueError(f"Block with id {block_id} not found in lookup.")
 
         index = data["index"]
 
@@ -258,6 +269,10 @@ class Serializer:
             out._block_idx = {}
 
             for block in blocks:
+                # ensure block has no lingering parent from placeholder registration
+                existing_parent = block.parent
+                if existing_parent is not None and existing_parent is not out:
+                    block.parent = None
                 out.blocks.append(block)
 
             return out
@@ -271,30 +286,61 @@ class Serializer:
             raise ValueError("Invalid region data for decoding.")
 
     def serialize_block(self, block: ir.Block) -> dict[str, Any]:
-        self._ctx.Block_Lookup[self._ctx.blk_idtable[block]] = (
-            block  # register to Block lookup
-        )
-        return {
-            "kind": "block",
-            "id": self._ctx.blk_idtable[block],
-            "stmts": [self.serialize(stmt) for stmt in block.stmts],
-            "_args": [self.serialize(arg) for arg in block.args],
-        }
+        if self._ctx.blk_idtable[block] in self._ctx.Block_Lookup:
+            # already registered, so we dont need to encode it again
+            out = {
+                "kind": "block_ref",
+                "id": self._ctx.blk_idtable[block],
+            }
+        else:
+            self._ctx.Block_Lookup[self._ctx.blk_idtable[block]] = block
+            out = {
+                "kind": "block",
+                "id": self._ctx.blk_idtable[block],
+                "stmts": [self.serialize_statement(stmt) for stmt in block.stmts],
+                "_args": [self.serialize_block_argument(arg) for arg in block.args],
+            }
+        return out
 
-    def deserialize_block(self, data: dict[str, Any]) -> ir.Block:
-        block_id = int(data["id"])
+    def deserialize_block(self, block_data: dict) -> ir.Block:
+        if block_data.get("kind") == "block_ref":
+            return self.deserialize_block_ref(block_data)
+        elif block_data.get("kind") == "block":
+            return self.deserialize_concrete_block(block_data)
+        else:
+            raise ValueError("Invalid block data for decoding.")
 
-        out = ir.Block.__new__(ir.Block)
-        self._ctx.Block_Lookup[block_id] = (
-            out  # register to block_id first, so the consecutive ref can follow
-        )
+    def deserialize_block_ref(self, block_data: dict) -> ir.Block:
+        if block_data.get("kind") != "block_ref":
+            raise ValueError("Invalid block reference data for decoding.")
+
+        block_id = int(block_data["id"])
+        if block_id not in self._ctx.Block_Lookup:
+            raise ValueError(f"Block with id {block_id} not found in lookup.")
+
+        return self._ctx.Block_Lookup[block_id]
+
+    def deserialize_concrete_block(self, block_data: dict) -> ir.Block:
+        if block_data.get("kind") != "block":
+            raise ValueError("Invalid block data for decoding.")
+
+        block_id = int(block_data["id"])
+
+        if block_id not in self._ctx.Block_Lookup:
+            if block_id in self._block_reference_store:
+                out = self._block_reference_store.pop(block_id)
+                self._ctx.Block_Lookup[block_id] = out
+            raise ValueError(f"Block with id {block_id} not found in lookup.")
+        else:
+            out = self._ctx.Block_Lookup[block_id]
 
         # construct the block:
         out._args = tuple(
-            self.deserialize(arg_data) for arg_data in data.get("_args", [])
+            self.deserialize_block_argument(arg_data)
+            for arg_data in block_data.get("_args", [])
         )
 
-        stmts_data = data.get("stmts")
+        stmts_data = block_data.get("stmts")
         if stmts_data is None:
             raise ValueError("Block data must contain 'stmts' field.")
 
@@ -303,7 +349,7 @@ class Serializer:
         out._first_branch = None
         out._last_branch = None
         out._stmt_len = 0
-        stmts = tuple(self.deserialize(stmt_data) for stmt_data in stmts_data)
+        stmts = tuple(self.deserialize_statement(stmt_data) for stmt_data in stmts_data)
         out.stmts.extend(stmts)
 
         return out
