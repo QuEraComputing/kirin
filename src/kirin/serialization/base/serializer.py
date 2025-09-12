@@ -413,8 +413,8 @@ class Serializer:
             "kind": "result-value",
             "id": self._ctx.ssa_idtable[result],
             "index": result.index,
-            # "type": self._ctx._typeattr_serializer.encode(result.type),
-            # "name": result.name,
+            "type": self._typeattr_serializer.encode(result.type),
+            "name": result.name,
         }
 
     def deserialize_result(
@@ -434,10 +434,9 @@ class Serializer:
 
         index = int(data["index"])
 
-        # typ = self._typeattr_serializer.decode(data["type"])
+        typ = self._typeattr_serializer.decode(data["type"])
 
-        # out = ir.ResultValue(stmt=owner, index=index, type=typ)
-        out = ir.ResultValue(stmt=owner, index=index)
+        out = ir.ResultValue(stmt=owner, index=index, type=typ)
         out.name = data.get("name", None)
 
         self._ctx.SSA_Lookup[ssa_id] = out
