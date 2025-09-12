@@ -21,25 +21,24 @@ class Serializer:
         default_factory=TypeAttributeSerializer
     )
     _dialect_serializer: DialectSerializer = field(default_factory=DialectSerializer)
-    _block_reference_store: dict[int, ir.Block]
 
     def __init__(self):
         self._ctx = SerializationContext()
         self._runtime_serializer = RuntimeSerializer()
         self._typeattr_serializer = TypeAttributeSerializer()
         self._dialect_serializer = DialectSerializer()
-        self._block_reference_store = {}
 
     def encode(self, obj: object) -> dict[str, Any]:
+        self._ctx.clear()
         out = {"kind": "module", "symbol_table": None, "body": self.serialize(obj)}
         return out
 
     def decode(self, data: dict[str, Any]) -> Any:
         kind = data.get("kind")
-        self._block_reference_store = {}
+        self._ctx._block_reference_store = {}
         for i in range(len(self._ctx.blk_idtable.lookup)):
             x = ir.Block.__new__(ir.Block)
-            self._block_reference_store[i] = x
+            self._ctx._block_reference_store[i] = x
         match kind:
             case "module":
                 return self.deserialize(data["body"])
@@ -229,8 +228,8 @@ class Serializer:
         block = self._ctx.Block_Lookup.get(int(data["blk_id"]))
         if block is None:
             block_id = int(data["blk_id"])
-            if block_id in self._block_reference_store:
-                block = self._block_reference_store.pop(block_id)
+            if block_id in self._ctx._block_reference_store:
+                block = self._ctx._block_reference_store.pop(block_id)
                 self._ctx.Block_Lookup[block_id] = block
             else:
                 raise ValueError(f"Block with id {block_id} not found in lookup.")
@@ -327,8 +326,8 @@ class Serializer:
         block_id = int(block_data["id"])
 
         if block_id not in self._ctx.Block_Lookup:
-            if block_id in self._block_reference_store:
-                out = self._block_reference_store.pop(block_id)
+            if block_id in self._ctx._block_reference_store:
+                out = self._ctx._block_reference_store.pop(block_id)
                 self._ctx.Block_Lookup[block_id] = out
             raise ValueError(f"Block with id {block_id} not found in lookup.")
         else:

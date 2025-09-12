@@ -13,6 +13,10 @@ class SerializationContext:
     blk_idtable: IntIdTable[ir.Block] = field(default_factory=IntIdTable[ir.Block])
     region_idtable: IntIdTable[ir.Region] = field(default_factory=IntIdTable[ir.Region])
 
+    _block_reference_store: dict[int, ir.Block] = field(
+        default_factory=dict[int, ir.Block]
+    )
+
     SSA_Lookup: dict[int, ir.SSAValue] = field(default_factory=dict)
     Block_Lookup: dict[int, ir.Block] = field(default_factory=dict)
     Region_Lookup: dict[int, ir.Region] = field(default_factory=dict)
@@ -28,5 +32,6 @@ class SerializationContext:
         self.ssa_idtable.clear()
         self.blk_idtable.clear()
         self.region_idtable.clear()
+        self._block_reference_store.clear()
 
     assert _impls
