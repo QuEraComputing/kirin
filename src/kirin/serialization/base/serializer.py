@@ -139,7 +139,7 @@ class Serializer:
             "name": stmt.name,
             "_args": list(self.serialize(arg) for arg in stmt._args),
             "_results": list(self.serialize(res) for res in stmt._results),
-            "_name_args_slice": stmt._name_args_slice,
+            "_name_args_slice": self._runtime_serializer.encode(stmt._name_args_slice),
             "attributes": {k: self.serialize(v) for k, v in stmt.attributes.items()},
             "successors": [self.serialize(succ) for succ in stmt.successors],
             "_regions": [self.serialize(region) for region in stmt._regions],
@@ -172,7 +172,7 @@ class Serializer:
         out = stmt_cls.__new__(stmt_cls)
         _args = tuple(self.deserialize(x) for x in data["_args"])
         _results = list(self.deserialize(owner=out, data=x) for x in data["_results"])
-        _name_args_slice = data["_name_args_slice"]
+        _name_args_slice = self._runtime_serializer.decode(data["_name_args_slice"])
         _attributes = {k: self.deserialize(v) for k, v in data["attributes"].items()}
 
         out._args = _args

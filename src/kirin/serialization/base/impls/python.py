@@ -107,15 +107,15 @@ def decode_pyrange(decoder: RuntimeSerializer, data):
 @runtime_register_encode(slice)
 def encode_pyslice(encoder: RuntimeSerializer, obj):
     return {
-        "start": encoder.encode(obj.start),
-        "stop": encoder.encode(obj.stop),
-        "step": encoder.encode(obj.step),
+        "start": obj.start,
+        "stop": obj.stop,
+        "step": obj.step,
     }
 
 
 @runtime_register_decode(slice)
-def decode_pyslice(decoder: RuntimeSerializer, data):
-    start = decoder.decode(int(data["start"]))
-    stop = decoder.decode(int(data["stop"]))
-    step = decoder.decode(int(data["step"]))
+def decode_pyslice(decoder: RuntimeSerializer, data) -> slice:
+    start = data["start"]
+    stop = data["stop"]
+    step = data["step"]
     return slice(start, stop, step)
