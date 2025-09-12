@@ -43,6 +43,16 @@ def decode_pystr(decoder: RuntimeSerializer, data):
     return str(data)
 
 
+@runtime_register_encode(type(None))
+def encode_pynone(encoder: RuntimeSerializer, obj):
+    return None
+
+
+@runtime_register_decode(type(None))
+def decode_pynone(decoder: RuntimeSerializer, data):
+    return None
+
+
 # py sequence
 register_type(list)
 register_type(tuple)
