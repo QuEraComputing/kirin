@@ -5,13 +5,11 @@ from kirin import ir, types
 from kirin.dialects import func, ilist
 from kirin.serialization.base.context import SerializationContext
 from kirin.serialization.base.registry import (
-    mangle,  # <- import mangle so we can record mangled symbol in context
-)
-from kirin.serialization.base.registry import (
     DIALECTS_LOOKUP,
     DialectSerializer,
     RuntimeSerializer,
     TypeAttributeSerializer,
+    mangle,
     register_dialect,
 )
 
@@ -171,9 +169,7 @@ class Serializer:
                 f"Statement class {stmt_name} not found in dialect {dialect_name}."
             )
 
-        # initialize the instance:
         out = stmt_cls.__new__(stmt_cls)
-        # decode fields:
         _args = tuple(self.deserialize(x) for x in data["_args"])
         _results = list(self.deserialize(owner=out, data=x) for x in data["_results"])
         _name_args_slice = data["_name_args_slice"]
@@ -187,7 +183,6 @@ class Serializer:
         successors_data = data.get("successors", [])
         out.successors = [self.deserialize(succ_data) for succ_data in successors_data]
 
-        # deal with :
         regions_data = data.get("_regions", [])
         _regions = [self.deserialize(region_data) for region_data in regions_data]
 
@@ -199,7 +194,6 @@ class Serializer:
                 callee = self._ctx.Method_SymbolTable[mangled_name]
                 out.callee = callee
 
-        # link parents:
         for region in _regions:
             if region.parent_node is None:
                 region.parent_node = out
@@ -224,9 +218,6 @@ class Serializer:
             raise ValueError("Invalid SSA block argument data for decoding.")
 
         ssa_id = int(data["id"])
-        # If this SSA id was already created earlier in the decode (e.g. the
-        # same block-arg was referenced multiple times in the serialized
-        # payload), return the existing object.
         if ssa_id in self._ctx.SSA_Lookup:
             existing = self._ctx.SSA_Lookup[ssa_id]
             if isinstance(existing, ir.BlockArgument):
@@ -247,27 +238,11 @@ class Serializer:
         index = data["index"]
 
         typ = self._typeattr_serializer.decode(data["type"])
-
-        # construct BlockArgument:
         out = ir.BlockArgument(block=block, index=index, type=typ)
         out._name = data.get("name", None)
         self._ctx.SSA_Lookup[ssa_id] = out  # reg to ssa lookup
 
         return out
-
-    # def serialize_ssa_value(self, value: ir.SSAValue) -> dict[str, Any]:
-    #     return {"kind": "ssa-value", "id": self._ctx.ssa_idtable[value]}
-
-    # def deserialize_ssa_value(self, data: dict[str, Any]) -> ir.SSAValue:
-    #     if data.get("kind") != "ssa-value":
-    #         raise ValueError("Invalid SSA data for decoding.")
-
-    #     ssa_id = int(data["id"])
-    #     out = self._ctx.SSA_Lookup.get(ssa_id)
-    #     if out is None:
-    #         raise ValueError(f"SSA value with id {ssa_id} not found in lookup.")
-
-    #     return out
 
     def serialize_region(self, region: ir.Region) -> dict[str, Any]:
         region_id = self._ctx.region_idtable[region]
@@ -277,7 +252,6 @@ class Serializer:
                 "id": region_id,
             }
         else:
-            # register region and include explicit id so decoder can reuse it
             self._ctx.Region_Lookup[region_id] = region
             out = {
                 "kind": "region",
@@ -297,7 +271,6 @@ class Serializer:
             out._block_idx = {}
 
             for block in blocks:
-                # ensure block has no lingering parent from placeholder registration
                 existing_parent = block.parent
                 if existing_parent is not None and existing_parent is not out:
                     block.parent = None
@@ -315,7 +288,6 @@ class Serializer:
 
     def serialize_block(self, block: ir.Block) -> dict[str, Any]:
         if self._ctx.blk_idtable[block] in self._ctx.Block_Lookup:
-            # already registered, so we dont need to encode it again
             out = {
                 "kind": "block_ref",
                 "id": self._ctx.blk_idtable[block],
@@ -362,7 +334,6 @@ class Serializer:
         else:
             out = self._ctx.Block_Lookup[block_id]
 
-        # construct the block:
         out._args = tuple(
             self.deserialize_block_argument(arg_data)
             for arg_data in block_data.get("_args", [])
@@ -452,9 +423,7 @@ class Serializer:
         if data.get("kind") != "result-value":
             raise ValueError("Invalid result SSA data for decoding.")
         ssa_id = int(data["id"])
-        # If the id was already created earlier (multiple references to the
-        # same SSA value in the serialized payload), reuse the existing object
-        # if it's the right kind.
+
         if ssa_id in self._ctx.SSA_Lookup:
             existing = self._ctx.SSA_Lookup[ssa_id]
             if isinstance(existing, ir.ResultValue):
