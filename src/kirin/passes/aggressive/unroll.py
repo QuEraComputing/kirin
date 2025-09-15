@@ -14,6 +14,11 @@ class UnrollScf(Pass):
     """This pass can be used to unroll scf.For loops and inline/expand scf.IfElse when
     the input are known at compile time.
 
+    usage:
+        UnrollScf(dialects).fixpoint(method)
+
+    Note: This pass should be used in a fixpoint manner, to unroll nested scf nodes.
+
     """
 
     typeinfer: TypeInfer = field(init=False)

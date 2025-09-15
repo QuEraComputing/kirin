@@ -1,6 +1,6 @@
 from kirin.prelude import structural
 from kirin.dialects import py, func
-from kirin.passes.aggressive.scf_unroll import UnrollScf
+from kirin.passes.aggressive import UnrollScf
 
 
 def test_unroll_scf():
