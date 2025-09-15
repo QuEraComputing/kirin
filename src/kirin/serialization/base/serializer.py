@@ -27,7 +27,7 @@ class Serializer:
     )
     _dialect_serializer: DialectSerializer = field(default_factory=DialectSerializer)
 
-    def __init__(self):
+    def __init__(self, types: list[type] = []) -> None:
         self._ctx = SerializationContext()
         self._runtime_serializer = RuntimeSerializer()
         self._typeattr_serializer = TypeAttributeSerializer()
@@ -38,6 +38,8 @@ class Serializer:
         for t in BUILTINS:
             register_type(t)
         autodiscover_serializers()
+        for t in types:
+            register_type(t)
 
     def encode(self, obj: object) -> dict[str, Any]:
         self._ctx.clear()

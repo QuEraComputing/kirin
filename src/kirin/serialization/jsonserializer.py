@@ -5,6 +5,8 @@ from kirin.serialization.base.serializer import Serializer
 
 
 class JSONSerializer(Serializer):
+    def __init__(self, types: list[type] = []):
+        super().__init__(types=types)
 
     def encode(self, obj):
         data = super().encode(obj)
