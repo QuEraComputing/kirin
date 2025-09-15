@@ -1,6 +1,5 @@
 from dataclasses import field, dataclass
 
-import kirin.serialization.base.impls as _impls
 from kirin import ir
 from kirin.serialization.base.ssa_int_idtable import IntIdTable
 
@@ -21,9 +20,8 @@ class SerializationContext:
     Block_Lookup: dict[int, ir.Block] = field(default_factory=dict)
     Region_Lookup: dict[int, ir.Region] = field(default_factory=dict)
 
-    Method_SymbolTable: dict[str, ir.Method] = field(
-        default_factory=dict[str, ir.Method]
-    )
+    Method_Symbol: dict[str, str] = field(default_factory=dict)
+    Method_Runtime: dict[str, ir.Method] = field(default_factory=dict)
 
     def clear(self) -> None:
         self.SSA_Lookup.clear()
@@ -33,5 +31,5 @@ class SerializationContext:
         self.blk_idtable.clear()
         self.region_idtable.clear()
         self._block_reference_store.clear()
-
-    assert _impls
+        self.Method_Symbol.clear()
+        self.Method_Runtime.clear()

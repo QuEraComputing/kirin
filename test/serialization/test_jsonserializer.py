@@ -3,8 +3,10 @@ from kirin.serialization.jsonserializer import JSONSerializer
 
 
 @basic
-def foo(x: int, y: float):
+def foo(x: int, y: float, z: bool):
     c = [[(200.0, 200.0), (210.0, 200.0)]]
+    if not z and z:
+        c.append([(222.0, 333.0)])
     return c
 
 
@@ -13,16 +15,18 @@ def bar():
     def goo(x: int, y: int):
         return 42
 
-    def foo(x: str, y: str):
+    def boo(x: str, y: str):
         return goo(1, 2)
 
-    return foo("hello", "world")
+    return boo("hello", "world")
 
 
 @basic
 def main():
+    c = 0
     for i in range(3):
-        foo(i, 0.1)
+        c += i
+    return c
 
 
 def test_to_json1():
@@ -58,6 +62,14 @@ def test_to_json3():
     assert decoded.code.is_structurally_equal(main.code)
 
 
+def test_deterministic():
+    serializer = JSONSerializer()
+    s1 = serializer.encode(main)
+    s2 = serializer.encode(main)
+    assert s1 == s2
+
+
 test_to_json1()
 test_to_json2()
 test_to_json3()
+test_deterministic()

@@ -5,13 +5,14 @@ from collections.abc import Sequence
 
 from kirin import ir, types
 from kirin.print.printer import Printer
+from kirin.serialization.base.serializermixin import SerializerMixin
 
 T = TypeVar("T")
 L = TypeVar("L")
 
 
 @dataclass
-class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
+class IList(SerializerMixin, ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
     """A simple immutable list."""
 
     data: Sequence[T]
@@ -90,3 +91,21 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
             self.data, delim=", ", prefix="[", suffix="]", emit=printer.plain_print
         )
         printer.plain_print(")")
+
+    def serialize(self) -> dict[str, Any]:
+        def enc(x: Any) -> Any:
+            if isinstance(x, SerializerMixin):
+                return x.serialize()
+            return x
+
+        return {"data": [enc(a) for a in self.data], "elem": enc(self.elem)}
+
+    @classmethod
+    def deserialize(cls, data: dict[str, Any]) -> "IList":
+        items = []
+        for x in data.get("data", []):
+            items.append(x)
+        # 'elem' is expected to be already decoded by the global Serializer.
+        # Do not call .deserialize() here (that caused the AttributeError).
+        elem = data.get("elem", types.Any)
+        return IList(items, elem=elem)

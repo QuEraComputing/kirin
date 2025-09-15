@@ -1,20 +1,54 @@
+import inspect
+import pkgutil
+import importlib
+from typing import Any, Dict
 from dataclasses import dataclass
 
 from kirin import ir, types
-from kirin.ir.attrs.types import TypeAttribute
+from kirin.serialization.base.serializermixin import SerializerMixin
 
-RUNTIME_ENCODE_LOOKUP = {}
-RUNTIME_DECODE_LOOKUP = {}
-RUNTIME_NAME2TYPE = {}
+RUNTIME_ENCODE_LOOKUP: Dict[str, Any] = {}
+RUNTIME_DECODE_LOOKUP: Dict[str, Any] = {}
+RUNTIME_NAME2TYPE: Dict[str, type] = {}
 DIALECTS_LOOKUP = {}
+
+
+def autodiscover_serializers() -> None:
+    try:
+        impls_pkg = importlib.import_module("kirin.serialization.base.impls")
+    except Exception:
+        return
+    for finder, module_name, ispkg in pkgutil.walk_packages(
+        impls_pkg.__path__, impls_pkg.__name__ + "."
+    ):
+        try:
+            mod = importlib.import_module(module_name)
+        except Exception:
+            continue
+        for obj in vars(mod).values():
+            if inspect.isclass(obj):
+                if obj is SerializerMixin:
+                    continue
+                if issubclass(obj, SerializerMixin) or (
+                    hasattr(obj, "serialize") and hasattr(obj, "deserialize")
+                ):
+                    RUNTIME_NAME2TYPE[obj.__name__] = obj
+
+
+def register_type(obj_type: type):
+    RUNTIME_NAME2TYPE[obj_type.__name__] = obj_type
+    return obj_type
 
 
 PREFIX = "_method_@"
 PARAM_SEP = "->"
 
 
-def get_str_from_type(typ: TypeAttribute) -> str:
-    repr_name = typ.__repr__() if hasattr(typ, "__repr__") else str(type(typ))
+def get_str_from_type(typ: types.TypeAttribute) -> str:
+    repr_name = repr(typ)
+    if not isinstance(repr_name, str):
+        repr_name = typ.__class__.__name__
+
     if repr_name in (
         "int",
         "str",
@@ -26,7 +60,7 @@ def get_str_from_type(typ: TypeAttribute) -> str:
         "dict",
     ):
         return repr_name
-    elif repr_name == "AnyType()":
+    elif repr_name in ("AnyType()", "Any"):
         return "Any"
     elif repr_name.startswith("IList["):
         return "IList"
@@ -38,7 +72,7 @@ def get_str_from_type(typ: TypeAttribute) -> str:
 
 def mangle(
     symbol_name: str | None,
-    param_types: tuple[TypeAttribute, ...],
+    param_types: tuple[types.TypeAttribute, ...],
 ) -> str:
 
     mangled_name = f"{PREFIX}{symbol_name}"
@@ -46,21 +80,6 @@ def mangle(
         for typ in param_types:
             mangled_name += f"{PARAM_SEP}{get_str_from_type(typ)}"
     return mangled_name
-
-
-# def demangle(mangled_name: str) -> dict:
-#     if not mangled_name.startswith(PREFIX):
-#         raise ValueError(f"Invalid mangled name: {mangled_name}")
-
-#     body = mangled_name[len(PREFIX) :]
-#     if body == "":
-#         raise ValueError(f"Invalid mangled name body: {body}")
-
-#     parts = body.split(PARAM_SEP)
-#     symbol_name = parts[0]
-#     param_codes = parts[1:] if len(parts) > 1 else []
-
-#     return {"symbol_name": symbol_name, "param_codes": param_codes}
 
 
 def register_dialect(dialect: ir.Dialect):
@@ -76,16 +95,16 @@ def register_dialect(dialect: ir.Dialect):
     DIALECTS_LOOKUP[dialect.name] = (dialect, stmt_map)
 
 
-def register_type(obj_type: type):
-    RUNTIME_NAME2TYPE[obj_type.__name__] = obj_type
-
-
 def runtime_register_encode(obj_type):
     def wrapper(func):
-        if obj_type.__name__ in RUNTIME_ENCODE_LOOKUP:
-            pass
+        import warnings
 
-        # TODO check func signature
+        warnings.warn(
+            "runtime_register_encode is deprecated and will be removed; "
+            "prefer the new Serializer API.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         RUNTIME_ENCODE_LOOKUP[obj_type.__name__] = func
         return func
 
@@ -94,10 +113,14 @@ def runtime_register_encode(obj_type):
 
 def runtime_register_decode(obj_type):
     def wrapper(func):
-        if obj_type.__name__ in RUNTIME_DECODE_LOOKUP:
-            pass
+        import warnings
 
-        # TODO check func signature
+        warnings.warn(
+            "runtime_register_decode is deprecated and will be removed; "
+            "prefer the new Serializer API.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         RUNTIME_DECODE_LOOKUP[obj_type.__name__] = func
         return func
 
@@ -218,7 +241,7 @@ class TypeAttributeSerializer:
     def _encode_PyClass(self, obj: types.PyClass):
         if obj.typ.__name__ not in RUNTIME_NAME2TYPE:
             raise ValueError(
-                f"No registered type for {obj.typ.__name__}. {RUNTIME_NAME2TYPE}"
+                f"No registered type for {obj.typ.__name__}. {RUNTIME_NAME2TYPE}."
             )
 
         return {
@@ -313,3 +336,8 @@ class TypeAttributeSerializer:
             typ = self.decode(typ)
 
         return types.Literal(data=value, datatype=typ)
+
+
+def register_builtin_defaults():
+    for t in (str, bool, int, float, type(None), list, tuple, dict, range, slice):
+        register_type(t)

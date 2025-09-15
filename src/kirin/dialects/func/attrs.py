@@ -1,9 +1,10 @@
-from typing import Generic, TypeVar
+from typing import Any, Dict, Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin import types
 from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
+from kirin.serialization.base.serializermixin import SerializerMixin
 
 from ._dialect import dialect
 
@@ -16,7 +17,7 @@ TypeLatticeElem = TypeVar("TypeLatticeElem", bound="types.TypeAttribute")
 
 @dialect.register
 @dataclass
-class Signature(Generic[TypeLatticeElem], Attribute):
+class Signature(Generic[TypeLatticeElem], Attribute, SerializerMixin):
     """function body signature.
 
     This is not a type attribute because it just stores
@@ -38,3 +39,14 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         printer.print_seq(self.inputs, delim=", ", prefix="(", suffix=")")
         printer.plain_print(" -> ")
         printer.print(self.output)
+
+    def serialize(self) -> dict[str, Any]:
+        # return the plain inner payload ONLY; global Serializer will encode nested
+        return {"inputs": [a for a in self.inputs], "output": self.output}
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any]) -> "Signature":
+        # accept the plain inner payload produced by serialize()
+        inputs = tuple(data.get("inputs", ()))
+        output = data.get("output")
+        return cls(inputs=inputs, output=output)

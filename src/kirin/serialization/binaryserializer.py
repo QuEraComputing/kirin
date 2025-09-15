@@ -1,15 +1,15 @@
 import pickle
+from typing import Any
 
-from kirin import ir
 from kirin.serialization.base.serializer import Serializer
 
 
 class BinarySerializer(Serializer):
 
     def encode(self, obj) -> bytes:
-        data = super().serialize(obj)
+        data = super().encode(obj)
         return pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def decode(self, payload: bytes) -> ir.Method:
+    def decode(self, payload: bytes) -> Any:
         data = pickle.loads(payload)
-        return super().deserialize(data)
+        return super().decode(data)

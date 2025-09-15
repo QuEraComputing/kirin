@@ -1,16 +1,18 @@
-from typing import TypeVar
+from typing import Any, Type, TypeVar, cast
 from dataclasses import dataclass
 
 from kirin.print import Printer
+from kirin.serialization.base.serializermixin import SerializerMixin
 
 from .data import Data
 from .types import PyClass, TypeAttribute
 
 T = TypeVar("T")
+U = TypeVar("U")  # used for deserialize return typing
 
 
 @dataclass
-class PyAttr(Data[T]):
+class PyAttr(Data[T], SerializerMixin):
     """Python attribute for compile-time values.
     This is a generic attribute that holds a Python value.
 
@@ -51,3 +53,15 @@ class PyAttr(Data[T]):
 
     def unwrap(self) -> T:
         return self.data
+
+    def serialize(self) -> dict[str, Any]:
+        return {"data": self.data}
+
+    @classmethod
+    def deserialize(cls: Type["PyAttr[U]"], data: Any) -> "PyAttr[U]":
+        payload = (
+            data.get("data") if isinstance(data, dict) and "data" in data else data
+        )
+        return cls(
+            cast(U, payload)
+        )  # cast payload to U so the constructor call type-checks
