@@ -1,12 +1,10 @@
 from dataclasses import field, dataclass
 
-from kirin import ir, rewrite
-from kirin.passes import Pass
-from kirin.rewrite import abc
-from kirin.passes.typeinfer import TypeInfer
+from kirin.ir import Method
+from kirin.passes import Fold, Pass, TypeInfer
+from kirin.rewrite import Walk
+from kirin.rewrite.abc import RewriteResult
 from kirin.dialects.scf.unroll import ForLoop, PickIfElse
-
-from ..fold import Fold
 
 
 @dataclass
@@ -28,10 +26,10 @@ class UnrollScf(Pass):
         self.typeinfer = TypeInfer(self.dialects, no_raise=self.no_raise)
         self.fold = Fold(self.dialects, no_raise=self.no_raise)
 
-    def unsafe_run(self, mt: ir.Method):
-        result = abc.RewriteResult()
-        result = rewrite.Walk(PickIfElse()).rewrite(mt.code).join(result)
-        result = rewrite.Walk(ForLoop()).rewrite(mt.code).join(result)
+    def unsafe_run(self, mt: Method):
+        result = RewriteResult()
+        result = Walk(PickIfElse()).rewrite(mt.code).join(result)
+        result = Walk(ForLoop()).rewrite(mt.code).join(result)
         result = self.typeinfer(mt).join(result)
         result = self.fold(mt).join(result)
         return result
