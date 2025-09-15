@@ -4,26 +4,28 @@ from kirin.passes.aggressive import UnrollScf
 
 
 def test_unroll_scf():
-
     @structural
-    def main(r: list[int]):
-        for i in range(4):
-            tmp = r[-1]
-            if i < 2:
-                tmp += i * 2
-            else:
-                for j in range(4):
-                    if i > j:
-                        tmp += i + j
-                    else:
-                        tmp += i - j
+    def main(r: list[int], cond: bool):
+        if cond:
+            for i in range(4):
+                tmp = r[-1]
+                if i < 2:
+                    tmp += i * 2
+                else:
+                    for j in range(4):
+                        if i > j:
+                            tmp += i + j
+                        else:
+                            tmp += i - j
 
-            r.append(tmp)
-
+                r.append(tmp)
+        else:
+            for i in range(4):
+                r.append(i)
         return r
 
     UnrollScf(structural).fixpoint(main)
-
+    main.print()
     num_adds = 0
     num_calls = 0
 
@@ -34,4 +36,4 @@ def test_unroll_scf():
             num_calls += 1
 
     assert num_adds == 10
-    assert num_calls == 4
+    assert num_calls == 8
