@@ -25,7 +25,7 @@ def test_unroll_scf():
         return r
 
     UnrollScf(structural).fixpoint(main)
-    main.print()
+
     num_adds = 0
     num_calls = 0
 
