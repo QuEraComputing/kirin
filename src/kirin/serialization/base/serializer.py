@@ -584,18 +584,14 @@ class Serializer:
             elif type(val) in BUILTINS:
                 out["data"] = self.serialize_builtin(val)
             elif hasattr(val, "serialize") and callable(getattr(val, "serialize")):
-                out["data"] = val.serialize()
+                out["data"] = val.serialize(self)
             out["pytype"] = self._typeattr_serializer.encode(attr.type)
             return out
         elif hasattr(attr, "serialize") and callable(getattr(attr, "serialize")):
-            out["kind"] = "attribute-generic"
+            out["kind"] = "attribute-pyclass"
             out["module"] = attr.__class__.__module__
             out["name"] = attr.__class__.__name__
-            out["data"] = self.serialize_builtin(attr.serialize(self))
-            return out
-        elif isinstance(attr, types.TypeAttribute):
-            out["kind"] = "attribute-typeattr"
-            out["data"] = self._typeattr_serializer.encode(attr)
+            out["data"] = attr.serialize(self)
             return out
         raise TypeError(
             f"Unsupported attribute type {type(attr)} for serialization. "
@@ -606,15 +602,17 @@ class Serializer:
     def deserialize_attribute(self, data: dict[str, Any]) -> ir.Attribute:
         kind = data.get("kind")
 
-        if kind == "attribute-generic":
+        if kind == "attribute-pyclass":
             mod_path = data.get("module")
             cls_name = data.get("name")
             payload_enc = data.get("data")
 
-            if isinstance(payload_enc, dict) and payload_enc.get("kind") == "builtin":
-                inner_payload = self.deserialize_builtin(payload_enc)
-            else:
-                inner_payload = payload_enc
+            inner_payload = (
+                self.deserialize_builtin(payload_enc)
+                if isinstance(payload_enc, dict)
+                and payload_enc.get("kind") == "builtin"
+                else payload_enc
+            )
 
             if not mod_path or not cls_name:
                 raise ImportError(
@@ -629,9 +627,7 @@ class Serializer:
                     f"Attribute class {cls_name!r} not found in module {mod_path!r}"
                 )
 
-            if not hasattr(attr_cls, "deserialize") or not callable(
-                getattr(attr_cls, "deserialize")
-            ):
+            if not callable(getattr(attr_cls, "deserialize", None)):
                 raise ValueError(
                     f"Attribute class {cls_name} does not implement deserialize() method."
                 )
@@ -658,23 +654,14 @@ class Serializer:
                             else pytype
                         ),
                     )
-                elif data_enc.get("kind") == "builtin":
-                    val = self.deserialize_builtin(data_enc)
-                    return ir.PyAttr(data=val, pytype=pytype)
-                elif hasattr(data_enc, "deserialize") and callable(
-                    getattr(data_enc, "deserialize")
-                ):
-                    val = self.deserialize(data_enc)
-                    return ir.PyAttr(data=val, pytype=pytype)
-            return ir.PyAttr(data=data_enc, pytype=pytype)
+                if data_enc.get("kind") == "builtin":
+                    return ir.PyAttr(
+                        data=self.deserialize_builtin(data_enc), pytype=pytype
+                    )
+                if callable(getattr(data_enc, "deserialize", None)):
+                    return ir.PyAttr(data=self.deserialize(data_enc), pytype=pytype)
 
-        if kind == "attribute-typeattr":
-            payload = data.get("data")
-            if payload is None:
-                raise ValueError("Missing 'data' field for type-attribute decoding.")
-            if not isinstance(payload, dict):
-                raise TypeError(f"'data' field must be a dict, got {type(payload)!r}")
-            return self._typeattr_serializer.decode(payload)
+            return ir.PyAttr(data=data_enc, pytype=pytype)
 
         raise ValueError(f"Unknown attribute kind {kind}")
 

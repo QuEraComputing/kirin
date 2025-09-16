@@ -43,9 +43,7 @@ class Signature(Generic[TypeLatticeElem], Attribute, SerializerMixin):
     def serialize(self, serializer) -> dict[str, Any]:
         return {
             "inputs": [a.serialize(serializer=serializer) for a in self.inputs],
-            "output": (
-                self.output.serialize(serializer=serializer) if self.output else None
-            ),
+            "output": (self.output.serialize(serializer=serializer)),
         }
 
     @classmethod
