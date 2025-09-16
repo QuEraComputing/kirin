@@ -92,20 +92,32 @@ class IList(SerializerMixin, ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         )
         printer.plain_print(")")
 
-    def serialize(self) -> dict[str, Any]:
+    def serialize(self, serializer: Any = None) -> dict[str, Any]:
         def enc(x: Any) -> Any:
+            if serializer is not None and hasattr(serializer, "serialize"):
+                return serializer.serialize(x)
             if isinstance(x, SerializerMixin):
-                return x.serialize()
+                return x.serialize(serializer)
             return x
 
-        return {"data": [enc(a) for a in self.data], "elem": enc(self.elem)}
+        return {
+            "kind": "ilist",
+            "data": [enc(a) for a in self.data],
+            "elem": enc(self.elem),
+        }
 
     @classmethod
-    def deserialize(cls, data: dict[str, Any]) -> "IList":
-        items = []
-        for x in data.get("data", []):
-            items.append(x)
-        # 'elem' is expected to be already decoded by the global Serializer.
-        # Do not call .deserialize() here (that caused the AttributeError).
-        elem = data.get("elem", types.Any)
+    def deserialize(cls, data: dict[str, Any], serializer: Any = None) -> "IList":
+        raw_items = data["data"]
+        raw_elem = data["elem"]
+
+        def dec(x: Any) -> Any:
+            if not isinstance(x, dict):
+                return x
+            if serializer is not None and hasattr(serializer, "deserialize"):
+                return serializer.deserialize(x)
+            return x
+
+        items = [dec(x) for x in raw_items]
+        elem = dec(raw_elem)
         return IList(items, elem=elem)

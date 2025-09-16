@@ -5,10 +5,9 @@ from dataclasses import field
 from kirin import ir, types
 from kirin.dialects import func
 from kirin.serialization.base.context import SerializationContext
-from kirin.serialization.base.registry import (
+from kirin.serialization.base.registry import (  # RuntimeSerializer,
     DIALECTS_LOOKUP,
     DialectSerializer,
-    RuntimeSerializer,
     TypeAttributeSerializer,
     mangle,
     register_type,
@@ -21,7 +20,7 @@ BUILTINS = (bool, str, int, float, tuple, list, dict, slice, type(None))
 
 class Serializer:
     _ctx: SerializationContext
-    _runtime_serializer: RuntimeSerializer = field(default_factory=RuntimeSerializer)
+    # _runtime_serializer: RuntimeSerializer = field(default_factory=RuntimeSerializer)
     _typeattr_serializer: TypeAttributeSerializer = field(
         default_factory=TypeAttributeSerializer
     )
@@ -29,7 +28,7 @@ class Serializer:
 
     def __init__(self, types: list[type] = []) -> None:
         self._ctx = SerializationContext()
-        self._runtime_serializer = RuntimeSerializer()
+        # self._runtime_serializer = RuntimeSerializer()
         self._typeattr_serializer = TypeAttributeSerializer()
         self._dialect_serializer = DialectSerializer()
         self._ctx.Method_Symbol = getattr(self._ctx, "Method_Symbol", {})
@@ -590,7 +589,7 @@ class Serializer:
             out["kind"] = "attribute-generic"
             out["module"] = attr.__class__.__module__
             out["name"] = attr.__class__.__name__
-            out["data"] = self.serialize_builtin(attr.serialize())
+            out["data"] = self.serialize_builtin(attr.serialize(self))
             return out
         elif isinstance(attr, types.TypeAttribute):
             out["kind"] = "attribute-typeattr"
@@ -635,7 +634,7 @@ class Serializer:
                     f"Attribute class {cls_name} does not implement deserialize() method."
                 )
 
-            return attr_cls.deserialize(inner_payload)
+            return attr_cls.deserialize(inner_payload, self)
 
         if kind == "attribute-pyattr":
             pytype_enc = data.get("pytype")

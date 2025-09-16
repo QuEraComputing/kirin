@@ -54,14 +54,22 @@ class PyAttr(Data[T], SerializerMixin):
     def unwrap(self) -> T:
         return self.data
 
-    def serialize(self) -> dict[str, Any]:
+    def serialize(self, serializer) -> dict[str, Any]:
+        if isinstance(self.data, SerializerMixin):
+            return {"data": self.data.serialize(serializer)}
         return {"data": self.data}
 
     @classmethod
-    def deserialize(cls: Type["PyAttr[U]"], data: Any) -> "PyAttr[U]":
+    def deserialize(cls: Type["PyAttr[U]"], data: Any, serializer) -> "PyAttr[U]":
         payload = (
             data.get("data") if isinstance(data, dict) and "data" in data else data
         )
+        if (
+            isinstance(payload, dict)
+            and serializer is not None
+            and hasattr(serializer, "deserialize")
+        ):
+            payload = serializer.deserialize(payload)
         return cls(
             cast(U, payload)
         )  # cast payload to U so the constructor call type-checks

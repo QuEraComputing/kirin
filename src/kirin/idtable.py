@@ -55,3 +55,9 @@ class IdTable(Generic[T]):
             return self.table[value]
         else:
             return self.add(value)
+
+    def __len__(self) -> int:
+        return len(self.table)
+
+    def size(self) -> int:
+        return len(self)

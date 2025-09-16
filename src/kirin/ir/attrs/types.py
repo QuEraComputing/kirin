@@ -1,5 +1,6 @@
 import typing
 from abc import abstractmethod
+from typing import Any, Dict
 from dataclasses import dataclass
 from collections.abc import Hashable
 
@@ -15,6 +16,7 @@ from kirin.lattice import (
     IsSubsetEqMixin,
     SimpleMeetMixin,
 )
+from kirin.serialization.base.serializermixin import SerializerMixin
 
 from .abc import Attribute, LatticeAttributeMeta
 from ._types import _TypeAttribute
@@ -46,6 +48,7 @@ class UnionTypeMeta(TypeAttributeMeta, UnionMeta):
 @dataclass
 class TypeAttribute(
     _TypeAttribute,
+    SerializerMixin,
     SimpleMeetMixin["TypeAttribute"],
     IsSubsetEqMixin["TypeAttribute"],
     BoundedLattice["TypeAttribute"],
@@ -80,6 +83,18 @@ class TypeAttribute(
 
     @abstractmethod
     def __hash__(self) -> int: ...
+
+    def serialize(self, serializer) -> Dict[str, Any]:
+        return serializer._typeattr_serializer.encode(self)
+
+    @classmethod
+    def deserialize(cls, data: Any, serializer) -> "TypeAttribute":
+        try:
+            return serializer._typeattr_serializer.decode(data)
+        except Exception:
+            raise ValueError(
+                "Cannot deserialize TypeAttribute: no registered deserializer found"
+            )
 
 
 @typing.final

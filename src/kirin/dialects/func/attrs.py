@@ -40,13 +40,18 @@ class Signature(Generic[TypeLatticeElem], Attribute, SerializerMixin):
         printer.plain_print(" -> ")
         printer.print(self.output)
 
-    def serialize(self) -> dict[str, Any]:
-        # return the plain inner payload ONLY; global Serializer will encode nested
-        return {"inputs": [a for a in self.inputs], "output": self.output}
+    def serialize(self, serializer) -> dict[str, Any]:
+        return {
+            "inputs": [a.serialize(serializer=serializer) for a in self.inputs],
+            "output": (
+                self.output.serialize(serializer=serializer) if self.output else None
+            ),
+        }
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any]) -> "Signature":
-        # accept the plain inner payload produced by serialize()
-        inputs = tuple(data.get("inputs", ()))
-        output = data.get("output")
+    def deserialize(cls, data: Dict[str, Any], serializer) -> "Signature":
+        inputs = tuple(
+            serializer._typeattr_serializer.decode(a) for a in data["inputs"]
+        )
+        output = serializer._typeattr_serializer.decode(data["output"])
         return cls(inputs=inputs, output=output)

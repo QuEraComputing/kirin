@@ -186,30 +186,30 @@ class DialectSerializer:
         return DIALECTS_LOOKUP[name][0]
 
 
-@dataclass
-class RuntimeSerializer:
+# @dataclass
+# class RuntimeSerializer:
 
-    def encode(self, obj):
-        if obj.__class__.__name__ not in RUNTIME_ENCODE_LOOKUP:
-            raise ValueError(
-                f"No registered encode method for {obj.__class__.__name__}. {RUNTIME_ENCODE_LOOKUP}"
-            )
+#     def encode(self, obj):
+#         if obj.__class__.__name__ not in RUNTIME_ENCODE_LOOKUP:
+#             raise ValueError(
+#                 f"No registered encode method for {obj.__class__.__name__}. {RUNTIME_ENCODE_LOOKUP}"
+#             )
 
-        return {
-            "kind": "runtime",
-            "style": obj.__class__.__name__,
-            "data": RUNTIME_ENCODE_LOOKUP[obj.__class__.__name__](self, obj),
-        }
+#         return {
+#             "kind": "runtime",
+#             "style": obj.__class__.__name__,
+#             "data": RUNTIME_ENCODE_LOOKUP[obj.__class__.__name__](self, obj),
+#         }
 
-    def decode(self, data):
-        if data.get("kind") != "runtime":
-            raise ValueError("Invalid runtime data for decoding.")
+#     def decode(self, data):
+#         if data.get("kind") != "runtime":
+#             raise ValueError("Invalid runtime data for decoding.")
 
-        style = data.get("style")
-        if style not in RUNTIME_DECODE_LOOKUP:
-            raise ValueError(f"No registered decode method for style {style}.")
+#         style = data.get("style")
+#         if style not in RUNTIME_DECODE_LOOKUP:
+#             raise ValueError(f"No registered decode method for style {style}.")
 
-        return RUNTIME_DECODE_LOOKUP[style](self, data.get("data"))
+#         return RUNTIME_DECODE_LOOKUP[style](self, data.get("data"))
 
 
 @dataclass
