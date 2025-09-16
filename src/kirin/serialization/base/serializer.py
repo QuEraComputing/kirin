@@ -4,12 +4,16 @@ from dataclasses import field
 
 from kirin import ir, types
 from kirin.dialects import func
-from kirin.serialization.base.context import SerializationContext
+from kirin.serialization.base.context import (
+    MethodSymbolMeta,
+    SerializationContext,
+    mangle,
+    get_str_from_type,
+)
 from kirin.serialization.base.registry import (
     DIALECTS_LOOKUP,
     DialectSerializer,
     TypeAttributeSerializer,
-    mangle,
     register_type,
     register_dialect,
     autodiscover_serializers,
@@ -39,14 +43,23 @@ class Serializer:
     def encode(self, obj: object) -> dict[str, Any]:
         self._ctx.clear()
         body = self.serialize(obj)
-        symbol_table = None
         if getattr(self._ctx, "Method_Symbol", None):
-            st: dict[str, str] = {}
+            st: dict[str, MethodSymbolMeta] = {}
             for mangled, meta in self._ctx.Method_Symbol.items():
-                st[mangled] = meta
-            symbol_table: dict[str, str] = st
+                sym_name = meta.get("sym_name")
+                if sym_name is None:
+                    raise ValueError(f"symbol_table[{mangled}] missing 'sym_name'")
+                st[mangled] = (
+                    MethodSymbolMeta(
+                        sym_name=sym_name,
+                        arg_types=meta.get("arg_types", []),
+                    )
+                    if isinstance(meta, dict)
+                    else meta
+                )
+            symbol_table: dict[str, MethodSymbolMeta] = st
         else:
-            symbol_table = None
+            symbol_table = dict[str, MethodSymbolMeta]()
 
         out = {"kind": "module", "symbol_table": symbol_table, "body": body}
         return out
@@ -57,31 +70,16 @@ class Serializer:
 
         if kind == "module":
             for mangled, meta in data["symbol_table"].items():
-                if mangled in self._ctx.Method_Runtime:
-                    continue
                 if not isinstance(meta, dict):
-                    continue
+                    raise TypeError(f"symbol_table[{mangled}] is not a dict")
                 sym_name = meta.get("sym_name")
-
-                m = ir.Method.__new__(ir.Method)
-                m.mod = None
-                m.py_func = None
-                m.sym_name = sym_name
-                m.arg_names = []
-                m.dialects = None
-                m.code = None
-                encoded_arg_types = meta.get("arg_types", []) or []
-                try:
-                    decoded_arg_types = [
-                        self._typeattr_serializer.decode(t_enc)
-                        for t_enc in encoded_arg_types
-                    ]
-                    setattr(m, "arg_types", tuple(decoded_arg_types))
-                except Exception:
-                    pass
-
-                self._ctx.Method_Runtime[mangled] = m
-                self._ctx.Method_Symbol[mangled] = meta
+                if sym_name is None:
+                    raise ValueError(f"symbol_table[{mangled}] missing 'sym_name'")
+                arg_types = meta.get("arg_types", []) or []
+                self._ctx.Method_Symbol[mangled] = MethodSymbolMeta(
+                    sym_name=sym_name,
+                    arg_types=list(arg_types),
+                )
 
             body = data.get("body")
             if body is None:
@@ -146,11 +144,23 @@ class Serializer:
             for d in method_dialects.data:
                 register_dialect(d)
 
-        mangled = mangle(mthd.sym_name, mthd.arg_types)
-        meta = {
+        mangled = mangle(
+            mthd.sym_name,
+            getattr(mthd, "arg_types", ()),
+            getattr(mthd, "ret_type", None),
+        )
+        arg_types_list: list[str] = []
+        ret_type: str = get_str_from_type(mthd.return_type)
+        for t in getattr(mthd, "arg_types", ()):
+            arg_types_list.append(get_str_from_type(t))
+        if mthd.sym_name is None:
+            raise ValueError("Method.sym_name is None, cannot serialize.")
+        meta: MethodSymbolMeta = {
             "sym_name": mthd.sym_name,
-            "arg_types": [self._typeattr_serializer.encode(t) for t in mthd.arg_types],
+            "arg_types": arg_types_list,
+            "ret_type": ret_type,
         }
+
         existing = self._ctx.Method_Symbol.get(mangled)
         if existing is not None:
             if existing != meta:
@@ -177,27 +187,22 @@ class Serializer:
         if mangled is None:
             raise ValueError("Missing 'mangled' key for method deserialization.")
 
-        # obtain or create placeholder/runtime Method instance
         out = self._ctx.Method_Runtime.get(mangled)
         if out is None:
             out = ir.Method.__new__(ir.Method)
-            # initialize minimal fields so callers can reference this placeholder
             out.mod = None
             out.py_func = None
-            out.code = None
+            out.code = ir.Statement.__new__(ir.Statement)
             self._ctx.Method_Runtime[mangled] = out
 
-        # fill/update definitive fields from payload
         out.sym_name = data["sym_name"]
         out.arg_names = data.get("arg_names", [])
         out.dialects = self._dialect_serializer.decode(data["dialects"])
         out.code = self.deserialize(data["code"])
 
-        # prefer symbol-table provided arg types (already loaded into Method_Symbol
-        # during module decode). Decode them if present and attach.
         sym_meta = self._ctx.Method_Symbol.get(mangled, {}) or {}
         if isinstance(sym_meta, dict):
-            encoded_arg_types = sym_meta.get("arg_types", []) or []
+            encoded_arg_types = data.get("arg_types", []) or []
         else:
             encoded_arg_types = []
         try:
@@ -205,28 +210,22 @@ class Serializer:
                 self._typeattr_serializer.decode(t_enc) for t_enc in encoded_arg_types
             )
             if decoded_arg_types:
-                setattr(out, "arg_types", decoded_arg_types)
+                try:
+                    setattr(out, "arg_types", decoded_arg_types)
+                except (AttributeError, TypeError):
+                    object.__setattr__(out, "_arg_types", tuple(decoded_arg_types))
         except Exception:
-            # best-effort: ignore failures and leave arg_types untouched
             pass
 
-        # sanity check: ensure mangled name matches computed name from payload
-        computed = mangle(out.sym_name, getattr(out, "arg_types", ()))
+        computed = mangle(
+            out.sym_name,
+            getattr(out, "arg_types", ()),
+            getattr(out, "ret_type", None),
+        )
         if computed != mangled:
             raise ValueError(
                 f"Mangled name mismatch: expected {mangled}, got {computed}"
             )
-
-        # ensure symbol table entry exists for future references
-        if mangled not in self._ctx.Method_Symbol:
-            self._ctx.Method_Symbol[mangled] = {
-                "sym_name": out.sym_name,
-                "arg_types": [
-                    self._typeattr_serializer.encode(t)
-                    for t in getattr(out, "arg_types", [])
-                ],
-            }
-
         return out
 
     def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
@@ -246,14 +245,16 @@ class Serializer:
         if isinstance(stmt, func.Invoke):
             callee = stmt.callee
             if callee is not None:
-                callee_arg_types = getattr(callee, "arg_types", []) or []
-                mangled = mangle(callee.sym_name, callee_arg_types)
-                meta = {
-                    "sym_name": callee.sym_name,
-                    "arg_types": [
-                        self._typeattr_serializer.encode(t) for t in callee_arg_types
-                    ],
-                }
+                mangled = mangle(callee.sym_name, callee.arg_types, callee.return_type)
+                if callee.sym_name is None:
+                    raise ValueError(
+                        "Invoke.callee.sym_name is None, cannot serialize."
+                    )
+                meta = MethodSymbolMeta(
+                    sym_name=callee.sym_name,
+                    arg_types=[t.__class__.__name__ for t in callee.arg_types],
+                    ret_type=callee.return_type,
+                )
                 if not hasattr(self._ctx, "Method_Symbol"):
                     self._ctx.Method_Symbol = {}
                 existing = self._ctx.Method_Symbol.get(mangled)
@@ -310,24 +311,26 @@ class Serializer:
 
         if isinstance(out, func.Invoke) and data.get("call_method"):
             mangled_name = data["call_method"]
-            runtime = getattr(self._ctx, "Method_Runtime", {}) or {}
+            runtime = self._ctx.Method_Runtime
             if mangled_name not in runtime:
-                meta = getattr(self._ctx, "Method_Symbol", {}) or {}
-                entry = meta.get(mangled_name)
-                if entry:
-                    decoded_arg_types = [
-                        self._typeattr_serializer.decode(t_enc)
-                        for t_enc in entry.get("arg_types", [])
-                    ]
-                    placeholder = ir.Method(
-                        mod=None,
-                        py_func=None,
-                        sym_name=entry.get("sym_name"),
-                        arg_names=[],
-                        dialects=None,
-                        code=None,
-                    )
-                    setattr(placeholder, "arg_types", decoded_arg_types)
+                method_meta = self._ctx.Method_Symbol[mangled_name]
+                if method_meta:
+                    decoded_arg_types = []
+                    # create a lightweight placeholder without running Method.__init__
+                    placeholder = ir.Method.__new__(ir.Method)
+                    placeholder.mod = None
+                    placeholder.py_func = None
+                    placeholder.sym_name = method_meta.get("sym_name")
+                    placeholder.arg_names = []
+                    placeholder.dialects = ir.DialectGroup([])
+                    placeholder.code = ir.Statement.__new__(ir.Statement)
+                    try:
+                        setattr(placeholder, "arg_types", decoded_arg_types)
+                    except (AttributeError, TypeError):
+                        # property is read-only; write to the internal backing field
+                        object.__setattr__(
+                            placeholder, "_arg_types", tuple(decoded_arg_types)
+                        )
                     self._ctx.Method_Runtime[mangled_name] = placeholder
                 else:
                     raise ValueError(
@@ -343,7 +346,6 @@ class Serializer:
         return out
 
     def serialize_block_argument(self, arg: ir.BlockArgument) -> dict[str, Any]:
-
         out = {
             "kind": "block-arg",
             "id": self._ctx.ssa_idtable[arg],
@@ -662,12 +664,17 @@ class Serializer:
                 elif hasattr(data_enc, "deserialize") and callable(
                     getattr(data_enc, "deserialize")
                 ):
-                    val = data_enc.deserialize()
+                    val = self.deserialize(data_enc)
                     return ir.PyAttr(data=val, pytype=pytype)
             return ir.PyAttr(data=data_enc, pytype=pytype)
 
         if kind == "attribute-typeattr":
-            return self._typeattr_serializer.decode(data.get("data"))
+            payload = data.get("data")
+            if payload is None:
+                raise ValueError("Missing 'data' field for type-attribute decoding.")
+            if not isinstance(payload, dict):
+                raise TypeError(f"'data' field must be a dict, got {type(payload)!r}")
+            return self._typeattr_serializer.decode(payload)
 
         raise ValueError(f"Unknown attribute kind {kind}")
 

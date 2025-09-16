@@ -40,48 +40,6 @@ def register_type(obj_type: type):
     return obj_type
 
 
-PREFIX = "_method_@"
-PARAM_SEP = "->"
-
-
-def get_str_from_type(typ: types.TypeAttribute) -> str:
-    repr_name = repr(typ)
-    if not isinstance(repr_name, str):
-        repr_name = typ.__class__.__name__
-
-    if repr_name in (
-        "int",
-        "str",
-        "float",
-        "bool",
-        "NoneType",
-        "list",
-        "tuple",
-        "dict",
-    ):
-        return repr_name
-    elif repr_name in ("AnyType()", "Any"):
-        return "Any"
-    elif repr_name.startswith("IList["):
-        return "IList"
-    elif repr_name.startswith("Method["):
-        return "Method"
-    else:
-        return "?"
-
-
-def mangle(
-    symbol_name: str | None,
-    param_types: tuple[types.TypeAttribute, ...],
-) -> str:
-
-    mangled_name = f"{PREFIX}{symbol_name}"
-    if param_types:
-        for typ in param_types:
-            mangled_name += f"{PARAM_SEP}{get_str_from_type(typ)}"
-    return mangled_name
-
-
 def register_dialect(dialect: ir.Dialect):
     stmt_map: dict[str, type] = {}
     for stmt_cls in dialect.stmts:
