@@ -5,7 +5,7 @@ from dataclasses import field
 from kirin import ir, types
 from kirin.dialects import func
 from kirin.serialization.base.context import SerializationContext
-from kirin.serialization.base.registry import (  # RuntimeSerializer,
+from kirin.serialization.base.registry import (
     DIALECTS_LOOKUP,
     DialectSerializer,
     TypeAttributeSerializer,
@@ -20,7 +20,6 @@ BUILTINS = (bool, str, int, float, tuple, list, dict, slice, type(None))
 
 class Serializer:
     _ctx: SerializationContext
-    # _runtime_serializer: RuntimeSerializer = field(default_factory=RuntimeSerializer)
     _typeattr_serializer: TypeAttributeSerializer = field(
         default_factory=TypeAttributeSerializer
     )
@@ -28,11 +27,8 @@ class Serializer:
 
     def __init__(self, types: list[type] = []) -> None:
         self._ctx = SerializationContext()
-        # self._runtime_serializer = RuntimeSerializer()
         self._typeattr_serializer = TypeAttributeSerializer()
         self._dialect_serializer = DialectSerializer()
-        self._ctx.Method_Symbol = getattr(self._ctx, "Method_Symbol", {})
-        self._ctx.Method_Runtime = getattr(self._ctx, "Method_Runtime", {})
         register_type(ir.Method)
         for t in BUILTINS:
             register_type(t)
@@ -48,7 +44,7 @@ class Serializer:
             st: dict[str, str] = {}
             for mangled, meta in self._ctx.Method_Symbol.items():
                 st[mangled] = meta
-            symbol_table = st or None
+            symbol_table: dict[str, str] = st
         else:
             symbol_table = None
 
@@ -57,11 +53,8 @@ class Serializer:
 
     def decode(self, data: dict[str, Any]) -> Any:
         kind = data.get("kind")
-
         self._ctx._block_reference_store = {}
-        for i in range(len(self._ctx.blk_idtable.lookup)):
-            x = ir.Block.__new__(ir.Block)
-            self._ctx._block_reference_store[i] = x
+
         if kind == "module":
             for mangled, meta in data["symbol_table"].items():
                 if mangled in self._ctx.Method_Runtime:
@@ -69,23 +62,14 @@ class Serializer:
                 if not isinstance(meta, dict):
                     continue
                 sym_name = meta.get("sym_name")
-                try:
-                    m = ir.Method(
-                        mod=None,
-                        py_func=None,
-                        sym_name=sym_name,
-                        arg_names=[],
-                        dialects=None,
-                        code=None,
-                    )
-                except Exception:
-                    m = ir.Method.__new__(ir.Method)
-                    m.mod = None
-                    m.py_func = None
-                    m.sym_name = sym_name
-                    m.arg_names = []
-                    m.dialects = None
-                    m.code = None
+
+                m = ir.Method.__new__(ir.Method)
+                m.mod = None
+                m.py_func = None
+                m.sym_name = sym_name
+                m.arg_names = []
+                m.dialects = None
+                m.code = None
                 encoded_arg_types = meta.get("arg_types", []) or []
                 try:
                     decoded_arg_types = [
@@ -186,40 +170,54 @@ class Serializer:
         }
 
     def deserialize_method(self, data: dict[str, Any]) -> ir.Method:
-
         if data.get("kind") != "method":
             raise ValueError("Invalid method data for deserialization.")
 
         mangled = data.get("mangled")
+        if mangled is None:
+            raise ValueError("Missing 'mangled' key for method deserialization.")
 
-        existing = self._ctx.Method_Runtime.get(mangled)
-        if existing is not None:
-            out = existing
-            out.sym_name = data["sym_name"]
-            out.arg_names = data["arg_names"]
-            out.dialects = self._dialect_serializer.decode(data["dialects"])
-            out.code = self.deserialize(data["code"])
-            sym_meta = self._ctx.Method_Symbol.get(mangled, {})
+        # obtain or create placeholder/runtime Method instance
+        out = self._ctx.Method_Runtime.get(mangled)
+        if out is None:
+            out = ir.Method.__new__(ir.Method)
+            # initialize minimal fields so callers can reference this placeholder
+            out.mod = None
+            out.py_func = None
+            out.code = None
+            self._ctx.Method_Runtime[mangled] = out
+
+        # fill/update definitive fields from payload
+        out.sym_name = data["sym_name"]
+        out.arg_names = data.get("arg_names", [])
+        out.dialects = self._dialect_serializer.decode(data["dialects"])
+        out.code = self.deserialize(data["code"])
+
+        # prefer symbol-table provided arg types (already loaded into Method_Symbol
+        # during module decode). Decode them if present and attach.
+        sym_meta = self._ctx.Method_Symbol.get(mangled, {}) or {}
+        if isinstance(sym_meta, dict):
             encoded_arg_types = sym_meta.get("arg_types", []) or []
-            if not encoded_arg_types:
-                encoded_arg_types = []
-            try:
-                decoded_arg_types = tuple(
-                    self._typeattr_serializer.decode(t_enc)
-                    for t_enc in encoded_arg_types
-                )
-                if decoded_arg_types:
-                    setattr(out, "arg_types", decoded_arg_types)
-            except Exception:
-                pass
+        else:
+            encoded_arg_types = []
+        try:
+            decoded_arg_types = tuple(
+                self._typeattr_serializer.decode(t_enc) for t_enc in encoded_arg_types
+            )
+            if decoded_arg_types:
+                setattr(out, "arg_types", decoded_arg_types)
+        except Exception:
+            # best-effort: ignore failures and leave arg_types untouched
+            pass
 
+        # sanity check: ensure mangled name matches computed name from payload
         computed = mangle(out.sym_name, getattr(out, "arg_types", ()))
         if computed != mangled:
             raise ValueError(
                 f"Mangled name mismatch: expected {mangled}, got {computed}"
             )
 
-        self._ctx.Method_Runtime[mangled] = out
+        # ensure symbol table entry exists for future references
         if mangled not in self._ctx.Method_Symbol:
             self._ctx.Method_Symbol[mangled] = {
                 "sym_name": out.sym_name,
@@ -228,6 +226,7 @@ class Serializer:
                     for t in getattr(out, "arg_types", [])
                 ],
             }
+
         return out
 
     def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
@@ -359,30 +358,31 @@ class Serializer:
         if data.get("kind") != "block-arg":
             raise ValueError("Invalid SSA block argument data for decoding.")
 
-        ssa_id = int(data["id"])
-        if ssa_id in self._ctx.SSA_Lookup:
-            existing = self._ctx.SSA_Lookup[ssa_id]
+        ssa_name = data["id"]
+        if ssa_name in self._ctx.SSA_Lookup:
+            existing = self._ctx.SSA_Lookup[ssa_name]
             if isinstance(existing, ir.BlockArgument):
                 return existing
             raise ValueError(
-                f"Block argument id {ssa_id} already present but maps to {type(existing).__name__}"
+                f"Block argument id {ssa_name} already present but maps to {type(existing).__name__}"
             )
 
-        block = self._ctx.Block_Lookup.get(int(data["blk_id"]))
+        blk_name = data["blk_id"]
+        block = self._ctx.Block_Lookup.get(blk_name)
         if block is None:
-            block_id = int(data["blk_id"])
-            if block_id in self._ctx._block_reference_store:
-                block = self._ctx._block_reference_store.pop(block_id)
-                self._ctx.Block_Lookup[block_id] = block
+            if blk_name in self._ctx._block_reference_store:
+                block = self._ctx._block_reference_store.pop(blk_name)
+                self._ctx.Block_Lookup[blk_name] = block
             else:
-                raise ValueError(f"Block with id {block_id} not found in lookup.")
+                block = ir.Block.__new__(ir.Block)
+                self._ctx.Block_Lookup[blk_name] = block
 
         index = data["index"]
 
         typ = self._typeattr_serializer.decode(data["type"])
         out = ir.BlockArgument(block=block, index=index, type=typ)
         out._name = data.get("name", None)
-        self._ctx.SSA_Lookup[ssa_id] = out  # reg to ssa lookup
+        self._ctx.SSA_Lookup[ssa_name] = out
 
         return out
 
@@ -405,7 +405,9 @@ class Serializer:
     def deserialize_region(self, data: dict[str, Any]) -> ir.Region:
         if data.get("kind") == "region":
             out = ir.Region.__new__(ir.Region)
-            self._ctx.Region_Lookup[self._ctx.region_idtable[out]] = out
+            region_name = data.get("id")
+            if region_name is not None:
+                self._ctx.Region_Lookup[region_name] = out
 
             blocks = [self.deserialize(blk) for blk in data.get("blocks", [])]
 
@@ -420,11 +422,10 @@ class Serializer:
 
             return out
         elif data.get("kind") == "region_ref":
-            region_id = int(data["id"])
-            if region_id not in self._ctx.Region_Lookup:
-                raise ValueError(f"Region with id {region_id} not found in lookup.")
-
-            return self._ctx.Region_Lookup[region_id]
+            region_name = data["id"]
+            if region_name not in self._ctx.Region_Lookup:
+                raise ValueError(f"Region with id {region_name} not found in lookup.")
+            return self._ctx.Region_Lookup[region_name]
         else:
             raise ValueError("Invalid region data for decoding.")
 
@@ -456,27 +457,26 @@ class Serializer:
         if block_data.get("kind") != "block_ref":
             raise ValueError("Invalid block reference data for decoding.")
 
-        block_id = int(block_data["id"])
-        if block_id not in self._ctx.Block_Lookup:
-            raise ValueError(f"Block with id {block_id} not found in lookup.")
-
-        return self._ctx.Block_Lookup[block_id]
+        block_name = block_data["id"]
+        if block_name not in self._ctx.Block_Lookup:
+            raise ValueError(f"Block with id {block_name} not found in lookup.")
+        return self._ctx.Block_Lookup[block_name]
 
     def deserialize_concrete_block(self, block_data: dict) -> ir.Block:
         if block_data.get("kind") != "block":
             raise ValueError("Invalid block data for decoding.")
 
-        block_id = int(block_data["id"])
+        block_name = block_data["id"]
 
-        if block_id not in self._ctx.Block_Lookup:
-            if block_id in self._ctx._block_reference_store:
-                out = self._ctx._block_reference_store.pop(block_id)
-                self._ctx.Block_Lookup[block_id] = out
+        if block_name not in self._ctx.Block_Lookup:
+            if block_name in self._ctx._block_reference_store:
+                out = self._ctx._block_reference_store.pop(block_name)
+                self._ctx.Block_Lookup[block_name] = out
             else:
                 out = ir.Block.__new__(ir.Block)
-                self._ctx.Block_Lookup[block_id] = out
+                self._ctx.Block_Lookup[block_name] = out
         else:
-            out = self._ctx.Block_Lookup[block_id]
+            out = self._ctx.Block_Lookup[block_name]
 
         out._args = tuple(
             self.deserialize_block_argument(arg_data)
@@ -685,23 +685,26 @@ class Serializer:
     ) -> ir.ResultValue:
         if data.get("kind") != "result-value":
             raise ValueError("Invalid result SSA data for decoding.")
-        ssa_id = int(data["id"])
-
-        if ssa_id in self._ctx.SSA_Lookup:
-            existing = self._ctx.SSA_Lookup[ssa_id]
+        ssa_name = data["id"]
+        if ssa_name in self._ctx.SSA_Lookup:
+            existing = self._ctx.SSA_Lookup[ssa_name]
             if isinstance(existing, ir.ResultValue):
                 return existing
             raise ValueError(
-                f"SSA id {ssa_id} already exists and is {type(existing).__name__}"
+                f"SSA id {ssa_name} already exists and is {type(existing).__name__}"
             )
 
         index = int(data["index"])
 
         typ = self._typeattr_serializer.decode(data["type"])
 
+        if owner is None:
+            raise ValueError(
+                "Owner (Statement) must not be None when deserializing a ResultValue."
+            )
         out = ir.ResultValue(stmt=owner, index=index, type=typ)
         out.name = data.get("name", None)
 
-        self._ctx.SSA_Lookup[ssa_id] = out
+        self._ctx.SSA_Lookup[ssa_name] = out
 
         return out

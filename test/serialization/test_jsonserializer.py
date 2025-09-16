@@ -65,7 +65,8 @@ def test_to_json3():
 def test_deterministic():
     serializer = JSONSerializer()
     s1 = serializer.encode(main)
-    s2 = serializer.encode(main)
+    serializer2 = JSONSerializer()
+    s2 = serializer2.encode(main)
     assert s1 == s2
 
 

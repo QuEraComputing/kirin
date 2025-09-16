@@ -186,35 +186,9 @@ class DialectSerializer:
         return DIALECTS_LOOKUP[name][0]
 
 
-# @dataclass
-# class RuntimeSerializer:
-
-#     def encode(self, obj):
-#         if obj.__class__.__name__ not in RUNTIME_ENCODE_LOOKUP:
-#             raise ValueError(
-#                 f"No registered encode method for {obj.__class__.__name__}. {RUNTIME_ENCODE_LOOKUP}"
-#             )
-
-#         return {
-#             "kind": "runtime",
-#             "style": obj.__class__.__name__,
-#             "data": RUNTIME_ENCODE_LOOKUP[obj.__class__.__name__](self, obj),
-#         }
-
-#     def decode(self, data):
-#         if data.get("kind") != "runtime":
-#             raise ValueError("Invalid runtime data for decoding.")
-
-#         style = data.get("style")
-#         if style not in RUNTIME_DECODE_LOOKUP:
-#             raise ValueError(f"No registered decode method for style {style}.")
-
-#         return RUNTIME_DECODE_LOOKUP[style](self, data.get("data"))
-
-
 @dataclass
 class TypeAttributeSerializer:
-    def encode(self, obj: types.TypeAttribute):
+    def encode(self, obj: object):
         encode_content_method = getattr(self, f"_encode_{obj.__class__.__name__}", None)
         if not encode_content_method:
             raise ValueError(f"No encode method for {obj.__class__.__name__}")
