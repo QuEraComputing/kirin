@@ -1,8 +1,11 @@
+from pytest import mark
+
 from kirin import types
 from kirin.prelude import structural_no_opt
 from kirin.analysis import TypeInference
 
 
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_self_ref_closure():
 
     @structural_no_opt

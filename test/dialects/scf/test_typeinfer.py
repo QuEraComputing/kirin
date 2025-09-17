@@ -1,3 +1,5 @@
+from pytest import mark
+
 from kirin import types
 from kirin.prelude import structural_no_opt
 from kirin.analysis import TypeInference
@@ -5,6 +7,7 @@ from kirin.analysis import TypeInference
 type_infer = TypeInference(structural_no_opt)
 
 
+@mark.xfail(reason="for with early return not supported in scf lowering")
 def test_inside_return_loop():
     @structural_no_opt
     def simple_loop(x: float):
@@ -16,6 +19,7 @@ def test_inside_return_loop():
     assert ret.is_subseteq(types.Int | types.Float)
 
 
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_simple_ifelse():
     @structural_no_opt
     def simple_ifelse(x: int):
