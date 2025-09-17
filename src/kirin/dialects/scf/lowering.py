@@ -71,8 +71,8 @@ class Lowering(lowering.FromPythonAST):
                 else_yields.append(value)
 
         if not (
-            (last_stmt := body_frame.curr_block.last_stmt)
-            and last_stmt.has_trait(ir.IsTerminator)
+            body_frame.curr_block.last_stmt
+            and body_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
         ):
             body_frame.push(Yield(*body_yields))
         else:
