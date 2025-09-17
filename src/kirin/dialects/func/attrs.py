@@ -1,10 +1,9 @@
-from typing import Any, Dict, Generic, TypeVar
+from typing import Any, Dict, Generic, TypeVar, cast
 from dataclasses import dataclass
 
 from kirin import types
 from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
-from kirin.serialization.base.serializermixin import SerializerMixin
 
 from ._dialect import dialect
 
@@ -17,7 +16,7 @@ TypeLatticeElem = TypeVar("TypeLatticeElem", bound="types.TypeAttribute")
 
 @dialect.register
 @dataclass
-class Signature(Generic[TypeLatticeElem], Attribute, SerializerMixin):
+class Signature(Generic[TypeLatticeElem], Attribute):
     """function body signature.
 
     This is not a type attribute because it just stores
@@ -42,14 +41,20 @@ class Signature(Generic[TypeLatticeElem], Attribute, SerializerMixin):
 
     def serialize(self, serializer) -> dict[str, Any]:
         return {
-            "inputs": [a.serialize(serializer=serializer) for a in self.inputs],
-            "output": (self.output.serialize(serializer=serializer)),
+            "kind": "attribute-signature",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {
+                "inputs": [a.serialize(serializer) for a in self.inputs],
+                "output": (self.output.serialize(serializer)),
+            },
         }
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any], serializer) -> "Signature":
+        sig_data = data.get("data", data)
         inputs = tuple(
-            serializer._typeattr_serializer.decode(a) for a in data["inputs"]
+            cast(TypeLatticeElem, serializer.deserialize(a)) for a in sig_data["inputs"]
         )
-        output = serializer._typeattr_serializer.decode(data["output"])
+        output = cast(TypeLatticeElem, serializer.deserialize(sig_data["output"]))
         return cls(inputs=inputs, output=output)

@@ -12,7 +12,7 @@ L = TypeVar("L")
 
 
 @dataclass
-class IList(SerializerMixin, ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
+class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
     """A simple immutable list."""
 
     data: Sequence[T]

@@ -1,6 +1,6 @@
 """Lattice for constant analysis."""
 
-from typing import Any, final
+from typing import Any, Dict, final
 from dataclasses import dataclass
 
 from kirin import ir
@@ -62,6 +62,13 @@ class Bottom(Result, metaclass=SingletonLatticeAttributeMeta):
 
     def __hash__(self) -> int:
         return id(self)
+
+    def serialize(self, serializer) -> Dict[str, Any]:
+        return {"__kirin_lattice__": "Bottom"}
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer) -> "Bottom":
+        return cls()
 
 
 @final

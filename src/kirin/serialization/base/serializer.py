@@ -1,8 +1,9 @@
-from typing import Any
+from typing import Any, cast
 from importlib import import_module
 from dataclasses import field
 
-from kirin import ir, types
+import kirin.types as types
+from kirin import ir
 from kirin.dialects import func
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
@@ -13,7 +14,6 @@ from kirin.serialization.base.context import (
 from kirin.serialization.base.registry import (
     DIALECTS_LOOKUP,
     DialectSerializer,
-    TypeAttributeSerializer,
     register_type,
     register_dialect,
     autodiscover_serializers,
@@ -24,14 +24,10 @@ BUILTINS = (bool, str, int, float, tuple, list, dict, slice, type(None))
 
 class Serializer:
     _ctx: SerializationContext
-    _typeattr_serializer: TypeAttributeSerializer = field(
-        default_factory=TypeAttributeSerializer
-    )
     _dialect_serializer: DialectSerializer = field(default_factory=DialectSerializer)
 
     def __init__(self, types: list[type] = []) -> None:
         self._ctx = SerializationContext()
-        self._typeattr_serializer = TypeAttributeSerializer()
         self._dialect_serializer = DialectSerializer()
         register_type(ir.Method)
         for t in BUILTINS:
@@ -105,8 +101,12 @@ class Serializer:
             return self.serialize_result(obj)
         elif type(obj) in BUILTINS:
             return self.serialize_builtin(obj)
+        elif hasattr(obj, "serialize") and callable(getattr(obj, "serialize")):
+            return cast(Any, obj).serialize(self)
         else:
-            raise ValueError(f"Unsupported object type {type(obj)} for serialization.")
+            raise ValueError(
+                f"Unsupported object type {type(obj)} for serialization. Implement 'serialize' method."
+            )
 
     def deserialize(
         self, data: dict[str, Any], owner: ir.Statement | None = None
@@ -114,7 +114,6 @@ class Serializer:
         kind = data.get("kind")
         if kind is None:
             raise ValueError("Invalid data for deserialization: missing 'kind' field.")
-
         if kind == "method":
             return self.deserialize_method(data)
         elif kind == "block-arg":
@@ -207,7 +206,7 @@ class Serializer:
             encoded_arg_types = []
         try:
             decoded_arg_types = tuple(
-                self._typeattr_serializer.decode(t_enc) for t_enc in encoded_arg_types
+                t_enc.deserialize(self) for t_enc in encoded_arg_types
             )
             if decoded_arg_types:
                 try:
@@ -294,9 +293,13 @@ class Serializer:
 
         out = stmt_cls.__new__(stmt_cls)
         _args = tuple(self.deserialize(x) for x in data["_args"])
-        _results = list(self.deserialize(owner=out, data=x) for x in data["_results"])
+        _results = list(
+            self.deserialize_result(owner=out, data=x) for x in data["_results"]
+        )
         _name_args_slice = self.deserialize(data["_name_args_slice"])
-        _attributes = {k: self.deserialize(v) for k, v in data["attributes"].items()}
+        _attributes = {
+            k: self.deserialize_attribute(v) for k, v in data["attributes"].items()
+        }
 
         out._args = _args
         out._results = _results
@@ -316,7 +319,6 @@ class Serializer:
                 method_meta = self._ctx.Method_Symbol[mangled_name]
                 if method_meta:
                     decoded_arg_types = []
-                    # create a lightweight placeholder without running Method.__init__
                     placeholder = ir.Method.__new__(ir.Method)
                     placeholder.mod = None
                     placeholder.py_func = None
@@ -327,7 +329,6 @@ class Serializer:
                     try:
                         setattr(placeholder, "arg_types", decoded_arg_types)
                     except (AttributeError, TypeError):
-                        # property is read-only; write to the internal backing field
                         object.__setattr__(
                             placeholder, "_arg_types", tuple(decoded_arg_types)
                         )
@@ -351,7 +352,7 @@ class Serializer:
             "id": self._ctx.ssa_idtable[arg],
             "blk_id": self._ctx.blk_idtable[arg.owner],
             "index": arg.index,
-            "type": self._typeattr_serializer.encode(arg.type),
+            "type": arg.type.serialize(self),
             "name": arg.name,
         }
         return out
@@ -380,9 +381,12 @@ class Serializer:
                 self._ctx.Block_Lookup[blk_name] = block
 
         index = data["index"]
-
-        typ = self._typeattr_serializer.decode(data["type"])
-        out = ir.BlockArgument(block=block, index=index, type=typ)
+        typ = self.deserialize_attribute(data["type"])
+        if not isinstance(typ, types.TypeAttribute):
+            raise TypeError(f"Expected a TypeAttribute, got {type(typ)!r}: {typ!r}")
+        out = ir.BlockArgument(
+            block=block, index=index, type=cast(types.TypeAttribute, typ)
+        )
         out._name = data.get("name", None)
         self._ctx.SSA_Lookup[ssa_name] = out
 
@@ -575,102 +579,48 @@ class Serializer:
             )
 
     def serialize_attribute(self, attr: ir.Attribute) -> dict[str, Any]:
-        out: dict[str, Any] = {}
-        if isinstance(attr, ir.PyAttr):
-            out["kind"] = "attribute-pyattr"
-            val = attr.data
-            if isinstance(val, types.TypeAttribute):
-                out["data"] = {"__typeattr__": self._typeattr_serializer.encode(val)}
-            elif type(val) in BUILTINS:
-                out["data"] = self.serialize_builtin(val)
-            elif hasattr(val, "serialize") and callable(getattr(val, "serialize")):
-                out["data"] = val.serialize(self)
-            out["pytype"] = self._typeattr_serializer.encode(attr.type)
-            return out
-        elif hasattr(attr, "serialize") and callable(getattr(attr, "serialize")):
-            out["kind"] = "attribute-pyclass"
-            out["module"] = attr.__class__.__module__
-            out["name"] = attr.__class__.__name__
-            out["data"] = attr.serialize(self)
-            return out
+        if hasattr(attr, "serialize") and callable(getattr(attr, "serialize")):
+            return {
+                "data": attr.serialize(self),
+                "module": attr.__class__.__module__,
+                "name": attr.__class__.__name__,
+            }
         raise TypeError(
             f"Unsupported attribute type {type(attr)} for serialization. "
             "Provide a serialize()/deserialize() pair (implement SerializerMixin) "
-            "or wrap Python values in PyAttr."
         )
 
     def deserialize_attribute(self, data: dict[str, Any]) -> ir.Attribute:
-        kind = data.get("kind")
-
-        if kind == "attribute-pyclass":
-            mod_path = data.get("module")
-            cls_name = data.get("name")
-            payload_enc = data.get("data")
-
-            inner_payload = (
-                self.deserialize_builtin(payload_enc)
-                if isinstance(payload_enc, dict)
-                and payload_enc.get("kind") == "builtin"
-                else payload_enc
+        module_name = data.get("module")
+        class_name = data.get("name")
+        if not module_name or not class_name:
+            raise ValueError(
+                f"Attribute {data} must contain 'module' and 'name' fields."
             )
 
-            if not mod_path or not cls_name:
-                raise ImportError(
-                    f"Missing module/name for generic attribute: {data!r}"
-                )
+        mod = import_module(module_name)
+        cls = getattr(mod, class_name, None)
+        if cls is None:
+            raise ImportError(f"Could not find class {class_name} in {module_name}")
 
-            mod = import_module(mod_path)
+        payload = data.get("data")
+        if payload is None:
+            raise ValueError("Attribute data missing 'data' field for deserialization.")
+
+        if getattr(cls, "deserialize", None) and callable(getattr(cls, "deserialize")):
             try:
-                attr_cls = getattr(mod, cls_name)
-            except AttributeError:
-                raise ImportError(
-                    f"Attribute class {cls_name!r} not found in module {mod_path!r}"
-                )
-
-            if not callable(getattr(attr_cls, "deserialize", None)):
-                raise ValueError(
-                    f"Attribute class {cls_name} does not implement deserialize() method."
-                )
-
-            return attr_cls.deserialize(inner_payload, self)
-
-        if kind == "attribute-pyattr":
-            pytype_enc = data.get("pytype")
-            pytype = (
-                self._typeattr_serializer.decode(pytype_enc)
-                if pytype_enc is not None
-                else None
-            )
-            data_enc = data.get("data")
-
-            if isinstance(data_enc, dict):
-                if "__typeattr__" in data_enc:
-                    decoded = self._typeattr_serializer.decode(data_enc["__typeattr__"])
-                    return ir.PyAttr(
-                        data=decoded,
-                        pytype=(
-                            decoded
-                            if isinstance(decoded, types.TypeAttribute)
-                            else pytype
-                        ),
-                    )
-                if data_enc.get("kind") == "builtin":
-                    return ir.PyAttr(
-                        data=self.deserialize_builtin(data_enc), pytype=pytype
-                    )
-                if callable(getattr(data_enc, "deserialize", None)):
-                    return ir.PyAttr(data=self.deserialize(data_enc), pytype=pytype)
-
-            return ir.PyAttr(data=data_enc, pytype=pytype)
-
-        raise ValueError(f"Unknown attribute kind {kind}")
+                return cls.deserialize(payload, self)
+            except TypeError:
+                return cls.deserialize(payload)
+        else:
+            raise ValueError(f"Class {cls} missing deserialize() method.")
 
     def serialize_result(self, result: ir.ResultValue) -> dict[str, Any]:
         return {
             "kind": "result-value",
             "id": self._ctx.ssa_idtable[result],
             "index": result.index,
-            "type": self._typeattr_serializer.encode(result.type),
+            "type": result.type.serialize(self),
             "name": result.name,
         }
 
@@ -687,16 +637,18 @@ class Serializer:
             raise ValueError(
                 f"SSA id {ssa_name} already exists and is {type(existing).__name__}"
             )
-
         index = int(data["index"])
 
-        typ = self._typeattr_serializer.decode(data["type"])
-
+        typ = self.deserialize_attribute(data["type"])
         if owner is None:
             raise ValueError(
                 "Owner (Statement) must not be None when deserializing a ResultValue."
             )
-        out = ir.ResultValue(stmt=owner, index=index, type=typ)
+        if typ is None or not isinstance(typ, types.TypeAttribute):
+            raise TypeError(f"Expected a TypeAttribute, got {type(typ)!r}: {typ!r}")
+        out = ir.ResultValue(
+            stmt=owner, index=index, type=cast(types.TypeAttribute, typ)
+        )
         out.name = data.get("name", None)
 
         self._ctx.SSA_Lookup[ssa_name] = out

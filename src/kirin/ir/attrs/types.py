@@ -6,6 +6,10 @@ from collections.abc import Hashable
 
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
+
+if typing.TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+
 from typing_extensions import Never
 
 from kirin.print import Printer
@@ -84,18 +88,6 @@ class TypeAttribute(
     @abstractmethod
     def __hash__(self) -> int: ...
 
-    def serialize(self, serializer) -> Dict[str, Any]:
-        return serializer._typeattr_serializer.encode(self)
-
-    @classmethod
-    def deserialize(cls, data: Any, serializer) -> "TypeAttribute":
-        try:
-            return serializer._typeattr_serializer.decode(data)
-        except Exception:
-            raise ValueError(
-                "Cannot deserialize TypeAttribute: no registered deserializer found"
-            )
-
 
 @typing.final
 @dataclass(eq=False)
@@ -107,6 +99,18 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def __hash__(self) -> int:
         return id(self)
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "kind": "attribute-any",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": dict(),
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "AnyType":
+        return AnyType()
 
 
 @typing.final
@@ -121,6 +125,20 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def __hash__(self) -> int:
         return id(self)
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "kind": "attribute-bottom",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": dict(),
+        }
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], serializer: "Serializer"
+    ) -> "BottomType":
+        return BottomType()
 
 
 class PyClassMeta(TypeAttributeMeta):
@@ -208,6 +226,32 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(f"!{self.prefix}.", self.display_name)
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "kind": "attribute-pyclass",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {
+                "typ": self.typ.__name__,
+                "display_name": self.display_name,
+                "prefix": self.prefix,
+            },
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "PyClass":
+        from kirin.serialization.base.registry import RUNTIME_NAME2TYPE
+
+        if data["typ"] not in RUNTIME_NAME2TYPE:
+            raise ValueError(f"No registered type for {data['typ']}.")
+
+        pytype = RUNTIME_NAME2TYPE[data["typ"]]
+        return PyClass(
+            typ=pytype,
+            display_name=data.get("display_name", ""),
+            prefix=data.get("prefix", ""),
+        )
+
 
 class LiteralMeta(TypeAttributeMeta):
 
@@ -265,6 +309,26 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("Literal(", repr(self.data), ",", self.type, ")")
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "kind": "attribute-literal",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {
+                "value": self.data,
+                "type": (
+                    self.type.serialize(serializer=serializer) if self.type else None
+                ),
+            },
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer) -> "Literal":
+        type_attr = (
+            serializer.deserialize(data["type"]) if data["type"] is not None else None
+        )
+        return cls(data["value"], type_attr)
 
 
 @typing.final
@@ -327,6 +391,21 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
         printer.print_name(self, prefix="!")
         printer.print_seq(self.types, delim=", ", prefix="[", suffix="]")
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "kind": "attribute-union",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {
+                "types": [t.serialize(serializer=serializer) for t in self.types],
+            },
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer) -> "Union":
+        types = [serializer.deserialize(t) for t in data["types"]]
+        return cls(types)
+
 
 @typing.final
 @dataclass(eq=False)
@@ -364,6 +443,22 @@ class TypeVar(TypeAttribute):
             printer.plain_print(" : ")
             printer.print(self.bound)
 
+    def serialize(self, serializer) -> Dict[str, Any]:
+        return {
+            "kind": "attribute-typevar",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {
+                "varname": self.varname,
+                "bound": self.bound.serialize(serializer=serializer),
+            },
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer) -> "TypeVar":
+        bound = serializer.deserialize(data["bound"])
+        return cls(data["varname"], bound)
+
 
 @typing.final
 @dataclass
@@ -383,6 +478,19 @@ class Vararg(Attribute):
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("*")
         printer.print(self.typ)
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "kind": "attribute-vararg",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {"typ": self.typ.serialize(serializer)},
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Vararg":
+        typ = serializer.deserialize(data["typ"])
+        return cls(typ)
 
 
 TypeVarValue: typing.TypeAlias = TypeAttribute | Vararg | list
@@ -507,6 +615,32 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
                 ):
                     return Generic(self.body, *args, vararg)
         raise TypeError("Type arguments do not match")
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        out = {
+            "kind": "attribute-generic",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {
+                "body": self.body.serialize(serializer),
+                "vars": [v.serialize(serializer) for v in self.vars],
+                "vararg": self.vararg.serialize(serializer) if self.vararg else None,
+            },
+        }
+        return out
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Generic":
+        generic_data = data.get("data", data)
+        body = serializer.deserialize(generic_data["body"])
+        vars = tuple(serializer.deserialize(v) for v in generic_data["vars"])
+        if generic_data["vararg"] is not None:
+            vararg = serializer.deserialize(generic_data["vararg"])
+        else:
+            vararg = None
+        generic = cls(body, *vars)
+        generic.vararg = vararg
+        return generic
 
 
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:

@@ -8,11 +8,10 @@ from .data import Data
 from .types import PyClass, TypeAttribute
 
 T = TypeVar("T")
-U = TypeVar("U")  # used for deserialize return typing
 
 
 @dataclass
-class PyAttr(Data[T], SerializerMixin):
+class PyAttr(Data[T]):
     """Python attribute for compile-time values.
     This is a generic attribute that holds a Python value.
 
@@ -55,15 +54,34 @@ class PyAttr(Data[T], SerializerMixin):
         return self.data
 
     def serialize(self, serializer) -> dict[str, Any]:
+        out = {
+            "kind": "attribute-pyattr",
+            "module": self.__class__.__module__,
+            "name": self.__class__.__name__,
+            "data": {},
+        }
         if isinstance(self.data, SerializerMixin):
-            return {"data": self.data.serialize(serializer)}
-        return {"data": self.data}
+            data = {
+                "data": self.data.serialize(serializer),
+                "pytype": self.type.serialize(serializer),
+            }
+            out.update(data)
+        else:
+            data = {
+                "data": serializer.serialize(self.data),
+                "pytype": self.type.serialize(serializer),
+            }
+            out.update(data)
+        return out
 
     @classmethod
-    def deserialize(cls: Type["PyAttr[U]"], data: Any, serializer) -> "PyAttr[U]":
+    def deserialize(cls: Type["PyAttr[T]"], data: Any, serializer) -> "PyAttr[T]":
         payload = (
             data.get("data") if isinstance(data, dict) and "data" in data else data
         )
+        pytype = None
+        if isinstance(data, dict) and "pytype" in data and serializer is not None:
+            pytype = serializer.deserialize(data["pytype"])
         if (
             isinstance(payload, dict)
             and serializer is not None
@@ -71,5 +89,6 @@ class PyAttr(Data[T], SerializerMixin):
         ):
             payload = serializer.deserialize(payload)
         return cls(
-            cast(U, payload)
-        )  # cast payload to U so the constructor call type-checks
+            cast(T, payload),
+            pytype=pytype,
+        )

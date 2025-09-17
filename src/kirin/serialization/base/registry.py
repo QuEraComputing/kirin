@@ -4,7 +4,7 @@ import importlib
 from typing import Any, Dict
 from dataclasses import dataclass
 
-from kirin import ir, types
+from kirin import ir
 from kirin.serialization.base.serializermixin import SerializerMixin
 
 RUNTIME_ENCODE_LOOKUP: Dict[str, Any] = {}
@@ -43,9 +43,7 @@ def register_type(obj_type: type):
 def register_dialect(dialect: ir.Dialect):
     stmt_map: dict[str, type] = {}
     for stmt_cls in dialect.stmts:
-        # register under Python class name
         stmt_map[stmt_cls.__name__] = stmt_cls
-        # also register under the statement's declared `name` if provided
         stmt_declared_name = getattr(stmt_cls, "name", None)
         if stmt_declared_name and stmt_declared_name != stmt_cls.__name__:
             stmt_map[stmt_declared_name] = stmt_cls
@@ -142,132 +140,6 @@ class DialectSerializer:
             raise ValueError(f"No registered dialect for name {name}.")
 
         return DIALECTS_LOOKUP[name][0]
-
-
-@dataclass
-class TypeAttributeSerializer:
-    def encode(self, obj: object):
-        encode_content_method = getattr(self, f"_encode_{obj.__class__.__name__}", None)
-        if not encode_content_method:
-            raise ValueError(f"No encode method for {obj.__class__.__name__}")
-
-        content_data = encode_content_method(obj)
-
-        return {
-            "kind": "type_attr",
-            "style": obj.__class__.__name__,
-            "data": content_data,
-        }
-
-    def decode(self, data: dict):
-        if data.get("kind") != "type_attr":
-            raise ValueError("Invalid type attribute data for decoding.")
-
-        style = data.get("style")
-        decode_method = getattr(self, f"_decode_{style}", None)
-        if not decode_method:
-            raise ValueError(f"No decode method for style {style}.")
-
-        return decode_method(data.get("data"))
-
-    def _encode_PyClass(self, obj: types.PyClass):
-        if obj.typ.__name__ not in RUNTIME_NAME2TYPE:
-            raise ValueError(
-                f"No registered type for {obj.typ.__name__}. {RUNTIME_NAME2TYPE}."
-            )
-
-        return {
-            "typ": obj.typ.__name__,
-            "display_name": obj.display_name,
-            "prefix": obj.prefix,
-        }
-
-    def _decode_PyClass(self, content_data: dict):
-
-        typ_data = content_data["typ"]
-        if typ_data not in RUNTIME_NAME2TYPE:
-            raise ValueError(f"No registered type for {typ_data}.")
-
-        pytype = RUNTIME_NAME2TYPE[typ_data]
-
-        return types.PyClass(
-            typ=pytype,
-            display_name=content_data.get("display_name", ""),
-            prefix=content_data.get("prefix", ""),
-        )
-
-    def _encode_AnyType(self, obj: types.AnyType):
-        return dict()
-
-    def _decode_AnyType(self, content_data: dict):
-        return types.AnyType()
-
-    def _encode_BottomType(self, obj: types.BottomType):
-        return dict()
-
-    def _decode_BottomType(self, content_data: dict):
-        return types.BottomType()
-
-    def _encode_TypeVar(self, obj: types.TypeVar):
-        return {
-            "varname": obj.varname,
-            "bound": self.encode(obj.bound) if obj.bound else None,
-        }
-
-    def _decode_TypeVar(self, content_data: dict):
-        bound = content_data.get("bound")
-        if bound:
-            bound = self.decode(bound)
-
-        return types.TypeVar(name=content_data["varname"], bound=bound)
-
-    def _encode_Vararg(self, obj: types.Vararg):
-        return {"typ": self.encode(obj.typ)}
-
-    def _decode_Vararg(self, content_data: dict):
-
-        typ = self.decode(content_data["typ"])
-
-        return types.Vararg(typ=typ)
-
-    def _encode_Union(self, obj: types.Union):
-        return {"types": [self.encode(typ) for typ in obj.types]}
-
-    def _decode_Union(self, content_data: dict):
-        types_list = content_data["types"]
-        return types.Union(self.decode(typ) for typ in types_list)
-
-    def _encode_Generic(self, obj: types.Generic):
-        return {
-            "body": self.encode(obj.body),
-            "vars": [self.encode(arg) for arg in obj.vars],
-            "vararg": self.encode(obj.vararg) if obj.vararg else None,
-        }
-
-    def _decode_Generic(self, content_data: dict):
-        out = types.Generic.__new__(types.Generic)
-
-        out.body = self.decode(content_data["body"])
-        out.vars = tuple(self.decode(var) for var in content_data["vars"])
-        vararg = content_data.get("vararg")
-        if vararg:
-            out.vararg = self.decode(vararg)
-
-        return out
-
-    def _encode_Literal(self, obj: types.Literal):
-        return {
-            "value": obj.data,  # note we assume this data can be serialized directly with json.
-            "type": self.encode(obj.type) if obj.type else None,
-        }
-
-    def _decode_Literal(self, content_data: dict):
-        value = content_data["value"]
-        typ = content_data.get("type")
-        if typ:
-            typ = self.decode(typ)
-
-        return types.Literal(data=value, datatype=typ)
 
 
 def register_builtin_defaults():

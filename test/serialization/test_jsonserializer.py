@@ -32,6 +32,7 @@ def main():
 def test_to_json1():
     serializer = JSONSerializer()
     encoded = serializer.encode(foo)
+    # print(encoded)
     decoded = serializer.decode(encoded)
     assert decoded.code.is_structurally_equal(foo.code)
     encoded = serializer.encode_to_str(foo)
