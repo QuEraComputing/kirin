@@ -79,3 +79,10 @@ def test_deterministic():
     serializer2 = JSONSerializer()
     s2 = serializer2.encode_to_str(main)
     assert s1 == s2
+
+
+test_to_json1()
+test_to_json2()
+test_to_json3()
+test_deterministic()
+test_to_json4()

@@ -1,13 +1,13 @@
 import typing
 from abc import abstractmethod
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 from dataclasses import dataclass
 from collections.abc import Hashable
 
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
 
 from typing_extensions import Never
@@ -302,7 +302,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         }
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer) -> "Literal":
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Literal":
         type_attr = (
             serializer.deserialize(data["type"]) if data["type"] is not None else None
         )
@@ -373,7 +373,7 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
         return {"types": [serializer.serialize(t) for t in self.types]}
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer) -> "Union":
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Union":
         types = [serializer.deserialize(t) for t in data["types"]]
         return cls(types)
 
@@ -414,14 +414,14 @@ class TypeVar(TypeAttribute):
             printer.plain_print(" : ")
             printer.print(self.bound)
 
-    def serialize(self, serializer) -> Dict[str, Any]:
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
         return {
             "varname": self.varname,
             "bound": serializer.serialize(self.bound),
         }
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer) -> "TypeVar":
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "TypeVar":
         bound = serializer.deserialize(data["bound"])
         return cls(data["varname"], bound)
 

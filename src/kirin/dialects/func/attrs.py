@@ -1,9 +1,12 @@
-from typing import Any, Dict, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Dict, Generic, TypeVar, cast
 from dataclasses import dataclass
 
 from kirin import types
 from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
 
 from ._dialect import dialect
 
@@ -39,7 +42,7 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         printer.plain_print(" -> ")
         printer.print(self.output)
 
-    def serialize(self, serializer) -> dict[str, Any]:
+    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
         return {
             "inputs": [serializer.serialize(a) for a in self.inputs],
             "output": (serializer.serialize(self.output)),
