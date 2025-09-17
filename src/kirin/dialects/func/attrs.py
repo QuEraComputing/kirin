@@ -41,20 +41,14 @@ class Signature(Generic[TypeLatticeElem], Attribute):
 
     def serialize(self, serializer) -> dict[str, Any]:
         return {
-            "kind": "attribute-signature",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {
-                "inputs": [a.serialize(serializer) for a in self.inputs],
-                "output": (self.output.serialize(serializer)),
-            },
+            "inputs": [serializer.serialize(a) for a in self.inputs],
+            "output": (serializer.serialize(self.output)),
         }
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any], serializer) -> "Signature":
-        sig_data = data.get("data", data)
         inputs = tuple(
-            cast(TypeLatticeElem, serializer.deserialize(a)) for a in sig_data["inputs"]
+            cast(TypeLatticeElem, serializer.deserialize(a)) for a in data["inputs"]
         )
-        output = cast(TypeLatticeElem, serializer.deserialize(sig_data["output"]))
+        output = cast(TypeLatticeElem, serializer.deserialize(data["output"]))
         return cls(inputs=inputs, output=output)

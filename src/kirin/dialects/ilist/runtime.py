@@ -5,7 +5,6 @@ from collections.abc import Sequence
 
 from kirin import ir, types
 from kirin.print.printer import Printer
-from kirin.serialization.base.serializermixin import SerializerMixin
 
 T = TypeVar("T")
 L = TypeVar("L")
@@ -92,18 +91,10 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         )
         printer.plain_print(")")
 
-    def serialize(self, serializer: Any = None) -> dict[str, Any]:
-        def enc(x: Any) -> Any:
-            if serializer is not None and hasattr(serializer, "serialize"):
-                return serializer.serialize(x)
-            if isinstance(x, SerializerMixin):
-                return x.serialize(serializer)
-            return x
-
+    def serialize(self, serializer) -> dict[str, Any]:
         return {
-            "kind": "ilist",
-            "data": [enc(a) for a in self.data],
-            "elem": enc(self.elem),
+            "data": [serializer.serialize(a) for a in self.data],
+            "elem": serializer.serialize(self.elem),
         }
 
     @classmethod

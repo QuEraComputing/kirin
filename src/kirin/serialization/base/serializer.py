@@ -124,7 +124,7 @@ class Serializer:
             return self.deserialize_region(data)
         elif kind == "region_ref":
             return self.deserialize_region(data)
-        elif kind == "attribute" or kind.startswith("attribute-"):
+        elif kind == "attribute":
             return self.deserialize_attribute(data)
         elif kind == "block" or kind == "block_ref":
             return self.deserialize_block(data)
@@ -352,7 +352,7 @@ class Serializer:
             "id": self._ctx.ssa_idtable[arg],
             "blk_id": self._ctx.blk_idtable[arg.owner],
             "index": arg.index,
-            "type": arg.type.serialize(self),
+            "type": self.serialize_attribute(arg.type),
             "name": arg.name,
         }
         return out
@@ -581,9 +581,10 @@ class Serializer:
     def serialize_attribute(self, attr: ir.Attribute) -> dict[str, Any]:
         if hasattr(attr, "serialize") and callable(getattr(attr, "serialize")):
             return {
-                "data": attr.serialize(self),
+                "kind": "attribute",
                 "module": attr.__class__.__module__,
                 "name": attr.__class__.__name__,
+                "data": attr.serialize(self),
             }
         raise TypeError(
             f"Unsupported attribute type {type(attr)} for serialization. "
@@ -620,7 +621,7 @@ class Serializer:
             "kind": "result-value",
             "id": self._ctx.ssa_idtable[result],
             "index": result.index,
-            "type": result.type.serialize(self),
+            "type": self.serialize_attribute(result.type),
             "name": result.name,
         }
 

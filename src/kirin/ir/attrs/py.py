@@ -1,8 +1,7 @@
-from typing import Any, Type, TypeVar, cast
+from typing import Any, Type, TypeVar
 from dataclasses import dataclass
 
 from kirin.print import Printer
-from kirin.serialization.base.serializermixin import SerializerMixin
 
 from .data import Data
 from .types import PyClass, TypeAttribute
@@ -54,41 +53,15 @@ class PyAttr(Data[T]):
         return self.data
 
     def serialize(self, serializer) -> dict[str, Any]:
-        out = {
-            "kind": "attribute-pyattr",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {},
+        return {
+            "data": serializer.serialize(self.data),
+            "pytype": serializer.serialize(self.type),
         }
-        if isinstance(self.data, SerializerMixin):
-            data = {
-                "data": self.data.serialize(serializer),
-                "pytype": self.type.serialize(serializer),
-            }
-            out.update(data)
-        else:
-            data = {
-                "data": serializer.serialize(self.data),
-                "pytype": self.type.serialize(serializer),
-            }
-            out.update(data)
-        return out
 
     @classmethod
-    def deserialize(cls: Type["PyAttr[T]"], data: Any, serializer) -> "PyAttr[T]":
-        payload = (
-            data.get("data") if isinstance(data, dict) and "data" in data else data
-        )
-        pytype = None
-        if isinstance(data, dict) and "pytype" in data and serializer is not None:
-            pytype = serializer.deserialize(data["pytype"])
-        if (
-            isinstance(payload, dict)
-            and serializer is not None
-            and hasattr(serializer, "deserialize")
-        ):
-            payload = serializer.deserialize(payload)
-        return cls(
-            cast(T, payload),
-            pytype=pytype,
-        )
+    def deserialize(cls: Type["PyAttr"], data: dict[str, Any], serializer) -> "PyAttr":
+        pytype = serializer.deserialize(data["pytype"])
+        if not isinstance(pytype, TypeAttribute):
+            raise ValueError("Deserialized pytype is not a TypeAttribute")
+        value = serializer.deserialize(data["data"])
+        return PyAttr(value, pytype=pytype)

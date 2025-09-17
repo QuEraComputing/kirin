@@ -101,12 +101,7 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
         return id(self)
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
-        return {
-            "kind": "attribute-any",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": dict(),
-        }
+        return dict()
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "AnyType":
@@ -127,12 +122,7 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
         return id(self)
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
-        return {
-            "kind": "attribute-bottom",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": dict(),
-        }
+        return dict()
 
     @classmethod
     def deserialize(
@@ -228,14 +218,9 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
         return {
-            "kind": "attribute-pyclass",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {
-                "typ": self.typ.__name__,
-                "display_name": self.display_name,
-                "prefix": self.prefix,
-            },
+            "typ": self.typ.__name__,
+            "display_name": self.display_name,
+            "prefix": self.prefix,
         }
 
     @classmethod
@@ -312,15 +297,8 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
         return {
-            "kind": "attribute-literal",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {
-                "value": self.data,
-                "type": (
-                    self.type.serialize(serializer=serializer) if self.type else None
-                ),
-            },
+            "value": self.data,
+            "type": serializer.serialize(self.type) if self.type else None,
         }
 
     @classmethod
@@ -392,14 +370,7 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
         printer.print_seq(self.types, delim=", ", prefix="[", suffix="]")
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
-        return {
-            "kind": "attribute-union",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {
-                "types": [t.serialize(serializer=serializer) for t in self.types],
-            },
-        }
+        return {"types": [serializer.serialize(t) for t in self.types]}
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any], serializer) -> "Union":
@@ -445,13 +416,8 @@ class TypeVar(TypeAttribute):
 
     def serialize(self, serializer) -> Dict[str, Any]:
         return {
-            "kind": "attribute-typevar",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {
-                "varname": self.varname,
-                "bound": self.bound.serialize(serializer=serializer),
-            },
+            "varname": self.varname,
+            "bound": serializer.serialize(self.bound),
         }
 
     @classmethod
@@ -480,12 +446,7 @@ class Vararg(Attribute):
         printer.print(self.typ)
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
-        return {
-            "kind": "attribute-vararg",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {"typ": self.typ.serialize(serializer)},
-        }
+        return {"typ": serializer.serialize(self.typ)}
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Vararg":
@@ -618,14 +579,9 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
         out = {
-            "kind": "attribute-generic",
-            "module": self.__class__.__module__,
-            "name": self.__class__.__name__,
-            "data": {
-                "body": self.body.serialize(serializer),
-                "vars": [v.serialize(serializer) for v in self.vars],
-                "vararg": self.vararg.serialize(serializer) if self.vararg else None,
-            },
+            "body": serializer.serialize(self.body),
+            "vars": [serializer.serialize(v) for v in self.vars],
+            "vararg": serializer.serialize(self.vararg) if self.vararg else None,
         }
         return out
 
