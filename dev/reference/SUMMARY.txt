@@ -176,6 +176,7 @@
         * [abc](kirin/passes/abc.md)
         * [aggressive](kirin/passes/aggressive/index.md)
             * [fold](kirin/passes/aggressive/fold.md)
+            * [unroll](kirin/passes/aggressive/unroll.md)
         * [canonicalize](kirin/passes/canonicalize.md)
         * [default](kirin/passes/default.md)
         * [fold](kirin/passes/fold.md)
