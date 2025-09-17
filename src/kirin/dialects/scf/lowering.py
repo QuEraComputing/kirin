@@ -76,8 +76,7 @@ class Lowering(lowering.FromPythonAST):
         ):
             body_frame.push(Yield(*body_yields))
         else:
-            # python only has one kind of terminator statement
-            # in this case we
+            # TODO: Remove this error when we support early termination in if bodies
             raise lowering.BuildError(
                 "Early returns/terminators in if bodies are not supported with structured control flow"
             )
@@ -88,8 +87,7 @@ class Lowering(lowering.FromPythonAST):
         ):
             else_frame.push(Yield(*else_yields))
         else:
-            # python only has one kind of terminator statement
-            # in this case we
+            # TODO: Remove this error when we support early termination in if bodies
             raise lowering.BuildError(
                 "Early returns/terminators in if bodies are not supported with structured control flow"
             )
@@ -147,8 +145,7 @@ class Lowering(lowering.FromPythonAST):
                 # NOTE: no yields, but also no terminator, add empty yield
                 body_frame.push(Yield())
             else:
-                # python only has one kind of terminator statement
-                # in this case we
+                # TODO: Remove this error when we support early termination in for loops
                 raise lowering.BuildError(
                     "Early returns/terminators in for loops are not supported with structured control flow"
                 )
