@@ -232,7 +232,11 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         self.type = datatype or PyClass(type(data))
 
     def is_equal(self, other: TypeAttribute) -> bool:
-        return self == other
+        return (
+            isinstance(other, Literal)
+            and self.type.is_equal(other.type)
+            and self.data == other.data
+        )
 
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.is_subseteq(other.bound)
