@@ -90,7 +90,7 @@ class IListInterpreter(MethodTable):
         coll: IList = frame.get(stmt.collection)
         for elem in coll.data:
             # NOTE: assume fn has been type checked
-            interp.run_method(fn, (elem, ))
+            interp.run_method(fn, (elem,))
         return
 
     @impl(Sorted)
