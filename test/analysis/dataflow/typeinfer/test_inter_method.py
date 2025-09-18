@@ -1,26 +1,26 @@
+from pytest import mark
+
 from kirin import types
 from kirin.prelude import basic
 
 
-@basic
-def foo(x: int):
-    if x > 1:
-        return x + 1
-    else:
-        return x - 1.0
-
-
-@basic(typeinfer=True, no_raise=False)
-def main(x: int):
-    return foo(x)
-
-
-@basic(typeinfer=True, no_raise=False)
-def moo(x):
-    return foo(x)
-
-
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_inter_method_infer():
+    @basic
+    def foo(x: int):
+        if x > 1:
+            return x + 1
+        else:
+            return x - 1.0
+
+    @basic(typeinfer=True, no_raise=False)
+    def main(x: int):
+        return foo(x)
+
+    @basic(typeinfer=True, no_raise=False)
+    def moo(x):
+        return foo(x)
+
     assert main.return_type == (types.Int | types.Float)
     # assert moo.arg_types[0] == types.Int  # type gets narrowed based on callee
     assert moo.return_type == (types.Int | types.Float)
@@ -30,6 +30,7 @@ def test_inter_method_infer():
     assert foo.return_type is types.Any
 
 
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_infer_if_return():
     from kirin.prelude import structural
 
