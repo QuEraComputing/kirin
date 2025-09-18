@@ -32,44 +32,30 @@ def main2():
     return [1, 2, 3]
 
 
-def test_round_trip1():
+def round_trip(program):
     json_serializer = JSONSerializer()
-    encoded = json_serializer.encode(foo)
+    encoded = json_serializer.encode(program)
     decoded = json_serializer.decode(encoded)
-    assert decoded.code.is_structurally_equal(foo.code)
-    encoded = json_serializer.encode_to_str(foo)
+    assert decoded.code.is_structurally_equal(program.code)
+    encoded = json_serializer.encode_to_str(program)
     decoded = json_serializer.decode_from_str(encoded)
-    assert decoded.code.is_structurally_equal(foo.code)
+    assert decoded.code.is_structurally_equal(program.code)
+
+
+def test_round_trip1():
+    round_trip(foo)
 
 
 def test_round_trip2():
-    json_serializer = JSONSerializer()
-    encoded = json_serializer.encode(bar)
-    decoded = json_serializer.decode(encoded)
-    assert decoded.code.is_structurally_equal(bar.code)
-    encoded = json_serializer.encode_to_str(bar)
-    decoded = json_serializer.decode_from_str(encoded)
-    assert decoded.code.is_structurally_equal(bar.code)
+    round_trip(bar)
 
 
 def test_round_trip3():
-    json_serializer = JSONSerializer()
-    encoded = json_serializer.encode(main)
-    decoded = json_serializer.decode(encoded)
-    assert decoded.code.is_structurally_equal(main.code)
-    encoded = json_serializer.encode_to_str(main)
-    decoded = json_serializer.decode_from_str(encoded)
-    assert decoded.code.is_structurally_equal(main.code)
+    round_trip(main)
 
 
 def test_round_trip4():
-    json_serializer = JSONSerializer()
-    encoded = json_serializer.encode(main2)
-    decoded = json_serializer.decode(encoded)
-    assert decoded.code.is_structurally_equal(main2.code)
-    encoded = json_serializer.encode_to_str(main2)
-    decoded = json_serializer.decode_from_str(encoded)
-    assert decoded.code.is_structurally_equal(main2.code)
+    round_trip(main2)
 
 
 def test_deterministic():
@@ -78,3 +64,10 @@ def test_deterministic():
     json_serializer2 = JSONSerializer()
     s2 = json_serializer2.encode_to_str(main)
     assert s1 == s2
+
+
+# test_deterministic()
+# test_round_trip1()
+# test_round_trip2()
+# test_round_trip3()
+test_round_trip4()

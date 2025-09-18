@@ -1,5 +1,4 @@
 from typing import Any, cast
-from dataclasses import field
 
 from kirin import ir
 from kirin.dialects import func
@@ -10,18 +9,15 @@ from kirin.serialization.base.context import (
     get_str_from_type,
 )
 from kirin.serialization.base.registry import (
-    DialectSerializer,
     register_dialect,
 )
 
 
 class Serializer:
     _ctx: SerializationContext
-    _dialect_serializer: DialectSerializer = field(default_factory=DialectSerializer)
 
     def __init__(self, type_list: list[type] = []) -> None:
         self._ctx = SerializationContext()
-        self._dialect_serializer = DialectSerializer()
 
     def encode(self, obj: object) -> dict[str, Any]:
         self._ctx.clear()
@@ -96,6 +92,10 @@ class Serializer:
             return self.serialize_block(obj)
         elif isinstance(obj, ir.ResultValue):
             return self.serialize_result(obj)
+        elif isinstance(obj, ir.Dialect):
+            return self.serialize_dialect(obj)
+        elif isinstance(obj, ir.DialectGroup):
+            return self.serialize_dialect_group(obj)
         elif hasattr(obj, "serialize") and callable(getattr(obj, "serialize")):
             return cast(Any, obj).serialize(self)
         else:
@@ -105,11 +105,8 @@ class Serializer:
 
     def serialize_method(self, mthd: ir.Method) -> dict[str, Any]:
         method_dialects = mthd.dialects
-        if isinstance(method_dialects, ir.Dialect):
-            register_dialect(method_dialects)
-        elif isinstance(method_dialects, ir.DialectGroup):
-            for d in method_dialects.data:
-                register_dialect(d)
+        for d in method_dialects.data:
+            register_dialect(d)
 
         mangled = mangle(
             mthd.sym_name,
@@ -141,17 +138,16 @@ class Serializer:
             "kind": "method",
             "sym_name": mthd.sym_name,
             "arg_names": mthd.arg_names,
-            "dialects": self._dialect_serializer.encode(mthd.dialects),
+            "dialects": self.serialize(method_dialects),
             "code": self.serialize(mthd.code),
             "mangled": mangled,
         }
 
     def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
-        dialects = stmt.dialect
         out = {
             "kind": "statement",
-            "dialect": self._dialect_serializer.encode(dialects),
-            "name": stmt.name,
+            "dialect": self.serialize(stmt.dialect),
+            "name": self.serialize(stmt.name),
             "_args": [self.serialize(arg) for arg in stmt._args],
             "_results": [self.serialize(res) for res in stmt._results],
             "_name_args_slice": self.serialize(stmt._name_args_slice),
@@ -355,4 +351,17 @@ class Serializer:
             "kind": "type",
             "module": typ.__module__,
             "name": typ.__name__,
+        }
+
+    def serialize_dialect(self, dialect: ir.Dialect) -> dict[str, Any]:
+        return {
+            "kind": "dialect",
+            "name": self.serialize(dialect.name),
+            "stmts": self.serialize(dialect.stmts),
+        }
+
+    def serialize_dialect_group(self, group: ir.DialectGroup) -> dict[str, Any]:
+        return {
+            "kind": "dialect_group",
+            "data": self.serialize(group.data),
         }

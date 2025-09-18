@@ -1,6 +1,5 @@
 from typing import Any, cast
 from importlib import import_module
-from dataclasses import field
 
 import kirin.types as types
 from kirin import ir
@@ -12,17 +11,14 @@ from kirin.serialization.base.context import (
 )
 from kirin.serialization.base.registry import (
     DIALECTS_LOOKUP,
-    DialectSerializer,
 )
 
 
 class Deserializer:
     _ctx: SerializationContext
-    _dialect_serializer: DialectSerializer = field(default_factory=DialectSerializer)
 
     def __init__(self, type_list: list[type] = []) -> None:
         self._ctx = SerializationContext()
-        self._dialect_serializer = DialectSerializer()
 
     def decode(self, data: dict[str, Any]) -> Any:
         kind = data.get("kind")
@@ -106,6 +102,10 @@ class Deserializer:
                 return self.deserialize_block(data)
             case "result-value":
                 return self.deserialize_result(data, owner=owner)
+            case "dialect":
+                return self.deserialize_dialect(data)
+            case "dialect_group":
+                return self.deserialize_dialect_group(data)
             case _:
                 raise ValueError(
                     f"Unsupported data kind {data.get('kind')} for deserialization."
@@ -129,7 +129,7 @@ class Deserializer:
 
         out.sym_name = data["sym_name"]
         out.arg_names = data.get("arg_names", [])
-        out.dialects = self._dialect_serializer.decode(data["dialects"])
+        out.dialects = self.deserialize(data["dialects"])
         out.code = self.deserialize(data["code"])
 
         sym_meta = self._ctx.Method_Symbol.get(mangled, {}) or {}
@@ -163,17 +163,20 @@ class Deserializer:
     def deserialize_statement(self, data: dict[str, Any]) -> ir.Statement:
         if data.get("kind") != "statement":
             raise ValueError("Invalid statement data for decoding.")
-
-        dialect_name = data["dialect"]["name"]
+        dialect: ir.Dialect = self.deserialize(data["dialect"])
+        dialect_name = dialect.name
         tmp = DIALECTS_LOOKUP.get(dialect_name)
-
+        # print(dialect.stmts)
         if tmp is None:
             raise ValueError(f"Dialect {dialect_name} not found in lookup.")
 
         dialect, stmt_map = tmp
-        stmt_name = data["name"]
+        stmt_name = self.deserialize(data["name"])
         stmt_cls = stmt_map.get(stmt_name)
-
+        # print()
+        # print(stmt_cls)
+        # print(dialect.stmts)
+        # print(dialect.name, stmt_name)
         if stmt_cls is None:
             raise ValueError(
                 f"Statement class {stmt_name} not found in dialect {dialect_name}."
@@ -508,3 +511,20 @@ class Deserializer:
             else:
                 raise ImportError(f"Could not find class {class_name} in {module_name}")
         return cls
+
+    def deserialize_dialect(self, data: dict[str, Any]) -> ir.Dialect:
+        if data.get("kind") != "dialect":
+            raise ValueError("Not a dialect data for decoding.")
+
+        name = self.deserialize(data["name"])
+        # if name not in DIALECTS_LOOKUP:
+        #     raise ValueError(f"No registered dialect for name {name}.")
+        # return DIALECTS_LOOKUP[name][0]
+        stmts = self.deserialize(data["stmts"])
+        return ir.Dialect(name=name, stmts=stmts)
+
+    def deserialize_dialect_group(self, data: dict) -> ir.DialectGroup:
+        if data.get("kind") != "dialect_group":
+            raise ValueError("Not a dialect group data for decoding.")
+        dialects = self.deserialize(data["data"])
+        return ir.DialectGroup(dialects=dialects)
