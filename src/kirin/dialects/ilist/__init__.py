@@ -31,5 +31,6 @@ from ._wrapper import (  # careful this is not the builtin range
     foldl as foldl,
     foldr as foldr,
     range as range,
+    sorted as sorted,
     for_each as for_each,
 )

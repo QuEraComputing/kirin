@@ -65,3 +65,36 @@ def for_each(
     fn: typing.Callable[[ElemT], typing.Any],
     collection: IList[ElemT, LenT] | list[ElemT],
 ) -> None: ...
+
+
+@typing.overload
+def sorted(collection: IList[ElemT, LenT] | list[ElemT]) -> IList[ElemT, LenT]: ...
+
+
+@typing.overload
+def sorted(
+    collection: IList[ElemT, LenT] | list[ElemT], reverse: bool
+) -> IList[ElemT, LenT]: ...
+
+
+@typing.overload
+def sorted(
+    collection: IList[ElemT, LenT] | list[ElemT],
+    key: typing.Callable[[ElemT], OutElemT],
+) -> IList[ElemT, LenT]: ...
+
+
+@typing.overload
+def sorted(
+    collection: IList[ElemT, LenT] | list[ElemT],
+    key: typing.Callable[[ElemT], OutElemT],
+    reverse: bool,
+) -> IList[ElemT, LenT]: ...
+
+
+@lowering.wraps(stmts.Sorted)
+def sorted(
+    collection: IList[ElemT, LenT] | list[ElemT],
+    key: typing.Callable[[ElemT], OutElemT],
+    reverse: bool,
+) -> IList[ElemT, LenT]: ...
