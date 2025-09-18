@@ -32,7 +32,7 @@ def main2():
     return [1, 2, 3]
 
 
-def test_to_json1():
+def test_round_trip1():
     json_serializer = JSONSerializer()
     encoded = json_serializer.encode(foo)
     decoded = json_serializer.decode(encoded)
@@ -42,7 +42,7 @@ def test_to_json1():
     assert decoded.code.is_structurally_equal(foo.code)
 
 
-def test_to_json2():
+def test_round_trip2():
     json_serializer = JSONSerializer()
     encoded = json_serializer.encode(bar)
     decoded = json_serializer.decode(encoded)
@@ -52,7 +52,7 @@ def test_to_json2():
     assert decoded.code.is_structurally_equal(bar.code)
 
 
-def test_to_json3():
+def test_round_trip3():
     json_serializer = JSONSerializer()
     encoded = json_serializer.encode(main)
     decoded = json_serializer.decode(encoded)
@@ -62,7 +62,7 @@ def test_to_json3():
     assert decoded.code.is_structurally_equal(main.code)
 
 
-def test_to_json4():
+def test_round_trip4():
     json_serializer = JSONSerializer()
     encoded = json_serializer.encode(main2)
     decoded = json_serializer.decode(encoded)

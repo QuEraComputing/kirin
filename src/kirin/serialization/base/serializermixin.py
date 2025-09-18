@@ -17,14 +17,3 @@ class SerializerMixin(ABC):
     def deserialize(
         cls: Type[T], data: Dict[str, Any], deserializer: "Deserializer"
     ) -> T: ...
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        try:
-            from kirin.serialization.base.registry import register_type
-        except Exception:
-            return
-        try:
-            register_type(cls)
-        except Exception:
-            return
