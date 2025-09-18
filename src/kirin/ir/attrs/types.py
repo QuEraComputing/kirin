@@ -222,6 +222,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
     name = "Literal"
     data: LiteralType
     type: TypeAttribute
+
     """type of the literal, this is useful when the Python type of
     data does not represent the type in IR, e.g Literal(1, types.Int32)
     """
@@ -231,7 +232,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         self.type = datatype or PyClass(type(data))
 
     def is_equal(self, other: TypeAttribute) -> bool:
-        return self is other
+        return self == other
 
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.is_subseteq(other.bound)
