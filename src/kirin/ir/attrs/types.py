@@ -274,6 +274,11 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         self.data = data
         self.type = datatype or PyClass(type(data))
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Literal):
+            return False
+        return self.data == other.data and self.type == other.type
+
     def is_equal(self, other: TypeAttribute) -> bool:
         return self is other
 
@@ -297,16 +302,17 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
 
     def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
         return {
-            "value": self.data,
+            "value": serializer.serialize(self.data),
             "type": serializer.serialize(self.type) if self.type else None,
         }
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Literal":
+        d = serializer.deserialize(data["value"])
         type_attr = (
             serializer.deserialize(data["type"]) if data["type"] is not None else None
         )
-        return cls(data["value"], type_attr)
+        return cls(d, type_attr)
 
 
 @typing.final

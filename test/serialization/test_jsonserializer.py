@@ -35,8 +35,10 @@ def main2():
 def test_to_json1():
     serializer = JSONSerializer()
     encoded = serializer.encode(foo)
-    # print(encoded)
     decoded = serializer.decode(encoded)
+    # foo.code.print()
+    # print()
+    # decoded.code.print()
     assert decoded.code.is_structurally_equal(foo.code)
     encoded = serializer.encode_to_str(foo)
     decoded = serializer.decode_from_str(encoded)
@@ -79,10 +81,3 @@ def test_deterministic():
     serializer2 = JSONSerializer()
     s2 = serializer2.encode_to_str(main)
     assert s1 == s2
-
-
-test_to_json1()
-test_to_json2()
-test_to_json3()
-test_deterministic()
-test_to_json4()

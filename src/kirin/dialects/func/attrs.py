@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Dict, Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin import types
@@ -42,6 +42,11 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         printer.plain_print(" -> ")
         printer.print(self.output)
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, Signature):
+            return False
+        return self.inputs == value.inputs and self.output == value.output
+
     def serialize(self, serializer: "Serializer") -> dict[str, Any]:
         return {
             "inputs": [serializer.serialize(a) for a in self.inputs],
@@ -49,9 +54,7 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         }
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer) -> "Signature":
-        inputs = tuple(
-            cast(TypeLatticeElem, serializer.deserialize(a)) for a in data["inputs"]
-        )
-        output = cast(TypeLatticeElem, serializer.deserialize(data["output"]))
+    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Signature":
+        inputs = tuple(serializer.deserialize(a) for a in data["inputs"])
+        output = serializer.deserialize(data["output"])
         return cls(inputs=inputs, output=output)
