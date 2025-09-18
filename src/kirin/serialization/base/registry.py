@@ -1,43 +1,12 @@
-import inspect
-import pkgutil
-import importlib
 from typing import Any, Dict
 from dataclasses import dataclass
 
 from kirin import ir
-from kirin.serialization.base.serializermixin import SerializerMixin
 
 RUNTIME_ENCODE_LOOKUP: Dict[str, Any] = {}
 RUNTIME_DECODE_LOOKUP: Dict[str, Any] = {}
 RUNTIME_NAME2TYPE: Dict[str, type] = {}
 DIALECTS_LOOKUP = {}
-
-
-def autodiscover_serializers() -> None:
-    try:
-        impls_pkg = importlib.import_module("kirin.serialization.base.impls")
-    except Exception:
-        return
-    for finder, module_name, ispkg in pkgutil.walk_packages(
-        impls_pkg.__path__, impls_pkg.__name__ + "."
-    ):
-        try:
-            mod = importlib.import_module(module_name)
-        except Exception:
-            continue
-        for obj in vars(mod).values():
-            if inspect.isclass(obj):
-                if obj is SerializerMixin:
-                    continue
-                if issubclass(obj, SerializerMixin) or (
-                    hasattr(obj, "serialize") and hasattr(obj, "deserialize")
-                ):
-                    RUNTIME_NAME2TYPE[obj.__name__] = obj
-
-
-def register_type(obj_type: type):
-    RUNTIME_NAME2TYPE[obj_type.__name__] = obj_type
-    return obj_type
 
 
 def register_dialect(dialect: ir.Dialect):
@@ -49,38 +18,6 @@ def register_dialect(dialect: ir.Dialect):
             stmt_map[stmt_declared_name] = stmt_cls
 
     DIALECTS_LOOKUP[dialect.name] = (dialect, stmt_map)
-
-
-def runtime_register_encode(obj_type):
-    def wrapper(func):
-        import warnings
-
-        warnings.warn(
-            "runtime_register_encode is deprecated and will be removed; "
-            "prefer the new Serializer API.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        RUNTIME_ENCODE_LOOKUP[obj_type.__name__] = func
-        return func
-
-    return wrapper
-
-
-def runtime_register_decode(obj_type):
-    def wrapper(func):
-        import warnings
-
-        warnings.warn(
-            "runtime_register_decode is deprecated and will be removed; "
-            "prefer the new Serializer API.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        RUNTIME_DECODE_LOOKUP[obj_type.__name__] = func
-        return func
-
-    return wrapper
 
 
 @dataclass
@@ -140,8 +77,3 @@ class DialectSerializer:
             raise ValueError(f"No registered dialect for name {name}.")
 
         return DIALECTS_LOOKUP[name][0]
-
-
-def register_builtin_defaults():
-    for t in (str, bool, int, float, type(None), list, tuple, dict, range, slice):
-        register_type(t)

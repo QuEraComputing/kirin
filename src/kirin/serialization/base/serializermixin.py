@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 T = TypeVar("T", bound="SerializerMixin")
 
@@ -14,7 +15,7 @@ class SerializerMixin(ABC):
     @classmethod
     @abstractmethod
     def deserialize(
-        cls: Type[T], data: Dict[str, Any], serializer: "Serializer"
+        cls: Type[T], data: Dict[str, Any], deserializer: "Deserializer"
     ) -> T: ...
 
     def __init_subclass__(cls, **kwargs):

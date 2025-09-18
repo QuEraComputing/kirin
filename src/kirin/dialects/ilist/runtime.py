@@ -8,6 +8,7 @@ from kirin.print.printer import Printer
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 T = TypeVar("T")
 L = TypeVar("L")
@@ -96,22 +97,12 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
 
     def serialize(self, serializer: "Serializer") -> dict[str, Any]:
         return {
-            "data": [serializer.serialize(a) for a in self.data],
+            "data": serializer.serialize(self.data),
             "elem": serializer.serialize(self.elem),
         }
 
     @classmethod
-    def deserialize(cls, data: dict[str, Any], serializer: "Serializer") -> "IList":
-        raw_items = data["data"]
-        raw_elem = data["elem"]
-
-        def dec(x: Any) -> Any:
-            if not isinstance(x, dict):
-                return x
-            if serializer is not None and hasattr(serializer, "deserialize"):
-                return serializer.deserialize(x)
-            return x
-
-        items = [dec(x) for x in raw_items]
-        elem = dec(raw_elem)
+    def deserialize(cls, data: dict[str, Any], deserializer: "Deserializer") -> "IList":
+        items = deserializer.deserialize(data["data"])
+        elem = deserializer.deserialize(data["elem"])
         return IList(items, elem=elem)

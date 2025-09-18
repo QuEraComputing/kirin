@@ -33,51 +33,48 @@ def main2():
 
 
 def test_to_json1():
-    serializer = JSONSerializer()
-    encoded = serializer.encode(foo)
-    decoded = serializer.decode(encoded)
-    # foo.code.print()
-    # print()
-    # decoded.code.print()
+    json_serializer = JSONSerializer()
+    encoded = json_serializer.encode(foo)
+    decoded = json_serializer.decode(encoded)
     assert decoded.code.is_structurally_equal(foo.code)
-    encoded = serializer.encode_to_str(foo)
-    decoded = serializer.decode_from_str(encoded)
+    encoded = json_serializer.encode_to_str(foo)
+    decoded = json_serializer.decode_from_str(encoded)
     assert decoded.code.is_structurally_equal(foo.code)
 
 
 def test_to_json2():
-    serializer = JSONSerializer()
-    encoded = serializer.encode(bar)
-    decoded = serializer.decode(encoded)
+    json_serializer = JSONSerializer()
+    encoded = json_serializer.encode(bar)
+    decoded = json_serializer.decode(encoded)
     assert decoded.code.is_structurally_equal(bar.code)
-    encoded = serializer.encode_to_str(bar)
-    decoded = serializer.decode_from_str(encoded)
+    encoded = json_serializer.encode_to_str(bar)
+    decoded = json_serializer.decode_from_str(encoded)
     assert decoded.code.is_structurally_equal(bar.code)
 
 
 def test_to_json3():
-    serializer = JSONSerializer()
-    encoded = serializer.encode(main)
-    decoded = serializer.decode(encoded)
+    json_serializer = JSONSerializer()
+    encoded = json_serializer.encode(main)
+    decoded = json_serializer.decode(encoded)
     assert decoded.code.is_structurally_equal(main.code)
-    encoded = serializer.encode_to_str(main)
-    decoded = serializer.decode_from_str(encoded)
+    encoded = json_serializer.encode_to_str(main)
+    decoded = json_serializer.decode_from_str(encoded)
     assert decoded.code.is_structurally_equal(main.code)
 
 
 def test_to_json4():
-    serializer = JSONSerializer()
-    encoded = serializer.encode(main2)
-    decoded = serializer.decode(encoded)
+    json_serializer = JSONSerializer()
+    encoded = json_serializer.encode(main2)
+    decoded = json_serializer.decode(encoded)
     assert decoded.code.is_structurally_equal(main2.code)
-    encoded = serializer.encode_to_str(main2)
-    decoded = serializer.decode_from_str(encoded)
+    encoded = json_serializer.encode_to_str(main2)
+    decoded = json_serializer.decode_from_str(encoded)
     assert decoded.code.is_structurally_equal(main2.code)
 
 
 def test_deterministic():
-    serializer = JSONSerializer()
-    s1 = serializer.encode_to_str(main)
-    serializer2 = JSONSerializer()
-    s2 = serializer2.encode_to_str(main)
+    json_serializer = JSONSerializer()
+    s1 = json_serializer.encode_to_str(main)
+    json_serializer2 = JSONSerializer()
+    s2 = json_serializer2.encode_to_str(main)
     assert s1 == s2

@@ -2,14 +2,16 @@ import json
 from typing import Any
 
 from kirin.serialization.base.serializer import Serializer
+from kirin.serialization.base.deserializer import Deserializer
 
 
-class JSONSerializer(Serializer):
+class JSONSerializer:
     def __init__(self, types: list[type] = []):
-        super().__init__(types=types)
+        self.serializer = Serializer(type_list=types)
+        self.deserializer = Deserializer(type_list=types)
 
     def encode(self, obj: object) -> dict[str, Any]:
-        return super().encode(obj)
+        return self.serializer.encode(obj)
 
     def encode_to_str(self, obj: object, **json_kwargs) -> str:
         return json.dumps(
@@ -17,7 +19,7 @@ class JSONSerializer(Serializer):
         )
 
     def decode(self, data: dict[str, Any]) -> Any:
-        return super().decode(data)
+        return self.deserializer.decode(data)
 
     def decode_from_str(self, payload: str) -> Any:
         parsed = json.loads(payload)

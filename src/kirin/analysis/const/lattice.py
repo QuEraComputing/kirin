@@ -15,6 +15,7 @@ from kirin.print.printer import Printer
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 from ._visitor import _ElemVisitor
 
@@ -58,7 +59,9 @@ class Unknown(Result, metaclass=SingletonLatticeAttributeMeta):
         return {"__kirin_lattice__": "Unknown"}
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Unknown":
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Unknown":
         return cls()
 
 
@@ -77,7 +80,9 @@ class Bottom(Result, metaclass=SingletonLatticeAttributeMeta):
         return {"__kirin_lattice__": "Bottom"}
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Bottom":
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Bottom":
         return cls()
 
 
@@ -109,8 +114,8 @@ class Value(Result):
         }
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Value":
-        value = serializer.deserialize(data["data"])
+    def deserialize(cls, data: Dict[str, Any], deserializer: "Deserializer") -> "Value":
+        value = deserializer.deserialize(data["data"])
         return cls(value)
 
 
@@ -194,9 +199,9 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
 
     @classmethod
     def deserialize(
-        cls, data: Dict[str, Any], serializer: "Serializer"
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
     ) -> "PartialTuple":
-        items = [serializer.deserialize(x) for x in data["data"]]
+        items = [deserializer.deserialize(x) for x in data["data"]]
         return cls(tuple(items))
 
 
@@ -282,9 +287,9 @@ class PartialLambda(PartialConst):
 
     @classmethod
     def deserialize(
-        cls, data: Dict[str, Any], serializer: "Serializer"
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
     ) -> "PartialLambda":
-        code = serializer.deserialize(data["code"])
-        captured = [serializer.deserialize(x) for x in data["captured"]]
+        code = deserializer.deserialize(data["code"])
+        captured = [deserializer.deserialize(x) for x in data["captured"]]
         argnames = data["argnames"]
         return cls(code, tuple(captured), argnames)

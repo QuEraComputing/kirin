@@ -7,6 +7,7 @@ from kirin.print.printer import Printer
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 from ._dialect import dialect
 
@@ -54,7 +55,9 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         }
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], serializer: "Serializer") -> "Signature":
-        inputs = tuple(serializer.deserialize(a) for a in data["inputs"])
-        output = serializer.deserialize(data["output"])
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Signature":
+        inputs = tuple(deserializer.deserialize(a) for a in data["inputs"])
+        output = deserializer.deserialize(data["output"])
         return cls(inputs=inputs, output=output)

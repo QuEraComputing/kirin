@@ -5,6 +5,7 @@ from kirin.print import Printer
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 from .data import Data
 from .types import PyClass, TypeAttribute
@@ -63,10 +64,10 @@ class PyAttr(Data[T]):
 
     @classmethod
     def deserialize(
-        cls: Type["PyAttr"], data: dict[str, Any], serializer: "Serializer"
+        cls: Type["PyAttr"], data: dict[str, Any], deserializer: "Deserializer"
     ) -> "PyAttr":
-        pytype = serializer.deserialize(data["pytype"])
+        pytype = deserializer.deserialize(data["pytype"])
         if not isinstance(pytype, TypeAttribute):
             raise ValueError("Deserialized pytype is not a TypeAttribute")
-        value = serializer.deserialize(data["data"])
+        value = deserializer.deserialize(data["data"])
         return PyAttr(value, pytype=pytype)

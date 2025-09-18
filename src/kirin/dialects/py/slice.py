@@ -19,6 +19,7 @@ from kirin.dialects.py.constant import Constant
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 dialect = ir.Dialect("py.slice")
 
@@ -102,11 +103,11 @@ class SliceAttribute(ir.Data[slice]):
 
     @classmethod
     def deserialize(
-        cls, data: Dict[str, Any], serializer: "Serializer"
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
     ) -> "SliceAttribute":
-        start = serializer.deserialize(data["start"])
-        stop = serializer.deserialize(data["stop"])
-        step = serializer.deserialize(data["step"])
+        start = deserializer.deserialize(data["start"])
+        stop = deserializer.deserialize(data["stop"])
+        step = deserializer.deserialize(data["step"])
         return cls(start=start, stop=stop, step=step)
 
 
