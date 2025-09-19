@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 from kirin import ir
-from kirin.dialects import func
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -142,44 +141,45 @@ class Serializer:
             "kind": "statement",
             "module": self.serialize_str(stmt.__class__.__module__),
             "class": self.serialize_str(stmt.__class__.__name__),
+            "id": self._ctx.stmt_idtable[stmt],
             "dialect": self.serialize(stmt.dialect),
             "name": self.serialize_str(stmt.name),
-            "_args": [self.serialize(arg) for arg in stmt._args],
-            "_results": [self.serialize(res) for res in stmt._results],
+            "_args": self.serialize_tuple(stmt._args),
+            "_results": self.serialize_list(stmt._results),
             "_name_args_slice": self.serialize(stmt._name_args_slice),
-            "attributes": {k: self.serialize(v) for k, v in stmt.attributes.items()},
-            "successors": [self.serialize(succ) for succ in stmt.successors],
-            "_regions": [self.serialize(region) for region in stmt._regions],
+            "attributes": self.serialize_dict(stmt.attributes),
+            "successors": self.serialize_list(stmt.successors),
+            "_regions": self.serialize_list(stmt._regions),
         }
 
-        if isinstance(stmt, func.Invoke):
-            callee = stmt.callee
-            if callee is not None:
-                mangled = mangle(callee.sym_name, callee.arg_types, callee.return_type)
-                if callee.sym_name is None:
-                    raise ValueError(
-                        "Invoke.callee.sym_name is None, cannot serialize."
-                    )
-                meta = MethodSymbolMeta(
-                    sym_name=callee.sym_name,
-                    arg_types=[t.__class__.__name__ for t in callee.arg_types],
-                    ret_type=callee.return_type,
-                )
-                if not hasattr(self._ctx, "Method_Symbol"):
-                    self._ctx.Method_Symbol = {}
-                existing = self._ctx.Method_Symbol.get(mangled)
-                if existing is None:
-                    self._ctx.Method_Symbol[mangled] = meta
-                elif existing != meta:
-                    raise ValueError(
-                        f"Mangled name collision for {mangled}: existing={existing} new={meta}"
-                    )
+        # if isinstance(stmt, func.Invoke):
+        #     callee = stmt.callee
+        #     if callee is not None:
+        #         mangled = mangle(callee.sym_name, callee.arg_types, callee.return_type)
+        #         if callee.sym_name is None:
+        #             raise ValueError(
+        #                 "Invoke.callee.sym_name is None, cannot serialize."
+        #             )
+        #         meta = MethodSymbolMeta(
+        #             sym_name=callee.sym_name,
+        #             arg_types=[t.__class__.__name__ for t in callee.arg_types],
+        #             ret_type=callee.return_type,
+        #         )
+        #         if not hasattr(self._ctx, "Method_Symbol"):
+        #             self._ctx.Method_Symbol = {}
+        #         existing = self._ctx.Method_Symbol.get(mangled)
+        #         if existing is None:
+        #             self._ctx.Method_Symbol[mangled] = meta
+        #         elif existing != meta:
+        #             raise ValueError(
+        #                 f"Mangled name collision for {mangled}: existing={existing} new={meta}"
+        #             )
 
-                out["call_method"] = mangled
-            else:
-                out["call_method"] = None
-        else:
-            out["call_method"] = None
+        #         out["call_method"] = mangled
+        #     else:
+        #         out["call_method"] = None
+        # else:
+        #     out["call_method"] = None
 
         return out
 
@@ -335,6 +335,7 @@ class Serializer:
         return {
             "kind": "result-value",
             "id": self._ctx.ssa_idtable[result],
+            "owner": self.serialize_str(self._ctx.stmt_idtable[result.owner]),
             "index": result.index,
             "type": self.serialize_attribute(result.type),
             "name": result.name,

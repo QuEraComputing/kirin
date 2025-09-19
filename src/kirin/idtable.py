@@ -61,3 +61,8 @@ class IdTable(Generic[T]):
 
     def size(self) -> int:
         return len(self)
+
+    def clear(self) -> None:
+        self.table.clear()
+        self.name_count.clear()
+        self.next_id = 0

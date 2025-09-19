@@ -3,11 +3,11 @@ from importlib import import_module
 
 import kirin.types as types
 from kirin import ir
-from kirin.dialects import func
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
     mangle,
+    get_cls_from_name,
 )
 
 
@@ -23,9 +23,7 @@ class Deserializer:
 
         if kind == "module":
             for mangled, meta in data["symbol_table"].items():
-                if not isinstance(meta, dict):
-                    raise TypeError(f"symbol_table[{mangled}] is not a dict")
-                sym_name = meta.get("sym_name")
+                sym_name = meta.get("sym_name", None)
                 if sym_name is None:
                     raise ValueError(f"symbol_table[{mangled}] missing 'sym_name'")
                 arg_types = meta.get("arg_types", []) or []
@@ -34,16 +32,14 @@ class Deserializer:
                     arg_types=list(arg_types),
                 )
 
-            body = data.get("body")
+            body = data.get("body", None)
             if body is None:
                 raise ValueError("Module envelope missing body for decoding.")
             return self.deserialize(body)
 
         return self.deserialize(data)
 
-    def deserialize(
-        self, data: dict[str, Any], owner: ir.Statement | None = None
-    ) -> Any:
+    def deserialize(self, data: dict[str, Any]) -> Any:
         match data["kind"]:
             case None:
                 raise ValueError(
@@ -98,7 +94,7 @@ class Deserializer:
             case "block" | "block_ref":
                 return self.deserialize_block(data)
             case "result-value":
-                return self.deserialize_result(data, owner=owner)
+                return self.deserialize_result(data)
             case "dialect":
                 return self.deserialize_dialect(data)
             case "dialect_group":
@@ -129,23 +125,6 @@ class Deserializer:
         out.dialects = self.deserialize(data["dialects"])
         out.code = self.deserialize(data["code"])
 
-        sym_meta = self._ctx.Method_Symbol.get(mangled, {}) or {}
-        if isinstance(sym_meta, dict):
-            encoded_arg_types = data.get("arg_types", []) or []
-        else:
-            encoded_arg_types = []
-        try:
-            decoded_arg_types = tuple(
-                t_enc.deserialize(self) for t_enc in encoded_arg_types
-            )
-            if decoded_arg_types:
-                try:
-                    setattr(out, "arg_types", decoded_arg_types)
-                except (AttributeError, TypeError):
-                    object.__setattr__(out, "_arg_types", tuple(decoded_arg_types))
-        except Exception:
-            pass
-
         computed = mangle(
             out.sym_name,
             getattr(out, "arg_types", ()),
@@ -160,65 +139,51 @@ class Deserializer:
     def deserialize_statement(self, data: dict[str, Any]) -> ir.Statement:
         if data.get("kind") != "statement":
             raise ValueError("Invalid statement data for decoding.")
-        dialect: ir.Dialect = self.deserialize(data["dialect"])
-        cls = self.get_cls_from_name(
+        cls = get_cls_from_name(
             self.deserialize(data["module"]), self.deserialize(data["class"])
         )
 
-        out = cls.__new__(cls)
-        _args = tuple(self.deserialize(x) for x in data["_args"])
-        _results = list(
-            self.deserialize_result(owner=out, data=x) for x in data["_results"]
-        )
-        _name_args_slice = self.deserialize(data["_name_args_slice"])
-        _attributes = {
-            k: self.deserialize_attribute(v) for k, v in data["attributes"].items()
-        }
-
-        out.dialect = dialect
+        out = ir.Statement.__new__(cls)
+        self._ctx.Statement_Lookup[data["id"]] = out
+        out.dialect = self.deserialize(data["dialect"])
         out.name = self.deserialize(data["name"])
-        out._args = _args
-        out._results = _results
-        out._name_args_slice = _name_args_slice
-        out.attributes = _attributes
-
-        successors_data = data.get("successors", [])
-        out.successors = [self.deserialize(succ_data) for succ_data in successors_data]
-
-        regions_data = data.get("_regions", [])
-        _regions = [self.deserialize(region_data) for region_data in regions_data]
-
-        if isinstance(out, func.Invoke) and data.get("call_method"):
-            mangled_name = data["call_method"]
-            runtime = self._ctx.Method_Runtime
-            if mangled_name not in runtime:
-                method_meta = self._ctx.Method_Symbol[mangled_name]
-                if method_meta:
-                    decoded_arg_types = []
-                    placeholder = ir.Method.__new__(ir.Method)
-                    placeholder.mod = None
-                    placeholder.py_func = None
-                    placeholder.sym_name = method_meta.get("sym_name")
-                    placeholder.arg_names = []
-                    placeholder.dialects = ir.DialectGroup([])
-                    placeholder.code = ir.Statement.__new__(ir.Statement)
-                    try:
-                        setattr(placeholder, "arg_types", decoded_arg_types)
-                    except (AttributeError, TypeError):
-                        object.__setattr__(
-                            placeholder, "_arg_types", tuple(decoded_arg_types)
-                        )
-                    self._ctx.Method_Runtime[mangled_name] = placeholder
-                else:
-                    raise ValueError(
-                        f"Method with mangled name {mangled_name} not found."
-                    )
-            out.callee = self._ctx.Method_Runtime[mangled_name]
-
+        out._args = self.deserialize_tuple(data["_args"])
+        out._results = self.deserialize_list(data["_results"])
+        out._name_args_slice = self.deserialize(data["_name_args_slice"])
+        out.attributes = self.deserialize_dict(data["attributes"])
+        out.successors = self.deserialize_list(data["successors"])
+        _regions = self.deserialize_list(data["_regions"])
         for region in _regions:
             if region.parent_node is None:
                 region.parent_node = out
         out._regions = _regions
+
+        # if isinstance(out, func.Invoke) and data.get("call_method"):
+        #     mangled_name = data["call_method"]
+        #     runtime = self._ctx.Method_Runtime
+        #     if mangled_name not in runtime:
+        #         method_meta = self._ctx.Method_Symbol[mangled_name]
+        #         if method_meta:
+        #             decoded_arg_types = []
+        #             placeholder = ir.Method.__new__(ir.Method)
+        #             placeholder.mod = None
+        #             placeholder.py_func = None
+        #             placeholder.sym_name = method_meta.get("sym_name")
+        #             placeholder.arg_names = []
+        #             placeholder.dialects = ir.DialectGroup([])
+        #             placeholder.code = ir.Statement.__new__(ir.Statement)
+        #             try:
+        #                 setattr(placeholder, "arg_types", decoded_arg_types)
+        #             except (AttributeError, TypeError):
+        #                 object.__setattr__(
+        #                     placeholder, "_arg_types", tuple(decoded_arg_types)
+        #                 )
+        #             self._ctx.Method_Runtime[mangled_name] = placeholder
+        #         else:
+        #             raise ValueError(
+        #                 f"Method with mangled name {mangled_name} not found."
+        #             )
+        #     out.callee = self._ctx.Method_Runtime[mangled_name]
 
         return out
 
@@ -236,15 +201,7 @@ class Deserializer:
             )
 
         blk_name = data["blk_id"]
-        block = self._ctx.Block_Lookup.get(blk_name)
-        if block is None:
-            if blk_name in self._ctx._block_reference_store:
-                block = self._ctx._block_reference_store.pop(blk_name)
-                self._ctx.Block_Lookup[blk_name] = block
-            else:
-                block = ir.Block.__new__(ir.Block)
-                self._ctx.Block_Lookup[blk_name] = block
-
+        block = self._ctx.Block_Lookup[blk_name]
         index = data["index"]
         typ = self.deserialize_attribute(data["type"])
         if not isinstance(typ, types.TypeAttribute):
@@ -427,18 +384,7 @@ class Deserializer:
         return tuple(self.deserialize(x) for x in data.get("value", []))
 
     def deserialize_attribute(self, data: dict[str, Any]) -> ir.Attribute:
-        module_name = data.get("module")
-        class_name = data.get("name")
-        if not module_name or not class_name:
-            raise ValueError(
-                f"Attribute {data} must contain 'module' and 'name' fields."
-            )
-
-        mod = import_module(module_name)
-        cls = getattr(mod, class_name, None)
-        if cls is None:
-            raise ImportError(f"Could not find class {class_name} in {module_name}")
-
+        cls = get_cls_from_name(data.get("module"), data.get("name"))
         payload = data.get("data")
         if payload is None:
             raise ValueError("Attribute data missing 'data' field for deserialization.")
@@ -448,9 +394,7 @@ class Deserializer:
         else:
             raise ValueError(f"Class {cls} missing deserialize() method.")
 
-    def deserialize_result(
-        self, data: dict[str, Any], owner: ir.Statement | None = None
-    ) -> ir.ResultValue:
+    def deserialize_result(self, data: dict[str, Any]) -> ir.ResultValue:
         if data.get("kind") != "result-value":
             raise ValueError("Invalid result SSA data for decoding.")
         ssa_name = data["id"]
@@ -464,12 +408,11 @@ class Deserializer:
         index = int(data["index"])
 
         typ = self.deserialize_attribute(data["type"])
-        if owner is None:
-            raise ValueError(
-                "Owner (Statement) must not be None when deserializing a ResultValue."
-            )
         if typ is None or not isinstance(typ, types.TypeAttribute):
             raise TypeError(f"Expected a TypeAttribute, got {type(typ)!r}: {typ!r}")
+        owner: ir.Statement = self._ctx.Statement_Lookup[
+            self.deserialize_str(data["owner"])
+        ]
         out = ir.ResultValue(
             stmt=owner, index=index, type=cast(types.TypeAttribute, typ)
         )
@@ -510,14 +453,3 @@ class Deserializer:
             raise ValueError("Not a dialect group data for decoding.")
         dialects = self.deserialize(data["data"])
         return ir.DialectGroup(dialects=dialects)
-
-    def get_cls_from_name(
-        self, module_name: str | None, class_name: str | None
-    ) -> type:
-        if not module_name or not class_name:
-            raise ValueError(f"Type {module_name} or {class_name} cannot be None.")
-        mod = import_module(module_name)
-        cls = getattr(mod, class_name, None)
-        if cls is None:
-            raise ImportError(f"Could not find class {class_name} in {module_name}")
-        return cls

@@ -1,4 +1,5 @@
 from typing import List, TypedDict
+from importlib import import_module
 from dataclasses import field, dataclass
 
 from kirin import ir, types
@@ -17,10 +18,12 @@ class MethodSymbolMeta(TypedDict, total=False):
 @dataclass
 class SerializationContext:
     ssa_idtable: IdTable[ir.SSAValue] = field(default_factory=IdTable[ir.SSAValue])
+    stmt_idtable: IdTable[ir.Statement] = field(default_factory=IdTable[ir.Statement])
     blk_idtable: IdTable[ir.Block] = field(default_factory=IdTable[ir.Block])
     region_idtable: IdTable[ir.Region] = field(default_factory=IdTable[ir.Region])
 
     SSA_Lookup: dict[str, ir.SSAValue] = field(default_factory=dict)
+    Statement_Lookup: dict[str, ir.Statement] = field(default_factory=dict)
     Block_Lookup: dict[str, ir.Block] = field(default_factory=dict)
     Region_Lookup: dict[str, ir.Region] = field(default_factory=dict)
 
@@ -35,13 +38,11 @@ class SerializationContext:
         self.SSA_Lookup.clear()
         self.Block_Lookup.clear()
         self.Region_Lookup.clear()
-        for tbl in (self.ssa_idtable, self.blk_idtable, self.region_idtable):
-            if hasattr(tbl, "table"):
-                tbl.table.clear()
-            if hasattr(tbl, "name_count"):
-                tbl.name_count.clear()
-            if hasattr(tbl, "next_id"):
-                tbl.next_id = 0
+        self.Statement_Lookup.clear()
+        self.ssa_idtable.clear()
+        self.stmt_idtable.clear()
+        self.blk_idtable.clear()
+        self.region_idtable.clear()
         self._block_reference_store.clear()
         self.Method_Symbol.clear()
         self.Method_Runtime.clear()
@@ -65,3 +66,13 @@ def mangle(
     if output is not None:
         mangled_name += f"{PARAM_SEP}{get_str_from_type(output)}"
     return mangled_name
+
+
+def get_cls_from_name(module_name: str | None, class_name: str | None) -> type:
+    if not module_name or not class_name:
+        raise ValueError(f"Type {module_name} or {class_name} cannot be None.")
+    mod = import_module(module_name)
+    cls = getattr(mod, class_name, None)
+    if cls is None:
+        raise ImportError(f"Could not find class {class_name} in {module_name}")
+    return cls

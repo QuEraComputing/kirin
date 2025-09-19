@@ -7,16 +7,21 @@ def foo(x: int, y: float, z: bool):
     c = [[(200.0, 200.0), (210.0, 200.0)]]
     if z:
         c.append([(222.0, 333.0)])
+    else:
+        return [1, 2, 3, 4]
     return c
 
 
 @basic
 def bar():
-    def goo(x: int, y: int):
-        return 42
+    def goo(x: int):
+        a = (3, 4)
+        return a[0]
 
-    def boo(x, y):
-        return goo(x, y)
+    def boo(y):
+        return goo(y) + 1
+
+    boo(4)
 
 
 @basic
@@ -27,16 +32,12 @@ def main():
     return c
 
 
-@basic
-def main2():
-    return [1, 2, 3]
-
-
 def round_trip(program):
     json_serializer = JSONSerializer()
     encoded = json_serializer.encode(program)
     decoded = json_serializer.decode(encoded)
     # program.code.print()
+    # print()
     # decoded.code.print()
     assert decoded.code.is_structurally_equal(program.code)
     # encoded = json_serializer.encode_to_str(program)
@@ -56,10 +57,6 @@ def test_round_trip3():
     round_trip(main)
 
 
-def test_round_trip4():
-    round_trip(main2)
-
-
 def test_deterministic():
     json_serializer = JSONSerializer()
     s1 = json_serializer.encode_to_str(main)
@@ -72,4 +69,3 @@ test_deterministic()
 test_round_trip1()
 test_round_trip2()
 test_round_trip3()
-test_round_trip4()
