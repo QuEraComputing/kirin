@@ -1,10 +1,14 @@
 # TODO: replace with something faster
-from typing import Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 from dataclasses import dataclass
 from collections.abc import Sequence
 
 from kirin import ir, types
 from kirin.print.printer import Printer
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 T = TypeVar("T")
 L = TypeVar("L")
@@ -90,3 +94,15 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
             self.data, delim=", ", prefix="[", suffix="]", emit=printer.plain_print
         )
         printer.plain_print(")")
+
+    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
+        return {
+            "data": serializer.serialize(self.data),
+            "elem": serializer.serialize(self.elem),
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict[str, Any], deserializer: "Deserializer") -> "IList":
+        items = deserializer.deserialize(data["data"])
+        elem = deserializer.deserialize(data["elem"])
+        return IList(items, elem=elem)

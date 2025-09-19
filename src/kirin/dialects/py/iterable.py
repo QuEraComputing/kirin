@@ -13,9 +13,14 @@ This dialect maps `iter()` and `next()` calls to the `Iter` and `Next` statement
 """
 
 from ast import Call
+from typing import TYPE_CHECKING, Any
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 dialect = ir.Dialect("py.iterable")
 
@@ -30,6 +35,16 @@ class Iter(ir.Statement):
     value: ir.SSAValue = info.argument(types.Any)
     iter: ir.ResultValue = info.result(types.Any)
 
+    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
+        return {
+            "value": serializer.serialize(self.value),
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict[str, Any], deserializer: "Deserializer") -> "Iter":
+        value = deserializer.deserialize(data["value"])
+        return Iter(value=value)
+
 
 @statement(dialect=dialect)
 class Next(ir.Statement):
@@ -37,6 +52,16 @@ class Next(ir.Statement):
 
     iter: ir.SSAValue = info.argument(types.Any)
     value: ir.ResultValue = info.result(types.Any)
+
+    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
+        return {
+            "iter": serializer.serialize(self.iter),
+        }
+
+    @classmethod
+    def deserialize(cls, data: dict[str, Any], deserializer: "Deserializer") -> "Next":
+        iter = deserializer.deserialize(data["iter"])
+        return Next(iter=iter)
 
 
 @dialect.register

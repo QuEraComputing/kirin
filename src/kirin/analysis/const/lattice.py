@@ -1,6 +1,6 @@
 """Lattice for constant analysis."""
 
-from typing import Any, final
+from typing import TYPE_CHECKING, Any, Dict, final
 from dataclasses import dataclass
 
 from kirin import ir
@@ -12,6 +12,10 @@ from kirin.lattice import (
 )
 from kirin.ir.attrs.abc import LatticeAttributeMeta, SingletonLatticeAttributeMeta
 from kirin.print.printer import Printer
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 from ._visitor import _ElemVisitor
 
@@ -51,6 +55,15 @@ class Unknown(Result, metaclass=SingletonLatticeAttributeMeta):
     def __hash__(self) -> int:
         return id(self)
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {"__kirin_lattice__": "Unknown"}
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Unknown":
+        return cls()
+
 
 @final
 @dataclass
@@ -62,6 +75,15 @@ class Bottom(Result, metaclass=SingletonLatticeAttributeMeta):
 
     def __hash__(self) -> int:
         return id(self)
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {"__kirin_lattice__": "Bottom"}
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Bottom":
+        return cls()
 
 
 @final
@@ -84,6 +106,17 @@ class Value(Result):
         # may not be hashable. This is fine because
         # the data is guaranteed to be unique.
         return id(self)
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "__kirin_lattice__": "Value",
+            "data": serializer.serialize(self.data),
+        }
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], deserializer: "Deserializer") -> "Value":
+        value = deserializer.deserialize(data["data"])
+        return cls(value)
 
 
 @dataclass
@@ -158,6 +191,19 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
     def __hash__(self) -> int:
         return hash(self.data)
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "__kirin_lattice__": "PartialTuple",
+            "data": [serializer.serialize(x) for x in self.data],
+        }
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "PartialTuple":
+        items = [deserializer.deserialize(x) for x in data["data"]]
+        return cls(tuple(items))
+
 
 @final
 @dataclass
@@ -230,3 +276,20 @@ class PartialLambda(PartialConst):
             tuple(x.meet(y) for x, y in zip(self.captured, other.captured)),
             self.argnames,
         )
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "__kirin_lattice__": "PartialLambda",
+            "code": serializer.serialize(self.code),
+            "captured": [serializer.serialize(x) for x in self.captured],
+            "argnames": self.argnames,
+        }
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "PartialLambda":
+        code = deserializer.deserialize(data["code"])
+        captured = [deserializer.deserialize(x) for x in data["captured"]]
+        argnames = data["argnames"]
+        return cls(code, tuple(captured), argnames)

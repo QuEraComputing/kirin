@@ -1,10 +1,16 @@
 import typing
 from abc import abstractmethod
+from typing import TYPE_CHECKING, Any, Dict
 from dataclasses import dataclass
 from collections.abc import Hashable
 
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
+
 from typing_extensions import Never
 
 from kirin.print import Printer
@@ -15,6 +21,7 @@ from kirin.lattice import (
     IsSubsetEqMixin,
     SimpleMeetMixin,
 )
+from kirin.serialization.base.serializermixin import SerializerMixin
 
 from .abc import Attribute, LatticeAttributeMeta
 from ._types import _TypeAttribute
@@ -46,6 +53,7 @@ class UnionTypeMeta(TypeAttributeMeta, UnionMeta):
 @dataclass
 class TypeAttribute(
     _TypeAttribute,
+    SerializerMixin,
     SimpleMeetMixin["TypeAttribute"],
     IsSubsetEqMixin["TypeAttribute"],
     BoundedLattice["TypeAttribute"],
@@ -93,6 +101,15 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
     def __hash__(self) -> int:
         return id(self)
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return dict()
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "AnyType":
+        return AnyType()
+
 
 @typing.final
 @dataclass(eq=False)
@@ -106,6 +123,15 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def __hash__(self) -> int:
         return id(self)
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return dict()
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "BottomType":
+        return BottomType()
 
 
 class PyClassMeta(TypeAttributeMeta):
@@ -193,6 +219,24 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(f"!{self.prefix}.", self.display_name)
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "kind": "PyClass",
+            "typ": serializer.serialize(self.typ),
+            "display_name": serializer.serialize(self.display_name),
+            "prefix": serializer.serialize(self.prefix),
+        }
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "PyClass":
+        return PyClass(
+            typ=deserializer.deserialize(data["typ"]),
+            display_name=deserializer.deserialize(data.get("display_name", "")),
+            prefix=deserializer.deserialize(data.get("prefix", "")),
+        )
+
 
 class LiteralMeta(TypeAttributeMeta):
 
@@ -231,6 +275,11 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         self.data = data
         self.type = datatype or PyClass(type(data))
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Literal):
+            return False
+        return self.data == other.data and self.type == other.type
+
     def is_equal(self, other: TypeAttribute) -> bool:
         return (
             isinstance(other, Literal)
@@ -255,6 +304,22 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
 
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("Literal(", repr(self.data), ",", self.type, ")")
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "value": serializer.serialize(self.data),
+            "type": serializer.serialize(self.type) if self.type else None,
+        }
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Literal":
+        d = deserializer.deserialize(data["value"])
+        type_attr = (
+            deserializer.deserialize(data["type"]) if data["type"] is not None else None
+        )
+        return cls(d, type_attr)
 
 
 @typing.final
@@ -317,6 +382,14 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
         printer.print_name(self, prefix="!")
         printer.print_seq(self.types, delim=", ", prefix="[", suffix="]")
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {"types": [serializer.serialize(t) for t in self.types]}
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any], deserializer: "Deserializer") -> "Union":
+        types = [deserializer.deserialize(t) for t in data["types"]]
+        return cls(types)
+
 
 @typing.final
 @dataclass(eq=False)
@@ -354,6 +427,19 @@ class TypeVar(TypeAttribute):
             printer.plain_print(" : ")
             printer.print(self.bound)
 
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {
+            "varname": self.varname,
+            "bound": serializer.serialize(self.bound),
+        }
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "TypeVar":
+        bound = deserializer.deserialize(data["bound"])
+        return cls(data["varname"], bound)
+
 
 @typing.final
 @dataclass
@@ -373,6 +459,16 @@ class Vararg(Attribute):
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("*")
         printer.print(self.typ)
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        return {"typ": serializer.serialize(self.typ)}
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Vararg":
+        typ = deserializer.deserialize(data["typ"])
+        return cls(typ)
 
 
 TypeVarValue: typing.TypeAlias = TypeAttribute | Vararg | list
@@ -497,6 +593,29 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
                 ):
                     return Generic(self.body, *args, vararg)
         raise TypeError("Type arguments do not match")
+
+    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
+        out = {
+            "body": serializer.serialize(self.body),
+            "vars": [serializer.serialize(v) for v in self.vars],
+            "vararg": serializer.serialize(self.vararg) if self.vararg else None,
+        }
+        return out
+
+    @classmethod
+    def deserialize(
+        cls, data: Dict[str, Any], deserializer: "Deserializer"
+    ) -> "Generic":
+        generic_data = data.get("data", data)
+        body = deserializer.deserialize(generic_data["body"])
+        vars = tuple(deserializer.deserialize(v) for v in generic_data["vars"])
+        if generic_data["vararg"] is not None:
+            vararg = deserializer.deserialize(generic_data["vararg"])
+        else:
+            vararg = None
+        generic = cls(body, *vars)
+        generic.vararg = vararg
+        return generic
 
 
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:

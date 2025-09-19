@@ -1,7 +1,11 @@
-from typing import TypeVar
+from typing import TYPE_CHECKING, Any, Type, TypeVar
 from dataclasses import dataclass
 
 from kirin.print import Printer
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 from .data import Data
 from .types import PyClass, TypeAttribute
@@ -51,3 +55,19 @@ class PyAttr(Data[T]):
 
     def unwrap(self) -> T:
         return self.data
+
+    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
+        return {
+            "data": serializer.serialize(self.data),
+            "pytype": serializer.serialize(self.type),
+        }
+
+    @classmethod
+    def deserialize(
+        cls: Type["PyAttr"], data: dict[str, Any], deserializer: "Deserializer"
+    ) -> "PyAttr":
+        pytype = deserializer.deserialize(data["pytype"])
+        if not isinstance(pytype, TypeAttribute):
+            raise ValueError("Deserialized pytype is not a TypeAttribute")
+        value = deserializer.deserialize(data["data"])
+        return PyAttr(value, pytype=pytype)

@@ -5,6 +5,7 @@ from dataclasses import field, dataclass
 from kirin.print import Printable
 from kirin.ir.traits import Trait
 from kirin.lattice.abc import LatticeMeta, SingletonMeta
+from kirin.serialization.base.serializermixin import SerializerMixin
 
 if TYPE_CHECKING:
     from kirin.ir.dialect import Dialect
@@ -29,7 +30,7 @@ class SingletonLatticeAttributeMeta(LatticeAttributeMeta, SingletonMeta):
 
 
 @dataclass(eq=False)
-class Attribute(ABC, Printable, metaclass=AttributeMeta):
+class Attribute(SerializerMixin, ABC, Printable, metaclass=AttributeMeta):
     """ABC for compile-time values. All attributes are hashable
     and thus need to implement the `__hash__` method.
 
