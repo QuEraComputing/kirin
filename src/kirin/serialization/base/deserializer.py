@@ -158,33 +158,6 @@ class Deserializer:
                 region.parent_node = out
         out._regions = _regions
 
-        # if isinstance(out, func.Invoke) and data.get("call_method"):
-        #     mangled_name = data["call_method"]
-        #     runtime = self._ctx.Method_Runtime
-        #     if mangled_name not in runtime:
-        #         method_meta = self._ctx.Method_Symbol[mangled_name]
-        #         if method_meta:
-        #             decoded_arg_types = []
-        #             placeholder = ir.Method.__new__(ir.Method)
-        #             placeholder.mod = None
-        #             placeholder.py_func = None
-        #             placeholder.sym_name = method_meta.get("sym_name")
-        #             placeholder.arg_names = []
-        #             placeholder.dialects = ir.DialectGroup([])
-        #             placeholder.code = ir.Statement.__new__(ir.Statement)
-        #             try:
-        #                 setattr(placeholder, "arg_types", decoded_arg_types)
-        #             except (AttributeError, TypeError):
-        #                 object.__setattr__(
-        #                     placeholder, "_arg_types", tuple(decoded_arg_types)
-        #                 )
-        #             self._ctx.Method_Runtime[mangled_name] = placeholder
-        #         else:
-        #             raise ValueError(
-        #                 f"Method with mangled name {mangled_name} not found."
-        #             )
-        #     out.callee = self._ctx.Method_Runtime[mangled_name]
-
         return out
 
     def deserialize_block_argument(self, data: dict[str, Any]) -> ir.BlockArgument:

@@ -40,9 +40,9 @@ def round_trip(program):
     # print()
     # decoded.code.print()
     assert decoded.code.is_structurally_equal(program.code)
-    # encoded = json_serializer.encode_to_str(program)
-    # decoded = json_serializer.decode_from_str(encoded)
-    # assert decoded.code.is_structurally_equal(program.code)
+    encoded = json_serializer.encode_to_str(program)
+    decoded = json_serializer.decode_from_str(encoded)
+    assert decoded.code.is_structurally_equal(program.code)
 
 
 def test_round_trip1():
@@ -63,9 +63,3 @@ def test_deterministic():
     json_serializer2 = JSONSerializer()
     s2 = json_serializer2.encode_to_str(main)
     assert s1 == s2
-
-
-test_deterministic()
-test_round_trip1()
-test_round_trip2()
-test_round_trip3()
