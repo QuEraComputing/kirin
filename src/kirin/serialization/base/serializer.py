@@ -8,9 +8,6 @@ from kirin.serialization.base.context import (
     mangle,
     get_str_from_type,
 )
-from kirin.serialization.base.registry import (
-    register_dialect,
-)
 
 
 class Serializer:
@@ -104,9 +101,6 @@ class Serializer:
             )
 
     def serialize_method(self, mthd: ir.Method) -> dict[str, Any]:
-        method_dialects = mthd.dialects
-        for d in method_dialects.data:
-            register_dialect(d)
 
         mangled = mangle(
             mthd.sym_name,
@@ -138,16 +132,18 @@ class Serializer:
             "kind": "method",
             "sym_name": mthd.sym_name,
             "arg_names": mthd.arg_names,
-            "dialects": self.serialize(method_dialects),
-            "code": self.serialize(mthd.code),
+            "dialects": self.serialize_dialect_group(mthd.dialects),
+            "code": self.serialize_statement(mthd.code),
             "mangled": mangled,
         }
 
     def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
         out = {
             "kind": "statement",
+            "module": self.serialize_str(stmt.__class__.__module__),
+            "class": self.serialize_str(stmt.__class__.__name__),
             "dialect": self.serialize(stmt.dialect),
-            "name": self.serialize(stmt.name),
+            "name": self.serialize_str(stmt.name),
             "_args": [self.serialize(arg) for arg in stmt._args],
             "_results": [self.serialize(res) for res in stmt._results],
             "_name_args_slice": self.serialize(stmt._name_args_slice),
@@ -237,11 +233,9 @@ class Serializer:
         }
 
     def serialize_bytes(self, value: bytes) -> dict[str, str]:
-        # encode as hex for lossless round-trip
         return {"kind": "bytes", "value": value.hex()}
 
-    def serialize_bytes_array(self, value: bytearray) -> dict[str, Any]:
-        # encode as hex for lossless round-trip
+    def serialize_bytes_array(self, value: bytearray) -> dict[str, str]:
         return {"kind": "bytearray", "value": bytes(value).hex()}
 
     def serialize_complex(self, value: complex) -> dict[str, Any]:

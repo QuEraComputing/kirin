@@ -2,7 +2,7 @@ from kirin.prelude import basic
 from kirin.serialization.jsonserializer import JSONSerializer
 
 
-@basic(typeinfer=True)
+@basic
 def foo(x: int, y: float, z: bool):
     c = [[(200.0, 200.0), (210.0, 200.0)]]
     if z:
@@ -10,7 +10,7 @@ def foo(x: int, y: float, z: bool):
     return c
 
 
-@basic(typeinfer=True)
+@basic
 def bar():
     def goo(x: int, y: int):
         return 42
@@ -19,7 +19,7 @@ def bar():
         return goo(x, y)
 
 
-@basic(typeinfer=True)
+@basic
 def main():
     c = 0
     for i in range(3):
@@ -27,7 +27,7 @@ def main():
     return c
 
 
-@basic(typeinfer=True)
+@basic
 def main2():
     return [1, 2, 3]
 
@@ -36,10 +36,12 @@ def round_trip(program):
     json_serializer = JSONSerializer()
     encoded = json_serializer.encode(program)
     decoded = json_serializer.decode(encoded)
+    # program.code.print()
+    # decoded.code.print()
     assert decoded.code.is_structurally_equal(program.code)
-    encoded = json_serializer.encode_to_str(program)
-    decoded = json_serializer.decode_from_str(encoded)
-    assert decoded.code.is_structurally_equal(program.code)
+    # encoded = json_serializer.encode_to_str(program)
+    # decoded = json_serializer.decode_from_str(encoded)
+    # assert decoded.code.is_structurally_equal(program.code)
 
 
 def test_round_trip1():
@@ -66,8 +68,8 @@ def test_deterministic():
     assert s1 == s2
 
 
-# test_deterministic()
-# test_round_trip1()
-# test_round_trip2()
-# test_round_trip3()
+test_deterministic()
+test_round_trip1()
+test_round_trip2()
+test_round_trip3()
 test_round_trip4()

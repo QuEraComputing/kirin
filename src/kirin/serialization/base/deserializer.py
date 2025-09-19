@@ -9,9 +9,6 @@ from kirin.serialization.base.context import (
     SerializationContext,
     mangle,
 )
-from kirin.serialization.base.registry import (
-    DIALECTS_LOOKUP,
-)
 
 
 class Deserializer:
@@ -164,25 +161,11 @@ class Deserializer:
         if data.get("kind") != "statement":
             raise ValueError("Invalid statement data for decoding.")
         dialect: ir.Dialect = self.deserialize(data["dialect"])
-        dialect_name = dialect.name
-        tmp = DIALECTS_LOOKUP.get(dialect_name)
-        # print(dialect.stmts)
-        if tmp is None:
-            raise ValueError(f"Dialect {dialect_name} not found in lookup.")
+        cls = self.get_cls_from_name(
+            self.deserialize(data["module"]), self.deserialize(data["class"])
+        )
 
-        dialect, stmt_map = tmp
-        stmt_name = self.deserialize(data["name"])
-        stmt_cls = stmt_map.get(stmt_name)
-        # print()
-        # print(stmt_cls)
-        # print(dialect.stmts)
-        # print(dialect.name, stmt_name)
-        if stmt_cls is None:
-            raise ValueError(
-                f"Statement class {stmt_name} not found in dialect {dialect_name}."
-            )
-
-        out = stmt_cls.__new__(stmt_cls)
+        out = cls.__new__(cls)
         _args = tuple(self.deserialize(x) for x in data["_args"])
         _results = list(
             self.deserialize_result(owner=out, data=x) for x in data["_results"]
@@ -192,6 +175,8 @@ class Deserializer:
             k: self.deserialize_attribute(v) for k, v in data["attributes"].items()
         }
 
+        out.dialect = dialect
+        out.name = self.deserialize(data["name"])
         out._args = _args
         out._results = _results
         out._name_args_slice = _name_args_slice
@@ -517,9 +502,6 @@ class Deserializer:
             raise ValueError("Not a dialect data for decoding.")
 
         name = self.deserialize(data["name"])
-        # if name not in DIALECTS_LOOKUP:
-        #     raise ValueError(f"No registered dialect for name {name}.")
-        # return DIALECTS_LOOKUP[name][0]
         stmts = self.deserialize(data["stmts"])
         return ir.Dialect(name=name, stmts=stmts)
 
@@ -528,3 +510,14 @@ class Deserializer:
             raise ValueError("Not a dialect group data for decoding.")
         dialects = self.deserialize(data["data"])
         return ir.DialectGroup(dialects=dialects)
+
+    def get_cls_from_name(
+        self, module_name: str | None, class_name: str | None
+    ) -> type:
+        if not module_name or not class_name:
+            raise ValueError(f"Type {module_name} or {class_name} cannot be None.")
+        mod = import_module(module_name)
+        cls = getattr(mod, class_name, None)
+        if cls is None:
+            raise ImportError(f"Could not find class {class_name} in {module_name}")
+        return cls
