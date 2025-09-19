@@ -1,5 +1,4 @@
 from typing import Any, cast
-from importlib import import_module
 
 import kirin.types as types
 from kirin import ir
@@ -9,50 +8,41 @@ from kirin.serialization.base.context import (
     mangle,
     get_cls_from_name,
 )
+from kirin.serialization.base.serializationunit import SerializationUnit
+from kirin.serialization.base.serializationmodule import SerializationModule
 
 
 class Deserializer:
     _ctx: SerializationContext
 
-    def __init__(self, type_list: list[type] = []) -> None:
+    def __init__(self) -> None:
         self._ctx = SerializationContext()
+        self._ctx.clear()
 
-    def decode(self, data: dict[str, Any]) -> Any:
-        kind = data.get("kind")
-        self._ctx._block_reference_store = {}
+    def decode(self, data: SerializationModule) -> Any:
+        for mangled, meta in data.symbol_table.items():
+            sym_name = meta.get("sym_name", None)
+            if sym_name is None:
+                raise ValueError(f"symbol_table[{mangled}] missing 'sym_name'")
+            arg_types = meta.get("arg_types", []) or []
+            self._ctx.Method_Symbol[mangled] = MethodSymbolMeta(
+                sym_name=sym_name,
+                arg_types=list(arg_types),
+            )
 
-        if kind == "module":
-            for mangled, meta in data["symbol_table"].items():
-                sym_name = meta.get("sym_name", None)
-                if sym_name is None:
-                    raise ValueError(f"symbol_table[{mangled}] missing 'sym_name'")
-                arg_types = meta.get("arg_types", []) or []
-                self._ctx.Method_Symbol[mangled] = MethodSymbolMeta(
-                    sym_name=sym_name,
-                    arg_types=list(arg_types),
-                )
+        body = data.body
+        if body is None:
+            raise ValueError("Module envelope missing body for decoding.")
+        return self.deserialize(body)
 
-            body = data.get("body", None)
-            if body is None:
-                raise ValueError("Module envelope missing body for decoding.")
-            return self.deserialize(body)
-
-        return self.deserialize(data)
-
-    def deserialize(self, data: dict[str, Any]) -> Any:
-        match data["kind"]:
-            case None:
-                raise ValueError(
-                    "Invalid data for deserialization: missing 'kind' field."
-                )
+    def deserialize(self, data: SerializationUnit) -> Any:
+        match data.kind:
             case "bool":
                 return self.deserialize_boolean(data)
             case "bytes":
                 return self.deserialize_bytes(data)
             case "bytearray":
                 return self.deserialize_bytearray(data)
-            case "complex":
-                return self.deserialize_complex(data)
             case "dict":
                 return self.deserialize_dict(data)
             case "float":
@@ -71,8 +61,6 @@ class Deserializer:
                 return self.deserialize_slice(data)
             case "str":
                 return self.deserialize_str(data)
-            case "memoryview":
-                return self.deserialize_memoryview(data)
             case "none":
                 return self.deserialize_none(data)
             case "tuple":
@@ -101,14 +89,11 @@ class Deserializer:
                 return self.deserialize_dialect_group(data)
             case _:
                 raise ValueError(
-                    f"Unsupported data kind {data.get('kind')} for deserialization."
+                    f"Unsupported data kind {data.kind} for deserialization."
                 )
 
-    def deserialize_method(self, data: dict[str, Any]) -> ir.Method:
-        if data.get("kind") != "method":
-            raise ValueError("Invalid method data for deserialization.")
-
-        mangled = data.get("mangled")
+    def deserialize_method(self, serUnit: SerializationUnit) -> ir.Method:
+        mangled = serUnit.data.get("mangled")
         if mangled is None:
             raise ValueError("Missing 'mangled' key for method deserialization.")
 
@@ -120,10 +105,10 @@ class Deserializer:
             out.code = ir.Statement.__new__(ir.Statement)
             self._ctx.Method_Runtime[mangled] = out
 
-        out.sym_name = data["sym_name"]
-        out.arg_names = data.get("arg_names", [])
-        out.dialects = self.deserialize(data["dialects"])
-        out.code = self.deserialize(data["code"])
+        out.sym_name = serUnit.data["sym_name"]
+        out.arg_names = serUnit.data.get("arg_names", [])
+        out.dialects = self.deserialize(serUnit.data["dialects"])
+        out.code = self.deserialize(serUnit.data["code"])
 
         computed = mangle(
             out.sym_name,
@@ -136,13 +121,9 @@ class Deserializer:
             )
         return out
 
-    def deserialize_statement(self, data: dict[str, Any]) -> ir.Statement:
-        if data.get("kind") != "statement":
-            raise ValueError("Invalid statement data for decoding.")
-        cls = get_cls_from_name(
-            self.deserialize(data["module"]), self.deserialize(data["class"])
-        )
-
+    def deserialize_statement(self, serUnit: SerializationUnit) -> ir.Statement:
+        cls = get_cls_from_name(serUnit=serUnit)
+        data = serUnit.data
         out = ir.Statement.__new__(cls)
         self._ctx.Statement_Lookup[data["id"]] = out
         out.dialect = self.deserialize(data["dialect"])
@@ -157,14 +138,13 @@ class Deserializer:
             if region.parent_node is None:
                 region.parent_node = out
         out._regions = _regions
-
         return out
 
-    def deserialize_block_argument(self, data: dict[str, Any]) -> ir.BlockArgument:
-        if data.get("kind") != "block-arg":
-            raise ValueError("Invalid SSA block argument data for decoding.")
-
-        ssa_name = data["id"]
+    def deserialize_block_argument(
+        self, serUnit: SerializationUnit
+    ) -> ir.BlockArgument:
+        cls = get_cls_from_name(serUnit=serUnit)
+        ssa_name = serUnit.data["id"]
         if ssa_name in self._ctx.SSA_Lookup:
             existing = self._ctx.SSA_Lookup[ssa_name]
             if isinstance(existing, ir.BlockArgument):
@@ -173,28 +153,26 @@ class Deserializer:
                 f"Block argument id {ssa_name} already present but maps to {type(existing).__name__}"
             )
 
-        blk_name = data["blk_id"]
+        blk_name = serUnit.data["blk_id"]
         block = self._ctx.Block_Lookup[blk_name]
-        index = data["index"]
-        typ = self.deserialize_attribute(data["type"])
+        index = serUnit.data["index"]
+        typ = self.deserialize_attribute(serUnit.data["type"])
         if not isinstance(typ, types.TypeAttribute):
             raise TypeError(f"Expected a TypeAttribute, got {type(typ)!r}: {typ!r}")
-        out = ir.BlockArgument(
-            block=block, index=index, type=cast(types.TypeAttribute, typ)
-        )
-        out._name = data.get("name", None)
+        out = cls(block=block, index=index, type=cast(types.TypeAttribute, typ))
+        out._name = serUnit.data.get("name", None)
         self._ctx.SSA_Lookup[ssa_name] = out
 
         return out
 
-    def deserialize_region(self, data: dict[str, Any]) -> ir.Region:
-        if data.get("kind") == "region":
+    def deserialize_region(self, serUnit: SerializationUnit) -> ir.Region:
+        if serUnit.kind == "region":
             out = ir.Region.__new__(ir.Region)
-            region_name = data.get("id")
+            region_name = serUnit.data.get("id")
             if region_name is not None:
                 self._ctx.Region_Lookup[region_name] = out
 
-            blocks = [self.deserialize(blk) for blk in data.get("blocks", [])]
+            blocks = [self.deserialize(blk) for blk in serUnit.data.get("blocks", [])]
 
             out._blocks = []
             out._block_idx = {}
@@ -206,36 +184,36 @@ class Deserializer:
                 out.blocks.append(block)
 
             return out
-        elif data.get("kind") == "region_ref":
-            region_name = data["id"]
+        elif serUnit.data.get("kind") == "region_ref":
+            region_name = serUnit.data["id"]
             if region_name not in self._ctx.Region_Lookup:
                 raise ValueError(f"Region with id {region_name} not found in lookup.")
             return self._ctx.Region_Lookup[region_name]
         else:
             raise ValueError("Invalid region data for decoding.")
 
-    def deserialize_block(self, block_data: dict) -> ir.Block:
-        if block_data.get("kind") == "block_ref":
-            return self.deserialize_block_ref(block_data)
-        elif block_data.get("kind") == "block":
-            return self.deserialize_concrete_block(block_data)
+    def deserialize_block(self, serUnit: SerializationUnit) -> ir.Block:
+        if serUnit.kind == "block_ref":
+            return self.deserialize_block_ref(serUnit)
+        elif serUnit.kind == "block":
+            return self.deserialize_concrete_block(serUnit)
         else:
             raise ValueError("Invalid block data for decoding.")
 
-    def deserialize_block_ref(self, block_data: dict) -> ir.Block:
-        if block_data.get("kind") != "block_ref":
+    def deserialize_block_ref(self, serUnit: SerializationUnit) -> ir.Block:
+        if serUnit.kind != "block_ref":
             raise ValueError("Invalid block reference data for decoding.")
 
-        block_name = block_data["id"]
+        block_name = serUnit.data["id"]
         if block_name not in self._ctx.Block_Lookup:
             raise ValueError(f"Block with id {block_name} not found in lookup.")
         return self._ctx.Block_Lookup[block_name]
 
-    def deserialize_concrete_block(self, block_data: dict) -> ir.Block:
-        if block_data.get("kind") != "block":
+    def deserialize_concrete_block(self, serUnit: SerializationUnit) -> ir.Block:
+        if serUnit.kind != "block":
             raise ValueError("Invalid block data for decoding.")
 
-        block_name = block_data["id"]
+        block_name = serUnit.data["id"]
 
         if block_name not in self._ctx.Block_Lookup:
             if block_name in self._ctx._block_reference_store:
@@ -249,10 +227,10 @@ class Deserializer:
 
         out._args = tuple(
             self.deserialize_block_argument(arg_data)
-            for arg_data in block_data.get("_args", [])
+            for arg_data in serUnit.data.get("_args", [])
         )
 
-        stmts_data = block_data.get("stmts")
+        stmts_data = serUnit.data.get("stmts")
         if stmts_data is None:
             raise ValueError("Block data must contain 'stmts' field.")
 
@@ -266,111 +244,66 @@ class Deserializer:
 
         return out
 
-    def deserialize_boolean(self, data: dict[str, str]) -> bool:
-        if data.get("kind") != "bool":
-            raise ValueError("Invalid boolean data for deserialization.")
-        return bool(data["value"])
+    def deserialize_boolean(self, serUnit: SerializationUnit) -> bool:
+        return bool(serUnit.data["value"])
 
-    def deserialize_bytes(self, data: dict[str, str]) -> bytes:
-        if data.get("kind") != "bytes":
-            raise ValueError("Invalid bytes data for deserialization.")
-        return bytes.fromhex(data["value"])
+    def deserialize_bytes(self, serUnit: SerializationUnit) -> bytes:
+        return bytes.fromhex(serUnit.data["value"])
 
-    def deserialize_bytearray(self, data: dict[str, str]) -> bytearray:
-        if data.get("kind") != "bytearray":
-            raise ValueError("Invalid bytearray data for deserialization.")
-        return bytearray.fromhex(data["value"])
+    def deserialize_bytearray(self, serUnit: SerializationUnit) -> bytearray:
+        return bytearray.fromhex(serUnit.data["value"])
 
-    def deserialize_complex(self, data: dict[str, Any]) -> complex:
-        if data.get("kind") != "complex":
-            raise ValueError("Invalid complex data for deserialization.")
-        return complex(data["real"], data["imag"])
-
-    def deserialize_dict(self, data: dict[str, Any]) -> dict:
-        if data.get("kind") != "dict":
-            raise ValueError("Invalid dict data for deserialization.")
-        keys = [self.deserialize(k) for k in data.get("keys", [])]
-        values = [self.deserialize(v) for v in data.get("values", [])]
+    def deserialize_dict(self, serUnit: SerializationUnit) -> dict:
+        keys = [self.deserialize(k) for k in serUnit.data.get("keys", [])]
+        values = [self.deserialize(v) for v in serUnit.data.get("values", [])]
         return dict(zip(keys, values))
 
-    def deserialize_float(self, data: dict[str, str]) -> float:
-        if data.get("kind") != "float":
-            raise ValueError("Invalid float data for deserialization.")
-        return float(data["value"])
+    def deserialize_float(self, serUnit: SerializationUnit) -> float:
+        return float(serUnit.data["value"])
 
-    def deserialize_frozenset(self, data: dict[str, Any]) -> frozenset:
-        if data.get("kind") != "frozenset":
-            raise ValueError("Invalid frozenset data for deserialization.")
-        return frozenset(self.deserialize(x) for x in data.get("value", []))
+    def deserialize_frozenset(self, serUnit: SerializationUnit) -> frozenset:
+        return frozenset(self.deserialize(x) for x in serUnit.data.get("value", []))
 
-    def deserialize_int(self, data: dict[str, str]) -> int:
-        if data.get("kind") != "int":
-            raise ValueError("Invalid int data for deserialization.")
-        return int(data["value"])
+    def deserialize_int(self, serUnit: SerializationUnit) -> int:
+        return int(serUnit.data["value"])
 
-    def deserialize_list(self, data: dict[str, Any]) -> list:
-        if data.get("kind") != "list":
-            raise ValueError("Invalid list data for deserialization.")
-        return [self.deserialize(x) for x in data.get("value", [])]
+    def deserialize_list(self, serUnit: SerializationUnit) -> list:
+        return [self.deserialize(x) for x in serUnit.data.get("value", [])]
 
-    def deserialize_range(self, data: dict[str, Any]) -> range:
-        if data.get("kind") != "range":
-            raise ValueError("Invalid range data for deserialization.")
-        start = self.deserialize(data.get("start", 0))
-        stop = self.deserialize(data.get("stop", 0))
-        step = self.deserialize(data.get("step", 1))
-        if not all(isinstance(v, int) for v in (start, stop, step)):
-            raise TypeError("Range start, stop, and step must be integers.")
+    def deserialize_range(self, serUnit: SerializationUnit) -> range:
+        start = self.deserialize(serUnit.data.get("start", 0))
+        stop = self.deserialize(serUnit.data.get("stop", 0))
+        step = self.deserialize(serUnit.data.get("step", 1))
         return range(start, stop, step)
 
-    def deserialize_set(self, data: dict[str, Any]) -> set:
-        if data.get("kind") != "set":
-            raise ValueError("Invalid set data for deserialization.")
-        return set(self.deserialize(x) for x in data.get("value", []))
+    def deserialize_set(self, serUnit: SerializationUnit) -> set:
+        return set(self.deserialize(x) for x in serUnit.data.get("value", []))
 
-    def deserialize_slice(self, data: dict[str, Any]) -> slice:
-        if data.get("kind") != "slice":
-            raise ValueError("Invalid slice data for deserialization.")
-        start = self.deserialize(data["start"])
-        stop = self.deserialize(data["stop"])
-        step = self.deserialize(data["step"])
+    def deserialize_slice(self, serUnit: SerializationUnit) -> slice:
+        start = self.deserialize(serUnit.data["start"])
+        stop = self.deserialize(serUnit.data["stop"])
+        step = self.deserialize(serUnit.data["step"])
         return slice(start, stop, step)
 
-    def deserialize_str(self, data: dict[str, str]) -> str:
-        if data.get("kind") != "str":
-            raise ValueError("Invalid string data for deserialization.")
-        return data["value"]
+    def deserialize_str(self, serUnit: SerializationUnit) -> str:
+        return serUnit.data["value"]
 
-    def deserialize_memoryview(self, data: dict[str, Any]) -> memoryview:
-        if data.get("kind") != "memoryview":
-            raise ValueError("Invalid memoryview data for deserialization.")
-        return memoryview(bytes.fromhex(data["value"]))
-
-    def deserialize_none(self, data: dict[str, str]) -> None:
-        if data.get("kind") != "none":
-            raise ValueError("Invalid NoneType data for deserialization.")
+    def deserialize_none(self, serUnit: SerializationUnit) -> None:
         return None
 
-    def deserialize_tuple(self, data: dict[str, Any]) -> tuple:
-        if data.get("kind") != "tuple":
-            raise ValueError("Invalid tuple data for deserialization.")
-        return tuple(self.deserialize(x) for x in data.get("value", []))
+    def deserialize_tuple(self, serUnit: SerializationUnit) -> tuple:
+        return tuple(self.deserialize(x) for x in serUnit.data.get("value", []))
 
-    def deserialize_attribute(self, data: dict[str, Any]) -> ir.Attribute:
-        cls = get_cls_from_name(data.get("module"), data.get("name"))
-        payload = data.get("data")
-        if payload is None:
-            raise ValueError("Attribute data missing 'data' field for deserialization.")
-
+    def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
+        cls = get_cls_from_name(serUnit)
+        payload = serUnit.data
         if getattr(cls, "deserialize", None) and callable(getattr(cls, "deserialize")):
             return cls.deserialize(payload, self)
         else:
             raise ValueError(f"Class {cls} missing deserialize() method.")
 
-    def deserialize_result(self, data: dict[str, Any]) -> ir.ResultValue:
-        if data.get("kind") != "result-value":
-            raise ValueError("Invalid result SSA data for decoding.")
-        ssa_name = data["id"]
+    def deserialize_result(self, serUnit: SerializationUnit) -> ir.ResultValue:
+        ssa_name = serUnit.data["id"]
         if ssa_name in self._ctx.SSA_Lookup:
             existing = self._ctx.SSA_Lookup[ssa_name]
             if isinstance(existing, ir.ResultValue):
@@ -378,51 +311,34 @@ class Deserializer:
             raise ValueError(
                 f"SSA id {ssa_name} already exists and is {type(existing).__name__}"
             )
-        index = int(data["index"])
+        index = int(serUnit.data["index"])
 
-        typ = self.deserialize_attribute(data["type"])
+        typ = self.deserialize_attribute(serUnit.data["type"])
         if typ is None or not isinstance(typ, types.TypeAttribute):
             raise TypeError(f"Expected a TypeAttribute, got {type(typ)!r}: {typ!r}")
         owner: ir.Statement = self._ctx.Statement_Lookup[
-            self.deserialize_str(data["owner"])
+            self.deserialize_str(serUnit.data["owner"])
         ]
         out = ir.ResultValue(
             stmt=owner, index=index, type=cast(types.TypeAttribute, typ)
         )
-        out.name = data.get("name", None)
+        out.name = serUnit.data.get("name", None)
 
         self._ctx.SSA_Lookup[ssa_name] = out
 
         return out
 
-    def deserialize_type(self, data: dict[str, Any]) -> type:
-        if data.get("kind") != "type":
-            raise ValueError("Invalid type data for deserialization.")
-        module_name = data.get("module")
-        class_name = data.get("name")
-        if not module_name or not class_name:
-            raise ValueError(f"Type {data} must contain 'module' and 'name' fields.")
-
-        mod = import_module(module_name)
-        cls = getattr(mod, class_name, None)
-
-        if cls is None:
-            if class_name == "NoneType" and module_name == "builtins":
-                return type(None)
-            else:
-                raise ImportError(f"Could not find class {class_name} in {module_name}")
+    def deserialize_type(self, serUnit: SerializationUnit) -> type:
+        cls = get_cls_from_name(serUnit)
         return cls
 
-    def deserialize_dialect(self, data: dict[str, Any]) -> ir.Dialect:
-        if data.get("kind") != "dialect":
-            raise ValueError("Not a dialect data for decoding.")
+    def deserialize_dialect(self, serUnit: SerializationUnit) -> ir.Dialect:
+        name = self.deserialize(serUnit.data["name"])
+        stmts = self.deserialize(serUnit.data["stmts"])
+        cls = get_cls_from_name(serUnit)
+        return cls(name=name, stmts=stmts)
 
-        name = self.deserialize(data["name"])
-        stmts = self.deserialize(data["stmts"])
-        return ir.Dialect(name=name, stmts=stmts)
-
-    def deserialize_dialect_group(self, data: dict) -> ir.DialectGroup:
-        if data.get("kind") != "dialect_group":
-            raise ValueError("Not a dialect group data for decoding.")
-        dialects = self.deserialize(data["data"])
-        return ir.DialectGroup(dialects=dialects)
+    def deserialize_dialect_group(self, serUnit: SerializationUnit) -> ir.DialectGroup:
+        dialects = self.deserialize(serUnit.data["data"])
+        cls = get_cls_from_name(serUnit)
+        return cls(dialects=dialects)

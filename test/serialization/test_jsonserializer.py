@@ -1,5 +1,7 @@
 from kirin.prelude import basic
 from kirin.serialization.jsonserializer import JSONSerializer
+from kirin.serialization.base.serializer import Serializer
+from kirin.serialization.base.deserializer import Deserializer
 
 
 @basic
@@ -33,16 +35,19 @@ def main():
 
 
 def round_trip(program):
+    serializer = Serializer()
+    deserializer = Deserializer()
+    encoded = serializer.encode(program)
+    decoded = deserializer.decode(encoded)
+    program.code.print()
+    print()
+    decoded.code.print()
+    assert decoded.code.is_structurally_equal(program.code)
     json_serializer = JSONSerializer()
-    encoded = json_serializer.encode(program)
-    decoded = json_serializer.decode(encoded)
-    # program.code.print()
-    # print()
-    # decoded.code.print()
-    assert decoded.code.is_structurally_equal(program.code)
-    encoded = json_serializer.encode_to_str(program)
-    decoded = json_serializer.decode_from_str(encoded)
-    assert decoded.code.is_structurally_equal(program.code)
+    json_encoded = json_serializer.encode(encoded)
+    json_decoded = json_serializer.decode(json_encoded)
+    decoded_2 = deserializer.decode(json_decoded)
+    assert decoded_2.code.is_structurally_equal(program.code)
 
 
 def test_round_trip1():
@@ -58,8 +63,12 @@ def test_round_trip3():
 
 
 def test_deterministic():
+    serializer = Serializer()
+    s1 = serializer.encode(main)
     json_serializer = JSONSerializer()
-    s1 = json_serializer.encode_to_str(main)
+    json_s1 = json_serializer.encode(s1)
+    serializer2 = Serializer()
+    s2 = serializer2.encode(main)
     json_serializer2 = JSONSerializer()
-    s2 = json_serializer2.encode_to_str(main)
-    assert s1 == s2
+    json_s2 = json_serializer2.encode(s2)
+    assert json_s1 == json_s2

@@ -7,16 +7,18 @@ from kirin.serialization.base.context import (
     mangle,
     get_str_from_type,
 )
+from kirin.serialization.base.serializationunit import SerializationUnit
+from kirin.serialization.base.serializationmodule import SerializationModule
 
 
 class Serializer:
     _ctx: SerializationContext
 
-    def __init__(self, type_list: list[type] = []) -> None:
+    def __init__(self) -> None:
         self._ctx = SerializationContext()
-
-    def encode(self, obj: object) -> dict[str, Any]:
         self._ctx.clear()
+
+    def encode(self, obj: object) -> SerializationModule:
         body = self.serialize(obj)
         if getattr(self._ctx, "Method_Symbol", None):
             st: dict[str, MethodSymbolMeta] = {}
@@ -36,18 +38,15 @@ class Serializer:
         else:
             symbol_table = dict[str, MethodSymbolMeta]()
 
-        out = {"kind": "module", "symbol_table": symbol_table, "body": body}
-        return out
+        return SerializationModule(symbol_table=symbol_table, body=body)
 
-    def serialize(self, obj: object) -> dict[str, Any]:
+    def serialize(self, obj: object) -> SerializationUnit:
         if isinstance(obj, bool):
             return self.serialize_boolean(obj)
         elif isinstance(obj, bytes):
             return self.serialize_bytes(obj)
         elif isinstance(obj, bytearray):
             return self.serialize_bytes_array(obj)
-        elif isinstance(obj, complex):
-            return self.serialize_complex(obj)
         elif isinstance(obj, dict):
             return self.serialize_dict(obj)
         elif isinstance(obj, float):
@@ -66,8 +65,6 @@ class Serializer:
             return self.serialize_slice(obj)
         elif isinstance(obj, str):
             return self.serialize_str(obj)
-        elif isinstance(obj, memoryview):
-            return self.serialize_memoryview(obj)
         elif obj is None:
             return self.serialize_none(obj)
         elif isinstance(obj, tuple):
@@ -99,7 +96,7 @@ class Serializer:
                 f"Unsupported object type {type(obj)} for serialization. Implement 'serialize' method."
             )
 
-    def serialize_method(self, mthd: ir.Method) -> dict[str, Any]:
+    def serialize_method(self, mthd: ir.Method) -> SerializationUnit:
 
         mangled = mangle(
             mthd.sym_name,
@@ -127,236 +124,292 @@ class Serializer:
         else:
             self._ctx.Method_Symbol[mangled] = meta
 
-        return {
-            "kind": "method",
-            "sym_name": mthd.sym_name,
-            "arg_names": mthd.arg_names,
-            "dialects": self.serialize_dialect_group(mthd.dialects),
-            "code": self.serialize_statement(mthd.code),
-            "mangled": mangled,
-        }
+        return SerializationUnit(
+            kind="method",
+            module_name=ir.Method.__module__,
+            class_name=ir.Method.__name__,
+            data={
+                "sym_name": mthd.sym_name,
+                "arg_names": mthd.arg_names,
+                "dialects": self.serialize_dialect_group(mthd.dialects),
+                "code": self.serialize_statement(mthd.code),
+                "mangled": mangled,
+            },
+        )
 
-    def serialize_statement(self, stmt: ir.Statement) -> dict[str, Any]:
-        out = {
-            "kind": "statement",
-            "module": self.serialize_str(stmt.__class__.__module__),
-            "class": self.serialize_str(stmt.__class__.__name__),
-            "id": self._ctx.stmt_idtable[stmt],
-            "dialect": self.serialize(stmt.dialect),
-            "name": self.serialize_str(stmt.name),
-            "_args": self.serialize_tuple(stmt._args),
-            "_results": self.serialize_list(stmt._results),
-            "_name_args_slice": self.serialize(stmt._name_args_slice),
-            "attributes": self.serialize_dict(stmt.attributes),
-            "successors": self.serialize_list(stmt.successors),
-            "_regions": self.serialize_list(stmt._regions),
-        }
+    def serialize_statement(self, stmt: ir.Statement) -> SerializationUnit:
+        return SerializationUnit(
+            kind="statement",
+            module_name=stmt.__class__.__module__,
+            class_name=stmt.__class__.__name__,
+            data={
+                "id": self._ctx.stmt_idtable[stmt],
+                "dialect": self.serialize(stmt.dialect),
+                "name": self.serialize_str(stmt.name),
+                "_args": self.serialize_tuple(stmt._args),
+                "_results": self.serialize_list(stmt._results),
+                "_name_args_slice": self.serialize(stmt._name_args_slice),
+                "attributes": self.serialize_dict(stmt.attributes),
+                "successors": self.serialize_list(stmt.successors),
+                "_regions": self.serialize_list(stmt._regions),
+            },
+        )
 
-        # if isinstance(stmt, func.Invoke):
-        #     callee = stmt.callee
-        #     if callee is not None:
-        #         mangled = mangle(callee.sym_name, callee.arg_types, callee.return_type)
-        #         if callee.sym_name is None:
-        #             raise ValueError(
-        #                 "Invoke.callee.sym_name is None, cannot serialize."
-        #             )
-        #         meta = MethodSymbolMeta(
-        #             sym_name=callee.sym_name,
-        #             arg_types=[t.__class__.__name__ for t in callee.arg_types],
-        #             ret_type=callee.return_type,
-        #         )
-        #         if not hasattr(self._ctx, "Method_Symbol"):
-        #             self._ctx.Method_Symbol = {}
-        #         existing = self._ctx.Method_Symbol.get(mangled)
-        #         if existing is None:
-        #             self._ctx.Method_Symbol[mangled] = meta
-        #         elif existing != meta:
-        #             raise ValueError(
-        #                 f"Mangled name collision for {mangled}: existing={existing} new={meta}"
-        #             )
+    def serialize_block_argument(self, arg: ir.BlockArgument) -> SerializationUnit:
+        return SerializationUnit(
+            kind="block-arg",
+            module_name=ir.BlockArgument.__module__,
+            class_name=ir.BlockArgument.__name__,
+            data={
+                "kind": "block-arg",
+                "id": self._ctx.ssa_idtable[arg],
+                "blk_id": self._ctx.blk_idtable[arg.owner],
+                "index": arg.index,
+                "type": self.serialize_attribute(arg.type),
+                "name": arg.name,
+            },
+        )
 
-        #         out["call_method"] = mangled
-        #     else:
-        #         out["call_method"] = None
-        # else:
-        #     out["call_method"] = None
-
-        return out
-
-    def serialize_block_argument(self, arg: ir.BlockArgument) -> dict[str, Any]:
-        out = {
-            "kind": "block-arg",
-            "id": self._ctx.ssa_idtable[arg],
-            "blk_id": self._ctx.blk_idtable[arg.owner],
-            "index": arg.index,
-            "type": self.serialize_attribute(arg.type),
-            "name": arg.name,
-        }
-        return out
-
-    def serialize_region(self, region: ir.Region) -> dict[str, Any]:
+    def serialize_region(self, region: ir.Region) -> SerializationUnit:
         region_id = self._ctx.region_idtable[region]
         if region_id in self._ctx.Region_Lookup:
-            out = {
-                "kind": "region_ref",
-                "id": region_id,
-            }
+            return SerializationUnit(
+                kind="region_ref",
+                module_name=ir.Region.__module__,
+                class_name=ir.Region.__name__,
+                data={
+                    "kind": "region_ref",
+                    "id": region_id,
+                },
+            )
         else:
             self._ctx.Region_Lookup[region_id] = region
-            out = {
-                "kind": "region",
-                "id": region_id,
-                "blocks": [self.serialize(block) for block in region.blocks],
-            }
-        return out
+            return SerializationUnit(
+                kind="region",
+                module_name=ir.Region.__module__,
+                class_name=ir.Region.__name__,
+                data={
+                    "id": region_id,
+                    "blocks": [self.serialize(block) for block in region.blocks],
+                },
+            )
 
-    def serialize_block(self, block: ir.Block) -> dict[str, Any]:
+    def serialize_block(self, block: ir.Block) -> SerializationUnit:
         if self._ctx.blk_idtable[block] in self._ctx.Block_Lookup:
-            out = {
-                "kind": "block_ref",
-                "id": self._ctx.blk_idtable[block],
-            }
+            return SerializationUnit(
+                kind="block_ref",
+                module_name=ir.Block.__module__,
+                class_name=ir.Block.__name__,
+                data={
+                    "id": self._ctx.blk_idtable[block],
+                },
+            )
         else:
             self._ctx.Block_Lookup[self._ctx.blk_idtable[block]] = block
-            out = {
-                "kind": "block",
-                "id": self._ctx.blk_idtable[block],
-                "stmts": [self.serialize_statement(stmt) for stmt in block.stmts],
-                "_args": [self.serialize_block_argument(arg) for arg in block.args],
-            }
-        return out
+            return SerializationUnit(
+                kind="block",
+                module_name=ir.Block.__module__,
+                class_name=ir.Block.__name__,
+                data={
+                    "id": self._ctx.blk_idtable[block],
+                    "stmts": [self.serialize_statement(stmt) for stmt in block.stmts],
+                    "_args": [self.serialize_block_argument(arg) for arg in block.args],
+                },
+            )
 
-    def serialize_boolean(self, value: bool) -> dict[str, str]:
-        return {
-            "kind": "bool",
-            "value": str(value) if value else "",
-        }
+    def serialize_boolean(self, value: bool) -> SerializationUnit:
+        return SerializationUnit(
+            kind="bool",
+            module_name=bool.__module__,
+            class_name=bool.__name__,
+            data={
+                "value": str(value) if value else "",
+            },
+        )
 
-    def serialize_bytes(self, value: bytes) -> dict[str, str]:
-        return {"kind": "bytes", "value": value.hex()}
+    def serialize_bytes(self, value: bytes) -> SerializationUnit:
+        return SerializationUnit(
+            kind="bytes",
+            module_name=bytes.__module__,
+            class_name=bytes.__name__,
+            data={
+                "value": value.hex(),
+            },
+        )
 
-    def serialize_bytes_array(self, value: bytearray) -> dict[str, str]:
-        return {"kind": "bytearray", "value": bytes(value).hex()}
+    def serialize_bytes_array(self, value: bytearray) -> SerializationUnit:
+        return SerializationUnit(
+            kind="bytearray",
+            module_name=bytearray.__module__,
+            class_name=bytearray.__name__,
+            data={
+                "value": bytes(value).hex(),
+            },
+        )
 
-    def serialize_complex(self, value: complex) -> dict[str, Any]:
-        return {
-            "kind": "complex",
-            "real": str(value.real),
-            "imag": str(value.imag),
-        }
+    def serialize_dict(self, value: dict) -> SerializationUnit:
+        return SerializationUnit(
+            kind="dict",
+            module_name=dict.__module__,
+            class_name=dict.__name__,
+            data={
+                "keys": [self.serialize(k) for k in value.keys()],
+                "values": [self.serialize(v) for v in value.values()],
+            },
+        )
 
-    def serialize_dict(self, value: dict) -> dict[str, Any]:
-        return {
-            "kind": "dict",
-            "keys": [self.serialize(k) for k in value.keys()],
-            "values": [self.serialize(v) for v in value.values()],
-        }
+    def serialize_float(self, value: float) -> SerializationUnit:
+        return SerializationUnit(
+            kind="float",
+            module_name=float.__module__,
+            class_name=float.__name__,
+            data={
+                "value": str(value),
+            },
+        )
 
-    def serialize_float(self, value: float) -> dict[str, str]:
-        return {
-            "kind": "float",
-            "value": str(value),
-        }
+    def serialize_frozenset(self, value: frozenset) -> SerializationUnit:
+        return SerializationUnit(
+            kind="frozenset",
+            module_name=frozenset.__module__,
+            class_name=frozenset.__name__,
+            data={
+                "value": [self.serialize(x) for x in value],
+            },
+        )
 
-    def serialize_frozenset(self, value: frozenset) -> dict[str, Any]:
-        return {
-            "kind": "frozenset",
-            "value": [self.serialize(x) for x in value],
-        }
+    def serialize_int(self, value: int) -> SerializationUnit:
+        return SerializationUnit(
+            kind="int",
+            module_name=int.__module__,
+            class_name=int.__name__,
+            data={
+                "value": str(value),
+            },
+        )
 
-    def serialize_int(self, value: int) -> dict[str, str]:
-        return {
-            "kind": "int",
-            "value": str(value),
-        }
+    def serialize_list(self, value: list) -> SerializationUnit:
+        return SerializationUnit(
+            kind="list",
+            module_name=list.__module__,
+            class_name=list.__name__,
+            data={
+                "value": [self.serialize(x) for x in value],
+            },
+        )
 
-    def serialize_list(self, value: list) -> dict[str, Any]:
-        return {
-            "kind": "list",
-            "value": [self.serialize(x) for x in value],
-        }
+    def serialize_range(self, r: range) -> SerializationUnit:
+        return SerializationUnit(
+            kind="range",
+            module_name=range.__module__,
+            class_name=range.__name__,
+            data={
+                "start": self.serialize(r.start),
+                "stop": self.serialize(r.stop),
+                "step": self.serialize(r.step),
+            },
+        )
 
-    def serialize_range(self, r: range) -> dict[str, Any]:
-        return {
-            "kind": "range",
-            "start": self.serialize(r.start),
-            "stop": self.serialize(r.stop),
-            "step": self.serialize(r.step),
-        }
+    def serialize_set(self, value: set) -> SerializationUnit:
+        return SerializationUnit(
+            kind="set",
+            module_name=set.__module__,
+            class_name=set.__name__,
+            data={
+                "value": [self.serialize(x) for x in value],
+            },
+        )
 
-    def serialize_set(self, value: set) -> dict[str, Any]:
-        return {
-            "kind": "set",
-            "value": [self.serialize(x) for x in value],
-        }
+    def serialize_slice(self, value: slice) -> SerializationUnit:
+        return SerializationUnit(
+            kind="slice",
+            module_name=slice.__module__,
+            class_name=slice.__name__,
+            data={
+                "start": self.serialize(value.start),
+                "stop": self.serialize(value.stop),
+                "step": self.serialize(value.step),
+            },
+        )
 
-    def serialize_slice(self, value: slice) -> dict[str, Any]:
-        return {
-            "kind": "slice",
-            "start": self.serialize(value.start),
-            "stop": self.serialize(value.stop),
-            "step": self.serialize(value.step),
-        }
+    def serialize_str(self, value: str) -> SerializationUnit:
+        return SerializationUnit(
+            kind="str",
+            module_name=str.__module__,
+            class_name=str.__name__,
+            data={
+                "value": value,
+            },
+        )
 
-    def serialize_str(self, value: str) -> dict[str, str]:
-        return {
-            "kind": "str",
-            "value": value,
-        }
+    def serialize_none(self, value: None) -> SerializationUnit:
+        return SerializationUnit(
+            kind="none",
+            module_name=type(value).__module__,
+            class_name=type(value).__name__,
+            data={},
+        )
 
-    def serialize_memoryview(self, value: memoryview) -> dict[str, Any]:
-        return {"kind": "memoryview", "value": value.tobytes().hex()}
+    def serialize_tuple(self, value: tuple) -> SerializationUnit:
+        return SerializationUnit(
+            kind="tuple",
+            module_name=tuple.__module__,
+            class_name=tuple.__name__,
+            data={
+                "value": [self.serialize(x) for x in value],
+            },
+        )
 
-    def serialize_none(self, value: None) -> dict[str, str]:
-        return {
-            "kind": "none",
-        }
-
-    def serialize_tuple(self, value: tuple) -> dict[str, Any]:
-        return {
-            "kind": "tuple",
-            "value": [self.serialize(x) for x in value],
-        }
-
-    def serialize_attribute(self, attr: ir.Attribute) -> dict[str, Any]:
+    def serialize_attribute(self, attr: ir.Attribute) -> SerializationUnit:
         if hasattr(attr, "serialize") and callable(getattr(attr, "serialize")):
-            return {
-                "kind": "attribute",
-                "module": attr.__class__.__module__,
-                "name": attr.__class__.__name__,
-                "data": attr.serialize(self),
-            }
+            return SerializationUnit(
+                kind="attribute",
+                module_name=attr.__class__.__module__,
+                class_name=attr.__class__.__name__,
+                data=attr.serialize(self),
+            )
         raise TypeError(
             f"Unsupported attribute type {type(attr)} for serialization. "
             "Provide a serialize()/deserialize() pair (implement SerializerMixin) "
         )
 
-    def serialize_result(self, result: ir.ResultValue) -> dict[str, Any]:
-        return {
-            "kind": "result-value",
-            "id": self._ctx.ssa_idtable[result],
-            "owner": self.serialize_str(self._ctx.stmt_idtable[result.owner]),
-            "index": result.index,
-            "type": self.serialize_attribute(result.type),
-            "name": result.name,
-        }
+    def serialize_result(self, result: ir.ResultValue) -> SerializationUnit:
+        return SerializationUnit(
+            kind="result-value",
+            module_name=ir.ResultValue.__module__,
+            class_name=ir.ResultValue.__name__,
+            data={
+                "kind": "result-value",
+                "id": self._ctx.ssa_idtable[result],
+                "owner": self.serialize_str(self._ctx.stmt_idtable[result.owner]),
+                "index": result.index,
+                "type": self.serialize_attribute(result.type),
+                "name": result.name,
+            },
+        )
 
-    def serialize_type(self, typ: type) -> dict[str, Any]:
-        return {
-            "kind": "type",
-            "module": typ.__module__,
-            "name": typ.__name__,
-        }
+    def serialize_type(self, typ: type) -> SerializationUnit:
+        return SerializationUnit(
+            kind="type", module_name=typ.__module__, class_name=typ.__name__, data={}
+        )
 
-    def serialize_dialect(self, dialect: ir.Dialect) -> dict[str, Any]:
-        return {
-            "kind": "dialect",
-            "name": self.serialize(dialect.name),
-            "stmts": self.serialize(dialect.stmts),
-        }
+    def serialize_dialect(self, dialect: ir.Dialect) -> SerializationUnit:
+        return SerializationUnit(
+            kind="dialect",
+            module_name=ir.Dialect.__module__,
+            class_name=ir.Dialect.__name__,
+            data={
+                "name": self.serialize(dialect.name),
+                "stmts": self.serialize(dialect.stmts),
+            },
+        )
 
-    def serialize_dialect_group(self, group: ir.DialectGroup) -> dict[str, Any]:
-        return {
-            "kind": "dialect_group",
-            "data": self.serialize(group.data),
-        }
+    def serialize_dialect_group(self, group: ir.DialectGroup) -> SerializationUnit:
+        return SerializationUnit(
+            kind="dialect_group",
+            module_name=ir.DialectGroup.__module__,
+            class_name=ir.DialectGroup.__name__,
+            data={
+                "data": self.serialize(group.data),
+            },
+        )

@@ -4,6 +4,7 @@ from dataclasses import field, dataclass
 
 from kirin import ir, types
 from kirin.idtable import IdTable
+from kirin.serialization.base.serializationunit import SerializationUnit
 
 PREFIX = "_method_@"
 PARAM_SEP = "->"
@@ -68,11 +69,18 @@ def mangle(
     return mangled_name
 
 
-def get_cls_from_name(module_name: str | None, class_name: str | None) -> type:
-    if not module_name or not class_name:
-        raise ValueError(f"Type {module_name} or {class_name} cannot be None.")
-    mod = import_module(module_name)
-    cls = getattr(mod, class_name, None)
+def get_cls_from_name(serUnit: SerializationUnit) -> type:
+    if not serUnit.module_name or not serUnit.class_name:
+        raise ValueError(
+            f"Type {serUnit.module_name} or {serUnit.class_name} cannot be None."
+        )
+    mod = import_module(serUnit.module_name)
+    cls = getattr(mod, serUnit.class_name, None)
     if cls is None:
-        raise ImportError(f"Could not find class {class_name} in {module_name}")
+        if serUnit.class_name == "NoneType" and serUnit.module_name == "builtins":
+            return type(None)
+        else:
+            raise ImportError(
+                f"Could not find class {serUnit.class_name} in {serUnit.module_name}"
+            )
     return cls
