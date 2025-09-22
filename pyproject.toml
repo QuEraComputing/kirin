@@ -1,6 +1,6 @@
 [project]
 name = "kirin-toolchain"
-version = "0.17.24"
+version = "0.17.25"
 description = "The Kirin Toolchain for building compilers and interpreters."
 authors = [{ name = "Roger-luo", email = "rluo@quera.com" }]
 dependencies = [
@@ -13,7 +13,7 @@ requires-python = ">= 3.10"
 
 [project.optional-dependencies]
 vmath = [
-    "numpy>=2.2.6",
+    "numpy>1.26.0",
     "scipy>=1.15.3",
 ]
 [build-system]

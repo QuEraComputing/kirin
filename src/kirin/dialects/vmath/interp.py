@@ -15,31 +15,37 @@ class MathMethodTable(MethodTable):
     @impl(stmts.acos)
     def acos(self, interp, frame: Frame, stmt: stmts.acos):
         values = frame.get_values(stmt.args)
-        return (ilist.IList(np.acos(np.asarray(values[0])).tolist(), elem=types.Float),)
+        return (
+            ilist.IList(np.arccos(np.asarray(values[0])).tolist(), elem=types.Float),
+        )
 
     @impl(stmts.asin)
     def asin(self, interp, frame: Frame, stmt: stmts.asin):
         values = frame.get_values(stmt.args)
-        return (ilist.IList(np.asin(np.asarray(values[0])).tolist(), elem=types.Float),)
+        return (
+            ilist.IList(np.arcsin(np.asarray(values[0])).tolist(), elem=types.Float),
+        )
 
     @impl(stmts.asinh)
     def asinh(self, interp, frame: Frame, stmt: stmts.asinh):
         values = frame.get_values(stmt.args)
         return (
-            ilist.IList(np.asinh(np.asarray(values[0])).tolist(), elem=types.Float),
+            ilist.IList(np.arcsinh(np.asarray(values[0])).tolist(), elem=types.Float),
         )
 
     @impl(stmts.atan)
     def atan(self, interp, frame: Frame, stmt: stmts.atan):
         values = frame.get_values(stmt.args)
-        return (ilist.IList(np.atan(np.asarray(values[0])).tolist(), elem=types.Float),)
+        return (
+            ilist.IList(np.arctan(np.asarray(values[0])).tolist(), elem=types.Float),
+        )
 
     @impl(stmts.atan2)
     def atan2(self, interp, frame: Frame, stmt: stmts.atan2):
         values = frame.get_values(stmt.args)
         return (
             ilist.IList(
-                np.atan2(np.asarray(values[0]), np.asarray(values[1])).tolist(),
+                np.arctan2(np.asarray(values[0]), np.asarray(values[1])).tolist(),
                 elem=types.Float,
             ),
         )
@@ -48,7 +54,7 @@ class MathMethodTable(MethodTable):
     def atanh(self, interp, frame: Frame, stmt: stmts.atanh):
         values = frame.get_values(stmt.args)
         return (
-            ilist.IList(np.atanh(np.asarray(values[0])).tolist(), elem=types.Float),
+            ilist.IList(np.arctanh(np.asarray(values[0])).tolist(), elem=types.Float),
         )
 
     @impl(stmts.ceil)
