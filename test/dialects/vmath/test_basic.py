@@ -12,7 +12,7 @@ def acos_func(x):
 
 
 def test_acos():
-    truth = np.acos(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    truth = np.arccos(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     out = acos_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
@@ -25,7 +25,7 @@ def asin_func(x):
 
 
 def test_asin():
-    truth = np.asin(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    truth = np.arcsin(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     out = asin_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
@@ -38,7 +38,7 @@ def asinh_func(x):
 
 
 def test_asinh():
-    truth = np.asinh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    truth = np.arcsinh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     out = asinh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
@@ -51,7 +51,7 @@ def atan_func(x):
 
 
 def test_atan():
-    truth = np.atan(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    truth = np.arctan(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     out = atan_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
@@ -64,7 +64,7 @@ def atan2_func(y, x):
 
 
 def test_atan2():
-    truth = np.atan2(
+    truth = np.arctan2(
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
     )
@@ -83,7 +83,7 @@ def atanh_func(x):
 
 
 def test_atanh():
-    truth = np.atanh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
+    truth = np.arctanh(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     out = atanh_func(ilist.IList([0.42, 0.87, 0.32], elem=types.Float))
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
@@ -368,7 +368,7 @@ def pow_func(x, y):
 
 
 def test_pow():
-    truth = np.pow(
+    truth = np.power(
         ilist.IList([0.42, 0.87, 0.32], elem=types.Float),
         3.33,
     )
