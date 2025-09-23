@@ -5,6 +5,7 @@ from collections.abc import Sequence
 
 from kirin import ir, types
 from kirin.print.printer import Printer
+from kirin.serialization.base.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
@@ -89,20 +90,26 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         return self
 
     def print_impl(self, printer: Printer) -> None:
-        printer.plain_print("IList(")
         printer.print_seq(
             self.data, delim=", ", prefix="[", suffix="]", emit=printer.plain_print
         )
         printer.plain_print(")")
 
-    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
-        return {
-            "data": serializer.serialize(self.data),
-            "elem": serializer.serialize(self.elem),
-        }
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return SerializationUnit(
+            kind="ilist",
+            module_name=IList.__module__,
+            class_name=IList.__name__,
+            data={
+                "data": serializer.serialize(self.data),
+                "elem": serializer.serialize(self.elem),
+            },
+        )
 
     @classmethod
-    def deserialize(cls, data: dict[str, Any], deserializer: "Deserializer") -> "IList":
-        items = deserializer.deserialize(data["data"])
-        elem = deserializer.deserialize(data["elem"])
+    def deserialize(
+        cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> "IList":
+        items = deserializer.deserialize(serUnit.data["data"])
+        elem = deserializer.deserialize(serUnit.data["elem"])
         return IList(items, elem=elem)

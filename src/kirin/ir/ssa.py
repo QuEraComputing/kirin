@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from kirin.ir.use import Use
     from kirin.ir.nodes.stmt import Statement
     from kirin.ir.nodes.block import Block
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
+    from kirin.serialization.base.serializationunit import SerializationUnit
 
 
 @dataclass
@@ -130,6 +133,15 @@ class ResultValue(SSAValue):
             )
         return f"<{type(self).__name__}{type_str} stmt: {self.stmt.name}, uses: {len(self.uses)}>"
 
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_result(self)
+
+    @classmethod
+    def deserialize(
+        cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> Self:
+        return cast(Self, deserializer.deserialize_result(serUnit))
+
 
 @dataclass
 class BlockArgument(SSAValue):
@@ -169,6 +181,15 @@ class BlockArgument(SSAValue):
             with printer.rich(style="comment"):
                 printer.plain_print(" : ")
                 printer.print(self.type)
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_block_argument(self)
+
+    @classmethod
+    def deserialize(
+        cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> Self:
+        return cast(Self, deserializer.deserialize_block_argument(serUnit))
 
 
 @dataclass

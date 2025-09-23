@@ -1,9 +1,10 @@
-from typing import TYPE_CHECKING, Any, Dict, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin import types
 from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
+from kirin.serialization.base.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
@@ -48,16 +49,21 @@ class Signature(Generic[TypeLatticeElem], Attribute):
             return False
         return self.inputs == value.inputs and self.output == value.output
 
-    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
-        return {
-            "inputs": [serializer.serialize(a) for a in self.inputs],
-            "output": (serializer.serialize(self.output)),
-        }
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return SerializationUnit(
+            kind="attribute",
+            module_name=self.__class__.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "inputs": serializer.serialize(self.inputs),
+                "output": serializer.serialize(self.output),
+            },
+        )
 
     @classmethod
     def deserialize(
-        cls, data: Dict[str, Any], deserializer: "Deserializer"
+        cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Signature":
-        inputs = tuple(deserializer.deserialize(a) for a in data["inputs"])
-        output = deserializer.deserialize(data["output"])
+        inputs = deserializer.deserialize(serUnit.data["inputs"])
+        output = deserializer.deserialize(serUnit.data["output"])
         return cls(inputs=inputs, output=output)

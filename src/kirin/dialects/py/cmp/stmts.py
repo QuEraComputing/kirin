@@ -1,11 +1,5 @@
-from typing import TYPE_CHECKING, Any
-
 from kirin import ir, types, lowering
 from kirin.decl import info, statement
-
-if TYPE_CHECKING:
-    from kirin.serialization.base.serializer import Serializer
-    from kirin.serialization.base.deserializer import Deserializer
 
 from ._dialect import dialect
 
@@ -16,22 +10,6 @@ class Cmp(ir.Statement):
     lhs: ir.SSAValue = info.argument()
     rhs: ir.SSAValue = info.argument()
     result: ir.ResultValue = info.result(types.Bool)
-
-    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
-        return {
-            "lhs": serializer.serialize(self.lhs),
-            "rhs": serializer.serialize(self.rhs),
-            "result": serializer.serialize_result(self.result),
-        }
-
-    @classmethod
-    def deserialize(cls, data: dict[str, Any], deserializer: "Deserializer") -> "Cmp":
-        lhs = deserializer.deserialize(data["lhs"])
-        rhs = deserializer.deserialize(data["rhs"])
-        result = deserializer.deserialize_result(data["result"])
-        stmt = cls(lhs=lhs, rhs=rhs)
-        stmt.result = result
-        return stmt
 
 
 @statement(dialect=dialect)

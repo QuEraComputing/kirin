@@ -1,5 +1,3 @@
-from typing import Any, cast
-
 from kirin import ir
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
@@ -7,6 +5,7 @@ from kirin.serialization.base.context import (
     mangle,
     get_str_from_type,
 )
+from kirin.serialization.base.serializable import Serializable
 from kirin.serialization.base.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
@@ -18,8 +17,8 @@ class Serializer:
         self._ctx = SerializationContext()
         self._ctx.clear()
 
-    def encode(self, obj: object) -> SerializationModule:
-        body = self.serialize(obj)
+    def encode(self, obj: ir.Method) -> SerializationModule:
+        body = self.serialize_method(obj)
         if getattr(self._ctx, "Method_Symbol", None):
             st: dict[str, MethodSymbolMeta] = {}
             for mangled, meta in self._ctx.Method_Symbol.items():
@@ -41,7 +40,9 @@ class Serializer:
         return SerializationModule(symbol_table=symbol_table, body=body)
 
     def serialize(self, obj: object) -> SerializationUnit:
-        if isinstance(obj, bool):
+        if isinstance(obj, Serializable):
+            return obj.serialize(self)
+        elif isinstance(obj, bool):
             return self.serialize_boolean(obj)
         elif isinstance(obj, bytes):
             return self.serialize_bytes(obj)
@@ -71,26 +72,6 @@ class Serializer:
             return self.serialize_tuple(obj)
         elif isinstance(obj, type):
             return self.serialize_type(obj)
-        elif isinstance(obj, ir.Method):
-            return self.serialize_method(obj)
-        elif isinstance(obj, ir.BlockArgument):
-            return self.serialize_block_argument(obj)
-        elif isinstance(obj, ir.Statement):
-            return self.serialize_statement(obj)
-        elif isinstance(obj, ir.Region):
-            return self.serialize_region(obj)
-        elif isinstance(obj, ir.Attribute):
-            return self.serialize_attribute(obj)
-        elif isinstance(obj, ir.Block):
-            return self.serialize_block(obj)
-        elif isinstance(obj, ir.ResultValue):
-            return self.serialize_result(obj)
-        elif isinstance(obj, ir.Dialect):
-            return self.serialize_dialect(obj)
-        elif isinstance(obj, ir.DialectGroup):
-            return self.serialize_dialect_group(obj)
-        elif hasattr(obj, "serialize") and callable(getattr(obj, "serialize")):
-            return cast(Any, obj).serialize(self)
         else:
             raise ValueError(
                 f"Unsupported object type {type(obj)} for serialization. Implement 'serialize' method."
@@ -124,7 +105,7 @@ class Serializer:
         else:
             self._ctx.Method_Symbol[mangled] = meta
 
-        return SerializationUnit(
+        out = SerializationUnit(
             kind="method",
             module_name=ir.Method.__module__,
             class_name=ir.Method.__name__,
@@ -136,6 +117,7 @@ class Serializer:
                 "mangled": mangled,
             },
         )
+        return out
 
     def serialize_statement(self, stmt: ir.Statement) -> SerializationUnit:
         return SerializationUnit(
@@ -361,17 +343,9 @@ class Serializer:
         )
 
     def serialize_attribute(self, attr: ir.Attribute) -> SerializationUnit:
-        if hasattr(attr, "serialize") and callable(getattr(attr, "serialize")):
-            return SerializationUnit(
-                kind="attribute",
-                module_name=attr.__class__.__module__,
-                class_name=attr.__class__.__name__,
-                data=attr.serialize(self),
-            )
-        raise TypeError(
-            f"Unsupported attribute type {type(attr)} for serialization. "
-            "Provide a serialize()/deserialize() pair (implement SerializerMixin) "
-        )
+        if not isinstance(attr, Serializable):
+            raise TypeError(f"Attribute {attr} is not Serializable.")
+        return attr.serialize(self)
 
     def serialize_result(self, result: ir.ResultValue) -> SerializationUnit:
         return SerializationUnit(

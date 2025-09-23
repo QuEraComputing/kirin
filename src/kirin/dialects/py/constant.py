@@ -13,15 +13,12 @@ This dialect maps `ast.Constant` nodes to the `Constant` statement.
 from __future__ import annotations
 
 import ast
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from kirin import ir, emit, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
 
-if TYPE_CHECKING:
-    from kirin.serialization.base.serializer import Serializer
-    from kirin.serialization.base.deserializer import Deserializer
 dialect = ir.Dialect("py.constant")
 
 T = TypeVar("T", covariant=True)
@@ -59,23 +56,6 @@ class Constant(ir.Statement, Generic[T]):
             raise TypeError(
                 f"Expected result type to be PyType, got {self.result.type}"
             )
-
-    def serialize(self, serializer: "Serializer") -> dict[str, Any]:
-        return {
-            "op": self.name,
-            "value": serializer.serialize(self.value),
-            "result": serializer.serialize_result(self.result),
-        }
-
-    @classmethod
-    def deserialize(
-        cls, data: dict[str, Any], deserializer: "Deserializer"
-    ) -> "Constant":
-        value = deserializer.deserialize(data["value"])
-        result = deserializer.deserialize_result(data["result"])
-        stmt = cls(value)
-        stmt.result = result
-        return stmt
 
 
 @dialect.register

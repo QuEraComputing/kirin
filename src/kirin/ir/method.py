@@ -9,6 +9,11 @@ from dataclasses import field, dataclass
 from kirin.print.printer import Printer
 from kirin.print.printable import Printable
 
+if typing.TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
+    from kirin.serialization.base.serializationunit import SerializationUnit
+
 from .traits import (
     StaticCall,
     HasSignature,
@@ -202,3 +207,14 @@ class Method(Printable, typing.Generic[Param, RetType]):
 
             callee = trait.get_callee(stmt)
             callee.backedges.add(self)
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_method(self)
+
+    @classmethod
+    def deserialize(
+        cls: type[typing.Self],
+        serUnit: "SerializationUnit",
+        deserializer: "Deserializer",
+    ) -> typing.Self:
+        return typing.cast(typing.Self, deserializer.deserialize_method(serUnit))

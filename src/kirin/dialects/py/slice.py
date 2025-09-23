@@ -9,17 +9,12 @@ This dialect provides a `Slice` statement that represents a slice object in Pyth
 """
 
 import ast
-from typing import TYPE_CHECKING, Any, Dict
 from dataclasses import dataclass
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
 from kirin.dialects.py.constant import Constant
-
-if TYPE_CHECKING:
-    from kirin.serialization.base.serializer import Serializer
-    from kirin.serialization.base.deserializer import Deserializer
 
 dialect = ir.Dialect("py.slice")
 
@@ -93,22 +88,6 @@ class SliceAttribute(ir.Data[slice]):
 
     def print_impl(self, printer: Printer) -> None:
         return printer.plain_print(f"slice({self.start}, {self.stop}, {self.step})")
-
-    def serialize(self, serializer: "Serializer") -> Dict[str, Any]:
-        return {
-            "start": serializer.serialize(self.start),
-            "stop": serializer.serialize(self.stop),
-            "step": serializer.serialize(self.step),
-        }
-
-    @classmethod
-    def deserialize(
-        cls, data: Dict[str, Any], deserializer: "Deserializer"
-    ) -> "SliceAttribute":
-        start = deserializer.deserialize(data["start"])
-        stop = deserializer.deserialize(data["stop"])
-        step = deserializer.deserialize(data["step"])
-        return cls(start=start, stop=stop, step=step)
 
 
 @dialect.register

@@ -69,3 +69,9 @@ def test_deterministic():
     json_serializer2 = JSONSerializer()
     json_s2 = json_serializer2.encode(s2)
     assert json_s1 == json_s2
+
+
+test_deterministic()
+test_round_trip1()
+test_round_trip2()
+test_round_trip3()

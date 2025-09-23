@@ -8,6 +8,7 @@ from kirin.serialization.base.context import (
     mangle,
     get_cls_from_name,
 )
+from kirin.serialization.base.deserializable import Deserializable
 from kirin.serialization.base.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
@@ -36,6 +37,10 @@ class Deserializer:
         return self.deserialize(body)
 
     def deserialize(self, data: SerializationUnit) -> Any:
+        if not hasattr(data, "kind"):
+            raise ValueError(
+                f"Invalid SerializationUnit: {data} missing 'kind' attribute."
+            )
         match data.kind:
             case "bool":
                 return self.deserialize_boolean(data)
@@ -67,30 +72,14 @@ class Deserializer:
                 return self.deserialize_tuple(data)
             case "type":
                 return self.deserialize_type(data)
-            case "method":
-                return self.deserialize_method(data)
-            case "block-arg":
-                return self.deserialize_block_argument(data)
-            case "statement":
-                return self.deserialize_statement(data)
-            case "region":
-                return self.deserialize_region(data)
-            case "region_ref":
-                return self.deserialize_region(data)
-            case "attribute":
-                return self.deserialize_attribute(data)
-            case "block" | "block_ref":
-                return self.deserialize_block(data)
-            case "result-value":
-                return self.deserialize_result(data)
-            case "dialect":
-                return self.deserialize_dialect(data)
-            case "dialect_group":
-                return self.deserialize_dialect_group(data)
             case _:
-                raise ValueError(
-                    f"Unsupported data kind {data.kind} for deserialization."
-                )
+                obj = get_cls_from_name(serUnit=data)
+                if isinstance(obj, Deserializable):
+                    return obj.deserialize(data, self)
+                else:
+                    raise ValueError(
+                        f"Unsupported kind {data.kind} for deserialization."
+                    )
 
     def deserialize_method(self, serUnit: SerializationUnit) -> ir.Method:
         mangled = serUnit.data.get("mangled")
@@ -107,9 +96,8 @@ class Deserializer:
 
         out.sym_name = serUnit.data["sym_name"]
         out.arg_names = serUnit.data.get("arg_names", [])
-        out.dialects = self.deserialize(serUnit.data["dialects"])
-        out.code = self.deserialize(serUnit.data["code"])
-
+        out.dialects = self.deserialize_dialect_group(serUnit.data["dialects"])
+        out.code = self.deserialize_statement(serUnit.data["code"])
         computed = mangle(
             out.sym_name,
             getattr(out, "arg_types", ()),
@@ -296,11 +284,10 @@ class Deserializer:
 
     def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
         cls = get_cls_from_name(serUnit)
-        payload = serUnit.data
-        if getattr(cls, "deserialize", None) and callable(getattr(cls, "deserialize")):
-            return cls.deserialize(payload, self)
-        else:
-            raise ValueError(f"Class {cls} missing deserialize() method.")
+        if not issubclass(cls, Deserializable):
+            raise TypeError(f"Class {cls} is not Deserializable.")
+        assert issubclass(cls, ir.Attribute)
+        return cls.deserialize(serUnit, self)
 
     def deserialize_result(self, serUnit: SerializationUnit) -> ir.ResultValue:
         ssa_name = serUnit.data["id"]
