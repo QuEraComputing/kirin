@@ -1,7 +1,8 @@
 from typing import Any, cast
 
-import kirin.types as types
-from kirin import ir
+from kirin import ir, types
+from kirin.dialects.func.attrs import Signature
+from kirin.dialects.ilist.runtime import IList
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -327,3 +328,57 @@ class Deserializer:
         dialects = self.deserialize_frozenset(serUnit.data["data"])
         cls = get_cls_from_name(serUnit)
         return cls(dialects=dialects)
+
+    def deserialize_pyclass(self, serUnit: SerializationUnit) -> types.PyClass:
+        return types.PyClass(
+            typ=self.deserialize(serUnit.data["typ"]),
+            display_name=self.deserialize(serUnit.data.get("display_name", "")),
+            prefix=self.deserialize(serUnit.data.get("prefix", "")),
+        )
+
+    def deserialize_typevar(self, serUnit: SerializationUnit) -> types.TypeVar:
+        varname = self.deserialize(serUnit.data["varname"])
+        bound = self.deserialize(serUnit.data["bound"])
+        return types.TypeVar(varname, bound)
+
+    def deserialize_generic(self, serUnit: SerializationUnit) -> types.Generic:
+        body = self.deserialize_pyclass(serUnit.data["body"])
+        vars = self.deserialize_tuple(serUnit.data["vars"])
+        vararg = self.deserialize(serUnit.data["vararg"])
+        out = types.Generic(body, *vars)
+        out.vararg = vararg
+        return out
+
+    def deserialize_vararg(self, serUnit: SerializationUnit) -> types.Vararg:
+        typ = self.deserialize(serUnit.data["typ"])
+        return types.Vararg(typ)
+
+    def deserialize_anytype(self, serUnit: SerializationUnit) -> types.AnyType:
+        return types.AnyType()
+
+    def deserialize_bottomtype(self, serUnit: SerializationUnit) -> types.BottomType:
+        return types.BottomType()
+
+    def deserialize_pyattr(self, serUnit: SerializationUnit) -> ir.PyAttr:
+        pytype = self.deserialize(serUnit.data["pytype"])
+        value = self.deserialize(serUnit.data["data"])
+        return ir.PyAttr(value, pytype=pytype)
+
+    def deserialize_literal(self, serUnit: SerializationUnit) -> types.Literal:
+        d = self.deserialize(serUnit.data["value"])
+        type_attr = self.deserialize(serUnit.data["type"])
+        return types.Literal(d, type_attr)
+
+    def deserialize_union(self, serUnit: SerializationUnit) -> types.Union:
+        types = self.deserialize(serUnit.data["types"])
+        return types.Union(types)
+
+    def deserialize_signature(self, serUnit: SerializationUnit) -> Signature:
+        inputs = self.deserialize(serUnit.data["inputs"])
+        output = self.deserialize(serUnit.data["output"])
+        return Signature(inputs=inputs, output=output)
+
+    def deserialize_ilist(self, serUnit: SerializationUnit) -> IList:
+        items = self.deserialize(serUnit.data["data"])
+        elem = self.deserialize(serUnit.data["elem"])
+        return IList(items, elem=elem)

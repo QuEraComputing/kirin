@@ -6,6 +6,8 @@ from types import ModuleType
 # from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
+from typing_extensions import Self
+
 from kirin.print.printer import Printer
 from kirin.print.printable import Printable
 
@@ -213,8 +215,8 @@ class Method(Printable, typing.Generic[Param, RetType]):
 
     @classmethod
     def deserialize(
-        cls: type[typing.Self],
+        cls: type[Self],
         serUnit: "SerializationUnit",
         deserializer: "Deserializer",
-    ) -> typing.Self:
-        return typing.cast(typing.Self, deserializer.deserialize_method(serUnit))
+    ) -> Self:
+        return typing.cast(Self, deserializer.deserialize_method(serUnit))

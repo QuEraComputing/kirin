@@ -102,6 +102,4 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "IList":
-        items = deserializer.deserialize(serUnit.data["data"])
-        elem = deserializer.deserialize(serUnit.data["elem"])
-        return IList(items, elem=elem)
+        return deserializer.deserialize_ilist(serUnit)

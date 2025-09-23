@@ -64,6 +64,4 @@ class PyAttr(Data[T]):
     def deserialize(
         cls: Type["PyAttr"], serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "PyAttr":
-        pytype = deserializer.deserialize(serUnit.data["pytype"])
-        value = deserializer.deserialize(serUnit.data["data"])
-        return PyAttr(value, pytype=pytype)
+        return deserializer.deserialize_pyattr(serUnit)

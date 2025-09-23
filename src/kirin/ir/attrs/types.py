@@ -1,6 +1,6 @@
 import typing
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING
 from dataclasses import dataclass
 from collections.abc import Hashable
 
@@ -108,7 +108,7 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "AnyType":
-        return AnyType()
+        return deserializer.deserialize_anytype(serUnit)
 
 
 @typing.final
@@ -129,9 +129,9 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     @classmethod
     def deserialize(
-        cls, data: Dict[str, Any], deserializer: "Deserializer"
+        cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "BottomType":
-        return BottomType()
+        return deserializer.deserialize_bottomtype(serUnit)
 
 
 class PyClassMeta(TypeAttributeMeta):
@@ -226,11 +226,7 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "PyClass":
-        return PyClass(
-            typ=deserializer.deserialize(serUnit.data["typ"]),
-            display_name=deserializer.deserialize(serUnit.data.get("display_name", "")),
-            prefix=deserializer.deserialize(serUnit.data.get("prefix", "")),
-        )
+        return deserializer.deserialize_pyclass(serUnit)
 
 
 class LiteralMeta(TypeAttributeMeta):
@@ -302,9 +298,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Literal":
-        d = deserializer.deserialize(serUnit.data["value"])
-        type_attr = deserializer.deserialize(serUnit.data["type"])
-        return cls(d, type_attr)
+        return deserializer.deserialize_literal(serUnit)
 
 
 @typing.final
@@ -374,8 +368,7 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Union":
-        types = deserializer.deserialize(serUnit.data["types"])
-        return cls(types)
+        return deserializer.deserialize_union(serUnit)
 
 
 @typing.final
@@ -421,9 +414,7 @@ class TypeVar(TypeAttribute):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "TypeVar":
-        varname = deserializer.deserialize(serUnit.data["varname"])
-        bound = deserializer.deserialize(serUnit.data["bound"])
-        return cls(varname, bound)
+        return deserializer.deserialize_typevar(serUnit)
 
 
 @typing.final
@@ -452,8 +443,7 @@ class Vararg(Attribute):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Vararg":
-        typ = deserializer.deserialize(serUnit.data["typ"])
-        return cls(typ)
+        return deserializer.deserialize_vararg(serUnit)
 
 
 TypeVarValue: typing.TypeAlias = TypeAttribute | Vararg | list
@@ -586,12 +576,7 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Generic":
-        body = deserializer.deserialize(serUnit.data["body"])
-        vars = tuple(deserializer.deserialize(serUnit.data["vars"]))
-        vararg = deserializer.deserialize(serUnit.data["vararg"])
-        out = Generic(body, *vars)
-        out.vararg = vararg
-        return out
+        return deserializer.deserialize_generic(serUnit)
 
 
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:

@@ -56,6 +56,4 @@ class Signature(Generic[TypeLatticeElem], Attribute):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Signature":
-        inputs = deserializer.deserialize(serUnit.data["inputs"])
-        output = deserializer.deserialize(serUnit.data["output"])
-        return cls(inputs=inputs, output=output)
+        return deserializer.deserialize_signature(serUnit)
