@@ -134,13 +134,13 @@ class ResultValue(SSAValue):
         return f"<{type(self).__name__}{type_str} stmt: {self.stmt.name}, uses: {len(self.uses)}>"
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_result(self)
+        return serializer.serialize_resultvalue(self)
 
     @classmethod
     def deserialize(
         cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> Self:
-        return cast(Self, deserializer.deserialize_result(serUnit))
+        return cast(Self, deserializer.deserialize_resultvalue(serUnit))
 
 
 @dataclass
@@ -183,13 +183,13 @@ class BlockArgument(SSAValue):
                 printer.print(self.type)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_block_argument(self)
+        return serializer.serialize_blockargument(self)
 
     @classmethod
     def deserialize(
         cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> Self:
-        return cast(Self, deserializer.deserialize_block_argument(serUnit))
+        return cast(Self, deserializer.deserialize_blockargument(serUnit))
 
 
 @dataclass

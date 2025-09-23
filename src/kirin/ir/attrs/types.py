@@ -102,12 +102,7 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
         return id(self)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="AnyType",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data=dict(),
-        )
+        return serializer.serialize_anytype(self)
 
     @classmethod
     def deserialize(
@@ -130,12 +125,7 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
         return id(self)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="BottomType",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data=dict(),
-        )
+        return serializer.serialize_bottomtype(self)
 
     @classmethod
     def deserialize(
@@ -230,16 +220,7 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
         printer.plain_print(f"!{self.prefix}.", self.display_name)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="PyClass",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data=dict(
-                typ=serializer.serialize_type(self.typ),
-                display_name=serializer.serialize_str(self.display_name),
-                prefix=serializer.serialize_str(self.prefix),
-            ),
-        )
+        return serializer.serialize_pyclass(self)
 
     @classmethod
     def deserialize(
@@ -315,15 +296,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         printer.plain_print("Literal(", repr(self.data), ",", self.type, ")")
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="Literal",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data={
-                "value": serializer.serialize(self.data),
-                "type": serializer.serialize(self.type),
-            },
-        )
+        return serializer.serialize_literal(self)
 
     @classmethod
     def deserialize(
@@ -395,12 +368,7 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
         printer.print_seq(self.types, delim=", ", prefix="[", suffix="]")
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="Union",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data={"types": serializer.serialize(self.types)},
-        )
+        return serializer.serialize_union(self)
 
     @classmethod
     def deserialize(
@@ -447,15 +415,7 @@ class TypeVar(TypeAttribute):
             printer.print(self.bound)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="TypeVar",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data={
-                "varname": serializer.serialize(self.varname),
-                "bound": serializer.serialize(self.bound),
-            },
-        )
+        return serializer.serialize_typevar(self)
 
     @classmethod
     def deserialize(
@@ -486,12 +446,7 @@ class Vararg(Attribute):
         printer.print(self.typ)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="Vararg",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data={"typ": serializer.serialize(self.typ)},
-        )
+        return serializer.serialize_vararg(self)
 
     @classmethod
     def deserialize(
@@ -625,16 +580,7 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         raise TypeError("Type arguments do not match")
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="Generic",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data={
-                "body": serializer.serialize(self.body),
-                "vars": serializer.serialize(self.vars),
-                "vararg": serializer.serialize(self.vararg),
-            },
-        )
+        return serializer.serialize_generic(self)
 
     @classmethod
     def deserialize(

@@ -58,15 +58,7 @@ class PyAttr(Data[T]):
         return self.data
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="PyAttr",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
-            data={
-                "data": serializer.serialize(self.data),
-                "pytype": serializer.serialize(self.type),
-            },
-        )
+        return serializer.serialize_pyattr(self)
 
     @classmethod
     def deserialize(

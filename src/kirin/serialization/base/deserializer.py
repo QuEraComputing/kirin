@@ -20,7 +20,7 @@ class Deserializer:
         self._ctx = SerializationContext()
         self._ctx.clear()
 
-    def decode(self, data: SerializationModule) -> Any:
+    def decode(self, data: SerializationModule) -> ir.Method:
         for mangled, meta in data.symbol_table.items():
             sym_name = meta.get("sym_name", None)
             if sym_name is None:
@@ -34,7 +34,7 @@ class Deserializer:
         body = data.body
         if body is None:
             raise ValueError("Module envelope missing body for decoding.")
-        return self.deserialize(body)
+        return self.deserialize_method(body)
 
     def deserialize(self, data: SerializationUnit) -> Any:
         if not hasattr(data, "kind"):
@@ -115,10 +115,10 @@ class Deserializer:
         out = ir.Statement.__new__(cls)
         self._ctx.Statement_Lookup[data["id"]] = out
         out.dialect = self.deserialize(data["dialect"])
-        out.name = self.deserialize(data["name"])
+        out.name = self.deserialize_str(data["name"])
         out._args = self.deserialize_tuple(data["_args"])
         out._results = self.deserialize_list(data["_results"])
-        out._name_args_slice = self.deserialize(data["_name_args_slice"])
+        out._name_args_slice = self.deserialize_dict(data["_name_args_slice"])
         out.attributes = self.deserialize_dict(data["attributes"])
         out.successors = self.deserialize_list(data["successors"])
         _regions = self.deserialize_list(data["_regions"])
@@ -128,9 +128,7 @@ class Deserializer:
         out._regions = _regions
         return out
 
-    def deserialize_block_argument(
-        self, serUnit: SerializationUnit
-    ) -> ir.BlockArgument:
+    def deserialize_blockargument(self, serUnit: SerializationUnit) -> ir.BlockArgument:
         cls = get_cls_from_name(serUnit=serUnit)
         ssa_name = serUnit.data["id"]
         if ssa_name in self._ctx.SSA_Lookup:
@@ -214,7 +212,7 @@ class Deserializer:
             out = self._ctx.Block_Lookup[block_name]
 
         out._args = tuple(
-            self.deserialize_block_argument(arg_data)
+            self.deserialize_blockargument(arg_data)
             for arg_data in serUnit.data.get("_args", [])
         )
 
@@ -289,7 +287,7 @@ class Deserializer:
         assert issubclass(cls, ir.Attribute)
         return cls.deserialize(serUnit, self)
 
-    def deserialize_result(self, serUnit: SerializationUnit) -> ir.ResultValue:
+    def deserialize_resultvalue(self, serUnit: SerializationUnit) -> ir.ResultValue:
         ssa_name = serUnit.data["id"]
         if ssa_name in self._ctx.SSA_Lookup:
             existing = self._ctx.SSA_Lookup[ssa_name]
@@ -320,12 +318,12 @@ class Deserializer:
         return cls
 
     def deserialize_dialect(self, serUnit: SerializationUnit) -> ir.Dialect:
-        name = self.deserialize(serUnit.data["name"])
-        stmts = self.deserialize(serUnit.data["stmts"])
+        name = self.deserialize_str(serUnit.data["name"])
+        stmts = self.deserialize_list(serUnit.data["stmts"])
         cls = get_cls_from_name(serUnit)
         return cls(name=name, stmts=stmts)
 
     def deserialize_dialect_group(self, serUnit: SerializationUnit) -> ir.DialectGroup:
-        dialects = self.deserialize(serUnit.data["data"])
+        dialects = self.deserialize_frozenset(serUnit.data["data"])
         cls = get_cls_from_name(serUnit)
         return cls(dialects=dialects)

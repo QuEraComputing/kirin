@@ -50,15 +50,7 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         return self.inputs == value.inputs and self.output == value.output
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="attribute",
-            module_name=self.__class__.__module__,
-            class_name=self.__class__.__name__,
-            data={
-                "inputs": serializer.serialize(self.inputs),
-                "output": serializer.serialize(self.output),
-            },
-        )
+        return serializer.serialize_signature(self)
 
     @classmethod
     def deserialize(

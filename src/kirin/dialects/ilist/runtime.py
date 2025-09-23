@@ -96,15 +96,7 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         printer.plain_print(")")
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return SerializationUnit(
-            kind="ilist",
-            module_name=IList.__module__,
-            class_name=IList.__name__,
-            data={
-                "data": serializer.serialize(self.data),
-                "elem": serializer.serialize(self.elem),
-            },
-        )
+        return serializer.serialize_ilist(self)
 
     @classmethod
     def deserialize(
