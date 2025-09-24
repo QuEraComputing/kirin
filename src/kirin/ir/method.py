@@ -126,6 +126,15 @@ class Method(Printable, typing.Generic[Param, RetType]):
         _, ret = interp.run(self, *args, **kwargs)
         return ret
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Method):
+            return False
+        return (
+            self.sym_name == other.sym_name
+            and self.arg_types == other.arg_types
+            and self.return_type == other.return_type
+        )
+
     @property
     def args(self):
         """Return the arguments of the method. (excluding self)"""

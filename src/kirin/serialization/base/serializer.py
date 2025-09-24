@@ -41,7 +41,6 @@ class Serializer:
             symbol_table: dict[str, MethodSymbolMeta] = st
         else:
             symbol_table = dict[str, MethodSymbolMeta]()
-
         return SerializationModule(symbol_table=symbol_table, body=body)
 
     def serialize(
@@ -483,8 +482,8 @@ class Serializer:
     def serialize_union(self, uni: types.Union) -> SerializationUnit:
         return SerializationUnit(
             kind="Union",
-            module_name=self.__module__,
-            class_name=self.__class__.__name__,
+            module_name=uni.__module__,
+            class_name=uni.__class__.__name__,
             data={"types": self.serialize_frozenset(uni.types)},
         )
 

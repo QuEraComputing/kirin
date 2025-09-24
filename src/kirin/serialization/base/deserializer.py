@@ -37,7 +37,13 @@ class Deserializer:
             raise ValueError("Module envelope missing body for decoding.")
         return self.deserialize_method(body)
 
-    def deserialize(self, data: SerializationUnit) -> Any:
+    def deserialize(self, serUnit: SerializationUnit) -> Any:
+        ser_method = getattr(
+            self, "serialize_" + serUnit.class_name.lower(), self.generic_deserialize
+        )
+        return ser_method(serUnit)
+
+    def generic_deserialize(self, data: SerializationUnit) -> Any:
         if not hasattr(data, "kind"):
             raise ValueError(
                 f"Invalid SerializationUnit: {data} missing 'kind' attribute."
@@ -141,7 +147,11 @@ class Deserializer:
             )
 
         blk_name = serUnit.data["blk_id"]
-        block = self._ctx.Block_Lookup[blk_name]
+        if blk_name not in self._ctx.Block_Lookup:
+            block = ir.Block.__new__(ir.Block)
+            self._ctx.Block_Lookup[blk_name] = block
+        else:
+            block = self._ctx.Block_Lookup[blk_name]
         index = serUnit.data["index"]
         typ = self.deserialize_attribute(serUnit.data["type"])
         if not isinstance(typ, types.TypeAttribute):
@@ -370,8 +380,8 @@ class Deserializer:
         return types.Literal(d, type_attr)
 
     def deserialize_union(self, serUnit: SerializationUnit) -> types.Union:
-        types = self.deserialize(serUnit.data["types"])
-        return types.Union(types)
+        ty = self.deserialize_frozenset(serUnit.data["types"])
+        return types.Union(ty)
 
     def deserialize_signature(self, serUnit: SerializationUnit) -> Signature:
         inputs = self.deserialize(serUnit.data["inputs"])
