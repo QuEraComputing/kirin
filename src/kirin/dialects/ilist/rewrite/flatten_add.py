@@ -1,4 +1,5 @@
 from kirin import ir
+from kirin.analysis import const
 from kirin.dialects import py, ilist
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
@@ -6,43 +7,35 @@ from kirin.rewrite.abc import RewriteRule, RewriteResult
 class FlattenAdd(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if not isinstance(node, py.binop.Add):
+        if (
+            not isinstance(node, py.binop.Add)
+            or not node.lhs.type.is_subseteq(ilist.IListType)
+            or not node.rhs.type.is_subseteq(ilist.IListType)
+        ):
             return RewriteResult()
 
         # check if we are adding two ilist.New objects
         new_data = ()
 
         # lhs:
-        if not isinstance(node.lhs.owner, ilist.New):
-            if not (
-                isinstance(node.lhs.owner, py.Constant)
-                and isinstance(
-                    const_ilist := node.lhs.owner.value.unwrap(), ilist.IList
-                )
-                and len(const_ilist.data) == 0
-            ):
-                return RewriteResult()
-
-        else:
-            new_data += node.lhs.owner.values
+        if isinstance((lhs := node.lhs).owner, ilist.New):
+            new_data += lhs.owner.values
+        elif (
+            not isinstance(const_lhs := lhs.hints.get("const"), const.Value)
+            or len(const_lhs.data) > 0
+        ):
+            return RewriteResult()
 
         # rhs:
-        if not isinstance(node.rhs.owner, ilist.New):
-            if not (
-                isinstance(node.rhs.owner, py.Constant)
-                and isinstance(
-                    const_ilist := node.rhs.owner.value.unwrap(), ilist.IList
-                )
-                and len(const_ilist.data) == 0
-            ):
-                return RewriteResult()
-
-        else:
-            new_data += node.rhs.owner.values
+        if isinstance((rhs := node.rhs).owner, ilist.New):
+            new_data += rhs.owner.values
+        elif (
+            not isinstance(const_rhs := rhs.hints.get("const"), const.Value)
+            or len(const_rhs.data) > 0
+        ):
+            return RewriteResult()
 
         new_stmt = ilist.New(values=new_data)
         node.replace_by(new_stmt)
 
-        return RewriteResult(
-            has_done_something=True,
-        )
+        return RewriteResult(has_done_something=True)
