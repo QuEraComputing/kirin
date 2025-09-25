@@ -3,7 +3,7 @@ from kirin.dialects import py, ilist
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 
-class FlattenAddOpIList(RewriteRule):
+class FlattenAdd(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if (
