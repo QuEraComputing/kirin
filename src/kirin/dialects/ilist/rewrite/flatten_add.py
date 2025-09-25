@@ -1,11 +1,8 @@
-from dataclasses import dataclass
-
 from kirin import ir
 from kirin.dialects import py, ilist
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 
-@dataclass
 class FlattenAddOpIList(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
