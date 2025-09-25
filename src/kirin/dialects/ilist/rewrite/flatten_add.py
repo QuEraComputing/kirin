@@ -35,7 +35,6 @@ class FlattenAdd(RewriteRule):
         ):
             return RewriteResult()
 
-        new_stmt = ilist.New(values=new_data)
-        node.replace_by(new_stmt)
+        node.replace_by(ilist.New(values=new_data))
 
         return RewriteResult(has_done_something=True)
