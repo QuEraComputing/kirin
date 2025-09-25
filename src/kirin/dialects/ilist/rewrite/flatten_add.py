@@ -7,10 +7,10 @@ from kirin.rewrite.abc import RewriteRule, RewriteResult
 class FlattenAdd(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if (
-            not isinstance(node, py.binop.Add)
-            or not node.lhs.type.is_subseteq(ilist.IListType)
-            or not node.rhs.type.is_subseteq(ilist.IListType)
+        if not (
+            isinstance(node, py.binop.Add)
+            and node.lhs.type.is_subseteq(ilist.IListType)
+            and node.rhs.type.is_subseteq(ilist.IListType)
         ):
             return RewriteResult()
 
