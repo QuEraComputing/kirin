@@ -210,7 +210,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
             callee = trait.get_callee(stmt)
             callee.backedges.add(self)
 
-    def is_structurally_equal(self, other: object) -> bool:
+    def is_structurally_equal(self, other: object, context: dict) -> bool:
         return (
             isinstance(other, Method)
             and self.dialects.is_structurally_equal(other.dialects)
@@ -218,7 +218,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
             and self.arg_names == other.arg_names
             and self.arg_types == other.arg_types
             and self.return_type == other.return_type
-            and self.code.is_structurally_equal(other.code)
+            and self.code.is_structurally_equal(other.code, context)
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
