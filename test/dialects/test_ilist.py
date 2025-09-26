@@ -199,6 +199,135 @@ def test_inline_get_item():
     assert test_block.is_equal(expected_block)
 
 
+def test_inline_getitem_slice():
+    values = tuple(ir.TestValue() for _ in range(6))
+    test_block = ir.Block(
+        [
+            qreg := ilist.New(values=values),
+            slice_value := py.Constant(slice(2, 5, 1)),
+            py.GetItem(obj=qreg.result, index=slice_value.result),
+        ]
+    )
+    slice_value.result.hints["const"] = const.Value(slice(2, 5, 1))
+
+    rule = rewrite.Walk(ilist.rewrite.InlineGetItem())
+    rule.rewrite(test_block)
+
+    expected_block = ir.Block(
+        [
+            qreg := ilist.New(values=values),
+            slice_value := py.Constant(slice(2, 5, 1)),
+            ilist.New(values=(values[2], values[3], values[4])),
+        ]
+    )
+    assert test_block.is_equal(expected_block)
+
+
+def test_ilist_flatten_add_rhs_empty():
+    values = tuple(ir.TestValue() for _ in range(6))
+    test_block = ir.Block(
+        [
+            lhs := ilist.New(values=values),
+            rhs := py.Constant(ilist.IList([])),
+            py.Add(lhs=lhs.result, rhs=rhs.result),
+        ]
+    )
+    rhs.result.hints["const"] = const.Value(ilist.IList([]))
+
+    rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
+    rule.rewrite(test_block)
+
+    expected_block = ir.Block(
+        [
+            lhs := ilist.New(values=values),
+            rhs := py.Constant(ilist.IList([])),
+            ilist.New(values=values),
+        ]
+    )
+    assert test_block.is_equal(expected_block)
+
+
+def test_ilist_flatten_add_lhs_empty():
+    values = tuple(ir.TestValue() for _ in range(6))
+    test_block = ir.Block(
+        [
+            lhs := py.Constant(ilist.IList([])),
+            rhs := ilist.New(values=values),
+            py.Add(lhs=lhs.result, rhs=rhs.result),
+        ]
+    )
+    lhs.result.hints["const"] = const.Value(ilist.IList([]))
+
+    rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
+    rule.rewrite(test_block)
+
+    expected_block = ir.Block(
+        [
+            lhs := py.Constant(ilist.IList([])),
+            rhs := ilist.New(values=values),
+            ilist.New(values=values),
+        ]
+    )
+    assert test_block.is_equal(expected_block)
+
+
+def test_ilist_flatten_add_lhs_not_empty():
+    values = tuple(ir.TestValue() for _ in range(6))
+    test_block = ir.Block(
+        [
+            lhs := py.Constant(value := ilist.IList([1])),
+            rhs := ilist.New(values=values),
+            py.Add(lhs=lhs.result, rhs=rhs.result),
+        ]
+    )
+    lhs.result.hints["const"] = const.Value(value)
+
+    rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
+    result = rule.rewrite(test_block)
+
+    assert not result.has_done_something
+
+
+def test_ilist_flatten_add_rhs_not_empty():
+    values = tuple(ir.TestValue() for _ in range(6))
+    test_block = ir.Block(
+        [
+            lhs := ilist.New(values=values),
+            rhs := py.Constant(value := ilist.IList([1])),
+            py.Add(lhs=lhs.result, rhs=rhs.result),
+        ]
+    )
+    rhs.result.hints["const"] = const.Value(value)
+
+    rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
+    result = rule.rewrite(test_block)
+
+    assert not result.has_done_something
+
+
+def test_ilist_flatten_add_both_new():
+    lhs_values = tuple(ir.TestValue() for _ in range(6))
+    rhs_values = tuple(ir.TestValue() for _ in range(3))
+    test_block = ir.Block(
+        [
+            lhs := ilist.New(values=lhs_values),
+            rhs := ilist.New(values=rhs_values),
+            py.Add(lhs=lhs.result, rhs=rhs.result),
+        ]
+    )
+    expected_block = ir.Block(
+        [
+            lhs := ilist.New(values=lhs_values),
+            rhs := ilist.New(values=rhs_values),
+            ilist.New(values=lhs_values + rhs_values),
+        ]
+    )
+    rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
+    rule.rewrite(test_block)
+
+    assert test_block.is_equal(expected_block)
+
+
 def test_ilist_constprop():
     from kirin.analysis import const
 
