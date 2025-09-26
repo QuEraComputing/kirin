@@ -46,6 +46,7 @@
             * [passes](kirin/dialects/ilist/passes.md)
             * [rewrite](kirin/dialects/ilist/rewrite/index.md)
                 * [const](kirin/dialects/ilist/rewrite/const.md)
+                * [flatten_add](kirin/dialects/ilist/rewrite/flatten_add.md)
                 * [hint_len](kirin/dialects/ilist/rewrite/hint_len.md)
                 * [inline_getitem](kirin/dialects/ilist/rewrite/inline_getitem.md)
                 * [list](kirin/dialects/ilist/rewrite/list.md)
