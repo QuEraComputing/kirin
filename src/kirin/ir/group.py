@@ -294,6 +294,18 @@ class DialectGroup(Generic[PassParams]):
                 )
             self.symbol_table[name] = stmt
 
+    def is_structurally_equal(self, other: object) -> bool:
+        if not isinstance(other, DialectGroup):
+            return False
+        if len(self.data) != len(other.data):
+            return False
+        x = sorted(self.data, key=lambda d: d.name)
+        y = sorted(other.data, key=lambda d: d.name)
+        for dialect1, dialect2 in zip(x, y):
+            if dialect1.name != dialect2.name:
+                return False
+        return True
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_dialect_group(self)
 

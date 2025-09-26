@@ -561,8 +561,16 @@ class Statement(IRNode["Block"]):
             len(self.args) != len(other.args)
             or len(self.regions) != len(other.regions)
             or len(self.successors) != len(other.successors)
-            or self.attributes != other.attributes
         ):
+            return False
+
+        if self.attributes.keys() == other.attributes.keys():
+            for k, v in self.attributes.items():
+                if hasattr(v, "is_structurally_equal"):
+                    return v.is_structurally_equal(other.attributes[k])
+                else:
+                    return v == other.attributes[k]
+        else:
             return False
 
         if (

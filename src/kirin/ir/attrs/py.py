@@ -57,6 +57,15 @@ class PyAttr(Data[T]):
     def unwrap(self) -> T:
         return self.data
 
+    def is_structurally_equal(self, other: "PyAttr") -> bool:
+        if not isinstance(other, PyAttr):
+            return False
+        if self.type != other.type:
+            return False
+        if hasattr(self.data, "is_structurally_equal"):
+            return self.data.is_structurally_equal(other.data)
+        return self.data == other.data
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_pyattr(self)
 

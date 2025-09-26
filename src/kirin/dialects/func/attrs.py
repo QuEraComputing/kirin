@@ -52,6 +52,9 @@ class Signature(Generic[TypeLatticeElem], Attribute):
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_signature(self)
 
+    def is_structurally_equal(self, other: "Signature") -> bool:
+        return self == other
+
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
