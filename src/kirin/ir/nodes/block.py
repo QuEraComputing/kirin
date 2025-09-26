@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, Iterable, Iterator, cast
 from dataclasses import field, dataclass
 from collections.abc import Sequence
 
@@ -17,6 +17,9 @@ if TYPE_CHECKING:
     from kirin.ir.nodes.stmt import Statement
     from kirin.ir.attrs.types import TypeAttribute
     from kirin.ir.nodes.region import Region
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
+    from kirin.serialization.base.serializationunit import SerializationUnit
 
 
 @dataclass
@@ -467,3 +470,12 @@ class Block(IRNode["Region"]):
         """
         for stmt in self.stmts:
             stmt.verify_type()
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_block(self)
+
+    @classmethod
+    def deserialize(
+        cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> Self:
+        return cast(Self, deserializer.deserialize_block(serUnit))
