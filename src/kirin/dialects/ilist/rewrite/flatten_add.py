@@ -1,4 +1,4 @@
-from kirin import ir
+from kirin import ir, types
 from kirin.analysis import const
 from kirin.dialects import py, ilist
 from kirin.rewrite.abc import RewriteRule, RewriteResult
@@ -35,6 +35,13 @@ class FlattenAdd(RewriteRule):
         ):
             return RewriteResult()
 
-        node.replace_by(ilist.New(values=new_data))
+        assert isinstance(rhs_type := rhs.type, types.Generic), "Impossible"
+        assert isinstance(lhs_type := lhs.type, types.Generic), "Impossible"
+
+        lhs_elem_type = lhs_type.vars[0]
+        rhs_elem_type = rhs_type.vars[0]
+
+        result_elem_type = lhs_elem_type.join(rhs_elem_type)
+        node.replace_by(ilist.New(values=new_data, elem_type=result_elem_type))
 
         return RewriteResult(has_done_something=True)
