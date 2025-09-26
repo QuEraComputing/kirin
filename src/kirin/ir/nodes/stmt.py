@@ -573,9 +573,11 @@ class Statement(IRNode["Block"]):
                     and isinstance(v1, PyAttr)
                     and isinstance(v2, PyAttr)
                 ):
-                    return v1.is_structurally_equal(v2)
+                    if not v1.is_structurally_equal(v2, context):
+                        return False
                 else:
-                    return v1 == v2
+                    if v1 != v2:
+                        return False
         else:
             return False
 
