@@ -2,9 +2,9 @@ from typing import Callable
 from dataclasses import dataclass
 
 from kirin import ir
+from kirin.interp import BaseInterpreter
 from kirin.dialects import cf, func
 from kirin.rewrite.abc import RewriteRule, RewriteResult
-from kirin.interp import BaseInterpreter
 
 # TODO: use func.Constant instead of kirin.dialects.py.stmts.Constant
 from kirin.dialects.py.constant import Constant
@@ -31,9 +31,11 @@ class Inline(RewriteRule):
             return RewriteResult()
 
         # NOTE: a lambda statement is defined and used in the same scope
-        args = BaseInterpreter.permute_values(arg_names=node.callee.arg_names, 
-                                                            values=tuple(node.args),
-                                                            kwarg_names=node.kwargs)
+        args = BaseInterpreter.permute_values(
+            arg_names=node.callee.arg_names,
+            values=tuple(node.args),
+            kwarg_names=node.kwargs,
+        )
         self.inline_call_like(node, tuple(args), lambda_stmt.body)
         return RewriteResult(has_done_something=True)
 
@@ -51,14 +53,12 @@ class Inline(RewriteRule):
             func_self = Constant(node.callee)
             func_self.result.name = node.callee.sym_name
             func_self.insert_before(node)
-            # import ipdb; ipdb.set_trace()
-            args = BaseInterpreter.permute_values(arg_names=node.callee.arg_names, 
-                                                       values=tuple(node.args),
-                                                       kwarg_names=node.kwargs)
-            #import ipdb; ipdb.set_trace() # node.args is in the wrong order
-            self.inline_call_like(
-                node, (func_self.result,) + tuple(args), region
+            args = BaseInterpreter.permute_values(
+                arg_names=node.callee.arg_names,
+                values=tuple(node.args),
+                kwarg_names=node.kwargs,
             )
+            self.inline_call_like(node, (func_self.result,) + tuple(args), region)
             has_done_something = True
 
         return RewriteResult(has_done_something=has_done_something)
