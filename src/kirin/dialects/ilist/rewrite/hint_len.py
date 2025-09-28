@@ -26,7 +26,7 @@ class HintLen(RewriteRule):
             return None
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if not isinstance(node, py.Len):
+        if not isinstance(node, py.Len) or not node.result.type.is_subseteq(types.Int):
             return RewriteResult()
 
         if (coll_len := self._get_collection_len(node.value)) is None:
