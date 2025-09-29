@@ -551,8 +551,12 @@ class Statement(IRNode["Block"]):
         Returns:
             bool: True if the IRNode is structurally equal to the other.
         """
+        if self is other:
+            return True
+
         if context is None:
             context = {}
+        context[self] = other
 
         if self.name != other.name:
             return False
@@ -577,6 +581,12 @@ class Statement(IRNode["Block"]):
             and other.parent is not None
             and context.get(self.parent) != other.parent
         ):
+            print(id(self.parent))
+            self.parent.print()
+            print(id(other.parent))
+            other.parent.print()
+            for c, v in context.items():
+                print("id:", id(c), "value:", id(v))
             return False
 
         if not all(

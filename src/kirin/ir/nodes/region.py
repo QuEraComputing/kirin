@@ -261,7 +261,7 @@ class Region(IRNode["Statement"]):
         """
         if context is None:
             context = {}
-
+        context[self] = other
         if len(self.blocks) != len(other.blocks):
             return False
 
