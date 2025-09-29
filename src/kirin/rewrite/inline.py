@@ -149,5 +149,4 @@ class Inline(RewriteRule):
                 successor=entry_block,
             ).insert_before(call_like)
         call_like.delete()
-        parent_region.print()
         return
