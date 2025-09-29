@@ -36,7 +36,7 @@ class Inline(RewriteRule):
             values=tuple(node.args),
             kwarg_names=node.kwargs,
         )
-        self.inline_call_like(node, tuple(args), lambda_stmt.body)
+        self.inline_call_like(node, args, lambda_stmt.body)
         return RewriteResult(has_done_something=True)
 
     def rewrite_func_Invoke(self, node: func.Invoke) -> RewriteResult:
