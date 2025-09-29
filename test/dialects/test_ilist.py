@@ -244,7 +244,7 @@ def test_ilist_flatten_add_rhs_empty():
             ilist.New(values=values),
         ]
     )
-    assert test_block.is_equal(expected_block)
+    assert test_block.is_structurally_equal(expected_block)
 
 
 def test_ilist_flatten_add_lhs_empty():
@@ -268,7 +268,7 @@ def test_ilist_flatten_add_lhs_empty():
             ilist.New(values=values),
         ]
     )
-    assert test_block.is_equal(expected_block)
+    assert test_block.is_structurally_equal(expected_block)
 
 
 def test_ilist_flatten_add_lhs_not_empty():
@@ -325,7 +325,7 @@ def test_ilist_flatten_add_both_new():
     rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
     rule.rewrite(test_block)
 
-    assert test_block.is_equal(expected_block)
+    assert test_block.is_structurally_equal(expected_block)
 
 
 def test_ilist_constprop():
