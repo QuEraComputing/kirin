@@ -18,7 +18,7 @@ def test_ann_assign():
 
     typeinfer = TypeInference(basic_no_opt)
     _, ret = typeinfer.run(main, types.Int)
-    assert ret.is_equal(types.Int)
+    assert ret.is_structurally_equal(types.Int)
     _, ret = typeinfer.run(main, types.Float)
     assert ret is ret.bottom()
 
@@ -41,9 +41,13 @@ def test_list_assign():
 
     stmt = list_assign.callable_region.blocks[0].stmts.at(3)
     assert isinstance(stmt, ilist.New)
-    assert stmt.elem_type.is_equal(types.Float)
-    assert stmt.result.type.is_equal(ilist.IListType[types.Float, types.Literal(3)])
+    assert stmt.elem_type.is_structurally_equal(types.Float)
+    assert stmt.result.type.is_structurally_equal(
+        ilist.IListType[types.Float, types.Literal(3)]
+    )
 
     stmt = list_assign.callable_region.blocks[0].stmts.at(4)
     assert isinstance(stmt, py.assign.TypeAssert)
-    assert stmt.expected.is_equal(ilist.IListType[types.Float, types.Literal(3)])
+    assert stmt.expected.is_structurally_equal(
+        ilist.IListType[types.Float, types.Literal(3)]
+    )

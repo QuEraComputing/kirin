@@ -73,8 +73,8 @@ def test_getitem_typeinfer():
     assert tuple_const_slice.return_type.is_subseteq(
         types.Tuple[types.Float, types.String]
     )
-    assert tuple_err.return_type.is_equal(types.Bottom)
-    assert tuple_const_err.return_type.is_equal(types.Bottom)
+    assert tuple_err.return_type.is_structurally_equal(types.Bottom)
+    assert tuple_const_err.return_type.is_structurally_equal(types.Bottom)
     assert list_infer.return_type.is_subseteq(types.Int)
     assert list_slice.return_type.is_subseteq(IListType[types.Int])
-    assert unknown.return_type.is_equal(types.Any)
+    assert unknown.return_type.is_structurally_equal(types.Any)

@@ -72,40 +72,40 @@ class TestLattice:
             == const.Unknown()
         )
 
-    def test_is_equal(self):
-        assert const.Unknown().is_equal(const.Unknown())
-        assert not const.Unknown().is_equal(const.Bottom())
-        assert not const.Unknown().is_equal(const.Value(1))
-        assert const.Bottom().is_equal(const.Bottom())
-        assert not const.Bottom().is_equal(const.Value(1))
-        assert const.Value(1).is_equal(const.Value(1))
-        assert not const.Value(1).is_equal(const.Value(2))
-        assert const.PartialTuple((const.Value(1), const.Bottom())).is_equal(
-            const.PartialTuple((const.Value(1), const.Bottom()))
-        )
-        assert not const.PartialTuple((const.Value(1), const.Bottom())).is_equal(
-            const.PartialTuple((const.Value(1), const.Value(2)))
-        )
+    def test_is_structurally_equal(self):
+        assert const.Unknown().is_structurally_equal(const.Unknown())
+        assert not const.Unknown().is_structurally_equal(const.Bottom())
+        assert not const.Unknown().is_structurally_equal(const.Value(1))
+        assert const.Bottom().is_structurally_equal(const.Bottom())
+        assert not const.Bottom().is_structurally_equal(const.Value(1))
+        assert const.Value(1).is_structurally_equal(const.Value(1))
+        assert not const.Value(1).is_structurally_equal(const.Value(2))
+        assert const.PartialTuple(
+            (const.Value(1), const.Bottom())
+        ).is_structurally_equal(const.PartialTuple((const.Value(1), const.Bottom())))
+        assert not const.PartialTuple(
+            (const.Value(1), const.Bottom())
+        ).is_structurally_equal(const.PartialTuple((const.Value(1), const.Value(2))))
 
     def test_partial_tuple(self):
         pt1 = const.PartialTuple((const.Value(1), const.Bottom()))
         pt2 = const.PartialTuple((const.Value(1), const.Bottom()))
-        assert pt1.is_equal(pt2)
+        assert pt1.is_structurally_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt1
         assert pt1.meet(pt2) == pt1
         pt2 = const.PartialTuple((const.Value(1), const.Value(2)))
-        assert not pt1.is_equal(pt2)
+        assert not pt1.is_structurally_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == const.PartialTuple((const.Value(1), const.Value(2)))
         assert pt1.meet(pt2) == const.PartialTuple((const.Value(1), const.Bottom()))
         pt2 = const.PartialTuple((const.Value(1), const.Bottom()))
-        assert pt1.is_equal(pt2)
+        assert pt1.is_structurally_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt1
         assert pt1.meet(pt2) == pt1
         pt2 = const.PartialTuple((const.Value(1), const.Unknown()))
-        assert not pt1.is_equal(pt2)
+        assert not pt1.is_structurally_equal(pt2)
         assert pt1.is_subseteq(pt2)
         assert pt1.join(pt2) == pt2
         assert pt1.meet(pt2) == pt1

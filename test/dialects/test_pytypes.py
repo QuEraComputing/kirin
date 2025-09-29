@@ -33,7 +33,7 @@ def test_union():
     assert PyClass(int) | PyClass(float) == Union(PyClass(int), PyClass(float))
     assert Union(PyClass(int), PyClass(int)) == PyClass(int)
     assert Union(PyClass(int), PyClass(float)) == Union(PyClass(int), PyClass(float))
-    assert Union(Int, Float, BottomType()).is_equal(Union(Int, Float))
+    assert Union(Int, Float, BottomType()).is_structurally_equal(Union(Int, Float))
     assert hash(Union(PyClass(int), PyClass(float))) == hash(
         Union(PyClass(int), PyClass(float))
     )
@@ -110,5 +110,5 @@ def test_generic_topbottom():
     t = Union(Int, Float)
     assert t.join(TypeAttribute.bottom()).is_subseteq(t)
     assert t.meet(TypeAttribute.bottom()).is_subseteq(TypeAttribute.bottom())
-    assert t.join(TypeAttribute.top()).is_equal(TypeAttribute.top())
-    assert t.meet(TypeAttribute.top()).is_equal(t)
+    assert t.join(TypeAttribute.top()).is_structurally_equal(TypeAttribute.top())
+    assert t.meet(TypeAttribute.top()).is_structurally_equal(t)

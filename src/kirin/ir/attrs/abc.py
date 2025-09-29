@@ -55,7 +55,6 @@ class Attribute(ABC, Printable, metaclass=AttributeMeta):
     @abstractmethod
     def __eq__(self, value: object) -> bool: ...
 
-    @abstractmethod
     def is_structurally_equal(self, other: Self, context: dict | None = None) -> bool:
         return self == other
 

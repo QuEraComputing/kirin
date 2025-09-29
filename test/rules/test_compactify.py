@@ -51,7 +51,7 @@ def test_duplicated_branch():
     bb0.stmts.append(none)
     bb0.stmts.append(func.Return(none.result))
 
-    assert code.is_equal(target)
+    assert code.is_structurally_equal(target)
 
 
 def test_cfg_skip_block():
@@ -126,7 +126,7 @@ def test_cfg_skip_block():
     bb1.stmts.extend([none, func.Return(none.result)])
     code.print()
     target.print()
-    assert code.is_equal(target)
+    assert code.is_structurally_equal(target)
 
 
 def test_cfg_pass_around():

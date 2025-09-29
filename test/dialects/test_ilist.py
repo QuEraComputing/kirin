@@ -196,7 +196,7 @@ def test_inline_get_item_integer():
         ]
     )
 
-    assert test_block.is_equal(expected_block)
+    assert test_block.is_structurally_equal(expected_block)
 
 
 def test_inline_getitem_slice():
@@ -220,7 +220,7 @@ def test_inline_getitem_slice():
             ilist.New(values=(values[2], values[3], values[4])),
         ]
     )
-    assert test_block.is_equal(expected_block)
+    assert test_block.is_structurally_equal(expected_block)
 
 
 def test_ilist_constprop():

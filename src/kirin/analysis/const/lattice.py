@@ -84,11 +84,6 @@ class Value(Result):
     def is_subseteq_Value(self, other: "Value") -> bool:
         return self.data == other.data
 
-    def is_equal(self, other: Result) -> bool:
-        if isinstance(other, Value):
-            return self.data == other.data
-        return False
-
     def __hash__(self) -> int:
         # NOTE: we use id here because the data
         # may not be hashable. This is fine because
@@ -100,9 +95,7 @@ class Value(Result):
     ) -> bool:
         if not isinstance(other, Value):
             return False
-        if isinstance(self.data, ir.Attribute) and isinstance(other.data, ir.Attribute):
-            return self.data.is_structurally_equal(other.data, context=context)
-        return self.data.is_structurally_equal(other.data, context=context)
+        return self.data == other.data
 
 
 @dataclass
@@ -159,13 +152,6 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
             )
         return self.bottom()
 
-    def is_equal(self, other: Result) -> bool:
-        if isinstance(other, PartialTuple):
-            return all(x.is_equal(y) for x, y in zip(self.data, other.data))
-        elif isinstance(other, Value) and isinstance(other.data, tuple):
-            return all(x.is_equal(Value(y)) for x, y in zip(self.data, other.data))
-        return False
-
     def is_subseteq_PartialTuple(self, other: "PartialTuple") -> bool:
         return all(x.is_subseteq(y) for x, y in zip(self.data, other.data))
 
@@ -180,14 +166,17 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
     def is_structurally_equal(
         self, other: ir.Attribute, context: dict | None = None
     ) -> bool:
-        if not isinstance(other, PartialTuple):
-            return False
-        if len(self.data) != len(other.data):
-            return False
-        return all(
-            x.is_structurally_equal(y, context=context)
-            for x, y in zip(self.data, other.data)
-        )
+        if isinstance(other, PartialTuple):
+            return all(
+                x.is_structurally_equal(y, context=context)
+                for x, y in zip(self.data, other.data)
+            )
+        elif isinstance(other, Value) and isinstance(other.data, tuple):
+            return all(
+                x.is_structurally_equal(Value(y), context=context)
+                for x, y in zip(self.data, other.data)
+            )
+        return False
 
 
 @final
