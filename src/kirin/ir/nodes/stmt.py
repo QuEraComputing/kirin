@@ -9,7 +9,6 @@ from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue, ResultValue
 from kirin.ir.use import Use
 from kirin.ir.traits import Trait
-from kirin.ir.attrs.py import PyAttr
 from kirin.ir.attrs.abc import Attribute
 from kirin.ir.exception import TypeCheckError, ValidationError
 from kirin.ir.nodes.base import IRNode
@@ -568,16 +567,8 @@ class Statement(IRNode["Block"]):
         if self.attributes.keys() == other.attributes.keys():
             for k, v1 in self.attributes.items():
                 v2 = other.attributes[k]
-                if (
-                    hasattr(v1, "is_structurally_equal")
-                    and isinstance(v1, PyAttr)
-                    and isinstance(v2, PyAttr)
-                ):
-                    if not v1.is_structurally_equal(v2, context):
-                        return False
-                else:
-                    if v1 != v2:
-                        return False
+                if not v1.is_structurally_equal(v2, context):
+                    return False
         else:
             return False
 

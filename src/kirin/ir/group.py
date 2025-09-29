@@ -294,7 +294,9 @@ class DialectGroup(Generic[PassParams]):
                 )
             self.symbol_table[name] = stmt
 
-    def is_structurally_equal(self, other: object, context: dict | None = None) -> bool:
+    def is_structurally_equal(
+        self, other: DialectGroup, context: dict | None = None
+    ) -> bool:
         if not isinstance(other, DialectGroup):
             return False
         if len(self.data) != len(other.data):

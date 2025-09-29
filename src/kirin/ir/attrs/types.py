@@ -101,6 +101,11 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
     def __hash__(self) -> int:
         return id(self)
 
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, AnyType)
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_anytype(self)
 
@@ -123,6 +128,11 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def __hash__(self) -> int:
         return id(self)
+
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, BottomType)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_bottomtype(self)
@@ -219,6 +229,11 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print(f"!{self.prefix}.", self.display_name)
 
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, PyClass) and self.typ == other.typ
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_pyclass(self)
 
@@ -291,6 +306,15 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("Literal(", repr(self.data), ",", self.type, ")")
 
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return (
+            isinstance(other, Literal)
+            and self.data == other.data
+            and self.type.is_equal(other.type)
+        )
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_literal(self)
 
@@ -361,6 +385,11 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
         printer.print_name(self, prefix="!")
         printer.print_seq(self.types, delim=", ", prefix="[", suffix="]")
 
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, Union) and self.types == other.types
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_union(self)
 
@@ -407,6 +436,15 @@ class TypeVar(TypeAttribute):
             printer.plain_print(" : ")
             printer.print(self.bound)
 
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return (
+            isinstance(other, TypeVar)
+            and self.varname == other.varname
+            and self.bound.is_equal(other.bound)
+        )
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_typevar(self)
 
@@ -435,6 +473,11 @@ class Vararg(Attribute):
     def print_impl(self, printer: Printer) -> None:
         printer.plain_print("*")
         printer.print(self.typ)
+
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, Vararg) and self.typ.is_equal(other.typ)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_vararg(self)
@@ -568,6 +611,23 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
                 ):
                     return Generic(self.body, *args, vararg)
         raise TypeError("Type arguments do not match")
+
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        if not isinstance(other, Generic):
+            return False
+        if self.body != other.body:
+            return False
+        if len(self.vars) != len(other.vars):
+            return False
+        if any(not v.is_equal(o) for v, o in zip(self.vars, other.vars)):
+            return False
+        if self.vararg is None and other.vararg is None:
+            return True
+        if self.vararg is not None and other.vararg is not None:
+            return self.vararg.typ.is_equal(other.vararg.typ)
+        return False
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_generic(self)

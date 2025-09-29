@@ -210,7 +210,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
             callee = trait.get_callee(stmt)
             callee.backedges.add(self)
 
-    def is_structurally_equal(self, other: object, context: dict | None = None) -> bool:
+    def is_structurally_equal(self, other: Method, context: dict | None = None) -> bool:
         return (
             isinstance(other, Method)
             and self.dialects.is_structurally_equal(other.dialects)

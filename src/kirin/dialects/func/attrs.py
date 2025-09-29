@@ -53,7 +53,9 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         return serializer.serialize_signature(self)
 
     def is_structurally_equal(
-        self, other: "Signature", context: dict | None = None
+        self,
+        other: Attribute,
+        context: dict | None = None,
     ) -> bool:
         return self == other
 

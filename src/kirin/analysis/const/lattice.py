@@ -51,6 +51,11 @@ class Unknown(Result, metaclass=SingletonLatticeAttributeMeta):
     def __hash__(self) -> int:
         return id(self)
 
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, Unknown)
+
 
 @final
 @dataclass
@@ -62,6 +67,11 @@ class Bottom(Result, metaclass=SingletonLatticeAttributeMeta):
 
     def __hash__(self) -> int:
         return id(self)
+
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, Bottom)
 
 
 @final
@@ -84,6 +94,15 @@ class Value(Result):
         # may not be hashable. This is fine because
         # the data is guaranteed to be unique.
         return id(self)
+
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        if not isinstance(other, Value):
+            return False
+        if isinstance(self.data, ir.Attribute) and isinstance(other.data, ir.Attribute):
+            return self.data.is_structurally_equal(other.data, context=context)
+        return self.data.is_structurally_equal(other.data, context=context)
 
 
 @dataclass
@@ -158,6 +177,18 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
     def __hash__(self) -> int:
         return hash(self.data)
 
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        if not isinstance(other, PartialTuple):
+            return False
+        if len(self.data) != len(other.data):
+            return False
+        return all(
+            x.is_structurally_equal(y, context=context)
+            for x, y in zip(self.data, other.data)
+        )
+
 
 @final
 @dataclass
@@ -229,4 +260,18 @@ class PartialLambda(PartialConst):
             self.code,
             tuple(x.meet(y) for x, y in zip(self.captured, other.captured)),
             self.argnames,
+        )
+
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        return (
+            isinstance(other, PartialLambda)
+            and self.code.is_structurally_equal(other.code, context=context)
+            and self.argnames == other.argnames
+            and len(self.captured) == len(other.captured)
+            and all(
+                x.is_structurally_equal(y, context=context)
+                for x, y in zip(self.captured, other.captured)
+            )
         )

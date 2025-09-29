@@ -95,6 +95,15 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         )
         printer.plain_print(")")
 
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        return (
+            isinstance(other, IList)
+            and self.data == other.data
+            and self.elem.is_equal(other.elem)
+        )
+
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_ilist(self)
 

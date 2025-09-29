@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing_extensions import Protocol, runtime_checkable
 
 from kirin.print import Printer
+from kirin.ir.attrs.abc import Attribute
 from kirin.serialization.base.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
@@ -60,7 +61,7 @@ class PyAttr(Data[T]):
         return self.data
 
     def is_structurally_equal(
-        self, other: "PyAttr", context: dict | None = None
+        self, other: Attribute, context: dict | None = None
     ) -> bool:
         if not isinstance(other, PyAttr):
             return False
