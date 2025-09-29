@@ -277,6 +277,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
     name = "Literal"
     data: LiteralType
     type: TypeAttribute
+
     """type of the literal, this is useful when the Python type of
     data does not represent the type in IR, e.g Literal(1, types.Int32)
     """

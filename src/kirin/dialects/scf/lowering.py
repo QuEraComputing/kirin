@@ -75,12 +75,22 @@ class Lowering(lowering.FromPythonAST):
             and body_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
         ):
             body_frame.push(Yield(*body_yields))
+        else:
+            # TODO: Remove this error when we support early termination in if bodies
+            raise lowering.BuildError(
+                "Early returns/terminators in if bodies are not supported with structured control flow"
+            )
 
         if not (
             else_frame.curr_block.last_stmt
             and else_frame.curr_block.last_stmt.has_trait(ir.IsTerminator)
         ):
             else_frame.push(Yield(*else_yields))
+        else:
+            # TODO: Remove this error when we support early termination in if bodies
+            raise lowering.BuildError(
+                "Early returns/terminators in if bodies are not supported with structured control flow"
+            )
 
         stmt = IfElse(
             cond,
@@ -134,6 +144,11 @@ class Lowering(lowering.FromPythonAST):
             elif body_has_no_terminator:
                 # NOTE: no yields, but also no terminator, add empty yield
                 body_frame.push(Yield())
+            else:
+                # TODO: Remove this error when we support early termination in for loops
+                raise lowering.BuildError(
+                    "Early returns/terminators in for loops are not supported with structured control flow"
+                )
 
         initializers: list[ir.SSAValue] = []
         for name in yields:

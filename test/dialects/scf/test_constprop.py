@@ -1,3 +1,5 @@
+from pytest import mark
+
 from kirin.prelude import structural_no_opt
 from kirin.analysis import const
 from kirin.dialects import scf, func
@@ -69,6 +71,7 @@ def test_nested_loop_with_if_else():
     assert frame.frame_is_not_pure is False
 
 
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_inside_return():
     @structural_no_opt
     def simple_loop(x: float):

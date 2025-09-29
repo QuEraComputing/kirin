@@ -173,7 +173,7 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
             )
         elif isinstance(other, Value) and isinstance(other.data, tuple):
             return all(
-                x.is_structurally_equal(Value(y), context=context)
+                x.is_structurally_equal(y, context=context)
                 for x, y in zip(self.data, other.data)
             )
         return False

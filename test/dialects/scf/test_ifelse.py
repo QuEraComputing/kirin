@@ -1,3 +1,5 @@
+from pytest import mark
+
 from kirin import ir
 from kirin.passes import Fold
 from kirin.prelude import python_basic
@@ -23,6 +25,7 @@ def kernel(self):
     return run_pass
 
 
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_basic_if_else():
     @kernel
     def main(x):
@@ -112,6 +115,7 @@ def test_if_else_defs():
     assert main_nested_if(10) == 0 == main_nested_if2(8)
 
 
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_def_only_else():
     @kernel
     def main(n: int):
@@ -127,6 +131,7 @@ def test_def_only_else():
     assert main(0) == 0.0
 
 
+@mark.xfail(reason="if with early return not supported in scf lowering")
 def test_def_only_else_nested():
     @kernel
     def main(n: int):
