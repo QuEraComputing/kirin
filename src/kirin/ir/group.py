@@ -10,11 +10,14 @@ from typing import (
     Callable,
     ParamSpec,
     Concatenate,
+    cast,
     overload,
 )
 from functools import update_wrapper
 from dataclasses import field, dataclass
 from collections.abc import Iterable
+
+from typing_extensions import Self
 
 from kirin.ir.method import Method
 from kirin.ir.traits import SymbolTable, SymbolOpInterface
@@ -24,6 +27,9 @@ if TYPE_CHECKING:
     from kirin.ir import Dialect, Statement
     from kirin.lowering import Python
     from kirin.registry import Registry
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
+    from kirin.serialization.base.serializationunit import SerializationUnit
 
 PassParams = ParamSpec("PassParams")
 RunPass = Callable[Concatenate[Method, PassParams], None]
@@ -287,6 +293,29 @@ class DialectGroup(Generic[PassParams]):
                     f"duplicate symbol `{name}` in dialect group",
                 )
             self.symbol_table[name] = stmt
+
+    def is_structurally_equal(
+        self, other: DialectGroup, context: dict | None = None
+    ) -> bool:
+        if not isinstance(other, DialectGroup):
+            return False
+        if len(self.data) != len(other.data):
+            return False
+        x = sorted(self.data, key=lambda d: d.name)
+        y = sorted(other.data, key=lambda d: d.name)
+        for dialect1, dialect2 in zip(x, y):
+            if dialect1.name != dialect2.name:
+                return False
+        return True
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_dialect_group(self)
+
+    @classmethod
+    def deserialize(
+        cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> Self:
+        return cast(Self, deserializer.deserialize_dialect_group(serUnit))
 
 
 def dialect_group(

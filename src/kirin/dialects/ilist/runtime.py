@@ -1,10 +1,15 @@
 # TODO: replace with something faster
-from typing import Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 from dataclasses import dataclass
 from collections.abc import Sequence
 
 from kirin import ir, types
 from kirin.print.printer import Printer
+from kirin.serialization.base.serializationunit import SerializationUnit
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 T = TypeVar("T")
 L = TypeVar("L")
@@ -85,8 +90,25 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         return self
 
     def print_impl(self, printer: Printer) -> None:
-        printer.plain_print("IList(")
         printer.print_seq(
             self.data, delim=", ", prefix="[", suffix="]", emit=printer.plain_print
         )
         printer.plain_print(")")
+
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        return (
+            isinstance(other, IList)
+            and self.data == other.data
+            and self.elem.is_equal(other.elem)
+        )
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_ilist(self)
+
+    @classmethod
+    def deserialize(
+        cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> "IList":
+        return deserializer.deserialize_ilist(serUnit)

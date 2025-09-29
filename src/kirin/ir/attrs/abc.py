@@ -2,6 +2,8 @@ from abc import ABC, ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, TypeVar, ClassVar, Optional
 from dataclasses import field, dataclass
 
+from typing_extensions import Self
+
 from kirin.print import Printable
 from kirin.ir.traits import Trait
 from kirin.lattice.abc import LatticeMeta, SingletonMeta
@@ -52,6 +54,10 @@ class Attribute(ABC, Printable, metaclass=AttributeMeta):
 
     @abstractmethod
     def __eq__(self, value: object) -> bool: ...
+
+    @abstractmethod
+    def is_structurally_equal(self, other: Self, context: dict | None = None) -> bool:
+        return self == other
 
     @classmethod
     def has_trait(cls, trait_type: type[Trait["Attribute"]]) -> bool:

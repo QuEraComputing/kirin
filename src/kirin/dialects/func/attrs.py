@@ -1,9 +1,14 @@
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin import types
 from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
+from kirin.serialization.base.serializationunit import SerializationUnit
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 from ._dialect import dialect
 
@@ -38,3 +43,24 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         printer.print_seq(self.inputs, delim=", ", prefix="(", suffix=")")
         printer.plain_print(" -> ")
         printer.print(self.output)
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, Signature):
+            return False
+        return self.inputs == value.inputs and self.output == value.output
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_signature(self)
+
+    def is_structurally_equal(
+        self,
+        other: Attribute,
+        context: dict | None = None,
+    ) -> bool:
+        return self == other
+
+    @classmethod
+    def deserialize(
+        cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> "Signature":
+        return deserializer.deserialize_signature(serUnit)

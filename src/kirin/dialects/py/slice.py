@@ -89,6 +89,16 @@ class SliceAttribute(ir.Data[slice]):
     def print_impl(self, printer: Printer) -> None:
         return printer.plain_print(f"slice({self.start}, {self.stop}, {self.step})")
 
+    def is_structurally_equal(
+        self, other: ir.Attribute, context: dict | None = None
+    ) -> bool:
+        return (
+            isinstance(other, SliceAttribute)
+            and self.start == other.start
+            and self.stop == other.stop
+            and self.step == other.step
+        )
+
 
 @dialect.register
 class Concrete(interp.MethodTable):

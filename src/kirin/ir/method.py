@@ -6,8 +6,15 @@ from types import ModuleType
 # from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
 from dataclasses import field, dataclass
 
+from typing_extensions import Self
+
 from kirin.print.printer import Printer
 from kirin.print.printable import Printable
+
+if typing.TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
+    from kirin.serialization.base.serializationunit import SerializationUnit
 
 from .traits import (
     StaticCall,
@@ -202,3 +209,25 @@ class Method(Printable, typing.Generic[Param, RetType]):
 
             callee = trait.get_callee(stmt)
             callee.backedges.add(self)
+
+    def is_structurally_equal(self, other: Method, context: dict | None = None) -> bool:
+        return (
+            isinstance(other, Method)
+            and self.dialects.is_structurally_equal(other.dialects)
+            and self.sym_name == other.sym_name
+            and self.arg_names == other.arg_names
+            and self.arg_types == other.arg_types
+            and self.return_type == other.return_type
+            and self.code.is_structurally_equal(other.code, context)
+        )
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_method(self)
+
+    @classmethod
+    def deserialize(
+        cls: type[Self],
+        serUnit: "SerializationUnit",
+        deserializer: "Deserializer",
+    ) -> Self:
+        return typing.cast(Self, deserializer.deserialize_method(serUnit))

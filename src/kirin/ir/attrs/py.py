@@ -1,7 +1,15 @@
-from typing import TypeVar
+from typing import TYPE_CHECKING, Any, Type, TypeVar
 from dataclasses import dataclass
 
+from typing_extensions import Protocol, runtime_checkable
+
 from kirin.print import Printer
+from kirin.ir.attrs.abc import Attribute
+from kirin.serialization.base.serializationunit import SerializationUnit
+
+if TYPE_CHECKING:
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
 
 from .data import Data
 from .types import PyClass, TypeAttribute
@@ -51,3 +59,32 @@ class PyAttr(Data[T]):
 
     def unwrap(self) -> T:
         return self.data
+
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        if not isinstance(other, PyAttr):
+            return False
+        if self.type != other.type:
+            return False
+        if isinstance(self.data, StructurallyEqual) and isinstance(
+            other.data, StructurallyEqual
+        ):
+            return self.data.is_structurally_equal(other.data, context=context)
+        return self.data == other.data
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_pyattr(self)
+
+    @classmethod
+    def deserialize(
+        cls: Type["PyAttr"], serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> "PyAttr":
+        return deserializer.deserialize_pyattr(serUnit)
+
+
+@runtime_checkable
+class StructurallyEqual(Protocol):
+    def is_structurally_equal(
+        self, other: Any, context: dict | None = None
+    ) -> bool: ...
