@@ -101,7 +101,7 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         return (
             isinstance(other, IList)
             and self.data == other.data
-            and self.elem.is_equal(other.elem)
+            and self.elem.is_structurally_equal(other.elem, context=context)
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":

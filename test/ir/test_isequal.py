@@ -2,7 +2,7 @@ from kirin import ir, types
 from kirin.dialects import func
 
 
-def test_is_equal_ignoring_hint():
+def test_is_structurally_equal_ignoring_hint():
     block = ir.Block()
     block.args.append_from(types.PyClass(ir.Method), "self")
     source_func = func.Function(
@@ -25,4 +25,4 @@ def test_is_equal_ignoring_hint():
         body=ir.Region(block),
     )
 
-    assert expected_func.is_equal(source_func)
+    assert expected_func.is_structurally_equal(source_func)

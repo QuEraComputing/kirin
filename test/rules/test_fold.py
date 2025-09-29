@@ -42,4 +42,4 @@ def test_const_fold_subroutine():
     fold = ConstantFold()
     Fixpoint(Walk(fold)).rewrite(main.code)
 
-    assert old_main_region.is_equal(main.callable_region)
+    assert old_main_region.is_structurally_equal(main.callable_region)

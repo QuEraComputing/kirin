@@ -84,7 +84,12 @@ class TypeAttribute(
         return self.join(other)
 
     def __eq__(self, value: object) -> bool:
-        return isinstance(value, TypeAttribute) and self.is_equal(value)
+        return isinstance(value, TypeAttribute) and self.is_structurally_equal(value)
+
+    @abstractmethod
+    def is_structurally_equal(
+        self, other: "Attribute", context: dict | None = None
+    ) -> bool: ...
 
     @abstractmethod
     def __hash__(self) -> int: ...
@@ -286,13 +291,6 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
             return False
         return self.data == other.data and self.type == other.type
 
-    def is_equal(self, other: TypeAttribute) -> bool:
-        return (
-            isinstance(other, Literal)
-            and self.type.is_equal(other.type)
-            and self.data == other.data
-        )
-
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.is_subseteq(other.bound)
 
@@ -317,7 +315,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         return (
             isinstance(other, Literal)
             and self.data == other.data
-            and self.type.is_equal(other.type)
+            and self.type.is_structurally_equal(other.type, context=context)
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
@@ -354,9 +352,6 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
             else:
                 types = types.union({typ})
         self.types = types
-
-    def is_equal(self, other: TypeAttribute) -> bool:
-        return isinstance(other, Union) and self.types == other.types
 
     def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
         return all(t.is_subseteq(other) for t in self.types)
@@ -416,13 +411,6 @@ class TypeVar(TypeAttribute):
         self.varname = name
         self.bound = bound or AnyType()
 
-    def is_equal(self, other: TypeAttribute) -> bool:
-        return (
-            isinstance(other, TypeVar)
-            and self.varname == other.varname
-            and self.bound.is_equal(other.bound)
-        )
-
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.bound.is_subseteq(other.bound)
 
@@ -447,7 +435,7 @@ class TypeVar(TypeAttribute):
         return (
             isinstance(other, TypeVar)
             and self.varname == other.varname
-            and self.bound.is_equal(other.bound)
+            and self.bound.is_structurally_equal(other.bound, context=context)
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
@@ -482,7 +470,7 @@ class Vararg(Attribute):
     def is_structurally_equal(
         self, other: Attribute, context: dict | None = None
     ) -> bool:
-        return isinstance(other, Vararg) and self.typ.is_equal(other.typ)
+        return isinstance(other, Vararg) and self.typ.is_structurally_equal(other.typ)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return serializer.serialize_vararg(self)
@@ -626,12 +614,17 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
             return False
         if len(self.vars) != len(other.vars):
             return False
-        if any(not v.is_equal(o) for v, o in zip(self.vars, other.vars)):
+        if any(
+            not v.is_structurally_equal(o, context=context)
+            for v, o in zip(self.vars, other.vars)
+        ):
             return False
         if self.vararg is None and other.vararg is None:
             return True
         if self.vararg is not None and other.vararg is not None:
-            return self.vararg.typ.is_equal(other.vararg.typ)
+            return self.vararg.typ.is_structurally_equal(
+                other.vararg.typ, context=context
+            )
         return False
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":

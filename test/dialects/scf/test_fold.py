@@ -16,4 +16,4 @@ def test_simple_loop():
 
     fold = Fold(structural_no_opt)
     fold(simple_loop)
-    assert target.callable_region.is_equal(simple_loop.callable_region)
+    assert target.callable_region.is_structurally_equal(simple_loop.callable_region)

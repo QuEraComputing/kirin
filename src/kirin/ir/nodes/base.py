@@ -58,25 +58,6 @@ class IRNode(Generic[ParentType], ABC, Printable):
             return self
         return parent.get_root()
 
-    def is_equal(self, other: IRNode, context: dict = {}) -> bool:
-        """Check if the current node is equal to the other node.
-
-        Args:
-            other: The other node to compare.
-            context: The context to store the visited nodes. Defaults to {}.
-
-        Returns:
-            True if the nodes are equal, False otherwise.
-
-        !!! note
-            This method is not the same as the `==` operator. It checks for
-            structural equality rather than identity. To change the behavior
-            of structural equality, override the `is_structurally_equal` method.
-        """
-        if not isinstance(other, type(self)):
-            return False
-        return self.is_structurally_equal(other, context)
-
     def attach(self, parent: ParentType) -> None:
         """Attach the current node to the parent node."""
         assert isinstance(parent, IRNode), f"Expected IRNode, got {type(parent)}"
@@ -116,7 +97,7 @@ class IRNode(Generic[ParentType], ABC, Printable):
 
         !!! note
             This method is for tweaking the behavior of structural equality.
-            To check if two nodes are structurally equal, use the `is_equal` method.
+            To check if two nodes are structurally equal, use the `is_structurally_equal` method.
 
         Args:
             other: The other node to compare.

@@ -49,7 +49,9 @@ class Lattice(ABC, Generic[LatticeType], metaclass=LatticeMeta):
         """Subseteq operation."""
         ...
 
-    def is_equal(self, other: LatticeType) -> bool:
+    def is_structurally_equal(
+        self, other: LatticeType, context: dict | None = None
+    ) -> bool:
         """Check if two lattices are equal."""
         if self is other:
             return True
@@ -61,7 +63,7 @@ class Lattice(ABC, Generic[LatticeType], metaclass=LatticeMeta):
 
     def __eq__(self, value: object) -> bool:
         raise NotImplementedError(
-            "Equality is not implemented for lattices, use is_equal instead"
+            "Equality is not implemented for lattices, use is_structurally_equal instead"
         )
 
     def __hash__(self) -> int:
