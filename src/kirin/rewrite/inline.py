@@ -31,12 +31,13 @@ class Inline(RewriteRule):
             return RewriteResult()
 
         # NOTE: a lambda statement is defined and used in the same scope
+        arg_names = [arg.name for arg in node.callee.owner.body.blocks[0].args]
         args = BaseInterpreter.permute_values(
-            arg_names=node.callee.arg_names,
-            values=tuple(node.args),
+            arg_names=arg_names,
+            values=tuple(node.args[1:]),
             kwarg_names=node.kwargs,
         )
-        self.inline_call_like(node, args, lambda_stmt.body)
+        self.inline_call_like(node, (node.args[0],) + args, lambda_stmt.body)
         return RewriteResult(has_done_something=True)
 
     def rewrite_func_Invoke(self, node: func.Invoke) -> RewriteResult:

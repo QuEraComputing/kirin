@@ -12,8 +12,6 @@ def test_aggressive_inline():
     def main_aggressive(arg0):
         return foo0(arg1=2, arg0=arg0)
 
-    main_aggressive.print()
-
     main_aggressive = main_aggressive.similar()
     aggressive.Fold(main_aggressive.dialects).fixpoint(main_aggressive)
 
@@ -43,8 +41,6 @@ def test_aggressive_inline_pos_args():
     def main_aggressive(arg0):
         return foo2(arg0, 2)
 
-    main_aggressive.print()
-
     assert main_aggressive(1) == -1
 
 
@@ -58,12 +54,23 @@ def test_aggressive_inline_closure():
 
         return foo3(arg1=2, arg0=1)
 
-    main_aggressive.print()
-
     main_aggressive = main_aggressive.similar()
     aggressive.Fold(main_aggressive.dialects).fixpoint(main_aggressive)
 
-    main_aggressive.print()
-    print(main_aggressive(1))
+    assert main_aggressive(1) == 0
+
+
+def test_aggressive_inline_closure_pos_args():
+
+    # @basic(aggressive=False, fold=False, typeinfer=True)
+    @basic
+    def main_aggressive(param: int):
+        def foo3(arg0: int, arg1: int):
+            return arg0 - arg1 + param
+
+        return foo3(1, arg1=2)
+
+    main_aggressive = main_aggressive.similar()
+    aggressive.Fold(main_aggressive.dialects).fixpoint(main_aggressive)
 
     assert main_aggressive(1) == 0
