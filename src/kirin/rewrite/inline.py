@@ -2,6 +2,7 @@ from typing import Callable
 from dataclasses import dataclass
 
 from kirin import ir
+from kirin.interp import BaseInterpreter
 from kirin.dialects import cf, func
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
@@ -30,7 +31,13 @@ class Inline(RewriteRule):
             return RewriteResult()
 
         # NOTE: a lambda statement is defined and used in the same scope
-        self.inline_call_like(node, tuple(node.args), lambda_stmt.body)
+        arg_names = [arg.name for arg in node.callee.owner.body.blocks[0].args]
+        args = BaseInterpreter.permute_values(
+            arg_names=arg_names,
+            values=tuple(node.args[1:]),
+            kwarg_names=node.kwargs,
+        )
+        self.inline_call_like(node, (node.args[0],) + args, lambda_stmt.body)
         return RewriteResult(has_done_something=True)
 
     def rewrite_func_Invoke(self, node: func.Invoke) -> RewriteResult:
@@ -47,9 +54,12 @@ class Inline(RewriteRule):
             func_self = Constant(node.callee)
             func_self.result.name = node.callee.sym_name
             func_self.insert_before(node)
-            self.inline_call_like(
-                node, (func_self.result,) + tuple(arg for arg in node.args), region
+            args = BaseInterpreter.permute_values(
+                arg_names=node.callee.arg_names,
+                values=tuple(node.args),
+                kwarg_names=node.kwargs,
             )
+            self.inline_call_like(node, (func_self.result,) + tuple(args), region)
             has_done_something = True
 
         return RewriteResult(has_done_something=has_done_something)
