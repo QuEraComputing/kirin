@@ -74,3 +74,16 @@ def test_aggressive_inline_closure_pos_args():
     aggressive.Fold(main_aggressive.dialects).fixpoint(main_aggressive)
 
     assert main_aggressive(1) == 0
+
+
+def test_aggressive_inline_closure_alias():
+    @basic(aggressive=True)
+    def main_aggressive2(param: int):
+        def foo4(arg0: int, arg1: int):
+            return arg0 - arg1 + param
+
+        alias_foo4 = foo4
+
+        return alias_foo4(arg1=2, arg0=1)
+
+    assert main_aggressive2(1) == 0
