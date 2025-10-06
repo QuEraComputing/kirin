@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar, ClassVar, Generator
+from typing import Any, Generic, TypeVar, ClassVar, Sequence, Generator
 from contextlib import contextmanager
 from dataclasses import field, dataclass
 
@@ -227,6 +227,8 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         """
         region_trait = node.get_present_trait(ir.RegionInterpretationTrait)
         how = self.registry.get(Signature(region_trait))
+        print(type(node), region_trait, how, node.sym_name)
+
         if how is None:
             raise InterpreterError(
                 f"Interpreter {self.__class__.__name__} does not "
@@ -328,3 +330,41 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
 
     def build_signature(self, frame: FrameType, node: ir.Statement) -> Signature:
         return Signature(node.__class__, tuple(arg.type for arg in node.args))
+
+    @staticmethod
+    def get_args(
+        left_arg_names, args: tuple[ValueType, ...], kwargs: dict[str, ValueType] | None
+    ) -> tuple[ValueType, ...]:
+        if kwargs:
+            # NOTE: #self# is not user input so it is not
+            # in the args, +1 is for self
+            for name in left_arg_names:
+                args += (kwargs[name],)
+        return args
+
+    @staticmethod
+    def permute_values(
+        arg_names: Sequence[str],
+        values: tuple[ValueType, ...],
+        kwarg_names: tuple[str, ...],
+    ) -> tuple[ValueType, ...]:
+        """Permute the arguments according to the method signature and
+        the given keyword arguments, where the keyword argument names
+        refer to the last n arguments in the values tuple.
+
+        Args:
+            arg_names: the argument names
+            values: the values tuple (should not contain method itself)
+            kwarg_names: the keyword argument names
+        """
+        n_total = len(values)
+        if kwarg_names:
+            kwargs = dict(zip(kwarg_names, values[n_total - len(kwarg_names) :]))
+        else:
+            kwargs = None
+
+        positionals = values[: n_total - len(kwarg_names)]
+        args = InterpreterABC.get_args(
+            arg_names[len(positionals) + 1 :], positionals, kwargs
+        )
+        return args
