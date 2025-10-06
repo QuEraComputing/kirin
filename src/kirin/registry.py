@@ -96,6 +96,6 @@ class Registry:
                 for _, member in inspect.getmembers(dialect_table):
                     if isinstance(member, BoundedDef):
                         for sig in member.signature:
-                            registry[sig] = member
-                break
+                            if sig not in registry:
+                                registry[sig] = member
         return registry
