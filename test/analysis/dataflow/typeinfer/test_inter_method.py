@@ -1,7 +1,8 @@
 from pytest import mark
 
 from kirin import types
-from kirin.prelude import basic
+from kirin.prelude import basic, structural
+from kirin.dialects import ilist
 
 
 @mark.xfail(reason="if with early return not supported in scf lowering")
@@ -44,3 +45,16 @@ def test_infer_if_return():
         return b
 
     test.print()
+
+
+def test_method_constant_type_infer():
+
+    @structural(typeinfer=True, fold=False)
+    def _new(qid: int):
+        return 1
+
+    @structural(fold=False, typeinfer=True)
+    def alloc(n_iter: int):
+        return ilist.map(_new, ilist.range(n_iter))
+
+    assert alloc.return_type.is_subseteq(ilist.IListType[types.Literal(1), types.Any])
