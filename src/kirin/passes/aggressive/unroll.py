@@ -30,6 +30,6 @@ class UnrollScf(Pass):
         result = RewriteResult()
         result = Walk(PickIfElse()).rewrite(mt.code).join(result)
         result = Walk(ForLoop()).rewrite(mt.code).join(result)
-        result = self.typeinfer(mt).join(result)
-        result = self.fold(mt).join(result)
+        result = self.fold.unsafe_run(mt).join(result)
+        self.typeinfer.unsafe_run(mt)
         return result
