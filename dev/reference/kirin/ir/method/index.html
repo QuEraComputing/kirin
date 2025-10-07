@@ -12,14 +12,7 @@
     <span class=n>lineno_begin</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>0</span><span class=p>,</span>
     <span class=n>inferred</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="../../print/printable/#kirin.print.printable.Printable">Printable</a></code>, <code><span title="typing.Generic">Generic</span>[<span title="kirin.ir.method.Param">Param</span>, <span title="kirin.ir.method.RetType">RetType</span>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 60</span>
-<span class=normal> 61</span>
-<span class=normal> 62</span>
-<span class=normal> 63</span>
-<span class=normal> 64</span>
-<span class=normal> 65</span>
-<span class=normal> 66</span>
-<span class=normal> 67</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.print.printable.Printable" href="../../print/printable/#kirin.print.printable.Printable">Printable</a></code>, <code><span title="typing.Generic">Generic</span>[<span title="kirin.ir.method.Param">Param</span>, <span title="kirin.ir.method.RetType">RetType</span>]</code></p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 67</span>
 <span class=normal> 68</span>
 <span class=normal> 69</span>
 <span class=normal> 70</span>
@@ -57,7 +50,14 @@
 <span class=normal>102</span>
 <span class=normal>103</span>
 <span class=normal>104</span>
-<span class=normal>105</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>105</span>
+<span class=normal>106</span>
+<span class=normal>107</span>
+<span class=normal>108</span>
+<span class=normal>109</span>
+<span class=normal>110</span>
+<span class=normal>111</span>
+<span class=normal>112</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>dialects</span><span class=p>:</span> <span class=n>DialectGroup</span><span class=p>,</span>
     <span class=n>code</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span>
@@ -121,15 +121,15 @@
 </code></pre></div> <div class="doc doc-contents "> <p>The original Python function. None if no Python function.</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.method.Method.self_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">self_type</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-property"><code>property</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>self_type</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Return the type of the self argument of the method.</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.method.Method.sym_name class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">sym_name</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>sym_name</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=n>sym_name</span>
 </code></pre></div> <div class="doc doc-contents "> <p>The name of the method. None if no name.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.method.Method.update_backedges class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">update_backedges</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>update_backedges</span><span class=p>()</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Update the backedges of callee methods. (if they are static calls)</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>196</span>
-<span class=normal>197</span>
-<span class=normal>198</span>
-<span class=normal>199</span>
-<span class=normal>200</span>
-<span class=normal>201</span>
-<span class=normal>202</span>
-<span class=normal>203</span>
-<span class=normal>204</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>update_backedges</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Update the backedges of callee methods. (if they are static calls)</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>203</span>
+<span class=normal>204</span>
+<span class=normal>205</span>
+<span class=normal>206</span>
+<span class=normal>207</span>
+<span class=normal>208</span>
+<span class=normal>209</span>
+<span class=normal>210</span>
+<span class=normal>211</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>update_backedges</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Update the backedges of callee methods. (if they are static calls)&quot;&quot;&quot;</span>
     <span class=k>for</span> <span class=n>stmt</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>code</span><span class=o>.</span><span class=n>walk</span><span class=p>():</span>
         <span class=n>trait</span> <span class=o>=</span> <span class=n>stmt</span><span class=o>.</span><span class=n>get_trait</span><span class=p>(</span><span class=n>StaticCall</span><span class=p>)</span>
@@ -139,16 +139,16 @@
         <span class=n>callee</span> <span class=o>=</span> <span class=n>trait</span><span class=o>.</span><span class=n>get_callee</span><span class=p>(</span><span class=n>stmt</span><span class=p>)</span>
         <span class=n>callee</span><span class=o>.</span><span class=n>backedges</span><span class=o>.</span><span class=n>add</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.method.Method.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>verify the method body.</p> <p>This will raise a ValidationError if the method body is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>171</span>
-<span class=normal>172</span>
-<span class=normal>173</span>
-<span class=normal>174</span>
-<span class=normal>175</span>
-<span class=normal>176</span>
-<span class=normal>177</span>
-<span class=normal>178</span>
+</code></pre></div> <div class="doc doc-contents "> <p>verify the method body.</p> <p>This will raise a ValidationError if the method body is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>178</span>
 <span class=normal>179</span>
-<span class=normal>180</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>180</span>
+<span class=normal>181</span>
+<span class=normal>182</span>
+<span class=normal>183</span>
+<span class=normal>184</span>
+<span class=normal>185</span>
+<span class=normal>186</span>
+<span class=normal>187</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;verify the method body.</span>
 
 <span class=sd>    This will raise a ValidationError if the method body is not valid.</span>
@@ -159,19 +159,19 @@
         <span class=n>e</span><span class=o>.</span><span class=n>attach</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span>
         <span class=k>raise</span> <span class=n>e</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.method.Method.verify_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify_type</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify_type</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>verify the method type.</p> <p>This will raise a ValidationError if the method type is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>182</span>
-<span class=normal>183</span>
-<span class=normal>184</span>
-<span class=normal>185</span>
-<span class=normal>186</span>
-<span class=normal>187</span>
-<span class=normal>188</span>
-<span class=normal>189</span>
+</code></pre></div> <div class="doc doc-contents "> <p>verify the method type.</p> <p>This will raise a ValidationError if the method type is not valid.</p> <details class=quote> <summary>Source code in <code>src/kirin/ir/method.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>189</span>
 <span class=normal>190</span>
 <span class=normal>191</span>
 <span class=normal>192</span>
 <span class=normal>193</span>
-<span class=normal>194</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>194</span>
+<span class=normal>195</span>
+<span class=normal>196</span>
+<span class=normal>197</span>
+<span class=normal>198</span>
+<span class=normal>199</span>
+<span class=normal>200</span>
+<span class=normal>201</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;verify the method type.</span>
 
 <span class=sd>    This will raise a ValidationError if the method type is not valid.</span>
