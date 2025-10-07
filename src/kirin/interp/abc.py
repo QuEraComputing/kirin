@@ -227,7 +227,6 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         """
         region_trait = node.get_present_trait(ir.RegionInterpretationTrait)
         how = self.registry.get(Signature(region_trait))
-        print(type(node), region_trait, how, node.sym_name)
 
         if how is None:
             raise InterpreterError(
