@@ -581,12 +581,6 @@ class Statement(IRNode["Block"]):
             and other.parent is not None
             and context.get(self.parent) != other.parent
         ):
-            print(id(self.parent))
-            self.parent.print()
-            print(id(other.parent))
-            other.parent.print()
-            for c, v in context.items():
-                print("id:", id(c), "value:", id(v))
             return False
 
         if not all(
