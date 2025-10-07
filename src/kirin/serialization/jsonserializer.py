@@ -6,6 +6,11 @@ from kirin.serialization.base.serializationmodule import SerializationModule
 
 
 class JSONSerializer:
+    """
+    JSON serializer/deserializer for SerializationModule
+    and SerializationUnit.
+    """
+
     def _to_jsonifiable(self, obj: Any) -> Any:
         if isinstance(obj, SerializationModule):
             return {
@@ -47,23 +52,25 @@ class JSONSerializer:
         return obj
 
     def encode(self, data: SerializationModule) -> str:
+        """
+        Top-level function to encode a SerializationModule to a JSON string.
+        Args:
+            data: SerializationModule to encode.
+        Returns:
+            JSON string representation of the SerializationModule.
+        """
         payload = self._to_jsonifiable(data)
         return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
     def decode(self, data: str) -> SerializationModule:
+        """
+        Top-level function to decode a JSON string to a SerializationModule.
+        Args:
+            data: JSON string to decode.
+        Returns:
+            Deserialized SerializationModule."""
         parsed = json.loads(data)
         result = self._from_jsonifiable(parsed)
         if not isinstance(result, SerializationModule):
             raise TypeError("decoded payload is not a SerializationModule")
         return result
-
-    def serialize_serialization_unit(self, unit: SerializationUnit) -> str:
-        payload = self._to_jsonifiable(unit)
-        return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-
-    def deserialize_serialization_unit(self, data: str) -> SerializationUnit:
-        parsed = json.loads(data)
-        obj = self._from_jsonifiable(parsed)
-        if not isinstance(obj, SerializationUnit):
-            raise TypeError("decoded payload is not a SerializationUnit")
-        return obj
