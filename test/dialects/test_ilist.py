@@ -368,10 +368,6 @@ def test_region_boundary():
     assert test_impl.code.is_equal(expected_impl.code)
 
 
-if __name__ == "__main__":
-    test_region_boundary()
-
-
 def test_ilist_constprop():
     from kirin.analysis import const
 
