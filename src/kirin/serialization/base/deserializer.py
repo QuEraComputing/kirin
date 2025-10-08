@@ -103,6 +103,7 @@ class Deserializer:
 
         out.sym_name = serUnit.data["sym_name"]
         out.arg_names = serUnit.data.get("arg_names", [])
+        out.nargs = self.deserialize_int(serUnit.data["nargs"])
         out.dialects = self.deserialize_dialect_group(serUnit.data["dialects"])
         out.code = self.deserialize_statement(serUnit.data["code"])
         computed = mangle(
