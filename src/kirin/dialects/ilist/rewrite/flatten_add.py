@@ -38,7 +38,7 @@ class FlattenAdd(RewriteRule):
             return RewriteResult()
 
         # rhs:
-        if isinstance((rhs := node.rhs).owner, ilist.New):
+        if isinstance(rhs.owner, ilist.New):
             new_data += rhs.owner.values
         elif (
             not isinstance(const_rhs := rhs.hints.get("const"), const.Value)
