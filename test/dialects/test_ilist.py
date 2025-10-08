@@ -345,7 +345,7 @@ def test_region_boundary_structural():
     rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
     rule.rewrite(test_impl.code)
 
-    assert test_impl.code.is_equal(expected_impl.code)
+    assert test_impl.code.is_structurally_equal(expected_impl.code)
 
 
 def test_region_boundary():
@@ -365,7 +365,7 @@ def test_region_boundary():
     rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
     rule.rewrite(test_impl.code)
 
-    assert test_impl.code.is_equal(expected_impl.code)
+    assert test_impl.code.is_structurally_equal(expected_impl.code)
 
 
 def test_ilist_constprop():
