@@ -50,6 +50,3 @@ def test_missing_impl_try_eval_const_pure():
     call_stmt = test.callable_region.blocks[0].stmts.at(5)
     assert isinstance(call_stmt, ilist.Map)
     assert isinstance(call_stmt.result.hints.get("const"), const.Unknown)
-
-
-test_missing_impl_try_eval_const_pure()
