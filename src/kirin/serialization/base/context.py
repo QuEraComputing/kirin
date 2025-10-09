@@ -23,6 +23,7 @@ class SerializationContext:
     blk_idtable: IdTable[ir.Block] = field(default_factory=IdTable[ir.Block])
     region_idtable: IdTable[ir.Region] = field(default_factory=IdTable[ir.Region])
 
+    Dialect_Lookup: dict[str, ir.Dialect] = field(default_factory=dict)
     SSA_Lookup: dict[str, ir.SSAValue] = field(default_factory=dict)
     Statement_Lookup: dict[str, ir.Statement] = field(default_factory=dict)
     Block_Lookup: dict[str, ir.Block] = field(default_factory=dict)
@@ -47,6 +48,7 @@ class SerializationContext:
         self._block_reference_store.clear()
         self.Method_Symbol.clear()
         self.Method_Runtime.clear()
+        self.Dialect_Lookup.clear()
 
 
 def get_str_from_type(typ: types.TypeAttribute) -> str:

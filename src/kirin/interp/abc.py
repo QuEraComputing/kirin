@@ -228,10 +228,6 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         region_trait = node.get_present_trait(ir.RegionInterpretationTrait)
 
         how = self.registry.get(Signature(region_trait))
-        # if how is None:
-        #     print([hash(x) for x in self.registry.keys()])
-        #     print(hash(Signature(region_trait)))
-
         if how is None:
 
             raise InterpreterError(

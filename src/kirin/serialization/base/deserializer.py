@@ -1,3 +1,4 @@
+import importlib
 from typing import Any, cast
 
 from kirin import ir, types
@@ -330,10 +331,21 @@ class Deserializer:
         return cls
 
     def deserialize_dialect(self, serUnit: SerializationUnit) -> ir.Dialect:
-        name = self.deserialize_str(serUnit.data["name"])
-        stmts = self.deserialize_list(serUnit.data["stmts"])
-        cls = get_cls_from_name(serUnit)
-        return cls(name=name, stmts=stmts)
+        name = serUnit.data["name"]
+        if name in self._ctx.Dialect_Lookup:
+            return self._ctx.Dialect_Lookup[name]
+
+        module_name = serUnit.module_name
+        class_name = serUnit.class_name
+        if module_name:
+            mod = importlib.import_module(module_name)
+            candidate = getattr(mod, class_name, None)
+            if isinstance(candidate, ir.Dialect) and candidate.name == name:
+                self._ctx.Dialect_Lookup[name] = candidate
+                return candidate
+        raise ValueError(
+            f"Could not find dialect {name} in module {module_name} class {class_name}"
+        )
 
     def deserialize_dialect_group(self, serUnit: SerializationUnit) -> ir.DialectGroup:
         dialects = self.deserialize_frozenset(serUnit.data["data"])
