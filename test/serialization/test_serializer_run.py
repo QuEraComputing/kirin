@@ -67,13 +67,10 @@ def test_round_trip_sequence_run():
     before = slicing()
     after = decoded()
     assert before == after
-    # json_ser = JSONSerializer()
-    # json_encoded = json_ser.encode(encoded)
-    # json_decoded = json_ser.decode(json_encoded)
-    # decoded_2 = basic.decode(json_decoded)
-    # after2 = decoded_2(10)
-    # assert before == after2 == after
+
+
 test_round_trip_sequence_run()
+
 
 def test_round_trip1_run():
     serializer = Serializer()

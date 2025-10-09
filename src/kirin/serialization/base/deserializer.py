@@ -41,7 +41,6 @@ class Deserializer:
         if serUnit.kind == "attribute":
             return self.deserialize_attribute(serUnit)
 
-
         ser_method = getattr(
             self, "serialize_" + serUnit.class_name.lower(), self.generic_deserialize
         )
@@ -297,19 +296,24 @@ class Deserializer:
         return tuple(self.deserialize(x) for x in serUnit.data.get("value", []))
 
     def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
+        assert serUnit.kind == "attribute"
+        serUnit = serUnit.data["data"]
         # try to see if its a registered attribute in any of the dialects:
         belong_to_dialect = None
         for dialect in self.dialect_group.data:
             if serUnit.module_name == dialect.name:
                 belong_to_dialect = dialect
                 break
-        
+
         if belong_to_dialect is not None:
-            print(belong_to_dialect)
             for cls in belong_to_dialect.attrs:
-                if cls.__name__ == serUnit.class_name and isinstance(cls, Deserializable):
-                    return cls.deserialize(serUnit, self)
-            raise ValueError(f"Attribute class {serUnit.class_name} not found in dialect {belong_to_dialect.name}.")
+                if cls.__name__ == serUnit.class_name and isinstance(
+                    cls, Deserializable
+                ):
+                    return cast(ir.Attribute, cls.deserialize(serUnit, self))
+            raise ValueError(
+                f"Attribute class {serUnit.class_name} not found in dialect {belong_to_dialect.name}."
+            )
 
         # TODO clean this up
         cls = get_cls_from_name(serUnit)
@@ -409,4 +413,3 @@ class Deserializer:
         inputs = self.deserialize(serUnit.data["inputs"])
         output = self.deserialize(serUnit.data["output"])
         return Signature(inputs=inputs, output=output)
-
