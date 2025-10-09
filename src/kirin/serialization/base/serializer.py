@@ -1,6 +1,4 @@
-import typing
 from dataclasses import field, dataclass
-from collections.abc import Sequence
 
 from kirin import ir
 from kirin.serialization.base.context import (
@@ -10,6 +8,7 @@ from kirin.serialization.base.context import (
     get_str_from_type,
 )
 from kirin.serialization.core.serializable import Serializable
+from kirin.serialization.core.supportedtypes import SUPPORTED_PYTHON_TYPES
 from kirin.serialization.core.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
@@ -41,7 +40,20 @@ class Serializer:
         return SerializationModule(symbol_table=symbol_table, body=body)
 
     def serialize(
-        self, obj: Serializable | Sequence[typing.Any] | ir.Attribute | None
+        self,
+        obj: (
+            Serializable
+            | SUPPORTED_PYTHON_TYPES
+            | ir.Attribute
+            | ir.Statement
+            | ir.Block
+            | ir.Region
+            | ir.ResultValue
+            | ir.BlockArgument
+            | ir.Dialect
+            | ir.DialectGroup
+            | ir.Method
+        ),
     ) -> SerializationUnit:
         if isinstance(obj, ir.Attribute):
             return self.serialize_attribute(obj)
