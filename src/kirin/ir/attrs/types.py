@@ -7,8 +7,9 @@ from collections.abc import Hashable
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
 
+from kirin.serialization.serializationunit import SerializationUnit
+
 if TYPE_CHECKING:
-    from kirin.serialization.base.serializationunit import SerializationUnit
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
 
@@ -111,13 +112,18 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
         return isinstance(other, AnyType)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_anytype(self)
+        return SerializationUnit(
+            kind="anytype",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data=dict(),
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "AnyType":
-        return deserializer.deserialize_anytype(serUnit)
+        return AnyType()
 
 
 @typing.final
@@ -139,13 +145,18 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
         return isinstance(other, BottomType)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_bottomtype(self)
+        return SerializationUnit(
+            kind="bottomtype",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data=dict(),
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "BottomType":
-        return deserializer.deserialize_bottomtype(serUnit)
+        return BottomType()
 
 
 class PyClassMeta(TypeAttributeMeta):
@@ -239,13 +250,26 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
         return isinstance(other, PyClass) and self.typ == other.typ
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_pyclass(self)
+        return SerializationUnit(
+            kind="pyclass",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data=dict(
+                typ=serializer.serialize_type(self.typ),
+                display_name=serializer.serialize_str(self.display_name),
+                prefix=serializer.serialize_str(self.prefix),
+            ),
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "PyClass":
-        return deserializer.deserialize_pyclass(serUnit)
+        return PyClass(
+            typ=deserializer.deserialize(serUnit.data["typ"]),
+            display_name=deserializer.deserialize(serUnit.data.get("display_name", "")),
+            prefix=deserializer.deserialize(serUnit.data.get("prefix", "")),
+        )
 
 
 class LiteralMeta(TypeAttributeMeta):
@@ -318,13 +342,23 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_literal(self)
+        return SerializationUnit(
+            kind="literal",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "value": serializer.serialize(self.data),
+                "type": serializer.serialize_attribute(self.type),
+            },
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Literal":
-        return deserializer.deserialize_literal(serUnit)
+        d = deserializer.deserialize(serUnit.data["value"])
+        type_attr = deserializer.deserialize(serUnit.data["type"])
+        return Literal(d, type_attr)
 
 
 @typing.final
@@ -390,13 +424,19 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
         return isinstance(other, Union) and self.types == other.types
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_union(self)
+        return SerializationUnit(
+            kind="Union",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={"types": serializer.serialize_frozenset(self.types)},
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Union":
-        return deserializer.deserialize_union(serUnit)
+        ty = deserializer.deserialize_frozenset(serUnit.data["types"])
+        return Union(ty)
 
 
 @typing.final
@@ -438,13 +478,23 @@ class TypeVar(TypeAttribute):
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_typevar(self)
+        return SerializationUnit(
+            kind="typevar",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "varname": serializer.serialize_str(self.varname),
+                "bound": serializer.serialize_attribute(self.bound),
+            },
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "TypeVar":
-        return deserializer.deserialize_typevar(serUnit)
+        varname = deserializer.deserialize(serUnit.data["varname"])
+        bound = deserializer.deserialize(serUnit.data["bound"])
+        return TypeVar(varname, bound)
 
 
 @typing.final
@@ -472,13 +522,19 @@ class Vararg(Attribute):
         return isinstance(other, Vararg) and self.typ.is_structurally_equal(other.typ)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_vararg(self)
+        return SerializationUnit(
+            kind="vararg",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={"typ": serializer.serialize_attribute(self.typ)},
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Vararg":
-        return deserializer.deserialize_vararg(serUnit)
+        typ = deserializer.deserialize(serUnit.data["typ"])
+        return Vararg(typ)
 
 
 TypeVarValue: typing.TypeAlias = TypeAttribute | Vararg | list
@@ -627,13 +683,27 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         return False
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_generic(self)
+        return SerializationUnit(
+            kind="generic",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "body": serializer.serialize(self.body),
+                "vars": serializer.serialize_tuple(self.vars),
+                "vararg": serializer.serialize(self.vararg),
+            },
+        )
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Generic":
-        return deserializer.deserialize_generic(serUnit)
+        body = deserializer.deserialize(serUnit.data["body"])
+        vars = deserializer.deserialize_tuple(serUnit.data["vars"])
+        vararg = deserializer.deserialize(serUnit.data["vararg"])
+        out = Generic(body, *vars)
+        out.vararg = vararg
+        return out
 
 
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:

@@ -5,9 +5,9 @@ from typing_extensions import Protocol, runtime_checkable
 
 from kirin.print import Printer
 from kirin.ir.attrs.abc import Attribute
+from kirin.serialization.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
-    from kirin.serialization.base.serializationunit import SerializationUnit
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
 
@@ -74,13 +74,23 @@ class PyAttr(Data[T]):
         return self.data == other.data
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_pyattr(self)
+        return SerializationUnit(
+            kind="pyattr",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "data": serializer.serialize(self.data),
+                "pytype": serializer.serialize_attribute(self.type),
+            },
+        )
 
     @classmethod
     def deserialize(
         cls: Type["PyAttr"], serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "PyAttr":
-        return deserializer.deserialize_pyattr(serUnit)
+        pytype = deserializer.deserialize(serUnit.data["pytype"])
+        value = deserializer.deserialize(serUnit.data["data"])
+        return PyAttr(value, pytype=pytype)
 
 
 @runtime_checkable

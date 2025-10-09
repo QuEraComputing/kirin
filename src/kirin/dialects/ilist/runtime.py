@@ -7,7 +7,7 @@ from kirin import ir, types
 from kirin.print.printer import Printer
 from kirin.serialization.base.serializer import Serializer
 from kirin.serialization.base.deserializer import Deserializer
-from kirin.serialization.base.serializationunit import SerializationUnit
+from kirin.serialization.serializationunit import SerializationUnit
 
 from ._dialect import dialect
 

@@ -5,7 +5,7 @@ from typing_extensions import Self
 
 if TYPE_CHECKING:
     from kirin.serialization.base.deserializer import Deserializer
-    from kirin.serialization.base.serializationunit import SerializationUnit
+    from kirin.serialization.serializationunit import SerializationUnit
 
 
 @runtime_checkable

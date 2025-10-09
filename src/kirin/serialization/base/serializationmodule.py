@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from kirin.serialization.base.context import MethodSymbolMeta
-    from kirin.serialization.base.serializationunit import SerializationUnit
+    from kirin.serialization.serializationunit import SerializationUnit
 
 
 class SerializationModule:

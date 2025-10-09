@@ -2,7 +2,7 @@ import typing
 from dataclasses import field, dataclass
 from collections.abc import Sequence
 
-from kirin import ir, types
+from kirin import ir
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -10,7 +10,7 @@ from kirin.serialization.base.context import (
     get_str_from_type,
 )
 from kirin.serialization.base.serializable import Serializable
-from kirin.serialization.base.serializationunit import SerializationUnit
+from kirin.serialization.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
 
@@ -41,7 +41,7 @@ class Serializer:
         return SerializationModule(symbol_table=symbol_table, body=body)
 
     def serialize(
-        self, obj: Serializable | Sequence[typing.Any] | types.TypeAttribute | None
+        self, obj: Serializable | Sequence[typing.Any] | ir.Attribute | None
     ) -> SerializationUnit:
         if isinstance(obj, ir.Attribute):
             return self.serialize_attribute(obj)
@@ -356,6 +356,7 @@ class Serializer:
     def serialize_attribute(self, attr: ir.Attribute) -> SerializationUnit:
         if not isinstance(attr, Serializable):
             raise TypeError(f"Attribute {attr} is not Serializable.")
+        print(attr.__module__, attr.__class__.__name__)
         return SerializationUnit(
             kind="attribute",
             module_name=attr.__module__,
@@ -373,7 +374,7 @@ class Serializer:
                 "id": self._ctx.ssa_idtable[result],
                 "owner": self.serialize_str(self._ctx.stmt_idtable[result.owner]),
                 "index": result.index,
-                "type": self.serialize_attribute(result.type),
+                "type": self.serialize(result.type),
                 "name": result.name,
             },
         )
@@ -399,93 +400,4 @@ class Serializer:
             data={
                 "data": self.serialize_frozenset(group.data),
             },
-        )
-
-    def serialize_pyclass(self, pc: types.PyClass) -> SerializationUnit:
-        return SerializationUnit(
-            kind="pyclass",
-            module_name=pc.__module__,
-            class_name=pc.__class__.__name__,
-            data=dict(
-                typ=self.serialize_type(pc.typ),
-                display_name=self.serialize_str(pc.display_name),
-                prefix=self.serialize_str(pc.prefix),
-            ),
-        )
-
-    def serialize_typevar(self, tv: types.TypeVar) -> SerializationUnit:
-        return SerializationUnit(
-            kind="typevar",
-            module_name=tv.__module__,
-            class_name=tv.__class__.__name__,
-            data={
-                "varname": self.serialize_str(tv.varname),
-                "bound": self.serialize_attribute(tv.bound),
-            },
-        )
-
-    def serialize_generic(self, gen: types.Generic) -> SerializationUnit:
-        return SerializationUnit(
-            kind="generic",
-            module_name=gen.__module__,
-            class_name=gen.__class__.__name__,
-            data={
-                "body": self.serialize_pyclass(gen.body),
-                "vars": self.serialize_tuple(gen.vars),
-                "vararg": self.serialize(gen.vararg),
-            },
-        )
-
-    def serialize_vararg(self, var: types.Vararg) -> SerializationUnit:
-        return SerializationUnit(
-            kind="vararg",
-            module_name=var.__module__,
-            class_name=var.__class__.__name__,
-            data={"typ": self.serialize_attribute(var.typ)},
-        )
-
-    def serialize_anytype(self, at: types.AnyType) -> SerializationUnit:
-        return SerializationUnit(
-            kind="anytype",
-            module_name=at.__module__,
-            class_name=at.__class__.__name__,
-            data=dict(),
-        )
-
-    def serialize_bottomtype(self, bt: types.BottomType) -> SerializationUnit:
-        return SerializationUnit(
-            kind="bottomtype",
-            module_name=bt.__module__,
-            class_name=bt.__class__.__name__,
-            data=dict(),
-        )
-
-    def serialize_pyattr(self, pa: ir.PyAttr) -> SerializationUnit:
-        return SerializationUnit(
-            kind="pyattr",
-            module_name=pa.__module__,
-            class_name=pa.__class__.__name__,
-            data={
-                "data": self.serialize(pa.data),
-                "pytype": self.serialize_attribute(pa.type),
-            },
-        )
-
-    def serialize_literal(self, lit: types.Literal) -> SerializationUnit:
-        return SerializationUnit(
-            kind="literal",
-            module_name=lit.__module__,
-            class_name=lit.__class__.__name__,
-            data={
-                "value": self.serialize(lit.data),
-                "type": self.serialize_attribute(lit.type),
-            },
-        )
-
-    def serialize_union(self, uni: types.Union) -> SerializationUnit:
-        return SerializationUnit(
-            kind="Union",
-            module_name=uni.__module__,
-            class_name=uni.__class__.__name__,
-            data={"types": self.serialize_frozenset(uni.types)},
         )

@@ -4,7 +4,7 @@ from dataclasses import field, dataclass
 
 from kirin import ir, types
 from kirin.idtable import IdTable
-from kirin.serialization.base.serializationunit import SerializationUnit
+from kirin.serialization.serializationunit import SerializationUnit
 
 PREFIX = "_method_@"
 PARAM_SEP = "->"

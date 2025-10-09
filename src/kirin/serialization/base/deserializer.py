@@ -1,15 +1,15 @@
-from typing import Any, cast
+from typing import Any
 from dataclasses import field, dataclass
 
-from kirin import ir, types
+from kirin import ir
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
     mangle,
     get_cls_from_name,
 )
+from kirin.serialization.serializationunit import SerializationUnit
 from kirin.serialization.base.deserializable import Deserializable
-from kirin.serialization.base.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
 
@@ -36,7 +36,11 @@ class Deserializer:
         return self.deserialize_method(body)
 
     def deserialize(self, serUnit: SerializationUnit) -> Any:
-        if serUnit.kind == "attribute":
+        if serUnit.kind == "pyattr":
+            return self.deserialize_pyattr(serUnit)
+        elif serUnit.kind == "type-attribute":
+            return self.deserialize_type_attribute(serUnit)
+        elif serUnit.kind == "custom-attribute":
             return self.deserialize_attribute(serUnit)
 
         ser_method = getattr(
@@ -156,9 +160,7 @@ class Deserializer:
             block = self._ctx.Block_Lookup[blk_name]
         index = serUnit.data["index"]
         typ = self.deserialize_attribute(serUnit.data["type"])
-        if not isinstance(typ, types.TypeAttribute):
-            raise TypeError(f"Expected a TypeAttribute, got {type(typ)!r}: {typ!r}")
-        out = cls(block=block, index=index, type=cast(types.TypeAttribute, typ))
+        out = cls(block=block, index=index, type=typ)
         out._name = serUnit.data.get("name", None)
         self._ctx.SSA_Lookup[ssa_name] = out
 
@@ -293,32 +295,45 @@ class Deserializer:
     def deserialize_tuple(self, serUnit: SerializationUnit) -> tuple:
         return tuple(self.deserialize(x) for x in serUnit.data.get("value", []))
 
-    def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
-        assert serUnit.kind == "attribute"
-        serUnit = serUnit.data["data"]
-        # try to see if its a registered attribute in any of the dialects:
-        belong_to_dialect = None
-        for dialect in self.dialect_group.data:
-            if serUnit.module_name == dialect.name:
-                belong_to_dialect = dialect
-                break
+    # def deserialize_type_attribute(self, serUnit: SerializationUnit) -> types.TypeAttribute:
+    #     assert serUnit.kind == "type-attribute"
+    #     serUnit = serUnit.data["data"]
+    #     cls = get_cls_from_name(serUnit)
+    #     if not issubclass(cls, Deserializable):
+    #         raise TypeError(f"Class {cls} is not Deserializable.")
+    #     return cls.deserialize(serUnit, self)
 
-        if belong_to_dialect is not None:
-            for cls in belong_to_dialect.attrs:
-                if cls.__name__ == serUnit.class_name and isinstance(
-                    cls, Deserializable
-                ):
-                    return cast(ir.Attribute, cls.deserialize(serUnit, self))
-            raise ValueError(
-                f"Attribute class {serUnit.class_name} not found in dialect {belong_to_dialect.name}."
-            )
+    # def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
+    #     assert serUnit.kind == "attribute"
 
-        # TODO clean this up
-        cls = get_cls_from_name(serUnit)
-        if not issubclass(cls, Deserializable):
-            raise TypeError(f"Class {cls} is not Deserializable.")
-        assert issubclass(cls, ir.Attribute)
-        return cls.deserialize(serUnit, self)
+    #     serUnit = serUnit.data["data"]
+    #     cls = get_cls_from_name(serUnit)
+    #     print(cls)
+
+    #     if serUnit.kind == "pyattr":
+    #         return self.deserialize_pyattr(serUnit)
+    #     elif serUnit.kind == "custom-attribute":
+    #         serUnit = serUnit.data["data"]
+    #         # try to see if its a registered attribute in any of the dialects:
+    #         belong_to_dialect = None
+    #         for dialect in self.dialect_group.data:
+    #             if serUnit.module_name == dialect.name:
+    #                 belong_to_dialect = dialect
+    #                 break
+
+    #         if belong_to_dialect is not None:
+    #             for cls in belong_to_dialect.attrs:
+    #                 if cls.__name__ == serUnit.class_name and isinstance(
+    #                     cls, Deserializable
+    #                 ):
+    #                     return cast(ir.Attribute, cls.deserialize(serUnit, self))
+    #             raise ValueError(
+    #                 f"Attribute class {serUnit.class_name} not found in dialect {belong_to_dialect.name}."
+    #             )
+    #         else:
+    #             raise ValueError(
+    #                 f"Dialect {serUnit.module_name} not found in dialect group {self.dialect_group}."
+    #             )
 
     def deserialize_resultvalue(self, serUnit: SerializationUnit) -> ir.ResultValue:
         ssa_name = serUnit.data["id"]
@@ -331,15 +346,11 @@ class Deserializer:
             )
         index = int(serUnit.data["index"])
 
-        typ = self.deserialize_attribute(serUnit.data["type"])
-        if typ is None or not isinstance(typ, types.TypeAttribute):
-            raise TypeError(f"Expected a TypeAttribute, got {type(typ)!r}: {typ!r}")
+        typ = self.deserialize(serUnit.data["type"])
         owner: ir.Statement = self._ctx.Statement_Lookup[
             self.deserialize_str(serUnit.data["owner"])
         ]
-        out = ir.ResultValue(
-            stmt=owner, index=index, type=cast(types.TypeAttribute, typ)
-        )
+        out = ir.ResultValue(stmt=owner, index=index, type=typ)
         out.name = serUnit.data.get("name", None)
 
         self._ctx.SSA_Lookup[ssa_name] = out
@@ -362,47 +373,3 @@ class Deserializer:
         dialects = self.deserialize_frozenset(serUnit.data["data"])
         cls = get_cls_from_name(serUnit)
         return cls(dialects=dialects)
-
-    def deserialize_pyclass(self, serUnit: SerializationUnit) -> types.PyClass:
-        return types.PyClass(
-            typ=self.deserialize(serUnit.data["typ"]),
-            display_name=self.deserialize(serUnit.data.get("display_name", "")),
-            prefix=self.deserialize(serUnit.data.get("prefix", "")),
-        )
-
-    def deserialize_typevar(self, serUnit: SerializationUnit) -> types.TypeVar:
-        varname = self.deserialize(serUnit.data["varname"])
-        bound = self.deserialize(serUnit.data["bound"])
-        return types.TypeVar(varname, bound)
-
-    def deserialize_generic(self, serUnit: SerializationUnit) -> types.Generic:
-        body = self.deserialize_pyclass(serUnit.data["body"])
-        vars = self.deserialize_tuple(serUnit.data["vars"])
-        vararg = self.deserialize(serUnit.data["vararg"])
-        out = types.Generic(body, *vars)
-        out.vararg = vararg
-        return out
-
-    def deserialize_vararg(self, serUnit: SerializationUnit) -> types.Vararg:
-        typ = self.deserialize(serUnit.data["typ"])
-        return types.Vararg(typ)
-
-    def deserialize_anytype(self, serUnit: SerializationUnit) -> types.AnyType:
-        return types.AnyType()
-
-    def deserialize_bottomtype(self, serUnit: SerializationUnit) -> types.BottomType:
-        return types.BottomType()
-
-    def deserialize_pyattr(self, serUnit: SerializationUnit) -> ir.PyAttr:
-        pytype = self.deserialize(serUnit.data["pytype"])
-        value = self.deserialize(serUnit.data["data"])
-        return ir.PyAttr(value, pytype=pytype)
-
-    def deserialize_literal(self, serUnit: SerializationUnit) -> types.Literal:
-        d = self.deserialize(serUnit.data["value"])
-        type_attr = self.deserialize(serUnit.data["type"])
-        return types.Literal(d, type_attr)
-
-    def deserialize_union(self, serUnit: SerializationUnit) -> types.Union:
-        ty = self.deserialize_frozenset(serUnit.data["types"])
-        return types.Union(ty)
