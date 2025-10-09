@@ -1,4 +1,5 @@
 import typing
+from dataclasses import field, dataclass
 from collections.abc import Sequence
 
 from kirin import ir, types
@@ -13,14 +14,12 @@ from kirin.serialization.base.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
 
+@dataclass
 class Serializer:
-    _ctx: SerializationContext
-
-    def __init__(self) -> None:
-        self._ctx = SerializationContext()
-        self._ctx.clear()
+    _ctx: SerializationContext = field(default_factory=SerializationContext)
 
     def encode(self, obj: ir.Method) -> SerializationModule:
+        self._ctx.clear()
         body = self.serialize_method(obj)
         if getattr(self._ctx, "Method_Symbol", None):
             st: dict[str, MethodSymbolMeta] = {}

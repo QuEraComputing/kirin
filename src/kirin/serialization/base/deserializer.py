@@ -1,4 +1,5 @@
 from typing import Any, cast
+from dataclasses import field, dataclass
 
 from kirin import ir, types
 from kirin.serialization.base.context import (
@@ -12,15 +13,13 @@ from kirin.serialization.base.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
 
+@dataclass
 class Deserializer:
-    _ctx: SerializationContext
-
-    def __init__(self, dialect_group: ir.DialectGroup) -> None:
-        self._ctx = SerializationContext()
-        self._ctx.clear()
-        self.dialect_group = dialect_group
+    dialect_group: ir.DialectGroup
+    _ctx: SerializationContext = field(default_factory=SerializationContext, init=False)
 
     def decode(self, data: SerializationModule) -> ir.Method:
+        self._ctx.clear()
         for mangled, meta in data.symbol_table.items():
             sym_name = meta.get("sym_name", None)
             if sym_name is None:
