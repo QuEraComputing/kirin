@@ -60,6 +60,21 @@ def slicing():
     return (a, b, c, d, e)
 
 
+def test_round_trip_sequence_run():
+    serializer = Serializer()
+    encoded = serializer.encode(slicing)
+    decoded = basic.decode(encoded)
+    before = slicing()
+    after = decoded()
+    assert before == after
+    # json_ser = JSONSerializer()
+    # json_encoded = json_ser.encode(encoded)
+    # json_decoded = json_ser.decode(json_encoded)
+    # decoded_2 = basic.decode(json_decoded)
+    # after2 = decoded_2(10)
+    # assert before == after2 == after
+test_round_trip_sequence_run()
+
 def test_round_trip1_run():
     serializer = Serializer()
     encoded = serializer.encode(my_kernel1)

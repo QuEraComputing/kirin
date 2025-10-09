@@ -3,7 +3,6 @@ from collections.abc import Sequence
 
 from kirin import ir, types
 from kirin.dialects.func.attrs import Signature
-from kirin.dialects.ilist.runtime import IList
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -46,6 +45,9 @@ class Serializer:
     def serialize(
         self, obj: Serializable | Sequence[typing.Any] | None
     ) -> SerializationUnit:
+        if isinstance(obj, ir.Attribute):
+            return self.serialize_attribute(obj)
+
         ser_method = getattr(
             self, "serialize_" + type(obj).__name__.lower(), self.generic_serialize
         )
@@ -493,16 +495,5 @@ class Serializer:
             data={
                 "inputs": self.serialize_tuple(sig.inputs),
                 "output": self.serialize(sig.output),
-            },
-        )
-
-    def serialize_ilist(self, ilist: IList) -> SerializationUnit:
-        return SerializationUnit(
-            kind="ilist",
-            module_name=ilist.__module__,
-            class_name=ilist.__class__.__name__,
-            data={
-                "data": self.serialize(ilist.data),
-                "elem": self.serialize_attribute(ilist.elem),
             },
         )

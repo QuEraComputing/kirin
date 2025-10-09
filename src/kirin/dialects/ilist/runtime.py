@@ -5,20 +5,23 @@ from collections.abc import Sequence
 
 from kirin import ir, types
 from kirin.print.printer import Printer
+from ._dialect import dialect
 
-if TYPE_CHECKING:
-    from kirin.serialization.base.serializer import Serializer
-    from kirin.serialization.base.deserializer import Deserializer
-    from kirin.serialization.base.serializationunit import SerializationUnit
+from kirin.serialization.base.serializer import Serializer
+from kirin.serialization.base.deserializer import Deserializer
+from kirin.serialization.base.serializationunit import SerializationUnit
 
 T = TypeVar("T")
 L = TypeVar("L")
 
 
+
+
 @dataclass
+@dialect.register
 class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
     """A simple immutable list."""
-
+    name = "IList"
     data: Sequence[T]
     elem: types.TypeAttribute = types.Any
 
@@ -105,10 +108,25 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_ilist(self)
+        #print(type(self.data), self.data)
+        return SerializationUnit(
+            kind="ilist",
+            module_name=dialect.name,
+            class_name=IList.__name__,
+            data={
+                "data": serializer.serialize(self.data),
+                "elem": serializer.serialize_attribute(self.elem),
+            },
+        )
+
 
     @classmethod
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "IList":
-        return deserializer.deserialize_ilist(serUnit)
+        items = deserializer.deserialize(serUnit.data["data"])
+        elem = deserializer.deserialize(serUnit.data["elem"])
+        return IList(items, elem=elem)
+
+
+

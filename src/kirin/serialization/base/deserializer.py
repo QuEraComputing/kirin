@@ -2,7 +2,6 @@ from typing import Any, cast
 
 from kirin import ir, types
 from kirin.dialects.func.attrs import Signature
-from kirin.dialects.ilist.runtime import IList
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -39,6 +38,10 @@ class Deserializer:
         return self.deserialize_method(body)
 
     def deserialize(self, serUnit: SerializationUnit) -> Any:
+        if serUnit.kind == "attribute":
+            return self.deserialize_attribute(serUnit)
+
+
         ser_method = getattr(
             self, "serialize_" + serUnit.class_name.lower(), self.generic_deserialize
         )
@@ -294,6 +297,21 @@ class Deserializer:
         return tuple(self.deserialize(x) for x in serUnit.data.get("value", []))
 
     def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
+        # try to see if its a registered attribute in any of the dialects:
+        belong_to_dialect = None
+        for dialect in self.dialect_group.data:
+            if serUnit.module_name == dialect.name:
+                belong_to_dialect = dialect
+                break
+        
+        if belong_to_dialect is not None:
+            print(belong_to_dialect)
+            for cls in belong_to_dialect.attrs:
+                if cls.__name__ == serUnit.class_name and isinstance(cls, Deserializable):
+                    return cls.deserialize(serUnit, self)
+            raise ValueError(f"Attribute class {serUnit.class_name} not found in dialect {belong_to_dialect.name}.")
+
+        # TODO clean this up
         cls = get_cls_from_name(serUnit)
         if not issubclass(cls, Deserializable):
             raise TypeError(f"Class {cls} is not Deserializable.")
@@ -392,7 +410,3 @@ class Deserializer:
         output = self.deserialize(serUnit.data["output"])
         return Signature(inputs=inputs, output=output)
 
-    def deserialize_ilist(self, serUnit: SerializationUnit) -> IList:
-        items = self.deserialize(serUnit.data["data"])
-        elem = self.deserialize(serUnit.data["elem"])
-        return IList(items, elem=elem)
