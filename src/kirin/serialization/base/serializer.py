@@ -356,7 +356,6 @@ class Serializer:
     def serialize_attribute(self, attr: ir.Attribute) -> SerializationUnit:
         if not isinstance(attr, Serializable):
             raise TypeError(f"Attribute {attr} is not Serializable.")
-        print(attr.__module__, attr.__class__.__name__)
         return SerializationUnit(
             kind="attribute",
             module_name=attr.__module__,

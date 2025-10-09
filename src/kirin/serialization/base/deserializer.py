@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from dataclasses import field, dataclass
 
 from kirin import ir
@@ -36,11 +36,7 @@ class Deserializer:
         return self.deserialize_method(body)
 
     def deserialize(self, serUnit: SerializationUnit) -> Any:
-        if serUnit.kind == "pyattr":
-            return self.deserialize_pyattr(serUnit)
-        elif serUnit.kind == "type-attribute":
-            return self.deserialize_type_attribute(serUnit)
-        elif serUnit.kind == "custom-attribute":
+        if serUnit.kind == "attribute":
             return self.deserialize_attribute(serUnit)
 
         ser_method = getattr(
@@ -295,45 +291,30 @@ class Deserializer:
     def deserialize_tuple(self, serUnit: SerializationUnit) -> tuple:
         return tuple(self.deserialize(x) for x in serUnit.data.get("value", []))
 
-    # def deserialize_type_attribute(self, serUnit: SerializationUnit) -> types.TypeAttribute:
-    #     assert serUnit.kind == "type-attribute"
-    #     serUnit = serUnit.data["data"]
-    #     cls = get_cls_from_name(serUnit)
-    #     if not issubclass(cls, Deserializable):
-    #         raise TypeError(f"Class {cls} is not Deserializable.")
-    #     return cls.deserialize(serUnit, self)
+    def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
+        if serUnit.kind != "attribute":
+            raise ValueError(f"Expected kind='attribute', got {serUnit.kind}")
 
-    # def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
-    #     assert serUnit.kind == "attribute"
-
-    #     serUnit = serUnit.data["data"]
-    #     cls = get_cls_from_name(serUnit)
-    #     print(cls)
-
-    #     if serUnit.kind == "pyattr":
-    #         return self.deserialize_pyattr(serUnit)
-    #     elif serUnit.kind == "custom-attribute":
-    #         serUnit = serUnit.data["data"]
-    #         # try to see if its a registered attribute in any of the dialects:
-    #         belong_to_dialect = None
-    #         for dialect in self.dialect_group.data:
-    #             if serUnit.module_name == dialect.name:
-    #                 belong_to_dialect = dialect
-    #                 break
-
-    #         if belong_to_dialect is not None:
-    #             for cls in belong_to_dialect.attrs:
-    #                 if cls.__name__ == serUnit.class_name and isinstance(
-    #                     cls, Deserializable
-    #                 ):
-    #                     return cast(ir.Attribute, cls.deserialize(serUnit, self))
-    #             raise ValueError(
-    #                 f"Attribute class {serUnit.class_name} not found in dialect {belong_to_dialect.name}."
-    #             )
-    #         else:
-    #             raise ValueError(
-    #                 f"Dialect {serUnit.module_name} not found in dialect group {self.dialect_group}."
-    #             )
+        inner = serUnit.data.get("data")
+        if not isinstance(inner, SerializationUnit):
+            raise ValueError("Attribute data must contain a SerializationUnit")
+        if inner.kind not in ("type-attribute", "pyattr"):
+            belong_to_dialect = None
+            for dialect in self.dialect_group.data:
+                if inner.module_name == dialect.name:
+                    belong_to_dialect = dialect
+                    break
+            if belong_to_dialect is not None:
+                for cls in belong_to_dialect.attrs:
+                    if cls.__name__ == inner.class_name and isinstance(
+                        cls, Deserializable
+                    ):
+                        return cast(ir.Attribute, cls.deserialize(inner, self))
+                raise ValueError(
+                    f"Attribute class {inner.class_name} not found in dialect {belong_to_dialect.name}"
+                )
+        cls = get_cls_from_name(inner)
+        return cls.deserialize(inner, self)
 
     def deserialize_resultvalue(self, serUnit: SerializationUnit) -> ir.ResultValue:
         ssa_name = serUnit.data["id"]

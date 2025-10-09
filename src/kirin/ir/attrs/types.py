@@ -113,7 +113,7 @@ class AnyType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="anytype",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data=dict(),
@@ -146,7 +146,7 @@ class BottomType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="bottomtype",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data=dict(),
@@ -251,7 +251,7 @@ class PyClass(TypeAttribute, typing.Generic[PyClassType], metaclass=PyClassMeta)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="pyclass",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data=dict(
@@ -343,7 +343,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="literal",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data={
@@ -425,7 +425,7 @@ class Union(TypeAttribute, metaclass=UnionTypeMeta):
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="Union",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data={"types": serializer.serialize_frozenset(self.types)},
@@ -479,7 +479,7 @@ class TypeVar(TypeAttribute):
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="typevar",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data={
@@ -523,7 +523,7 @@ class Vararg(Attribute):
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="vararg",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data={"typ": serializer.serialize_attribute(self.typ)},
@@ -684,7 +684,7 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
         return SerializationUnit(
-            kind="generic",
+            kind="type-attribute",
             module_name=self.__module__,
             class_name=self.__class__.__name__,
             data={

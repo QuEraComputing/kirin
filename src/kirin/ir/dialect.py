@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 from dataclasses import field, dataclass
 
-from typing_extensions import dataclass_transform
+from typing_extensions import Self, dataclass_transform
 
 from kirin.ir.nodes import Statement
 from kirin.ir.attrs.abc import Attribute
@@ -15,10 +15,9 @@ if TYPE_CHECKING:
     from kirin.rewrite.abc import RewriteRule
     from kirin.interp.table import MethodTable
     from kirin.lowering.python.dialect import FromPythonAST
-
-    # from kirin.serialization.base.serializer import Serializer
-    # from kirin.serialization.base.deserializer import Deserializer
-    # from kirin.serialization.serializationunit import SerializationUnit
+    from kirin.serialization.base.serializer import Serializer
+    from kirin.serialization.base.deserializer import Deserializer
+    from kirin.serialization.core.serializationunit import SerializationUnit
 
 
 @dataclass
@@ -188,11 +187,11 @@ class Dialect:
         self.rules.inference.append(rule())
         return rule
 
-    # def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-    #     return serializer.serialize_dialect(self)
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return serializer.serialize_dialect(self)
 
-    # @classmethod
-    # def deserialize(
-    #     cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
-    # ) -> Self:
-    #     return cast(Self, deserializer.deserialize_dialect(serUnit))
+    @classmethod
+    def deserialize(
+        cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> Self:
+        return cast(Self, deserializer.deserialize_dialect(serUnit))
