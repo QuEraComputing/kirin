@@ -57,7 +57,11 @@ class ConstPropMethods(MethodTable):
                 method.code,
                 (fn, const.Unknown(), const.Unknown()),
             )
-            if isinstance(collection, const.Value) and isinstance(init, const.Value):
+            if (
+                isinstance(collection, const.Value)
+                and isinstance(init, const.Value)
+                and stmt in frame.should_be_pure
+            ):
                 return interp_.try_eval_const_pure(frame, stmt, (fn, collection, init))
         elif isinstance(fn, const.PartialLambda):
             self.detect_purity(
