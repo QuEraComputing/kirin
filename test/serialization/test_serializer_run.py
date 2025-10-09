@@ -74,9 +74,6 @@ def test_round_trip_sequence_run():
     assert before == after2 == after
 
 
-test_round_trip_sequence_run()
-
-
 def test_round_trip1_run():
     encoded = basic.encode(my_kernel1)
     decoded = basic.decode(encoded)

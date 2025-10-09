@@ -46,6 +46,23 @@ def my_kernel2(y: int):
 
 
 @basic
+def make_ker(x: int):
+
+    def inner(y: int):
+        return x + y
+
+    return inner
+
+
+ker = make_ker(3)
+
+
+@basic
+def my_kernel3(z: int):
+    return ker(z) * 10
+
+
+@basic
 def slicing():
     in1 = ("a", "b", "c", "d", "e", "f", "g", "h")
     in2 = [1, 2, 3, 4, 5]
@@ -68,6 +85,10 @@ def round_trip(program):
     json_decoded = json_serializer.decode(json_encoded)
     decoded_2 = basic.decode(json_decoded)
     assert decoded_2.code.is_structurally_equal(program.code)
+
+
+def test_round_trip_kernel_by_closure():
+    round_trip(my_kernel3)
 
 
 def test_round_trip1():
