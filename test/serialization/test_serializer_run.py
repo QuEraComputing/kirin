@@ -69,9 +69,6 @@ def test_round_trip_sequence_run():
     assert before == after
 
 
-test_round_trip_sequence_run()
-
-
 def test_round_trip1_run():
     serializer = Serializer()
     encoded = serializer.encode(my_kernel1)
