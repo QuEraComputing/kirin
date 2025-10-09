@@ -1,7 +1,6 @@
 from kirin.prelude import basic
 from kirin.dialects import ilist
 from kirin.serialization.jsonserializer import JSONSerializer
-from kirin.serialization.base.serializer import Serializer
 
 
 @basic
@@ -61,8 +60,7 @@ def slicing():
 
 
 def test_round_trip_sequence_run():
-    serializer = Serializer()
-    encoded = serializer.encode(slicing)
+    encoded = basic.encode(slicing)
     decoded = basic.decode(encoded)
     before = slicing()
     after = decoded()
@@ -80,8 +78,7 @@ test_round_trip_sequence_run()
 
 
 def test_round_trip1_run():
-    serializer = Serializer()
-    encoded = serializer.encode(my_kernel1)
+    encoded = basic.encode(my_kernel1)
     decoded = basic.decode(encoded)
     before = my_kernel1(10)
     after = decoded(10)
@@ -95,8 +92,7 @@ def test_round_trip1_run():
 
 
 def test_round_trip2_run():
-    serializer = Serializer()
-    encoded = serializer.encode(foo)
+    encoded = basic.encode(foo)
     decoded = basic.decode(encoded)
     before = foo(10, 20.0, True)
     after = decoded(10, 20.0, True)

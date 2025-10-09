@@ -318,6 +318,12 @@ class DialectGroup(Generic[PassParams]):
     ) -> Self:
         return cast(Self, deserializer.deserialize_dialect_group(serUnit))
 
+    def encode(self, program) -> "SerializationModule":
+        from kirin.serialization.base.serializer import Serializer
+
+        serializer = Serializer()
+        return serializer.encode(program)
+
     def decode(self, encoded: "SerializationModule") -> Method:
         from kirin.serialization.base.deserializer import Deserializer
 
