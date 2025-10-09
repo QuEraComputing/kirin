@@ -31,7 +31,7 @@ class ConstPropMethods(MethodTable):
         # 1. if the function is a constant method, and the method is pure, then the map is pure
         if isinstance(fn, const.Value) and isinstance(method := fn.data, ir.Method):
             self.detect_purity(interp_, frame, stmt, method.code, (fn, const.Unknown()))
-            if isinstance(collection, const.Value):
+            if isinstance(collection, const.Value) and stmt in frame.should_be_pure:
                 return interp_.try_eval_const_pure(frame, stmt, (fn, collection))
         elif isinstance(fn, const.PartialLambda):
             self.detect_purity(interp_, frame, stmt, fn.code, (fn, const.Unknown()))
@@ -57,7 +57,11 @@ class ConstPropMethods(MethodTable):
                 method.code,
                 (fn, const.Unknown(), const.Unknown()),
             )
-            if isinstance(collection, const.Value) and isinstance(init, const.Value):
+            if (
+                isinstance(collection, const.Value)
+                and isinstance(init, const.Value)
+                and stmt in frame.should_be_pure
+            ):
                 return interp_.try_eval_const_pure(frame, stmt, (fn, collection, init))
         elif isinstance(fn, const.PartialLambda):
             self.detect_purity(

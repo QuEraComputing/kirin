@@ -1,10 +1,12 @@
 from typing import Any, Literal
 
 from kirin import ir, types, rewrite
+from kirin.decl import info, statement
 from kirin.passes import aggressive
 from kirin.prelude import basic_no_opt, python_basic
 from kirin.analysis import const
 from kirin.dialects import py, func, ilist, lowering
+from kirin.lowering import FromPythonCall
 from kirin.passes.typeinfer import TypeInfer
 
 
@@ -384,6 +386,31 @@ def test_ilist_constprop():
     target = frame.entries[target_ssa]
     assert isinstance(target, const.Value)
     assert target.data == (6, 6)
+
+
+def test_ilist_constprop_non_pure():
+
+    new_dialect = ir.Dialect("test")
+
+    @statement(dialect=new_dialect)
+    class DefaultInit(ir.Statement):
+        name = "test"
+        traits = frozenset({FromPythonCall()})
+        result: ir.ResultValue = info.result(types.Float)
+
+    dialect_group = basic_no_opt.add(new_dialect)
+
+    @dialect_group
+    def test():
+
+        def inner(_: int):
+            return DefaultInit()
+
+        return ilist.map(inner, ilist.range(10))
+
+    _, res = const.Propagate(dialect_group).run(test)
+
+    assert isinstance(res, const.Unknown)
 
 
 rule = rewrite.Fixpoint(rewrite.Walk(ilist.rewrite.Unroll()))
