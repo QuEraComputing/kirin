@@ -1,14 +1,12 @@
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 from dataclasses import dataclass
 
 from kirin import types
 from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
-
-if TYPE_CHECKING:
-    from kirin.serialization.base.serializationunit import SerializationUnit
-    from kirin.serialization.base.serializer import Serializer
-    from kirin.serialization.base.deserializer import Deserializer
+from kirin.serialization.base.serializer import Serializer
+from kirin.serialization.base.deserializer import Deserializer
+from kirin.serialization.base.serializationunit import SerializationUnit
 
 from ._dialect import dialect
 
@@ -50,7 +48,15 @@ class Signature(Generic[TypeLatticeElem], Attribute):
         return self.inputs == value.inputs and self.output == value.output
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_signature(self)
+        return SerializationUnit(
+            kind="signature",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "inputs": serializer.serialize_tuple(self.inputs),
+                "output": serializer.serialize(self.output),
+            },
+        )
 
     def is_structurally_equal(
         self,
@@ -63,4 +69,6 @@ class Signature(Generic[TypeLatticeElem], Attribute):
     def deserialize(
         cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "Signature":
-        return deserializer.deserialize_signature(serUnit)
+        inputs = deserializer.deserialize(serUnit.data["inputs"])
+        output = deserializer.deserialize(serUnit.data["output"])
+        return Signature(inputs=inputs, output=output)

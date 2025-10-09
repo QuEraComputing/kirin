@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 from kirin import ir, types
-from kirin.dialects.func.attrs import Signature
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -408,8 +407,3 @@ class Deserializer:
     def deserialize_union(self, serUnit: SerializationUnit) -> types.Union:
         ty = self.deserialize_frozenset(serUnit.data["types"])
         return types.Union(ty)
-
-    def deserialize_signature(self, serUnit: SerializationUnit) -> Signature:
-        inputs = self.deserialize(serUnit.data["inputs"])
-        output = self.deserialize(serUnit.data["output"])
-        return Signature(inputs=inputs, output=output)

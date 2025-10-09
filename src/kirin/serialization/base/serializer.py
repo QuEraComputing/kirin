@@ -2,7 +2,6 @@ import typing
 from collections.abc import Sequence
 
 from kirin import ir, types
-from kirin.dialects.func.attrs import Signature
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -43,7 +42,7 @@ class Serializer:
         return SerializationModule(symbol_table=symbol_table, body=body)
 
     def serialize(
-        self, obj: Serializable | Sequence[typing.Any] | None
+        self, obj: Serializable | Sequence[typing.Any] | types.TypeAttribute | None
     ) -> SerializationUnit:
         if isinstance(obj, ir.Attribute):
             return self.serialize_attribute(obj)
@@ -490,15 +489,4 @@ class Serializer:
             module_name=uni.__module__,
             class_name=uni.__class__.__name__,
             data={"types": self.serialize_frozenset(uni.types)},
-        )
-
-    def serialize_signature(self, sig: Signature) -> SerializationUnit:
-        return SerializationUnit(
-            kind="signature",
-            module_name=sig.__module__,
-            class_name=sig.__class__.__name__,
-            data={
-                "inputs": self.serialize_tuple(sig.inputs),
-                "output": self.serialize(sig.output),
-            },
         )
