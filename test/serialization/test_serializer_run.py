@@ -65,45 +65,45 @@ def test_round_trip_sequence_run():
     encoded = serializer.encode(slicing)
     decoded = basic.decode(encoded)
     before = slicing()
-    # after = decoded()
-    # assert before == after
+    after = decoded()
+    assert before == after
 
-    # json_ser = JSONSerializer()
-    # json_encoded = json_ser.encode(encoded)
-    # json_decoded = json_ser.decode(json_encoded)
-    # decoded_2 = basic.decode(json_decoded)
-    # after2 = decoded_2()
-    # assert before == after2 == after
+    json_ser = JSONSerializer()
+    json_encoded = json_ser.encode(encoded)
+    json_decoded = json_ser.decode(json_encoded)
+    decoded_2 = basic.decode(json_decoded)
+    after2 = decoded_2()
+    assert before == after2 == after
 
 
 test_round_trip_sequence_run()
 
 
-# def test_round_trip1_run():
-#     serializer = Serializer()
-#     encoded = serializer.encode(my_kernel1)
-#     decoded = basic.decode(encoded)
-#     before = my_kernel1(10)
-#     after = decoded(10)
-#     assert before == after
-#     json_ser = JSONSerializer()
-#     json_encoded = json_ser.encode(encoded)
-#     json_decoded = json_ser.decode(json_encoded)
-#     decoded_2 = basic.decode(json_decoded)
-#     after2 = decoded_2(10)
-#     assert before == after2 == after
+def test_round_trip1_run():
+    serializer = Serializer()
+    encoded = serializer.encode(my_kernel1)
+    decoded = basic.decode(encoded)
+    before = my_kernel1(10)
+    after = decoded(10)
+    assert before == after
+    json_ser = JSONSerializer()
+    json_encoded = json_ser.encode(encoded)
+    json_decoded = json_ser.decode(json_encoded)
+    decoded_2 = basic.decode(json_decoded)
+    after2 = decoded_2(10)
+    assert before == after2 == after
 
 
-# def test_round_trip2_run():
-#     serializer = Serializer()
-#     encoded = serializer.encode(foo)
-#     decoded = basic.decode(encoded)
-#     before = foo(10, 20.0, True)
-#     after = decoded(10, 20.0, True)
-#     assert before == after
-#     json_ser = JSONSerializer()
-#     json_encoded = json_ser.encode(encoded)
-#     json_decoded = json_ser.decode(json_encoded)
-#     decoded_2 = basic.decode(json_decoded)
-#     after2 = decoded_2(10, 20.0, True)
-#     assert before == after2 == after
+def test_round_trip2_run():
+    serializer = Serializer()
+    encoded = serializer.encode(foo)
+    decoded = basic.decode(encoded)
+    before = foo(10, 20.0, True)
+    after = decoded(10, 20.0, True)
+    assert before == after
+    json_ser = JSONSerializer()
+    json_encoded = json_ser.encode(encoded)
+    json_decoded = json_ser.decode(json_encoded)
+    decoded_2 = basic.decode(json_decoded)
+    after2 = decoded_2(10, 20.0, True)
+    assert before == after2 == after
