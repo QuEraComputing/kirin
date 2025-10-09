@@ -19,7 +19,16 @@ class DefaultInit(ir.Statement):
 dialect_group = basic_no_opt.add(new_dialect)
 
 
-def test_fallback_try_eval_const_pure():
+def test_missing_impl_try_eval_const_pure():
+    # this test is trying to trigger the code path in constprop.py
+    # where a statement has no concrete implementation but is pure
+    # in this case, the ilist will attempt to evaluate the closure
+    # which contains a call to DefaultInit, which has no implementation
+    # in the concrete interpreter. In this case we should still be able
+    # to mark the result as Unknown, rather than failing the analysis.
+    # In other words, if a statement has no implementation, but is pure,
+    # the function `try_eval_const_pure` will catch the exception and
+    # return Unknown for the result.
     @dialect_group
     def test():
         n = 10
@@ -43,4 +52,4 @@ def test_fallback_try_eval_const_pure():
     assert isinstance(call_stmt.result.hints.get("const"), const.Unknown)
 
 
-test_fallback_try_eval_const_pure()
+test_missing_impl_try_eval_const_pure()
