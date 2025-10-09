@@ -2,7 +2,7 @@ from kirin import ir, types, passes, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt
 from kirin.analysis import const
-from kirin.dialects import py
+from kirin.dialects import py, func
 
 new_dialect = ir.Dialect("test")
 
@@ -23,7 +23,11 @@ def test_fallback_try_eval_const_pure():
     @dialect_group
     def test():
         n = 10
-        return n * DefaultInit()  # type: ignore
+
+        def _inner(val: int) -> int:
+            return DefaultInit() * val
+
+        return _inner(n)
 
     passes.HintConst(dialect_group)(test)
 
@@ -31,6 +35,6 @@ def test_fallback_try_eval_const_pure():
     assert isinstance(const_n, py.Constant)
     assert const_n.result.hints.get("const") == const.Value(10)
 
-    default_init = test.callable_region.blocks[0].stmts.at(1)
-    assert isinstance(default_init, DefaultInit)
-    assert isinstance(default_init.result.hints.get("const"), const.Unknown)
+    call_stmt = test.callable_region.blocks[0].stmts.at(2)
+    assert isinstance(call_stmt, func.Call)
+    assert isinstance(call_stmt.result.hints.get("const"), const.Unknown)
