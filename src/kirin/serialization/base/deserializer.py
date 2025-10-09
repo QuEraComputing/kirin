@@ -8,8 +8,8 @@ from kirin.serialization.base.context import (
     mangle,
     get_cls_from_name,
 )
-from kirin.serialization.serializationunit import SerializationUnit
-from kirin.serialization.base.deserializable import Deserializable
+from kirin.serialization.core.deserializable import Deserializable
+from kirin.serialization.core.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
 

@@ -7,7 +7,7 @@ from collections.abc import Hashable
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
 
-from kirin.serialization.serializationunit import SerializationUnit
+from kirin.serialization.core.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer

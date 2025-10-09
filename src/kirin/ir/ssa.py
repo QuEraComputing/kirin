@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from kirin.ir.nodes.block import Block
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
-    from kirin.serialization.serializationunit import SerializationUnit
+    from kirin.serialization.core.serializationunit import SerializationUnit
 
 
 @dataclass

@@ -9,8 +9,8 @@ from kirin.serialization.base.context import (
     mangle,
     get_str_from_type,
 )
-from kirin.serialization.base.serializable import Serializable
-from kirin.serialization.serializationunit import SerializationUnit
+from kirin.serialization.core.serializable import Serializable
+from kirin.serialization.core.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
 

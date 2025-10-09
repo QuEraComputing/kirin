@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from kirin.serialization.serializationunit import SerializationUnit
+from kirin.serialization.core.serializationunit import SerializationUnit
 from kirin.serialization.base.serializationmodule import SerializationModule
 
 

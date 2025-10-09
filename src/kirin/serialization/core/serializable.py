@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
-    from kirin.serialization.serializationunit import SerializationUnit
+    from kirin.serialization.core.serializationunit import SerializationUnit
 
 
 @runtime_checkable
