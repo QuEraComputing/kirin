@@ -1,4 +1,3 @@
-import importlib
 from typing import Any, cast
 
 from kirin import ir, types
@@ -18,9 +17,10 @@ from kirin.serialization.base.serializationmodule import SerializationModule
 class Deserializer:
     _ctx: SerializationContext
 
-    def __init__(self) -> None:
+    def __init__(self, dialect_group: ir.DialectGroup) -> None:
         self._ctx = SerializationContext()
         self._ctx.clear()
+        self.dialect_group = dialect_group
 
     def decode(self, data: SerializationModule) -> ir.Method:
         for mangled, meta in data.symbol_table.items():
@@ -105,7 +105,7 @@ class Deserializer:
         out.sym_name = serUnit.data["sym_name"]
         out.arg_names = serUnit.data.get("arg_names", [])
         out.nargs = self.deserialize_int(serUnit.data["nargs"])
-        out.dialects = self.deserialize_dialect_group(serUnit.data["dialects"])
+        out.dialects = self.dialect_group
         out.code = self.deserialize_statement(serUnit.data["code"])
         computed = mangle(
             out.sym_name,
@@ -334,18 +334,9 @@ class Deserializer:
         name = serUnit.data["name"]
         if name in self._ctx.Dialect_Lookup:
             return self._ctx.Dialect_Lookup[name]
-
-        module_name = serUnit.module_name
-        class_name = serUnit.class_name
-        if module_name:
-            mod = importlib.import_module(module_name)
-            candidate = getattr(mod, class_name, None)
-            if isinstance(candidate, ir.Dialect) and candidate.name == name:
-                self._ctx.Dialect_Lookup[name] = candidate
-                return candidate
-        raise ValueError(
-            f"Could not find dialect {name} in module {module_name} class {class_name}"
-        )
+        result = ir.Dialect(name)
+        self._ctx.Dialect_Lookup[name] = result
+        return result
 
     def deserialize_dialect_group(self, serUnit: SerializationUnit) -> ir.DialectGroup:
         dialects = self.deserialize_frozenset(serUnit.data["data"])

@@ -63,7 +63,7 @@ def slicing():
 
 def round_trip(program):
     serializer = Serializer()
-    deserializer = Deserializer()
+    deserializer = Deserializer(dialect_group=basic)
     encoded = serializer.encode(program)
     decoded = deserializer.decode(encoded)
     assert decoded.code.is_structurally_equal(program.code)

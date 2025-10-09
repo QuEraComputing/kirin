@@ -1,4 +1,3 @@
-import sys
 import typing
 from collections.abc import Sequence
 
@@ -380,36 +379,10 @@ class Serializer:
         )
 
     def serialize_dialect(self, dialect: ir.Dialect) -> SerializationUnit:
-        dialect_module = None
-        class_name = None
-
-        for module_name, module in sys.modules.items():
-            if module is None:
-                continue
-            module_dict = getattr(module, "__dict__", None)
-            if not module_dict:
-                continue
-            for name, val in module_dict.items():
-                if val is dialect:
-                    dialect_module = module_name
-                    class_name = name
-                    break
-            if dialect_module:
-                break
-
-        if dialect_module is None:
-            raise ValueError(
-                f"Cannot serialize dialect '{dialect.name}': module/attribute not found in sys.modules."
-            )
-
-        if class_name is None:
-            raise ValueError(
-                f"Cannot serialize dialect '{dialect.name}': class name not found in module '{dialect_module}'."
-            )
         return SerializationUnit(
             kind="dialect",
-            module_name=dialect_module,
-            class_name=class_name,
+            module_name=dialect.__module__,
+            class_name=dialect.__class__.__name__,
             data={"name": dialect.name},
         )
 
