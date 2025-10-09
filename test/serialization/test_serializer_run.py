@@ -88,6 +88,3 @@ def test_round_trip2_run():
     decoded_2 = basic.decode(json_decoded)
     after2 = decoded_2(10, 20.0, True)
     assert before == after2 == after
-
-
-test_round_trip1_run()
