@@ -20,7 +20,7 @@ dialect_group = basic_no_opt.add(new_dialect)
 
 
 def test_missing_impl_try_eval_const_pure():
-    # this test is trying to trigger the code path in constprop.py
+    # this test is trying to trigger the code path in propagate.py
     # where a statement has no concrete implementation but is pure
     # in this case, the ilist will attempt to evaluate the closure
     # which contains a call to DefaultInit, which has no implementation
