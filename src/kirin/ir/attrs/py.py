@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 from typing_extensions import Protocol, runtime_checkable
 
-from kirin import ir
 from kirin.print import Printer
 from kirin.ir.attrs.abc import Attribute
+from kirin.serialization.core.serializable import Serializable
 from kirin.serialization.core.supportedtypes import SUPPORTED_PYTHON_TYPES
 from kirin.serialization.core.serializationunit import SerializationUnit
 
@@ -76,8 +76,9 @@ class PyAttr(Data[T]):
         return self.data == other.data
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        if not isinstance(self.data, SUPPORTED_PYTHON_TYPES) and not isinstance(
-            self.data, ir.Method
+        if not (
+            isinstance(self.data, SUPPORTED_PYTHON_TYPES)
+            or isinstance(self.data, Serializable)
         ):
             raise TypeError(
                 f"Cannot serialize data of type {type(self.data)}. "
