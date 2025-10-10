@@ -10,7 +10,7 @@ from kirin.serialization.base.context import (
 from kirin.serialization.core.serializable import Serializable
 from kirin.serialization.core.supportedtypes import SUPPORTED_PYTHON_TYPES
 from kirin.serialization.core.serializationunit import SerializationUnit
-from kirin.serialization.base.serializationmodule import SerializationModule
+from kirin.serialization.core.serializationmodule import SerializationModule
 
 
 @dataclass

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
     from kirin.serialization.core.serializationunit import SerializationUnit
-    from kirin.serialization.base.serializationmodule import SerializationModule
+    from kirin.serialization.core.serializationmodule import SerializationModule
 
 PassParams = ParamSpec("PassParams")
 RunPass = Callable[Concatenate[Method, PassParams], None]
