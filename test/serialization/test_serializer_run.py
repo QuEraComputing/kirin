@@ -46,6 +46,23 @@ def my_kernel2(y: int):
 
 
 @basic
+def foo2(y: int):
+
+    def inner(x: int):
+        return x * y + 1
+
+    return inner
+
+
+inner_ker = foo2(y=10)
+
+
+@basic
+def main_lambda(z: int):
+    return inner_ker(z)
+
+
+@basic
 def slicing():
     in1 = ("a", "b", "c", "d", "e", "f", "g", "h")
     in2 = [1, 2, 3, 4, 5]
@@ -99,4 +116,21 @@ def test_round_trip2_run():
     json_decoded = json_ser.decode(json_encoded)
     decoded_2 = basic.decode(json_decoded)
     after2 = decoded_2(10, 20.0, True)
+    assert before == after2 == after
+
+
+def test_round_trip3_run():
+    encoded = basic.encode(main_lambda)
+    decoded = basic.decode(encoded)
+    before = main_lambda(2)
+    after = decoded(2)
+    assert before == after
+
+    assert main_lambda.code.is_structurally_equal(decoded.code)
+
+    json_ser = JSONSerializer()
+    json_encoded = json_ser.encode(encoded)
+    json_decoded = json_ser.decode(json_encoded)
+    decoded_2 = basic.decode(json_decoded)
+    after2 = decoded_2(2)
     assert before == after2 == after
