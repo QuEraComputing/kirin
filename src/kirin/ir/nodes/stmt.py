@@ -571,7 +571,6 @@ class Statement(IRNode["Block"]):
         if self.attributes.keys() == other.attributes.keys():
             for k, v1 in self.attributes.items():
                 v2 = other.attributes[k]
-                print("match", v1, v2, v1.is_structurally_equal(v2, context))
                 if not v1.is_structurally_equal(v2, context):
                     return False
         else:
