@@ -38,9 +38,10 @@ class Deserializer:
     def deserialize(self, serUnit: SerializationUnit) -> Any:
         if serUnit.kind == "attribute":
             return self.deserialize_attribute(serUnit)
-
+        elif serUnit.kind == "type":
+            return self.deserialize_type(serUnit)
         ser_method = getattr(
-            self, "serialize_" + serUnit.class_name.lower(), self.generic_deserialize
+            self, "deserialize_" + serUnit.class_name.lower(), self.generic_deserialize
         )
         return ser_method(serUnit)
 
