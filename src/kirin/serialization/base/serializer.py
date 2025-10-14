@@ -15,7 +15,7 @@ from kirin.serialization.core.serializationmodule import SerializationModule
 
 @dataclass
 class Serializer:
-    _ctx: SerializationContext = field(default_factory=SerializationContext)
+    _ctx: SerializationContext = field(default_factory=SerializationContext, init=False)
 
     def encode(self, obj: ir.Method) -> SerializationModule:
         self._ctx.clear()
