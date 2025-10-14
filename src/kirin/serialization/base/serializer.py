@@ -137,6 +137,7 @@ class Serializer:
                 "dialects": self.serialize_dialect_group(mthd.dialects),
                 "code": self.serialize_statement(mthd.code),
                 "nargs": self.serialize_int(mthd.nargs),
+                "fields": self.serialize_tuple(mthd.fields),
                 "mangled": mangled,
             },
         )
