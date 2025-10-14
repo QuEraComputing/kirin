@@ -107,7 +107,6 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        # print(type(self.data), self.data)
         return SerializationUnit(
             kind="ilist",
             module_name=dialect.name,
