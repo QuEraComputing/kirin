@@ -568,13 +568,17 @@ class Statement(IRNode["Block"]):
         ):
             return False
 
+        print(self.name, list(self.attributes.keys()), list(other.attributes.keys()))
         if self.attributes.keys() == other.attributes.keys():
             for k, v1 in self.attributes.items():
                 v2 = other.attributes[k]
+                print("match", v1, v2, v1.is_structurally_equal(v2, context))
                 if not v1.is_structurally_equal(v2, context):
                     return False
         else:
             return False
+
+        print("ok")
 
         if (
             self.parent is not None
@@ -583,10 +587,14 @@ class Statement(IRNode["Block"]):
         ):
             return False
 
+        for arg, other_arg in zip(self.args, other.args):
+            print(context.get(arg, arg), other_arg, context.get(arg, arg) == other_arg)
+
         if not all(
             context.get(arg, arg) == other_arg
             for arg, other_arg in zip(self.args, other.args)
         ):
+
             return False
 
         if not all(

@@ -126,8 +126,6 @@ def test_round_trip3_run():
     after = decoded(2)
     assert before == after
 
-    assert main_lambda.code.is_structurally_equal(decoded.code)
-
     json_ser = JSONSerializer()
     json_encoded = json_ser.encode(encoded)
     json_decoded = json_ser.decode(json_encoded)

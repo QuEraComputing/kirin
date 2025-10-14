@@ -72,6 +72,7 @@ class PyAttr(Data[T]):
         if isinstance(self.data, StructurallyEqual) and isinstance(
             other.data, StructurallyEqual
         ):
+
             return self.data.is_structurally_equal(other.data, context=context)
         return self.data == other.data
 
