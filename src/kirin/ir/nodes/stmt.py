@@ -568,7 +568,6 @@ class Statement(IRNode["Block"]):
         ):
             return False
 
-        print(self.name, list(self.attributes.keys()), list(other.attributes.keys()))
         if self.attributes.keys() == other.attributes.keys():
             for k, v1 in self.attributes.items():
                 v2 = other.attributes[k]
@@ -578,17 +577,12 @@ class Statement(IRNode["Block"]):
         else:
             return False
 
-        print("ok")
-
         if (
             self.parent is not None
             and other.parent is not None
             and context.get(self.parent) != other.parent
         ):
             return False
-
-        for arg, other_arg in zip(self.args, other.args):
-            print(context.get(arg, arg), other_arg, context.get(arg, arg) == other_arg)
 
         if not all(
             context.get(arg, arg) == other_arg
