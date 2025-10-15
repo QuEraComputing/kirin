@@ -101,6 +101,7 @@ class Deserializer:
             out.mod = None
             out.py_func = None
             out.code = ir.Statement.__new__(ir.Statement)
+            out.backedges = set()
             self._ctx.Method_Runtime[mangled] = out
 
         out.sym_name = serUnit.data["sym_name"]
@@ -108,6 +109,7 @@ class Deserializer:
         out.nargs = self.deserialize_int(serUnit.data["nargs"])
         out.dialects = self.dialect_group
         out.code = self.deserialize_statement(serUnit.data["code"])
+        out.backedges = set()
         out.fields = self.deserialize_tuple(serUnit.data.get("fields", ()))
         computed = mangle(
             out.sym_name,
@@ -118,6 +120,7 @@ class Deserializer:
             raise ValueError(
                 f"Mangled name mismatch: expected {mangled}, got {computed}"
             )
+        out.update_backedges()
         return out
 
     def deserialize_statement(self, serUnit: SerializationUnit) -> ir.Statement:
