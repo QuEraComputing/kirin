@@ -5,9 +5,9 @@ from typing_extensions import Protocol, runtime_checkable
 
 from kirin.print import Printer
 from kirin.ir.attrs.abc import Attribute
-from kirin.serialization.base.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
+    from kirin.serialization.base.serializationunit import SerializationUnit
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
 

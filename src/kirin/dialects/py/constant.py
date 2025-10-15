@@ -33,8 +33,13 @@ class Constant(ir.Statement, Generic[T]):
 
     # NOTE: we allow py.Constant take data.PyAttr too
     def __init__(self, value: T | ir.Data[T]) -> None:
-        if not isinstance(value, ir.Data):
+        if isinstance(value, ir.Method):
+            value = ir.PyAttr(
+                value, pytype=types.MethodType[list(value.arg_types), value.return_type]
+            )
+        elif not isinstance(value, ir.Data):
             value = ir.PyAttr(value)
+
         super().__init__(
             attributes={"value": value},
             result_types=(value.type,),

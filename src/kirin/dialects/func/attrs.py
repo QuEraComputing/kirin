@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from kirin import types
 from kirin.ir import Method, Attribute
 from kirin.print.printer import Printer
-from kirin.serialization.base.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
+    from kirin.serialization.base.serializationunit import SerializationUnit
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
 
