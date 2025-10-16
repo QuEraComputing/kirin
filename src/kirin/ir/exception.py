@@ -26,8 +26,6 @@ class ValidationError(StaticCheckError):
             return
         self.method = method
 
-        from kirin.ir.nodes.stmt import Statement
-
         console = Console(force_terminal=True, force_jupyter=False, file=sys.stderr)
         printer = Printer(console=console)
         # NOTE: populate the printer with the method body
@@ -40,7 +38,7 @@ class ValidationError(StaticCheckError):
         node_str = "\n".join(
             map(lambda each_line: " " * 4 + each_line, node_str.splitlines())
         )
-        if isinstance(self.node, Statement):
+        if self.node.IS_STATEMENT:
             dialect = self.node.dialect.name if self.node.dialect else "<no dialect>"
             self.args += (
                 "when verifying the following statement",

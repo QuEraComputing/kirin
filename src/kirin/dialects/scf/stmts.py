@@ -30,17 +30,17 @@ class IfElse(ir.Statement):
         then_body: ir.Region | ir.Block,
         else_body: ir.Region | ir.Block | None = None,
     ):
-        if isinstance(then_body, ir.Region):
+        if then_body.IS_REGION:
             then_body_region = then_body
             if then_body_region.blocks:
                 then_body_block = then_body_region.blocks[-1]
             else:
                 then_body_block = None
-        elif isinstance(then_body, ir.Block):
+        elif then_body.IS_BLOCK:
             then_body_block = then_body
             then_body_region = ir.Region(then_body)
 
-        if isinstance(else_body, ir.Region):
+        if else_body.IS_REGION:
             if not else_body.blocks:  # empty region
                 else_body_region = else_body
                 else_body_block = None
@@ -50,7 +50,7 @@ class IfElse(ir.Statement):
             else:
                 else_body_region = else_body
                 else_body_block = else_body_region.blocks[0]
-        elif isinstance(else_body, ir.Block):
+        elif else_body.IS_BLOCK:
             else_body_region = ir.Region(else_body)
             else_body_block = else_body
         else:

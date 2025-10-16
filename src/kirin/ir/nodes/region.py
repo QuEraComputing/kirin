@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, ClassVar, Iterable, Iterator
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
@@ -90,6 +90,8 @@ class Region(IRNode["Statement"]):
         This object is pretty printable via
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
+
+    IS_REGION: ClassVar[bool] = True
 
     _blocks: list[Block] = field(default_factory=list, repr=False)
     _block_idx: dict[Block, int] = field(default_factory=dict, repr=False)

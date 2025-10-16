@@ -53,9 +53,9 @@ class Frame(Generic[Stmt]):
     def push(self, node: Block) -> Block: ...
 
     def push(self, node: StmtType | Block) -> StmtType | Block:
-        if isinstance(node, Block):
+        if node.IS_BLOCK:
             return self._push_block(node)
-        elif isinstance(node, Statement):
+        elif node.IS_STATEMENT:
             return self._push_stmt(node)
         else:
             raise BuildError(f"Unsupported type {type(node)} in push()")

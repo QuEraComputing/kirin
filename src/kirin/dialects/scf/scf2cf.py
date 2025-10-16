@@ -34,7 +34,7 @@ class ScfRule(RewriteRule):
             result.replace_by(exit_block.args.append_from(result.type, result.name))
 
         curr_block = node.parent_block
-        assert isinstance(curr_block, ir.Block), "Node must be inside a block"
+        assert curr_block.IS_BLOCK, "Node must be inside a block"
 
         curr_block.stmts.append(
             Branch(arguments=(), successor=(entr_block := ir.Block()))
@@ -47,8 +47,8 @@ class ScfRule(RewriteRule):
         curr_block = node.parent_block
         region = node.parent_region
 
-        assert isinstance(region, ir.Region), "Node must be inside a region"
-        assert isinstance(curr_block, ir.Block), "Node must be inside a block"
+        assert region.IS_REGION, "Node must be inside a region"
+        assert curr_block.IS_BLOCK, "Node must be inside a block"
 
         block_idx = region._block_idx[curr_block]
         return region, block_idx
