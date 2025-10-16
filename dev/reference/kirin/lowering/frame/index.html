@@ -22,16 +22,7 @@
 </code></pre></div> <div class="doc doc-contents "> <p>parent frame, if any</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.lowering.frame.Frame.state class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">state</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>state</span><span class=p>:</span> <span class=n>State</span>
 </code></pre></div> <div class="doc doc-contents "> <p>lowering state</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.lowering.frame.Frame.stream class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">stream</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>stream</span><span class=p>:</span> <span class=n>StmtStream</span><span class=p>[</span><span class=n>Stmt</span><span class=p>]</span>
 </code></pre></div> <div class="doc doc-contents "> <p>stream of statements</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.lowering.frame.Frame.__getitem__ class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">__getitem__</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=fm>__getitem__</span><span class=p>(</span><span class=nf>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>SSAValue</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get a variable from current scope.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>name(str)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>variable name</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>SSAValue</code></td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a></code> </td> <td> <div class=doc-md-description> <p>the value of the variable</p> </div> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.lowering.BuildError" href="../exception/#kirin.lowering.exception.BuildError">BuildError</a></code> </td> <td> <div class=doc-md-description> <p>if the variable is not found in the scope, or if the variable has multiple possible values.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>127</span>
-<span class=normal>128</span>
-<span class=normal>129</span>
-<span class=normal>130</span>
-<span class=normal>131</span>
-<span class=normal>132</span>
-<span class=normal>133</span>
-<span class=normal>134</span>
-<span class=normal>135</span>
-<span class=normal>136</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get a variable from current scope.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>name(str)</code> </td> <td> </td> <td> <div class=doc-md-description> <p>variable name</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>SSAValue</code></td> <td> <code><a class="autorefs autorefs-internal" title="kirin.ir.SSAValue" href="../../ir/ssa/#kirin.ir.ssa.SSAValue">SSAValue</a></code> </td> <td> <div class=doc-md-description> <p>the value of the variable</p> </div> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title="kirin.lowering.BuildError" href="../exception/#kirin.lowering.exception.BuildError">BuildError</a></code> </td> <td> <div class=doc-md-description> <p>if the variable is not found in the scope, or if the variable has multiple possible values.</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>136</span>
 <span class=normal>137</span>
 <span class=normal>138</span>
 <span class=normal>139</span>
@@ -39,7 +30,16 @@
 <span class=normal>141</span>
 <span class=normal>142</span>
 <span class=normal>143</span>
-<span class=normal>144</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__getitem__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>SSAValue</span><span class=p>:</span>
+<span class=normal>144</span>
+<span class=normal>145</span>
+<span class=normal>146</span>
+<span class=normal>147</span>
+<span class=normal>148</span>
+<span class=normal>149</span>
+<span class=normal>150</span>
+<span class=normal>151</span>
+<span class=normal>152</span>
+<span class=normal>153</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__getitem__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>SSAValue</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get a variable from current scope.</span>
 
 <span class=sd>    Args:</span>
@@ -58,29 +58,29 @@
     <span class=k>else</span><span class=p>:</span>
         <span class=k>raise</span> <span class=n>BuildError</span><span class=p>(</span><span class=sa>f</span><span class=s2>&quot;Variable </span><span class=si>{</span><span class=n>name</span><span class=si>}</span><span class=s2> not found in scope&quot;</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.lowering.frame.Frame.exhaust class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">exhaust</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>exhaust</span><span class=p>()</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Exhaust the current stream and return the remaining statements.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>146</span>
-<span class=normal>147</span>
-<span class=normal>148</span>
-<span class=normal>149</span>
-<span class=normal>150</span>
-<span class=normal>151</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>exhaust</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Exhaust the current stream and return the remaining statements.</p> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>155</span>
+<span class=normal>156</span>
+<span class=normal>157</span>
+<span class=normal>158</span>
+<span class=normal>159</span>
+<span class=normal>160</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>exhaust</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Exhaust the current stream and return the remaining statements.&quot;&quot;&quot;</span>
     <span class=n>stream</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>stream</span>
     <span class=k>while</span> <span class=n>stream</span><span class=p>:</span>
         <span class=n>stmt</span> <span class=o>=</span> <span class=n>stream</span><span class=o>.</span><span class=n>pop</span><span class=p>()</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>state</span><span class=o>.</span><span class=n>parent</span><span class=o>.</span><span class=n>visit</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>state</span><span class=p>,</span> <span class=n>stmt</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.lowering.frame.Frame.jump_next_block class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">jump_next_block</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>jump_next_block</span><span class=p>()</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Jump to the next block and return it. This appends the current <code>Frame.next_block</code> to the current region and creates a new Block for <code>next_block</code>.</p> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>Block</code></td> <td> </td> <td> <div class=doc-md-description> <p>the next block</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>87</span>
-<span class=normal>88</span>
-<span class=normal>89</span>
-<span class=normal>90</span>
-<span class=normal>91</span>
-<span class=normal>92</span>
-<span class=normal>93</span>
-<span class=normal>94</span>
-<span class=normal>95</span>
-<span class=normal>96</span>
-<span class=normal>97</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>jump_next_block</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Jump to the next block and return it. This appends the current <code>Frame.next_block</code> to the current region and creates a new Block for <code>next_block</code>.</p> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>Block</code></td> <td> </td> <td> <div class=doc-md-description> <p>the next block</p> </div> </td> </tr> </tbody> </table> <details class=quote> <summary>Source code in <code>src/kirin/lowering/frame.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 96</span>
+<span class=normal> 97</span>
+<span class=normal> 98</span>
+<span class=normal> 99</span>
+<span class=normal>100</span>
+<span class=normal>101</span>
+<span class=normal>102</span>
+<span class=normal>103</span>
+<span class=normal>104</span>
+<span class=normal>105</span>
+<span class=normal>106</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>jump_next_block</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Jump to the next block and return it.</span>
 <span class=sd>    This appends the current `Frame.next_block` to the current region</span>
 <span class=sd>    and creates a new Block for `next_block`.</span>
