@@ -1,4 +1,5 @@
 from abc import ABC
+from typing import cast
 from dataclasses import field, dataclass
 
 from kirin.ir import Pure, Block, IRNode, Region, MaybePure, Statement
@@ -29,12 +30,12 @@ class RewriteRule(ABC):
     """
 
     def rewrite(self, node: IRNode) -> RewriteResult:
-        if isinstance(node, Region):
-            return self.rewrite_Region(node)
-        elif isinstance(node, Block):
-            return self.rewrite_Block(node)
-        elif isinstance(node, Statement):
-            return self.rewrite_Statement(node)
+        if node.IS_REGION:
+            return self.rewrite_Region(cast(Region, node))
+        elif node.IS_BLOCK:
+            return self.rewrite_Block(cast(Block, node))
+        elif node.IS_STATEMENT:
+            return self.rewrite_Statement(cast(Statement, node))
         else:
             return RewriteResult()
 

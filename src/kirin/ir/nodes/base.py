@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar, Iterator
+from typing import TYPE_CHECKING, Generic, TypeVar, ClassVar, Iterator
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
@@ -28,6 +28,10 @@ class IRNode(Generic[ParentType], ABC, Printable):
     """
 
     source: SourceInfo | None = field(default=None, init=False, repr=False)
+
+    IS_REGION: ClassVar[bool] = False
+    IS_BLOCK: ClassVar[bool] = False
+    IS_STATEMENT: ClassVar[bool] = False
 
     def assert_parent(self, type_: type[IRNode], parent) -> None:
         assert (
