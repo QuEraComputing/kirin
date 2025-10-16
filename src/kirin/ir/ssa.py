@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 class SSAValue(ABC, Printable):
     """Base class for all SSA values in the IR."""
 
+    IS_SSA_VALUE: ClassVar[bool] = True
+
     type: TypeAttribute = field(default_factory=AnyType, init=False, repr=True)
     """The type of this SSA value."""
     hints: dict[str, Attribute] = field(default_factory=dict, init=False, repr=False)

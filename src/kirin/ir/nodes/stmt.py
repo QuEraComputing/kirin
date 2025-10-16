@@ -131,6 +131,8 @@ class Statement(IRNode["Block"]):
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
 
+    IS_STATEMENT: ClassVar[bool] = True
+
     name: ClassVar[str]
     dialect: ClassVar[Dialect | None] = field(default=None, init=False, repr=False)
     traits: ClassVar[frozenset[Trait["Statement"]]] = frozenset()
