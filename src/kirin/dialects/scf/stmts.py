@@ -1,4 +1,7 @@
+from typing import cast
+
 from kirin import ir, types
+from kirin.ir import Block, Region
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
 
@@ -31,31 +34,29 @@ class IfElse(ir.Statement):
         else_body: ir.Region | ir.Block | None = None,
     ):
         if then_body.IS_REGION:
-            then_body_region = then_body
+            then_body_region = cast(Region, then_body)
             if then_body_region.blocks:
                 then_body_block = then_body_region.blocks[-1]
             else:
                 then_body_block = None
-        elif then_body.IS_BLOCK:
-            then_body_block = then_body
-            then_body_region = ir.Region(then_body)
+        else:  # then_body.IS_BLOCK:
+            then_body_block = cast(Block, then_body)
+            then_body_region = Region(then_body)
 
-        if else_body.IS_REGION:
-            if not else_body.blocks:  # empty region
-                else_body_region = else_body
-                else_body_block = None
-            elif len(else_body.blocks) == 0:
-                else_body_region = else_body
-                else_body_block = None
-            else:
-                else_body_region = else_body
-                else_body_block = else_body_region.blocks[0]
-        elif else_body.IS_BLOCK:
-            else_body_region = ir.Region(else_body)
-            else_body_block = else_body
-        else:
+        if else_body is None:
             else_body_region = ir.Region()
             else_body_block = None
+        elif else_body.IS_REGION:
+            else_body_region = cast(Region, else_body)
+            if not else_body.blocks:  # empty region
+                else_body_block = None
+            elif len(else_body.blocks) == 0:
+                else_body_block = None
+            else:
+                else_body_block = else_body_region.blocks[0]
+        else:  # else_body.IS_BLOCK:
+            else_body_region = ir.Region(cast(Block, else_body))
+            else_body_block = else_body
 
         # if either then or else body has yield, we generate results
         # we assume if both have yields, they have the same number of results

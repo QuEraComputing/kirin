@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 import inspect
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from rich.console import Console
 
@@ -11,7 +11,7 @@ from kirin.exception import StaticCheckError
 from kirin.print.printer import Printer
 
 if TYPE_CHECKING:
-    from kirin.ir import IRNode, Method
+    from kirin.ir import IRNode, Method, Statement
 
 
 class ValidationError(StaticCheckError):
@@ -39,7 +39,8 @@ class ValidationError(StaticCheckError):
             map(lambda each_line: " " * 4 + each_line, node_str.splitlines())
         )
         if self.node.IS_STATEMENT:
-            dialect = self.node.dialect.name if self.node.dialect else "<no dialect>"
+            stmt = cast("Statement", self.node)
+            dialect = stmt.dialect.name if stmt.dialect else "<no dialect>"
             self.args += (
                 "when verifying the following statement",
                 f" `{dialect}.{type(self.node).__name__}` at\n",

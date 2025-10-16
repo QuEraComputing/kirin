@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Callable, Optional, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    TypeVar,
+    Callable,
+    Optional,
+    cast,
+    overload,
+)
 from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, SSAValue, Statement
@@ -54,9 +63,9 @@ class Frame(Generic[Stmt]):
 
     def push(self, node: StmtType | Block) -> StmtType | Block:
         if node.IS_BLOCK:
-            return self._push_block(node)
+            return self._push_block(cast(Block, node))
         elif node.IS_STATEMENT:
-            return self._push_stmt(node)
+            return self._push_stmt(cast(Statement, node))
         else:
             raise BuildError(f"Unsupported type {type(node)} in push()")
 
