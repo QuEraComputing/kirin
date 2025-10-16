@@ -18,7 +18,18 @@ class FlattenAdd(RewriteRule):
         new_data = ()
 
         # lhs:
-        if isinstance((lhs := node.lhs).owner, ilist.New):
+        lhs = node.lhs
+        rhs = node.rhs
+
+        if (
+            (lhs_parent := lhs.owner.parent) is None
+            or (rhs_parent := rhs.owner.parent) is None
+            or lhs_parent is not rhs_parent
+        ):
+            # do not flatten across different blocks/regions
+            return RewriteResult()
+
+        if isinstance(lhs.owner, ilist.New):
             new_data += lhs.owner.values
         elif (
             not isinstance(const_lhs := lhs.hints.get("const"), const.Value)
@@ -27,7 +38,7 @@ class FlattenAdd(RewriteRule):
             return RewriteResult()
 
         # rhs:
-        if isinstance((rhs := node.rhs).owner, ilist.New):
+        if isinstance(rhs.owner, ilist.New):
             new_data += rhs.owner.values
         elif (
             not isinstance(const_rhs := rhs.hints.get("const"), const.Value)

@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from kirin import ir, types, rewrite
 from kirin.passes import aggressive
-from kirin.prelude import basic_no_opt, python_basic
+from kirin.prelude import structural, basic_no_opt, python_basic
 from kirin.analysis import const
 from kirin.dialects import py, func, ilist, lowering
 from kirin.passes.typeinfer import TypeInfer
@@ -326,6 +326,46 @@ def test_ilist_flatten_add_both_new():
     rule.rewrite(test_block)
 
     assert test_block.is_equal(expected_block)
+
+
+def test_region_boundary_structural():
+
+    # Do not optimize across region boundary like if-else or basic blocks
+    @structural
+    def test_impl(n: int):
+        a = ilist.IList([])
+
+        if n > 0:
+            a = a + [n]
+
+        return a
+
+    expected_impl = test_impl.similar()
+    test_impl.print(hint="const")
+    rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
+    rule.rewrite(test_impl.code)
+
+    assert test_impl.code.is_structurally_equal(expected_impl.code)
+
+
+def test_region_boundary():
+
+    # Do not optimize across region boundary like if-else or basic blocks
+    @basic_no_opt
+    def test_impl(n: int):
+        a = ilist.IList([])
+
+        if n > 0:
+            a = a + [n]
+
+        return a
+
+    expected_impl = test_impl.similar()
+    test_impl.print(hint="const")
+    rule = rewrite.Walk(ilist.rewrite.FlattenAdd())
+    rule.rewrite(test_impl.code)
+
+    assert test_impl.code.is_structurally_equal(expected_impl.code)
 
 
 def test_ilist_constprop():
