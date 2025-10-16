@@ -25,7 +25,7 @@ class EmitABC(abc.InterpreterABC[CodeGenFrameType, TargetType], ABC):
         super().__init_subclass__()
         for each in getattr(cls, "keys", ()):
             if not each.startswith("emit."):
-                raise ValueError(f"Key {each} cannot start with 'emit.'")
+                raise ValueError(f"Key {each} must start with 'emit.'")
 
     @abstractmethod
     def run(self, node: ir.Method | ir.Statement): ...
