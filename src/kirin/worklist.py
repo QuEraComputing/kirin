@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar, Iterable
 from queue import SimpleQueue
+from typing import Generic, TypeVar, Iterable
 
 ElemType = TypeVar("ElemType")
 
