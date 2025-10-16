@@ -1,3 +1,4 @@
+from typing import cast
 from dataclasses import field, dataclass
 
 from kirin import ir
@@ -34,7 +35,10 @@ class ScfRule(RewriteRule):
             result.replace_by(exit_block.args.append_from(result.type, result.name))
 
         curr_block = node.parent_block
-        assert curr_block.IS_BLOCK, "Node must be inside a block"
+        assert (
+            curr_block is not None and curr_block.IS_BLOCK
+        ), "Node must be inside a block"
+        curr_block = cast(ir.Block, curr_block)
 
         curr_block.stmts.append(
             Branch(arguments=(), successor=(entr_block := ir.Block()))
@@ -47,8 +51,12 @@ class ScfRule(RewriteRule):
         curr_block = node.parent_block
         region = node.parent_region
 
-        assert region.IS_REGION, "Node must be inside a region"
-        assert curr_block.IS_BLOCK, "Node must be inside a block"
+        assert region is not None and region.IS_REGION, "Node must be inside a region"
+        region = cast(ir.Region, region)
+        assert (
+            curr_block is not None and curr_block.IS_BLOCK
+        ), "Node must be inside a block"
+        curr_block = cast(ir.Block, curr_block)
 
         block_idx = region._block_idx[curr_block]
         return region, block_idx

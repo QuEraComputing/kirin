@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, cast
 from dataclasses import field, dataclass
 
 from kirin.ir import Block, Region, Statement
@@ -49,11 +49,11 @@ class Walk(RewriteRule):
             return
 
         if node.IS_STATEMENT:
-            self.populate_worklist_Statement(node)
+            self.populate_worklist_Statement(cast(Statement, node))
         elif node.IS_REGION:
-            self.populate_worklist_Region(node)
+            self.populate_worklist_Region(cast(Region, node))
         elif node.IS_BLOCK:
-            self.populate_worklist_Block(node)
+            self.populate_worklist_Block(cast(Block, node))
         else:
             raise NotImplementedError(f"populate_worklist_{node.__class__.__name__}")
 
