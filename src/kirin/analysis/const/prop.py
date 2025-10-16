@@ -99,11 +99,7 @@ class Propagate(ForwardExtra[Frame, Result]):
         _frame.set_values(stmt.args, tuple(x.data for x in values))
         method = self._interp.lookup_registry(frame, stmt)
         if method is not None:
-            try:
-                value = method(self._interp, _frame, stmt)
-            except NotImplementedError:
-                # the concrete interpreter doesn't have the implementation so we cannot evaluate it
-                return tuple(Unknown() for _ in stmt.results)
+            value = method(self._interp, _frame, stmt)
         else:
             return tuple(Unknown() for _ in stmt.results)
         match value:
