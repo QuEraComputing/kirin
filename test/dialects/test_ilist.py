@@ -1,10 +1,12 @@
 from typing import Any, Literal
 
 from kirin import ir, types, rewrite
+from kirin.decl import info, statement
 from kirin.passes import aggressive
 from kirin.prelude import structural, basic_no_opt, python_basic
 from kirin.analysis import const
 from kirin.dialects import py, func, ilist, lowering
+from kirin.lowering import FromPythonCall
 from kirin.passes.typeinfer import TypeInfer
 
 
@@ -424,3 +426,50 @@ def test_ilist_constprop():
     target = frame.entries[target_ssa]
     assert isinstance(target, const.Value)
     assert target.data == (6, 6)
+
+
+def test_ilist_constprop_non_pure():
+
+    new_dialect = ir.Dialect("test")
+
+    @statement(dialect=new_dialect)
+    class DefaultInit(ir.Statement):
+        name = "test"
+        traits = frozenset({FromPythonCall()})
+        result: ir.ResultValue = info.result(types.Float)
+
+    dialect_group = basic_no_opt.add(new_dialect)
+
+    @dialect_group
+    def test():
+
+        def inner(_: int):
+            return DefaultInit()
+
+        return ilist.map(inner, ilist.range(10))
+
+    _, res = const.Propagate(dialect_group).run_analysis(test)
+
+    assert isinstance(res, const.Unknown)
+
+
+rule = rewrite.Fixpoint(rewrite.Walk(ilist.rewrite.Unroll()))
+xs = ilist.IList([1, 2, 3])
+
+
+@basic
+def map(xs: ilist.IList[int, Literal[3]]):
+    return ilist.map(add1, xs)
+
+
+@basic_no_opt
+def foreach(xs: ilist.IList[int, Literal[3]]):
+    ilist.for_each(add1, xs)
+
+
+map_before = map(xs)
+foreach_before = foreach(xs)
+rule.rewrite(map.code)
+rule.rewrite(foreach.code)
+map_after = map(xs)
+foreach_after = foreach(xs)
