@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, ClassVar, Iterable, Iterator
 from dataclasses import field, dataclass
 from collections.abc import Sequence
 
@@ -240,6 +240,8 @@ class Block(IRNode["Region"]):
         This object is pretty printable via
         [`.print()`][kirin.print.printable.Printable.print] method.
     """
+
+    IS_BLOCK: ClassVar[bool] = True
 
     _args: tuple[BlockArgument, ...]
 

@@ -48,11 +48,11 @@ class Walk(RewriteRule):
         if self.skip(node):
             return
 
-        if isinstance(node, Statement):
+        if node.IS_STATEMENT:
             self.populate_worklist_Statement(node)
-        elif isinstance(node, Region):
+        elif node.IS_REGION:
             self.populate_worklist_Region(node)
-        elif isinstance(node, Block):
+        elif node.IS_BLOCK:
             self.populate_worklist_Block(node)
         else:
             raise NotImplementedError(f"populate_worklist_{node.__class__.__name__}")
