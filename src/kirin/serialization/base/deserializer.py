@@ -107,7 +107,17 @@ class Deserializer:
         out.sym_name = serUnit.data["sym_name"]
         out.arg_names = serUnit.data.get("arg_names", [])
         out.nargs = self.deserialize_int(serUnit.data["nargs"])
+
+        ser_dg = self.deserialize_dialect_group(serUnit.data["dialects"])
+        ser_names = {d.name for d in ser_dg.data}
+        allowed_names = {d.name for d in self.dialect_group.data}
+        if not ser_names.issubset(allowed_names):
+            missing = ser_names - allowed_names
+            raise ValueError(
+                f"Deserialized method {out.sym_name} uses dialects not present in interpreter: {sorted(missing)}"
+            )
         out.dialects = self.dialect_group
+
         out.code = self.deserialize_statement(serUnit.data["code"])
         out.backedges = set()
         out.fields = self.deserialize_tuple(serUnit.data.get("fields", ()))
