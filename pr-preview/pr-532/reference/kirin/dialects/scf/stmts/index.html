@@ -3,8 +3,7 @@
     <span class=n>body</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span>
     <span class=o>*</span><span class=n>initializers</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>142</span>
-<span class=normal>143</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>143</span>
 <span class=normal>144</span>
 <span class=normal>145</span>
 <span class=normal>146</span>
@@ -20,7 +19,8 @@
 <span class=normal>156</span>
 <span class=normal>157</span>
 <span class=normal>158</span>
-<span class=normal>159</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>159</span>
+<span class=normal>160</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>iterable</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span>
     <span class=n>body</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span>
@@ -39,8 +39,7 @@
         <span class=n>attributes</span><span class=o>=</span><span class=p>{</span><span class=s2>&quot;purity&quot;</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>PyAttr</span><span class=p>(</span><span class=kc>False</span><span class=p>)},</span>
     <span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.scf.stmts.For.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as verify_type, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>161</span>
-<span class=normal>162</span>
+</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as verify_type, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>162</span>
 <span class=normal>163</span>
 <span class=normal>164</span>
 <span class=normal>165</span>
@@ -69,7 +68,8 @@
 <span class=normal>188</span>
 <span class=normal>189</span>
 <span class=normal>190</span>
-<span class=normal>191</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>191</span>
+<span class=normal>192</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=kn>from</span> <span class=nn>kirin.dialects.func</span> <span class=kn>import</span> <span class=n>Return</span>
 
     <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>body</span><span class=o>.</span><span class=n>blocks</span><span class=p>)</span> <span class=o>!=</span> <span class=mi>1</span><span class=p>:</span>
@@ -105,10 +105,7 @@
     <span class=n>then_body</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span> <span class=o>|</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>,</span>
     <span class=n>else_body</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span> <span class=o>|</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>Python-like if-else statement.</p> <p>This statement has a condition, then body, and else body.</p> <p>Then body either terminates with a yield statement or <code>scf.return</code>.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>27</span>
-<span class=normal>28</span>
-<span class=normal>29</span>
-<span class=normal>30</span>
+</code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.ir.Statement" href="../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement">Statement</a></code></p> <p>Python-like if-else statement.</p> <p>This statement has a condition, then body, and else body.</p> <p>Then body either terminates with a yield statement or <code>scf.return</code>.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>30</span>
 <span class=normal>31</span>
 <span class=normal>32</span>
 <span class=normal>33</span>
@@ -158,38 +155,37 @@
 <span class=normal>77</span>
 <span class=normal>78</span>
 <span class=normal>79</span>
-<span class=normal>80</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>80</span>
+<span class=normal>81</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>cond</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>,</span>
     <span class=n>then_body</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span> <span class=o>|</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>,</span>
     <span class=n>else_body</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span> <span class=o>|</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>):</span>
-    <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>then_body</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>):</span>
-        <span class=n>then_body_region</span> <span class=o>=</span> <span class=n>then_body</span>
+    <span class=k>if</span> <span class=n>then_body</span><span class=o>.</span><span class=n>IS_REGION</span><span class=p>:</span>
+        <span class=n>then_body_region</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=n>Region</span><span class=p>,</span> <span class=n>then_body</span><span class=p>)</span>
         <span class=k>if</span> <span class=n>then_body_region</span><span class=o>.</span><span class=n>blocks</span><span class=p>:</span>
             <span class=n>then_body_block</span> <span class=o>=</span> <span class=n>then_body_region</span><span class=o>.</span><span class=n>blocks</span><span class=p>[</span><span class=o>-</span><span class=mi>1</span><span class=p>]</span>
         <span class=k>else</span><span class=p>:</span>
             <span class=n>then_body_block</span> <span class=o>=</span> <span class=kc>None</span>
-    <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>then_body</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>):</span>
-        <span class=n>then_body_block</span> <span class=o>=</span> <span class=n>then_body</span>
-        <span class=n>then_body_region</span> <span class=o>=</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>(</span><span class=n>then_body</span><span class=p>)</span>
+    <span class=k>else</span><span class=p>:</span>  <span class=c1># then_body.IS_BLOCK:</span>
+        <span class=n>then_body_block</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=n>Block</span><span class=p>,</span> <span class=n>then_body</span><span class=p>)</span>
+        <span class=n>then_body_region</span> <span class=o>=</span> <span class=n>Region</span><span class=p>(</span><span class=n>then_body</span><span class=p>)</span>
 
-    <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>else_body</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>):</span>
-        <span class=k>if</span> <span class=ow>not</span> <span class=n>else_body</span><span class=o>.</span><span class=n>blocks</span><span class=p>:</span>  <span class=c1># empty region</span>
-            <span class=n>else_body_region</span> <span class=o>=</span> <span class=n>else_body</span>
-            <span class=n>else_body_block</span> <span class=o>=</span> <span class=kc>None</span>
-        <span class=k>elif</span> <span class=nb>len</span><span class=p>(</span><span class=n>else_body</span><span class=o>.</span><span class=n>blocks</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>:</span>
-            <span class=n>else_body_region</span> <span class=o>=</span> <span class=n>else_body</span>
-            <span class=n>else_body_block</span> <span class=o>=</span> <span class=kc>None</span>
-        <span class=k>else</span><span class=p>:</span>
-            <span class=n>else_body_region</span> <span class=o>=</span> <span class=n>else_body</span>
-            <span class=n>else_body_block</span> <span class=o>=</span> <span class=n>else_body_region</span><span class=o>.</span><span class=n>blocks</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span>
-    <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>else_body</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>):</span>
-        <span class=n>else_body_region</span> <span class=o>=</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>(</span><span class=n>else_body</span><span class=p>)</span>
-        <span class=n>else_body_block</span> <span class=o>=</span> <span class=n>else_body</span>
-    <span class=k>else</span><span class=p>:</span>
+    <span class=k>if</span> <span class=n>else_body</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
         <span class=n>else_body_region</span> <span class=o>=</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>()</span>
         <span class=n>else_body_block</span> <span class=o>=</span> <span class=kc>None</span>
+    <span class=k>elif</span> <span class=n>else_body</span><span class=o>.</span><span class=n>IS_REGION</span><span class=p>:</span>
+        <span class=n>else_body_region</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=n>Region</span><span class=p>,</span> <span class=n>else_body</span><span class=p>)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>else_body</span><span class=o>.</span><span class=n>blocks</span><span class=p>:</span>  <span class=c1># empty region</span>
+            <span class=n>else_body_block</span> <span class=o>=</span> <span class=kc>None</span>
+        <span class=k>elif</span> <span class=nb>len</span><span class=p>(</span><span class=n>else_body</span><span class=o>.</span><span class=n>blocks</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>:</span>
+            <span class=n>else_body_block</span> <span class=o>=</span> <span class=kc>None</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>else_body_block</span> <span class=o>=</span> <span class=n>else_body_region</span><span class=o>.</span><span class=n>blocks</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span>
+    <span class=k>else</span><span class=p>:</span>  <span class=c1># else_body.IS_BLOCK:</span>
+        <span class=n>else_body_region</span> <span class=o>=</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>(</span><span class=n>cast</span><span class=p>(</span><span class=n>Block</span><span class=p>,</span> <span class=n>else_body</span><span class=p>))</span>
+        <span class=n>else_body_block</span> <span class=o>=</span> <span class=n>else_body</span>
 
     <span class=c1># if either then or else body has yield, we generate results</span>
     <span class=c1># we assume if both have yields, they have the same number of results</span>
@@ -213,8 +209,7 @@
         <span class=n>attributes</span><span class=o>=</span><span class=p>{</span><span class=s2>&quot;purity&quot;</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>PyAttr</span><span class=p>(</span><span class=kc>False</span><span class=p>)},</span>
     <span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.scf.stmts.IfElse.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as verify_type, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal> 99</span>
-<span class=normal>100</span>
+</code></pre></div> <div class="doc doc-contents "> <p>run mandatory validation checks. This is not same as verify_type, which may be optional.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/stmts.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>100</span>
 <span class=normal>101</span>
 <span class=normal>102</span>
 <span class=normal>103</span>
@@ -244,7 +239,8 @@
 <span class=normal>127</span>
 <span class=normal>128</span>
 <span class=normal>129</span>
-<span class=normal>130</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>130</span>
+<span class=normal>131</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=kn>from</span> <span class=nn>kirin.dialects.func</span> <span class=kn>import</span> <span class=n>Return</span>
 
     <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>then_body</span><span class=o>.</span><span class=n>blocks</span><span class=p>)</span> <span class=o>!=</span> <span class=mi>1</span><span class=p>:</span>

@@ -2,28 +2,35 @@
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title="kirin.rewrite.abc.RewriteRule" href="../../../rewrite/abc/#kirin.rewrite.abc.RewriteRule">RewriteRule</a></code></p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.scf.scf2cf.ScfRule.get_curr_blk_info class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_curr_blk_info</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_curr_blk_info</span><span class=p>(</span>
     <span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span> <span class=nb>int</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get the current region and the block index of the node in the region.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/scf2cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>45</span>
-<span class=normal>46</span>
-<span class=normal>47</span>
-<span class=normal>48</span>
-<span class=normal>49</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get the current region and the block index of the node in the region.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/scf2cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>49</span>
 <span class=normal>50</span>
 <span class=normal>51</span>
 <span class=normal>52</span>
 <span class=normal>53</span>
-<span class=normal>54</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_curr_blk_info</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span> <span class=nb>int</span><span class=p>]:</span>
+<span class=normal>54</span>
+<span class=normal>55</span>
+<span class=normal>56</span>
+<span class=normal>57</span>
+<span class=normal>58</span>
+<span class=normal>59</span>
+<span class=normal>60</span>
+<span class=normal>61</span>
+<span class=normal>62</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_curr_blk_info</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span> <span class=nb>int</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the current region and the block index of the node in the region.&quot;&quot;&quot;</span>
     <span class=n>curr_block</span> <span class=o>=</span> <span class=n>node</span><span class=o>.</span><span class=n>parent_block</span>
     <span class=n>region</span> <span class=o>=</span> <span class=n>node</span><span class=o>.</span><span class=n>parent_region</span>
 
-    <span class=k>assert</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>region</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>),</span> <span class=s2>&quot;Node must be inside a region&quot;</span>
-    <span class=k>assert</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>curr_block</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>),</span> <span class=s2>&quot;Node must be inside a block&quot;</span>
+    <span class=k>assert</span> <span class=n>region</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span> <span class=ow>and</span> <span class=n>region</span><span class=o>.</span><span class=n>IS_REGION</span><span class=p>,</span> <span class=s2>&quot;Node must be inside a region&quot;</span>
+    <span class=n>region</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Region</span><span class=p>,</span> <span class=n>region</span><span class=p>)</span>
+    <span class=k>assert</span> <span class=p>(</span>
+        <span class=n>curr_block</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span> <span class=ow>and</span> <span class=n>curr_block</span><span class=o>.</span><span class=n>IS_BLOCK</span>
+    <span class=p>),</span> <span class=s2>&quot;Node must be inside a block&quot;</span>
+    <span class=n>curr_block</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>,</span> <span class=n>curr_block</span><span class=p>)</span>
 
     <span class=n>block_idx</span> <span class=o>=</span> <span class=n>region</span><span class=o>.</span><span class=n>_block_idx</span><span class=p>[</span><span class=n>curr_block</span><span class=p>]</span>
     <span class=k>return</span> <span class=n>region</span><span class=p>,</span> <span class=n>block_idx</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.scf.scf2cf.ScfRule.get_entr_and_exit_blks class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_entr_and_exit_blks</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_entr_and_exit_blks</span><span class=p>(</span><span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get the enter and exit blocks for the given SCF node.</p> <p>The exit block is a new block that will be created to hold the statements that follow the SCF node in the current block and the enter block is a new block that will be created to hold the any logic required to enter the SCF node.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/scf2cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>15</span>
-<span class=normal>16</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get the enter and exit blocks for the given SCF node.</p> <p>The exit block is a new block that will be created to hold the statements that follow the SCF node in the current block and the enter block is a new block that will be created to hold the any logic required to enter the SCF node.</p> <details class=quote> <summary>Source code in <code>src/kirin/dialects/scf/scf2cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>16</span>
 <span class=normal>17</span>
 <span class=normal>18</span>
 <span class=normal>19</span>
@@ -50,7 +57,11 @@
 <span class=normal>40</span>
 <span class=normal>41</span>
 <span class=normal>42</span>
-<span class=normal>43</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_entr_and_exit_blks</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>):</span>
+<span class=normal>43</span>
+<span class=normal>44</span>
+<span class=normal>45</span>
+<span class=normal>46</span>
+<span class=normal>47</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_entr_and_exit_blks</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>For</span> <span class=o>|</span> <span class=n>IfElse</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the enter and exit blocks for the given SCF node.</span>
 
 <span class=sd>    The exit block is a new block that will be created to hold the</span>
@@ -72,7 +83,10 @@
         <span class=n>result</span><span class=o>.</span><span class=n>replace_by</span><span class=p>(</span><span class=n>exit_block</span><span class=o>.</span><span class=n>args</span><span class=o>.</span><span class=n>append_from</span><span class=p>(</span><span class=n>result</span><span class=o>.</span><span class=n>type</span><span class=p>,</span> <span class=n>result</span><span class=o>.</span><span class=n>name</span><span class=p>))</span>
 
     <span class=n>curr_block</span> <span class=o>=</span> <span class=n>node</span><span class=o>.</span><span class=n>parent_block</span>
-    <span class=k>assert</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>curr_block</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>),</span> <span class=s2>&quot;Node must be inside a block&quot;</span>
+    <span class=k>assert</span> <span class=p>(</span>
+        <span class=n>curr_block</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span> <span class=ow>and</span> <span class=n>curr_block</span><span class=o>.</span><span class=n>IS_BLOCK</span>
+    <span class=p>),</span> <span class=s2>&quot;Node must be inside a block&quot;</span>
+    <span class=n>curr_block</span> <span class=o>=</span> <span class=n>cast</span><span class=p>(</span><span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>,</span> <span class=n>curr_block</span><span class=p>)</span>
 
     <span class=n>curr_block</span><span class=o>.</span><span class=n>stmts</span><span class=o>.</span><span class=n>append</span><span class=p>(</span>
         <span class=n>Branch</span><span class=p>(</span><span class=n>arguments</span><span class=o>=</span><span class=p>(),</span> <span class=n>successor</span><span class=o>=</span><span class=p>(</span><span class=n>entr_block</span> <span class=o>:=</span> <span class=n>ir</span><span class=o>.</span><span class=n>Block</span><span class=p>()))</span>
