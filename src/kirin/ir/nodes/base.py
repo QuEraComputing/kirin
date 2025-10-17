@@ -91,6 +91,10 @@ class IRNode(Generic[ParentType], ABC, Printable):
             raise ValueError("Node is an ancestor of the parent")
         self.parent_node = parent
 
+    def attach_no_check(self, parent: ParentType) -> None:
+        """Attach the current node to the parent node without checking for error conditions."""
+        self.parent_node = parent
+
     @abstractmethod
     def detach(self) -> None:
         """Detach the current node from the parent node."""

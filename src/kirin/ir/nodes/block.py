@@ -230,6 +230,20 @@ class BlockStmts(View["Block", "Statement"]):
         else:
             raise ValueError("Invalid block, last_stmt is None")
 
+    def append_no_check(self, value: Statement) -> None:
+        """Append a Statement to the reference Block without checking for error conditions.
+
+        Args:
+            value (Statement): A Statement to be appended.
+        """
+        if self.node._stmt_len == 0:  # empty block
+            value.attach_no_check(self.node)
+            self.node._first_stmt = value
+            self.node._last_stmt = value
+            self.node._stmt_len += 1
+        else:  # self.node._last_stmt:
+            value.insert_after(self.node._last_stmt)
+
 
 @dataclass
 class Block(IRNode["Region"]):

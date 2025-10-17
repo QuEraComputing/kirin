@@ -112,10 +112,11 @@ class Inline(RewriteRule):
 
         # wrap what's after invoke into a block
         after_block = ir.Block()
+        after_block_stmts = after_block.stmts  # Only call property function once
         stmt = call_like.next_stmt
         while stmt is not None:
             stmt.detach()
-            after_block.stmts.append(stmt)
+            after_block_stmts.append_no_check(stmt)
             stmt = call_like.next_stmt
 
         for result in call_like.results:
