@@ -589,6 +589,7 @@ class Statement(IRNode["Block"]):
             context.get(arg, arg) == other_arg
             for arg, other_arg in zip(self.args, other.args)
         ):
+
             return False
 
         if not all(

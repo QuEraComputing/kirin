@@ -1,28 +1,24 @@
-import typing
-from collections.abc import Sequence
+from dataclasses import field, dataclass
 
-from kirin import ir, types
-from kirin.dialects.func.attrs import Signature
-from kirin.dialects.ilist.runtime import IList
+from kirin import ir
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
     mangle,
     get_str_from_type,
 )
-from kirin.serialization.base.serializable import Serializable
-from kirin.serialization.base.serializationunit import SerializationUnit
-from kirin.serialization.base.serializationmodule import SerializationModule
+from kirin.serialization.core.serializable import Serializable
+from kirin.serialization.core.supportedtypes import SUPPORTED_PYTHON_TYPES
+from kirin.serialization.core.serializationunit import SerializationUnit
+from kirin.serialization.core.serializationmodule import SerializationModule
 
 
+@dataclass
 class Serializer:
-    _ctx: SerializationContext
-
-    def __init__(self) -> None:
-        self._ctx = SerializationContext()
-        self._ctx.clear()
+    _ctx: SerializationContext = field(default_factory=SerializationContext, init=False)
 
     def encode(self, obj: ir.Method) -> SerializationModule:
+        self._ctx.clear()
         body = self.serialize_method(obj)
         if getattr(self._ctx, "Method_Symbol", None):
             st: dict[str, MethodSymbolMeta] = {}
@@ -44,8 +40,24 @@ class Serializer:
         return SerializationModule(symbol_table=symbol_table, body=body)
 
     def serialize(
-        self, obj: Serializable | Sequence[typing.Any] | None
+        self,
+        obj: (
+            Serializable
+            | SUPPORTED_PYTHON_TYPES
+            | ir.Attribute
+            | ir.Statement
+            | ir.Block
+            | ir.Region
+            | ir.ResultValue
+            | ir.BlockArgument
+            | ir.Dialect
+            | ir.DialectGroup
+            | ir.Method
+        ),
     ) -> SerializationUnit:
+        if isinstance(obj, ir.Attribute):
+            return self.serialize_attribute(obj)
+
         ser_method = getattr(
             self, "serialize_" + type(obj).__name__.lower(), self.generic_serialize
         )
@@ -124,6 +136,8 @@ class Serializer:
                 "arg_names": mthd.arg_names,
                 "dialects": self.serialize_dialect_group(mthd.dialects),
                 "code": self.serialize_statement(mthd.code),
+                "nargs": self.serialize_int(mthd.nargs),
+                "fields": self.serialize_tuple(mthd.fields),
                 "mangled": mangled,
             },
         )
@@ -355,7 +369,12 @@ class Serializer:
     def serialize_attribute(self, attr: ir.Attribute) -> SerializationUnit:
         if not isinstance(attr, Serializable):
             raise TypeError(f"Attribute {attr} is not Serializable.")
-        return attr.serialize(self)
+        return SerializationUnit(
+            kind="attribute",
+            module_name=attr.__module__,
+            class_name=attr.__class__.__name__,
+            data={"data": attr.serialize(self)},
+        )
 
     def serialize_resultvalue(self, result: ir.ResultValue) -> SerializationUnit:
         return SerializationUnit(
@@ -367,7 +386,7 @@ class Serializer:
                 "id": self._ctx.ssa_idtable[result],
                 "owner": self.serialize_str(self._ctx.stmt_idtable[result.owner]),
                 "index": result.index,
-                "type": self.serialize_attribute(result.type),
+                "type": self.serialize(result.type),
                 "name": result.name,
             },
         )
@@ -380,12 +399,9 @@ class Serializer:
     def serialize_dialect(self, dialect: ir.Dialect) -> SerializationUnit:
         return SerializationUnit(
             kind="dialect",
-            module_name=ir.Dialect.__module__,
-            class_name=ir.Dialect.__name__,
-            data={
-                "name": self.serialize_str(dialect.name),
-                "stmts": self.serialize_list(dialect.stmts),
-            },
+            module_name=dialect.__module__,
+            class_name=dialect.__class__.__name__,
+            data={"name": dialect.name},
         )
 
     def serialize_dialect_group(self, group: ir.DialectGroup) -> SerializationUnit:
@@ -395,116 +411,5 @@ class Serializer:
             class_name=ir.DialectGroup.__name__,
             data={
                 "data": self.serialize_frozenset(group.data),
-            },
-        )
-
-    def serialize_pyclass(self, pc: types.PyClass) -> SerializationUnit:
-        return SerializationUnit(
-            kind="pyclass",
-            module_name=pc.__module__,
-            class_name=pc.__class__.__name__,
-            data=dict(
-                typ=self.serialize_type(pc.typ),
-                display_name=self.serialize_str(pc.display_name),
-                prefix=self.serialize_str(pc.prefix),
-            ),
-        )
-
-    def serialize_typevar(self, tv: types.TypeVar) -> SerializationUnit:
-        return SerializationUnit(
-            kind="typevar",
-            module_name=tv.__module__,
-            class_name=tv.__class__.__name__,
-            data={
-                "varname": self.serialize_str(tv.varname),
-                "bound": self.serialize_attribute(tv.bound),
-            },
-        )
-
-    def serialize_generic(self, gen: types.Generic) -> SerializationUnit:
-        return SerializationUnit(
-            kind="generic",
-            module_name=gen.__module__,
-            class_name=gen.__class__.__name__,
-            data={
-                "body": self.serialize_pyclass(gen.body),
-                "vars": self.serialize_tuple(gen.vars),
-                "vararg": self.serialize(gen.vararg),
-            },
-        )
-
-    def serialize_vararg(self, var: types.Vararg) -> SerializationUnit:
-        return SerializationUnit(
-            kind="vararg",
-            module_name=var.__module__,
-            class_name=var.__class__.__name__,
-            data={"typ": self.serialize_attribute(var.typ)},
-        )
-
-    def serialize_anytype(self, at: types.AnyType) -> SerializationUnit:
-        return SerializationUnit(
-            kind="anytype",
-            module_name=at.__module__,
-            class_name=at.__class__.__name__,
-            data=dict(),
-        )
-
-    def serialize_bottomtype(self, bt: types.BottomType) -> SerializationUnit:
-        return SerializationUnit(
-            kind="bottomtype",
-            module_name=bt.__module__,
-            class_name=bt.__class__.__name__,
-            data=dict(),
-        )
-
-    def serialize_pyattr(self, pa: ir.PyAttr) -> SerializationUnit:
-        return SerializationUnit(
-            kind="pyattr",
-            module_name=pa.__module__,
-            class_name=pa.__class__.__name__,
-            data={
-                "data": self.serialize(pa.data),
-                "pytype": self.serialize_attribute(pa.type),
-            },
-        )
-
-    def serialize_literal(self, lit: types.Literal) -> SerializationUnit:
-        return SerializationUnit(
-            kind="literal",
-            module_name=lit.__module__,
-            class_name=lit.__class__.__name__,
-            data={
-                "value": self.serialize(lit.data),
-                "type": self.serialize_attribute(lit.type),
-            },
-        )
-
-    def serialize_union(self, uni: types.Union) -> SerializationUnit:
-        return SerializationUnit(
-            kind="Union",
-            module_name=uni.__module__,
-            class_name=uni.__class__.__name__,
-            data={"types": self.serialize_frozenset(uni.types)},
-        )
-
-    def serialize_signature(self, sig: Signature) -> SerializationUnit:
-        return SerializationUnit(
-            kind="signature",
-            module_name=sig.__module__,
-            class_name=sig.__class__.__name__,
-            data={
-                "inputs": self.serialize_tuple(sig.inputs),
-                "output": self.serialize(sig.output),
-            },
-        )
-
-    def serialize_ilist(self, ilist: IList) -> SerializationUnit:
-        return SerializationUnit(
-            kind="ilist",
-            module_name=ilist.__module__,
-            class_name=ilist.__class__.__name__,
-            data={
-                "data": self.serialize(ilist.data),
-                "elem": self.serialize_attribute(ilist.elem),
             },
         )

@@ -226,8 +226,10 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
             InterpreterError: if cannot find a matching implementation for the region.
         """
         region_trait = node.get_present_trait(ir.RegionInterpretationTrait)
+
         how = self.registry.get(Signature(region_trait))
         if how is None:
+
             raise InterpreterError(
                 f"Interpreter {self.__class__.__name__} does not "
                 f"support {node} using {region_trait} convention"
