@@ -7,6 +7,7 @@ from collections.abc import Hashable
 from beartype.door import TupleVariableTypeHint  # type: ignore
 from beartype.door import TypeHint, ClassTypeHint, LiteralTypeHint, TypeVarTypeHint
 
+from kirin.serialization.core.serializable import Serializable
 from kirin.serialization.core.supportedtypes import SUPPORTED_PYTHON_TYPES
 from kirin.serialization.core.serializationunit import SerializationUnit
 
@@ -343,7 +344,10 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         )
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        if not isinstance(self.data, SUPPORTED_PYTHON_TYPES):
+        if not (
+            isinstance(self.data, SUPPORTED_PYTHON_TYPES)
+            or isinstance(self.data, Serializable)
+        ):
             raise ValueError(
                 f"Unsupported data type {type(self.data)} for serialization. Implement 'serialize' method."
             )
