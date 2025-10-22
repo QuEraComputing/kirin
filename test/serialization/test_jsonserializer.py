@@ -9,7 +9,7 @@ from kirin.serialization.base.deserializer import Deserializer
 def foo(x: int, y: float, z: bool):
     c = [[(200.0, 200.0), (210.0, 200.0)]]
     if z:
-        c.append([(222.0, 333.0)])
+        c = [(222.0, 333.0)]
     else:
         return [1, 2, 3, 4]
     return c
@@ -45,6 +45,23 @@ def my_kernel1(x: int):
 @basic
 def my_kernel2(y: int):
     return my_kernel1(y) * 10
+
+
+@basic
+def foo2(y: int):
+
+    def inner(x: int):
+        return x * y + 1
+
+    return inner
+
+
+inner_ker = foo2(y=10)
+
+
+@basic
+def main_lambda(z: int):
+    return inner_ker(z)
 
 
 @basic
@@ -92,6 +109,10 @@ def test_round_trip4():
 
 def test_round_trip5():
     round_trip(slicing)
+
+
+def test_round_trip6():
+    round_trip(main_lambda)
 
 
 def test_deterministic():

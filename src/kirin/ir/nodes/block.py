@@ -391,6 +391,10 @@ class Block(IRNode["Region"]):
         if context is None:
             context = {}
 
+        if self in context:
+            return context[self] is other
+        context[self] = other
+
         if len(self._args) != len(other._args) or len(self.stmts) != len(other.stmts):
             return False
 
