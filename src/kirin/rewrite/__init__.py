@@ -13,3 +13,4 @@ from .compactify import CFGCompactify as CFGCompactify
 from .wrap_const import WrapConst as WrapConst
 from .call2invoke import Call2Invoke as Call2Invoke
 from .type_assert import InlineTypeAssert as InlineTypeAssert
+from .closurefieldlowering import ClosureFieldLowering as ClosureFieldLowering
