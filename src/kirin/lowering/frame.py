@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .state import State
 
 CallbackFn = Callable[["Frame", SSAValue], SSAValue]
+StmtType = TypeVar("StmtType", bound=Statement)
 
 
 @dataclass
@@ -53,8 +54,6 @@ class Frame(Generic[Stmt]):
     def __repr__(self):
         return f"Frame({len(self.defs)} defs, {len(self.globals)} globals)"
 
-    StmtType = TypeVar("StmtType", bound=Statement)
-
     @overload
     def push(self, node: StmtType) -> StmtType: ...
 
@@ -65,7 +64,7 @@ class Frame(Generic[Stmt]):
         if node.IS_BLOCK:
             return self._push_block(cast(Block, node))
         elif node.IS_STATEMENT:
-            return self._push_stmt(cast(Statement, node))
+            return self._push_stmt(cast(StmtType, node))
         else:
             raise BuildError(f"Unsupported type {type(node)} in push()")
 
