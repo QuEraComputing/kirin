@@ -198,6 +198,7 @@
         * [apply_type](kirin/rewrite/apply_type.md)
         * [call2invoke](kirin/rewrite/call2invoke.md)
         * [chain](kirin/rewrite/chain.md)
+        * [closurefieldlowering](kirin/rewrite/closurefieldlowering.md)
         * [compactify](kirin/rewrite/compactify.md)
         * [cse](kirin/rewrite/cse.md)
         * [dce](kirin/rewrite/dce.md)
