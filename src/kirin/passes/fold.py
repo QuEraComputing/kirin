@@ -10,6 +10,7 @@ from kirin.rewrite import (
     CFGCompactify,
     InlineGetItem,
     DeadCodeElimination,
+    ClosureFieldLowering,
 )
 from kirin.passes.abc import Pass
 from kirin.rewrite.abc import RewriteResult
@@ -28,6 +29,7 @@ class Fold(Pass):
     - `InlineGetItem`
     - `Call2Invoke`
     - `DeadCodeElimination`
+    - `ClosureFieldLowering`
     """
 
     hint_const: HintConst = field(init=False)
@@ -46,6 +48,7 @@ class Fold(Pass):
                         InlineGetItem(),
                         Call2Invoke(),
                         DeadCodeElimination(),
+                        ClosureFieldLowering(),
                     )
                 )
             )
