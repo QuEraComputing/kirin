@@ -41,16 +41,16 @@ class IfElse(ir.Statement):
                 then_body_block = None
         else:  # then_body.IS_BLOCK:
             then_body_block = cast(Block, then_body)
-            then_body_region = Region(then_body)
+            then_body_region = cast(Region, then_body)
 
         if else_body is None:
             else_body_region = ir.Region()
             else_body_block = None
         elif else_body.IS_REGION:
             else_body_region = cast(Region, else_body)
-            if not else_body.blocks:  # empty region
+            if not else_body_region.blocks:  # empty region
                 else_body_block = None
-            elif len(else_body.blocks) == 0:
+            elif len(else_body_region.blocks) == 0:
                 else_body_block = None
             else:
                 else_body_block = else_body_region.blocks[0]
@@ -63,6 +63,7 @@ class IfElse(ir.Statement):
         results = ()
         if then_body_block is not None:
             then_yield = then_body_block.last_stmt
+            else_body_block = cast(Block, else_body_block)
             else_yield = (
                 else_body_block.last_stmt if else_body_block is not None else None
             )
