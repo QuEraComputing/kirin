@@ -30,16 +30,39 @@ class LambdaLifting(RewriteRule):
             return pyattr_data.data
         return None
 
+    def _get_field_index(self, getfield_stmt: func.GetField) -> int | None:
+        fld = getfield_stmt.attributes.get("field")
+        if fld:
+            return getfield_stmt.field
+        else:
+            return None
+
     def _promote_lambda(self, method: ir.Method) -> None:
-        lambda_node = method.code
+        new_method = method.similar()
         assert isinstance(
-            lambda_node, func.Lambda
-        ), "expected method.code to be func.Function after promotion"
+            new_method.code, func.Lambda
+        ), "expected method.code to be func.Lambda before promotion"
+
+        captured_fields = method.fields
+        if captured_fields:
+            for stmt in new_method.code.body.blocks[0].stmts:
+                if not isinstance(stmt, func.GetField):
+                    continue
+                idx = self._get_field_index(stmt)
+                if idx is None:
+                    continue
+                captured = new_method.fields[idx]
+                const_stmt = py.Constant(captured)
+                const_stmt.insert_before(stmt)
+                if stmt.results and const_stmt.results:
+                    stmt.results[0].replace_by(const_stmt.results[0])
+                stmt.delete()
+                new_method.code
+
         fn = func.Function(
-            sym_name=lambda_node.sym_name,
-            slots=lambda_node.slots,
-            signature=lambda_node.signature,
-            body=lambda_node.body,
+            sym_name=new_method.code.sym_name,
+            slots=new_method.code.slots,
+            signature=new_method.code.signature,
+            body=new_method.code.body,
         )
         method.code = fn
-        method.fields = tuple(lambda_node.captured)
