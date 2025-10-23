@@ -3,7 +3,7 @@ from pytest import mark
 from kirin import ir
 from kirin.passes import Fold
 from kirin.prelude import python_basic
-from kirin.dialects import scf, func, lowering
+from kirin.dialects import py, scf, func, lowering
 
 # TODO:
 # test_cons
@@ -150,3 +150,19 @@ def test_def_only_else_nested():
     assert main(2) == 1.0
     assert main(1) == 1.0
     assert main(0) == 0.0
+
+
+def test_manual_construct_ifelse_from_blocks():
+    scf.IfElse(
+        cond=ir.TestValue(),
+        then_body=ir.Block(
+            stmts=[
+                py.Constant(5),
+            ],
+        ),
+        else_body=ir.Block(
+            stmts=[
+                py.Constant(11),
+            ],
+        ),
+    )
