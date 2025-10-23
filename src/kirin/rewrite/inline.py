@@ -97,6 +97,16 @@ class Inline(RewriteRule):
 
         # NOTE: we cannot change region because it may be used elsewhere
         inline_region: ir.Region = region.clone()
+
+        # Preserve source information by attributing inlined code to the call site
+        if call_like.source is not None:
+            for block in inline_region.blocks:
+                if block.source is None:
+                    block.source = call_like.source
+                for stmt in block.stmts:
+                    if stmt.source is None:
+                        stmt.source = call_like.source
+
         parent_block: ir.Block = call_like.parent_block
         parent_region: ir.Region = call_like.parent_region
 
