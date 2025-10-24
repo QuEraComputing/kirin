@@ -20,7 +20,11 @@ class LambdaLifting(RewriteRule):
         if not isinstance(method.code, func.Lambda):
             return RewriteResult(has_done_something=False)
         self._promote_lambda(method)
-        return RewriteResult(has_done_something=True)
+
+        from kirin.passes import TypeInfer
+
+        rewrite_result = TypeInfer(dialects=method.dialects).unsafe_run(method)
+        return RewriteResult(has_done_something=True).join(rewrite_result)
 
     def _get_method_from_constant(self, const_stmt: py.Constant) -> ir.Method | None:
         pyattr_data = const_stmt.value

@@ -22,7 +22,10 @@ class ClosureField(RewriteRule):
         changed = self._lower_captured_fields(method)
         if changed:
             method.fields = ()
-        return RewriteResult(has_done_something=changed)
+        from kirin.passes import TypeInfer
+
+        rewrite_result = TypeInfer(dialects=method.dialects).unsafe_run(method)
+        return RewriteResult(has_done_something=changed).join(rewrite_result)
 
     def _get_field_index(self, getfield_stmt: func.GetField) -> int | None:
         fld = getfield_stmt.attributes.get("field")
