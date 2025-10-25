@@ -35,7 +35,7 @@ class HintLen(RewriteRule):
         existing_hint = node.result.hints.get("const")
         new_hint = const.Value(coll_len)
 
-        if new_hint.is_structurally_equal(existing_hint):
+        if existing_hint is not None and new_hint.is_structurally_equal(existing_hint):
             return RewriteResult()
 
         node.result.hints["const"] = new_hint

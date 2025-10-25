@@ -48,8 +48,10 @@ class WrapConst(RewriteRule):
                 has_done_something = True
 
         if (
-            trait := node.get_trait(ir.MaybePure)
-        ) and node in self.frame.should_be_pure and not trait.is_pure(node):
+            (trait := node.get_trait(ir.MaybePure))
+            and node in self.frame.should_be_pure
+            and not trait.is_pure(node)
+        ):
             trait.set_pure(node)
             has_done_something = True
         return RewriteResult(has_done_something=has_done_something)
