@@ -1,8 +1,8 @@
 import json
 from typing import Any
 
-from kirin.serialization.base.serializationunit import SerializationUnit
-from kirin.serialization.base.serializationmodule import SerializationModule
+from kirin.serialization.core.serializationunit import SerializationUnit
+from kirin.serialization.core.serializationmodule import SerializationModule
 
 
 class JSONSerializer:

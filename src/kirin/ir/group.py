@@ -29,7 +29,8 @@ if TYPE_CHECKING:
     from kirin.registry import Registry
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
-    from kirin.serialization.base.serializationunit import SerializationUnit
+    from kirin.serialization.core.serializationunit import SerializationUnit
+    from kirin.serialization.core.serializationmodule import SerializationModule
 
 PassParams = ParamSpec("PassParams")
 RunPass = Callable[Concatenate[Method, PassParams], None]
@@ -316,6 +317,18 @@ class DialectGroup(Generic[PassParams]):
         cls: type[Self], serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> Self:
         return cast(Self, deserializer.deserialize_dialect_group(serUnit))
+
+    def encode(self, program) -> "SerializationModule":
+        from kirin.serialization.base.serializer import Serializer
+
+        serializer = Serializer()
+        return serializer.encode(program)
+
+    def decode(self, encoded: "SerializationModule") -> Method:
+        from kirin.serialization.base.deserializer import Deserializer
+
+        deserializer = Deserializer(dialect_group=self)
+        return deserializer.decode(encoded)
 
 
 def dialect_group(

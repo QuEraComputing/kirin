@@ -5,9 +5,11 @@ from typing_extensions import Protocol, runtime_checkable
 
 from kirin.print import Printer
 from kirin.ir.attrs.abc import Attribute
+from kirin.serialization.core.serializable import Serializable
+from kirin.serialization.core.supportedtypes import SUPPORTED_PYTHON_TYPES
+from kirin.serialization.core.serializationunit import SerializationUnit
 
 if TYPE_CHECKING:
-    from kirin.serialization.base.serializationunit import SerializationUnit
     from kirin.serialization.base.serializer import Serializer
     from kirin.serialization.base.deserializer import Deserializer
 
@@ -70,17 +72,37 @@ class PyAttr(Data[T]):
         if isinstance(self.data, StructurallyEqual) and isinstance(
             other.data, StructurallyEqual
         ):
+
             return self.data.is_structurally_equal(other.data, context=context)
         return self.data == other.data
 
     def serialize(self, serializer: "Serializer") -> "SerializationUnit":
-        return serializer.serialize_pyattr(self)
+        if not (
+            isinstance(self.data, SUPPORTED_PYTHON_TYPES)
+            or isinstance(self.data, Serializable)
+        ):
+            raise TypeError(
+                f"Cannot serialize data of type {type(self.data)}. "
+                "Data must be one of the supported Python types."
+            )
+
+        return SerializationUnit(
+            kind="pyattr",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "data": serializer.serialize(self.data),
+                "pytype": serializer.serialize_attribute(self.type),
+            },
+        )
 
     @classmethod
     def deserialize(
         cls: Type["PyAttr"], serUnit: "SerializationUnit", deserializer: "Deserializer"
     ) -> "PyAttr":
-        return deserializer.deserialize_pyattr(serUnit)
+        pytype = deserializer.deserialize(serUnit.data["pytype"])
+        value = deserializer.deserialize(serUnit.data["data"])
+        return PyAttr(value, pytype=pytype)
 
 
 @runtime_checkable
