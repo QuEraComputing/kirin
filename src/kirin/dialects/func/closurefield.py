@@ -1,12 +1,12 @@
-from dataclasses import dataclass
-
 from kirin import ir
 from kirin.dialects import py, func
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
+from ._dialect import dialect
 
-@dataclass
-class ClosureFieldLowering(RewriteRule):
+
+@dialect.canonicalize
+class ClosureField(RewriteRule):
     """Lowers captured closure fields into py.Constants.
     - Trigger on func.Invoke
     - If the callee Method has non-empty .fields, lower its func.GetField to py.Constant
@@ -15,7 +15,6 @@ class ClosureFieldLowering(RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, func.Invoke):
             return RewriteResult(has_done_something=False)
-
         method = node.callee
         if not method.fields:
             return RewriteResult(has_done_something=False)
@@ -23,7 +22,10 @@ class ClosureFieldLowering(RewriteRule):
         changed = self._lower_captured_fields(method)
         if changed:
             method.fields = ()
-        return RewriteResult(has_done_something=changed)
+        from kirin.passes import TypeInfer
+
+        rewrite_result = TypeInfer(dialects=method.dialects).unsafe_run(method)
+        return RewriteResult(has_done_something=changed).join(rewrite_result)
 
     def _get_field_index(self, getfield_stmt: func.GetField) -> int | None:
         fld = getfield_stmt.attributes.get("field")

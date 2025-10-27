@@ -18,4 +18,8 @@ from kirin.dialects.func.stmts import (
 )
 from kirin.dialects.func._dialect import dialect as dialect
 
-from . import _julia as _julia
+from . import (
+    _julia as _julia,
+    closurefield as closurefield,
+    lambdalifting as lambdalifting,
+)
