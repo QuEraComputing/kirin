@@ -981,27 +981,35 @@
          <lastmod>2025-10-27</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/base/deserializable/</loc>
-         <lastmod>2025-10-27</lastmod>
-    </url>
-    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/base/deserializer/</loc>
          <lastmod>2025-10-27</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/base/serializable/</loc>
-         <lastmod>2025-10-27</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/base/serializationmodule/</loc>
-         <lastmod>2025-10-27</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/base/serializationunit/</loc>
-         <lastmod>2025-10-27</lastmod>
-    </url>
-    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/base/serializer/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/core/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/core/deserializable/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/core/serializable/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/core/serializationmodule/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/core/serializationunit/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/serialization/core/supportedtypes/</loc>
          <lastmod>2025-10-27</lastmod>
     </url>
     <url>
