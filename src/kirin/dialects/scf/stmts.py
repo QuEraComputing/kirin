@@ -41,7 +41,7 @@ class IfElse(ir.Statement):
                 then_body_block = None
         else:  # then_body.IS_BLOCK:
             then_body_block = cast(Block, then_body)
-            then_body_region = cast(Region, then_body)
+            then_body_region = Region(then_body_block)
 
         if else_body is None:
             else_body_region = ir.Region()
