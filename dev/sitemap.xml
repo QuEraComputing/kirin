@@ -293,11 +293,19 @@
          <lastmod>2025-10-27</lastmod>
     </url>
     <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/closurefield/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/constprop/</loc>
          <lastmod>2025-10-27</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/interp/</loc>
+         <lastmod>2025-10-27</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/dialects/func/lambdalifting/</loc>
          <lastmod>2025-10-27</lastmod>
     </url>
     <url>
@@ -906,10 +914,6 @@
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/chain/</loc>
-         <lastmod>2025-10-27</lastmod>
-    </url>
-    <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/dev/reference/kirin/rewrite/closurefieldlowering/</loc>
          <lastmod>2025-10-27</lastmod>
     </url>
     <url>
