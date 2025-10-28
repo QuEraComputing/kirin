@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import TypeVar
 from dataclasses import field, dataclass
 
@@ -62,5 +62,16 @@ class EmitABC(abc.InterpreterABC[CodeGenFrameType, TargetType], ABC):
             if not each.startswith("emit."):
                 raise ValueError(f"Key {each} does not start with 'emit.'")
 
-    @abstractmethod
-    def run(self, node: ir.Method | ir.Statement): ...
+    def run(self, node: ir.Method | ir.Statement):
+        if isinstance(node, ir.Method):
+            node = node.code
+
+        with self.eval_context():
+            self.callables.add(node)
+            self.callable_to_emit.append(node)
+            while self.callable_to_emit:
+                callable = self.callable_to_emit.pop()
+                if callable is None:
+                    break
+                self.eval(callable)
+        return
