@@ -1,6 +1,7 @@
 from kirin import ir, rewrite
 from kirin.prelude import basic
 from kirin.dialects import py, func
+from kirin.dialects.func.rewrite import lambdalifting
 
 
 def test_rewrite_inner_lambda():
@@ -20,7 +21,7 @@ def test_rewrite_inner_lambda():
         pyconstant_stmt.value.data.code, func.Lambda
     ), "expected a lambda Method in outer body"
 
-    rewrite.Walk(func.lambdalifting.LambdaLifting()).rewrite(outer.code)
+    rewrite.Walk(lambdalifting.LambdaLifting()).rewrite(outer.code)
     assert isinstance(
         pyconstant_stmt.value.data.code, func.Function
     ), "expected a Function in outer body"
@@ -45,7 +46,7 @@ def test_rewrite_inner_lambda_with_captured_vars():
     assert isinstance(
         pyconstant_stmt.value.data.code, func.Lambda
     ), "expected a lambda Method in outer body"
-    rewrite.Walk(func.lambdalifting.LambdaLifting()).rewrite(outer2.code)
+    rewrite.Walk(lambdalifting.LambdaLifting()).rewrite(outer2.code)
     assert isinstance(
         pyconstant_stmt.value.data.code, func.Function
     ), "expected a Function in outer body"

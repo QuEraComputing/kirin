@@ -1,8 +1,8 @@
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
-from .stmts import Invoke, GetField
-from ._dialect import dialect
+from ..stmts import Invoke, GetField
+from .._dialect import dialect
 
 
 @dialect.canonicalize

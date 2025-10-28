@@ -6,8 +6,8 @@ if TYPE_CHECKING:
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
-from .stmts import Lambda, Function, GetField
-from ._dialect import dialect
+from ..stmts import Lambda, Function, GetField
+from .._dialect import dialect
 
 
 @dialect.canonicalize
