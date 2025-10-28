@@ -1,5 +1,6 @@
 from kirin.prelude import basic_no_opt
 from kirin.passes.inline import InlinePass
+from kirin.dialects.py.constant import Constant
 
 
 @basic_no_opt
@@ -40,3 +41,25 @@ def test_inline_pass_custom_heru():
     assert a == b
 
     assert len(main_inline_pass2.callable_region.blocks[0].stmts) == 4
+
+
+def test_inline_preserves_source_info():
+    def get_line_of(target: str) -> int:
+        for i, line in enumerate(open(__file__), 1):
+            if target in line:
+                return i
+
+    @basic_no_opt
+    def main_inline_pass(x: int):
+        y = inline_func(x)
+        return y + 2
+
+    inline = InlinePass(main_inline_pass.dialects)
+    inline(main_inline_pass)
+
+    stmt = main_inline_pass.callable_region.blocks[0].stmts.at(0)
+    line = stmt.source.lineno + stmt.source.lineno_begin
+    assert stmt.value.data == 1
+    assert isinstance(stmt, Constant)
+
+    assert get_line_of("return x - 1") == line

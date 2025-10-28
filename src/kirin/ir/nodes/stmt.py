@@ -267,6 +267,9 @@ class Statement(IRNode["Block"]):
         self.parent = stmt.parent
         stmt._next_stmt = self
 
+        if self.source is None and stmt.source is not None:
+            self.source = stmt.source
+
         if self.parent:
             self.parent._stmt_len += 1
 
@@ -301,6 +304,9 @@ class Statement(IRNode["Block"]):
 
         self.parent = stmt.parent
         stmt._prev_stmt = self
+
+        if self.source is None and stmt.source is not None:
+            self.source = stmt.source
 
         if self.parent:
             self.parent._stmt_len += 1
@@ -506,6 +512,7 @@ class Statement(IRNode["Block"]):
             attributes=attributes or other.attributes,
             result_types=[result.type for result in other._results],
             args_slice=other._name_args_slice,
+            source=other.source,
         )
         # inherit the hint:
         for result, other_result in zip(obj._results, other._results):
