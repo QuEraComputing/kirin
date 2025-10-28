@@ -13,7 +13,7 @@ class List2IList(RewriteRule):
     def rewrite_Block(self, node: ir.Block) -> RewriteResult:
         has_done_something = False
         for arg in node.args:
-            has_done_something = self._rewrite_SSAValue_type(arg)
+            has_done_something = has_done_something or self._rewrite_SSAValue_type(arg)
         return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
@@ -25,7 +25,9 @@ class List2IList(RewriteRule):
             )
 
         for result in node.results:
-            has_done_something = self._rewrite_SSAValue_type(result)
+            has_done_something = has_done_something or self._rewrite_SSAValue_type(
+                result
+            )
 
         return RewriteResult(has_done_something=has_done_something)
 

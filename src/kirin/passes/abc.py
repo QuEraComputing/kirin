@@ -36,7 +36,7 @@ class Pass(ABC):
         for _ in range(max_iter):
             result_ = self.unsafe_run(mt)
             result = result_.join(result)
-            if not result.has_done_something:
+            if not result_.has_done_something:
                 break
         mt.verify()
         return result

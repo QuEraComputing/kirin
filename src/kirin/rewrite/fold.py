@@ -29,6 +29,8 @@ class ConstantFold(RewriteRule):
         has_done_something = False
         for old_result in node.results:
             if (value := self.get_const(old_result)) is not None:
+                if not old_result.uses:
+                    continue
                 stmt = Constant(value.data)
                 stmt.insert_before(node)
                 old_result.replace_by(stmt.result)
