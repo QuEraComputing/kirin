@@ -1,7 +1,7 @@
 import pytest
 
-from kirin.testing import assert_structurally_same
 from kirin.prelude import structural_no_opt
+from kirin.testing import assert_structurally_same
 from kirin.dialects import py, func
 
 

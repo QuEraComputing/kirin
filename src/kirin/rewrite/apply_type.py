@@ -13,8 +13,10 @@ class ApplyType(RewriteRule):
         has_done_something = False
         for arg in node.args:
             if arg in self.results:
-                arg.type = self.results[arg]
-                has_done_something = True
+                arg_type = self.results[arg]
+                if arg.type != arg_type:
+                    arg.type = arg_type
+                    has_done_something = True
 
         return RewriteResult(has_done_something=has_done_something)
 
@@ -22,8 +24,10 @@ class ApplyType(RewriteRule):
         has_done_something = False
         for result in node._results:
             if result in self.results:
-                result.type = self.results[result]
-                has_done_something = True
+                arg_type = self.results[result]
+                if result.type != arg_type:
+                    result.type = arg_type
+                    has_done_something = True
 
         if (trait := node.get_trait(ir.HasSignature)) is not None and (
             callable_trait := node.get_trait(ir.CallableStmtInterface)

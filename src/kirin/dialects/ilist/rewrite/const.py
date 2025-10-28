@@ -27,11 +27,15 @@ class ConstList2IList(RewriteRule):
             typ = result.type
             data = hint.data
             if isinstance(typ, types.PyClass) and typ.is_subseteq(types.PyClass(IList)):
-                has_done_something = self._rewrite_IList_type(result, data)
+                has_done_something = has_done_something or self._rewrite_IList_type(
+                    result, data
+                )
             elif isinstance(typ, types.Generic) and typ.body.is_subseteq(
                 types.PyClass(IList)
             ):
-                has_done_something = self._rewrite_IList_type(result, data)
+                has_done_something = has_done_something or self._rewrite_IList_type(
+                    result, data
+                )
         return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_Constant(self, node: Constant) -> RewriteResult:
@@ -53,6 +57,13 @@ class ConstList2IList(RewriteRule):
         for elem in data.data[1:]:
             elem_type = elem_type.join(types.PyClass(type(elem)))
 
-        result.type = IListType[elem_type, types.Literal(len(data.data))]
-        result.hints["const"] = const.Value(data)
+        new_type = IListType[elem_type, types.Literal(len(data.data))]
+        new_hint = const.Value(data)
+
+        # Check if type and hint are already correct
+        if result.type == new_type and result.hints.get("const") == new_hint:
+            return False
+
+        result.type = new_type
+        result.hints["const"] = new_hint
         return True

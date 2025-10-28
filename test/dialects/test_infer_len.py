@@ -7,7 +7,13 @@ from kirin.dialects import py, ilist
 
 def test():
     rule = rewrite.Fixpoint(
-        rewrite.Walk(rewrite.Chain(ilist.rewrite.HintLen(), rewrite.ConstantFold()))
+        rewrite.Walk(
+            rewrite.Chain(
+                ilist.rewrite.HintLen(),
+                rewrite.ConstantFold(),
+                rewrite.DeadCodeElimination(),
+            )
+        )
     )
 
     @basic
@@ -24,6 +30,8 @@ def test():
     stmt = len_func.callable_region.blocks[0].stmts.at(0)
     assert isinstance(stmt, py.Constant)
     assert stmt.value.unwrap() == 3
+    assert len(len_func.callable_region.blocks[0].stmts) == 2
 
     stmt = len_func3.callable_region.blocks[0].stmts.at(0)
     assert isinstance(stmt, py.Len)
+    assert len(len_func3.callable_region.blocks[0].stmts) == 2
