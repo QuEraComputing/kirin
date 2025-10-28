@@ -6,7 +6,6 @@ from dataclasses import field, dataclass
 
 from kirin import ir, interp
 from kirin.idtable import IdTable
-from kirin.worklist import WorkList
 
 from .abc import EmitABC, EmitFrame
 
@@ -50,11 +49,9 @@ class Julia(EmitABC[JuliaFrame, str], Generic[IO_t]):
 
     # some states
     io: IO_t
-    callable_to_emit: WorkList[ir.Statement] = field(init=False)
 
     def initialize(self):
         super().initialize()
-        self.callable_to_emit = WorkList()
         return self
 
     def initialize_frame(

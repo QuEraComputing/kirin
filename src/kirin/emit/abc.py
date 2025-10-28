@@ -7,6 +7,7 @@ from dataclasses import field, dataclass
 from kirin import ir
 from kirin.interp import Frame, abc
 from kirin.idtable import IdTable
+from kirin.worklist import WorkList
 
 TargetType = TypeVar("TargetType")
 
@@ -51,13 +52,15 @@ class EmitTable(IdTable[ir.Statement]):
 @dataclass
 class EmitABC(abc.InterpreterABC[CodeGenFrameType, TargetType], ABC):
     callables: EmitTable = field(init=False)
+    callable_to_emit: WorkList[ir.Statement] = field(init=False)
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
-        cls.callables = EmitTable(prefix="_callable_")
+        cls.callables = EmitTable(prefix="")
+        cls.callable_to_emit = WorkList()
         for each in getattr(cls, "keys", ()):
             if not each.startswith("emit."):
-                raise ValueError(f"Key {each} cannot start with 'emit.'")
+                raise ValueError(f"Key {each} does not start with 'emit.'")
 
     @abstractmethod
     def run(self, node: ir.Method | ir.Statement): ...
