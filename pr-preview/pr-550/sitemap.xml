@@ -293,10 +293,6 @@
          <lastmod>2025-10-28</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/closurefield/</loc>
-         <lastmod>2025-10-28</lastmod>
-    </url>
-    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/constprop/</loc>
          <lastmod>2025-10-28</lastmod>
     </url>
@@ -305,15 +301,23 @@
          <lastmod>2025-10-28</lastmod>
     </url>
     <url>
-         <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/lambdalifting/</loc>
-         <lastmod>2025-10-28</lastmod>
-    </url>
-    <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/stmts/</loc>
          <lastmod>2025-10-28</lastmod>
     </url>
     <url>
          <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/typeinfer/</loc>
+         <lastmod>2025-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/rewrite/</loc>
+         <lastmod>2025-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/rewrite/closurefield/</loc>
+         <lastmod>2025-10-28</lastmod>
+    </url>
+    <url>
+         <loc>https://special-broccoli-revrkk1.pages.github.io/reference/kirin/dialects/func/rewrite/lambdalifting/</loc>
          <lastmod>2025-10-28</lastmod>
     </url>
     <url>
