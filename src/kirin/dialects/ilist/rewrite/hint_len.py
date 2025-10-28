@@ -1,3 +1,5 @@
+from typing import cast
+
 from kirin import ir, types
 from kirin.analysis import const
 from kirin.dialects import py
@@ -32,10 +34,10 @@ class HintLen(RewriteRule):
         if (coll_len := self._get_collection_len(node.value)) is None:
             return RewriteResult()
 
-        existing_hint = node.result.hints.get("const")
+        existing_hint = cast(const.Result | None, node.result.hints.get("const"))
         new_hint = const.Value(coll_len)
 
-        if existing_hint is not None and new_hint.is_structurally_equal(existing_hint):
+        if existing_hint is not None and new_hint.is_equal(existing_hint):
             return RewriteResult()
 
         node.result.hints["const"] = new_hint
