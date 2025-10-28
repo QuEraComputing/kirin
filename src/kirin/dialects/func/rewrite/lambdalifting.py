@@ -1,9 +1,6 @@
-from typing_extensions import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from kirin.dialects import py
-
 from kirin import ir
+from kirin.passes import TypeInfer
+from kirin.dialects import py
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 from ..stmts import Lambda, Function, GetField
@@ -28,12 +25,10 @@ class LambdaLifting(RewriteRule):
             return RewriteResult(has_done_something=False)
         self._promote_lambda(method)
 
-        from kirin.passes import TypeInfer
-
         rewrite_result = TypeInfer(dialects=method.dialects).unsafe_run(method)
         return RewriteResult(has_done_something=True).join(rewrite_result)
 
-    def _get_method_from_constant(self, const_stmt: "py.Constant") -> ir.Method | None:
+    def _get_method_from_constant(self, const_stmt: py.Constant) -> ir.Method | None:
         pyattr_data = const_stmt.value
         if isinstance(pyattr_data, ir.PyAttr) and isinstance(
             pyattr_data.data, ir.Method

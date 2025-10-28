@@ -1,4 +1,5 @@
 from kirin import ir
+from kirin.passes import TypeInfer
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
 from ..stmts import Invoke, GetField
@@ -22,7 +23,6 @@ class ClosureField(RewriteRule):
         changed = self._lower_captured_fields(method)
         if changed:
             method.fields = ()
-        from kirin.passes import TypeInfer
 
         rewrite_result = TypeInfer(dialects=method.dialects).unsafe_run(method)
         return RewriteResult(has_done_something=changed).join(rewrite_result)
