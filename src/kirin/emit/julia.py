@@ -14,35 +14,6 @@ IO_t = TypeVar("IO_t", bound=IO)
 
 
 @dataclass
-class SymbolTable(IdTable[ir.Statement]):
-
-    def add(self, value: ir.Statement) -> str:
-        id = self.next_id
-        if (trait := value.get_trait(ir.SymbolOpInterface)) is not None:
-            value_name = trait.get_sym_name(value).unwrap()
-            curr_ind = self.name_count.get(value_name, 0)
-            suffix = f"_{curr_ind}" if curr_ind != 0 else ""
-            self.name_count[value_name] = curr_ind + 1
-            name = self.prefix + value_name + suffix
-            self.table[value] = name
-        else:
-            name = f"{self.prefix}{self.prefix_if_none}{id}"
-            self.next_id += 1
-            self.table[value] = name
-        return name
-
-    def __getitem__(self, value: ir.Statement) -> str:
-        if value in self.table:
-            return self.table[value]
-        raise KeyError(f"Symbol {value} not found in SymbolTable")
-
-    def get(self, value: ir.Statement, default: str | None = None) -> str | None:
-        if value in self.table:
-            return self.table[value]
-        return default
-
-
-@dataclass
 class JuliaFrame(EmitFrame[str], Generic[IO_t]):
     io: IO_t
     ssa: IdTable[ir.SSAValue] = field(
@@ -79,12 +50,10 @@ class Julia(EmitABC[JuliaFrame, str], Generic[IO_t]):
 
     # some states
     io: IO_t
-    callables: SymbolTable = field(init=False)
     callable_to_emit: WorkList[ir.Statement] = field(init=False)
 
     def initialize(self):
         super().initialize()
-        self.callables = SymbolTable(prefix="_callable_")
         self.callable_to_emit = WorkList()
         return self
 
