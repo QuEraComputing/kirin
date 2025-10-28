@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, cast
 from dataclasses import dataclass
 
 from kirin import ir
@@ -77,6 +77,15 @@ class Inline(RewriteRule):
         # NOTE: we cannot change region because it may be used elsewhere
         inline_region: ir.Region = region.clone()
 
+        # Preserve source information by attributing inlined code to the call site
+        if call_like.source is not None:
+            for block in inline_region.blocks:
+                if block.source is None:
+                    block.source = call_like.source
+                for stmt in block.stmts:
+                    if stmt.source is None:
+                        stmt.source = call_like.source
+
         if self._can_use_simple_inline(inline_region):
             return self._inline_simple(call_like, args, inline_region.blocks[0])
 
@@ -136,7 +145,7 @@ class Inline(RewriteRule):
                         call_result.replace_by(return_value)
 
                 # Don't insert the return statement itself
-                continue
+                break
 
             new_stmt = stmt.from_stmt(
                 stmt,
@@ -165,7 +174,7 @@ class Inline(RewriteRule):
 
         This handles the general case where the function has multiple blocks
 
-        Complexity: O(n k) where n = statements after call site (due to moving them)
+        Complexity: O(n+k) where n = statements after call site (due to moving them)
             and k = number of statements in function.
 
         Args:
@@ -195,8 +204,8 @@ class Inline(RewriteRule):
         #     split the current block into two, and replace the return with
         #     the branch instruction
         # 4. remove the call
-        parent_block: ir.Block = call_like.parent_block
-        parent_region: ir.Region = call_like.parent_region
+        parent_block: ir.Block = cast(ir.Block, call_like.parent_block)
+        parent_region: ir.Region = cast(ir.Region, call_like.parent_region)
 
         # wrap what's after invoke into a block
         after_block = ir.Block()
