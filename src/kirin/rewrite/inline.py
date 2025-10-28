@@ -97,7 +97,7 @@ class Inline(RewriteRule):
         block = inline_region.blocks[0]
 
         # Last statement must be a simple return
-        if not block.last_stmt or not isinstance(block.last_stmt, func.Return):
+        if not isinstance(block.last_stmt, func.Return):
             return False
 
         return True
