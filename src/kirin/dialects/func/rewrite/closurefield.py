@@ -1,8 +1,9 @@
 from kirin import ir
-from kirin.dialects import py, func
+from kirin.passes import TypeInfer
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
-from ._dialect import dialect
+from ..stmts import Invoke, GetField
+from .._dialect import dialect
 
 
 @dialect.canonicalize
@@ -13,7 +14,7 @@ class ClosureField(RewriteRule):
     """
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
-        if not isinstance(node, func.Invoke):
+        if not isinstance(node, Invoke):
             return RewriteResult(has_done_something=False)
         method = node.callee
         if not method.fields:
@@ -22,12 +23,11 @@ class ClosureField(RewriteRule):
         changed = self._lower_captured_fields(method)
         if changed:
             method.fields = ()
-        from kirin.passes import TypeInfer
 
         rewrite_result = TypeInfer(dialects=method.dialects).unsafe_run(method)
         return RewriteResult(has_done_something=changed).join(rewrite_result)
 
-    def _get_field_index(self, getfield_stmt: func.GetField) -> int | None:
+    def _get_field_index(self, getfield_stmt: GetField) -> int | None:
         fld = getfield_stmt.attributes.get("field")
         if fld:
             return getfield_stmt.field
@@ -43,7 +43,7 @@ class ClosureField(RewriteRule):
         for region in method.code.regions:
             for block in region.blocks:
                 for stmt in list(block.stmts):
-                    if not isinstance(stmt, func.GetField):
+                    if not isinstance(stmt, GetField):
                         continue
                     idx = self._get_field_index(stmt)
                     if idx is None:
@@ -53,6 +53,8 @@ class ClosureField(RewriteRule):
                     if isinstance(captured, ir.Method):
                         continue
                     # Replace GetField with Constant.
+                    from kirin.dialects import py
+
                     const_stmt = py.Constant(captured)
                     const_stmt.insert_before(stmt)
                     if stmt.results and const_stmt.results:
