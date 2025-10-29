@@ -62,3 +62,7 @@ class Julia(EmitABC[JuliaFrame, str], Generic[IO_t]):
         if method is None:
             raise ValueError(f"Method not found for node: {node}")
         return method(self, frame, node)
+
+    def reset(self):
+        self.io.truncate(0)
+        self.io.seek(0)

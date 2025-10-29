@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import TypeVar
 from contextlib import contextmanager
 from dataclasses import field, dataclass
@@ -80,6 +80,7 @@ class EmitABC(abc.InterpreterABC[CodeGenFrameType, TargetType], ABC):
                 raise ValueError(f"Key {each} does not start with 'emit.'")
 
     def run(self, node: ir.Method | ir.Statement):
+        self.reset()
         if isinstance(node, ir.Method):
             node = node.code
 
@@ -92,3 +93,8 @@ class EmitABC(abc.InterpreterABC[CodeGenFrameType, TargetType], ABC):
                     break
                 self.eval(callable)
         return
+
+    @abstractmethod
+    def reset(self):
+        """Reset any per-run state in the emitter."""
+        pass
