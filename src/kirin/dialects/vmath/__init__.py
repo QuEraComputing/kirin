@@ -14,6 +14,13 @@ tau = pymath.tau
 ListLen = TypeVar("ListLen")
 
 
+@lowering.wraps(stmts.add)
+def add(
+    lhs: ilist.IList[float, ListLen] | float,
+    rhs: ilist.IList[float, ListLen] | float,
+) -> ilist.IList[float, ListLen]: ...
+
+
 @lowering.wraps(stmts.acos)
 def acos(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 

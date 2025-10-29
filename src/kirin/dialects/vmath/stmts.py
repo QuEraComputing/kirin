@@ -8,6 +8,21 @@ ListLen = types.TypeVar("ListLen")
 
 
 @statement(dialect=dialect)
+class add(ir.Statement):
+    """Addition statement"""
+
+    name = "Add"
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    lhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    rhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    result: ir.ResultValue = info.result(types.Any)
+
+
+@statement(dialect=dialect)
 class acos(ir.Statement):
     """acos statement, wrapping the math.acos function"""
 

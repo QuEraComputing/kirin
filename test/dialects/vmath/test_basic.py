@@ -7,6 +7,31 @@ from kirin.dialects import ilist, vmath
 
 
 @basic.union([vmath])
+def add_kernel(x, y):
+    return vmath.add(x, y)
+
+
+def test_add_lists():
+    a = ilist.IList([0.0, 1.0, 2.0], elem=types.Float)
+    b = ilist.IList([3.0, 4.0, 5.0], elem=types.Float)
+    truth = np.array([0.0, 1.0, 2.0]) + np.array([3.0, 4.0, 5.0])
+    out = add_kernel(a, b)
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+
+def test_add_scalar_list():
+    a = 2.0
+    b = ilist.IList([3.0, 4.0, 5.0], elem=types.Float)
+    truth = 2.0 + np.array([3.0, 4.0, 5.0])
+    out = add_kernel(a, b)
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+
+@basic.union([vmath])
 def acos_func(x):
     return vmath.acos(x)
 

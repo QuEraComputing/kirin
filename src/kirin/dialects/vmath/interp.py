@@ -12,6 +12,17 @@ from ._dialect import dialect
 @dialect.register
 class MathMethodTable(MethodTable):
 
+    @impl(stmts.add)
+    def add(self, interp, frame: Frame, stmt: stmts.add):
+        lhs = frame.get(stmt.lhs)
+        rhs = frame.get(stmt.rhs)
+        if isinstance(lhs, ilist.IList):
+            lhs = np.asarray(lhs)
+        if isinstance(rhs, ilist.IList):
+            rhs = np.asarray(rhs)
+        arraysum = lhs + rhs
+        return (ilist.IList(arraysum.tolist(), elem=types.Float),)
+
     @impl(stmts.acos)
     def acos(self, interp, frame: Frame, stmt: stmts.acos):
         values = frame.get_values(stmt.args)
