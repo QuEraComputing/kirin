@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from typing import TypeVar
+from contextlib import contextmanager
 from dataclasses import field, dataclass
 
 from kirin import ir
@@ -14,7 +15,23 @@ TargetType = TypeVar("TargetType")
 
 @dataclass
 class EmitFrame(Frame[TargetType]):
-    pass
+    ssa: IdTable[ir.SSAValue] = field(
+        default_factory=lambda: IdTable[ir.SSAValue](prefix="ssa_"),
+        init=False,
+    )
+    block: IdTable[ir.Block] = field(
+        default_factory=lambda: IdTable[ir.Block](prefix="block_"),
+        init=False,
+    )
+    _indent: int = field(default=0, init=False)
+
+    @contextmanager
+    def indent(self):
+        self._indent += 1
+        try:
+            yield
+        finally:
+            self._indent -= 1
 
 
 CodeGenFrameType = TypeVar("CodeGenFrameType", bound=EmitFrame)

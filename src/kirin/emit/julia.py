@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import IO, Generic, TypeVar
+import sys
+from typing import IO, Generic, TypeVar, cast
 from contextlib import contextmanager
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 
 from kirin import ir, interp
-from kirin.idtable import IdTable
 
 from .abc import EmitABC, EmitFrame
 
@@ -14,14 +14,7 @@ IO_t = TypeVar("IO_t", bound=IO)
 
 @dataclass
 class JuliaFrame(EmitFrame[str], Generic[IO_t]):
-    io: IO_t
-    ssa: IdTable[ir.SSAValue] = field(
-        default_factory=lambda: IdTable[ir.SSAValue](prefix="ssa_")
-    )
-    block: IdTable[ir.Block] = field(
-        default_factory=lambda: IdTable[ir.Block](prefix="block_")
-    )
-    _indent: int = 0
+    io: IO_t = cast(IO_t, sys.stdout)
 
     def write(self, value):
         self.io.write(value)
