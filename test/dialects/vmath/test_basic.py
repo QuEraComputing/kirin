@@ -21,14 +21,115 @@ def test_add_lists():
     assert np.allclose(out, truth)
 
 
+@basic.union([vmath])
+def sub_kernel(x, y):
+    return vmath.sub(x, y)
+
+
+def test_sub_lists():
+    a = ilist.IList([5.0, 7.0, 9.0], elem=types.Float)
+    b = ilist.IList([3.0, 4.0, 5.0], elem=types.Float)
+    truth = np.array([5.0, 7.0, 9.0]) - np.array([3.0, 4.0, 5.0])
+    out = sub_kernel(a, b)
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+
+def test_sub_scalar_list():
+    a = 10.0
+    b = ilist.IList([3.0, 4.0, 5.0], elem=types.Float)
+    truth = 10.0 - np.array([3.0, 4.0, 5.0])
+    out = sub_kernel(a, b)
+    out2 = sub_kernel(b, a)
+
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+    truth2 = np.array([3.0, 4.0, 5.0]) - 10.0
+    assert isinstance(out2, ilist.IList)
+    assert out2.elem == types.Float
+    assert np.allclose(out2, truth2)
+
+
 def test_add_scalar_list():
     a = 2.0
     b = ilist.IList([3.0, 4.0, 5.0], elem=types.Float)
     truth = 2.0 + np.array([3.0, 4.0, 5.0])
     out = add_kernel(a, b)
+    out2 = add_kernel(b, a)
+
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
     assert np.allclose(out, truth)
+
+    assert isinstance(out2, ilist.IList)
+    assert out2.elem == types.Float
+    assert np.allclose(out2, truth)
+
+
+@basic.union([vmath])
+def mul_kernel(x, y):
+    return vmath.mul(x, y)
+
+
+def test_mul_lists():
+    a = ilist.IList([1.0, 2.0, 3.0], elem=types.Float)
+    b = ilist.IList([4.0, 5.0, 6.0], elem=types.Float)
+    truth = np.array([1.0, 2.0, 3.0]) * np.array([4.0, 5.0, 6.0])
+    out = mul_kernel(a, b)
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+
+def test_mul_scalar_list():
+    a = 3.0
+    b = ilist.IList([4.0, 5.0, 6.0], elem=types.Float)
+    truth = 3.0 * np.array([4.0, 5.0, 6.0])
+    out = mul_kernel(a, b)
+    out2 = mul_kernel(b, a)
+
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+    assert isinstance(out2, ilist.IList)
+    assert out2.elem == types.Float
+    assert np.allclose(out2, truth)
+
+
+@basic.union([vmath])
+def div_kernel(x, y):
+    return vmath.div(x, y)
+
+
+def test_div_lists():
+    a = ilist.IList([8.0, 9.0, 10.0], elem=types.Float)
+    b = ilist.IList([2.0, 3.0, 5.2], elem=types.Float)
+    truth = np.array([8.0, 9.0, 10.0]) / np.array([2.0, 3.0, 5.2])
+    out = div_kernel(a, b)
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+
+def test_div_scalar_list():
+    a = 12.0
+    b = ilist.IList([2.0, 3.0, 4.0], elem=types.Float)
+    truth = 12.0 / np.array([2.0, 3.0, 4.0])
+    out = div_kernel(a, b)
+    out2 = div_kernel(b, a)
+
+    assert isinstance(out, ilist.IList)
+    assert out.elem == types.Float
+    assert np.allclose(out, truth)
+
+    truth2 = np.array([2.0, 3.0, 4.0]) / 12.0
+    assert isinstance(out2, ilist.IList)
+    assert out2.elem == types.Float
+    assert np.allclose(out2, truth2)
 
 
 @basic.union([vmath])

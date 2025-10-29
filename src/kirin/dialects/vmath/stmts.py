@@ -11,7 +11,7 @@ ListLen = types.TypeVar("ListLen")
 class add(ir.Statement):
     """Addition statement"""
 
-    name = "Add"
+    name = "add"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     lhs: ir.SSAValue = info.argument(
         ilist.IListType[types.Float, ListLen] | types.Float
@@ -132,6 +132,21 @@ class degrees(ir.Statement):
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
     result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
+
+
+@statement(dialect=dialect)
+class div(ir.Statement):
+    """multiplication statement, scalar*list or list*list"""
+
+    name = "div"
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    lhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    rhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    result: ir.ResultValue = info.result(types.Any)
 
 
 @statement(dialect=dialect)
@@ -286,6 +301,21 @@ class log2(ir.Statement):
 
 
 @statement(dialect=dialect)
+class mul(ir.Statement):
+    """multiplication statement, scalar*list or list*list"""
+
+    name = "mul"
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    lhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    rhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    result: ir.ResultValue = info.result(types.Any)
+
+
+@statement(dialect=dialect)
 class pow(ir.Statement):
     """pow statement, wrapping the math.pow function"""
 
@@ -335,6 +365,21 @@ class sinh(ir.Statement):
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     x: ir.SSAValue = info.argument(ilist.IListType[types.Float, ListLen])
     result: ir.ResultValue = info.result(ilist.IListType[types.Float, ListLen])
+
+
+@statement(dialect=dialect)
+class sub(ir.Statement):
+    """multiplication statement, scalar*list or list*list"""
+
+    name = "sub"
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    lhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    rhs: ir.SSAValue = info.argument(
+        ilist.IListType[types.Float, ListLen] | types.Float
+    )
+    result: ir.ResultValue = info.result(types.Any)
 
 
 @statement(dialect=dialect)
