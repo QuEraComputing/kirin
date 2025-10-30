@@ -2,6 +2,7 @@ from kirin import ir
 from kirin.rewrite import abc
 from kirin.analysis import const
 from kirin.dialects import py
+from kirin.dialects.py.slice import SliceAttribute
 
 from ..stmts import New
 
@@ -34,10 +35,9 @@ class InlineGetItem(abc.RewriteRule):
         ):
             node.result.replace_by(stmt.args[index])
             return abc.RewriteResult(has_done_something=True)
-        elif isinstance(index, slice):
-            start, stop, step = index.indices(len(stmt.args))
+        elif isinstance(index, (slice, SliceAttribute)):
             new_tuple = New(
-                tuple(stmt.args[start:stop:step]),
+                tuple(stmt.args[index.start : index.stop : index.step]),
             )
             node.replace_by(new_tuple)
             return abc.RewriteResult(has_done_something=True)
