@@ -233,8 +233,8 @@ class ConstProp(interp.MethodTable):
             if isinstance(index.data, int) and 0 <= index.data < len(obj):
                 return (obj[index.data],)
             elif isinstance(index.data, slice):
-                start, stop, step = index.data.indices(len(obj))
-                return (const.PartialTuple(obj[start:stop:step]),)
+                sl = index.data
+                return (const.PartialTuple(obj[sl.start : sl.stop : sl.step]),)
         return (const.Unknown(),)
 
 
