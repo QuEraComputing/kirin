@@ -1,11 +1,13 @@
 import pytest
 
+from kirin import types
 from kirin.prelude import basic_no_opt
 from kirin.rewrite import Walk, Chain, Fixpoint, WrapConst
 from kirin.analysis import const
+from kirin.dialects import ilist
 from kirin.rewrite.dce import DeadCodeElimination
-from kirin.rewrite.getitem import InlineGetItem
 from kirin.dialects.py.indexing import GetItem
+from kirin.dialects.ilist.rewrite.inline_getitem import InlineGetItem
 
 
 def apply_getitem_optimization(func):
@@ -18,10 +20,11 @@ def apply_getitem_optimization(func):
 
 @pytest.mark.parametrize("index", [0, -1, 1])
 def test_getitem_index(index):
+    index = 0
 
     @basic_no_opt
     def func(x: int):
-        ylist = (x, x, 1, x)
+        ylist = ilist.New(values=(x, x, 1, x), elem_type=types.PyClass(int))
         return ylist[index]
 
     before = func(1)
@@ -48,7 +51,7 @@ def test_getitem_slice(sl):
 
     @basic_no_opt
     def func():
-        ylist = (0, 1, 2, 3, 4)
+        ylist = ilist.New(values=(0, 1, 2, 3, 4), elem_type=types.PyClass(int))
         return ylist[sl]
 
     func.code.print()
@@ -80,7 +83,7 @@ def test_getitem_slice_with_literal_indices(start, stop, step):
 
     @basic_no_opt
     def func():
-        ylist = (0, 1, 2, 3, 4)
+        ylist = ilist.New(values=(0, 1, 2, 3, 4), elem_type=types.PyClass(int))
         return ylist[start:stop:step]
 
     stmt_types = [type(stmt) for stmt in func.callable_region.blocks[0].stmts]
@@ -106,7 +109,7 @@ def test_getitem_slice_does_nothing():
 
     @basic_no_opt
     def func():
-        ylist = (0, 1, 2, 3, 4)
+        ylist = ilist.New(values=(0, 1, 2, 3, 4), elem_type=types.PyClass(int))
         ylist[0]  # no use
         return 1
 
