@@ -3,6 +3,7 @@ from typing import cast
 from kirin import rewrite
 from kirin.prelude import basic
 from kirin.dialects import py, func
+from kirin.dialects.func.rewrite import closurefield
 
 
 def test_rewrite_closure_inner_lambda():
@@ -26,7 +27,7 @@ def test_rewrite_closure_inner_lambda():
         inner_getfield_stmt, func.GetField
     ), "expected GetField before rewrite"
 
-    rewrite.Walk(func.closurefield.ClosureField()).rewrite(main_lambda.code)
+    rewrite.Walk(closurefield.ClosureField()).rewrite(main_lambda.code)
 
     inner_getfield_stmt = inner_lambda.regions[0].blocks[0].stmts.at(0)
     assert isinstance(
@@ -47,6 +48,6 @@ def test_rewrite_closure_no_fields():
         return boo(4)
 
     before = bar.code.regions[0].blocks[0].stmts.at(0)
-    rewrite.Walk(func.closurefield.ClosureField()).rewrite(bar.code)
+    rewrite.Walk(closurefield.ClosureField()).rewrite(bar.code)
     after = bar.code.regions[0].blocks[0].stmts.at(0)
     assert before is after
