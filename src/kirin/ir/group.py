@@ -217,7 +217,7 @@ class DialectGroup(Generic[PassParams]):
                             f"`{py_func.__name__}` is already defined in the current scope and is not a Method."
                         )
 
-                lineno_offset = call_site_frame.f_lineno - 1
+                lineno_offset = py_func.__code__.co_firstlineno - 1
                 file = call_site_frame.f_code.co_filename
 
             code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)

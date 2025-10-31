@@ -75,9 +75,9 @@ class Frame(Generic[Stmt]):
             raise BuildError(
                 f"Unsupported dialect `{stmt.dialect.name}` from statement {stmt.name}"
             )
-        self.curr_block.stmts.append(stmt)
         if stmt.source is None:
             stmt.source = self.state.source
+        self.curr_block.stmts.append(stmt)
         return stmt
 
     def _push_block(self, block: Block):

@@ -61,6 +61,7 @@ class CommonSubexpressionElimination(RewriteRule):
 
     def rewrite_Block(self, node: ir.Block) -> RewriteResult:
         seen: dict[Info, ir.Statement] = {}
+        has_done_something = False
 
         for stmt in node.stmts:
             if not stmt.has_trait(ir.Pure):
@@ -81,10 +82,10 @@ class CommonSubexpressionElimination(RewriteRule):
                 for result, old_result in zip(stmt._results, old_stmt.results):
                     result.replace_by(old_result)
                 stmt.delete()
-                return RewriteResult(has_done_something=True)
+                has_done_something = True
             else:
                 seen[info] = stmt
-        return RewriteResult()
+        return RewriteResult(has_done_something=has_done_something)
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not node.regions:

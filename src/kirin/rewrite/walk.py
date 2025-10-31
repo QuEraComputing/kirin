@@ -31,6 +31,8 @@ class Walk(RewriteRule):
         # NOTE: because the rewrite pass may mutate the node
         # thus we need to save the list of nodes to be processed
         # first before we start processing them
+        assert self.worklist.is_empty()
+
         self.populate_worklist(node)
         has_done_something = False
         subnode = self.worklist.pop()

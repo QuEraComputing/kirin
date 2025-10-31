@@ -138,6 +138,7 @@ class Python(LoweringABC[ast.AST]):
     def visit(self, state: State[ast.AST], node: ast.AST) -> Result:
         if hasattr(node, "lineno"):
             state.source = SourceInfo.from_ast(node, state.file)
+            state.source.offset(state.lineno_offset, state.col_offset)
         name = node.__class__.__name__
         if name in self.registry.ast_table:
             return self.registry.ast_table[name].lower(state, node)
@@ -148,7 +149,8 @@ class Python(LoweringABC[ast.AST]):
 
     def visit_Call(self, state: State[ast.AST], node: ast.Call) -> Result:
         if hasattr(node.func, "lineno"):
-            state.source = SourceInfo.from_ast(node.func, state.file)
+            state.source = SourceInfo.from_ast(node, state.file)
+            state.source.offset(state.lineno_offset, state.col_offset)
 
         global_callee_result = state.get_global(node.func, no_raise=True)
         if global_callee_result is None:

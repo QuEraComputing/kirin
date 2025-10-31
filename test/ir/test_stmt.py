@@ -1,6 +1,7 @@
 import pytest
 
 from kirin.ir import Block
+from kirin.source import SourceInfo
 from kirin.dialects import py
 
 
@@ -50,3 +51,12 @@ def test_stmt_from_stmt():
     y = x.from_stmt(x)
 
     assert y.result.hints["const"] == py.constant.types.Int
+
+
+def test_stmt_from_stmt_preserves_source_info():
+    x = py.Constant(1)
+    x.source = SourceInfo(lineno=1, col_offset=0, end_lineno=None, end_col_offset=None)
+
+    y = x.from_stmt(x)
+    assert y.source == x.source
+    assert y.source is x.source
