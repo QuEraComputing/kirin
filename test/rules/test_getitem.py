@@ -30,7 +30,6 @@ def test_getitem_index(index):
 
     assert before == after
     assert len(func.callable_region.blocks[0].stmts) == 1
-    print(func.code.print())
 
 
 @pytest.mark.parametrize(
@@ -50,8 +49,6 @@ def test_getitem_slice(sl):
     def func():
         ylist = (0, 1, 2, 3, 4)
         return ylist[sl]
-
-    func.code.print()
 
     stmt_types = [type(stmt) for stmt in func.callable_region.blocks[0].stmts]
     assert GetItem in stmt_types
@@ -87,15 +84,12 @@ def test_getitem_slice_with_literal_indices(start, stop, step):
     assert GetItem in stmt_types
 
     before = func()
-    func.code.print()
 
     apply_getitem_optimization(func)
 
     stmt_types = [type(stmt) for stmt in func.callable_region.blocks[0].stmts]
     assert GetItem not in stmt_types
     after = func()
-
-    func.code.print()
 
     assert before == after
 

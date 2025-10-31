@@ -98,17 +98,7 @@ class Concrete(interp.MethodTable):
 
     @interp.impl(GetItem)
     def getindex(self, interp, frame: interp.Frame, stmt: GetItem):
-        from kirin.dialects.py.slice import SliceAttribute
-
-        index = frame.get(stmt.index)
-
-        # need to handle special case of slice attribute
-        if isinstance(index, SliceAttribute):
-            index_value = index.unwrap()
-        else:
-            index_value = index
-
-        return (frame.get(stmt.obj)[index_value],)
+        return (frame.get(stmt.obj)[frame.get(stmt.index)],)
 
 
 @dialect.register(key="typeinfer")
@@ -218,23 +208,13 @@ class ConstProp(interp.MethodTable):
             return (const.Unknown(),)
 
         if isinstance(obj, const.Value):
-            from kirin.dialects.py.slice import SliceAttribute
-
-            # need to handle special case of slice attribute
-            if isinstance(index.data, SliceAttribute):
-                index_value = index.data.unwrap()
-            else:
-                index_value = index.data
-
-            return (const.Value(obj.data[index_value]),)
-
+            return (const.Value(obj.data[index.data]),)
         elif isinstance(obj, const.PartialTuple):
             obj = obj.data
             if isinstance(index.data, int) and 0 <= index.data < len(obj):
                 return (obj[index.data],)
             elif isinstance(index.data, slice):
-                sl = index.data
-                return (const.PartialTuple(obj[sl.start : sl.stop : sl.step]),)
+                return (const.PartialTuple(obj[index.data]),)
         return (const.Unknown(),)
 
 
