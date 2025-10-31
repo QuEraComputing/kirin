@@ -4,13 +4,19 @@ from kirin.dialects.py import Add, Div, Sub, Mult, BinOp
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.ir.nodes.base import IRNode
 from kirin.dialects.ilist import IListType
-from kirin.dialects.ilist.runtime import IList
 
 from ..stmts import add as vadd, div as vdiv, mul as vmul, sub as vsub
 from .._dialect import dialect
 
 
 class DesugarBinOp(RewriteRule):
+    """
+    Convert py.BinOp statements with one scalar arg and one IList arg
+    to the corresponding vmath binop. Currently supported binops are
+    add, mult, sub, and div. BinOps where both args are IList are not
+    supported, since `+` between two IList objects is taken to mean
+    concatenation.
+    """
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         match node:
@@ -49,6 +55,10 @@ class DesugarBinOp(RewriteRule):
 
 @dialect.post_inference
 class WalkDesugarBinop(RewriteRule):
+    """
+    Walks DesugarBinop. Needed for correct behavior when
+    registering as a post-inference rewrite.
+    """
 
     def rewrite(self, node: IRNode):
         return Walk(DesugarBinOp()).rewrite(node)
