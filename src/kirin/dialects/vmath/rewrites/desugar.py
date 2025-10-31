@@ -1,33 +1,35 @@
-from kirin import ir
+from kirin import ir, types
+from kirin.rewrite import Walk
 from kirin.dialects.py import Add, Div, Sub, Mult, BinOp
 from kirin.rewrite.abc import RewriteRule, RewriteResult
-from kirin.ir.attrs.types import Generic, PyClass
+from kirin.ir.nodes.base import IRNode
+from kirin.dialects.ilist import IListType
 from kirin.dialects.ilist.runtime import IList
 
 from ..stmts import add as vadd, div as vdiv, mul as vmul, sub as vsub
 from .._dialect import dialect
 
 
-@dialect.post_inference
 class DesugarBinOp(RewriteRule):
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         match node:
             case BinOp():
-                match (node.lhs.type, node.rhs.type):
-                    case (PyClass(lhs_typ), Generic(PyClass(rhs_typ))):
-                        if (lhs_typ is float or lhs_typ is int) and rhs_typ == IList:
-                            return self.replace_binop(node)
-                    case (Generic(PyClass(lhs_typ)), PyClass(rhs_typ)):
-                        if lhs_typ is IList and (rhs_typ is float or rhs_typ is int):
-                            return self.replace_binop(node)
-                    case _:
-                        return RewriteResult()
+                if (
+                    node.lhs.type.is_subseteq(types.Number)
+                    and node.rhs.type.is_subseteq(IListType)
+                ) or (
+                    node.lhs.type.is_subseteq(IListType)
+                    and node.rhs.type.is_subseteq(types.Number)
+                ):
+                    return self.replace_binop(node)
 
             case _:
                 return RewriteResult()
 
-    def replace_binop(self, node: ir.Statement):
+        return RewriteResult()
+
+    def replace_binop(self, node: ir.Statement) -> RewriteResult:
         match node:
             case Add():
                 node.replace_by(vadd(lhs=node.lhs, rhs=node.rhs))
@@ -43,3 +45,10 @@ class DesugarBinOp(RewriteRule):
                 return RewriteResult(has_done_something=True)
             case _:
                 return RewriteResult()
+
+
+@dialect.post_inference
+class WalkDesugarBinop(RewriteRule):
+
+    def rewrite(self, node: IRNode):
+        return Walk(DesugarBinOp()).rewrite(node)
