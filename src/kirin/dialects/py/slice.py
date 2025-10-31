@@ -13,7 +13,6 @@ from dataclasses import dataclass
 
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
-from kirin.print.printer import Printer
 from kirin.dialects.py.constant import Constant
 
 dialect = ir.Dialect("py.slice")
@@ -63,43 +62,6 @@ class Slice(ir.Statement):
         )
 
 
-@dataclass
-class SliceAttribute(ir.Data[slice]):
-
-    start: int | None
-    stop: int | None
-    step: int | None
-
-    def __post_init__(self) -> None:
-        if self.start is None and self.step is None:
-            self.type = types.Slice[types.Literal(self.stop)]
-        else:
-            self.type = types.Slice3[
-                types.Literal(self.start),
-                types.Literal(self.stop),
-                types.Literal(self.step),
-            ]
-
-    def unwrap(self):
-        return slice(self.start, self.stop, self.step)
-
-    def __hash__(self):
-        return hash((type(self), self.start, self.stop, self.step))
-
-    def print_impl(self, printer: Printer) -> None:
-        return printer.plain_print(f"slice({self.start}, {self.stop}, {self.step})")
-
-    def is_structurally_equal(
-        self, other: ir.Attribute, context: dict | None = None
-    ) -> bool:
-        return (
-            isinstance(other, SliceAttribute)
-            and self.start == other.start
-            and self.stop == other.stop
-            and self.step == other.step
-        )
-
-
 @dialect.register
 class Concrete(interp.MethodTable):
 
@@ -107,11 +69,11 @@ class Concrete(interp.MethodTable):
     def _slice(self, interp, frame: interp.Frame, stmt: Slice):
         start, stop, step = frame.get_values(stmt.args)
         if start is None and step is None:
-            return (SliceAttribute(None, stop, None),)
+            return (slice(stop),)
         elif step is None:
-            return (SliceAttribute(start, stop, None),)
+            return (slice(start, stop),)
         else:
-            return (SliceAttribute(start, stop, step),)
+            return (slice(start, stop, step),)
 
 
 @dialect.register
