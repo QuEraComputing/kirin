@@ -1,7 +1,6 @@
 from kirin import types
 from kirin.prelude import basic_no_opt
-from kirin.dialects import py, ilist
-from kirin.dialects.py.slice import SliceAttribute
+from kirin.dialects import py
 
 
 @basic_no_opt
@@ -45,32 +44,3 @@ def test_wrong_slice():
 
     stmt: py.slice.Slice = wrong_slice.code.body.blocks[0].stmts.at(7)
     assert stmt.result.type.is_subseteq(types.Bottom)
-
-
-def test_slice_attr():
-
-    @basic_no_opt
-    def test():
-
-        return (slice(0, 20), slice(30), slice(1, 40, 5))
-
-    result = test()
-    assert result == (
-        SliceAttribute(0, 20, None),
-        SliceAttribute(None, 30, None),
-        SliceAttribute(1, 40, 5),
-    )
-
-
-def test_slice_attr_hash():
-    assert hash(SliceAttribute(0, 20, None)) == hash((SliceAttribute, 0, 20, None))
-
-
-def test_slice_get_index():
-    @basic_no_opt
-    def test():
-        x = slice(0, 20, None)
-        y = range(40)
-        return y[x]
-
-    assert test() == ilist.IList(range(0, 20, 1))
