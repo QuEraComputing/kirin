@@ -207,7 +207,8 @@ def test_inline_getitem_slice():
         [
             qreg := ilist.New(values=values),
             slice_value := py.Constant(slice(2, 5, 1)),
-            py.GetItem(obj=qreg.result, index=slice_value.result),
+            res := py.GetItem(obj=qreg.result, index=slice_value.result),
+            func.Return(res.result),
         ]
     )
     slice_value.result.hints["const"] = const.Value(slice(2, 5, 1))
@@ -219,7 +220,8 @@ def test_inline_getitem_slice():
         [
             qreg := ilist.New(values=values),
             slice_value := py.Constant(slice(2, 5, 1)),
-            ilist.New(values=(values[2], values[3], values[4])),
+            res := ilist.New(values=(values[2], values[3], values[4])),
+            func.Return(res.result),
         ]
     )
     assert test_block.is_structurally_equal(expected_block)

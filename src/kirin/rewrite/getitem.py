@@ -19,6 +19,9 @@ class InlineGetItem(RewriteRule):
         if not isinstance(index_value := node.index.hints.get("const"), const.Value):
             return RewriteResult()
 
+        if not node.result.uses:
+            return RewriteResult()
+
         stmt = node.obj.owner
         index = index_value.data
         if isinstance(index, int) and (

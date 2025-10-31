@@ -95,3 +95,22 @@ def test_getitem_slice_with_literal_indices(start, stop, step):
     after = func()
 
     assert before == after
+
+
+def test_getitem_slice_does_nothing():
+    """Test that inline_getiem returns `has_done_something=False` when the getitem
+    statement has no uses"""
+
+    @basic_no_opt
+    def func():
+        ylist = ilist.New(values=(0, 1, 2, 3, 4), elem_type=types.PyClass(int))
+        ylist[0]  # no use
+        return 1
+
+    constprop = const.Propagate(func.dialects)
+    frame, _ = constprop.run(func)
+    Fixpoint(Walk(WrapConst(frame))).rewrite(func.code)
+
+    inline_getitem = InlineGetItem()
+
+    assert not Walk(inline_getitem).rewrite(func.code).has_done_something
