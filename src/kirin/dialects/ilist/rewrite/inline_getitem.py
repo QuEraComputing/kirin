@@ -32,10 +32,7 @@ class InlineGetItem(abc.RewriteRule):
             node.result.replace_by(stmt.args[index])
             return abc.RewriteResult(has_done_something=True)
         elif isinstance(index, slice):
-            start, stop, step = index.indices(len(stmt.args))
-            new_tuple = New(
-                tuple(stmt.args[start:stop:step]),
-            )
+            new_tuple = New(tuple(stmt.args[index]))
             node.replace_by(new_tuple)
             return abc.RewriteResult(has_done_something=True)
         else:
