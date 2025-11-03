@@ -1,4 +1,4 @@
-function _callable_julia_like(ssa_x, ssa_y)
+function julia_like(ssa_x, ssa_y)
     @label block_0
     ssa_0 = 0:1:ssa_x
     local ssa_y_1
@@ -27,11 +27,11 @@ function _callable_julia_like(ssa_x, ssa_y)
         ssa_y_2 = ssa_y_3
     end
     ssa_5 = (ssa_x + ssa_y_1)
-    ssa_6 = _callable_some_arith(ssa_5, 4.0)
+    ssa_6 = some_arith(ssa_5, 4.0)
     return ssa_6
 end
 
-function _callable_some_arith(ssa_x, ssa_y)
+function some_arith(ssa_x, ssa_y)
     @label block_0
     ssa_0 = (ssa_x + ssa_y)
     return ssa_0
