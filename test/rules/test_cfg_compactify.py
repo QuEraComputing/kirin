@@ -1,5 +1,5 @@
 from kirin import ir, types
-from kirin.prelude import basic_no_opt
+from kirin.prelude import basic, basic_no_opt
 from kirin.rewrite import Walk, Fixpoint
 from kirin.dialects import cf, func
 from kirin.dialects.py import cmp, binop
@@ -130,3 +130,21 @@ def test_compactify_entry_block_single_branch():
     target.blocks[0].stmts.append(x1)
     target.blocks[0].stmts.append(func.Return(x1.result))
     assert region.is_structurally_equal(target)
+
+
+def test_compactify_dead_subgraph():
+    @basic
+    def deadblock_mwe():
+        j = 0
+        if False:
+            j = 1
+
+            if True:
+                j = j + 1
+
+            else:
+                j = j - 1
+
+        return j
+
+    deadblock_mwe()
