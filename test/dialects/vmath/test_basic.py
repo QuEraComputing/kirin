@@ -70,26 +70,26 @@ def test_add_scalar_list():
 
 
 @basic.union([vmath])
-def mul_kernel(x, y):
-    return vmath.mul(x, y)
+def mult_kernel(x, y):
+    return vmath.mult(x, y)
 
 
-def test_mul_lists():
+def test_mult_lists():
     a = ilist.IList([1.0, 2.0, 3.0], elem=types.Float)
     b = ilist.IList([4.0, 5.0, 6.0], elem=types.Float)
     truth = np.array([1.0, 2.0, 3.0]) * np.array([4.0, 5.0, 6.0])
-    out = mul_kernel(a, b)
+    out = mult_kernel(a, b)
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
     assert np.allclose(out, truth)
 
 
-def test_mul_scalar_list():
+def test_mult_scalar_list():
     a = 3.0
     b = ilist.IList([4.0, 5.0, 6.0], elem=types.Float)
     truth = 3.0 * np.array([4.0, 5.0, 6.0])
-    out = mul_kernel(a, b)
-    out2 = mul_kernel(b, a)
+    out = mult_kernel(a, b)
+    out2 = mult_kernel(b, a)
 
     assert isinstance(out, ilist.IList)
     assert out.elem == types.Float
