@@ -6,7 +6,6 @@ from kirin.ir.nodes.base import IRNode
 from kirin.dialects.ilist import IListType
 
 from ..stmts import add as vadd, div as vdiv, mul as vmul, sub as vsub
-from .._dialect import dialect
 
 
 class DesugarBinOp(RewriteRule):
@@ -53,7 +52,6 @@ class DesugarBinOp(RewriteRule):
                 return RewriteResult()
 
 
-@dialect.post_inference
 class WalkDesugarBinop(RewriteRule):
     """
     Walks DesugarBinop. Needed for correct behavior when
