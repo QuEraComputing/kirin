@@ -301,10 +301,10 @@ class log2(ir.Statement):
 
 
 @statement(dialect=dialect)
-class mul(ir.Statement):
+class mult(ir.Statement):
     """multiplication statement, scalar*list or list*list"""
 
-    name = "mul"
+    name = "mult"
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     lhs: ir.SSAValue = info.argument(
         ilist.IListType[types.Float, ListLen] | types.Float

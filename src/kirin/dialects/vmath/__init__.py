@@ -138,8 +138,8 @@ def log1p(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 def log2(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 
 
-@lowering.wraps(stmts.mul)
-def mul(
+@lowering.wraps(stmts.mult)
+def mult(
     lhs: ilist.IList[float, ListLen] | float,
     rhs: ilist.IList[float, ListLen] | float,
 ) -> ilist.IList[float, ListLen]: ...

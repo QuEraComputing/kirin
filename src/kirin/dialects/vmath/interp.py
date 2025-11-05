@@ -213,8 +213,8 @@ class MathMethodTable(MethodTable):
         values = frame.get_values(stmt.args)
         return (ilist.IList(np.log2(np.asarray(values[0])).tolist(), elem=types.Float),)
 
-    @impl(stmts.mul)
-    def mul(self, interp, frame: Frame, stmt: stmts.mul):
+    @impl(stmts.mult)
+    def mult(self, interp, frame: Frame, stmt: stmts.mult):
         lhs = frame.get(stmt.lhs)
         rhs = frame.get(stmt.rhs)
         if isinstance(lhs, ilist.IList):

@@ -5,7 +5,7 @@ from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.ir.nodes.base import IRNode
 from kirin.dialects.ilist import IListType
 
-from ..stmts import add as vadd, div as vdiv, mul as vmul, sub as vsub
+from ..stmts import add as vadd, div as vdiv, sub as vsub, mult as vmult
 
 
 class DesugarBinOp(RewriteRule):
@@ -43,7 +43,7 @@ class DesugarBinOp(RewriteRule):
                 node.replace_by(vsub(lhs=node.lhs, rhs=node.rhs))
                 return RewriteResult(has_done_something=True)
             case Mult():
-                node.replace_by(vmul(lhs=node.lhs, rhs=node.rhs))
+                node.replace_by(vmult(lhs=node.lhs, rhs=node.rhs))
                 return RewriteResult(has_done_something=True)
             case Div():
                 node.replace_by(vdiv(lhs=node.lhs, rhs=node.rhs))
