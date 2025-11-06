@@ -27,7 +27,7 @@ class DeadBlock(RewriteRule):
                     self.cfg.predecessors[successor].discard(block)
                 self.cfg.successors.pop(block, None)
                 self.cfg.predecessors.pop(block, None)
-                block.delete()
+                block.delete(safe=False)
                 has_done_something = True
         return RewriteResult(has_done_something=has_done_something)
 
