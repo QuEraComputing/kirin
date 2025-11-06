@@ -103,13 +103,25 @@
 <span class=normal>42</span>
 <span class=normal>43</span>
 <span class=normal>44</span>
-<span class=normal>45</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>45</span>
+<span class=normal>46</span>
+<span class=normal>47</span>
+<span class=normal>48</span>
+<span class=normal>49</span>
+<span class=normal>50</span>
+<span class=normal>51</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>values</span><span class=p>:</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>],</span>
     <span class=n>elem_type</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=n>elem_type</span><span class=p>:</span>
-        <span class=n>elem_type</span> <span class=o>=</span> <span class=n>types</span><span class=o>.</span><span class=n>Any</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>values</span><span class=p>:</span>
+            <span class=n>elem_type</span> <span class=o>=</span> <span class=n>types</span><span class=o>.</span><span class=n>Any</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>elem_type</span> <span class=o>=</span> <span class=n>values</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span><span class=o>.</span><span class=n>type</span>
+            <span class=k>for</span> <span class=n>v</span> <span class=ow>in</span> <span class=n>values</span><span class=p>[</span><span class=mi>1</span><span class=p>:]:</span>
+                <span class=n>elem_type</span> <span class=o>=</span> <span class=n>elem_type</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>v</span><span class=o>.</span><span class=n>type</span><span class=p>)</span>
+
     <span class=n>result_type</span> <span class=o>=</span> <span class=n>IListType</span><span class=p>[</span><span class=n>elem_type</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>Literal</span><span class=p>(</span><span class=nb>len</span><span class=p>(</span><span class=n>values</span><span class=p>))]</span>
     <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>(</span>
         <span class=n>args</span><span class=o>=</span><span class=n>values</span><span class=p>,</span>
