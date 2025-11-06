@@ -35,7 +35,13 @@ class New(ir.Statement):
         elem_type: types.TypeAttribute | None = None,
     ) -> None:
         if not elem_type:
-            elem_type = types.Any
+            if not values:
+                elem_type = types.Any
+            else:
+                elem_type = values[0].type
+                for v in values[1:]:
+                    elem_type = elem_type.join(v.type)
+
         result_type = IListType[elem_type, types.Literal(len(values))]
         super().__init__(
             args=values,
