@@ -25,6 +25,9 @@ class InlineGetItem(abc.RewriteRule):
         if not isinstance(index_const := node.index.hints.get("const"), const.Value):
             return abc.RewriteResult()
 
+        if not node.result.uses:
+            return abc.RewriteResult()
+
         index = index_const.data
         if isinstance(index, int) and (
             0 <= index < len(stmt.args) or -len(stmt.args) <= index < 0
