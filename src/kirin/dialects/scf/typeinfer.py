@@ -34,7 +34,10 @@ class TypeInfer(absint.Methods):
         body_block = stmt.body.blocks[0]
         block_args = body_block.args
 
-        eltype = interp_.frame_eval(frame, ElType(stmt.iterable))
+        eltype_stmt = ElType(stmt.iterable)
+        eltype = interp_.frame_eval(frame, eltype_stmt)
+        eltype_stmt.drop_all_references()
+
         if not isinstance(eltype, tuple):  # error
             return
         item = eltype[0]

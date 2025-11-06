@@ -1,5 +1,5 @@
-from kirin.prelude import structural
-from kirin.dialects import py, func
+from kirin.prelude import structural, structural_no_opt
+from kirin.dialects import py, func, ilist
 from kirin.passes.aggressive import UnrollScf
 
 
@@ -37,3 +37,22 @@ def test_unroll_scf():
 
     assert num_adds == 10
     assert num_calls == 8
+
+
+def test_dce_unroll_typeinfer():
+    # NOTE: tests bug in typeinfer preventing DCE from issue#564
+
+    @structural_no_opt
+    def main():
+        ls = [1, 2, 3]
+        for i in range(1):
+            ls[i] = 10
+        return ls
+
+    UnrollScf(main.dialects).fixpoint(main)
+
+    for stmt in main.callable_region.stmts():
+        if isinstance(stmt, py.Constant) and isinstance(
+            value := stmt.value, ilist.IList
+        ):
+            assert not isinstance(value.data, range), "Unused range not eliminated!"
