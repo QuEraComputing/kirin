@@ -12,6 +12,17 @@ from ._dialect import dialect
 @dialect.register
 class MathMethodTable(MethodTable):
 
+    @impl(stmts.add)
+    def add(self, interp, frame: Frame, stmt: stmts.add):
+        lhs = frame.get(stmt.lhs)
+        rhs = frame.get(stmt.rhs)
+        if isinstance(lhs, ilist.IList):
+            lhs = np.asarray(lhs)
+        if isinstance(rhs, ilist.IList):
+            rhs = np.asarray(rhs)
+        result = lhs + rhs
+        return (ilist.IList(result.tolist(), elem=types.Float),)
+
     @impl(stmts.acos)
     def acos(self, interp, frame: Frame, stmt: stmts.acos):
         values = frame.get_values(stmt.args)
@@ -88,6 +99,17 @@ class MathMethodTable(MethodTable):
         return (
             ilist.IList(np.degrees(np.asarray(values[0])).tolist(), elem=types.Float),
         )
+
+    @impl(stmts.div)
+    def div(self, interp, frame: Frame, stmt: stmts.div):
+        lhs = frame.get(stmt.lhs)
+        rhs = frame.get(stmt.rhs)
+        if isinstance(lhs, ilist.IList):
+            lhs = np.asarray(lhs)
+        if isinstance(rhs, ilist.IList):
+            rhs = np.asarray(rhs)
+        result = lhs / rhs
+        return (ilist.IList(result.tolist(), elem=types.Float),)
 
     @impl(stmts.erf)
     def erf(self, interp, frame: Frame, stmt: stmts.erf):
@@ -191,6 +213,17 @@ class MathMethodTable(MethodTable):
         values = frame.get_values(stmt.args)
         return (ilist.IList(np.log2(np.asarray(values[0])).tolist(), elem=types.Float),)
 
+    @impl(stmts.mult)
+    def mult(self, interp, frame: Frame, stmt: stmts.mult):
+        lhs = frame.get(stmt.lhs)
+        rhs = frame.get(stmt.rhs)
+        if isinstance(lhs, ilist.IList):
+            lhs = np.asarray(lhs)
+        if isinstance(rhs, ilist.IList):
+            rhs = np.asarray(rhs)
+        result = lhs * rhs
+        return (ilist.IList(result.tolist(), elem=types.Float),)
+
     @impl(stmts.pow)
     def pow(self, interp, frame: Frame, stmt: stmts.pow):
         x = frame.get(stmt.x)
@@ -233,6 +266,17 @@ class MathMethodTable(MethodTable):
     def sqrt(self, interp, frame: Frame, stmt: stmts.sqrt):
         values = frame.get_values(stmt.args)
         return (ilist.IList(np.sqrt(np.asarray(values[0])).tolist(), elem=types.Float),)
+
+    @impl(stmts.sub)
+    def sub(self, interp, frame: Frame, stmt: stmts.sub):
+        lhs = frame.get(stmt.lhs)
+        rhs = frame.get(stmt.rhs)
+        if isinstance(lhs, ilist.IList):
+            lhs = np.asarray(lhs)
+        if isinstance(rhs, ilist.IList):
+            rhs = np.asarray(rhs)
+        result = lhs - rhs
+        return (ilist.IList(result.tolist(), elem=types.Float),)
 
     @impl(stmts.tan)
     def tan(self, interp, frame: Frame, stmt: stmts.tan):

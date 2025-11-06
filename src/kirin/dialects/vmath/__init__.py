@@ -14,6 +14,13 @@ tau = pymath.tau
 ListLen = TypeVar("ListLen")
 
 
+@lowering.wraps(stmts.add)
+def add(
+    lhs: ilist.IList[float, ListLen] | float,
+    rhs: ilist.IList[float, ListLen] | float,
+) -> ilist.IList[float, ListLen]: ...
+
+
 @lowering.wraps(stmts.acos)
 def acos(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 
@@ -60,6 +67,13 @@ def cosh(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 
 @lowering.wraps(stmts.degrees)
 def degrees(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
+
+
+@lowering.wraps(stmts.div)
+def div(
+    lhs: ilist.IList[float, ListLen] | float,
+    rhs: ilist.IList[float, ListLen] | float,
+) -> ilist.IList[float, ListLen]: ...
 
 
 @lowering.wraps(stmts.erf)
@@ -124,6 +138,13 @@ def log1p(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 def log2(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 
 
+@lowering.wraps(stmts.mult)
+def mult(
+    lhs: ilist.IList[float, ListLen] | float,
+    rhs: ilist.IList[float, ListLen] | float,
+) -> ilist.IList[float, ListLen]: ...
+
+
 @lowering.wraps(stmts.pow)
 def pow(x: ilist.IList[float, ListLen], y: float) -> ilist.IList[float, ListLen]: ...
 
@@ -148,6 +169,13 @@ def sinh(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
 
 @lowering.wraps(stmts.sqrt)
 def sqrt(x: ilist.IList[float, ListLen]) -> ilist.IList[float, ListLen]: ...
+
+
+@lowering.wraps(stmts.sub)
+def sub(
+    lhs: ilist.IList[float, ListLen] | float,
+    rhs: ilist.IList[float, ListLen] | float,
+) -> ilist.IList[float, ListLen]: ...
 
 
 @lowering.wraps(stmts.tan)
