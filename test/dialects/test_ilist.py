@@ -453,6 +453,14 @@ def test_ilist_constprop_non_pure():
     assert isinstance(res, const.Unknown)
 
 
+def test_ilist_new_eltype():
+    x = py.Constant(value=1)
+    stmt = ilist.New(values=(x.result, x.result))
+
+    assert x.result.type == stmt.elem_type
+    assert stmt.result.type.is_subseteq(ilist.IListType[types.Int, types.Literal(2)])
+
+
 rule = rewrite.Fixpoint(rewrite.Walk(ilist.rewrite.Unroll()))
 xs = ilist.IList([1, 2, 3])
 
