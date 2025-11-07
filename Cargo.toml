@@ -8,11 +8,11 @@ salsa = "0.24.0"
 serde = { version = "1.0.228", optional = true }
 
 [workspace]
-members = []
+members = ["crates/kirin-ir", "crates/kirin-derive"]
 
 [features]
 serde = ["dep:serde"]
 
-[[example]]
-name = "simple"
-path = "example/simple.rs"
+# [[example]]
+# name = "simple"
+# path = "example/simple.rs"
