@@ -6,6 +6,7 @@ from kirin.dialects import ilist
 
 from . import stmts as stmts, interp as interp
 from ._dialect import dialect as dialect
+from .rewrites import desugar as desugar
 
 pi = pymath.pi
 e = pymath.e

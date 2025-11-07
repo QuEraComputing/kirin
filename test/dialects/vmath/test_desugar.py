@@ -37,7 +37,7 @@ def test_typed_kernel_add():
     assert np.allclose(np.asarray(res), np.asarray([3.1, 4.1, 5.1]))
 
 
-@basic.union([vmath])
+@basic.union([vmath])(typeinfer=True)
 def add_two_lists():
     return add_kernel(x=[0, 1, 2], y=[3, 4, 5])
 
@@ -47,7 +47,7 @@ def test_add_lists():
     assert np.allclose(np.asarray(res), np.array([0, 1, 2, 3, 4, 5]))
 
 
-@basic.union([vmath])
+@basic.union([vmath])(typeinfer=True)
 def sub_scalar_rhs_typed(x: IList[float, Any], y: float):
     return x - y
 
@@ -57,7 +57,7 @@ def test_sub_scalar_typed():
     assert np.allclose(np.asarray(res), np.asarray([-3.1, -2.1, -1.1]))
 
 
-@basic.union([vmath])
+@basic.union([vmath])(typeinfer=True)
 def mult_scalar_lhs_typed(x: float, y: IList[float, Any]):
     return x * y
 
@@ -67,7 +67,7 @@ def test_mult_scalar_typed():
     assert np.allclose(np.asarray(res), np.asarray([0, 3, 6]))
 
 
-@basic.union([vmath])
+@basic.union([vmath])(typeinfer=True)
 def div_scalar_lhs_typed(x: float, y: IList[float, Any]):
     return x / y
 
