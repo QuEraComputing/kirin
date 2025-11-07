@@ -1,0 +1,13 @@
+[package]
+name = "kirin-ir"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-derive = { version = "0.1.0", path = "../kirin-derive", optional = true }
+serde = { version = "1.0.228", optional = true }
+
+[features]
+default = ["derive"]
+derive = ["dep:kirin-derive"]
+serde = ["dep:serde"]
