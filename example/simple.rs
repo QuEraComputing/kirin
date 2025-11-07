@@ -1,10 +1,4 @@
-// use kirin::{
-//     comptime::CompileTimeValue,
-//     context::{Context, IRContext},
-//     dialects::{arith::ArithInstruction, cf::ControlFlowInstruction, constant::Constant},
-//     language::Language,
-//     lattice::{FiniteLattice, Lattice, TypeLattice},
-// };
+use kirin::prelude::*;
 
 // fn main() {
 //     let _ctx: Context<Stage> = Context::default();

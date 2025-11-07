@@ -4,11 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
 salsa = "0.24.0"
 serde = { version = "1.0.228", optional = true }
 
 [workspace]
+<<<<<<< Updated upstream
 members = ["crates/kirin-ir", "crates/kirin-derive"]
+=======
+members = ["crates/kirin-derive", "crates/kirin-ir"]
+>>>>>>> Stashed changes
 
 [features]
 serde = ["dep:serde"]

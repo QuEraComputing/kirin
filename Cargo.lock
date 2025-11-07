@@ -142,6 +142,7 @@ dependencies = [
 name = "kirin"
 version = "0.1.0"
 dependencies = [
+ "kirin-ir",
  "salsa",
  "serde",
 ]

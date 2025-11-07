@@ -1,14 +1,16 @@
-use crate::{
-    comptime::CompileTimeValue,
-    ir::{Instruction, ResultValue},
-};
+use kirin_ir::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Instruction)]
 pub struct Constant<T: CompileTimeValue>(pub T, ResultValue);
 
-impl<T: CompileTimeValue> Instruction for Constant<T> {
-    type ResultIterator = std::iter::Once<crate::ir::ResultValue>;
-    fn results(&self) -> Self::ResultIterator {
-        std::iter::once(self.1)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_constant_results() {
+        let const_instr = Constant(42u32, TestSSAValue(1).into());
+        let results = const_instr.results().collect::<Vec<_>>();
+        assert_eq!(results, vec![TestSSAValue(1).into()]);
     }
 }
