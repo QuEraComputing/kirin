@@ -25,13 +25,13 @@ enum InstructionInfo {
         field_count: usize,
         indices: Vec<syn::LitInt>,
     },
-    AnonymousContainer(syn::Ident),
+    // AnonymousContainer(syn::Ident),
     Named {
         /// The name of the instruction
         name: syn::Ident,
         idents: Vec<syn::Ident>,
     },
-    NamedContainer(syn::Ident),
+    // NamedContainer(syn::Ident),
     Unit,
     /// Wraps(<variant/struct name>)
     /// wraps another instruction as
@@ -185,12 +185,7 @@ impl InstructionInfo {
 
         match fields {
             Named(fields_named) => {
-                if let Some((_, _)) =
-                    has_container_and_only_one_container(&fields_named.named, typename)
-                {
-                    Self::NamedContainer(name.clone())
-                } else {
-                    Self::Named {
+                Self::Named {
                         name: name.clone(),
                         idents: fields_named
                             .named
@@ -198,21 +193,21 @@ impl InstructionInfo {
                             .filter_map(|field| {
                                 if is_type(&field.ty, typename) {
                                     Some(field.ident.clone().unwrap())
-                                } else {
+                                } else if is_type_in_generic(&field.ty, typename) {
+                            panic!(
+                                "Generic field types like Vec<{}> are not supported yet, consider implementing manually",
+                                typename
+                            );
+                        }
+                                else {
                                     None
                                 }
                             })
                             .collect::<Vec<syn::Ident>>(),
                     }
-                }
             }
             Unnamed(fields_unnamed) => {
-                if let Some((_, _)) =
-                    has_container_and_only_one_container(&fields_unnamed.unnamed, typename)
-                {
-                    Self::AnonymousContainer(name.clone())
-                } else {
-                    Self::Anonymous {
+                Self::Anonymous {
                 name: name.clone(),
                 field_count: fields_unnamed.unnamed.len(),
                 indices: fields_unnamed
@@ -233,7 +228,6 @@ impl InstructionInfo {
                     })
                     .collect(),
             }
-                }
             }
             Unit => InstructionInfo::Unit,
         }
@@ -269,11 +263,11 @@ impl InstructionInfo {
                     }
                 }
             }
-            AnonymousContainer(_) | NamedContainer(_) => {
-                quote! {
-                    unreachable!("struct with container should not generate iterator");
-                }
-            }
+            // AnonymousContainer(_) | NamedContainer(_) => {
+            //     quote! {
+            //         unreachable!("struct with container should not generate iterator");
+            //     }
+            // }
             Unit => {
                 quote! {
                     None
@@ -330,13 +324,13 @@ impl InstructionInfo {
                     }
                 }
             }
-            AnonymousContainer(variant_name) | NamedContainer(variant_name) => {
-                quote! {
-                    #name::#variant_name => {
-                        unreachable!("variant with container should not generate iterator");
-                    }
-                }
-            }
+            // AnonymousContainer(variant_name) | NamedContainer(variant_name) => {
+            //     quote! {
+            //         #name::#variant_name => {
+            //             unreachable!("variant with container should not generate iterator");
+            //         }
+            //     }
+            // }
             _ => {
                 quote! {}
             }
@@ -450,18 +444,44 @@ mod tests {
             }",
         )
         .unwrap();
-        let fields = if let syn::Data::Struct(DataStruct { struct_token: _, fields: Fields::Named(f), semi_token: _ }) = fields.data {
+        let fields = if let syn::Data::Struct(DataStruct {
+            struct_token: _,
+            fields: Fields::Named(f),
+            semi_token: _,
+        }) = fields.data
+        {
             f
         } else {
             panic!("expected struct");
         };
         let result = has_container_and_only_one_container(&fields.named, "SSAValue");
-        assert_eq!(result, Some((0, Some(syn::Ident::new("args", proc_macro2::Span::call_site())))));
+        assert_eq!(
+            result,
+            Some((
+                0,
+                Some(syn::Ident::new("args", proc_macro2::Span::call_site()))
+            ))
+        );
 
         let result = has_container_and_only_one_container(&fields.named, "ResultValue");
-        assert_eq!(result, Some((1, Some(syn::Ident::new("results", proc_macro2::Span::call_site())))));
+        assert_eq!(
+            result,
+            Some((
+                1,
+                Some(syn::Ident::new("results", proc_macro2::Span::call_site()))
+            ))
+        );
 
         let result = has_container_and_only_one_container(&fields.named, "ContainerValue");
-        assert_eq!(result, Some((2, Some(syn::Ident::new("containers", proc_macro2::Span::call_site())))));
+        assert_eq!(
+            result,
+            Some((
+                2,
+                Some(syn::Ident::new(
+                    "containers",
+                    proc_macro2::Span::call_site()
+                ))
+            ))
+        );
     }
 }

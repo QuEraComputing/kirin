@@ -111,6 +111,7 @@ fn test_enum_wrapper() {
 }
 
 #[test]
+#[should_panic]
 fn test_vec_resultvalue_field() {
     let input = quote! {
         #[derive(Instruction)]
@@ -123,6 +124,7 @@ fn test_vec_resultvalue_field() {
 }
 
 #[test]
+#[should_panic]
 fn test_enum_vec() {
     let input = quote! {
         #[derive(Instruction)]
@@ -138,6 +140,30 @@ fn test_enum_vec() {
         }
     };
     insta::assert_snapshot!(check(input));
+}
+
+// test panic on vec<ResultValue> fields
+#[test]
+#[should_panic]
+fn test_scf() {
+    let input = quote! {
+        pub enum SCFInstruction {
+            If {
+                condition: SSAValue,
+                then_block: Block,
+                else_block: Block,
+                results: Vec<ResultValue>,
+            },
+            For {
+                lower_bound: SSAValue,
+                upper_bound: SSAValue,
+                step: SSAValue,
+                body_block: Block,
+                results: Vec<ResultValue>,
+            },
+        }
+    };
+    check(input);
 }
 
 fn check(src: TokenStream) -> String {
