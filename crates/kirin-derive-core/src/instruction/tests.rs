@@ -1,5 +1,4 @@
 use super::*;
-use crate::DeriveContext;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -16,7 +15,14 @@ fn test_struct_derivation() {
             e: Region,
         }
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
+    insta::assert_snapshot!(check::<DeriveInstruction>(&input));
 }
 
 #[test]
@@ -40,7 +46,13 @@ fn test_enum_derivation() {
             },
         }
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
 #[test]
@@ -65,7 +77,13 @@ fn test_global_enum_derivation() {
             },
         }
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
 #[test]
@@ -75,7 +93,13 @@ fn test_global_struct_wrapper() {
         #[kirin(wraps)]
         struct WrapperInst(TestInst);
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
 #[test]
@@ -88,7 +112,13 @@ fn test_global_enum_wrapper() {
             WrapB(TestInstB),
         }
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
 #[test]
@@ -107,7 +137,13 @@ fn test_enum_wrapper() {
             },
         }
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
 #[test]
@@ -120,7 +156,13 @@ fn test_vec_resultvalue_field() {
             results: Vec<ResultValue>,
         }
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
 #[test]
@@ -139,7 +181,13 @@ fn test_enum_vec() {
             },
         }
     };
-    insta::assert_snapshot!(check(input));
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
 // test panic on vec<ResultValue> fields
@@ -163,15 +211,18 @@ fn test_scf() {
             },
         }
     };
-    check(input);
+    insta::assert_snapshot!(check::<DeriveHasArguments>(&input));
+    insta::assert_snapshot!(check::<DeriveHasResults>(&input));
+    insta::assert_snapshot!(check::<DeriveHasSuccessors>(&input));
+    insta::assert_snapshot!(check::<DeriveHasRegions>(&input));
+    insta::assert_snapshot!(check::<DeriveIsTerminator>(&input));
+    insta::assert_snapshot!(check::<DeriveIsConstant>(&input));
+    insta::assert_snapshot!(check::<DeriveIsPure>(&input));
 }
 
-fn check(src: TokenStream) -> String {
-    let input = syn::parse2(src).unwrap();
-    let mut ctx = DeriveContext::new(quote! {::kirin_ir::Instruction}, input);
-    let mut pass = DeriveInstruction::new(&ctx);
-    pass.generate(&mut ctx).unwrap();
-    rustfmt(ctx.generate().to_string().as_str())
+fn check<T: DeriveTrait>(src: &TokenStream) -> String {
+    let input = syn::parse2(src.clone()).unwrap();
+    rustfmt(T::generate(input).to_string().as_str())
 }
 
 use std::process::{Command, Stdio};

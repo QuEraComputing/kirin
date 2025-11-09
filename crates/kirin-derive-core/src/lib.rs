@@ -5,5 +5,8 @@ mod traits;
 
 pub use accessor::FieldAccessor;
 pub use derive::DeriveContext;
-pub use instruction::DeriveInstruction;
-pub use traits::{DeriveHelperAttribute, Generate};
+pub use instruction::{
+    DeriveHasArguments, DeriveHasRegions, DeriveHasResults, DeriveHasSuccessors, DeriveIsConstant,
+    DeriveIsPure, DeriveIsTerminator,DeriveInstruction,
+};
+pub use traits::{DeriveHelperAttribute, WriteTokenStream, DeriveTrait};

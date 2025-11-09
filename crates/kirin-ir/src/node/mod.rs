@@ -1,5 +1,5 @@
 pub mod block;
-pub mod cfg;
+pub mod region;
 pub mod function;
 pub mod linked_list;
 pub mod module;
@@ -8,7 +8,7 @@ pub mod stmt;
 pub mod symbol;
 
 pub use block::{Block, BlockInfo};
-pub use cfg::CFG;
+pub use region::{Region, RegionInfo};
 pub use function::{
     Function, FunctionInfo, Signature, SpecializedFunction, SpecializedFunctionInfo,
     StagedFunction, StagedFunctionInfo,

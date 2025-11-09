@@ -1,0 +1,10 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: "check::<DeriveIsPure>(&input)"
+---
+#[automatically_derived]
+impl ::kirin_ir::IsPure for TestInst {
+    fn is_pure(&self) -> bool {
+        true
+    }
+}

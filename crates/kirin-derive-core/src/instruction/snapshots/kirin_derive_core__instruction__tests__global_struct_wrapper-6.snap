@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: "check::<DeriveIsConstant>(&input)"
+---
+#[automatically_derived]
+impl ::kirin_ir::IsConstant for WrapperInst {
+    fn is_constant(&self) -> bool {
+        let WrapperInst(wrapped_instruction) = self;
+        <wrapped_instruction as ::kirin_ir::IsConstant>::is_constant(wrapped_instruction)
+    }
+}

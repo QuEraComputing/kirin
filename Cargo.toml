@@ -9,11 +9,7 @@ salsa = "0.24.0"
 serde = { version = "1.0.228", optional = true }
 
 [workspace]
-<<<<<<< Updated upstream
-members = ["crates/kirin-ir", "crates/kirin-derive"]
-=======
-members = ["crates/kirin-derive", "crates/kirin-ir"]
->>>>>>> Stashed changes
+members = ["crates/kirin-derive", "crates/kirin-derive-core", "crates/kirin-ir"]
 
 [features]
 serde = ["dep:serde"]

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::language::Language;
 
 use super::symbol::Symbol;
-use super::cfg::CFG;
+use super::region::Region;
 
 /// A unique identifier for a function.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
@@ -39,7 +39,7 @@ pub struct SpecializedFunctionInfo<L: Language> {
     id: SpecializedFunction,
     signature: Signature<L>,
     return_type: L::Type,
-    body: CFG,
+    body: Region,
     /// Functions that call this function (used for inter-procedural analyses).
     backedges: Vec<SpecializedFunction>,
 }

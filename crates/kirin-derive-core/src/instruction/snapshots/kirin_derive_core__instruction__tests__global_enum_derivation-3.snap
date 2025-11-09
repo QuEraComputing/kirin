@@ -1,0 +1,34 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: "check::<DeriveHasSuccessors>(&input)"
+---
+#[automatically_derived]
+impl ::kirin_ir::HasSuccessors for TestInst {
+    fn successors(&self) -> impl Iterator<Item = &::kirin_ir::Block> {
+        __KirinSuccessorsIter {
+            parent: self,
+            index: 0,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinSuccessorsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinSuccessorsIter<'__kirin_ir_iter_a> {
+    type Item = &'__kirin_ir_iter_a ::kirin_ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.parent {
+            TestInst::Terminate { target, .. } => match self.index {
+                0 => {
+                    self.index += 1;
+                    Some(target)
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}

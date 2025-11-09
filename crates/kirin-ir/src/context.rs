@@ -1,3 +1,4 @@
+use crate::node::region::RegionInfo;
 use crate::node::*;
 use crate::language::Language;
 
@@ -23,10 +24,11 @@ impl<Stage> Default for Context<Stage> {
 }
 
 pub struct IRContext<L: Language> {
-    staged_functions: Vec<StagedFunctionInfo<L>>,
-    blocks: Vec<BlockInfo>,
-    statements: Vec<StatementInfo<L>>,
-    ssas: Vec<SSAInfo<L>>,
+    pub(crate) staged_functions: Vec<StagedFunctionInfo<L>>,
+    pub(crate) regions: Vec<RegionInfo<L>>,
+    pub(crate) blocks: Vec<BlockInfo<L>>,
+    pub(crate) statements: Vec<StatementInfo<L>>,
+    pub(crate) ssas: Vec<SSAInfo<L>>,
 }
 
 impl<L> Default for IRContext<L>
@@ -36,6 +38,7 @@ where
     fn default() -> Self {
         Self {
             staged_functions: Vec::new(),
+            regions: Vec::new(),
             blocks: Vec::new(),
             statements: Vec::new(),
             ssas: Vec::new(),
@@ -52,6 +55,7 @@ where
     fn clone(&self) -> Self {
         Self {
             staged_functions: self.staged_functions.clone(),
+            regions: self.regions.clone(),
             blocks: self.blocks.clone(),
             statements: self.statements.clone(),
             ssas: self.ssas.clone(),

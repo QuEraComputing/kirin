@@ -1,0 +1,10 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: "check::<DeriveIsConstant>(&input)"
+---
+#[automatically_derived]
+impl ::kirin_ir::IsConstant for TestInst {
+    fn is_constant(&self) -> bool {
+        true
+    }
+}

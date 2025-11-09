@@ -1,0 +1,17 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: "check::<DeriveHasResults>(&input)"
+---
+#[automatically_derived]
+impl ::kirin_ir::HasResults for WrapperInst {
+    fn results(&self) -> impl Iterator<Item = &::kirin_ir::ResultValue> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::HasResults>::results()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::HasResults>::results()
+            }
+        }
+    }
+}

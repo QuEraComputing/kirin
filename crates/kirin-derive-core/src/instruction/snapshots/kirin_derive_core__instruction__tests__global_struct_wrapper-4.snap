@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: "check::<DeriveHasRegions>(&input)"
+---
+#[automatically_derived]
+impl ::kirin_ir::HasRegions for WrapperInst {
+    fn regions(&self) -> impl Iterator<Item = &::kirin_ir::Region> {
+        let WrapperInst(wrapped_instruction) = self;
+        <wrapped_instruction as ::kirin_ir::HasRegions>::regions()
+    }
+}

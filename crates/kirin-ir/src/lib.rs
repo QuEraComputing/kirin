@@ -1,22 +1,29 @@
 mod comptime;
 mod context;
-mod node;
+mod detach;
 mod language;
 mod lattice;
+mod node;
+/// Queries from the IRContext.
+pub mod query;
 
 pub use comptime::CompileTimeValue;
 pub use context::{Context, IRContext};
-pub use language::{Language, Instruction};
-pub use lattice::{Lattice, FiniteLattice, TypeLattice};
-pub use node::{
-    SSAKind, SSAValue, SSAInfo, TestSSAValue, ResultValue, BlockArgument,
-    Statement, StatementInfo, Block, BlockInfo,
-    CFG,
-    Function, FunctionInfo, Signature, SpecializedFunction, SpecializedFunctionInfo,
-    StagedFunction, StagedFunctionInfo,
-    Module, SpecializedModule,
-    InternTable, Symbol,
-    LinkedList, Node,
+pub use detach::Detach;
+pub use language::{
+    HasArguments, HasRegions, HasResults, HasSuccessors, Instruction, IsConstant, IsPure,
+    IsTerminator, Language,
 };
+pub use lattice::{FiniteLattice, Lattice, TypeLattice};
+pub use node::{
+    Block, BlockArgument, BlockInfo, Function, FunctionInfo, InternTable, LinkedList, Module, Node,
+    Region, ResultValue, SSAInfo, SSAKind, SSAValue, Signature, SpecializedFunction,
+    SpecializedFunctionInfo, SpecializedModule, StagedFunction, StagedFunctionInfo, Statement,
+    StatementInfo, Symbol, TestSSAValue,
+};
+
 #[cfg(feature = "derive")]
-pub use kirin_derive::Instruction;
+pub use kirin_derive::{
+    HasArguments, HasRegions, HasResults, HasSuccessors, Instruction, IsConstant, IsPure,
+    IsTerminator,
+};

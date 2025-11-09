@@ -1,5 +1,20 @@
-use crate::ir::{Block, Instruction, ResultValue, SSAValue};
+use kirin_ir::*;
 
+use crate::ir::{Block, HasArguments, ResultValue, SSAValue};
+
+#[derive(
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    Debug,
+    HasArguments,
+    IsPure,
+    IsTerminator,
+    IsConstant,
+    HasRegions,
+    HasSuccessors,
+)]
 pub enum SCFInstruction {
     If {
         condition: SSAValue,
@@ -16,13 +31,12 @@ pub enum SCFInstruction {
     },
 }
 
-impl Instruction for SCFInstruction {
-    type ResultIterator = std::vec::IntoIter<ResultValue>;
-
-    fn results(&self) -> Self::ResultIterator {
+impl HasResults for SCFInstruction {
+    fn results(&self) -> impl Iterator<Item = &ResultValue> {
         match self {
-            SCFInstruction::If { results, .. } => results.clone().into_iter(),
-            SCFInstruction::For { results, .. } => results.clone().into_iter(),
+            SCFInstruction::If { results, .. } => results.iter(),
+            SCFInstruction::For { results, .. } => results.iter(),
         }
     }
 }
+impl Instruction for SCFInstruction {}

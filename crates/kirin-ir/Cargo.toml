@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+eyre = "0.6.12"
 kirin-derive = { version = "0.1.0", path = "../kirin-derive", optional = true }
 serde = { version = "1.0.228", optional = true }
 

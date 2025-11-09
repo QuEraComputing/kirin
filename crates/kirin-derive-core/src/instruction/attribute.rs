@@ -2,9 +2,9 @@ use core::panic;
 use quote::{format_ident, quote};
 use std::collections::HashMap;
 
-use crate::{DeriveHelperAttribute, Generate};
+use crate::{DeriveHelperAttribute, WriteTokenStream};
 
-pub struct DeriveAttribute;
+pub struct DeriveAttribute(pub String);
 
 impl DeriveAttribute {
     fn generate_variant_wrapper_arm(
@@ -114,18 +114,15 @@ impl DeriveAttribute {
     }
 }
 
-impl Generate<AttributeInfo> for DeriveAttribute {
-    fn generate(&mut self, ctx: &mut crate::DeriveContext<AttributeInfo>) -> eyre::Result<()> {
+impl WriteTokenStream for DeriveAttribute {
+    type HelperAttribute = AttributeInfo;
+    fn write_token(&mut self, ctx: &mut crate::DeriveContext<AttributeInfo>) -> eyre::Result<()> {
         match &ctx.input.data {
             syn::Data::Struct(_) => {
-                self.generate_struct(ctx, "is_terminator");
-                self.generate_struct(ctx, "is_constant");
-                self.generate_struct(ctx, "is_pure");
+                self.generate_struct(ctx, &self.0);
             }
             syn::Data::Enum(_) => {
-                self.generate_variant(ctx, "is_terminator");
-                self.generate_variant(ctx, "is_constant");
-                self.generate_variant(ctx, "is_pure");
+                self.generate_variant(ctx, &self.0);
             }
             _ => panic!("Attribute can only be applied to structs or enums"),
         }
