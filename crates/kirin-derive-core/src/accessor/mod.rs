@@ -13,13 +13,11 @@ pub struct FieldAccessor {
 
 impl FieldAccessor {
     pub fn new<A: DeriveHelperAttribute>(
-        f: impl Fn(&syn::Type) -> bool,
         config: Config,
         ctx: &DeriveContext<A>,
     ) -> Self {
         let accessor = data::AccessorImpl::new(&config, ctx);
-        let iterator = iterator::IteratorImpl::new(&config, ctx, &f);
-
+        let iterator = iterator::IteratorImpl::new(&config, ctx);
         Self { iterator, accessor }
     }
 }

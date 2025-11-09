@@ -19,22 +19,18 @@ impl DeriveInstruction {
         Self {
             attribute: DeriveAttribute,
             arguments: FieldAccessor::new(
-                is_argument,
                 Config::new("arguments", "SSAValue", "::kirin_ir::Instruction"),
                 ctx,
             ),
             results: FieldAccessor::new(
-                is_result,
                 Config::new("results", "ResultValue", "::kirin_ir::Instruction"),
                 ctx,
             ),
             successors: FieldAccessor::new(
-                is_block,
                 Config::new("successors", "Block", "::kirin_ir::Instruction"),
                 ctx,
             ),
             regions: FieldAccessor::new(
-                is_region,
                 Config::new("regions", "Region", "::kirin_ir::Instruction"),
                 ctx,
             ),
@@ -51,22 +47,6 @@ impl Generate<AttributeInfo> for DeriveInstruction {
         self.regions.generate(ctx)?;
         Ok(())
     }
-}
-
-fn is_argument(ty: &syn::Type) -> bool {
-    matches!(ty, syn::Type::Path(type_path) if type_path.path.is_ident("SSAValue"))
-}
-
-fn is_result(ty: &syn::Type) -> bool {
-    matches!(ty, syn::Type::Path(type_path) if type_path.path.is_ident("ResultValue"))
-}
-
-fn is_block(ty: &syn::Type) -> bool {
-    matches!(ty, syn::Type::Path(type_path) if type_path.path.is_ident("Block"))
-}
-
-fn is_region(ty: &syn::Type) -> bool {
-    matches!(ty, syn::Type::Path(type_path) if type_path.path.is_ident("Region"))
 }
 
 #[cfg(test)]

@@ -38,11 +38,11 @@ enum InstructionInfo {
 }
 
 impl IteratorImpl {
-    pub fn new<A, F>(config: &Config, ctx: &DeriveContext<A>, f: F) -> Self
+    pub fn new<A>(config: &Config, ctx: &DeriveContext<A>) -> Self
     where
         A: DeriveHelperAttribute,
-        F: Fn(&syn::Type) -> bool,
     {
+        let typename = config.matching_type.to_string();
         match &ctx.input.data {
             syn::Data::Struct(data) => {
                 let (iter_generics, iter_lifetime) = Self::generics(&ctx.input.generics);
@@ -57,7 +57,7 @@ impl IteratorImpl {
                         ctx.global_wraps(),
                         &ctx.input.ident,
                         &data.fields,
-                        f,
+                        &typename,
                     )),
                 }
             }
@@ -79,7 +79,7 @@ impl IteratorImpl {
                                     ctx.global_wraps() || ctx.variant_wraps(&variant.ident),
                                     &variant.ident,
                                     &variant.fields,
-                                    &f,
+                                    &typename,
                                 )
                             })
                             .collect(),
@@ -102,12 +102,13 @@ impl IteratorImpl {
 
     pub fn generate(&self) -> proc_macro2::TokenStream {
         match &self.inner {
-            IteratorImplInner::Struct(InstructionInfo::Wraps) => {
-                return quote! {}
-            }
+            IteratorImplInner::Struct(InstructionInfo::Wraps) => return quote! {},
             IteratorImplInner::Enum(_, infos) => {
-                if infos.iter().all(|info| matches!(info, InstructionInfo::Wraps)) {
-                    return quote! {}
+                if infos
+                    .iter()
+                    .all(|info| matches!(info, InstructionInfo::Wraps))
+                {
+                    return quote! {};
                 }
             }
             _ => {
@@ -164,10 +165,7 @@ impl IteratorImpl {
 }
 
 impl InstructionInfo {
-    fn from_fields<F>(wraps: bool, name: &syn::Ident, fields: &syn::Fields, f: F) -> Self
-    where
-        F: Fn(&syn::Type) -> bool,
-    {
+    fn from_fields(wraps: bool, name: &syn::Ident, fields: &syn::Fields, typename: &str) -> Self {
         use syn::Fields::*;
         if wraps {
             match fields {
@@ -190,8 +188,13 @@ impl InstructionInfo {
                     .named
                     .iter()
                     .filter_map(|field| {
-                        if f(&field.ty) {
+                        if is_type(&field.ty, typename) {
                             Some(field.ident.clone().unwrap())
+                        } else if is_type_in_generic(&field.ty, typename) {
+                            panic!(
+                                "Generic field types like Vec<{}> are not supported yet, consider implementing manually",
+                                typename
+                            );
                         } else {
                             None
                         }
@@ -206,8 +209,13 @@ impl InstructionInfo {
                     .iter()
                     .enumerate()
                     .filter_map(|(i, field)| {
-                        if f(&field.ty) {
+                        if is_type(&field.ty, typename) {
                             Some(syn::LitInt::new(&i.to_string(), field.span()))
+                        } else if is_type_in_generic(&field.ty, typename) {
+                            panic!(
+                                "Generic field types like Vec<{}> are not supported yet, consider implementing manually",
+                                typename
+                            );
                         } else {
                             None
                         }
@@ -346,5 +354,45 @@ impl InstructionInfo {
                 vec![]
             }
         }
+    }
+}
+
+fn is_type(ty: &syn::Type, name: &str) -> bool {
+    matches!(ty, syn::Type::Path(type_path) if type_path.path.is_ident(name))
+}
+
+fn is_type_in_generic(ty: &syn::Type, name: &str) -> bool {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(seg) = type_path.path.segments.last() {
+            if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
+                for each in &args.args {
+                    if let syn::GenericArgument::Type(inner_ty) = &each {
+                        if is_type(inner_ty, name) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_type() {
+        let ty: syn::Type = syn::parse_str("SSAValue").unwrap();
+        assert!(is_type(&ty, "SSAValue"));
+        assert!(!is_type(&ty, "ResultValue"));
+    }
+
+    #[test]
+    fn test_is_type_in_generic() {
+        let ty: syn::Type = syn::parse_str("Vec<SSAValue>").unwrap();
+        assert!(is_type_in_generic(&ty, "SSAValue"));
+        assert!(!is_type_in_generic(&ty, "ResultValue"));
     }
 }
