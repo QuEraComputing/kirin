@@ -25,11 +25,13 @@ enum InstructionInfo {
         field_count: usize,
         indices: Vec<syn::LitInt>,
     },
+    AnonymousContainer(syn::Ident),
     Named {
         /// The name of the instruction
         name: syn::Ident,
         idents: Vec<syn::Ident>,
     },
+    NamedContainer(syn::Ident),
     Unit,
     /// Wraps(<variant/struct name>)
     /// wraps another instruction as
@@ -134,7 +136,7 @@ impl IteratorImpl {
 
             #[automatically_derived]
             impl #iter_impl_generics Iterator for #iter_name #iter_ty_generics #iter_where_clause {
-                type Item = ::kirin_ir::#matching_type;
+                type Item = &#lifetime ::kirin_ir::#matching_type;
 
                 fn next(&mut self) -> Option<Self::Item> {
                     #body
@@ -182,26 +184,35 @@ impl InstructionInfo {
         }
 
         match fields {
-            Named(fields_named) => Self::Named {
-                name: name.clone(),
-                idents: fields_named
-                    .named
-                    .iter()
-                    .filter_map(|field| {
-                        if is_type(&field.ty, typename) {
-                            Some(field.ident.clone().unwrap())
-                        } else if is_type_in_generic(&field.ty, typename) {
-                            panic!(
-                                "Generic field types like Vec<{}> are not supported yet, consider implementing manually",
-                                typename
-                            );
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<syn::Ident>>(),
-            },
-            Unnamed(fields_unnamed) => Self::Anonymous {
+            Named(fields_named) => {
+                if let Some((_, _)) =
+                    has_container_and_only_one_container(&fields_named.named, typename)
+                {
+                    Self::NamedContainer(name.clone())
+                } else {
+                    Self::Named {
+                        name: name.clone(),
+                        idents: fields_named
+                            .named
+                            .iter()
+                            .filter_map(|field| {
+                                if is_type(&field.ty, typename) {
+                                    Some(field.ident.clone().unwrap())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<syn::Ident>>(),
+                    }
+                }
+            }
+            Unnamed(fields_unnamed) => {
+                if let Some((_, _)) =
+                    has_container_and_only_one_container(&fields_unnamed.unnamed, typename)
+                {
+                    Self::AnonymousContainer(name.clone())
+                } else {
+                    Self::Anonymous {
                 name: name.clone(),
                 field_count: fields_unnamed.unnamed.len(),
                 indices: fields_unnamed
@@ -221,7 +232,9 @@ impl InstructionInfo {
                         }
                     })
                     .collect(),
-            },
+            }
+                }
+            }
             Unit => InstructionInfo::Unit,
         }
     }
@@ -254,6 +267,11 @@ impl InstructionInfo {
                         #(#arms)*
                         _ => None,
                     }
+                }
+            }
+            AnonymousContainer(_) | NamedContainer(_) => {
+                quote! {
+                    unreachable!("struct with container should not generate iterator");
                 }
             }
             Unit => {
@@ -312,6 +330,13 @@ impl InstructionInfo {
                     }
                 }
             }
+            AnonymousContainer(variant_name) | NamedContainer(variant_name) => {
+                quote! {
+                    #name::#variant_name => {
+                        unreachable!("variant with container should not generate iterator");
+                    }
+                }
+            }
             _ => {
                 quote! {}
             }
@@ -329,7 +354,7 @@ impl InstructionInfo {
                     quote! {
                         #i => {
                             self.index += 1;
-                            Some(#self_i.clone())
+                            Some(#self_i)
                         },
                     }
                 })
@@ -342,15 +367,12 @@ impl InstructionInfo {
                     quote! {
                         #i_lit => {
                             self.index += 1;
-                            Some(#ident.clone())
+                            Some(#ident)
                         },
                     }
                 })
                 .collect(),
-            Unit => {
-                vec![]
-            }
-            Wraps => {
+            _ => {
                 vec![]
             }
         }
@@ -378,8 +400,30 @@ fn is_type_in_generic(ty: &syn::Type, name: &str) -> bool {
     false
 }
 
+pub(super) fn has_container_and_only_one_container(
+    field: &syn::punctuated::Punctuated<syn::Field, syn::Token![,]>,
+    typename: &str,
+) -> Option<(usize, Option<syn::Ident>)> {
+    let mut found = None;
+    for (i, field) in field.iter().enumerate() {
+        if is_type_in_generic(&field.ty, typename) {
+            if found.is_some() {
+                panic!(
+                    "Multiple container fields like Vec<{}> are not supported yet, consider implementing manually",
+                    typename
+                );
+            } else {
+                found = Some((i, field.ident.clone()));
+            }
+        }
+    }
+    found
+}
+
 #[cfg(test)]
 mod tests {
+    use syn::{DataStruct, Fields};
+
     use super::*;
 
     #[test]
@@ -394,5 +438,30 @@ mod tests {
         let ty: syn::Type = syn::parse_str("Vec<SSAValue>").unwrap();
         assert!(is_type_in_generic(&ty, "SSAValue"));
         assert!(!is_type_in_generic(&ty, "ResultValue"));
+    }
+
+    #[test]
+    fn test_has_container_and_only_one_container() {
+        let fields: syn::DeriveInput = syn::parse_str(
+            "struct Foo {
+                args: Vec<SSAValue>,
+                results: Vec<ResultValue>,
+                containers: Vec<ContainerValue>,
+            }",
+        )
+        .unwrap();
+        let fields = if let syn::Data::Struct(DataStruct { struct_token: _, fields: Fields::Named(f), semi_token: _ }) = fields.data {
+            f
+        } else {
+            panic!("expected struct");
+        };
+        let result = has_container_and_only_one_container(&fields.named, "SSAValue");
+        assert_eq!(result, Some((0, Some(syn::Ident::new("args", proc_macro2::Span::call_site())))));
+
+        let result = has_container_and_only_one_container(&fields.named, "ResultValue");
+        assert_eq!(result, Some((1, Some(syn::Ident::new("results", proc_macro2::Span::call_site())))));
+
+        let result = has_container_and_only_one_container(&fields.named, "ContainerValue");
+        assert_eq!(result, Some((2, Some(syn::Ident::new("containers", proc_macro2::Span::call_site())))));
     }
 }

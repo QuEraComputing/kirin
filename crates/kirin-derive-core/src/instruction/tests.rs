@@ -122,6 +122,24 @@ fn test_vec_resultvalue_field() {
     insta::assert_snapshot!(check(input));
 }
 
+#[test]
+fn test_enum_vec() {
+    let input = quote! {
+        #[derive(Instruction)]
+        enum TestInst {
+            OpA {
+                args: Vec<SSAValue>,
+                results: Vec<ResultValue>,
+            },
+            OpB {
+                arg: SSAValue,
+                result: ResultValue,
+            },
+        }
+    };
+    insta::assert_snapshot!(check(input));
+}
+
 fn check(src: TokenStream) -> String {
     let input = syn::parse2(src).unwrap();
     let mut ctx = DeriveContext::new(quote! {::kirin_ir::Instruction}, input);

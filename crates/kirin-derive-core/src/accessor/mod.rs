@@ -1,14 +1,14 @@
 use crate::{DeriveContext, DeriveHelperAttribute};
 
 mod config;
-mod data;
+mod trait_impl;
 mod iterator;
 
 pub use config::Config;
 
 pub struct FieldAccessor {
     iterator: iterator::IteratorImpl,
-    accessor: data::AccessorImpl,
+    accessor: trait_impl::AccessorImpl,
 }
 
 impl FieldAccessor {
@@ -16,7 +16,7 @@ impl FieldAccessor {
         config: Config,
         ctx: &DeriveContext<A>,
     ) -> Self {
-        let accessor = data::AccessorImpl::new(&config, ctx);
+        let accessor = trait_impl::AccessorImpl::new(&config, ctx);
         let iterator = iterator::IteratorImpl::new(&config, ctx);
         Self { iterator, accessor }
     }

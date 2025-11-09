@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-core/src/instruction/tests.rs
-assertion_line: 122
 expression: check(input)
 ---
 #[automatically_derived]
@@ -14,25 +13,21 @@ impl ::kirin_ir::Instruction for TestInst {
     fn is_pure(&self) -> bool {
         false
     }
-    fn arguments(&self) -> impl Iterator<Item = ::kirin_ir::SSAValue> {
-        __KirinArgumentsIter {
-            parent: self,
-            index: 0,
-        }
+    fn arguments(&self) -> impl Iterator<Item = &::kirin_ir::SSAValue> {
+        let TestInst { args, .. } = self;
+        args.iter()
     }
-    fn results(&self) -> impl Iterator<Item = ::kirin_ir::ResultValue> {
-        __KirinResultsIter {
-            parent: self,
-            index: 0,
-        }
+    fn results(&self) -> impl Iterator<Item = &::kirin_ir::ResultValue> {
+        let TestInst { results, .. } = self;
+        results.iter()
     }
-    fn successors(&self) -> impl Iterator<Item = ::kirin_ir::Block> {
+    fn successors(&self) -> impl Iterator<Item = &::kirin_ir::Block> {
         __KirinSuccessorsIter {
             parent: self,
             index: 0,
         }
     }
-    fn regions(&self) -> impl Iterator<Item = ::kirin_ir::Region> {
+    fn regions(&self) -> impl Iterator<Item = &::kirin_ir::Region> {
         __KirinRegionsIter {
             parent: self,
             index: 0,
@@ -46,12 +41,9 @@ pub struct __KirinArgumentsIter<'__kirin_ir_iter_a> {
 }
 #[automatically_derived]
 impl<'__kirin_ir_iter_a> Iterator for __KirinArgumentsIter<'__kirin_ir_iter_a> {
-    type Item = ::kirin_ir::SSAValue;
+    type Item = &'__kirin_ir_iter_a ::kirin_ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
-        let TestInst { .. } = self.parent;
-        match self.index {
-            _ => None,
-        }
+        unreachable!("struct with container should not generate iterator");
     }
 }
 #[automatically_derived]
@@ -61,12 +53,9 @@ pub struct __KirinResultsIter<'__kirin_ir_iter_a> {
 }
 #[automatically_derived]
 impl<'__kirin_ir_iter_a> Iterator for __KirinResultsIter<'__kirin_ir_iter_a> {
-    type Item = ::kirin_ir::ResultValue;
+    type Item = &'__kirin_ir_iter_a ::kirin_ir::ResultValue;
     fn next(&mut self) -> Option<Self::Item> {
-        let TestInst { .. } = self.parent;
-        match self.index {
-            _ => None,
-        }
+        unreachable!("struct with container should not generate iterator");
     }
 }
 #[automatically_derived]
@@ -76,7 +65,7 @@ pub struct __KirinSuccessorsIter<'__kirin_ir_iter_a> {
 }
 #[automatically_derived]
 impl<'__kirin_ir_iter_a> Iterator for __KirinSuccessorsIter<'__kirin_ir_iter_a> {
-    type Item = ::kirin_ir::Block;
+    type Item = &'__kirin_ir_iter_a ::kirin_ir::Block;
     fn next(&mut self) -> Option<Self::Item> {
         let TestInst { .. } = self.parent;
         match self.index {
@@ -91,7 +80,7 @@ pub struct __KirinRegionsIter<'__kirin_ir_iter_a> {
 }
 #[automatically_derived]
 impl<'__kirin_ir_iter_a> Iterator for __KirinRegionsIter<'__kirin_ir_iter_a> {
-    type Item = ::kirin_ir::Region;
+    type Item = &'__kirin_ir_iter_a ::kirin_ir::Region;
     fn next(&mut self) -> Option<Self::Item> {
         let TestInst { .. } = self.parent;
         match self.index {

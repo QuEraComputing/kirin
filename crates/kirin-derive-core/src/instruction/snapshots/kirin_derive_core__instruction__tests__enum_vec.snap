@@ -6,35 +6,38 @@ expression: check(input)
 impl ::kirin_ir::Instruction for TestInst {
     fn is_terminator(&self) -> bool {
         match self {
-            Self::Terminate { .. } => true,
-            Self::Constant { .. } => false,
-            Self::NotPureOp { .. } => false,
+            Self::OpA { .. } => false,
+            Self::OpB { .. } => false,
         }
     }
     fn is_constant(&self) -> bool {
         match self {
-            Self::Terminate { .. } => false,
-            Self::Constant { .. } => true,
-            Self::NotPureOp { .. } => false,
+            Self::OpA { .. } => false,
+            Self::OpB { .. } => false,
         }
     }
     fn is_pure(&self) -> bool {
         match self {
-            Self::Terminate { .. } => true,
-            Self::Constant { .. } => true,
-            Self::NotPureOp { .. } => true,
+            Self::OpA { .. } => false,
+            Self::OpB { .. } => false,
         }
     }
     fn arguments(&self) -> impl Iterator<Item = &::kirin_ir::SSAValue> {
-        __KirinArgumentsIter {
-            parent: self,
-            index: 0,
+        match self {
+            Self::OpA { args, .. } => args.iter(),
+            _ => __KirinArgumentsIter {
+                parent: self,
+                index: 0,
+            },
         }
     }
     fn results(&self) -> impl Iterator<Item = &::kirin_ir::ResultValue> {
-        __KirinResultsIter {
-            parent: self,
-            index: 0,
+        match self {
+            Self::OpA { results, .. } => results.iter(),
+            _ => __KirinResultsIter {
+                parent: self,
+                index: 0,
+            },
         }
     }
     fn successors(&self) -> impl Iterator<Item = &::kirin_ir::Block> {
@@ -60,14 +63,13 @@ impl<'__kirin_ir_iter_a> Iterator for __KirinArgumentsIter<'__kirin_ir_iter_a> {
     type Item = &'__kirin_ir_iter_a ::kirin_ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self.parent {
-            TestInst::NotPureOp { arg1, arg2, .. } => match self.index {
+            TestInst::OpA => {
+                unreachable!("variant with container should not generate iterator");
+            }
+            TestInst::OpB { arg, .. } => match self.index {
                 0 => {
                     self.index += 1;
-                    Some(arg1)
-                }
-                1 => {
-                    self.index += 1;
-                    Some(arg2)
+                    Some(arg)
                 }
                 _ => None,
             },
@@ -85,7 +87,10 @@ impl<'__kirin_ir_iter_a> Iterator for __KirinResultsIter<'__kirin_ir_iter_a> {
     type Item = &'__kirin_ir_iter_a ::kirin_ir::ResultValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self.parent {
-            TestInst::NotPureOp { result, .. } => match self.index {
+            TestInst::OpA => {
+                unreachable!("variant with container should not generate iterator");
+            }
+            TestInst::OpB { result, .. } => match self.index {
                 0 => {
                     self.index += 1;
                     Some(result)
@@ -106,13 +111,6 @@ impl<'__kirin_ir_iter_a> Iterator for __KirinSuccessorsIter<'__kirin_ir_iter_a> 
     type Item = &'__kirin_ir_iter_a ::kirin_ir::Block;
     fn next(&mut self) -> Option<Self::Item> {
         match self.parent {
-            TestInst::Terminate { target, .. } => match self.index {
-                0 => {
-                    self.index += 1;
-                    Some(target)
-                }
-                _ => None,
-            },
             _ => None,
         }
     }

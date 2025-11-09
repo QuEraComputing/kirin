@@ -16,19 +16,19 @@ impl ::kirin_ir::Instruction for WrapperInst {
         let WrapperInst(wrapped_instruction) = self;
         <wrapped_instruction as ::kirin_ir::Instruction>::is_pure(wrapped_instruction)
     }
-    fn arguments(&self) -> impl Iterator<Item = ::kirin_ir::SSAValue> {
+    fn arguments(&self) -> impl Iterator<Item = &::kirin_ir::SSAValue> {
         let WrapperInst(wrapped_instruction) = self;
         <wrapped_instruction as ::kirin_ir::Instruction>::arguments()
     }
-    fn results(&self) -> impl Iterator<Item = ::kirin_ir::ResultValue> {
+    fn results(&self) -> impl Iterator<Item = &::kirin_ir::ResultValue> {
         let WrapperInst(wrapped_instruction) = self;
         <wrapped_instruction as ::kirin_ir::Instruction>::results()
     }
-    fn successors(&self) -> impl Iterator<Item = ::kirin_ir::Block> {
+    fn successors(&self) -> impl Iterator<Item = &::kirin_ir::Block> {
         let WrapperInst(wrapped_instruction) = self;
         <wrapped_instruction as ::kirin_ir::Instruction>::successors()
     }
-    fn regions(&self) -> impl Iterator<Item = ::kirin_ir::Region> {
+    fn regions(&self) -> impl Iterator<Item = &::kirin_ir::Region> {
         let WrapperInst(wrapped_instruction) = self;
         <wrapped_instruction as ::kirin_ir::Instruction>::regions()
     }
