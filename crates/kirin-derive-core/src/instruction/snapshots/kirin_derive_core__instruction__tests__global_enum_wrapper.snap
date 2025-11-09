@@ -1,0 +1,77 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: check(input)
+---
+#[automatically_derived]
+impl ::kirin_ir::Instruction for WrapperInst {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_terminator(wrapped_instruction)
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_terminator(wrapped_instruction)
+            }
+        }
+    }
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_constant(wrapped_instruction)
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_constant(wrapped_instruction)
+            }
+        }
+    }
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_pure(wrapped_instruction)
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_pure(wrapped_instruction)
+            }
+        }
+    }
+    fn arguments(&self) -> impl Iterator<Item = ::kirin_ir::SSAValue> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::arguments()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::arguments()
+            }
+        }
+    }
+    fn results(&self) -> impl Iterator<Item = ::kirin_ir::ResultValue> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::results()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::results()
+            }
+        }
+    }
+    fn successors(&self) -> impl Iterator<Item = ::kirin_ir::Block> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::successors()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::successors()
+            }
+        }
+    }
+    fn regions(&self) -> impl Iterator<Item = ::kirin_ir::Region> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::regions()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::regions()
+            }
+        }
+    }
+}

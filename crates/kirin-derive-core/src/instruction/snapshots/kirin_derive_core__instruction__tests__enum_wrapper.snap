@@ -1,0 +1,166 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: check(input)
+---
+#[automatically_derived]
+impl ::kirin_ir::Instruction for TestInst {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_terminator(wrapped_instruction)
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_terminator(wrapped_instruction)
+            }
+            Self::Regular { .. } => false,
+        }
+    }
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_constant(wrapped_instruction)
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_constant(wrapped_instruction)
+            }
+            Self::Regular { .. } => false,
+        }
+    }
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_pure(wrapped_instruction)
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::is_pure(wrapped_instruction)
+            }
+            Self::Regular { .. } => true,
+        }
+    }
+    fn arguments(&self) -> impl Iterator<Item = ::kirin_ir::SSAValue> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::arguments()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::arguments()
+            }
+            _ => __KirinArgumentsIter {
+                parent: self,
+                index: 0,
+            },
+        }
+    }
+    fn results(&self) -> impl Iterator<Item = ::kirin_ir::ResultValue> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::results()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::results()
+            }
+            _ => __KirinResultsIter {
+                parent: self,
+                index: 0,
+            },
+        }
+    }
+    fn successors(&self) -> impl Iterator<Item = ::kirin_ir::Block> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::successors()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::successors()
+            }
+            _ => __KirinSuccessorsIter {
+                parent: self,
+                index: 0,
+            },
+        }
+    }
+    fn regions(&self) -> impl Iterator<Item = ::kirin_ir::Region> {
+        match self {
+            Self::WrapA(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::regions()
+            }
+            Self::WrapB(wrapped_instruction) => {
+                <wrapped_instruction as ::kirin_ir::Instruction>::regions()
+            }
+            _ => __KirinRegionsIter {
+                parent: self,
+                index: 0,
+            },
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinArgumentsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinArgumentsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.parent {
+            TestInst::Regular { arg, .. } => match self.index {
+                0 => {
+                    self.index += 1;
+                    Some(arg.clone())
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinResultsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinResultsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.parent {
+            TestInst::Regular { result, .. } => match self.index {
+                0 => {
+                    self.index += 1;
+                    Some(result.clone())
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinSuccessorsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinSuccessorsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.parent {
+            _ => None,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinRegionsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinRegionsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.parent {
+            _ => None,
+        }
+    }
+}

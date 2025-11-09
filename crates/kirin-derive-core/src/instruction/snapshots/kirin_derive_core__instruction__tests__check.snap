@@ -1,0 +1,120 @@
+---
+source: crates/kirin-derive-core/src/instruction/tests.rs
+expression: rustfmt(ctx.generate().to_string().as_str())
+---
+#[automatically_derived]
+impl ::kirin_ir::Instruction for TestInst {
+    fn is_terminator(&self) -> bool {
+        true
+    }
+    fn is_constant(&self) -> bool {
+        true
+    }
+    fn is_pure(&self) -> bool {
+        true
+    }
+    fn arguments(&self) -> impl Iterator<Item = ::kirin_ir::SSAValue> {
+        __KirinArgumentsIter {
+            parent: self,
+            index: 0,
+        }
+    }
+    fn results(&self) -> impl Iterator<Item = ::kirin_ir::ResultValue> {
+        __KirinResultsIter {
+            parent: self,
+            index: 0,
+        }
+    }
+    fn successors(&self) -> impl Iterator<Item = ::kirin_ir::Block> {
+        __KirinSuccessorsIter {
+            parent: self,
+            index: 0,
+        }
+    }
+    fn regions(&self) -> impl Iterator<Item = ::kirin_ir::Region> {
+        __KirinRegionsIter {
+            parent: self,
+            index: 0,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinArgumentsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinArgumentsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        let TestInst { a, b, .. } = self.parent;
+        match self.index {
+            0 => {
+                self.index += 1;
+                Some(a.clone())
+            }
+            1 => {
+                self.index += 1;
+                Some(b.clone())
+            }
+            _ => None,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinResultsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinResultsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        let TestInst { c, .. } = self.parent;
+        match self.index {
+            0 => {
+                self.index += 1;
+                Some(c.clone())
+            }
+            _ => None,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinSuccessorsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinSuccessorsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        let TestInst { d, .. } = self.parent;
+        match self.index {
+            0 => {
+                self.index += 1;
+                Some(d.clone())
+            }
+            _ => None,
+        }
+    }
+}
+#[automatically_derived]
+pub struct __KirinRegionsIter<'__kirin_ir_iter_a> {
+    parent: &'__kirin_ir_iter_a TestInst,
+    index: usize,
+}
+#[automatically_derived]
+impl<'__kirin_ir_iter_a> Iterator for __KirinRegionsIter<'__kirin_ir_iter_a> {
+    type Item = ::kirin_ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        let TestInst { e, .. } = self.parent;
+        match self.index {
+            0 => {
+                self.index += 1;
+                Some(e.clone())
+            }
+            _ => None,
+        }
+    }
+}

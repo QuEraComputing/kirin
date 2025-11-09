@@ -1,0 +1,350 @@
+use quote::{format_ident, quote};
+use syn::spanned::Spanned;
+
+use crate::{DeriveContext, DeriveHelperAttribute, accessor::config::Config};
+
+pub struct IteratorImpl {
+    name: syn::Ident,
+    generics: syn::Generics,
+    iter_name: syn::Ident,
+    iter_generics: syn::Generics,
+    iter_lifetime: syn::Lifetime,
+    matching_type: syn::Ident,
+    inner: IteratorImplInner,
+}
+
+enum IteratorImplInner {
+    Struct(InstructionInfo),
+    Enum(syn::Ident, Vec<InstructionInfo>),
+}
+
+enum InstructionInfo {
+    Anonymous {
+        /// The name of the instruction struct/variant
+        name: syn::Ident,
+        field_count: usize,
+        indices: Vec<syn::LitInt>,
+    },
+    Named {
+        /// The name of the instruction
+        name: syn::Ident,
+        idents: Vec<syn::Ident>,
+    },
+    Unit,
+    /// Wraps(<variant/struct name>)
+    /// wraps another instruction as
+    /// Name(OtherInstruction)
+    Wraps,
+}
+
+impl IteratorImpl {
+    pub fn new<A, F>(config: &Config, ctx: &DeriveContext<A>, f: F) -> Self
+    where
+        A: DeriveHelperAttribute,
+        F: Fn(&syn::Type) -> bool,
+    {
+        match &ctx.input.data {
+            syn::Data::Struct(data) => {
+                let (iter_generics, iter_lifetime) = Self::generics(&ctx.input.generics);
+                Self {
+                    name: ctx.input.ident.clone(),
+                    iter_name: config.accessor_iter.clone(),
+                    iter_generics: iter_generics,
+                    iter_lifetime,
+                    matching_type: config.matching_type.clone(),
+                    generics: ctx.input.generics.clone(),
+                    inner: IteratorImplInner::Struct(InstructionInfo::from_fields(
+                        ctx.global_wraps(),
+                        &ctx.input.ident,
+                        &data.fields,
+                        f,
+                    )),
+                }
+            }
+            syn::Data::Enum(data) => {
+                let (iter_generics, iter_lifetime) = Self::generics(&ctx.input.generics);
+                Self {
+                    name: ctx.input.ident.clone(),
+                    iter_name: config.accessor_iter.clone(),
+                    iter_generics: iter_generics,
+                    iter_lifetime,
+                    matching_type: config.matching_type.clone(),
+                    generics: ctx.input.generics.clone(),
+                    inner: IteratorImplInner::Enum(
+                        ctx.input.ident.clone(),
+                        data.variants
+                            .iter()
+                            .map(|variant| {
+                                InstructionInfo::from_fields(
+                                    ctx.global_wraps() || ctx.variant_wraps(&variant.ident),
+                                    &variant.ident,
+                                    &variant.fields,
+                                    &f,
+                                )
+                            })
+                            .collect(),
+                    ),
+                }
+            }
+            _ => panic!("only structs and enums are supported"),
+        }
+    }
+
+    fn generics(generics: &syn::Generics) -> (syn::Generics, syn::Lifetime) {
+        let lifetime = syn::Lifetime::new("'__kirin_ir_iter_a", proc_macro2::Span::call_site());
+        let mut g = generics.clone();
+        g.params.insert(
+            0,
+            syn::GenericParam::Lifetime(syn::LifetimeParam::new(lifetime.clone())),
+        );
+        (g, lifetime)
+    }
+
+    pub fn generate(&self) -> proc_macro2::TokenStream {
+        match &self.inner {
+            IteratorImplInner::Struct(InstructionInfo::Wraps) => {
+                return quote! {}
+            }
+            IteratorImplInner::Enum(_, infos) => {
+                if infos.iter().all(|info| matches!(info, InstructionInfo::Wraps)) {
+                    return quote! {}
+                }
+            }
+            _ => {
+                // continue
+            }
+        }
+
+        let body = self.generate_body();
+        let name = &self.name;
+        let iter_name = self.iter_name.clone();
+        let lifetime = &self.iter_lifetime;
+        let iter_generics = &self.iter_generics;
+        let matching_type = &self.matching_type;
+        let (iter_impl_generics, iter_ty_generics, iter_where_clause) =
+            iter_generics.split_for_impl();
+        let (_, ty_generics, _) = self.generics.split_for_impl();
+        quote! {
+            #[automatically_derived]
+            pub struct #iter_name #iter_generics {
+                parent: &#lifetime #name #ty_generics,
+                index: usize,
+            }
+
+            #[automatically_derived]
+            impl #iter_impl_generics Iterator for #iter_name #iter_ty_generics #iter_where_clause {
+                type Item = ::kirin_ir::#matching_type;
+
+                fn next(&mut self) -> Option<Self::Item> {
+                    #body
+                }
+            }
+        }
+    }
+
+    fn generate_body(&self) -> proc_macro2::TokenStream {
+        use IteratorImplInner::*;
+        match &self.inner {
+            Struct(info) => info.struct_body(),
+            Enum(name, info) => {
+                let matching_arms = info
+                    .iter()
+                    .map(|variant| variant.variant_matching_arm(&name))
+                    .collect::<Vec<_>>();
+
+                quote! {
+                    match self.parent {
+                        #(#matching_arms)*
+                        _ => None,
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl InstructionInfo {
+    fn from_fields<F>(wraps: bool, name: &syn::Ident, fields: &syn::Fields, f: F) -> Self
+    where
+        F: Fn(&syn::Type) -> bool,
+    {
+        use syn::Fields::*;
+        if wraps {
+            match fields {
+                Unnamed(fields) if fields.unnamed.len() == 1 => {
+                    return InstructionInfo::Wraps;
+                }
+                _ => {
+                    panic!(
+                        "`wrap` attribute can only be applied to tuple structs \
+                        or variants with a single field"
+                    );
+                }
+            }
+        }
+
+        match fields {
+            Named(fields_named) => Self::Named {
+                name: name.clone(),
+                idents: fields_named
+                    .named
+                    .iter()
+                    .filter_map(|field| {
+                        if f(&field.ty) {
+                            Some(field.ident.clone().unwrap())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<syn::Ident>>(),
+            },
+            Unnamed(fields_unnamed) => Self::Anonymous {
+                name: name.clone(),
+                field_count: fields_unnamed.unnamed.len(),
+                indices: fields_unnamed
+                    .unnamed
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, field)| {
+                        if f(&field.ty) {
+                            Some(syn::LitInt::new(&i.to_string(), field.span()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+            },
+            Unit => InstructionInfo::Unit,
+        }
+    }
+
+    fn struct_body(&self) -> proc_macro2::TokenStream {
+        use InstructionInfo::*;
+        match self {
+            Anonymous {
+                name,
+                field_count,
+                indices: _,
+            } => {
+                let vars = (0..*field_count)
+                    .map(|i| format_ident!("__self_{}", i))
+                    .collect::<Vec<_>>();
+                let arms = self.iteration_matching_arms();
+                quote! {
+                    let #name (#(#vars),*) = self.parent;
+                    match self.index {
+                        #(#arms)*
+                        _ => None,
+                    }
+                }
+            }
+            Named { name, idents } => {
+                let arms = self.iteration_matching_arms();
+                quote! {
+                    let #name { #(#idents,)* .. } = self.parent;
+                    match self.index {
+                        #(#arms)*
+                        _ => None,
+                    }
+                }
+            }
+            Unit => {
+                quote! {
+                    None
+                }
+            }
+            Wraps => {
+                panic!("Wraps variant should not generate any iterator");
+            }
+        }
+    }
+
+    fn variant_matching_arm(&self, name: &syn::Ident) -> proc_macro2::TokenStream {
+        use InstructionInfo::*;
+        match self {
+            Anonymous {
+                name: variant_name,
+                field_count,
+                indices,
+            } => {
+                // happy path: no fields matched
+                if indices.is_empty() {
+                    return quote! {};
+                }
+
+                let vars = (0..*field_count)
+                    .map(|i| format_ident!("__self_{}", i))
+                    .collect::<Vec<_>>();
+                let arms = self.iteration_matching_arms();
+                quote! {
+                    #name::#variant_name(#(#vars),*) => {
+                        match self.index {
+                            #(#arms)*
+                            _ => None,
+                        }
+                    }
+                }
+            }
+            Named {
+                name: variant_name,
+                idents,
+            } => {
+                // happy path: no fields matched
+                if idents.is_empty() {
+                    return quote! {};
+                }
+
+                let arms = self.iteration_matching_arms();
+                quote! {
+                    #name::#variant_name { #(#idents,)* .. } => {
+                        match self.index {
+                            #(#arms)*
+                            _ => None,
+                        }
+                    }
+                }
+            }
+            _ => {
+                quote! {}
+            }
+        }
+    }
+
+    fn iteration_matching_arms(&self) -> Vec<proc_macro2::TokenStream> {
+        use InstructionInfo::*;
+        match self {
+            Anonymous { indices, .. } => indices
+                .iter()
+                .enumerate()
+                .map(|(i, i_lit)| {
+                    let self_i = format_ident!("__self_{}", i_lit.base10_parse::<usize>().unwrap());
+                    quote! {
+                        #i => {
+                            self.index += 1;
+                            Some(#self_i.clone())
+                        },
+                    }
+                })
+                .collect(),
+            Named { idents, .. } => idents
+                .iter()
+                .enumerate()
+                .map(|(i, ident)| {
+                    let i_lit = syn::LitInt::new(&i.to_string(), ident.span());
+                    quote! {
+                        #i_lit => {
+                            self.index += 1;
+                            Some(#ident.clone())
+                        },
+                    }
+                })
+                .collect(),
+            Unit => {
+                vec![]
+            }
+            Wraps => {
+                vec![]
+            }
+        }
+    }
+}

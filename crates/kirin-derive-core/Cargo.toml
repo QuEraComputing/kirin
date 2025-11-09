@@ -1,14 +1,13 @@
 [package]
-name = "kirin-derive"
+name = "kirin-derive-core"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 eyre = "0.6.12"
-kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
 proc-macro2 = "1.0.103"
 quote = "1.0.42"
 syn = "2.0.109"
 
-[lib]
-proc-macro = true
+[dev-dependencies]
+insta = "1.43.2"
