@@ -14,6 +14,6 @@ members = ["crates/kirin-derive", "crates/kirin-derive-core", "crates/kirin-ir"]
 [features]
 serde = ["dep:serde"]
 
-# [[example]]
-# name = "simple"
-# path = "example/simple.rs"
+[[example]]
+name = "simple"
+path = "example/simple.rs"

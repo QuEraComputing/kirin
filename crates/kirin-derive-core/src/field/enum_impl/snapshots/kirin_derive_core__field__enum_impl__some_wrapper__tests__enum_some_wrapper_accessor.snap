@@ -1,0 +1,40 @@
+---
+source: crates/kirin-derive-core/src/field/enum_impl/some_wrapper.rs
+expression: rustfmt(generated)
+---
+impl<'a, T> ::kirin_ir::HasArguments<'a> for TestEnum<T> {
+    type Iter = __KirinArgumentsIter<'a, SSAValue>;
+    pub fn arguments(&'a self) -> Self::Iter {
+        match self {
+            TestEnum::VariantA { wrapped, .. } => __KirinArgumentsIter::VariantA(
+                <InnerStructA<T> as ::kirin_ir::HasArguments>::arguments(wrapped),
+            ),
+            TestEnum::VariantB(field_0, field_1) => __KirinArgumentsIter::VariantB(
+                <InnerStructB as ::kirin_ir::HasArguments>::arguments(field_0),
+            ),
+            TestEnum::VariantC(a, c) => {
+                __KirinArgumentsIter::VariantC(std::iter::once(a).chain(std::iter::once(c)))
+            }
+            TestEnum::VariantD(field_0, field_1, field_2) => __KirinArgumentsIter::VariantD(
+                std::iter::once(field_0).chain(std::iter::once(field_2)),
+            ),
+        }
+    }
+}
+pub enum __KirinArgumentsIter<'a, T> {
+    VariantA(<InnerStructA<T> as ::kirin_ir::HasArguments<'a>>::Iter),
+    VariantB(<InnerStructB as ::kirin_ir::HasArguments<'a>>::Iter),
+    VariantC(std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>),
+    VariantD(std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>),
+}
+impl<'a, T> Iterator for __KirinArgumentsIter<'a, T> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            __KirinArgumentsIter::VariantA(iter) => iter.next(),
+            __KirinArgumentsIter::VariantB(iter) => iter.next(),
+            __KirinArgumentsIter::VariantC(iter) => iter.next(),
+            __KirinArgumentsIter::VariantD(iter) => iter.next(),
+        }
+    }
+}

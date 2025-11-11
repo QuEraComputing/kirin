@@ -1,103 +1,98 @@
-use kirin::prelude::*;
+use kirin::*;
 
-// fn main() {
-//     let _ctx: Context<Stage> = Context::default();
-//     println!("Hello, world!");
-// }
+fn main() {
+    let _ctx: ir::Context<Stage> = ir::Context::default();
+    println!("Hello, world!");
+}
 
-// #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-// pub struct AnyType;
+pub enum Stage {
+    StageA(ir::IRContext<LangA>),
+    StageB(ir::IRContext<LangB>),
+}
 
-// impl Lattice for AnyType {
-//     fn join(&self, _other: &Self) -> Self {
-//         AnyType
-//     }
+#[derive(Clone, Debug, ir::Instruction)]
+#[kirin(wraps)]
+pub enum LangA {
+    Arith(dialects::arith::ArithInstruction),
+    Constant(dialects::constant::Constant<Value>),
+    Scf(dialects::scf::SCFInstruction),
+}
 
-//     fn meet(&self, _other: &Self) -> Self {
-//         AnyType
-//     }
+#[derive(Clone, Debug)]
+pub enum LangB {
+    Arith(dialects::arith::ArithInstruction),
+    Constant(dialects::constant::Constant<Value>),
+    Cf(dialects::cf::ControlFlowInstruction),
+}
 
-//     fn is_subseteq(&self, _other: &Self) -> bool {
-//         true
-//     }
-// }
+impl ir::Language for LangA {
+    type Type = AnyType;
+}
 
-// impl FiniteLattice for AnyType {
-//     fn bottom() -> Self {
-//         AnyType
-//     }
+impl ir::Language for LangB {
+    type Type = AnyType;
+}
 
-//     fn top() -> Self {
-//         AnyType
-//     }
-// }
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct AnyType;
 
-// impl CompileTimeValue for AnyType {}
+impl ir::Lattice for AnyType {
+    fn join(&self, _other: &Self) -> Self {
+        AnyType
+    }
 
-// impl TypeLattice for AnyType {}
+    fn meet(&self, _other: &Self) -> Self {
+        AnyType
+    }
 
-// #[derive(Clone, Debug, PartialEq)]
-// pub enum Value {
-//     I32(i32),
-//     I64(i64),
-//     F32(f32),
-//     F64(f64),
-// }
+    fn is_subseteq(&self, _other: &Self) -> bool {
+        true
+    }
+}
 
-// impl std::hash::Hash for Value {
-//     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-//         match self {
-//             Value::I32(v) => {
-//                 0u8.hash(state);
-//                 v.hash(state);
-//             }
-//             Value::I64(v) => {
-//                 1u8.hash(state);
-//                 v.hash(state);
-//             }
-//             Value::F32(v) => {
-//                 2u8.hash(state);
-//                 v.to_bits().hash(state);
-//             }
-//             Value::F64(v) => {
-//                 3u8.hash(state);
-//                 v.to_bits().hash(state);
-//             }
-//         }
-//     }
-// }
+impl ir::FiniteLattice for AnyType {
+    fn bottom() -> Self {
+        AnyType
+    }
 
-// impl CompileTimeValue for Value {}
+    fn top() -> Self {
+        AnyType
+    }
+}
 
-// #[derive(Clone)]
-// pub enum Stage {
-//     Structured(IRContext<StageA>),
-//     Flat(IRContext<StageB>),
-// }
+impl ir::CompileTimeValue for AnyType {}
 
-// #[derive(Clone)]
-// pub enum StageA {
-//     Arith(ArithInstruction),
-//     Constant(Constant<Value>),
-//     Cf(ControlFlowInstruction),
-// }
+impl ir::TypeLattice for AnyType {}
 
-// #[derive(Clone)]
-// pub enum StageB {
-//     Arith(ArithInstruction),
-//     Constant(Constant<Value>),
-// }
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value {
+    I32(i32),
+    I64(i64),
+    F32(f32),
+    F64(f64),
+}
 
-// impl Language for StageA {
-//     type Type = AnyType;
-// }
+impl std::hash::Hash for Value {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Value::I32(v) => {
+                0u8.hash(state);
+                v.hash(state);
+            }
+            Value::I64(v) => {
+                1u8.hash(state);
+                v.hash(state);
+            }
+            Value::F32(v) => {
+                2u8.hash(state);
+                v.to_bits().hash(state);
+            }
+            Value::F64(v) => {
+                3u8.hash(state);
+                v.to_bits().hash(state);
+            }
+        }
+    }
+}
 
-// impl Language for StageB {
-//     type Type = AnyType;
-// }
-
-// // impl Language for SimpleLang {
-// //     type Type = AnyType;
-// // }
-
-// // type Context = IRContext<SimpleLang>;
+impl ir::CompileTimeValue for Value {}

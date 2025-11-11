@@ -207,6 +207,7 @@ dependencies = [
 name = "kirin-derive-core"
 version = "0.1.0"
 dependencies = [
+ "either",
  "eyre",
  "insta",
  "proc-macro2",

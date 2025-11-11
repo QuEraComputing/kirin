@@ -92,7 +92,7 @@ impl AccessorImpl {
                 quote! {
                     fn #accessor_name(&self) -> impl Iterator<Item = &::kirin_ir::#matching_type> {
                         let #name (wrapped_instruction) = self;
-                        <wrapped_instruction as #trait_path>::#accessor_name()
+                        <wrapped_instruction as #trait_path>::#accessor_name(wrapped_instruction)
                     }
                 }
             }

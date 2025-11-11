@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-core/src/field/struct_impl/named_wrapper.rs
+expression: rustfmt(generated)
+---
+impl<'a, T> ::kirin_ir::HasArguments<'a> for TestStruct<T> {
+    type Iter = <InnerStruct<T> as ::kirin_ir::HasArguments>::Iter;
+    pub fn arguments(&'a self) -> Self::Iter {
+        let Self { wrapped, .. } = self;
+        <InnerStruct<T> as ::kirin_ir::HasArguments>::arguments(wrapped)
+    }
+}

@@ -4,20 +4,24 @@ pub trait Language: Clone {
     type Type: TypeLattice;
 }
 
-pub trait HasArguments {
-    fn arguments(&self) -> impl Iterator<Item = &crate::SSAValue>;
+pub trait HasArguments<'a> {
+    type Iter: Iterator<Item = &'a crate::SSAValue>;
+    fn arguments(&'a self) -> Self::Iter;
 }
 
-pub trait HasResults {
-    fn results(&self) -> impl Iterator<Item = &crate::ResultValue>;
+pub trait HasResults<'a> {
+    type Iter: Iterator<Item = &'a crate::ResultValue>;
+    fn results(&'a self) -> Self::Iter;
 }
 
-pub trait HasSuccessors {
-    fn successors(&self) -> impl Iterator<Item = &crate::Block>;
+pub trait HasSuccessors<'a> {
+    type Iter: Iterator<Item = &'a crate::Block>;
+    fn successors(&'a self) -> Self::Iter;
 }
 
-pub trait HasRegions {
-    fn regions(&self) -> impl Iterator<Item = &crate::Region>;
+pub trait HasRegions<'a> {
+    type Iter: Iterator<Item = &'a crate::Region>;
+    fn regions(&'a self) -> Self::Iter;
 }
 
 pub trait IsTerminator {
@@ -33,7 +37,12 @@ pub trait IsPure {
 }
 
 /// An instruction combines several traits to provide a complete interface.
-pub trait Instruction:
-    HasArguments + HasResults + HasSuccessors + HasRegions + IsTerminator + IsConstant + IsPure
+pub trait Instruction<'a>: HasArguments<'a>
+    + HasResults<'a>
+    + HasSuccessors<'a>
+    + HasRegions<'a>
+    + IsTerminator
+    + IsConstant
+    + IsPure
 {
 }

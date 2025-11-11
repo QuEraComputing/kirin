@@ -1,0 +1,30 @@
+---
+source: crates/kirin-derive-core/src/field/enum_impl/global_wrapper.rs
+expression: rustfmt(generated)
+---
+impl<'a, T> ::kirin_ir::HasArguments<'a> for TestEnum<T> {
+    type Iter = __KirinArgumentsIter<'a>;
+    pub fn arguments(&'a self) -> Self::Iter {
+        match self {
+            TestEnum::VariantA { wrapped, .. } => __KirinArgumentsIter::VariantA(
+                <InnerStructA<T> as ::kirin_ir::HasArguments>::arguments(wrapped),
+            ),
+            TestEnum::VariantB(field_0, field_1) => __KirinArgumentsIter::VariantB(
+                <InnerStructB as ::kirin_ir::HasArguments>::arguments(field_0),
+            ),
+        }
+    }
+}
+pub enum __KirinArgumentsIter<'a, T> {
+    VariantA(<InnerStructA<T> as ::kirin_ir::HasArguments<'a>>::Iter),
+    VariantB(<InnerStructB as ::kirin_ir::HasArguments<'a>>::Iter),
+}
+impl<'a, T> Iterator for __KirinArgumentsIter<'a, T> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            __KirinArgumentsIter::VariantA(iter) => iter.next(),
+            __KirinArgumentsIter::VariantB(iter) => iter.next(),
+        }
+    }
+}
