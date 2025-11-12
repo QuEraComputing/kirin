@@ -42,15 +42,17 @@ class ConstList2IList(RewriteRule):
         if not isinstance(node.value, ir.PyAttr):
             return RewriteResult()
 
-        if isinstance(data := node.value.data, (list)):
-            stmt = Constant(value=IList(data=node.value.data))
+        if isinstance(data := node.value.data, list):
+            stmt = Constant(value=IList(data=data))
             node.replace_by(stmt)
-            self._rewrite_IList_type(stmt.result, node.value.data)
+            self._rewrite_IList_type(stmt.result, data)
             return RewriteResult(has_done_something=True)
         elif isinstance(data, range):
-            stmt = Constant(value=IList(data=data, elem=types.Int))
+            new_constant = IList(data=data, elem=types.Int)
+            stmt = Constant(value=new_constant)
+            stmt.result.hints["const"] = const.Value(new_constant)
+            stmt.result.type = IListType[types.Int, types.Literal(len(data))]
             node.replace_by(stmt)
-            self._rewrite_IList_type(stmt.result, list(data))
             return RewriteResult(has_done_something=True)
 
         return RewriteResult()
