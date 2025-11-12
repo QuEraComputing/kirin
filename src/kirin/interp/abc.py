@@ -51,6 +51,10 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
     """The interpreter state."""
     __eval_lock: bool = field(default=False, init=False, repr=False)
     """Lock for the eval method."""
+    _validation_errors: dict[ir.IRNode, set[ir.ValidationError]] = field(
+        default_factory=dict, init=False
+    )
+    """The validation errors collected during interpretation."""
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -330,3 +334,25 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
 
     def build_signature(self, frame: FrameType, node: ir.Statement) -> Signature:
         return Signature(node.__class__, tuple(arg.type for arg in node.args))
+
+    def add_validation_error(self, node: ir.IRNode, error: ir.ValidationError) -> None:
+        """Add a ValidationError for a given IR node.
+
+        If the node is not present in the _validation_errors dict, create a new set.
+        Otherwise append to the existing set of errors.
+        """
+        self._validation_errors.setdefault(node, set()).add(error)
+
+    def get_validation_errors(
+        self, keys: set[ir.IRNode] | None = None
+    ) -> list[ir.ValidationError]:
+        """Get the validation errors collected during interpretation.
+
+        If keys is provided, only return errors for the given nodes.
+        Otherwise return all errors.
+        """
+        if keys is None:
+            return [err for s in self._validation_errors.values() for err in s]
+        return [
+            err for node in keys for err in self._validation_errors.get(node, set())
+        ]
