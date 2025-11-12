@@ -1,7 +1,5 @@
+use super::{Context, FromStructFields, GenerateFrom, KirinAttribute, TraitInfo};
 use proc_macro2::TokenStream;
-
-use crate::has_attr;
-use super::{Context, FromStructFields, GenerateFrom, TraitInfo};
 
 pub enum StructTrait<'input, T: TraitInfo<'input>> {
     Wrapper(WrapperStruct<'input, T>),
@@ -20,10 +18,7 @@ impl<'input, T: TraitInfo<'input>> StructTrait<'input, T> {
 
 impl<'input, T> GenerateFrom<'input, StructTrait<'input, T>> for T
 where
-    T: TraitInfo<'input>
-        + GenerateFrom<'input, NamedWrapperStruct<'input, T>>
-        + GenerateFrom<'input, UnnamedWrapperStruct<'input, T>>
-        + GenerateFrom<'input, RegularStruct<'input, T>>,
+    T: TraitInfo<'input>,
 {
     fn generate_from(&self, data: &StructTrait<'input, T>) -> TokenStream {
         match data {
@@ -73,11 +68,9 @@ impl<'input, T: TraitInfo<'input>> WrapperStruct<'input, T> {
     }
 }
 
-impl<'input, T: TraitInfo<'input>> GenerateFrom<'input, WrapperStruct<'input, T>> for T
+impl<'input, T> GenerateFrom<'input, WrapperStruct<'input, T>> for T
 where
-    T: TraitInfo<'input>
-        + GenerateFrom<'input, NamedWrapperStruct<'input, T>>
-        + GenerateFrom<'input, UnnamedWrapperStruct<'input, T>>,
+    T: TraitInfo<'input>,
 {
     fn generate_from(&self, data: &WrapperStruct<'input, T>) -> TokenStream {
         match data {
@@ -108,7 +101,7 @@ impl<'input, T: TraitInfo<'input>> NamedWrapperStruct<'input, T> {
         } else if let Some(f) = fields
             .named
             .iter()
-            .find(|f| has_attr(&f.attrs, "kirin", "wraps"))
+            .find(|f| KirinAttribute::from_field_attrs(&f.attrs).wraps)
         {
             Some(NamedWrapperStruct {
                 ctx,
@@ -143,7 +136,7 @@ impl<'input, T: TraitInfo<'input>> UnnamedWrapperStruct<'input, T> {
             .unnamed
             .iter()
             .enumerate()
-            .find(|(_, f)| has_attr(&f.attrs, "kirin", "wraps"))
+            .find(|(_, f)| KirinAttribute::from_field_attrs(&f.attrs).wraps)
         {
             Some(UnnamedWrapperStruct {
                 ctx,

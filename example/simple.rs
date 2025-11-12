@@ -18,7 +18,8 @@ pub enum LangA {
     Scf(dialects::scf::SCFInstruction),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ir::Instruction)]
+#[kirin(wraps)]
 pub enum LangB {
     Arith(dialects::arith::ArithInstruction),
     Constant(dialects::constant::Constant<Value>),

@@ -1,11 +1,18 @@
 use proc_macro2::TokenStream;
 
-use crate::has_attr;
-
-pub trait TraitInfo<'input>: Sized {
+pub trait TraitInfo<'input>:
+    Sized
+    + GenerateFrom<'input, RegularStruct<'input, Self>>
+    + GenerateFrom<'input, UnnamedWrapperStruct<'input, Self>>
+    + GenerateFrom<'input, NamedWrapperStruct<'input, Self>>
+    + GenerateFrom<'input, RegularEnum<'input, Self>>
+    + GenerateFrom<'input, WrapperEnum<'input, Self>>
+    + GenerateFrom<'input, EitherEnum<'input, Self>>
+where
+    Self: 'input,
+{
     type GlobalAttributeData: Default;
-    type MatchingFields: FromVariantFields<'input, Self>
-        + FromStructFields<'input, Self>;
+    type MatchingFields: FromVariantFields<'input, Self> + FromStructFields<'input, Self>;
     fn trait_path(&self) -> &syn::Path;
     fn trait_generics(&self) -> &syn::Generics;
     fn method_name(&self) -> &syn::Ident;
@@ -32,10 +39,12 @@ pub trait TraitInfo<'input>: Sized {
 //         true
 //     }
 // }
-pub trait GenerateFrom<'input, Data>: TraitInfo<'input> {
+pub trait GenerateFrom<'input, Data> {
     fn generate_from(&self, data: &Data) -> TokenStream;
 }
 
+/// If the statement is not a wrapper statement,
+/// extract relevant info from them
 pub trait FromStructFields<'input, T: TraitInfo<'input>> {
     fn from_struct_fields(
         ctx: &Context<'input, T>,
@@ -52,19 +61,83 @@ pub trait FromVariantFields<'input, T: TraitInfo<'input>> {
     ) -> Self;
 }
 
+/// Attributes parsed from #[kirin(...)]
+/// this can be used for other derive traits so we
+/// always keep it across different TraitInfo implementations
+/// e.g a new trait may define its own helper attribute in
+/// addition to `kirin(wraps)` etc.
+#[derive(Debug, Clone, Default)]
+pub struct KirinAttribute {
+    pub wraps: bool,
+    pub is_constant: Option<bool>,
+    pub is_pure: Option<bool>,
+    pub is_terminator: Option<bool>,
+}
+
+impl KirinAttribute {
+    pub fn from_attrs(attrs: &Vec<syn::Attribute>) -> Self {
+        let mut kirin_attr = KirinAttribute::default();
+        for attr in attrs {
+            if attr.path().is_ident("kirin") {
+                attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("wraps") {
+                        kirin_attr.wraps = true;
+                    } else if meta.path.is_ident("constant") {
+                        kirin_attr.is_constant = Some(true);
+                    } else if meta.path.is_ident("pure") {
+                        kirin_attr.is_pure = Some(true);
+                    } else if meta.path.is_ident("terminator") {
+                        kirin_attr.is_terminator = Some(true);
+                    } else {
+                        return Err(meta.error("unknown attribute inside #[kirin(...)]"));
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            }
+        }
+        kirin_attr
+    }
+
+    pub fn from_field_attrs(attrs: &[syn::Attribute]) -> Self {
+        let mut kirin_attr = KirinAttribute::default();
+        for attr in attrs {
+            if attr.path().is_ident("kirin") {
+                attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("wraps") {
+                        kirin_attr.wraps = true;
+                    } else if meta.path.is_ident("constant") {
+                        return Err(meta.error("the 'constant' attribute is not allowed on fields"));
+                    } else if meta.path.is_ident("pure") {
+                        return Err(meta.error("the 'pure' attribute is not allowed on fields"));
+                    } else if meta.path.is_ident("terminator") {
+                        return Err(
+                            meta.error("the 'terminator' attribute is not allowed on fields")
+                        );
+                    } else {
+                        return Err(meta.error("unknown attribute inside #[kirin(...)]"));
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            }
+        }
+        kirin_attr
+    }
+}
+
 /// some global context for the derive
 pub struct Context<'input, T: TraitInfo<'input>> {
     pub trait_info: T,
     pub input: &'input syn::DeriveInput,
     pub data: T::GlobalAttributeData,
-    /// if there is a global #[kirin(wraps)] attribute on the enum
-    pub wraps: bool,
+    pub kirin_attr: KirinAttribute,
     pub generics: syn::Generics,
 }
 
 impl<'input, T: TraitInfo<'input>> Context<'input, T> {
     pub fn new(trait_info: T, input: &'input syn::DeriveInput) -> Self {
-        let wraps = has_attr(&input.attrs, "kirin", "wraps");
+        let kirin_attr = KirinAttribute::from_attrs(&input.attrs);
         let data = T::GlobalAttributeData::default();
         let mut generics = input.generics.clone();
         let trait_generics = trait_info.trait_generics();
@@ -74,14 +147,14 @@ impl<'input, T: TraitInfo<'input>> Context<'input, T> {
             trait_info,
             input,
             data,
-            wraps,
+            kirin_attr,
             generics,
         }
     }
 
     /// splits the generics for impl
     /// - impl_generics: generics for impl declaration
-    /// - ty_generics: generics for the type being implemented
+    /// - trait_ty_generics: generics for the type being implemented
     /// - input_type_generics: generics for the input type
     /// - where_clause: where clause
     pub fn split_for_impl(
@@ -92,9 +165,24 @@ impl<'input, T: TraitInfo<'input>> Context<'input, T> {
         syn::TypeGenerics<'input>,
         Option<&'input syn::WhereClause>,
     ) {
+        let (_, trait_ty_generics, _) = self.trait_info.trait_generics().split_for_impl();
         let (_, input_ty_generics, _) = self.input.generics.split_for_impl();
-        let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
-        (impl_generics, ty_generics, input_ty_generics, where_clause)
+        let (impl_generics, _, where_clause) = self.generics.split_for_impl();
+        (
+            impl_generics,
+            trait_ty_generics,
+            input_ty_generics,
+            where_clause,
+        )
+    }
+}
+
+impl<'input, T, Data> GenerateFrom<'input, Data> for Context<'input, T>
+where
+    T: TraitInfo<'input> + GenerateFrom<'input, Data>,
+{
+    fn generate_from(&self, data: &Data) -> TokenStream {
+        self.trait_info.generate_from(data)
     }
 }
 
@@ -120,6 +208,9 @@ impl<'input, T: TraitInfo<'input> + Default> Context<'input, T> {
 mod enum_impl;
 mod struct_impl;
 
+pub use enum_impl::*;
+pub use struct_impl::*;
+
 pub enum DataTrait<'input, T: TraitInfo<'input>> {
     Struct(struct_impl::StructTrait<'input, T>),
     Enum(enum_impl::EnumTrait<'input, T>),
@@ -136,7 +227,7 @@ impl<'input, T: TraitInfo<'input>> DataTrait<'input, T> {
 }
 
 impl<'input, T> GenerateFrom<'input, DataTrait<'input, T>> for T
-where 
+where
     T: TraitInfo<'input>
         + GenerateFrom<'input, struct_impl::StructTrait<'input, T>>
         + GenerateFrom<'input, enum_impl::EnumTrait<'input, T>>,
@@ -147,4 +238,13 @@ where
             DataTrait::Enum(data) => self.generate_from(data),
         }
     }
+}
+
+#[macro_export]
+macro_rules! generate_derive {
+    ($input:expr, $trait_info:expr) => {{
+        let ctx = Context::new($trait_info, $input);
+        let data = DataTrait::new(&ctx);
+        ctx.generate_from(&data)
+    }};
 }

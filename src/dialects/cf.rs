@@ -1,7 +1,7 @@
 use crate::ir::{Block, Instruction, SSAValue};
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Instruction)]
-#[kirin(is_terminator = true)]
+#[kirin(terminator)]
 pub enum ControlFlowInstruction {
     Branch {
         target: Block,

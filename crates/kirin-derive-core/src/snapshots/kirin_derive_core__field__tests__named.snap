@@ -1,0 +1,33 @@
+---
+source: crates/kirin-derive-core/src/field.rs
+expression: generate(input)
+---
+impl<'a> kirin_ir::HasArguments<'a> for ControlFlowInstruction {
+    type Iter = ArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            ControlFlowInstruction::Branch { .. } => ArgumentsIter::Branch(std::iter::empty()),
+            ControlFlowInstruction::ConditionalBranch { condition, .. } => {
+                ArgumentsIter::ConditionalBranch(std::iter::once(condition))
+            }
+            ControlFlowInstruction::Return(field_0, ..) => {
+                ArgumentsIter::Return(std::iter::once(field_0))
+            }
+        }
+    }
+}
+pub enum ArgumentsIter<'a> {
+    Branch(std::iter::Empty<&'a kirin_ir::SSAValue>),
+    ConditionalBranch(std::iter::Once<&'a kirin_ir::SSAValue>),
+    Return(std::iter::Once<&'a kirin_ir::SSAValue>),
+}
+impl<'a> Iterator for ArgumentsIter<'a> {
+    type Item = &'a kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ArgumentsIter::Branch(iter) => iter.next(),
+            ArgumentsIter::ConditionalBranch(iter) => iter.next(),
+            ArgumentsIter::Return(iter) => iter.next(),
+        }
+    }
+}

@@ -1,0 +1,15 @@
+---
+source: crates/kirin-derive-core/src/check.rs
+expression: generate(input)
+---
+impl<T> ::kirin_ir::CheckConstant for WrapperEnum<T> {
+    pub fn is_constant(&self) -> bool {
+        match self {
+            Self::Variant1(field_0, ..) => <T as ::kirin_ir::CheckConstant>::is_constant(field_0),
+            Self::Variant2 { field, .. } => <T as ::kirin_ir::CheckConstant>::is_constant(field),
+            Self::Variant3(field_0, field_1, ..) => {
+                <Other as ::kirin_ir::CheckConstant>::is_constant(field_1)
+            }
+        }
+    }
+}

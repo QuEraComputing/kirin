@@ -1,0 +1,40 @@
+---
+source: crates/kirin-derive-core/src/field.rs
+expression: "rustfmt(derive_accessor!(&input, \"regions\", kirin_ir::Region,\nkirin_ir::HasRegions))"
+---
+impl<'a, T> kirin_ir::HasRegions<'a> for ArithInstruction<T> {
+    type Iter = RegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        match self {
+            ArithInstruction::Add(field_0, field_1, field_2, field_3, ..) => {
+                RegionsIter::Add(std::iter::empty())
+            }
+            ArithInstruction::Sub(field_0, field_1, field_2, field_3, ..) => {
+                RegionsIter::Sub(std::iter::empty())
+            }
+            ArithInstruction::Mul(field_0, field_1, field_2, ..) => {
+                RegionsIter::Mul(std::iter::empty())
+            }
+            ArithInstruction::Div(field_0, field_1, field_2, ..) => {
+                RegionsIter::Div(std::iter::empty())
+            }
+        }
+    }
+}
+pub enum RegionsIter<'a> {
+    Add(std::iter::Empty<&'a kirin_ir::Region>),
+    Sub(std::iter::Empty<&'a kirin_ir::Region>),
+    Mul(std::iter::Empty<&'a kirin_ir::Region>),
+    Div(std::iter::Empty<&'a kirin_ir::Region>),
+}
+impl<'a> Iterator for RegionsIter<'a> {
+    type Item = &'a kirin_ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            RegionsIter::Add(iter) => iter.next(),
+            RegionsIter::Sub(iter) => iter.next(),
+            RegionsIter::Mul(iter) => iter.next(),
+            RegionsIter::Div(iter) => iter.next(),
+        }
+    }
+}

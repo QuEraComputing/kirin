@@ -31,12 +31,13 @@ pub enum SCFInstruction {
     },
 }
 
-impl HasResults for SCFInstruction {
-    fn results(&self) -> impl Iterator<Item = &ResultValue> {
+impl<'a> HasResults<'a> for SCFInstruction {
+    type Iter = std::slice::Iter<'a, ResultValue>;
+    fn results(&'a self) -> Self::Iter {
         match self {
             SCFInstruction::If { results, .. } => results.iter(),
             SCFInstruction::For { results, .. } => results.iter(),
         }
     }
 }
-impl Instruction for SCFInstruction {}
+impl Instruction<'_> for SCFInstruction {}

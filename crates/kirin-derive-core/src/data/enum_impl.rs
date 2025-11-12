@@ -1,7 +1,6 @@
 use proc_macro2::TokenStream;
 
-use super::{Context, FromVariantFields, GenerateFrom, TraitInfo};
-use crate::has_attr;
+use super::{Context, FromVariantFields, GenerateFrom, KirinAttribute, TraitInfo};
 
 pub enum EnumTrait<'input, T: TraitInfo<'input>> {
     Wrapper(WrapperEnum<'input, T>),
@@ -11,14 +10,14 @@ pub enum EnumTrait<'input, T: TraitInfo<'input>> {
 
 impl<'input, T: TraitInfo<'input>> EnumTrait<'input, T> {
     pub fn new(ctx: &'input Context<'input, T>, data: &'input syn::DataEnum) -> Self {
-        if ctx.wraps {
+        if ctx.kirin_attr.wraps {
             return Self::Wrapper(WrapperEnum::new(ctx, data));
         } else if data.variants.iter().any(|variant| {
-            has_attr(&variant.attrs, "kirin", "wraps")
+            KirinAttribute::from_attrs(&variant.attrs).wraps
                 || variant
                     .fields
                     .iter()
-                    .any(|field| has_attr(&field.attrs, "kirin", "wraps"))
+                    .any(|field| KirinAttribute::from_field_attrs(&field.attrs).wraps)
         }) {
             return Self::Either(EitherEnum::new(ctx, data));
         } else {
@@ -29,10 +28,7 @@ impl<'input, T: TraitInfo<'input>> EnumTrait<'input, T> {
 
 impl<'input, T> GenerateFrom<'input, EnumTrait<'input, T>> for T
 where
-    T: TraitInfo<'input>
-        + GenerateFrom<'input, WrapperEnum<'input, T>>
-        + GenerateFrom<'input, EitherEnum<'input, T>>
-        + GenerateFrom<'input, RegularEnum<'input, T>>,
+    T: TraitInfo<'input>,
 {
     fn generate_from(&self, data: &EnumTrait<'input, T>) -> TokenStream {
         match data {
@@ -43,7 +39,11 @@ where
     }
 }
 
-pub struct WrapperEnum<'input, T: TraitInfo<'input>>(pub Vec<WrapperVariant<'input, T>>);
+/// An enum that contains only wrapper instruction definitions.
+pub struct WrapperEnum<'input, T: TraitInfo<'input>> {
+    pub ctx: &'input Context<'input, T>,
+    pub variants: Vec<WrapperVariant<'input, T>>,
+}
 
 impl<'input, T: TraitInfo<'input>> WrapperEnum<'input, T> {
     pub fn new(ctx: &'input Context<'input, T>, data: &'input syn::DataEnum) -> Self {
@@ -55,11 +55,15 @@ impl<'input, T: TraitInfo<'input>> WrapperEnum<'input, T> {
                         .expect("all variants must be wrapper variants when #[kirin(wraps)] is used on the enum")
                 })
                 .collect();
-        Self(variants)
+        Self { ctx, variants }
     }
 }
 
-pub struct RegularEnum<'input, T: TraitInfo<'input>>(pub Vec<RegularVariant<'input, T>>);
+/// An enum that contains only regular instruction definitions.
+pub struct RegularEnum<'input, T: TraitInfo<'input>> {
+    pub ctx: &'input Context<'input, T>,
+    pub variants: Vec<RegularVariant<'input, T>>,
+}
 
 impl<'input, T: TraitInfo<'input>> RegularEnum<'input, T> {
     pub fn new(ctx: &'input Context<'input, T>, data: &'input syn::DataEnum) -> Self {
@@ -68,53 +72,43 @@ impl<'input, T: TraitInfo<'input>> RegularEnum<'input, T> {
             .iter()
             .map(|variant| RegularVariant::from_fields(ctx, variant, &variant.fields))
             .collect();
-        Self(variants)
+        Self { ctx, variants }
     }
 }
 
-pub struct EitherEnum<'input, T: TraitInfo<'input>>(pub Vec<EitherWrapperOrRegular<'input, T>>);
+/// An enum that contains a mix of wrapper and regular instruction definitions.
+pub struct EitherEnum<'input, T: TraitInfo<'input>> {
+    pub ctx: &'input Context<'input, T>,
+    pub variants: Vec<WrapperOrRegularVariant<'input, T>>,
+}
 
 impl<'input, T: TraitInfo<'input>> EitherEnum<'input, T> {
     pub fn new(ctx: &'input Context<'input, T>, data: &'input syn::DataEnum) -> Self {
         let variants = data
             .variants
             .iter()
-            .map(|variant| EitherWrapperOrRegular::from_variant(ctx, variant))
+            .map(|variant| WrapperOrRegularVariant::from_variant(ctx, variant))
             .collect();
-        Self(variants)
+        Self { ctx, variants }
     }
 }
 
-pub enum EitherWrapperOrRegular<'input, T: TraitInfo<'input>> {
+pub enum WrapperOrRegularVariant<'input, T: TraitInfo<'input>> {
     Wrapper(WrapperVariant<'input, T>),
     Regular(RegularVariant<'input, T>),
 }
 
-impl<'input, T: TraitInfo<'input>> EitherWrapperOrRegular<'input, T> {
+impl<'input, T: TraitInfo<'input>> WrapperOrRegularVariant<'input, T> {
     /// Creates a new `EitherWrapperOrRegular` from the given variant.
     pub fn from_variant(ctx: &'input Context<'input, T>, variant: &'input syn::Variant) -> Self {
         if let Some(wrapper) = WrapperVariant::try_from_variant(ctx, variant) {
-            EitherWrapperOrRegular::Wrapper(wrapper)
+            WrapperOrRegularVariant::Wrapper(wrapper)
         } else {
-            EitherWrapperOrRegular::Regular(RegularVariant::from_fields(
+            WrapperOrRegularVariant::Regular(RegularVariant::from_fields(
                 ctx,
                 variant,
                 &variant.fields,
             ))
-        }
-    }
-}
-
-impl<'input, T> GenerateFrom<'input, EitherWrapperOrRegular<'input, T>> for T
-where
-    T: TraitInfo<'input>
-        + GenerateFrom<'input, WrapperVariant<'input, T>>
-        + GenerateFrom<'input, RegularVariant<'input, T>>,
-{
-    fn generate_from(&self, data: &EitherWrapperOrRegular<'input, T>) -> TokenStream {
-        match data {
-            EitherWrapperOrRegular::Wrapper(data) => self.generate_from(data),
-            EitherWrapperOrRegular::Regular(data) => self.generate_from(data),
         }
     }
 }
@@ -138,20 +132,6 @@ impl<'input, T: TraitInfo<'input>> WrapperVariant<'input, T> {
                 UnnamedWrapperVariant::try_from_fields(ctx, &variant, fields)?,
             )),
             _ => None,
-        }
-    }
-}
-
-impl<'input, T> GenerateFrom<'input, WrapperVariant<'input, T>> for T
-where
-    T: TraitInfo<'input>
-        + GenerateFrom<'input, NamedWrapperVariant<'input, T>>
-        + GenerateFrom<'input, UnnamedWrapperVariant<'input, T>>,
-{
-    fn generate_from(&self, data: &WrapperVariant<'input, T>) -> TokenStream {
-        match data {
-            WrapperVariant::Named(data) => self.generate_from(data),
-            WrapperVariant::Unnamed(data) => self.generate_from(data),
         }
     }
 }
@@ -180,7 +160,7 @@ impl<'input, T: TraitInfo<'input>> NamedWrapperVariant<'input, T> {
         } else if let Some(f) = fields
             .named
             .iter()
-            .find(|f| has_attr(&f.attrs, "kirin", "wraps"))
+            .find(|f| KirinAttribute::from_field_attrs(&f.attrs).wraps)
         {
             Some(Self {
                 ctx,
@@ -218,7 +198,7 @@ impl<'input, T: TraitInfo<'input>> UnnamedWrapperVariant<'input, T> {
             .unnamed
             .iter()
             .enumerate()
-            .find(|(_, f)| has_attr(&f.attrs, "kirin", "wraps"))
+            .find(|(_, f)| KirinAttribute::from_field_attrs(&f.attrs).wraps)
         {
             Some(Self {
                 ctx,

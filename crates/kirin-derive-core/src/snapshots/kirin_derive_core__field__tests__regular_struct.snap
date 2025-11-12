@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-core/src/field.rs
+expression: generate(input)
+---
+impl<'a, T> kirin_ir::HasArguments<'a> for TestStruct<T> {
+    type Iter = std::iter::Once<&'a kirin_ir::SSAValue>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self { a, .. } = self;
+        std::iter::once(a)
+    }
+}
