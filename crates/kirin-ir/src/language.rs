@@ -37,7 +37,7 @@ pub trait IsPure {
 }
 
 /// An instruction combines several traits to provide a complete interface.
-pub trait Instruction<'a>: HasArguments<'a>
+pub trait Statement<'a>: HasArguments<'a>
     + HasResults<'a>
     + HasSuccessors<'a>
     + HasRegions<'a>

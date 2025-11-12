@@ -1,19 +1,17 @@
-use crate::node::region::RegionInfo;
-use crate::node::*;
-use crate::language::Language;
+use crate::{FunctionInfo, InternTable, Symbol};
 
 /// Context holding information about functions, blocks, statements, and SSA values.
 ///
 /// Stage: the type representing different compilation stages, should be defined as an
 /// enum over different `IRContext`s over languages.
 #[derive(Clone, Debug)]
-pub struct Context<Stage> {
-    stages: Vec<Stage>,
-    functions: Vec<FunctionInfo<Stage>>,
-    interned_symbols: InternTable,
+pub struct Context<StageInfo> {
+    stages: Vec<StageInfo>,
+    functions: Vec<FunctionInfo>,
+    interned_symbols: InternTable<String, Symbol>,
 }
 
-impl<Stage> Default for Context<Stage> {
+impl<StageInfo> Default for Context<StageInfo> {
     fn default() -> Self {
         Self {
             stages: Vec::new(),
@@ -23,42 +21,19 @@ impl<Stage> Default for Context<Stage> {
     }
 }
 
-pub struct IRContext<L: Language> {
-    pub(crate) staged_functions: Vec<StagedFunctionInfo<L>>,
-    pub(crate) regions: Vec<RegionInfo<L>>,
-    pub(crate) blocks: Vec<BlockInfo<L>>,
-    pub(crate) statements: Vec<StatementInfo<L>>,
-    pub(crate) ssas: Vec<SSAInfo<L>>,
-}
-
-impl<L> Default for IRContext<L>
-where
-    L: Language,
-{
-    fn default() -> Self {
-        Self {
-            staged_functions: Vec::new(),
-            regions: Vec::new(),
-            blocks: Vec::new(),
-            statements: Vec::new(),
-            ssas: Vec::new(),
-        }
+impl<StageInfo> Context<StageInfo> {
+    /// Get the stages in the context.
+    pub fn stages(&self) -> &Vec<StageInfo> {
+        &self.stages
     }
-}
 
-impl<L> Clone for IRContext<L>
-where
-    L: Language,
-    StatementInfo<L>: Clone,
-    SSAInfo<L>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            staged_functions: self.staged_functions.clone(),
-            regions: self.regions.clone(),
-            blocks: self.blocks.clone(),
-            statements: self.statements.clone(),
-            ssas: self.ssas.clone(),
-        }
+    /// Get the functions in the context.
+    pub fn functions(&self) -> &Vec<FunctionInfo> {
+        &self.functions
+    }
+
+    /// Get the interned symbols table.
+    pub fn interned_symbols(&self) -> &InternTable<String, Symbol> {
+        &self.interned_symbols
     }
 }

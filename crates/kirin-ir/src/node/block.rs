@@ -1,6 +1,6 @@
 use crate::{Language, node::region::Region};
 
-use super::{linked_list::{Node, LinkedList}, ssa::BlockArgument, stmt::Statement};
+use super::{linked_list::{LinkedListNode, LinkedList}, ssa::BlockArgument, stmt::StatementRef};
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -10,10 +10,10 @@ pub struct Block(usize);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlockInfo<L: Language> {
     pub parent: Option<Region>,
-    pub node: Node<Block>,
+    pub node: LinkedListNode<Block>,
     pub arguments: Vec<BlockArgument>,
-    pub statements: LinkedList<Statement>,
-    pub terminator: Option<Statement>,
+    pub statements: LinkedList<StatementRef>,
+    pub terminator: Option<StatementRef>,
     _marker: std::marker::PhantomData<L>,
 }
 

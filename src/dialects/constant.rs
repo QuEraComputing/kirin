@@ -1,6 +1,6 @@
 use kirin_ir::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Instruction)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Statement)]
 #[kirin(constant)]
 pub struct Constant<T: CompileTimeValue>(pub T, ResultValue);
 

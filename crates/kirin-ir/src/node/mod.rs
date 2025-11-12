@@ -1,20 +1,20 @@
 pub mod block;
-pub mod region;
 pub mod function;
 pub mod linked_list;
 pub mod module;
+pub mod region;
 pub mod ssa;
 pub mod stmt;
 pub mod symbol;
 
 pub use block::{Block, BlockInfo};
-pub use region::{Region, RegionInfo};
 pub use function::{
-    Function, FunctionInfo, Signature, SpecializedFunction, SpecializedFunctionInfo,
+    CompileStage, Function, FunctionInfo, Signature, SpecializedFunction, SpecializedFunctionInfo,
     StagedFunction, StagedFunctionInfo,
 };
-pub use linked_list::{LinkedList, Node};
+pub use linked_list::{LinkedList, LinkedListNode};
 pub use module::{Module, SpecializedModule};
+pub use region::{Region, RegionInfo};
 pub use ssa::{BlockArgument, ResultValue, SSAInfo, SSAKind, SSAValue, TestSSAValue};
-pub use stmt::{Statement, StatementInfo};
-pub use symbol::{InternTable, Symbol};
+pub use stmt::{StatementInfo, StatementRef};
+pub use symbol::Symbol;

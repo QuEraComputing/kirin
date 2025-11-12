@@ -40,4 +40,4 @@ impl<'a> HasResults<'a> for SCFInstruction {
         }
     }
 }
-impl Instruction<'_> for SCFInstruction {}
+impl Statement<'_> for SCFInstruction {}

@@ -5,8 +5,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::parse_macro_input;
 
-#[proc_macro_derive(Instruction, attributes(kirin))]
-pub fn derive_instruction(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Statement, attributes(kirin))]
+pub fn derive_statement(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     let arguments = derive_accessor!(&ast, "arguments", ::kirin_ir::SSAValue, ::kirin_ir::HasArguments);
     let results = derive_accessor!(&ast, "results", ::kirin_ir::ResultValue, ::kirin_ir::HasResults);
@@ -36,7 +36,7 @@ pub fn derive_instruction(input: TokenStream) -> TokenStream {
         #is_constant
         #is_pure
 
-        impl #trait_impl_generics ::kirin_ir::Instruction<#lifetime> for #name #input_ty_generics #input_where_clause {} // Use the extracted name here
+        impl #trait_impl_generics ::kirin_ir::Statement<#lifetime> for #name #input_ty_generics #input_where_clause {} // Use the extracted name here
     };
     generated.into()
 }

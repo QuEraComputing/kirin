@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use crate::language::Language;
+use crate::{language::Language};
 
-use super::{block::Block, stmt::Statement};
+use super::{block::Block, stmt::StatementRef};
 
 /// Represents a general SSA value that can be either
 /// a value produced by a statement or an argument to a block.
@@ -46,14 +46,14 @@ pub struct SSAInfo<L: Language> {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Use {
-    stmt: Statement,
+    stmt: StatementRef,
     operand_index: usize,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SSAKind {
-    Result(Statement),
+    Result(StatementRef),
     BlockArgument(Block),
     Deleted,
     Test,

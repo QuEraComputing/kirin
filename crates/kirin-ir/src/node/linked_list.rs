@@ -1,22 +1,22 @@
-use super::stmt::Statement;
+use super::stmt::StatementRef;
 use super::block::Block;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Node<Ptr: Copy + PartialEq> {
+pub struct LinkedListNode<Ptr: Copy + PartialEq> {
     pub ptr: Ptr,
     pub next: Option<Ptr>,
     pub prev: Option<Ptr>,
 }
 
-impl From<Node<Statement>> for Statement {
-    fn from(value: Node<Statement>) -> Self {
+impl From<LinkedListNode<StatementRef>> for StatementRef {
+    fn from(value: LinkedListNode<StatementRef>) -> Self {
         value.ptr
     }
 }
 
-impl From<Node<Block>> for Block {
-    fn from(value: Node<Block>) -> Self {
+impl From<LinkedListNode<Block>> for Block {
+    fn from(value: LinkedListNode<Block>) -> Self {
         value.ptr
     }
 }

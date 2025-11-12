@@ -6,11 +6,11 @@ fn main() {
 }
 
 pub enum Stage {
-    StageA(ir::IRContext<LangA>),
-    StageB(ir::IRContext<LangB>),
+    StageA(ir::Arena<LangA>),
+    StageB(ir::Arena<LangB>),
 }
 
-#[derive(Clone, Debug, ir::Instruction)]
+#[derive(Clone, Debug, ir::Statement)]
 #[kirin(wraps)]
 pub enum LangA {
     Arith(dialects::arith::ArithInstruction),
@@ -18,7 +18,7 @@ pub enum LangA {
     Scf(dialects::scf::SCFInstruction),
 }
 
-#[derive(Clone, Debug, ir::Instruction)]
+#[derive(Clone, Debug, ir::Statement)]
 #[kirin(wraps)]
 pub enum LangB {
     Arith(dialects::arith::ArithInstruction),
