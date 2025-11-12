@@ -28,3 +28,18 @@ def test_ilist2list_rewrite():
     x = ilist2_list()
 
     assert isinstance(x, ilist.IList)
+
+
+def test_range_rewrite():
+
+    r = range(10)
+
+    @basic_desugar
+    def ilist_range():
+        return r
+
+    ilist_range.print()
+
+    x = ilist_range()
+
+    assert isinstance(x, ilist.IList)
