@@ -232,4 +232,6 @@
     * [testing](kirin/testing/index.md)
         * [statements](kirin/testing/statements.md)
     * [types](kirin/types.md)
+    * [validation](kirin/validation/index.md)
+        * [validationpass](kirin/validation/validationpass.md)
     * [worklist](kirin/worklist.md)
