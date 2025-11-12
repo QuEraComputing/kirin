@@ -50,6 +50,8 @@ class ConstList2IList(RewriteRule):
         elif isinstance(data, range):
             new_constant = IList(data=data, elem=types.Int)
             stmt = Constant(value=new_constant)
+            # specializing the type computation since we know that a
+            # range will always be integer typed.
             stmt.result.hints["const"] = const.Value(new_constant)
             stmt.result.type = IListType[types.Int, types.Literal(len(data))]
             node.replace_by(stmt)
