@@ -66,7 +66,7 @@ OutElemT = types.TypeVar("OutElemT")
 class Map(ir.Statement):
     traits = frozenset({ir.MaybePure(), lowering.FromPythonCall()})
     purity: bool = info.attribute(default=False)
-    fn: ir.SSAValue = info.argument(types.MethodType[[ElemT], OutElemT])
+    fn: ir.SSAValue = info.argument(types.TypeofMethodType[[ElemT], OutElemT])
     collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
     result: ir.ResultValue = info.result(IListType[OutElemT, ListLen])
 

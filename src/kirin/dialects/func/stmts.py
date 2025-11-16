@@ -248,7 +248,7 @@ class Call(ir.Statement):
             printer.plain_print(f" maybe_pure={self.purity}")
 
     def check_type(self) -> None:
-        if not self.callee.type.is_subseteq(types.MethodType):
+        if not self.callee.type.is_subseteq(types.TypeofMethodType):
             if self.callee.type.is_subseteq(types.PyClass(FunctionType)):
                 raise ir.TypeCheckError(
                     self,
