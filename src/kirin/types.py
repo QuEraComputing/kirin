@@ -16,6 +16,7 @@ from kirin.ir.attrs.types import (
     hint2type as hint2type,
     is_tuple_of as is_tuple_of,
     TypeofMethodType as TypeofMethodType,
+    FunctionType as FunctionType,
 )
 
 Any = AnyType()

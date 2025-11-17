@@ -88,6 +88,9 @@ class DialectGroup(Generic[PassParams]):
         names = ", ".join(each.name for each in self.data)
         return f"DialectGroup([{names}])"
 
+    def __hash__(self) -> int:
+        return hash(self.data)
+
     @staticmethod
     def map_module(dialect: Union["Dialect", ModuleType]) -> "Dialect":
         """map the module to the dialect if it is a module.
