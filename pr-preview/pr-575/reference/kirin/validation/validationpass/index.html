@@ -59,63 +59,49 @@
     <span class=n>frames</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Any</span><span class=p>]</span> <span class=o>=</span> <span class=nb>dict</span><span class=p>(),</span>
 <span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Result of running a validation suite.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.validation.validationpass.ValidationResult.error_count class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">error_count</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>error_count</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=nb>int</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Total number of violations across all passes.</p> <p>Counts violations directly from frames using the same logic as test helpers.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>144</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Total number of violations across all passes.</p> <p>Counts violations directly from frames using the same logic as test helpers.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>140</span>
+<span class=normal>141</span>
+<span class=normal>142</span>
+<span class=normal>143</span>
+<span class=normal>144</span>
 <span class=normal>145</span>
 <span class=normal>146</span>
 <span class=normal>147</span>
 <span class=normal>148</span>
 <span class=normal>149</span>
 <span class=normal>150</span>
-<span class=normal>151</span>
-<span class=normal>152</span>
-<span class=normal>153</span>
-<span class=normal>154</span>
-<span class=normal>155</span>
-<span class=normal>156</span>
-<span class=normal>157</span>
-<span class=normal>158</span>
-<span class=normal>159</span>
-<span class=normal>160</span>
-<span class=normal>161</span>
-<span class=normal>162</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>error_count</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>int</span><span class=p>:</span>
+<span class=normal>151</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>error_count</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>int</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Total number of violations across all passes.</span>
 
 <span class=sd>    Counts violations directly from frames using the same logic as test helpers.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
-    <span class=kn>from</span> <span class=nn>bloqade.analysis.validation.nocloning.lattice</span> <span class=kn>import</span> <span class=n>May</span><span class=p>,</span> <span class=n>Must</span>
 
     <span class=n>total</span> <span class=o>=</span> <span class=mi>0</span>
-    <span class=k>for</span> <span class=n>pass_name</span><span class=p>,</span> <span class=n>frame</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>frames</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
-        <span class=k>if</span> <span class=n>frame</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+    <span class=k>for</span> <span class=n>pass_name</span><span class=p>,</span> <span class=n>errors</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>errors</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
+        <span class=k>if</span> <span class=n>errors</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
             <span class=k>continue</span>
-
-        <span class=k>for</span> <span class=n>node</span><span class=p>,</span> <span class=n>value</span> <span class=ow>in</span> <span class=n>frame</span><span class=o>.</span><span class=n>entries</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
-            <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>value</span><span class=p>,</span> <span class=n>Must</span><span class=p>):</span>
-                <span class=n>total</span> <span class=o>+=</span> <span class=nb>len</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>violations</span><span class=p>)</span>
-            <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>value</span><span class=p>,</span> <span class=n>May</span><span class=p>):</span>
-                <span class=n>total</span> <span class=o>+=</span> <span class=nb>len</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>violations</span><span class=p>)</span>
-
+        <span class=n>total</span> <span class=o>+=</span> <span class=nb>len</span><span class=p>(</span><span class=n>errors</span><span class=p>)</span>
     <span class=k>return</span> <span class=n>total</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.validation.validationpass.ValidationResult.format_errors class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">format_errors</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>format_errors</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=nb>str</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Format all errors with their pass names.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>168</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Format all errors with their pass names.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>157</span>
+<span class=normal>158</span>
+<span class=normal>159</span>
+<span class=normal>160</span>
+<span class=normal>161</span>
+<span class=normal>162</span>
+<span class=normal>163</span>
+<span class=normal>164</span>
+<span class=normal>165</span>
+<span class=normal>166</span>
+<span class=normal>167</span>
+<span class=normal>168</span>
 <span class=normal>169</span>
 <span class=normal>170</span>
 <span class=normal>171</span>
 <span class=normal>172</span>
 <span class=normal>173</span>
 <span class=normal>174</span>
-<span class=normal>175</span>
-<span class=normal>176</span>
-<span class=normal>177</span>
-<span class=normal>178</span>
-<span class=normal>179</span>
-<span class=normal>180</span>
-<span class=normal>181</span>
-<span class=normal>182</span>
-<span class=normal>183</span>
-<span class=normal>184</span>
-<span class=normal>185</span>
-<span class=normal>186</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>format_errors</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>str</span><span class=p>:</span>
+<span class=normal>175</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>format_errors</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>str</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Format all errors with their pass names.&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_valid</span><span class=p>:</span>
         <span class=k>return</span> <span class=s2>&quot;</span><span class=se>\n\033</span><span class=s2>[32mAll validation passes succeeded</span><span class=se>\033</span><span class=s2>[0m&quot;</span>
@@ -135,17 +121,17 @@
 
     <span class=k>return</span> <span class=s2>&quot;</span><span class=se>\n</span><span class=s2>&quot;</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>lines</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.validation.validationpass.ValidationResult.get_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_frame</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_frame</span><span class=p>(</span><span class=n>pass_name</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Any</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Get the analysis frame for a specific pass.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>164</span>
-<span class=normal>165</span>
-<span class=normal>166</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>pass_name</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Any</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Get the analysis frame for a specific pass.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>153</span>
+<span class=normal>154</span>
+<span class=normal>155</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>get_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>pass_name</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Any</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the analysis frame for a specific pass.&quot;&quot;&quot;</span>
     <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>frames</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>pass_name</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.validation.validationpass.ValidationResult.raise_if_invalid class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">raise_if_invalid</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>raise_if_invalid</span><span class=p>()</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Raise an exception if validation failed.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>188</span>
-<span class=normal>189</span>
-<span class=normal>190</span>
-<span class=normal>191</span>
-<span class=normal>192</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>raise_if_invalid</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Raise an exception if validation failed.</p> <details class=quote> <summary>Source code in <code>src/kirin/validation/validationpass.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>177</span>
+<span class=normal>178</span>
+<span class=normal>179</span>
+<span class=normal>180</span>
+<span class=normal>181</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>raise_if_invalid</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Raise an exception if validation failed.&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_valid</span><span class=p>:</span>
         <span class=n>first_errors</span> <span class=o>=</span> <span class=nb>next</span><span class=p>(</span><span class=nb>iter</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>errors</span><span class=o>.</span><span class=n>values</span><span class=p>()))</span>
