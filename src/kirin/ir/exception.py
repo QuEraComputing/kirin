@@ -68,3 +68,15 @@ class TypeCheckError(ValidationError):
 
 class CompilerError(Exception):
     pass
+
+
+class PotentialValidationError(ValidationError):
+    """Indicates a potential violation that may occur at runtime."""
+
+    pass
+
+
+class DefiniteValidationError(ValidationError):
+    """Indicates a definite violation that will occur at runtime."""
+
+    pass

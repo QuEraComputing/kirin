@@ -132,33 +132,22 @@ class ValidationResult:
     is_valid: bool = field(default=True, init=False)
 
     def __post_init__(self):
-        from bloqade.analysis.validation.nocloning.lattice import May, Must
-
-        for _, frame in self.frames.items():
-            if frame is None:
-                continue
-            for node, value in frame.entries.items():
-                if isinstance(value, (Must, May)):
-                    self.is_valid = False
+        for _, errors in self.errors.items():
+            if errors:
+                self.is_valid = False
+                break
 
     def error_count(self) -> int:
         """Total number of violations across all passes.
 
         Counts violations directly from frames using the same logic as test helpers.
         """
-        from bloqade.analysis.validation.nocloning.lattice import May, Must
 
         total = 0
-        for pass_name, frame in self.frames.items():
-            if frame is None:
+        for pass_name, errors in self.errors.items():
+            if errors is None:
                 continue
-
-            for node, value in frame.entries.items():
-                if isinstance(value, Must):
-                    total += len(value.violations)
-                elif isinstance(value, May):
-                    total += len(value.violations)
-
+            total += len(errors)
         return total
 
     def get_frame(self, pass_name: str) -> Any:
