@@ -34,7 +34,6 @@
         * [debug](kirin/dialects/debug.md)
         * [eltype](kirin/dialects/eltype.md)
         * [func](kirin/dialects/func/index.md)
-            * [attrs](kirin/dialects/func/attrs.md)
             * [constprop](kirin/dialects/func/constprop.md)
             * [interp](kirin/dialects/func/interp.md)
             * [rewrite](kirin/dialects/func/rewrite/index.md)

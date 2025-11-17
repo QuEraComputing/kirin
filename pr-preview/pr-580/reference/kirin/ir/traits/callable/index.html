@@ -47,15 +47,15 @@
             </script> <p>A trait that indicates that a statement is a callable statement.</p> <p>A callable statement is a statement that can be called as a function.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.traits.callable.CallableStmtInterface.align_input_args class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">align_input_args</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>align_input_args</span><span class=p>(</span>
     <span class=n>stmt</span><span class=p>:</span> <span class=s2>&quot;StmtType&quot;</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>:</span> <span class=n>ValueType</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ValueType</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Permute the arguments and keyword arguments of the statement to match the execution order of the callable region input.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/traits/callable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>31</span>
-<span class=normal>32</span>
-<span class=normal>33</span>
-<span class=normal>34</span>
-<span class=normal>35</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Permute the arguments and keyword arguments of the statement to match the execution order of the callable region input.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/traits/callable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>35</span>
 <span class=normal>36</span>
 <span class=normal>37</span>
 <span class=normal>38</span>
-<span class=normal>39</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>39</span>
+<span class=normal>40</span>
+<span class=normal>41</span>
+<span class=normal>42</span>
+<span class=normal>43</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=nd>@abstractmethod</span>
 <span class=k>def</span><span class=w> </span><span class=nf>align_input_args</span><span class=p>(</span>
     <span class=bp>cls</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=s2>&quot;StmtType&quot;</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>:</span> <span class=n>ValueType</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>:</span> <span class=n>ValueType</span>
@@ -65,11 +65,11 @@
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=o>...</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.traits.callable.CallableStmtInterface.get_callable_region class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_callable_region</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_callable_region</span><span class=p>(</span><span class=n>stmt</span><span class=p>:</span> <span class=n>StmtType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s1>&#39;Region&#39;</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Returns the body of the callable region</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/traits/callable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>23</span>
-<span class=normal>24</span>
-<span class=normal>25</span>
-<span class=normal>26</span>
-<span class=normal>27</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Returns the body of the callable region</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/traits/callable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>27</span>
+<span class=normal>28</span>
+<span class=normal>29</span>
+<span class=normal>30</span>
+<span class=normal>31</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=nd>@abstractmethod</span>
 <span class=k>def</span><span class=w> </span><span class=nf>get_callable_region</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>StmtType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Region&quot;</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Returns the body of the callable region&quot;&quot;&quot;</span>
@@ -167,11 +167,11 @@
                 }
               });
             </script> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.traits.callable.StaticCall.get_callee class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">get_callee</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>get_callee</span><span class=p>(</span><span class=n>stmt</span><span class=p>:</span> <span class=n>StmtType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s1>&#39;Method&#39;</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Returns the callee of the static call statement.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/traits/callable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>70</span>
-<span class=normal>71</span>
-<span class=normal>72</span>
-<span class=normal>73</span>
-<span class=normal>74</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Returns the callee of the static call statement.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/traits/callable.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>74</span>
+<span class=normal>75</span>
+<span class=normal>76</span>
+<span class=normal>77</span>
+<span class=normal>78</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=nd>@abstractmethod</span>
 <span class=k>def</span><span class=w> </span><span class=nf>get_callee</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=n>StmtType</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;Method&quot;</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Returns the callee of the static call statement.&quot;&quot;&quot;</span>
