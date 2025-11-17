@@ -61,6 +61,52 @@ class CFG(Printable):
             while block is not None and block in visited:
                 block = worklist.pop()
         return graph
+    
+    @cached_property
+    def dominators(self):
+        """Compute the dominator sets for each block in the CFG."""
+        doms: dict[ir.Block, set[ir.Block]] = {}
+        blocks = list(self.successors.keys())
+        if not blocks:
+            return doms
+
+        entry = self.entry
+        for block in blocks:
+            doms[block] = set(blocks)  # Initialize to all blocks
+        doms[entry] = {entry}  # Entry block dominates itself
+
+        changed = True
+        while changed:
+            changed = False
+            for block in blocks:
+                if block == entry:
+                    continue
+                new_doms = set(blocks)
+                for pred in self.predecessors.get(block, []):
+                    new_doms &= doms[pred]
+                new_doms.add(block)
+                if new_doms != doms[block]:
+                    doms[block] = new_doms
+                    changed = True
+        return doms
+    
+    @cached_property
+    def dominator_tree(self):
+        """Compute the dominator tree for the CFG."""
+        idoms: dict[ir.Block, ir.Block] = {}
+        doms = self.dominators
+        for b in doms:
+            if b == self.entry:
+                continue
+            idom_candidates = doms[b] - {b}
+            idom = None
+            for candidate in idom_candidates:
+                if all((other == candidate or other not in doms[b]) for other in idom_candidates):
+                    idom = candidate
+                    break
+            if idom is not None:
+                idoms[b] = idom
+        return idoms
 
     # graph interface
     def get_neighbors(self, node: ir.Block) -> Iterable[ir.Block]:
