@@ -107,6 +107,19 @@ class CFG(Printable):
             if idom is not None:
                 idoms[b] = idom
         return idoms
+    
+    def get_nearest_common_dominator(self, block1: ir.Block, block2: ir.Block) -> ir.Block | None:
+        """Get the nearest common dominator of two blocks."""
+        doms1 = self.dominators.get(block1, set())
+        doms2 = self.dominators.get(block2, set())
+        common_doms = doms1 & doms2
+        if not common_doms:
+            return None
+        # Find the nearest common dominator
+        for dom in common_doms:
+            if all((other == dom or dom not in self.dominators[other]) for other in common_doms):
+                return dom
+        return None 
 
     # graph interface
     def get_neighbors(self, node: ir.Block) -> Iterable[ir.Block]:
