@@ -87,11 +87,11 @@ class TypeInfer(MethodTable):
     ):
         body_frame, ret = interp_.call(
             stmt,
-            types.MethodType,
+            types.TypeofMethodType,
             *tuple(arg.type for arg in stmt.body.blocks[0].args[1:]),
         )
         argtypes = tuple(arg.type for arg in stmt.body.blocks[0].args[1:])
-        ret = types.MethodType[[*argtypes], ret]
+        ret = types.TypeofMethodType[[*argtypes], ret]
         frame.entries.update(body_frame.entries)  # pass results back to upper frame
         self_ = stmt.body.blocks[0].args[0]
         frame.set(self_, ret)

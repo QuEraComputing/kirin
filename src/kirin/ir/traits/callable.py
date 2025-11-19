@@ -8,7 +8,7 @@ from kirin.ir.traits.abc import StmtTrait
 
 if TYPE_CHECKING:
     from kirin.ir import Method, Region, Statement
-    from kirin.dialects.func.attrs import Signature
+    from kirin.types import FunctionType
 
 StmtType = TypeVar("StmtType", bound="Statement")
 
@@ -19,6 +19,10 @@ class CallableStmtInterface(StmtTrait, ABC, Generic[StmtType]):
 
     A callable statement is a statement that can be called as a function.
     """
+
+    @classmethod
+    @abstractmethod
+    def get_signature(cls, stmt: StmtType) -> FunctionType: ...
 
     @classmethod
     @abstractmethod
@@ -47,22 +51,22 @@ class HasSignature(StmtTrait, ABC):
 
     @classmethod
     def get_signature(cls, stmt: "Statement"):
-        signature: Signature | None = stmt.attributes.get("signature")  # type: ignore
+        signature: FunctionType | None = stmt.attributes.get("signature")  # type: ignore
         if signature is None:
             raise ValueError(f"Statement {stmt.name} does not have a function type")
 
         return signature
 
     @classmethod
-    def set_signature(cls, stmt: "Statement", signature: "Signature"):
+    def set_signature(cls, stmt: "Statement", signature: "FunctionType"):
         stmt.attributes["signature"] = signature
 
     def verify(self, node: "Statement"):
-        from kirin.dialects.func.attrs import Signature
+        from kirin.types import FunctionType
 
         signature = self.get_signature(node)
-        if not isinstance(signature, Signature):
-            raise ValueError(f"{signature} is not a Signature attribute")
+        if not isinstance(signature, FunctionType):
+            raise ValueError(f"{signature} is not a FunctionType attribute")
 
 
 class StaticCall(StmtTrait, ABC, Generic[StmtType]):

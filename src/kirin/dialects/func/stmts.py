@@ -7,11 +7,15 @@ from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
 
-from .attrs import Signature, MethodType
 from ._dialect import dialect
 
 
 class FuncOpCallableInterface(ir.CallableStmtInterface["Function"]):
+
+    @classmethod
+    def get_signature(cls, stmt: "Function") -> types.FunctionType:
+        params_types = [arg.type for arg in stmt.body.blocks[0].args[1:]]
+        return types.FunctionType(tuple(params_types), stmt.return_type)
 
     @classmethod
     def get_callable_region(cls, stmt: "Function") -> ir.Region:
@@ -44,7 +48,6 @@ class Function(ir.Statement):
         {
             ir.IsolatedFromAbove(),
             ir.SymbolOpInterface(),
-            ir.HasSignature(),
             FuncOpCallableInterface(),
             ir.HasCFG(),
             ir.SSACFG(),
@@ -54,11 +57,11 @@ class Function(ir.Statement):
     """The symbol name of the function."""
     slots: tuple[str, ...] = info.attribute(default=())
     """The argument names of the function."""
-    signature: Signature = info.attribute()
-    """The signature of the function at declaration."""
+    return_type: types.TypeAttribute = info.attribute()
+    """The return type of the function."""
     body: ir.Region = info.region(multi=True)
     """The body of the function."""
-    result: ir.ResultValue = info.result(MethodType)
+    result: ir.ResultValue = info.result(types.MethodType)
     """The result of the function."""
 
     def print_impl(self, printer: Printer) -> None:
@@ -76,8 +79,9 @@ class Function(ir.Statement):
                 printer.plain_print(" : ")
                 printer.print(pair[1])
 
+        params_type = [arg.type for arg in self.body.blocks[0].args[1:]]
         printer.print_seq(
-            zip(self.slots, self.signature.inputs),
+            zip(self.slots, params_type),
             emit=print_arg,
             prefix="(",
             suffix=")",
@@ -86,7 +90,7 @@ class Function(ir.Statement):
 
         with printer.rich(style="comment"):
             printer.plain_print(" -> ")
-            printer.print(self.signature.output)
+            printer.print(self.return_type)
             printer.plain_print(" ")
 
         printer.print(self.body)
@@ -101,7 +105,6 @@ class Lambda(ir.Statement):
     traits = frozenset(
         {
             ir.Pure(),
-            ir.HasSignature(),
             ir.SymbolOpInterface(),
             FuncOpCallableInterface(),
             ir.HasCFG(),
@@ -111,11 +114,11 @@ class Lambda(ir.Statement):
     sym_name: str = info.attribute()
     slots: tuple[str, ...] = info.attribute(default=())
     """The argument names of the function."""
-    signature: Signature = info.attribute()
-    """The signature of the function at declaration."""
+    return_type: types.TypeAttribute = info.attribute()
+    """The return type of the function."""
     captured: tuple[ir.SSAValue, ...] = info.argument()
     body: ir.Region = info.region(multi=True)
-    result: ir.ResultValue = info.result(MethodType)
+    result: ir.ResultValue = info.result(types.MethodType)
 
     def check(self) -> None:
         assert self.body.blocks, "lambda body must not be empty"
@@ -130,9 +133,27 @@ class Lambda(ir.Statement):
 
         printer.print_seq(self.captured, prefix="(", suffix=")", delim=", ")
 
+        def print_arg(pair: tuple[str, types.TypeAttribute]):
+            with printer.rich(style="symbol"):
+                printer.plain_print(pair[0])
+            with printer.rich(style="black"):
+                printer.plain_print(" : ")
+                printer.print(pair[1])
+
         with printer.rich(style="bright_black"):
-            printer.plain_print(" -> ")
-            printer.print(self.signature.output)
+            printer.plain_print(" -> (")
+            params_type = [arg.type for arg in self.body.blocks[0].args[1:]]
+            printer.print_seq(
+                zip(self.slots, params_type),
+                emit=print_arg,
+                prefix="(",
+                suffix=")",
+                delim=", ",
+            )
+            printer.plain_print(" ")
+            printer.plain_print("-> ")
+            printer.print(self.return_type)
+            printer.plain_print(")")
 
         printer.plain_print(" ")
         printer.print(self.body)
@@ -145,7 +166,7 @@ class Lambda(ir.Statement):
 class GetField(ir.Statement):
     name = "getfield"
     traits = frozenset({ir.Pure()})
-    obj: ir.SSAValue = info.argument(MethodType)
+    obj: ir.SSAValue = info.argument(types.MethodType)
     field: int = info.attribute()
     # NOTE: mypy somehow doesn't understand default init=False
     result: ir.ResultValue = info.result(init=False)

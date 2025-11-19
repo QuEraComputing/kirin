@@ -35,7 +35,7 @@ class Constant(ir.Statement, Generic[T]):
     def __init__(self, value: T | ir.Data[T]) -> None:
         if isinstance(value, ir.Method):
             value = ir.PyAttr(
-                value, pytype=types.MethodType[list(value.arg_types), value.return_type]
+                value, pytype=types.TypeofMethodType[list(value.arg_types), value.return_type]
             )
         elif not isinstance(value, ir.Data):
             value = ir.PyAttr(value)

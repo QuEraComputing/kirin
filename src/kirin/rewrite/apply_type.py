@@ -43,7 +43,7 @@ class ApplyType(RewriteRule):
                 and isinstance(
                     output_ := self.results.get(node._results[0]), types.Generic
                 )
-                and output_.is_subseteq(types.MethodType)
+                and output_.is_subseteq(types.TypeofMethodType)
             ):
                 output_ = output_.vars[1]
                 trait.set_signature(node, Signature(inputs, output_))
