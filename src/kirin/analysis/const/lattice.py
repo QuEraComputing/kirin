@@ -275,6 +275,12 @@ class Predecessor(Result):
 
     def __hash__(self) -> int:
         return id(self)
+    
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Predecessor):
+            return self.block.is_structurally_equal(other.block) and self.value == other.value
+        else:
+            return False
 
     def is_subseteq(self, other: Result) -> bool:
         if isinstance(other, Predecessor):
@@ -313,6 +319,17 @@ class Predecessor(Result):
 class Union(Result):
 
     predecessors: frozenset[Predecessor]
+    
+    def __hash__(self) -> int:
+        return id(self)
+    
+    def is_subseteq(self, other: Result) -> bool:
+        if isinstance(other, Union):
+            return self.predecessors.issubset(other.predecessors)
+        elif isinstance(other, Predecessor):
+            return all(pred.is_subseteq(other) for pred in self.predecessors)
+        else:
+            return super().is_subseteq(other)
 
     def join(self, other: Result) -> Result:
         if isinstance(other, Union):
@@ -321,6 +338,8 @@ class Union(Result):
         elif isinstance(other, Predecessor):
             union_preds = self.predecessors.union({other})
             return Union(predecessors=union_preds)
+        else:
+            return Unknown()
     
     def meet(self, other: Result) -> Result:
         if isinstance(other, Union):
@@ -329,4 +348,6 @@ class Union(Result):
         elif isinstance(other, Predecessor):
             common_preds = self.predecessors.intersection({other})
             return Union(predecessors=common_preds)
+        else:
+            return self.bottom()
 

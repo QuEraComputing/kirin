@@ -30,4 +30,5 @@ def test_worklist_bfs():
     # test.print()
     prop = const.Propagate(basic_no_opt)
     frame, ret = prop.run(test)
+    frame.code.print(analysis=frame.entries)
     assert isinstance(ret, const.PartialLambda)
