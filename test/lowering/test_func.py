@@ -42,7 +42,10 @@ def test_recursive_func():
     assert isinstance(stmt.callee, ir.BlockArgument)
     print(stmt.callee.type)
     assert stmt.callee.type.is_subseteq(types.MethodType)
+
+
 test_recursive_func()
+
 
 def test_invalid_func_call():
 

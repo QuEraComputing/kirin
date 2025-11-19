@@ -715,6 +715,7 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         out.vararg = vararg
         return out
 
+
 @typing.final
 @dataclass(eq=False)
 class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
@@ -747,10 +748,7 @@ class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def __getitem__(
         self,
-        typ: (
-            tuple[list[TypeAttribute], TypeAttribute]
-            | tuple[list[TypeAttribute]]
-        ),
+        typ: tuple[list[TypeAttribute], TypeAttribute] | tuple[list[TypeAttribute]],
     ) -> "FunctionType":
         if isinstance(typ, tuple) and len(typ) == 2:
             return FunctionType(tuple(typ[0]), typ[1])
@@ -758,7 +756,6 @@ class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
             return FunctionType(tuple(typ[0]))
         else:
             raise TypeError("Invalid type arguments for TypeofMethodType")
-
 
 
 @typing.final
@@ -872,7 +869,6 @@ class FunctionType(TypeAttribute):
         params_type = deserializer.deserialize_tuple(serUnit.data["params_type"])
         return_type = deserializer.deserialize(serUnit.data["return_type"])
         return FunctionType(params_type, return_type)
-
 
 
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:

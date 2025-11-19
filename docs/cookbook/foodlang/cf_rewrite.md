@@ -132,7 +132,7 @@ def food(self):
 
         if fold:
             fold_pass(mt)
-        
+
         if hungry:
             Walk(NewFoodAndNap()).rewrite(mt.code)
 

@@ -86,7 +86,7 @@ class Foldl(ir.Statement):
     traits = frozenset({ir.MaybePure(), lowering.FromPythonCall()})
     purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(types.MethodType[[OutElemT, ElemT], OutElemT])
-    
+
     collection: ir.SSAValue = info.argument(IListType[ElemT])
     init: ir.SSAValue = info.argument(OutElemT)
     result: ir.ResultValue = info.result(OutElemT)

@@ -1,7 +1,16 @@
 from dataclasses import dataclass
 
 from .abc import Attribute
-from .types import Union, Generic, Literal, PyClass, TypeVar, TypeAttribute, FunctionType, TypeofMethodType
+from .types import (
+    Union,
+    Generic,
+    Literal,
+    PyClass,
+    TypeVar,
+    FunctionType,
+    TypeAttribute,
+    TypeofMethodType,
+)
 
 @dataclass
 class _TypeAttribute(Attribute):

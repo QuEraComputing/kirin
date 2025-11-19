@@ -4,6 +4,7 @@
 from enum import Enum
 from typing import ClassVar
 from dataclasses import dataclass
+
 from qulacs import QuantumState
 
 
@@ -27,7 +28,7 @@ class Basis(Enum):
 
 # [section]
 from kirin import ir, types, lowering
-from kirin.decl import statement, info
+from kirin.decl import info, statement
 from kirin.prelude import basic
 
 # our language definitions and compiler begins
@@ -161,8 +162,9 @@ main.print()
 # we need to implement the runtime for the quantum circuit
 # let's just import qulacs a quantum circuit simulator
 
+from qulacs import QuantumState, gate
+
 from kirin import interp
-from qulacs import gate, QuantumState
 
 
 @dialect.register

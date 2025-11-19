@@ -16,8 +16,8 @@ from kirin.types import (
     TypeVar,
     NoneType,
     BottomType,
-    TypeAttribute,
     MethodType,
+    TypeAttribute,
 )
 
 

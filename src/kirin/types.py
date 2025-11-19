@@ -2,7 +2,6 @@
 
 import numbers
 
-from kirin.ir.method import Method
 from kirin.ir.attrs.types import (
     Union as Union,
     Vararg as Vararg,
@@ -12,9 +11,9 @@ from kirin.ir.attrs.types import (
     PyClass as PyClass,
     TypeVar as TypeVar,
     BottomType as BottomType,
+    FunctionType as FunctionType,
     TypeAttribute as TypeAttribute,
     TypeofMethodType as TypeofMethodType,
-    FunctionType as FunctionType,
     hint2type as hint2type,
     is_tuple_of as is_tuple_of,
 )
