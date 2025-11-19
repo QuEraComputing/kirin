@@ -12,10 +12,6 @@ if TYPE_CHECKING:
 
 from ._dialect import dialect
 
-# TypeofMethodType = types.PyClass[Method]
-# MethodType = types.Generic(
-#     Method, types.TypeVar("Params", types.Tuple), types.TypeVar("Ret")
-# )
 TypeLatticeElem = TypeVar("TypeLatticeElem", bound="types.TypeAttribute")
 
 
