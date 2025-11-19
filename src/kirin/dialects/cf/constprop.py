@@ -10,7 +10,8 @@ class ConstPropMethodTable(MethodTable):
     @impl(Branch)
     def branch(self, interp: const.Propagate, frame: const.Frame, stmt: Branch):
         interp.state.current_frame.worklist.append(
-            Successor(stmt.successor, *frame.get_values(stmt.arguments))
+            Successor(stmt.successor, *(const.Predecessor(stmt.parent_block, arg) 
+                                        for arg in frame.get_values(stmt.arguments)))
         )
         return ()
 
@@ -25,10 +26,12 @@ class ConstPropMethodTable(MethodTable):
         cond = frame.get(stmt.cond)
         if isinstance(cond, const.Value):
             else_successor = Successor(
-                stmt.else_successor, *frame.get_values(stmt.else_arguments)
+                stmt.else_successor, *(const.Predecessor(stmt.parent_block, arg) 
+                                       for arg in frame.get_values(stmt.else_arguments))
             )
             then_successor = Successor(
-                stmt.then_successor, *frame.get_values(stmt.then_arguments)
+                stmt.then_successor, *(const.Predecessor(stmt.parent_block, arg) 
+                                       for arg in frame.get_values(stmt.then_arguments))
             )
             if cond.data:
                 frame.worklist.append(then_successor)
@@ -37,13 +40,15 @@ class ConstPropMethodTable(MethodTable):
         else:
             frame.entries[stmt.cond] = const.Value(True)
             then_successor = Successor(
-                stmt.then_successor, *frame.get_values(stmt.then_arguments)
+                stmt.then_successor, *(const.Predecessor(stmt.parent_block, arg) 
+                                       for arg in frame.get_values(stmt.then_arguments))
             )
             frame.worklist.append(then_successor)
 
             frame.entries[stmt.cond] = const.Value(False)
             else_successor = Successor(
-                stmt.else_successor, *frame.get_values(stmt.else_arguments)
+                stmt.else_successor, *(const.Predecessor(stmt.parent_block, arg) 
+                                       for arg in frame.get_values(stmt.else_arguments))
             )
             frame.worklist.append(else_successor)
 

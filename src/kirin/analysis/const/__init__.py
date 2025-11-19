@@ -13,6 +13,8 @@ from .lattice import (
     Value as Value,
     Bottom as Bottom,
     Result as Result,
+    Union as Union,
+    Predecessor as Predecessor,
     Unknown as Unknown,
     PartialConst as PartialConst,
     PartialTuple as PartialTuple,

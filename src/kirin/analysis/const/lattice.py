@@ -264,3 +264,69 @@ class PartialLambda(PartialConst):
                 for x, y in zip(self.captured, other.captured)
             )
         )
+
+@final
+@dataclass
+class Predecessor(Result):
+    """Predecessor block in CFG."""
+
+    block: ir.Block
+    value: Result
+
+    def __hash__(self) -> int:
+        return id(self)
+
+    def is_subseteq(self, other: Result) -> bool:
+        if isinstance(other, Predecessor):
+            return self.value.is_subseteq(other.value)
+        else:
+            return self.value.is_subseteq(other)
+    
+    def join(self, other: Result) -> Result:
+        if isinstance(other, Predecessor):
+            if self.is_subseteq(other):
+                return other.value
+            elif other.is_subseteq(self):
+                return self.value
+            else:
+                return Union(predecessors=frozenset({self, other}))
+        elif isinstance(other, Union):
+            return other.join(self)
+        else:
+            return self.value.join(other)
+                
+    def meet(self, other: Result) -> Result:
+        if isinstance(other, Predecessor):
+            if self.is_subseteq(other):
+                return self.value
+            elif other.is_subseteq(self):
+                return other.value
+            else:
+                return self.bottom()
+        elif isinstance(other, Union):
+            return other.meet(self)
+        else:
+            return self.value.meet(other)
+
+@final
+@dataclass
+class Union(Result):
+
+    predecessors: frozenset[Predecessor]
+
+    def join(self, other: Result) -> Result:
+        if isinstance(other, Union):
+            union_preds = self.predecessors.union(other.predecessors)
+            return Union(predecessors=union_preds)
+        elif isinstance(other, Predecessor):
+            union_preds = self.predecessors.union({other})
+            return Union(predecessors=union_preds)
+    
+    def meet(self, other: Result) -> Result:
+        if isinstance(other, Union):
+            common_preds = self.predecessors.intersection(other.predecessors)
+            return Union(predecessors=common_preds)
+        elif isinstance(other, Predecessor):
+            common_preds = self.predecessors.intersection({other})
+            return Union(predecessors=common_preds)
+
