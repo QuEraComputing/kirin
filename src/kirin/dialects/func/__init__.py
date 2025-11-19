@@ -5,7 +5,7 @@ from kirin.dialects.func import (
     constprop as constprop,
     typeinfer as typeinfer,
 )
-from kirin.dialects.func.attrs import Signature as Signature, MethodType as MethodType
+from kirin.dialects.func.attrs import Signature as Signature
 from kirin.dialects.func.stmts import (
     Call as Call,
     Invoke as Invoke,

@@ -69,6 +69,13 @@ class TypeResolution:
             )
         elif isinstance(typ, types.Union):
             return types.Union(self.substitute(t) for t in typ.types)
+        elif isinstance(typ, types.FunctionType):
+            return types.FunctionType(
+                params_type=tuple(self.substitute(t) for t in typ.params_type),
+                return_type=self.substitute(typ.return_type)
+                if typ.return_type
+                else None,
+            )
         return typ
 
     def solve(
@@ -94,6 +101,8 @@ class TypeResolution:
             return self.solve_Generic(annot, value)
         elif isinstance(annot, types.Union):
             return self.solve_Union(annot, value)
+        elif isinstance(annot, types.FunctionType):
+            return self.solve_FunctionType(annot, value)
 
         if annot.is_subseteq(value):
             return Ok
@@ -132,6 +141,28 @@ class TypeResolution:
             if not result:
                 return result
         return Ok
+
+    def solve_FunctionType(self, annot: types.FunctionType, value: types.TypeAttribute):
+        if not isinstance(value, types.FunctionType):
+            return ResolutionError(annot, value)
+        
+        for var, val in zip(annot.params_type, value.params_type):
+            result = self.solve(var, val)
+            if not result:
+                return result
+        
+        if not annot.return_type or not value.return_type:
+            return Ok
+        
+        result = self.solve(annot.return_type, value.return_type)
+        if not result:
+            return result
+        
+        return Ok
+    
+
+
+
 
     def solve_Union(self, annot: types.Union, value: types.TypeAttribute):
         for typ in annot.types:

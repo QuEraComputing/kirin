@@ -75,9 +75,7 @@ class Map(ir.Statement):
 class Foldr(ir.Statement):
     traits = frozenset({ir.MaybePure(), lowering.FromPythonCall()})
     purity: bool = info.attribute(default=False)
-    fn: ir.SSAValue = info.argument(
-        types.Generic(ir.Method, [ElemT, OutElemT], OutElemT)
-    )
+    fn: ir.SSAValue = info.argument(types.MethodType[[ElemT, OutElemT], OutElemT])
     collection: ir.SSAValue = info.argument(IListType[ElemT])
     init: ir.SSAValue = info.argument(OutElemT)
     result: ir.ResultValue = info.result(OutElemT)
@@ -87,9 +85,8 @@ class Foldr(ir.Statement):
 class Foldl(ir.Statement):
     traits = frozenset({ir.MaybePure(), lowering.FromPythonCall()})
     purity: bool = info.attribute(default=False)
-    fn: ir.SSAValue = info.argument(
-        types.Generic(ir.Method, [OutElemT, ElemT], OutElemT)
-    )
+    fn: ir.SSAValue = info.argument(types.MethodType[[OutElemT, ElemT], OutElemT])
+    
     collection: ir.SSAValue = info.argument(IListType[ElemT])
     init: ir.SSAValue = info.argument(OutElemT)
     result: ir.ResultValue = info.result(OutElemT)
@@ -104,7 +101,7 @@ class Scan(ir.Statement):
     traits = frozenset({ir.MaybePure(), lowering.FromPythonCall()})
     purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(
-        types.Generic(ir.Method, [OutElemT, ElemT], types.Tuple[OutElemT, ResultT])
+        types.MethodType[[OutElemT, ElemT], types.Tuple[OutElemT, ResultT]]
     )
     collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
     init: ir.SSAValue = info.argument(OutElemT)
@@ -117,7 +114,7 @@ class Scan(ir.Statement):
 class ForEach(ir.Statement):
     traits = frozenset({ir.MaybePure(), lowering.FromPythonCall()})
     purity: bool = info.attribute(default=False)
-    fn: ir.SSAValue = info.argument(types.Generic(ir.Method, [ElemT], types.NoneType))
+    fn: ir.SSAValue = info.argument(types.MethodType[[ElemT], types.NoneType])
     collection: ir.SSAValue = info.argument(IListType[ElemT])
 
 
@@ -141,7 +138,7 @@ class Sorted(ir.Statement):
     purity: bool = info.attribute(default=False)
     collection: ir.SSAValue = info.argument(IListType[ElemT, ListLen])
     key: ir.SSAValue = info.argument(
-        types.Union((types.Generic(ir.Method, [ElemT], ElemT), types.NoneType))
+        types.Union((types.MethodType[[ElemT], ElemT], types.NoneType))
     )
     reverse: ir.SSAValue = info.argument(types.Bool)
     result: ir.ResultValue = info.result(IListType[ElemT, ListLen])

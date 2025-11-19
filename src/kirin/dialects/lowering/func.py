@@ -35,9 +35,7 @@ class Lowering(lowering.FromPythonAST):
         entries: dict[str, ir.SSAValue] = {}
         entr_block = ir.Block()
         fn_self = entr_block.args.append_from(
-            types.Generic(
-                ir.Method, types.Tuple.where(signature.inputs), signature.output
-            ),
+            types.MethodType[list(signature.inputs), signature.output],
             node.name + "_self",
         )
         entries[node.name] = fn_self
