@@ -926,7 +926,6 @@ def hint2type(hint) -> TypeAttribute:
     if origin is None:  # non-generic
         return PyClass(hint)
 
-    body = PyClass(origin)
     args = typing.get_args(hint)
     params = []
     for arg in args:
@@ -934,4 +933,10 @@ def hint2type(hint) -> TypeAttribute:
             params.append([hint2type(elem) for elem in arg])
         else:
             params.append(hint2type(arg))
-    return Generic(body, *params)
+
+    if origin.__name__ == "Method":
+        assert len(params) == 2, "method type hint should be ir.Method[[params], return_type]"
+        return FunctionType(tuple(params[0]), params[1])
+    else:
+        body = PyClass(origin)
+        return Generic(body, *params)

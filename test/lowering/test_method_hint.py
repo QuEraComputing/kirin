@@ -11,6 +11,4 @@ def test_method_type_hint():
 
         return test
 
-    assert main.return_type == types.Generic(
-        ir.Method, [types.Int, types.Int], types.Float
-    )
+    assert main.return_type == types.MethodType[[types.Int, types.Int], types.Float]
