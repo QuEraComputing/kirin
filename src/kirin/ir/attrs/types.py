@@ -716,6 +716,9 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         return out
 
 
+TypeArg: typing.TypeAlias = TypeAttribute | TypeVar
+
+
 @typing.final
 @dataclass(eq=False)
 class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
@@ -748,7 +751,7 @@ class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
 
     def __getitem__(
         self,
-        typ: tuple[list[TypeAttribute], TypeAttribute] | tuple[list[TypeAttribute]],
+        typ: tuple[typing.Sequence[TypeArg], TypeArg] | tuple[typing.Sequence[TypeArg]],
     ) -> "FunctionType":
         if isinstance(typ, tuple) and len(typ) == 2:
             return FunctionType(tuple(typ[0]), typ[1])
@@ -794,10 +797,7 @@ class FunctionType(TypeAttribute):
 
     def __getitem__(
         self,
-        typ: (
-            tuple[tuple[TypeAttribute, ...], TypeAttribute]
-            | tuple[tuple[TypeAttribute, ...]]
-        ),
+        typ: tuple[tuple[TypeArg, ...], TypeArg] | tuple[tuple[TypeArg, ...]],
     ) -> "FunctionType":
         if isinstance(typ, tuple) and len(typ) == 2:
             return self.where(typ[0], typ[1])
