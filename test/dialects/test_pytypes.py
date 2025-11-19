@@ -130,5 +130,3 @@ def test_method_type():
     Var = TypeVar("Var")
     t5 = MethodType[[Int, Var], Bool]
     assert t1.is_subseteq(t5)
-
-
