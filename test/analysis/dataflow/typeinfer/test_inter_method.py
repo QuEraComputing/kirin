@@ -57,4 +57,6 @@ def test_method_constant_type_infer():
     def alloc(n_iter: int):
         return ilist.map(_new, ilist.range(n_iter))
 
+    alloc.print()
     assert alloc.return_type.is_subseteq(ilist.IListType[types.Literal(1), types.Any])
+test_method_constant_type_infer()

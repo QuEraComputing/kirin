@@ -13,6 +13,8 @@ from kirin.ir.attrs.types import (
     TypeVar as TypeVar,
     BottomType as BottomType,
     TypeAttribute as TypeAttribute,
+    TypeofMethodType as TypeofMethodType,
+    FunctionType as FunctionType,
     hint2type as hint2type,
     is_tuple_of as is_tuple_of,
 )
@@ -32,6 +34,4 @@ Tuple = Generic(tuple, Vararg(TypeVar("T")))
 Dict = Generic(dict, TypeVar("K"), TypeVar("V"))
 Set = Generic(set, TypeVar("T"))
 FrozenSet = Generic(frozenset, TypeVar("T"))
-TypeofFunctionType = Generic[type(lambda: None)]
-FunctionType = Generic(type(lambda: None), Tuple, Vararg(Any))
-MethodType = Generic(Method, TypeVar("Params", Tuple), TypeVar("Ret"))
+MethodType = TypeofMethodType()

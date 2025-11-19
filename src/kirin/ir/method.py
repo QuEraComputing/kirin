@@ -25,7 +25,7 @@ from .traits import (
 )
 from .exception import ValidationError
 from .nodes.stmt import Statement
-from .attrs.types import Generic
+from .attrs.types import FunctionType
 
 if typing.TYPE_CHECKING:
     from kirin.ir.group import DialectGroup
@@ -141,7 +141,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
         """Return the type of the self argument of the method."""
         trait = self.code.get_present_trait(HasSignature)
         signature = trait.get_signature(self.code)
-        return Generic(Method, Generic(tuple, *signature.inputs), signature.output)
+        return FunctionType(params_type=signature.inputs, return_type=signature.output)
 
     @property
     def callable_region(self):

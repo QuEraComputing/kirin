@@ -715,6 +715,165 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         out.vararg = vararg
         return out
 
+@typing.final
+@dataclass(eq=False)
+class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
+    name = "TypeofMethodType"
+
+    def __hash__(self) -> int:
+        return hash((TypeofMethodType,))
+
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return isinstance(other, TypeofMethodType)
+
+    def is_subseteq_TypeofMethodType(self, other: "TypeofMethodType") -> bool:
+        return True
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return SerializationUnit(
+            kind="type-attribute",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data=dict(),
+        )
+
+    @classmethod
+    def deserialize(
+        cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> "TypeofMethodType":
+        return TypeofMethodType()
+
+    def __getitem__(
+        self,
+        typ: (
+            tuple[list[TypeAttribute], TypeAttribute]
+            | tuple[list[TypeAttribute]]
+        ),
+    ) -> "FunctionType":
+        if isinstance(typ, tuple) and len(typ) == 2:
+            return FunctionType(tuple(typ[0]), typ[1])
+        elif isinstance(typ, tuple) and len(typ) == 1:
+            return FunctionType(tuple(typ[0]))
+        else:
+            raise TypeError("Invalid type arguments for TypeofMethodType")
+
+
+
+@typing.final
+@dataclass(eq=False)
+class FunctionType(TypeAttribute):
+    name = "MethodType"
+    params_type: tuple[TypeAttribute, ...]
+    return_type: TypeAttribute | None = None
+
+    def __init__(
+        self,
+        params_type: tuple[TypeAttribute, ...],
+        return_type: TypeAttribute | None = None,
+    ):
+        self.params_type = params_type
+        self.return_type = return_type
+
+    def __hash__(self) -> int:
+        return hash((FunctionType, self.params_type, self.return_type))
+
+    def __repr__(self) -> str:
+        params = ", ".join(map(repr, self.params_type))
+        if self.return_type is not None:
+            return f"({params}) -> {repr(self.return_type)}"
+        else:
+            return f"({params}) -> None"
+
+    def print_impl(self, printer: Printer) -> None:
+        printer.plain_print("(")
+        printer.print_seq(self.params_type, delim=", ")
+        printer.plain_print(") -> ")
+        if self.return_type is not None:
+            printer.print(self.return_type)
+        else:
+            printer.plain_print("None")
+
+    def __getitem__(
+        self,
+        typ: (
+            tuple[tuple[TypeAttribute, ...], TypeAttribute]
+            | tuple[tuple[TypeAttribute, ...]]
+        ),
+    ) -> "FunctionType":
+        if isinstance(typ, tuple) and len(typ) == 2:
+            return self.where(typ[0], typ[1])
+        elif isinstance(typ, tuple) and len(typ) == 1:
+            return self.where(typ[0])
+        else:
+            raise TypeError("Invalid type arguments for MethodType")
+
+    def where(
+        self, typ: tuple[TypeAttribute, ...], return_type: TypeAttribute | None = None
+    ) -> "FunctionType":
+        if len(typ) != len(self.params_type):
+            raise TypeError("Number of type arguments does not match")
+        if all(v.is_subseteq(bound) for v, bound in zip(typ, self.params_type)):
+            if return_type is None:
+                return FunctionType(typ, self.return_type)
+            elif self.return_type is not None and return_type.is_subseteq(
+                self.return_type
+            ):
+                return FunctionType(typ, return_type)
+        raise TypeError("Type arguments do not match")
+
+    def is_structurally_equal(
+        self, other: Attribute, context: dict | None = None
+    ) -> bool:
+        return (
+            isinstance(other, FunctionType)
+            and self.params_type == other.params_type
+            and self.return_type == other.return_type
+        )
+
+    def is_subseteq_FunctionType(self, other: "FunctionType") -> bool:
+        if len(self.params_type) != len(other.params_type):
+            return False
+        for s_param, o_param in zip(self.params_type, other.params_type):
+            if not s_param.is_subseteq(o_param):
+                return False
+        if self.return_type is None:
+            return True
+        elif other.return_type is None:
+            return False
+        else:
+            return self.return_type.is_subseteq(other.return_type)
+
+    def is_subseteq_TypeofMethodType(self, other: "TypeofMethodType") -> bool:
+        return True
+
+    def is_subseteq_Union(self, other: Union) -> bool:
+        return any(self.is_subseteq(t) for t in other.types)
+
+    def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
+        return False
+
+    def serialize(self, serializer: "Serializer") -> "SerializationUnit":
+        return SerializationUnit(
+            kind="type-attribute",
+            module_name=self.__module__,
+            class_name=self.__class__.__name__,
+            data={
+                "params_type": serializer.serialize_tuple(self.params_type),
+                "return_type": serializer.serialize(self.return_type),
+            },
+        )
+
+    @classmethod
+    def deserialize(
+        cls, serUnit: "SerializationUnit", deserializer: "Deserializer"
+    ) -> "FunctionType":
+        params_type = deserializer.deserialize_tuple(serUnit.data["params_type"])
+        return_type = deserializer.deserialize(serUnit.data["return_type"])
+        return FunctionType(params_type, return_type)
+
+
 
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:
     "provides the syntax sugar [A, B, C] type Generic(tuple, A, B, C)"
