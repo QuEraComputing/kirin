@@ -935,7 +935,9 @@ def hint2type(hint) -> TypeAttribute:
             params.append(hint2type(arg))
 
     if origin.__name__ == "Method":
-        assert len(params) == 2, "method type hint should be ir.Method[[params], return_type]"
+        assert (
+            len(params) == 2
+        ), "method type hint should be ir.Method[[params], return_type]"
         return FunctionType(tuple(params[0]), params[1])
     else:
         body = PyClass(origin)

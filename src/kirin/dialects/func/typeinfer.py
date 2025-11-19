@@ -3,7 +3,7 @@ from __future__ import annotations
 from kirin import ir, types
 from kirin.interp import Frame, MethodTable, ReturnValue, impl
 from kirin.analysis import const
-from kirin.analysis.typeinfer import TypeInference, TypeResolution
+from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.func.stmts import (
     Call,
     Invoke,
