@@ -39,7 +39,6 @@ def test_recursive_func():
     assert isinstance(code.body.blocks[2].stmts.at(2), func.Call)
     stmt: func.Call = code.body.blocks[2].stmts.at(2)  # type: ignore
     assert isinstance(stmt.callee, ir.BlockArgument)
-    print(stmt.callee.type)
     assert stmt.callee.type.is_subseteq(types.MethodType)
 
 
