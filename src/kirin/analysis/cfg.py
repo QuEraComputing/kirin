@@ -109,7 +109,8 @@ class CFG(Printable):
         return idoms
     
     def get_nearest_common_dominator(self, block1: ir.Block, block2: ir.Block) -> ir.Block | None:
-        """Get the nearest common dominator of two blocks."""
+        """Get the nearest common dominator of two blocks, as defined by
+        the most recent common ancestor in the dominator tree."""
         doms1 = self.dominators.get(block1, set())
         doms2 = self.dominators.get(block2, set())
         common_doms = doms1 & doms2
