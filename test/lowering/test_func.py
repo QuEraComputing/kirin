@@ -33,7 +33,6 @@ def test_recursive_func():
         return recursive(n - 1)
 
     code = lower.python_function(recursive)
-    code.print()
     assert isinstance(code, func.Function)
     assert len(code.body.blocks) == 3
     assert isinstance(code.body.blocks[0].last_stmt, cf.ConditionalBranch)
@@ -42,9 +41,6 @@ def test_recursive_func():
     assert isinstance(stmt.callee, ir.BlockArgument)
     print(stmt.callee.type)
     assert stmt.callee.type.is_subseteq(types.MethodType)
-
-
-test_recursive_func()
 
 
 def test_invalid_func_call():
