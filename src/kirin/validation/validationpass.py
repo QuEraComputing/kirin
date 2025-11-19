@@ -54,13 +54,15 @@ class ValidationSuite:
     Caches analysis results to avoid redundant computation when multiple
     validation passes depend on the same underlying analysis.
 
+    fail_fast: If True, stops at the first validation pass that fails.
+
     Example:
         suite = ValidationSuite([
             NoCloningValidation,
             AnotherValidation,
         ])
         result = suite.validate(my_kernel)
-        print(result.format_errors())
+        result.raise_if_invalid()
     """
 
     passes: list[type[ValidationPass]] = field(default_factory=list)
@@ -154,7 +156,7 @@ class ValidationResult:
         """Get the analysis frame for a specific pass."""
         return self.frames.get(pass_name)
 
-    def format_errors(self) -> str:
+    def _format_errors(self) -> str:
         """Format all errors with their pass names."""
         if self.is_valid:
             return "\n\033[32mAll validation passes succeeded\033[0m"
@@ -177,5 +179,10 @@ class ValidationResult:
     def raise_if_invalid(self):
         """Raise an exception if validation failed."""
         if not self.is_valid:
-            first_errors = next(iter(self.errors.values()))
-            raise first_errors[0]
+            exceptions = []
+            for pass_name, pass_errors in self.errors.items():
+                for err in pass_errors:
+                    exceptions.append(err)
+
+            message = self._format_errors()
+            raise ExceptionGroup(message, exceptions)
