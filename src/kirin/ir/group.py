@@ -24,7 +24,7 @@ from kirin.ir.traits import SymbolTable, SymbolOpInterface
 from kirin.ir.exception import CompilerError, ValidationError
 
 if TYPE_CHECKING:
-    from kirin.ir import Dialect, Statement
+    from kirin.ir import Method, Dialect, Statement
     from kirin.lowering import Python
     from kirin.registry import Registry
     from kirin.serialization.base.serializer import Serializer
@@ -329,6 +329,22 @@ class DialectGroup(Generic[PassParams]):
 
         deserializer = Deserializer(dialect_group=self)
         return deserializer.decode(encoded)
+
+    def encode_json(self, program: Method) -> str:
+        from kirin.serialization.jsonserializer import JSONSerializer
+
+        encoded_module = self.encode(program)
+        json_serializer = JSONSerializer()
+        json_str = json_serializer.encode(encoded_module)
+        return json_str
+
+    def decode_json(self, json_str: str) -> Method:
+        from kirin.serialization.jsonserializer import JSONSerializer
+
+        json_serializer = JSONSerializer()
+        decoded_module = json_serializer.decode(json_str)
+        program = self.decode(decoded_module)
+        return program
 
 
 def dialect_group(
