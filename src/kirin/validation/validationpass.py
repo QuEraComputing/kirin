@@ -3,7 +3,7 @@ from typing import Any, Generic, TypeVar
 from dataclasses import field, dataclass
 
 from kirin import ir
-from kirin.ir.exception import ValidationError
+from kirin.ir.exception import ValidationError, ValidationErrorGroup
 
 T = TypeVar("T")
 
@@ -180,9 +180,8 @@ class ValidationResult:
         """Raise an exception if validation failed."""
         if not self.is_valid:
             exceptions = []
-            for pass_name, pass_errors in self.errors.items():
-                for err in pass_errors:
-                    exceptions.append(err)
+            for _, pass_errors in self.errors.items():
+                exceptions.extend(pass_errors)
 
             message = self._format_errors()
-            raise ExceptionGroup(message, exceptions)
+            raise ValidationErrorGroup(message, errors=exceptions)
