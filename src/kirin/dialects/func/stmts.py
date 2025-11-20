@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from types import MethodType as ClassMethodType, FunctionType
+from types import MethodType as PyClassMethodType, FunctionType as PyFunctionType
 from typing import TypeVar
 
 from kirin import ir, types
 from kirin.decl import info, statement
 from kirin.print.printer import Printer
 
-from .attrs import Signature, MethodType
+from .attrs import Signature
 from ._dialect import dialect
 
 
@@ -58,7 +58,7 @@ class Function(ir.Statement):
     """The signature of the function at declaration."""
     body: ir.Region = info.region(multi=True)
     """The body of the function."""
-    result: ir.ResultValue = info.result(MethodType)
+    result: ir.ResultValue = info.result(types.MethodType)
     """The result of the function."""
 
     def print_impl(self, printer: Printer) -> None:
@@ -115,7 +115,7 @@ class Lambda(ir.Statement):
     """The signature of the function at declaration."""
     captured: tuple[ir.SSAValue, ...] = info.argument()
     body: ir.Region = info.region(multi=True)
-    result: ir.ResultValue = info.result(MethodType)
+    result: ir.ResultValue = info.result(types.MethodType)
 
     def check(self) -> None:
         assert self.body.blocks, "lambda body must not be empty"
@@ -145,7 +145,7 @@ class Lambda(ir.Statement):
 class GetField(ir.Statement):
     name = "getfield"
     traits = frozenset({ir.Pure()})
-    obj: ir.SSAValue = info.argument(MethodType)
+    obj: ir.SSAValue = info.argument(types.MethodType)
     field: int = info.attribute()
     # NOTE: mypy somehow doesn't understand default init=False
     result: ir.ResultValue = info.result(init=False)
@@ -249,7 +249,7 @@ class Call(ir.Statement):
 
     def check_type(self) -> None:
         if not self.callee.type.is_subseteq(types.MethodType):
-            if self.callee.type.is_subseteq(types.PyClass(FunctionType)):
+            if self.callee.type.is_subseteq(types.PyClass(PyFunctionType)):
                 raise ir.TypeCheckError(
                     self,
                     f"callee must be a method type, got {self.callee.type}",
@@ -257,7 +257,7 @@ class Call(ir.Statement):
                     "consider decorating it with kernel decorator",
                 )
 
-            if self.callee.type.is_subseteq(types.PyClass(ClassMethodType)):
+            if self.callee.type.is_subseteq(types.PyClass(PyClassMethodType)):
                 raise ir.TypeCheckError(
                     self,
                     "callee must be a method type, got class method",

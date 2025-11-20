@@ -1,7 +1,16 @@
 from dataclasses import dataclass
 
 from .abc import Attribute
-from .types import Union, Generic, Literal, PyClass, TypeVar, TypeAttribute
+from .types import (
+    Union,
+    Generic,
+    Literal,
+    PyClass,
+    TypeVar,
+    FunctionType,
+    TypeAttribute,
+    TypeofMethodType,
+)
 
 @dataclass
 class _TypeAttribute(Attribute):
@@ -11,3 +20,5 @@ class _TypeAttribute(Attribute):
     def is_subseteq_PyClass(self, other: PyClass) -> bool: ...
     def is_subseteq_Generic(self, other: Generic) -> bool: ...
     def is_subseteq_fallback(self, other: TypeAttribute) -> bool: ...
+    def is_subseteq_TypeofMethodType(self, other: TypeofMethodType) -> bool: ...
+    def is_subseteq_FunctionType(self, other: FunctionType) -> bool: ...

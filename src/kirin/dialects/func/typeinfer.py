@@ -3,7 +3,7 @@ from __future__ import annotations
 from kirin import ir, types
 from kirin.interp import Frame, MethodTable, ReturnValue, impl
 from kirin.analysis import const
-from kirin.analysis.typeinfer import TypeInference, TypeResolution
+from kirin.analysis.typeinfer import TypeInference
 from kirin.dialects.func.stmts import (
     Call,
     Invoke,
@@ -54,20 +54,11 @@ class TypeInfer(MethodTable):
 
     def _solve_method_type(self, interp: TypeInference, frame: Frame, stmt: Call):
         mt_inferred = frame.get(stmt.callee)
-        if not isinstance(mt_inferred, types.Generic):
+
+        if not isinstance(mt_inferred, types.FunctionType):
             return (types.Bottom,)
 
-        if len(mt_inferred.vars) != 2:
-            return (types.Bottom,)
-        args = mt_inferred.vars[0]
-        result = mt_inferred.vars[1]
-        if not args.is_subseteq(types.Tuple):
-            return (types.Bottom,)
-
-        resolve = TypeResolution()
-        # NOTE: we are not using [...] below to be compatible with 3.10
-        resolve.solve(args, types.Tuple.where(frame.get_values(stmt.inputs)))
-        return (resolve.substitute(result),)
+        return (mt_inferred.return_type,)
 
     @impl(Invoke)
     def invoke(self, interp_: TypeInference, frame: Frame, stmt: Invoke):

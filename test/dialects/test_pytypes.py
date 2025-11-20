@@ -16,6 +16,7 @@ from kirin.types import (
     TypeVar,
     NoneType,
     BottomType,
+    MethodType,
     TypeAttribute,
 )
 
@@ -112,3 +113,20 @@ def test_generic_topbottom():
     assert t.meet(TypeAttribute.bottom()).is_subseteq(TypeAttribute.bottom())
     assert t.join(TypeAttribute.top()).is_structurally_equal(TypeAttribute.top())
     assert t.meet(TypeAttribute.top()).is_structurally_equal(t)
+
+
+def test_method_type():
+    t1 = MethodType[[Int, Float], Bool]
+    t2 = MethodType[[Int, Float], Bool]
+
+    assert t1.is_subseteq(t2)
+
+    t3 = MethodType[[Int, Float], AnyType()]
+    assert t1.is_subseteq(t3)
+
+    t4 = MethodType[[Int, Float], String]
+    assert not t1.is_subseteq(t4)
+
+    Var = TypeVar("Var")
+    t5 = MethodType[[Int, Var], Bool]
+    assert t1.is_subseteq(t5)
