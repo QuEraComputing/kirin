@@ -33,7 +33,7 @@
 <span class=normal>273</span>
 <span class=normal>274</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>check_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>callee</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>MethodType</span><span class=p>):</span>
-        <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>callee</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>PyClass</span><span class=p>(</span><span class=n>FunctionType</span><span class=p>)):</span>
+        <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>callee</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>PyClass</span><span class=p>(</span><span class=n>PyFunctionType</span><span class=p>)):</span>
             <span class=k>raise</span> <span class=n>ir</span><span class=o>.</span><span class=n>TypeCheckError</span><span class=p>(</span>
                 <span class=bp>self</span><span class=p>,</span>
                 <span class=sa>f</span><span class=s2>&quot;callee must be a method type, got </span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>callee</span><span class=o>.</span><span class=n>type</span><span class=si>}</span><span class=s2>&quot;</span><span class=p>,</span>
@@ -41,7 +41,7 @@
                 <span class=s2>&quot;consider decorating it with kernel decorator&quot;</span><span class=p>,</span>
             <span class=p>)</span>
 
-        <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>callee</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>PyClass</span><span class=p>(</span><span class=n>ClassMethodType</span><span class=p>)):</span>
+        <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>callee</span><span class=o>.</span><span class=n>type</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>PyClass</span><span class=p>(</span><span class=n>PyClassMethodType</span><span class=p>)):</span>
             <span class=k>raise</span> <span class=n>ir</span><span class=o>.</span><span class=n>TypeCheckError</span><span class=p>(</span>
                 <span class=bp>self</span><span class=p>,</span>
                 <span class=s2>&quot;callee must be a method type, got class method&quot;</span><span class=p>,</span>
