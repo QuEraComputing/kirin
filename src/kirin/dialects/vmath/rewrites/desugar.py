@@ -21,7 +21,11 @@ class DesugarBinOp(RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         match node:
             case BinOp():
-                if (
+                if node.lhs.type.is_subseteq(types.Bottom) or node.rhs.type.is_subseteq(
+                    types.Bottom
+                ):
+                    return RewriteResult()
+                elif (
                     node.lhs.type.is_subseteq(types.Number)
                     and node.rhs.type.is_subseteq(IListType)
                 ) or (
