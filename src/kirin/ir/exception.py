@@ -80,3 +80,11 @@ class DefiniteValidationError(ValidationError):
     """Indicates a definite violation that will occur at runtime."""
 
     pass
+
+
+class ValidationErrorGroup(BaseException):
+    """Container for multiple validation errors (Python 3.10+ compatible)."""
+
+    def __init__(self, message: str, errors: list[ValidationError]) -> None:
+        super().__init__(message)
+        self.errors = errors
