@@ -1,5 +1,9 @@
+use crate::data::TraitInfoGenerateFrom;
+
 use super::{Context, FromStructFields, GenerateFrom, KirinAttribute, TraitInfo};
+
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 
 pub enum StructTrait<'input, T: TraitInfo<'input>> {
     Wrapper(WrapperStruct<'input, T>),
@@ -16,9 +20,27 @@ impl<'input, T: TraitInfo<'input>> StructTrait<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for StructTrait<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StructTrait::Wrapper(data) => f
+                .debug_tuple("StructTrait::Wrapper")
+                .field(data)
+                .finish(),
+            StructTrait::Regular(data) => f
+                .debug_tuple("StructTrait::Regular")
+                .field(data)
+                .finish(),
+        }
+    }
+}
+
 impl<'input, T> GenerateFrom<'input, StructTrait<'input, T>> for T
 where
-    T: TraitInfo<'input>,
+    T: TraitInfoGenerateFrom<'input>,
 {
     fn generate_from(&self, data: &StructTrait<'input, T>) -> TokenStream {
         match data {
@@ -46,6 +68,17 @@ impl<'input, T: TraitInfo<'input>> RegularStruct<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for RegularStruct<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegularStruct")
+            .field("fields", &self.fields)
+            .finish()
+    }
+}
+
 pub enum WrapperStruct<'input, T: TraitInfo<'input>> {
     Named(NamedWrapperStruct<'input, T>),
     Unnamed(UnnamedWrapperStruct<'input, T>),
@@ -68,9 +101,24 @@ impl<'input, T: TraitInfo<'input>> WrapperStruct<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for WrapperStruct<'input, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WrapperStruct::Named(data) => f
+                .debug_tuple("WrapperStruct::Named")
+                .field(data)
+                .finish(),
+            WrapperStruct::Unnamed(data) => f
+                .debug_tuple("WrapperStruct::Unnamed")
+                .field(data)
+                .finish(),
+        }
+    }
+}
+
 impl<'input, T> GenerateFrom<'input, WrapperStruct<'input, T>> for T
 where
-    T: TraitInfo<'input>,
+    T: TraitInfoGenerateFrom<'input>,
 {
     fn generate_from(&self, data: &WrapperStruct<'input, T>) -> TokenStream {
         match data {
@@ -114,6 +162,15 @@ impl<'input, T: TraitInfo<'input>> NamedWrapperStruct<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for NamedWrapperStruct<'input, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NamedWrapperStruct")
+            .field("wraps", &self.wraps)
+            .field("wraps_type", &self.wraps_type.to_token_stream())
+            .finish()
+    }
+}
+
 pub struct UnnamedWrapperStruct<'input, T: TraitInfo<'input>> {
     pub ctx: &'input Context<'input, T>,
     pub wraps: usize,
@@ -146,5 +203,14 @@ impl<'input, T: TraitInfo<'input>> UnnamedWrapperStruct<'input, T> {
         } else {
             None
         }
+    }
+}
+
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for UnnamedWrapperStruct<'input, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UnnamedWrapperStruct")
+            .field("wraps", &self.wraps)
+            .field("wraps_type", &self.wraps_type.to_token_stream())
+            .finish()
     }
 }

@@ -1,4 +1,7 @@
+use quote::ToTokens;
 use proc_macro2::TokenStream;
+
+use crate::data::TraitInfoGenerateFrom;
 
 use super::{Context, FromVariantFields, GenerateFrom, KirinAttribute, TraitInfo};
 
@@ -26,9 +29,31 @@ impl<'input, T: TraitInfo<'input>> EnumTrait<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for EnumTrait<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EnumTrait::Wrapper(data) => f
+                .debug_tuple("EnumTrait::Wrapper")
+                .field(data)
+                .finish(),
+            EnumTrait::Either(data) => f
+                .debug_tuple("EnumTrait::Either")
+                .field(data)
+                .finish(),
+            EnumTrait::Regular(data) => f
+                .debug_tuple("EnumTrait::Regular")
+                .field(data)
+                .finish(),
+        }
+    }
+}
+
 impl<'input, T> GenerateFrom<'input, EnumTrait<'input, T>> for T
 where
-    T: TraitInfo<'input>,
+    T: TraitInfoGenerateFrom<'input>,
 {
     fn generate_from(&self, data: &EnumTrait<'input, T>) -> TokenStream {
         match data {
@@ -59,6 +84,17 @@ impl<'input, T: TraitInfo<'input>> WrapperEnum<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for WrapperEnum<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WrapperEnum")
+            .field("variants", &self.variants)
+            .finish()
+    }
+}
+
 /// An enum that contains only regular instruction definitions.
 pub struct RegularEnum<'input, T: TraitInfo<'input>> {
     pub ctx: &'input Context<'input, T>,
@@ -73,6 +109,17 @@ impl<'input, T: TraitInfo<'input>> RegularEnum<'input, T> {
             .map(|variant| RegularVariant::from_fields(ctx, variant, &variant.fields))
             .collect();
         Self { ctx, variants }
+    }
+}
+
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for RegularEnum<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegularEnum")
+            .field("variants", &self.variants)
+            .finish()
     }
 }
 
@@ -93,6 +140,17 @@ impl<'input, T: TraitInfo<'input>> EitherEnum<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for EitherEnum<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EitherEnum")
+            .field("variants", &self.variants)
+            .finish()
+    }
+}
+
 pub enum WrapperOrRegularVariant<'input, T: TraitInfo<'input>> {
     Wrapper(WrapperVariant<'input, T>),
     Regular(RegularVariant<'input, T>),
@@ -101,14 +159,44 @@ pub enum WrapperOrRegularVariant<'input, T: TraitInfo<'input>> {
 impl<'input, T: TraitInfo<'input>> WrapperOrRegularVariant<'input, T> {
     /// Creates a new `EitherWrapperOrRegular` from the given variant.
     pub fn from_variant(ctx: &'input Context<'input, T>, variant: &'input syn::Variant) -> Self {
-        if let Some(wrapper) = WrapperVariant::try_from_variant(ctx, variant) {
-            WrapperOrRegularVariant::Wrapper(wrapper)
+        if KirinAttribute::from_attrs(&variant.attrs).wraps {
+            if let Some(wrapper) = WrapperVariant::try_from_variant(ctx, variant) {
+                return WrapperOrRegularVariant::Wrapper(wrapper);
+            } else {
+                panic!("Variant marked as wrapper but could not be parsed as one");
+            }
+        } else if variant.fields.iter().any(|field| {
+            KirinAttribute::from_field_attrs(&field.attrs).wraps
+        }) {
+            if let Some(wrapper) = WrapperVariant::try_from_variant(ctx, variant) {
+                return WrapperOrRegularVariant::Wrapper(wrapper);
+            } else {
+                panic!("Variant has a field marked as wrapper but could not be parsed as one");
+            }
         } else {
-            WrapperOrRegularVariant::Regular(RegularVariant::from_fields(
+            return WrapperOrRegularVariant::Regular(RegularVariant::from_fields(
                 ctx,
                 variant,
                 &variant.fields,
-            ))
+            ));
+        }
+    }
+}
+
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for WrapperOrRegularVariant<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WrapperOrRegularVariant::Wrapper(data) => f
+                .debug_tuple("WrapperOrRegularVariant::Wrapper")
+                .field(data)
+                .finish(),
+            WrapperOrRegularVariant::Regular(data) => f
+                .debug_tuple("WrapperOrRegularVariant::Regular")
+                .field(data)
+                .finish(),
         }
     }
 }
@@ -132,6 +220,24 @@ impl<'input, T: TraitInfo<'input>> WrapperVariant<'input, T> {
                 UnnamedWrapperVariant::try_from_fields(ctx, &variant, fields)?,
             )),
             _ => None,
+        }
+    }
+}
+
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for WrapperVariant<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WrapperVariant::Named(data) => f
+                .debug_tuple("WrapperVariant::Named")
+                .field(data)
+                .finish(),
+            WrapperVariant::Unnamed(data) => f
+                .debug_tuple("WrapperVariant::Unnamed")
+                .field(data)
+                .finish(),
         }
     }
 }
@@ -174,6 +280,19 @@ impl<'input, T: TraitInfo<'input>> NamedWrapperVariant<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for NamedWrapperVariant<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NamedWrapperVariant")
+            .field("variant_name", &self.variant_name)
+            .field("wraps", &self.wraps)
+            .field("wraps_type", &self.wraps_type.to_token_stream())
+            .finish()
+    }
+}
+
 pub struct UnnamedWrapperVariant<'input, T: TraitInfo<'input>> {
     pub ctx: &'input Context<'input, T>,
     pub variant_name: &'input syn::Ident,
@@ -212,6 +331,19 @@ impl<'input, T: TraitInfo<'input>> UnnamedWrapperVariant<'input, T> {
     }
 }
 
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for UnnamedWrapperVariant<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UnnamedWrapperVariant")
+            .field("variant_name", &self.variant_name)
+            .field("wraps", &self.wraps)
+            .field("wraps_type", &self.wraps_type.to_token_stream())
+            .finish()
+    }
+}
+
 pub struct RegularVariant<'input, T: TraitInfo<'input>> {
     pub ctx: &'input Context<'input, T>,
     pub variant_name: &'input syn::Ident,
@@ -229,5 +361,17 @@ impl<'input, T: TraitInfo<'input>> RegularVariant<'input, T> {
             variant_name: &parent.ident,
             matching_fields: T::MatchingFields::from_variant_fields(ctx, parent, fields),
         }
+    }
+}
+
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for RegularVariant<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegularVariant")
+            .field("variant_name", &self.variant_name)
+            .field("matching_fields", &self.matching_fields)
+            .finish()
     }
 }

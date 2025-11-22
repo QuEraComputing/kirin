@@ -1,0 +1,14 @@
+---
+source: crates/kirin-derive-core/src/from.rs
+expression: generate(input)
+---
+impl<T> From<A> for WrapperEnum<T> {
+    fn from(v: A) -> Self {
+        Self::Variant1(v)
+    }
+}
+impl<T> From<B> for WrapperEnum<T> {
+    fn from(v: B) -> Self {
+        Self::Variant2 { field: v }
+    }
+}

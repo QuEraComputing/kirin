@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use kirin_derive_core::prelude::*;
+use kirin_derive_core::{derive_from, prelude::*};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::parse_macro_input;
@@ -19,6 +19,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
     let is_terminator = derive_check!(&ast, is_terminator, IsTerminator);
     let is_constant = derive_check!(&ast, is_constant, IsConstant);
     let is_pure = derive_check!(&ast, is_pure, IsPure);
+    let from = derive_from!(&ast);
 
     let name = &ast.ident;
     let lifetime = syn::Lifetime::new("'a", Span::call_site());
@@ -54,6 +55,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
         #is_terminator
         #is_constant
         #is_pure
+        #from
 
         impl #trait_impl_generics #trait_path<#lifetime> for #name #input_ty_generics #input_where_clause {} // Use the extracted name here
     };

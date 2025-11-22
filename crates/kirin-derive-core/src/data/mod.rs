@@ -1,13 +1,12 @@
 use proc_macro2::TokenStream;
 
-pub trait TraitInfo<'input>:
-    Sized
-    + GenerateFrom<'input, RegularStruct<'input, Self>>
-    + GenerateFrom<'input, UnnamedWrapperStruct<'input, Self>>
-    + GenerateFrom<'input, NamedWrapperStruct<'input, Self>>
-    + GenerateFrom<'input, RegularEnum<'input, Self>>
-    + GenerateFrom<'input, WrapperEnum<'input, Self>>
-    + GenerateFrom<'input, EitherEnum<'input, Self>>
+pub trait TraitInfo<'input>: Sized
+// + GenerateFrom<'input, RegularStruct<'input, Self>>
+// + GenerateFrom<'input, UnnamedWrapperStruct<'input, Self>>
+// + GenerateFrom<'input, NamedWrapperStruct<'input, Self>>
+// + GenerateFrom<'input, RegularEnum<'input, Self>>
+// + GenerateFrom<'input, WrapperEnum<'input, Self>>
+// + GenerateFrom<'input, EitherEnum<'input, Self>>
 where
     Self: 'input,
 {
@@ -21,6 +20,28 @@ where
     fn trait_generics(&self) -> &syn::Generics;
     /// Method name for the trait being derived
     fn method_name(&self) -> &syn::Ident;
+}
+
+trait TraitInfoGenerateFrom<'input>:
+    TraitInfo<'input>
+    + GenerateFrom<'input, RegularStruct<'input, Self>>
+    + GenerateFrom<'input, UnnamedWrapperStruct<'input, Self>>
+    + GenerateFrom<'input, NamedWrapperStruct<'input, Self>>
+    + GenerateFrom<'input, RegularEnum<'input, Self>>
+    + GenerateFrom<'input, WrapperEnum<'input, Self>>
+    + GenerateFrom<'input, EitherEnum<'input, Self>>
+{
+}
+
+impl<'input, T> TraitInfoGenerateFrom<'input> for T where
+    T: TraitInfo<'input>
+        + GenerateFrom<'input, RegularStruct<'input, T>>
+        + GenerateFrom<'input, UnnamedWrapperStruct<'input, T>>
+        + GenerateFrom<'input, NamedWrapperStruct<'input, T>>
+        + GenerateFrom<'input, RegularEnum<'input, T>>
+        + GenerateFrom<'input, WrapperEnum<'input, T>>
+        + GenerateFrom<'input, EitherEnum<'input, T>>
+{
 }
 
 // pub struct CheckerTraitInfo {
@@ -165,11 +186,17 @@ impl KirinAttribute {
 
 /// some global context for the derive
 pub struct Context<'input, T: TraitInfo<'input>> {
+    /// information about the trait being derived
     pub trait_info: T,
+    /// reference to the input type being derived
     pub input: &'input syn::DeriveInput,
+    /// Global attribute data for the trait being derived
     pub data: T::GlobalAttributeData,
+    /// Attributes parsed from #[kirin(...)]
     pub kirin_attr: KirinAttribute,
+    /// combined generics from both the input type and the trait being derived
     pub generics: syn::Generics,
+    /// absolute path to the trait being derived
     pub absolute_trait_path: syn::Path,
 }
 
@@ -260,6 +287,7 @@ mod struct_impl;
 pub use enum_impl::*;
 pub use struct_impl::*;
 
+/// Represents either a struct or an enum
 pub enum DataTrait<'input, T: TraitInfo<'input>> {
     Struct(struct_impl::StructTrait<'input, T>),
     Enum(enum_impl::EnumTrait<'input, T>),
@@ -271,6 +299,18 @@ impl<'input, T: TraitInfo<'input>> DataTrait<'input, T> {
             syn::Data::Struct(data) => DataTrait::Struct(struct_impl::StructTrait::new(ctx, data)),
             syn::Data::Enum(data) => DataTrait::Enum(enum_impl::EnumTrait::new(ctx, data)),
             _ => panic!("only structs and enums are supported"),
+        }
+    }
+}
+
+impl<'input, T: TraitInfo<'input>> std::fmt::Debug for DataTrait<'input, T>
+where
+    T::MatchingFields: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataTrait::Struct(data) => f.debug_tuple("DataTrait::Struct").field(data).finish(),
+            DataTrait::Enum(data) => f.debug_tuple("DataTrait::Enum").field(data).finish(),
         }
     }
 }
