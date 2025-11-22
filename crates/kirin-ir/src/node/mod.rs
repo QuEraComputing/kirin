@@ -13,8 +13,7 @@ pub use function::{
     StagedFunction, StagedFunctionInfo,
 };
 pub use linked_list::{LinkedList, LinkedListNode};
-pub use module::{Module, SpecializedModule};
 pub use region::{Region, RegionInfo};
 pub use ssa::{BlockArgument, ResultValue, SSAInfo, SSAKind, SSAValue, TestSSAValue};
-pub use stmt::{StatementInfo, StatementRef};
+pub use stmt::{StatementInfo, StatementId};
 pub use symbol::Symbol;

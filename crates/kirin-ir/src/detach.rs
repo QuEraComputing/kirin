@@ -1,4 +1,4 @@
-use crate::node::{Block, StatementRef};
+use crate::node::{Block, StatementId};
 use crate::query::{Info, LinkedListElem, LinkedListInfo, ParentInfo};
 use crate::{Arena, Language};
 
@@ -58,5 +58,5 @@ macro_rules! impl_detach {
     };
 }
 
-impl_detach!(StatementRef);
+impl_detach!(StatementId);
 impl_detach!(Block);

@@ -1,6 +1,8 @@
-pub trait CompileTimeValue: Clone + std::fmt::Debug + std::hash::Hash + PartialEq {}
+use crate::Language;
 
-impl CompileTimeValue for i32 {}
-impl CompileTimeValue for i64 {}
-impl CompileTimeValue for u32 {}
-impl CompileTimeValue for u64 {}
+pub trait CompileTimeValue: Clone + std::fmt::Debug + std::hash::Hash + PartialEq {
+}
+
+pub trait Typeof<L: Language> {
+    fn type_of(&self) -> L::Type;
+}

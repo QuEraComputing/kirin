@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use crate::{language::Language};
+use crate::{Symbol, language::Language};
 
-use super::{block::Block, stmt::StatementRef};
+use super::{block::Block, stmt::StatementId};
 
 /// Represents a general SSA value that can be either
 /// a value produced by a statement or an argument to a block.
@@ -11,22 +11,29 @@ use super::{block::Block, stmt::StatementRef};
 /// `ResultValue` or `BlockArgument` instead.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SSAValue(usize);
+pub struct SSAValue(pub(crate) usize);
+
+impl SSAValue {
+    /// Get the underlying ID of the SSA value.
+    pub fn id(&self) -> usize {
+        self.0
+    }
+}
 
 /// Represents a value produced by a statement.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ResultValue(usize);
+pub struct ResultValue(pub(crate) usize);
 
 /// Represents an argument to a block.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BlockArgument(usize);
+pub struct BlockArgument(pub(crate) usize);
 
 /// Represents a deleted SSA value. Used as a placeholder.
 /// This points to the original SSA value's ID.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct DeletedSSAValue(usize);
+pub struct DeletedSSAValue(pub(crate) usize);
 
 /// Represents a test SSA value. Used in tests only.
 /// This SSAValue may not exist in the SSA database.
@@ -37,26 +44,64 @@ pub struct TestSSAValue(pub usize);
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SSAInfo<L: Language> {
-    id: SSAValue,
-    name: Option<String>,
-    ty: L::Type,
-    kind: SSAKind,
-    uses: HashSet<Use>,
+    pub(crate) id: SSAValue,
+    pub(crate) name: Option<Symbol>,
+    pub(crate) ty: L::Type,
+    pub(crate) kind: SSAKind,
+    pub(crate) uses: HashSet<Use>,
+}
+
+impl<L: Language> SSAInfo<L> {
+    pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::Type, kind: SSAKind) -> Self {
+        Self {
+            id,
+            name,
+            ty,
+            kind,
+            uses: HashSet::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Use {
-    stmt: StatementRef,
+    stmt: StatementId,
     operand_index: usize,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SSAKind {
-    Result(StatementRef),
-    BlockArgument(Block),
+    Result(StatementId, usize),
+    BlockArgument(Block, usize),
     Deleted,
+    // should not appear in final SSA IR
+    /// A placeholder for builders to update the Block information later.
+    /// It holds the index of the argument in the block's argument list.
+    BuilderBlockArgument(usize),
+    /// A placeholder for builders to update the Result information later when building the statement.
+    /// It holds the index of the result in the statement's result list.
+    BuilderResult(usize),
+    /// A placeholder for tests to create SSA values that do not exist in the SSA database.
     Test,
+}
+
+impl From<&SSAValue> for SSAValue {
+    fn from(ssa: &SSAValue) -> Self {
+        SSAValue(ssa.0)
+    }
+}
+
+impl From<SSAValue> for ResultValue {
+    fn from(ssa: SSAValue) -> Self {
+        ResultValue(ssa.0)
+    }
+}
+
+impl From<SSAValue> for BlockArgument {
+    fn from(ssa: SSAValue) -> Self {
+        BlockArgument(ssa.0)
+    }
 }
 
 impl From<ResultValue> for SSAValue {

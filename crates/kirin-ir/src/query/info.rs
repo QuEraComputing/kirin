@@ -1,8 +1,8 @@
 use crate::{
-    Arena, Language, LinkedList,
+    Arena, Language, LinkedList, SSAInfo, SSAValue,
     node::{
         Block, BlockInfo, LinkedListNode, Region, RegionInfo, SpecializedFunction,
-        SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo, StatementInfo, StatementRef,
+        SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo, StatementId, StatementInfo,
     },
 };
 
@@ -72,7 +72,7 @@ pub trait LinkedListInfo {
 }
 
 impl<L: Language> LinkedListInfo for BlockInfo<L> {
-    type Ptr = StatementRef;
+    type Ptr = StatementId;
     fn get_linked_list(&self) -> &LinkedList<Self::Ptr> {
         &self.statements
     }
@@ -119,7 +119,7 @@ pub trait LinkedListElem<L: Language> {
 }
 
 impl<L: Language> LinkedListElem<L> for StatementInfo<L> {
-    type Ptr = StatementRef;
+    type Ptr = StatementId;
     fn get_node(&self) -> &LinkedListNode<Self::Ptr> {
         &self.node
     }
@@ -143,33 +143,58 @@ impl<L: Language> LinkedListElem<L> for BlockInfo<L> {
 pub trait Info<L: Language> {
     type InfoType;
     /// Get a reference to the context info for the given node pointer.
-    fn get_info<'a>(&self, ctx: &'a Arena<L>) -> Option<&'a Self::InfoType>;
+    fn get_info<'a>(&self, arena: &'a Arena<L>) -> Option<&'a Self::InfoType>;
     /// Get a mutable reference to the context info for the given node pointer.
-    fn get_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType>;
+    fn get_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType>;
     /// Get a reference to the context info for the given node pointer, panicking if not found.
-    fn expect_info<'a>(&self, ctx: &'a Arena<L>) -> &'a Self::InfoType;
+    fn expect_info<'a>(&self, arena: &'a Arena<L>) -> &'a Self::InfoType;
     /// Get a mutable reference to the context info for the given node pointer, panicking if not found.
-    fn expect_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> &'a mut Self::InfoType;
+    fn expect_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> &'a mut Self::InfoType;
 }
 
-impl<L: Language> Info<L> for StatementRef {
+impl<T, L: Language> Info<L> for T
+where
+    T: Into<SSAValue> + Copy,
+{
+    type InfoType = SSAInfo<L>;
+    fn get_info<'a>(&self, arena: &'a Arena<L>) -> Option<&'a Self::InfoType> {
+        let ssa_value: SSAValue = (*self).into();
+        arena.ssas.get(ssa_value.id())
+    }
+    fn get_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
+        let ssa_value: SSAValue = (*self).into();
+        arena.ssas.get_mut(ssa_value.id())
+    }
+    fn expect_info<'a>(&self, arena: &'a Arena<L>) -> &'a Self::InfoType {
+        let ssa_value: SSAValue = (*self).into();
+        self.get_info(arena)
+            .expect(format!("SSAInfo not found for SSAValue id {}", ssa_value.id()).as_str())
+    }
+    fn expect_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> &'a mut Self::InfoType {
+        let ssa_value: SSAValue = (*self).into();
+        self.get_info_mut(arena)
+            .expect(format!("SSAInfo not found for SSAValue id {}", ssa_value.id()).as_str())
+    }
+}
+
+impl<L: Language> Info<L> for StatementId {
     type InfoType = StatementInfo<L>;
 
-    fn get_info<'a>(&self, ctx: &'a Arena<L>) -> Option<&'a Self::InfoType> {
-        ctx.statements.get(self.id())
+    fn get_info<'a>(&self, arena: &'a Arena<L>) -> Option<&'a Self::InfoType> {
+        arena.statements.get(self.id())
     }
 
-    fn get_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
-        ctx.statements.get_mut(self.id())
+    fn get_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
+        arena.statements.get_mut(self.id())
     }
 
-    fn expect_info<'a>(&self, ctx: &'a Arena<L>) -> &'a Self::InfoType {
-        self.get_info(ctx)
+    fn expect_info<'a>(&self, arena: &'a Arena<L>) -> &'a Self::InfoType {
+        self.get_info(arena)
             .expect(format!("StatementInfo not found for Statement id {}", self.id()).as_str())
     }
 
-    fn expect_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> &'a mut Self::InfoType {
-        self.get_info_mut(ctx)
+    fn expect_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> &'a mut Self::InfoType {
+        self.get_info_mut(arena)
             .expect(format!("StatementInfo not found for Statement id {}", self.id()).as_str())
     }
 }
@@ -177,21 +202,21 @@ impl<L: Language> Info<L> for StatementRef {
 impl<L: Language> Info<L> for Block {
     type InfoType = BlockInfo<L>;
 
-    fn get_info<'a>(&self, ctx: &'a Arena<L>) -> Option<&'a Self::InfoType> {
-        ctx.blocks.get(self.id())
+    fn get_info<'a>(&self, arena: &'a Arena<L>) -> Option<&'a Self::InfoType> {
+        arena.blocks.get(self.id())
     }
 
-    fn get_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
-        ctx.blocks.get_mut(self.id())
+    fn get_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
+        arena.blocks.get_mut(self.id())
     }
 
-    fn expect_info<'a>(&self, ctx: &'a Arena<L>) -> &'a Self::InfoType {
-        self.get_info(ctx)
+    fn expect_info<'a>(&self, arena: &'a Arena<L>) -> &'a Self::InfoType {
+        self.get_info(arena)
             .expect(format!("BlockInfo not found for Block id {}", self.id()).as_str())
     }
 
-    fn expect_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> &'a mut Self::InfoType {
-        self.get_info_mut(ctx)
+    fn expect_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> &'a mut Self::InfoType {
+        self.get_info_mut(arena)
             .expect(format!("BlockInfo not found for Block id {}", self.id()).as_str())
     }
 }
@@ -199,21 +224,21 @@ impl<L: Language> Info<L> for Block {
 impl<L: Language> Info<L> for Region {
     type InfoType = RegionInfo<L>;
 
-    fn get_info<'a>(&self, ctx: &'a Arena<L>) -> Option<&'a Self::InfoType> {
-        ctx.regions.get(self.id())
+    fn get_info<'a>(&self, arena: &'a Arena<L>) -> Option<&'a Self::InfoType> {
+        arena.regions.get(self.id())
     }
 
-    fn get_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
-        ctx.regions.get_mut(self.id())
+    fn get_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
+        arena.regions.get_mut(self.id())
     }
 
-    fn expect_info<'a>(&self, ctx: &'a Arena<L>) -> &'a Self::InfoType {
-        self.get_info(ctx)
+    fn expect_info<'a>(&self, arena: &'a Arena<L>) -> &'a Self::InfoType {
+        self.get_info(arena)
             .expect(format!("RegionInfo not found for Region id {}", self.id()).as_str())
     }
 
-    fn expect_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> &'a mut Self::InfoType {
-        self.get_info_mut(ctx)
+    fn expect_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> &'a mut Self::InfoType {
+        self.get_info_mut(arena)
             .expect(format!("RegionInfo not found for Region id {}", self.id()).as_str())
     }
 }
@@ -221,16 +246,16 @@ impl<L: Language> Info<L> for Region {
 impl<L: Language> Info<L> for StagedFunction {
     type InfoType = StagedFunctionInfo<L>;
 
-    fn get_info<'a>(&self, ctx: &'a Arena<L>) -> Option<&'a Self::InfoType> {
-        ctx.staged_functions.get(self.id())
+    fn get_info<'a>(&self, arena: &'a Arena<L>) -> Option<&'a Self::InfoType> {
+        arena.staged_functions.get(self.id())
     }
 
-    fn get_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
-        ctx.staged_functions.get_mut(self.id())
+    fn get_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
+        arena.staged_functions.get_mut(self.id())
     }
 
-    fn expect_info<'a>(&self, ctx: &'a Arena<L>) -> &'a Self::InfoType {
-        self.get_info(ctx).expect(
+    fn expect_info<'a>(&self, arena: &'a Arena<L>) -> &'a Self::InfoType {
+        self.get_info(arena).expect(
             format!(
                 "StagedFunctionInfo not found for StagedFunction id {}",
                 self.id()
@@ -239,8 +264,8 @@ impl<L: Language> Info<L> for StagedFunction {
         )
     }
 
-    fn expect_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> &'a mut Self::InfoType {
-        self.get_info_mut(ctx).expect(
+    fn expect_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> &'a mut Self::InfoType {
+        self.get_info_mut(arena).expect(
             format!(
                 "StagedFunctionInfo not found for StagedFunction id {}",
                 self.id()
@@ -253,22 +278,22 @@ impl<L: Language> Info<L> for StagedFunction {
 impl<L: Language> Info<L> for SpecializedFunction {
     type InfoType = SpecializedFunctionInfo<L>;
 
-    fn get_info<'a>(&self, ctx: &'a Arena<L>) -> Option<&'a Self::InfoType> {
+    fn get_info<'a>(&self, arena: &'a Arena<L>) -> Option<&'a Self::InfoType> {
         let (staged_fn, spec_idx) = self.id();
         staged_fn
-            .get_info(ctx)
+            .get_info(arena)
             .and_then(|f| f.specializations().get(spec_idx))
     }
 
-    fn get_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
+    fn get_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> Option<&'a mut Self::InfoType> {
         let (staged_fn, spec_idx) = self.id();
         staged_fn
-            .get_info_mut(ctx)
+            .get_info_mut(arena)
             .and_then(|f| f.specializations_mut().get_mut(spec_idx))
     }
 
-    fn expect_info<'a>(&self, ctx: &'a Arena<L>) -> &'a Self::InfoType {
-        self.get_info(ctx).expect(
+    fn expect_info<'a>(&self, arena: &'a Arena<L>) -> &'a Self::InfoType {
+        self.get_info(arena).expect(
             format!(
                 "SpecializedFunctionInfo not found for SpecializedFunction id {:?}",
                 self.id()
@@ -277,8 +302,8 @@ impl<L: Language> Info<L> for SpecializedFunction {
         )
     }
 
-    fn expect_info_mut<'a>(&self, ctx: &'a mut Arena<L>) -> &'a mut Self::InfoType {
-        self.get_info_mut(ctx).expect(
+    fn expect_info_mut<'a>(&self, arena: &'a mut Arena<L>) -> &'a mut Self::InfoType {
+        self.get_info_mut(arena).expect(
             format!(
                 "SpecializedFunctionInfo not found for SpecializedFunction id {:?}",
                 self.id()

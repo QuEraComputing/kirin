@@ -1,5 +1,5 @@
-use super::stmt::StatementRef;
 use super::block::Block;
+use super::stmt::StatementId;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -9,8 +9,18 @@ pub struct LinkedListNode<Ptr: Copy + PartialEq> {
     pub prev: Option<Ptr>,
 }
 
-impl From<LinkedListNode<StatementRef>> for StatementRef {
-    fn from(value: LinkedListNode<StatementRef>) -> Self {
+impl<Ptr: Copy + PartialEq> LinkedListNode<Ptr> {
+    pub fn new(ptr: Ptr) -> Self {
+        LinkedListNode {
+            ptr,
+            next: None,
+            prev: None,
+        }
+    }
+}
+
+impl From<LinkedListNode<StatementId>> for StatementId {
+    fn from(value: LinkedListNode<StatementId>) -> Self {
         value.ptr
     }
 }
@@ -47,5 +57,11 @@ impl<Ptr: Copy + PartialEq> LinkedList<Ptr> {
 
     pub fn len(&self) -> usize {
         self.len
+    }
+}
+
+impl<Ptr: Copy + PartialEq> Default for LinkedList<Ptr> {
+    fn default() -> Self {
+        Self::new()
     }
 }

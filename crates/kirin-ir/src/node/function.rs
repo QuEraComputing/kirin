@@ -1,16 +1,19 @@
 use std::collections::HashMap;
 
-use crate::Lattice;
 use crate::language::Language;
+use crate::{Lattice, StatementId};
 
-use super::region::Region;
 use super::symbol::Symbol;
 
 /// A unique identifier for a compilation stage.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct CompileStage(usize);
+pub struct CompileStage(pub(crate) usize);
 
 impl CompileStage {
+    pub fn new(stage: usize) -> Self {
+        CompileStage(stage)
+    }
+
     pub fn id(&self) -> usize {
         self.0
     }
@@ -18,7 +21,7 @@ impl CompileStage {
 
 /// A unique identifier for a function.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct Function(usize);
+pub struct Function(pub(crate) usize);
 
 impl Function {
     pub fn id(&self) -> usize {
@@ -28,7 +31,7 @@ impl Function {
 
 /// A unique identifier for a staged function.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct StagedFunction(usize);
+pub struct StagedFunction(pub(crate) usize);
 
 impl StagedFunction {
     pub fn id(&self) -> usize {
@@ -38,7 +41,7 @@ impl StagedFunction {
 
 /// A specialized version of a function, identified by its function ID and specialization ID.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct SpecializedFunction(usize, usize);
+pub struct SpecializedFunction(pub(crate) usize, pub(crate) usize);
 
 impl SpecializedFunction {
     pub fn id(&self) -> (StagedFunction, usize) {
@@ -50,6 +53,7 @@ impl SpecializedFunction {
 #[derive(Clone, Debug)]
 pub struct FunctionInfo {
     id: Function,
+    name: Option<Symbol>,
     /// compiled versions of the function at different stages.
     ///
     /// note that compile stages may not be sequential,
@@ -65,6 +69,18 @@ pub struct FunctionInfo {
 }
 
 impl FunctionInfo {
+    pub fn new(id: Function, name: Option<Symbol>) -> Self {
+        Self {
+            id,
+            name,
+            staged_functions: HashMap::new(),
+        }
+    }
+
+    pub fn name(&self) -> Option<&Symbol> {
+        self.name.as_ref()
+    }
+
     pub fn staged_functions(&self) -> &HashMap<CompileStage, StagedFunction> {
         &self.staged_functions
     }
@@ -76,17 +92,17 @@ impl FunctionInfo {
 
 #[derive(Clone, Debug)]
 pub struct StagedFunctionInfo<L: Language> {
-    id: StagedFunction,
-    name: Option<Symbol>,
-    signature: Signature<L>,
-    return_type: L::Type,
-    specializations: Vec<SpecializedFunctionInfo<L>>,
+    pub(crate) id: StagedFunction,
+    pub(crate) name: Option<Symbol>,
+    pub(crate) signature: Signature<L>,
+    pub(crate) return_type: L::Type,
+    pub(crate) specializations: Vec<SpecializedFunctionInfo<L>>,
     /// Functions that call this staged function (used for inter-procedural analyses).
     /// note that the call statement must refer to the `StagedFunction` ID,
     /// if it refers to a `SpecializedFunction`, it should be recorded in the
     /// `backedges` field of `SpecializedFunctionInfo`.
     /// thus the `backedges` field of `SpecializedFunctionInfo` is always a superset of this field.
-    backedges: Vec<StagedFunction>,
+    pub(crate) backedges: Vec<StagedFunction>,
 }
 
 impl<L: Language> StagedFunctionInfo<L> {
@@ -147,9 +163,34 @@ pub struct SpecializedFunctionInfo<L: Language> {
     id: SpecializedFunction,
     signature: Signature<L>,
     return_type: L::Type,
-    body: Region,
+    body: StatementId,
     /// Functions that call this function (used for inter-procedural analyses).
     backedges: Vec<SpecializedFunction>,
+}
+
+#[bon::bon]
+impl<L: Language> SpecializedFunctionInfo<L> {
+    #[builder(finish_fn = new)]
+    pub fn new(
+        /// The unique identifier for this specialized function.
+        id: SpecializedFunction,
+        /// The signature of this specialized function.
+        signature: Signature<L>,
+        /// The return type of this specialized function.
+        return_type: L::Type,
+        /// The body of this specialized function.
+        body: StatementId,
+        /// The functions that call this specialized function.
+        backedges: Option<Vec<SpecializedFunction>>,
+    ) -> Self {
+        Self {
+            id,
+            signature,
+            return_type,
+            body,
+            backedges: backedges.unwrap_or_default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -202,11 +243,11 @@ impl<L: Language> From<SpecializedFunctionInfo<L>> for SpecializedFunction {
 }
 
 impl<L: Language> SpecializedFunctionInfo<L> {
-    pub fn body(&self) -> &Region {
+    pub fn body(&self) -> &StatementId {
         &self.body
     }
 
-    pub fn body_mut(&mut self) -> &mut Region {
+    pub fn body_mut(&mut self) -> &mut StatementId {
         &mut self.body
     }
 
@@ -220,5 +261,45 @@ impl<L: Language> SpecializedFunctionInfo<L> {
 
     pub fn backedges(&self) -> &Vec<SpecializedFunction> {
         &self.backedges
+    }
+}
+
+impl<L: Language> Lattice for Signature<L> {
+    fn join(&self, other: &Self) -> Self {
+        if self.0.len() != other.0.len() {
+            panic!("Cannot join signatures of different lengths");
+        }
+        let types = self
+            .0
+            .iter()
+            .zip(other.0.iter())
+            .map(|(a, b)| a.join(b))
+            .collect();
+        Signature(types)
+    }
+
+    fn meet(&self, other: &Self) -> Self {
+        if self.0.len() != other.0.len() {
+            panic!("Cannot meet signatures of different lengths");
+        }
+        let types = self
+            .0
+            .iter()
+            .zip(other.0.iter())
+            .map(|(a, b)| a.meet(b))
+            .collect();
+        Signature(types)
+    }
+
+    fn is_subseteq(&self, other: &Self) -> bool {
+        if self.0.len() != other.0.len() {
+            return false;
+        }
+        for (a, b) in self.0.iter().zip(other.0.iter()) {
+            if !a.is_subseteq(b) {
+                return false;
+            }
+        }
+        true
     }
 }
