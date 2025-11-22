@@ -2,21 +2,25 @@
 source: crates/kirin-derive-core/src/field.rs
 expression: generate(input)
 ---
-impl<'a> kirin_ir::HasArguments<'a> for TestEnum {
+impl<'a> ::kirin::ir::HasArguments<'a> for TestEnum {
     type Iter = TestEnumArgumentsIter<'a>;
     fn arguments(&'a self) -> Self::Iter {
         match self {
-            TestEnum::VariantA => TestEnumArgumentsIter::VariantA(std::iter::empty()),
-            TestEnum::VariantB => TestEnumArgumentsIter::VariantB(std::iter::empty()),
+            TestEnum::VariantA => {
+                TestEnumArgumentsIter::VariantA(std::iter::empty::<&'a ::kirin::ir::SSAValue>())
+            }
+            TestEnum::VariantB => {
+                TestEnumArgumentsIter::VariantB(std::iter::empty::<&'a ::kirin::ir::SSAValue>())
+            }
         }
     }
 }
 pub enum TestEnumArgumentsIter<'a> {
-    VariantA(std::iter::Empty<()>),
-    VariantB(std::iter::Empty<()>),
+    VariantA(std::iter::Empty<&'a ::kirin::ir::SSAValue>),
+    VariantB(std::iter::Empty<&'a ::kirin::ir::SSAValue>),
 }
 impl<'a> Iterator for TestEnumArgumentsIter<'a> {
-    type Item = &'a kirin_ir::SSAValue;
+    type Item = &'a ::kirin::ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             TestEnumArgumentsIter::VariantA(iter) => iter.next(),

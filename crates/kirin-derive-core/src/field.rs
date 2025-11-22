@@ -62,8 +62,11 @@ impl AccessorTraitInfo {
 impl<'input> TraitInfo<'input> for AccessorTraitInfo {
     type GlobalAttributeData = ();
     type MatchingFields = MatchingFields;
-    fn trait_path(&self) -> &syn::Path {
+    fn relative_trait_path(&self) -> &syn::Path {
         &self.trait_path
+    }
+    fn default_crate_path(&self) -> syn::Path {
+        syn::parse_quote! { ::kirin::ir }
     }
     fn trait_generics(&self) -> &syn::Generics {
         &self.generics
@@ -86,10 +89,10 @@ impl MatchingFields {
     ) -> Self {
         match fields {
             syn::Fields::Named(named) => {
-                MatchingFields::Named(NamedMatchingFields::new(&ctx.trait_info, &named))
+                MatchingFields::Named(NamedMatchingFields::new(ctx, &named))
             }
             syn::Fields::Unnamed(unnamed) => {
-                MatchingFields::Unnamed(UnnamedMatchingFields::new(&ctx.trait_info, &unnamed))
+                MatchingFields::Unnamed(UnnamedMatchingFields::new(ctx, &unnamed))
             }
             syn::Fields::Unit => MatchingFields::Unit,
         }
@@ -123,14 +126,14 @@ pub struct NamedMatchingFields {
 }
 
 impl NamedMatchingFields {
-    fn new(info: &AccessorTraitInfo, fields: &syn::FieldsNamed) -> Self {
+    fn new(ctx: &Context<'_, AccessorTraitInfo>, fields: &syn::FieldsNamed) -> Self {
         Self {
-            lifetime: info.lifetime.clone(),
-            matching_type_path: info.matching_type_path.clone(),
+            lifetime: ctx.trait_info.lifetime.clone(),
+            matching_type_path: matching_type_path(ctx),
             matching_fields: fields
                 .named
                 .iter()
-                .filter_map(|f| NamedMatchingField::try_from_field(f, &info.matching_type_name))
+                .filter_map(|f| NamedMatchingField::try_from_field(f, &ctx.trait_info.matching_type_name))
                 .collect(),
         }
     }
@@ -192,17 +195,17 @@ pub struct UnnamedMatchingFields {
 }
 
 impl UnnamedMatchingFields {
-    fn new(info: &AccessorTraitInfo, fields: &syn::FieldsUnnamed) -> Self {
+    fn new(ctx: &Context<'_, AccessorTraitInfo>, fields: &syn::FieldsUnnamed) -> Self {
         Self {
             nfields: fields.unnamed.len(),
-            lifetime: info.lifetime.clone(),
-            matching_type_path: info.matching_type_path.clone(),
+            lifetime: ctx.trait_info.lifetime.clone(),
+            matching_type_path: matching_type_path(ctx),
             matching_fields: fields
                 .unnamed
                 .iter()
                 .enumerate()
                 .filter_map(|(i, f)| {
-                    UnnamedMatchingField::try_from_field(i, f, &info.matching_type_name)
+                    UnnamedMatchingField::try_from_field(i, f, &ctx.trait_info.matching_type_name)
                 })
                 .collect(),
         }
@@ -306,7 +309,7 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorTra
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let wraps = &data.wraps;
         let wraps_type = &data.wraps_type;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
@@ -329,7 +332,7 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorT
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let wraps_index = data.wraps;
         let wraps_type = &data.wraps_type;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
@@ -356,8 +359,8 @@ impl GenerateFrom<'_, RegularStruct<'_, AccessorTraitInfo>> for AccessorTraitInf
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let matching_type_path = &self.matching_type_path;
-        let trait_path = &self.trait_path;
+        let matching_type_path = matching_type_path(data.ctx);
+        let trait_path = &data.ctx.absolute_trait_path;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
             data.ctx.split_for_impl();
 
@@ -409,9 +412,9 @@ impl GenerateFrom<'_, RegularEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let iter_name = format_ident!("{}{}", name, data.ctx.trait_info.iter_name);
-        let matching_type_path = &self.matching_type_path;
+        let matching_type_path = matching_type_path(data.ctx);
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
             data.ctx.split_for_impl();
 
@@ -455,9 +458,9 @@ impl GenerateFrom<'_, WrapperEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let iter_name = format_ident!("{}{}", name, data.ctx.trait_info.iter_name);
-        let matching_type_path = &self.matching_type_path;
+        let matching_type_path = matching_type_path(data.ctx);
 
         let (trait_impl_generics, trait_ty_generics, input_type_generics, trait_where_clause) =
             data.ctx.split_for_impl();
@@ -498,9 +501,9 @@ impl GenerateFrom<'_, EitherEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo {
     fn generate_from(&self, data: &EitherEnum<'_, AccessorTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = data.ctx.trait_info.method_name();
-        let trait_path = data.ctx.trait_info.trait_path();
+        let trait_path = data.ctx.trait_info.relative_trait_path();
         let iter_name = format_ident!("{}{}", name, data.ctx.trait_info.iter_name);
-        let matching_type_path = &data.ctx.trait_info.matching_type_path;
+        let matching_type_path = matching_type_path(data.ctx);
         let lifetime = &data.ctx.trait_info.lifetime;
 
         let iter_variants = data.variants.iter().map(|variant| variant.iter_variant());
@@ -553,7 +556,7 @@ impl MethodMatchingArm for RegularVariant<'_, AccessorTraitInfo> {
         let iter_name = format_ident!("{}{}", name, self.ctx.trait_info.iter_name);
         let variant_name = self.variant_name;
         let lifetime = &self.ctx.trait_info.lifetime;
-        let matching_type_path = &self.ctx.trait_info.matching_type_path;
+        let matching_type_path = matching_type_path(self.ctx);
 
         match &self.matching_fields {
             MatchingFields::Named(fields) => {
@@ -650,7 +653,7 @@ impl IterVariantDef for RegularVariant<'_, AccessorTraitInfo> {
     fn iter_variant(&self) -> TokenStream {
         let variant_name = self.variant_name;
         let lifetime = &self.ctx.trait_info.lifetime;
-        let matching_type_path = &self.ctx.trait_info.matching_type_path;
+        let matching_type_path = matching_type_path(self.ctx);
         let iter_type = match &self.matching_fields {
             MatchingFields::Named(fields) => fields.iter_type(),
             MatchingFields::Unnamed(fields) => fields.iter_type(),
@@ -744,6 +747,22 @@ impl IterNextArm for WrapperOrRegularVariant<'_, AccessorTraitInfo> {
             WrapperOrRegularVariant::Wrapper(wrapper) => wrapper.iter_next_arm(),
             WrapperOrRegularVariant::Regular(regular) => regular.iter_next_arm(),
         }
+    }
+}
+
+fn matching_type_path(
+    ctx: &Context<'_, AccessorTraitInfo>,
+) -> syn::Path {
+    if let Some(path) = &ctx.kirin_attr.crate_path {
+        let mut path = path.clone();
+        path.segments
+            .extend(ctx.trait_info.matching_type_path.segments.clone());
+        path
+    } else {
+        let mut path = ctx.trait_info.default_crate_path();
+        path.segments
+            .extend(ctx.trait_info.matching_type_path.segments.clone());
+        path
     }
 }
 
@@ -906,8 +925,8 @@ mod tests {
         rustfmt(derive_accessor!(
             &input,
             "arguments",
-            kirin_ir::SSAValue,
-            kirin_ir::HasArguments
+            SSAValue,
+            HasArguments
         ))
     }
 }

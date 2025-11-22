@@ -13,8 +13,13 @@ where
 {
     type GlobalAttributeData: Default;
     type MatchingFields: FromVariantFields<'input, Self> + FromStructFields<'input, Self>;
-    fn trait_path(&self) -> &syn::Path;
+    /// Path to the trait being derived, relative to the crate root
+    fn relative_trait_path(&self) -> &syn::Path;
+    /// Default path to the crate root
+    fn default_crate_path(&self) -> syn::Path;
+    /// Generics for the trait being derived
     fn trait_generics(&self) -> &syn::Generics;
+    /// Method name for the trait being derived
     fn method_name(&self) -> &syn::Ident;
 }
 
@@ -66,15 +71,43 @@ pub trait FromVariantFields<'input, T: TraitInfo<'input>> {
 /// always keep it across different TraitInfo implementations
 /// e.g a new trait may define its own helper attribute in
 /// addition to `kirin(wraps)` etc.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct KirinAttribute {
     pub wraps: bool,
+    pub crate_path: Option<syn::Path>,
     pub is_constant: Option<bool>,
     pub is_pure: Option<bool>,
     pub is_terminator: Option<bool>,
 }
 
 impl KirinAttribute {
+    pub fn from_global_attrs(attrs: &Vec<syn::Attribute>) -> Self {
+        let mut kirin_attr = KirinAttribute::default();
+        for attr in attrs {
+            if attr.path().is_ident("kirin") {
+                attr.parse_nested_meta(|meta| {
+                    if meta.path.is_ident("wraps") {
+                        kirin_attr.wraps = true;
+                    } else if meta.path.is_ident("crate") {
+                        let path: syn::Path = meta.value()?.parse()?;
+                        kirin_attr.crate_path = Some(path);
+                    } else if meta.path.is_ident("constant") {
+                        kirin_attr.is_constant = Some(true);
+                    } else if meta.path.is_ident("pure") {
+                        kirin_attr.is_pure = Some(true);
+                    } else if meta.path.is_ident("terminator") {
+                        kirin_attr.is_terminator = Some(true);
+                    } else {
+                        return Err(meta.error("unknown attribute inside #[kirin(...)]"));
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            }
+        }
+        kirin_attr
+    }
+
     pub fn from_attrs(attrs: &Vec<syn::Attribute>) -> Self {
         let mut kirin_attr = KirinAttribute::default();
         for attr in attrs {
@@ -82,6 +115,8 @@ impl KirinAttribute {
                 attr.parse_nested_meta(|meta| {
                     if meta.path.is_ident("wraps") {
                         kirin_attr.wraps = true;
+                    } else if meta.path.is_ident("crate") {
+                        return Err(meta.error("the 'crate' attribute is not allowed on types"));
                     } else if meta.path.is_ident("constant") {
                         kirin_attr.is_constant = Some(true);
                     } else if meta.path.is_ident("pure") {
@@ -106,6 +141,8 @@ impl KirinAttribute {
                 attr.parse_nested_meta(|meta| {
                     if meta.path.is_ident("wraps") {
                         kirin_attr.wraps = true;
+                    } else if meta.path.is_ident("crate") {
+                        return Err(meta.error("the 'crate' attribute is not allowed on fields"));
                     } else if meta.path.is_ident("constant") {
                         return Err(meta.error("the 'constant' attribute is not allowed on fields"));
                     } else if meta.path.is_ident("pure") {
@@ -133,14 +170,25 @@ pub struct Context<'input, T: TraitInfo<'input>> {
     pub data: T::GlobalAttributeData,
     pub kirin_attr: KirinAttribute,
     pub generics: syn::Generics,
+    pub absolute_trait_path: syn::Path,
 }
 
 impl<'input, T: TraitInfo<'input>> Context<'input, T> {
     pub fn new(trait_info: T, input: &'input syn::DeriveInput) -> Self {
-        let kirin_attr = KirinAttribute::from_attrs(&input.attrs);
+        let kirin_attr = KirinAttribute::from_global_attrs(&input.attrs);
         let data = T::GlobalAttributeData::default();
         let mut generics = input.generics.clone();
         let trait_generics = trait_info.trait_generics();
+        let relative_trait_path = trait_info.relative_trait_path();
+        let absolute_trait_path: syn::Path = if let Some(crate_path) = &kirin_attr.crate_path {
+            let mut path = crate_path.clone();
+            path.segments.extend(relative_trait_path.segments.clone());
+            path
+        } else {
+            let mut path = trait_info.default_crate_path();
+            path.segments.extend(relative_trait_path.segments.clone());
+            path
+        };
 
         generics.params.extend(trait_generics.params.clone());
         Self {
@@ -149,6 +197,7 @@ impl<'input, T: TraitInfo<'input>> Context<'input, T> {
             data,
             kirin_attr,
             generics,
+            absolute_trait_path,
         }
     }
 
@@ -197,7 +246,7 @@ impl<'input, T: TraitInfo<'input> + Default> Context<'input, T> {
     }
 
     pub fn trait_path(&self) -> &syn::Path {
-        self.trait_info.trait_path()
+        self.trait_info.relative_trait_path()
     }
 
     pub fn method_name(&self) -> &syn::Ident {

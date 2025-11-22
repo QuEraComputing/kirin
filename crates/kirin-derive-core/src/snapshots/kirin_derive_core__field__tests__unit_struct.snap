@@ -2,9 +2,9 @@
 source: crates/kirin-derive-core/src/field.rs
 expression: generate(input)
 ---
-impl<'a> kirin_ir::HasArguments<'a> for TestStruct {
-    type Iter = std::iter::Empty<&'a ()>;
+impl<'a> ::kirin::ir::HasArguments<'a> for TestStruct {
+    type Iter = std::iter::Empty<&'a ::kirin::ir::SSAValue>;
     fn arguments(&'a self) -> Self::Iter {
-        std::iter::empty()
+        std::iter::empty::<&'a ::kirin::ir::SSAValue>()
     }
 }

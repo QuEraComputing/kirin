@@ -36,7 +36,11 @@ impl AccessorMutTraitInfo {
         trait_path: syn::Path,
     ) -> Self {
         let method_name_str = method_name.as_ref();
-        let iter_name = format_ident!("{}IterMut", to_camel_case(method_name_str), span = Span::call_site());
+        let iter_name = format_ident!(
+            "{}IterMut",
+            to_camel_case(method_name_str),
+            span = Span::call_site()
+        );
         let lifetime = syn::Lifetime::new("'a", Span::call_site());
         let mut generics = syn::Generics::default();
         generics
@@ -62,8 +66,11 @@ impl AccessorMutTraitInfo {
 impl<'input> TraitInfo<'input> for AccessorMutTraitInfo {
     type GlobalAttributeData = ();
     type MatchingFields = MatchingFields;
-    fn trait_path(&self) -> &syn::Path {
+    fn relative_trait_path(&self) -> &syn::Path {
         &self.trait_path
+    }
+    fn default_crate_path(&self) -> syn::Path {
+        syn::parse_quote! { ::kirin::ir }
     }
     fn trait_generics(&self) -> &syn::Generics {
         &self.generics
@@ -86,10 +93,10 @@ impl MatchingFields {
     ) -> Self {
         match fields {
             syn::Fields::Named(named) => {
-                MatchingFields::Named(NamedMatchingFields::new(&ctx.trait_info, &named))
+                MatchingFields::Named(NamedMatchingFields::new(ctx, &named))
             }
             syn::Fields::Unnamed(unnamed) => {
-                MatchingFields::Unnamed(UnnamedMatchingFields::new(&ctx.trait_info, &unnamed))
+                MatchingFields::Unnamed(UnnamedMatchingFields::new(ctx, &unnamed))
             }
             syn::Fields::Unit => MatchingFields::Unit,
         }
@@ -123,14 +130,17 @@ pub struct NamedMatchingFields {
 }
 
 impl NamedMatchingFields {
-    fn new(info: &AccessorMutTraitInfo, fields: &syn::FieldsNamed) -> Self {
+    fn new(ctx: &Context<'_, AccessorMutTraitInfo>, fields: &syn::FieldsNamed) -> Self {
+        let matching_type_path = matching_type_path(ctx);
         Self {
-            lifetime: info.lifetime.clone(),
-            matching_type_path: info.matching_type_path.clone(),
+            lifetime: ctx.trait_info.lifetime.clone(),
+            matching_type_path,
             matching_fields: fields
                 .named
                 .iter()
-                .filter_map(|f| NamedMatchingField::try_from_field(f, &info.matching_type_name))
+                .filter_map(|f| {
+                    NamedMatchingField::try_from_field(f, &ctx.trait_info.matching_type_name)
+                })
                 .collect(),
         }
     }
@@ -170,8 +180,12 @@ impl NamedMatchingFields {
         self.matching_fields
             .iter()
             .map(|f| match f {
-                NamedMatchingField::One(_) => quote! { std::iter::Once<&'a mut #matching_type_path> },
-                NamedMatchingField::Vec(_) => quote! { std::slice::IterMut<'a, #matching_type_path> },
+                NamedMatchingField::One(_) => {
+                    quote! { std::iter::Once<&'a mut #matching_type_path> }
+                }
+                NamedMatchingField::Vec(_) => {
+                    quote! { std::slice::IterMut<'a, #matching_type_path> }
+                }
             })
             .fold(None, |acc: Option<TokenStream>, field| {
                 if let Some(acc) = acc {
@@ -192,17 +206,18 @@ pub struct UnnamedMatchingFields {
 }
 
 impl UnnamedMatchingFields {
-    fn new(info: &AccessorMutTraitInfo, fields: &syn::FieldsUnnamed) -> Self {
+    fn new(ctx: &Context<'_, AccessorMutTraitInfo>, fields: &syn::FieldsUnnamed) -> Self {
+        let matching_type_path = matching_type_path(ctx);
         Self {
             nfields: fields.unnamed.len(),
-            lifetime: info.lifetime.clone(),
-            matching_type_path: info.matching_type_path.clone(),
+            lifetime: ctx.trait_info.lifetime.clone(),
+            matching_type_path,
             matching_fields: fields
                 .unnamed
                 .iter()
                 .enumerate()
                 .filter_map(|(i, f)| {
-                    UnnamedMatchingField::try_from_field(i, f, &info.matching_type_name)
+                    UnnamedMatchingField::try_from_field(i, f, &ctx.trait_info.matching_type_name)
                 })
                 .collect(),
         }
@@ -236,7 +251,9 @@ impl UnnamedMatchingFields {
                     Some(field.clone())
                 }
             })
-            .unwrap_or_else(|| quote::quote! { std::iter::empty::<&#lifetime mut #matching_type_path>() })
+            .unwrap_or_else(
+                || quote::quote! { std::iter::empty::<&#lifetime mut #matching_type_path>() },
+            )
     }
 
     fn iter_type(&self) -> TokenStream {
@@ -259,7 +276,9 @@ impl UnnamedMatchingFields {
                     Some(field.clone())
                 }
             })
-            .unwrap_or_else(|| quote::quote! { std::iter::Empty<&#lifetime mut #matching_type_path> })
+            .unwrap_or_else(
+                || quote::quote! { std::iter::Empty<&#lifetime mut #matching_type_path> },
+            )
     }
 }
 
@@ -306,7 +325,7 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, AccessorMutTraitInfo>> for Accessor
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let wraps = &data.wraps;
         let wraps_type = &data.wraps_type;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
@@ -329,7 +348,7 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, AccessorMutTraitInfo>> for Access
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let wraps_index = data.wraps;
         let wraps_type = &data.wraps_type;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
@@ -356,8 +375,8 @@ impl GenerateFrom<'_, RegularStruct<'_, AccessorMutTraitInfo>> for AccessorMutTr
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let matching_type_path = &self.matching_type_path;
-        let trait_path = &self.trait_path;
+        let matching_type_path = matching_type_path(&data.ctx);
+        let trait_path = &data.ctx.absolute_trait_path;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
             data.ctx.split_for_impl();
 
@@ -409,9 +428,9 @@ impl GenerateFrom<'_, RegularEnum<'_, AccessorMutTraitInfo>> for AccessorMutTrai
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let iter_name = format_ident!("{}{}", name, data.ctx.trait_info.iter_name);
-        let matching_type_path = &self.matching_type_path;
+        let matching_type_path = matching_type_path(&data.ctx);
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
             data.ctx.split_for_impl();
 
@@ -455,9 +474,9 @@ impl GenerateFrom<'_, WrapperEnum<'_, AccessorMutTraitInfo>> for AccessorMutTrai
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let iter_name = format_ident!("{}{}", name, data.ctx.trait_info.iter_name);
-        let matching_type_path = &self.matching_type_path;
+        let matching_type_path = matching_type_path(&data.ctx);
 
         let (trait_impl_generics, trait_ty_generics, input_type_generics, trait_where_clause) =
             data.ctx.split_for_impl();
@@ -498,9 +517,9 @@ impl GenerateFrom<'_, EitherEnum<'_, AccessorMutTraitInfo>> for AccessorMutTrait
     fn generate_from(&self, data: &EitherEnum<'_, AccessorMutTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = data.ctx.trait_info.method_name();
-        let trait_path = data.ctx.trait_info.trait_path();
+        let trait_path = data.ctx.trait_info.relative_trait_path();
         let iter_name = format_ident!("{}{}", name, data.ctx.trait_info.iter_name);
-        let matching_type_path = &data.ctx.trait_info.matching_type_path;
+        let matching_type_path = matching_type_path(&data.ctx);
         let lifetime = &data.ctx.trait_info.lifetime;
 
         let iter_variants = data.variants.iter().map(|variant| variant.iter_variant());
@@ -553,7 +572,7 @@ impl MethodMatchingArm for RegularVariant<'_, AccessorMutTraitInfo> {
         let iter_name = format_ident!("{}{}", name, self.ctx.trait_info.iter_name);
         let variant_name = self.variant_name;
         let lifetime = &self.ctx.trait_info.lifetime;
-        let matching_type_path = &self.ctx.trait_info.matching_type_path;
+        let matching_type_path = matching_type_path(&self.ctx);
 
         match &self.matching_fields {
             MatchingFields::Named(fields) => {
@@ -564,7 +583,7 @@ impl MethodMatchingArm for RegularVariant<'_, AccessorMutTraitInfo> {
                         #iter_name::#variant_name ( #iter )
                     }
                 }
-            },
+            }
             MatchingFields::Unnamed(fields) => {
                 let vars = fields.vars();
                 let iter = fields.iter();
@@ -573,14 +592,14 @@ impl MethodMatchingArm for RegularVariant<'_, AccessorMutTraitInfo> {
                         #iter_name::#variant_name ( #iter )
                     }
                 }
-            },
+            }
             MatchingFields::Unit => {
                 quote::quote! {
                     #name::#variant_name => {
                         #iter_name::#variant_name ( std::iter::empty::<&#lifetime mut #matching_type_path>() )
                     }
                 }
-            },
+            }
         }
     }
 }
@@ -650,7 +669,7 @@ impl IterVariantDef for RegularVariant<'_, AccessorMutTraitInfo> {
     fn iter_variant(&self) -> TokenStream {
         let variant_name = self.variant_name;
         let lifetime = &self.ctx.trait_info.lifetime;
-        let matching_type_path = &self.ctx.trait_info.matching_type_path;
+        let matching_type_path = matching_type_path(&self.ctx);
         let iter_type = match &self.matching_fields {
             MatchingFields::Named(fields) => fields.iter_type(),
             MatchingFields::Unnamed(fields) => fields.iter_type(),
@@ -747,6 +766,22 @@ impl IterNextArm for WrapperOrRegularVariant<'_, AccessorMutTraitInfo> {
     }
 }
 
+fn matching_type_path(
+    ctx: &Context<'_, AccessorMutTraitInfo>,
+) -> syn::Path {
+    if let Some(path) = &ctx.kirin_attr.crate_path {
+        let mut path = path.clone();
+        path.segments
+            .extend(ctx.trait_info.matching_type_path.segments.clone());
+        path
+    } else {
+        let mut path = ctx.trait_info.default_crate_path();
+        path.segments
+            .extend(ctx.trait_info.matching_type_path.segments.clone());
+        path
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -755,6 +790,21 @@ mod tests {
     #[test]
     fn test_either_enum() {
         let input: syn::DeriveInput = syn::parse_quote! {
+            enum TestEnum<T> {
+                VariantA { #[kirin(wraps)] wrapped: InnerStructA<T> },
+                #[kirin(wraps)]
+                VariantB(InnerStructB),
+                VariantC { a: SSAValue, b: T, c: SSAValue },
+                VariantD(SSAValue, f64, SSAValue),
+            }
+        };
+        insta::assert_snapshot!(generate(input));
+    }
+
+    #[test]
+    fn test_changing_crate() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(crate = ::my_crate)]
             enum TestEnum<T> {
                 VariantA { #[kirin(wraps)] wrapped: InnerStructA<T> },
                 #[kirin(wraps)]
@@ -803,8 +853,8 @@ mod tests {
         insta::assert_snapshot!(rustfmt(derive_accessor_mut!(
             &input,
             "regions",
-            kirin_ir::Region,
-            kirin_ir::HasRegions
+            Region,
+            HasRegions
         )))
     }
 
@@ -887,8 +937,8 @@ mod tests {
         rustfmt(derive_accessor_mut!(
             &input,
             "arguments",
-            kirin_ir::SSAValue,
-            kirin_ir::HasArguments
+            SSAValue,
+            HasArguments
         ))
     }
 }

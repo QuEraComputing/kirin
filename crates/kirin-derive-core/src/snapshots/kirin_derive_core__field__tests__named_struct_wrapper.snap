@@ -2,10 +2,10 @@
 source: crates/kirin-derive-core/src/field.rs
 expression: generate(input)
 ---
-impl<'a, T> kirin_ir::HasArguments<'a> for TestStruct<T> {
-    type Iter = <InnerStruct<T> as kirin_ir::HasArguments>::Iter;
+impl<'a, T> ::kirin::ir::HasArguments<'a> for TestStruct<T> {
+    type Iter = <InnerStruct<T> as ::kirin::ir::HasArguments>::Iter;
     fn arguments(&'a self) -> Self::Iter {
         let Self { wrapped, .. } = self;
-        <InnerStruct<T> as kirin_ir::HasArguments>::arguments(wrapped)
+        <InnerStruct<T> as ::kirin::ir::HasArguments>::arguments(wrapped)
     }
 }

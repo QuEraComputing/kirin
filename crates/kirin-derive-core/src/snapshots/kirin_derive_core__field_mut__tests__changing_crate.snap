@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/field_mut.rs
 expression: generate(input)
 ---
 impl<'a, T> HasArguments<'a> for TestEnum<T> {
-    type Iter = TestEnumArgumentsIterMut<'a, ::kirin::ir::SSAValue>;
+    type Iter = TestEnumArgumentsIterMut<'a, ::my_crate::SSAValue>;
     fn arguments(&'a mut self) -> Self::Iter {
         match self {
             TestEnum::VariantA { wrapped, .. } => TestEnumArgumentsIterMut::VariantA(
@@ -28,19 +28,19 @@ pub enum TestEnumArgumentsIterMut<'a, T> {
     VariantB(<InnerStructB as HasArguments<'a>>::Iter),
     VariantC(
         std::iter::Chain<
-            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
-            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+            std::iter::Once<&'a mut ::my_crate::SSAValue>,
+            std::iter::Once<&'a mut ::my_crate::SSAValue>,
         >,
     ),
     VariantD(
         std::iter::Chain<
-            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
-            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+            std::iter::Once<&'a mut ::my_crate::SSAValue>,
+            std::iter::Once<&'a mut ::my_crate::SSAValue>,
         >,
     ),
 }
 impl<'a, T> Iterator for TestEnumArgumentsIterMut<'a, T> {
-    type Item = &'a mut ::kirin::ir::SSAValue;
+    type Item = &'a mut ::my_crate::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             TestEnumArgumentsIterMut::VariantA(iter) => iter.next(),

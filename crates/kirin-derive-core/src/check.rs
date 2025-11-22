@@ -54,8 +54,12 @@ impl<'input> TraitInfo<'input> for CheckTraitInfo {
         &self.generics
     }
 
-    fn trait_path(&self) -> &syn::Path {
+    fn relative_trait_path(&self) -> &syn::Path {
         &self.trait_path
+    }
+
+    fn default_crate_path(&self) -> syn::Path {
+        syn::parse_quote! { ::kirin::ir }
     }
 }
 
@@ -89,7 +93,7 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, CheckTraitInfo>> for CheckTraitInfo
     ) -> proc_macro2::TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let wraps = &data.wraps;
         let wraps_type = &data.wraps_type;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
@@ -113,7 +117,7 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, CheckTraitInfo>> for CheckTraitIn
     ) -> proc_macro2::TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let wraps_index = data.wraps;
         let wraps_type = &data.wraps_type;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
@@ -138,7 +142,7 @@ impl GenerateFrom<'_, RegularStruct<'_, CheckTraitInfo>> for CheckTraitInfo {
     fn generate_from(&self, data: &RegularStruct<'_, CheckTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
             data.ctx.split_for_impl();
         let value = data.fields;
@@ -157,7 +161,7 @@ impl GenerateFrom<'_, RegularEnum<'_, CheckTraitInfo>> for CheckTraitInfo {
     fn generate_from(&self, data: &RegularEnum<'_, CheckTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
         let (impl_generics, trait_ty_generics, input_type_generics, where_clause) =
             data.ctx.split_for_impl();
 
@@ -179,7 +183,7 @@ impl GenerateFrom<'_, WrapperEnum<'_, CheckTraitInfo>> for CheckTraitInfo {
     fn generate_from(&self, data: &WrapperEnum<'_, CheckTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
 
         let (trait_impl_generics, trait_ty_generics, input_type_generics, trait_where_clause) =
             data.ctx.split_for_impl();
@@ -201,7 +205,7 @@ impl GenerateFrom<'_, EitherEnum<'_, CheckTraitInfo>> for CheckTraitInfo {
     fn generate_from(&self, data: &EitherEnum<'_, CheckTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
-        let trait_path = &self.trait_path;
+        let trait_path = &data.ctx.absolute_trait_path;
 
         let (trait_impl_generics, trait_ty_generics, input_type_generics, trait_where_clause) =
             data.ctx.split_for_impl();
@@ -329,7 +333,7 @@ mod tests {
             enum WrapperEnum<T> {
                 Variant1(T),
                 Variant2 { field: T },
-                Variant3(T, #[kirin(wraps, constant)] Other),
+                Variant3(T, #[kirin(wraps)] Other),
             }
         };
         insta::assert_snapshot!(generate(input));
@@ -338,7 +342,7 @@ mod tests {
     fn generate(input: syn::DeriveInput) -> String {
         let trait_info = CheckTraitInfo::new(
             "is_constant",
-            syn::parse_quote! { ::kirin_ir::CheckConstant },
+            syn::parse_quote! { CheckConstant },
             |attr: &KirinAttribute| attr.is_constant.unwrap_or(false),
         );
 

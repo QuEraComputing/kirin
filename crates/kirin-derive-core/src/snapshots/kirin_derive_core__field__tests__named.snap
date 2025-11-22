@@ -2,32 +2,36 @@
 source: crates/kirin-derive-core/src/field.rs
 expression: generate(input)
 ---
-impl<'a> kirin_ir::HasArguments<'a> for ControlFlowInstruction {
-    type Iter = ArgumentsIter<'a>;
+impl<'a> ::kirin::ir::HasArguments<'a> for ControlFlowInstruction {
+    type Iter = ControlFlowInstructionArgumentsIter<'a>;
     fn arguments(&'a self) -> Self::Iter {
         match self {
-            ControlFlowInstruction::Branch { .. } => ArgumentsIter::Branch(std::iter::empty()),
+            ControlFlowInstruction::Branch { .. } => {
+                ControlFlowInstructionArgumentsIter::Branch(std::iter::empty::<
+                    &'a ::kirin::ir::SSAValue,
+                >())
+            }
             ControlFlowInstruction::ConditionalBranch { condition, .. } => {
-                ArgumentsIter::ConditionalBranch(std::iter::once(condition))
+                ControlFlowInstructionArgumentsIter::ConditionalBranch(std::iter::once(condition))
             }
             ControlFlowInstruction::Return(field_0, ..) => {
-                ArgumentsIter::Return(std::iter::once(field_0))
+                ControlFlowInstructionArgumentsIter::Return(std::iter::once(field_0))
             }
         }
     }
 }
-pub enum ArgumentsIter<'a> {
-    Branch(std::iter::Empty<&'a kirin_ir::SSAValue>),
-    ConditionalBranch(std::iter::Once<&'a kirin_ir::SSAValue>),
-    Return(std::iter::Once<&'a kirin_ir::SSAValue>),
+pub enum ControlFlowInstructionArgumentsIter<'a> {
+    Branch(std::iter::Empty<&'a ::kirin::ir::SSAValue>),
+    ConditionalBranch(std::iter::Once<&'a ::kirin::ir::SSAValue>),
+    Return(std::iter::Once<&'a ::kirin::ir::SSAValue>),
 }
-impl<'a> Iterator for ArgumentsIter<'a> {
-    type Item = &'a kirin_ir::SSAValue;
+impl<'a> Iterator for ControlFlowInstructionArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ArgumentsIter::Branch(iter) => iter.next(),
-            ArgumentsIter::ConditionalBranch(iter) => iter.next(),
-            ArgumentsIter::Return(iter) => iter.next(),
+            ControlFlowInstructionArgumentsIter::Branch(iter) => iter.next(),
+            ControlFlowInstructionArgumentsIter::ConditionalBranch(iter) => iter.next(),
+            ControlFlowInstructionArgumentsIter::Return(iter) => iter.next(),
         }
     }
 }

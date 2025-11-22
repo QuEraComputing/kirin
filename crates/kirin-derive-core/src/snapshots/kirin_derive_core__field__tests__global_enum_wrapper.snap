@@ -2,29 +2,29 @@
 source: crates/kirin-derive-core/src/field.rs
 expression: generate(input)
 ---
-impl<'a, T> kirin_ir::HasArguments<'a> for TestEnum<T> {
-    type Iter = ArgumentsIter<'a>;
+impl<'a, T> ::kirin::ir::HasArguments<'a> for TestEnum<T> {
+    type Iter = TestEnumArgumentsIter<'a>;
     fn arguments(&'a self) -> Self::Iter {
         match self {
-            TestEnum::VariantA { wrapped, .. } => ArgumentsIter::VariantA(
-                <InnerStructA<T> as kirin_ir::HasArguments>::arguments(wrapped),
+            TestEnum::VariantA { wrapped, .. } => TestEnumArgumentsIter::VariantA(
+                <InnerStructA<T> as HasArguments>::arguments(wrapped),
             ),
-            TestEnum::VariantB(field_0, ..) => ArgumentsIter::VariantB(
-                <InnerStructB as kirin_ir::HasArguments>::arguments(field_0),
-            ),
+            TestEnum::VariantB(field_0, ..) => {
+                TestEnumArgumentsIter::VariantB(<InnerStructB as HasArguments>::arguments(field_0))
+            }
         }
     }
 }
-pub enum ArgumentsIter<'a, T> {
-    VariantA(<InnerStructA<T> as kirin_ir::HasArguments<'a>>::Iter),
-    VariantB(<InnerStructB as kirin_ir::HasArguments<'a>>::Iter),
+pub enum TestEnumArgumentsIter<'a, T> {
+    VariantA(<InnerStructA<T> as HasArguments<'a>>::Iter),
+    VariantB(<InnerStructB as HasArguments<'a>>::Iter),
 }
-impl<'a, T> Iterator for ArgumentsIter<'a, T> {
-    type Item = &'a kirin_ir::SSAValue;
+impl<'a, T> Iterator for TestEnumArgumentsIter<'a, T> {
+    type Item = &'a ::kirin::ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ArgumentsIter::VariantA(iter) => iter.next(),
-            ArgumentsIter::VariantB(iter) => iter.next(),
+            TestEnumArgumentsIter::VariantA(iter) => iter.next(),
+            TestEnumArgumentsIter::VariantB(iter) => iter.next(),
         }
     }
 }

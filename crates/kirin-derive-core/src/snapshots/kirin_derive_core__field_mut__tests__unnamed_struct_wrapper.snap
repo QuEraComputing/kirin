@@ -2,10 +2,10 @@
 source: crates/kirin-derive-core/src/field_mut.rs
 expression: generate(input)
 ---
-impl<'a, T> kirin_ir::HasArguments<'a> for TestStruct<T> {
+impl<'a, T> ::kirin::ir::HasArguments<'a> for TestStruct<T> {
     type Iter = std::iter::Chain<
-        std::iter::Once<&'a mut kirin_ir::SSAValue>,
-        std::iter::Once<&'a mut kirin_ir::SSAValue>,
+        std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+        std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
     >;
     fn arguments(&'a mut self) -> Self::Iter {
         let Self(field_0, field_1, field_2, field_3, field_4, ..) = self;
