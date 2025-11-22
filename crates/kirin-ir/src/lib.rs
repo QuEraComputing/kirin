@@ -17,7 +17,11 @@ pub use comptime::{CompileTimeValue, Typeof};
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    HasArguments, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure, IsTerminator,
+    HasArguments, HasArgumentsMut,
+    HasRegions, HasRegionsMut,
+    HasResults, HasResultsMut,
+    HasSuccessors, HasSuccessorsMut,
+    IsConstant, IsPure, IsTerminator,
     Language, Statement,
 };
 pub use lattice::{FiniteLattice, Lattice, TypeLattice};
