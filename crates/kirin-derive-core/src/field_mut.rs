@@ -4,10 +4,10 @@ use quote::{format_ident, quote};
 use crate::{data::*, utils::*};
 
 #[macro_export]
-macro_rules! derive_accessor {
+macro_rules! derive_accessor_mut {
     ($input:expr, $method_name:expr, $matching_type:expr, $trait_path:expr) => {{
         let ctx = Context::new(
-            AccessorTraitInfo::new(
+            AccessorMutTraitInfo::new(
                 $method_name,
                 syn::parse_quote! { $matching_type },
                 syn::parse_quote! { $trait_path },
@@ -19,7 +19,7 @@ macro_rules! derive_accessor {
     }};
 }
 
-pub struct AccessorTraitInfo {
+pub struct AccessorMutTraitInfo {
     method_name: syn::Ident,
     iter_name: syn::Ident,
     trait_path: syn::Path,
@@ -29,14 +29,14 @@ pub struct AccessorTraitInfo {
     generics: syn::Generics,
 }
 
-impl AccessorTraitInfo {
+impl AccessorMutTraitInfo {
     pub fn new(
         method_name: impl AsRef<str>,
         matching_type: syn::Path,
         trait_path: syn::Path,
     ) -> Self {
         let method_name_str = method_name.as_ref();
-        let iter_name = format_ident!("{}Iter", to_camel_case(method_name_str), span = Span::call_site());
+        let iter_name = format_ident!("{}IterMut", to_camel_case(method_name_str), span = Span::call_site());
         let lifetime = syn::Lifetime::new("'a", Span::call_site());
         let mut generics = syn::Generics::default();
         generics
@@ -59,7 +59,7 @@ impl AccessorTraitInfo {
     }
 }
 
-impl<'input> TraitInfo<'input> for AccessorTraitInfo {
+impl<'input> TraitInfo<'input> for AccessorMutTraitInfo {
     type GlobalAttributeData = ();
     type MatchingFields = MatchingFields;
     fn trait_path(&self) -> &syn::Path {
@@ -81,7 +81,7 @@ pub enum MatchingFields {
 
 impl MatchingFields {
     fn from_fields<'input>(
-        ctx: &Context<'input, AccessorTraitInfo>,
+        ctx: &Context<'input, AccessorMutTraitInfo>,
         fields: &'input syn::Fields,
     ) -> Self {
         match fields {
@@ -96,9 +96,9 @@ impl MatchingFields {
     }
 }
 
-impl<'input> FromStructFields<'input, AccessorTraitInfo> for MatchingFields {
+impl<'input> FromStructFields<'input, AccessorMutTraitInfo> for MatchingFields {
     fn from_struct_fields(
-        ctx: &crate::data::Context<'input, AccessorTraitInfo>,
+        ctx: &crate::data::Context<'input, AccessorMutTraitInfo>,
         _parent: &'input syn::DataStruct,
         fields: &'input syn::Fields,
     ) -> Self {
@@ -106,9 +106,9 @@ impl<'input> FromStructFields<'input, AccessorTraitInfo> for MatchingFields {
     }
 }
 
-impl<'input> FromVariantFields<'input, AccessorTraitInfo> for MatchingFields {
+impl<'input> FromVariantFields<'input, AccessorMutTraitInfo> for MatchingFields {
     fn from_variant_fields(
-        ctx: &crate::data::Context<'input, AccessorTraitInfo>,
+        ctx: &crate::data::Context<'input, AccessorMutTraitInfo>,
         _parent: &'input syn::Variant,
         fields: &'input syn::Fields,
     ) -> Self {
@@ -123,7 +123,7 @@ pub struct NamedMatchingFields {
 }
 
 impl NamedMatchingFields {
-    fn new(info: &AccessorTraitInfo, fields: &syn::FieldsNamed) -> Self {
+    fn new(info: &AccessorMutTraitInfo, fields: &syn::FieldsNamed) -> Self {
         Self {
             lifetime: info.lifetime.clone(),
             matching_type_path: info.matching_type_path.clone(),
@@ -161,7 +161,7 @@ impl NamedMatchingFields {
                     Some(field.clone())
                 }
             })
-            .unwrap_or(quote! { std::iter::empty::<&#lifetime #matching_type_path>() })
+            .unwrap_or(quote! { std::iter::empty::<&#lifetime mut #matching_type_path>() })
     }
 
     fn iter_type(&self) -> TokenStream {
@@ -170,8 +170,8 @@ impl NamedMatchingFields {
         self.matching_fields
             .iter()
             .map(|f| match f {
-                NamedMatchingField::One(_) => quote! { std::iter::Once<&'a #matching_type_path> },
-                NamedMatchingField::Vec(_) => quote! { std::slice::Iter<'a, #matching_type_path> },
+                NamedMatchingField::One(_) => quote! { std::iter::Once<&'a mut #matching_type_path> },
+                NamedMatchingField::Vec(_) => quote! { std::slice::IterMut<'a, #matching_type_path> },
             })
             .fold(None, |acc: Option<TokenStream>, field| {
                 if let Some(acc) = acc {
@@ -180,7 +180,7 @@ impl NamedMatchingFields {
                     Some(field.clone())
                 }
             })
-            .unwrap_or(quote! { std::iter::Empty<&#lifetime #matching_type_path> })
+            .unwrap_or(quote! { std::iter::Empty<&#lifetime mut #matching_type_path> })
     }
 }
 
@@ -192,7 +192,7 @@ pub struct UnnamedMatchingFields {
 }
 
 impl UnnamedMatchingFields {
-    fn new(info: &AccessorTraitInfo, fields: &syn::FieldsUnnamed) -> Self {
+    fn new(info: &AccessorMutTraitInfo, fields: &syn::FieldsUnnamed) -> Self {
         Self {
             nfields: fields.unnamed.len(),
             lifetime: info.lifetime.clone(),
@@ -236,7 +236,7 @@ impl UnnamedMatchingFields {
                     Some(field.clone())
                 }
             })
-            .unwrap_or_else(|| quote::quote! { std::iter::empty::<&#lifetime #matching_type_path>() })
+            .unwrap_or_else(|| quote::quote! { std::iter::empty::<&#lifetime mut #matching_type_path>() })
     }
 
     fn iter_type(&self) -> TokenStream {
@@ -246,10 +246,10 @@ impl UnnamedMatchingFields {
             .iter()
             .map(|f| match f {
                 UnnamedMatchingField::One(_) => {
-                    quote::quote! { std::iter::Once<&'a #matching_type_path> }
+                    quote::quote! { std::iter::Once<&'a mut #matching_type_path> }
                 }
                 UnnamedMatchingField::Vec(_) => {
-                    quote::quote! { std::slice::Iter<'a, #matching_type_path> }
+                    quote::quote! { std::slice::IterMut<'a, #matching_type_path> }
                 }
             })
             .fold(None, |acc: Option<TokenStream>, field| {
@@ -259,7 +259,7 @@ impl UnnamedMatchingFields {
                     Some(field.clone())
                 }
             })
-            .unwrap_or_else(|| quote::quote! { std::iter::Empty<&#lifetime #matching_type_path> })
+            .unwrap_or_else(|| quote::quote! { std::iter::Empty<&#lifetime mut #matching_type_path> })
     }
 }
 
@@ -301,8 +301,8 @@ impl UnnamedMatchingField {
     }
 }
 
-impl GenerateFrom<'_, NamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorTraitInfo {
-    fn generate_from(&self, data: &NamedWrapperStruct<'_, AccessorTraitInfo>) -> TokenStream {
+impl GenerateFrom<'_, NamedWrapperStruct<'_, AccessorMutTraitInfo>> for AccessorMutTraitInfo {
+    fn generate_from(&self, data: &NamedWrapperStruct<'_, AccessorMutTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
@@ -315,7 +315,7 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorTra
         quote! {
             impl #impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #where_clause {
                 type Iter = <#wraps_type as #trait_path>::Iter;
-                fn #method_name(&#lifetime self) -> Self::Iter {
+                fn #method_name(&#lifetime mut self) -> Self::Iter {
                     let Self { #wraps, .. } = self;
                     <#wraps_type as #trait_path>::#method_name(#wraps)
                 }
@@ -324,8 +324,8 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorTra
     }
 }
 
-impl GenerateFrom<'_, UnnamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorTraitInfo {
-    fn generate_from(&self, data: &UnnamedWrapperStruct<'_, AccessorTraitInfo>) -> TokenStream {
+impl GenerateFrom<'_, UnnamedWrapperStruct<'_, AccessorMutTraitInfo>> for AccessorMutTraitInfo {
+    fn generate_from(&self, data: &UnnamedWrapperStruct<'_, AccessorMutTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
@@ -342,7 +342,7 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorT
         quote! {
             impl #impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #where_clause {
                 type Iter = <#wraps_type as #trait_path>::Iter;
-                fn #method_name(&#lifetime self) -> Self::Iter {
+                fn #method_name(&#lifetime mut self) -> Self::Iter {
                     let Self (#(#vars,)* ..) = self;
                     <#wraps_type as #trait_path>::#method_name(#wraps_name)
                 }
@@ -351,8 +351,8 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, AccessorTraitInfo>> for AccessorT
     }
 }
 
-impl GenerateFrom<'_, RegularStruct<'_, AccessorTraitInfo>> for AccessorTraitInfo {
-    fn generate_from(&self, data: &RegularStruct<'_, AccessorTraitInfo>) -> TokenStream {
+impl GenerateFrom<'_, RegularStruct<'_, AccessorMutTraitInfo>> for AccessorMutTraitInfo {
+    fn generate_from(&self, data: &RegularStruct<'_, AccessorMutTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
@@ -369,7 +369,7 @@ impl GenerateFrom<'_, RegularStruct<'_, AccessorTraitInfo>> for AccessorTraitInf
                 quote::quote! {
                     impl #impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #where_clause {
                         type Iter = #iter_type;
-                        fn #method_name(&#lifetime self) -> Self::Iter {
+                        fn #method_name(&#lifetime mut self) -> Self::Iter {
                             let Self { #(#unpacking_vars,)* .. } = self;
                             #iter
                         }
@@ -383,7 +383,7 @@ impl GenerateFrom<'_, RegularStruct<'_, AccessorTraitInfo>> for AccessorTraitInf
                 quote::quote! {
                     impl #impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #where_clause {
                         type Iter = #iter_type;
-                        fn #method_name(&#lifetime self) -> Self::Iter {
+                        fn #method_name(&#lifetime mut self) -> Self::Iter {
                             let Self ( #(#unpacking_vars,)* .. ) = self;
                             #iter
                         }
@@ -393,9 +393,9 @@ impl GenerateFrom<'_, RegularStruct<'_, AccessorTraitInfo>> for AccessorTraitInf
             MatchingFields::Unit => {
                 quote::quote! {
                     impl #impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #where_clause {
-                        type Iter = std::iter::Empty<&#lifetime #matching_type_path>;
-                        fn #method_name(&#lifetime self) -> Self::Iter {
-                            std::iter::empty::<&#lifetime #matching_type_path>()
+                        type Iter = std::iter::Empty<&#lifetime mut ()>;
+                        fn #method_name(&#lifetime mut self) -> Self::Iter {
+                            std::iter::empty::<&#lifetime mut #matching_type_path>()
                         }
                     }
                 }
@@ -404,8 +404,8 @@ impl GenerateFrom<'_, RegularStruct<'_, AccessorTraitInfo>> for AccessorTraitInf
     }
 }
 
-impl GenerateFrom<'_, RegularEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo {
-    fn generate_from(&self, data: &RegularEnum<'_, AccessorTraitInfo>) -> TokenStream {
+impl GenerateFrom<'_, RegularEnum<'_, AccessorMutTraitInfo>> for AccessorMutTraitInfo {
+    fn generate_from(&self, data: &RegularEnum<'_, AccessorMutTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
@@ -426,7 +426,7 @@ impl GenerateFrom<'_, RegularEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
         quote::quote! {
             impl #impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #where_clause {
                 type Iter = #iter_name<#lifetime>;
-                fn #method_name(&#lifetime self) -> Self::Iter {
+                fn #method_name(&#lifetime mut self) -> Self::Iter {
                     match self {
                         #(#method_arms)*
                     }
@@ -439,7 +439,7 @@ impl GenerateFrom<'_, RegularEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
             }
 
             impl<#lifetime> Iterator for #iter_name<#lifetime> {
-                type Item = &#lifetime #matching_type_path;
+                type Item = &#lifetime mut #matching_type_path;
                 fn next(&mut self) -> Option<Self::Item> {
                     match self {
                         #(#iter_next_arms)*
@@ -450,8 +450,8 @@ impl GenerateFrom<'_, RegularEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
     }
 }
 
-impl GenerateFrom<'_, WrapperEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo {
-    fn generate_from(&self, data: &WrapperEnum<'_, AccessorTraitInfo>) -> TokenStream {
+impl GenerateFrom<'_, WrapperEnum<'_, AccessorMutTraitInfo>> for AccessorMutTraitInfo {
+    fn generate_from(&self, data: &WrapperEnum<'_, AccessorMutTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = &self.method_name;
         let lifetime = &self.lifetime;
@@ -471,7 +471,7 @@ impl GenerateFrom<'_, WrapperEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
         quote! {
             impl #trait_impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #trait_where_clause {
                 type Iter = #iter_name<#lifetime>;
-                fn #method_name(&#lifetime self) -> Self::Iter {
+                fn #method_name(&#lifetime mut self) -> Self::Iter {
                     match self {
                         #(#method_arms)*
                     }
@@ -483,7 +483,7 @@ impl GenerateFrom<'_, WrapperEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
             }
 
             impl #iter_impl_generics Iterator for #iter_name #iter_ty_generics #iter_where_clause {
-                type Item = &#lifetime #matching_type_path;
+                type Item = &#lifetime mut #matching_type_path;
                 fn next(&mut self) -> Option<Self::Item> {
                     match self {
                         #(#iter_next_arms)*
@@ -494,8 +494,8 @@ impl GenerateFrom<'_, WrapperEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo 
     }
 }
 
-impl GenerateFrom<'_, EitherEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo {
-    fn generate_from(&self, data: &EitherEnum<'_, AccessorTraitInfo>) -> TokenStream {
+impl GenerateFrom<'_, EitherEnum<'_, AccessorMutTraitInfo>> for AccessorMutTraitInfo {
+    fn generate_from(&self, data: &EitherEnum<'_, AccessorMutTraitInfo>) -> TokenStream {
         let name = &data.ctx.input.ident;
         let method_name = data.ctx.trait_info.method_name();
         let trait_path = data.ctx.trait_info.trait_path();
@@ -520,7 +520,7 @@ impl GenerateFrom<'_, EitherEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo {
         quote::quote! {
             impl #trait_impl_generics #trait_path #trait_ty_generics for #name #input_type_generics #trait_where_clause {
                 type Iter = #iter_name<#lifetime, #matching_type_path>;
-                fn #method_name(&#lifetime self) -> Self::Iter {
+                fn #method_name(&#lifetime mut self) -> Self::Iter {
                     match self {
                         #(#method_arms)*
                     }
@@ -532,7 +532,7 @@ impl GenerateFrom<'_, EitherEnum<'_, AccessorTraitInfo>> for AccessorTraitInfo {
             }
 
             impl #iter_impl_generics Iterator for #iter_name #iter_ty_generics #iter_where_clause {
-                type Item = &#lifetime #matching_type_path;
+                type Item = &#lifetime mut #matching_type_path;
                 fn next(&mut self) -> Option<Self::Item> {
                     match self {
                         #(#iter_next_arms)*
@@ -547,7 +547,7 @@ trait MethodMatchingArm {
     fn method_arm(&self) -> TokenStream;
 }
 
-impl MethodMatchingArm for RegularVariant<'_, AccessorTraitInfo> {
+impl MethodMatchingArm for RegularVariant<'_, AccessorMutTraitInfo> {
     fn method_arm(&self) -> TokenStream {
         let name = &self.ctx.input.ident;
         let iter_name = format_ident!("{}{}", name, self.ctx.trait_info.iter_name);
@@ -577,7 +577,7 @@ impl MethodMatchingArm for RegularVariant<'_, AccessorTraitInfo> {
             MatchingFields::Unit => {
                 quote::quote! {
                     #name::#variant_name => {
-                        #iter_name::#variant_name ( std::iter::empty::<&#lifetime #matching_type_path>() )
+                        #iter_name::#variant_name ( std::iter::empty::<&#lifetime mut #matching_type_path>() )
                     }
                 }
             },
@@ -585,7 +585,7 @@ impl MethodMatchingArm for RegularVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl MethodMatchingArm for WrapperOrRegularVariant<'_, AccessorTraitInfo> {
+impl MethodMatchingArm for WrapperOrRegularVariant<'_, AccessorMutTraitInfo> {
     fn method_arm(&self) -> TokenStream {
         match self {
             WrapperOrRegularVariant::Wrapper(wrapper) => wrapper.method_arm(),
@@ -594,7 +594,7 @@ impl MethodMatchingArm for WrapperOrRegularVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl MethodMatchingArm for WrapperVariant<'_, AccessorTraitInfo> {
+impl MethodMatchingArm for WrapperVariant<'_, AccessorMutTraitInfo> {
     fn method_arm(&self) -> TokenStream {
         match self {
             WrapperVariant::Named(named) => named.method_arm(),
@@ -603,7 +603,7 @@ impl MethodMatchingArm for WrapperVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl MethodMatchingArm for NamedWrapperVariant<'_, AccessorTraitInfo> {
+impl MethodMatchingArm for NamedWrapperVariant<'_, AccessorMutTraitInfo> {
     fn method_arm(&self) -> TokenStream {
         let name = &self.ctx.input.ident;
         let method_name = &self.ctx.trait_info.method_name;
@@ -620,7 +620,7 @@ impl MethodMatchingArm for NamedWrapperVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl MethodMatchingArm for UnnamedWrapperVariant<'_, AccessorTraitInfo> {
+impl MethodMatchingArm for UnnamedWrapperVariant<'_, AccessorMutTraitInfo> {
     fn method_arm(&self) -> TokenStream {
         let name = &self.ctx.input.ident;
         let method_name = &self.ctx.trait_info.method_name;
@@ -646,7 +646,7 @@ trait IterVariantDef {
     fn iter_variant(&self) -> TokenStream;
 }
 
-impl IterVariantDef for RegularVariant<'_, AccessorTraitInfo> {
+impl IterVariantDef for RegularVariant<'_, AccessorMutTraitInfo> {
     fn iter_variant(&self) -> TokenStream {
         let variant_name = self.variant_name;
         let lifetime = &self.ctx.trait_info.lifetime;
@@ -654,7 +654,7 @@ impl IterVariantDef for RegularVariant<'_, AccessorTraitInfo> {
         let iter_type = match &self.matching_fields {
             MatchingFields::Named(fields) => fields.iter_type(),
             MatchingFields::Unnamed(fields) => fields.iter_type(),
-            MatchingFields::Unit => quote! { std::iter::Empty<&#lifetime #matching_type_path> },
+            MatchingFields::Unit => quote! { std::iter::Empty<&#lifetime mut #matching_type_path> },
         };
         quote::quote! {
             #variant_name (#iter_type)
@@ -662,7 +662,7 @@ impl IterVariantDef for RegularVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl IterVariantDef for WrapperOrRegularVariant<'_, AccessorTraitInfo> {
+impl IterVariantDef for WrapperOrRegularVariant<'_, AccessorMutTraitInfo> {
     fn iter_variant(&self) -> TokenStream {
         match self {
             WrapperOrRegularVariant::Wrapper(wrapper) => wrapper.iter_variant(),
@@ -671,7 +671,7 @@ impl IterVariantDef for WrapperOrRegularVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl IterVariantDef for WrapperVariant<'_, AccessorTraitInfo> {
+impl IterVariantDef for WrapperVariant<'_, AccessorMutTraitInfo> {
     fn iter_variant(&self) -> TokenStream {
         match self {
             WrapperVariant::Named(named) => named.iter_variant(),
@@ -680,7 +680,7 @@ impl IterVariantDef for WrapperVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl IterVariantDef for NamedWrapperVariant<'_, AccessorTraitInfo> {
+impl IterVariantDef for NamedWrapperVariant<'_, AccessorMutTraitInfo> {
     fn iter_variant(&self) -> TokenStream {
         let variant_name = &self.variant_name;
         let wraps_type = &self.wraps_type;
@@ -692,7 +692,7 @@ impl IterVariantDef for NamedWrapperVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl IterVariantDef for UnnamedWrapperVariant<'_, AccessorTraitInfo> {
+impl IterVariantDef for UnnamedWrapperVariant<'_, AccessorMutTraitInfo> {
     fn iter_variant(&self) -> TokenStream {
         let variant_name = &self.variant_name;
         let wraps_type = &self.wraps_type;
@@ -710,7 +710,7 @@ trait IterNextArm {
 
 macro_rules! impl_iter_next_arm {
     ($variant:ident) => {
-        impl IterNextArm for $variant<'_, AccessorTraitInfo> {
+        impl IterNextArm for $variant<'_, AccessorMutTraitInfo> {
             fn iter_next_arm(&self) -> TokenStream {
                 let name = &self.ctx.input.ident;
                 let iter_name = format_ident!("{}{}", name, self.ctx.trait_info.iter_name);
@@ -729,7 +729,7 @@ impl_iter_next_arm!(RegularVariant);
 impl_iter_next_arm!(NamedWrapperVariant);
 impl_iter_next_arm!(UnnamedWrapperVariant);
 
-impl IterNextArm for WrapperVariant<'_, AccessorTraitInfo> {
+impl IterNextArm for WrapperVariant<'_, AccessorMutTraitInfo> {
     fn iter_next_arm(&self) -> TokenStream {
         match self {
             WrapperVariant::Named(named) => named.iter_next_arm(),
@@ -738,7 +738,7 @@ impl IterNextArm for WrapperVariant<'_, AccessorTraitInfo> {
     }
 }
 
-impl IterNextArm for WrapperOrRegularVariant<'_, AccessorTraitInfo> {
+impl IterNextArm for WrapperOrRegularVariant<'_, AccessorMutTraitInfo> {
     fn iter_next_arm(&self) -> TokenStream {
         match self {
             WrapperOrRegularVariant::Wrapper(wrapper) => wrapper.iter_next_arm(),
@@ -800,7 +800,7 @@ mod tests {
             }
         };
         // insta::assert_snapshot!(generate(input.clone()));
-        insta::assert_snapshot!(rustfmt(derive_accessor!(
+        insta::assert_snapshot!(rustfmt(derive_accessor_mut!(
             &input,
             "regions",
             kirin_ir::Region,
@@ -883,27 +883,8 @@ mod tests {
         insta::assert_snapshot!(generate(input));
     }
 
-    #[test]
-    fn test_unit_struct() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            struct TestStruct;
-        };
-        insta::assert_snapshot!(generate(input));
-    }
-
-    #[test]
-    fn test_unit_enum() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            enum TestEnum {
-                VariantA,
-                VariantB,
-            }
-        };
-        insta::assert_snapshot!(generate(input));
-    }
-
     fn generate(input: syn::DeriveInput) -> String {
-        rustfmt(derive_accessor!(
+        rustfmt(derive_accessor_mut!(
             &input,
             "arguments",
             kirin_ir::SSAValue,

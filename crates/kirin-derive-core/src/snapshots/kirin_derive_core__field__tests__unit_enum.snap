@@ -1,0 +1,26 @@
+---
+source: crates/kirin-derive-core/src/field.rs
+expression: generate(input)
+---
+impl<'a> kirin_ir::HasArguments<'a> for TestEnum {
+    type Iter = TestEnumArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            TestEnum::VariantA => TestEnumArgumentsIter::VariantA(std::iter::empty()),
+            TestEnum::VariantB => TestEnumArgumentsIter::VariantB(std::iter::empty()),
+        }
+    }
+}
+pub enum TestEnumArgumentsIter<'a> {
+    VariantA(std::iter::Empty<()>),
+    VariantB(std::iter::Empty<()>),
+}
+impl<'a> Iterator for TestEnumArgumentsIter<'a> {
+    type Item = &'a kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            TestEnumArgumentsIter::VariantA(iter) => iter.next(),
+            TestEnumArgumentsIter::VariantB(iter) => iter.next(),
+        }
+    }
+}

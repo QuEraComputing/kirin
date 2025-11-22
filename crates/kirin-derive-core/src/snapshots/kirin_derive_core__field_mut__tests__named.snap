@@ -1,0 +1,37 @@
+---
+source: crates/kirin-derive-core/src/field_mut.rs
+expression: generate(input)
+---
+impl<'a> kirin_ir::HasArguments<'a> for ControlFlowInstruction {
+    type Iter = ControlFlowInstructionArgumentsIterMut<'a>;
+    fn arguments(&'a mut self) -> Self::Iter {
+        match self {
+            ControlFlowInstruction::Branch { .. } => {
+                ControlFlowInstructionArgumentsIterMut::Branch(std::iter::empty())
+            }
+            ControlFlowInstruction::ConditionalBranch { condition, .. } => {
+                ControlFlowInstructionArgumentsIterMut::ConditionalBranch(std::iter::once(
+                    condition,
+                ))
+            }
+            ControlFlowInstruction::Return(field_0, ..) => {
+                ControlFlowInstructionArgumentsIterMut::Return(std::iter::once(field_0))
+            }
+        }
+    }
+}
+pub enum ControlFlowInstructionArgumentsIterMut<'a> {
+    Branch(std::iter::Empty<&'a mut kirin_ir::SSAValue>),
+    ConditionalBranch(std::iter::Once<&'a kirin_ir::SSAValue>),
+    Return(std::iter::Once<&'a mut kirin_ir::SSAValue>),
+}
+impl<'a> Iterator for ControlFlowInstructionArgumentsIterMut<'a> {
+    type Item = &'a mut kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ControlFlowInstructionArgumentsIterMut::Branch(iter) => iter.next(),
+            ControlFlowInstructionArgumentsIterMut::ConditionalBranch(iter) => iter.next(),
+            ControlFlowInstructionArgumentsIterMut::Return(iter) => iter.next(),
+        }
+    }
+}

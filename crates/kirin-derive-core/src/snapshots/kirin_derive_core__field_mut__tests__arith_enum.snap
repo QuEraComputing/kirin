@@ -1,0 +1,40 @@
+---
+source: crates/kirin-derive-core/src/field_mut.rs
+expression: "rustfmt(derive_accessor_mut!(&input, \"regions\", kirin_ir::Region,\nkirin_ir::HasRegions))"
+---
+impl<'a, T> kirin_ir::HasRegions<'a> for ArithInstruction<T> {
+    type Iter = ArithInstructionRegionsIterMut<'a>;
+    fn regions(&'a mut self) -> Self::Iter {
+        match self {
+            ArithInstruction::Add(field_0, field_1, field_2, field_3, ..) => {
+                ArithInstructionRegionsIterMut::Add(std::iter::empty())
+            }
+            ArithInstruction::Sub(field_0, field_1, field_2, field_3, ..) => {
+                ArithInstructionRegionsIterMut::Sub(std::iter::empty())
+            }
+            ArithInstruction::Mul(field_0, field_1, field_2, ..) => {
+                ArithInstructionRegionsIterMut::Mul(std::iter::empty())
+            }
+            ArithInstruction::Div(field_0, field_1, field_2, ..) => {
+                ArithInstructionRegionsIterMut::Div(std::iter::empty())
+            }
+        }
+    }
+}
+pub enum ArithInstructionRegionsIterMut<'a> {
+    Add(std::iter::Empty<&'a mut kirin_ir::Region>),
+    Sub(std::iter::Empty<&'a mut kirin_ir::Region>),
+    Mul(std::iter::Empty<&'a mut kirin_ir::Region>),
+    Div(std::iter::Empty<&'a mut kirin_ir::Region>),
+}
+impl<'a> Iterator for ArithInstructionRegionsIterMut<'a> {
+    type Item = &'a mut kirin_ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ArithInstructionRegionsIterMut::Add(iter) => iter.next(),
+            ArithInstructionRegionsIterMut::Sub(iter) => iter.next(),
+            ArithInstructionRegionsIterMut::Mul(iter) => iter.next(),
+            ArithInstructionRegionsIterMut::Div(iter) => iter.next(),
+        }
+    }
+}

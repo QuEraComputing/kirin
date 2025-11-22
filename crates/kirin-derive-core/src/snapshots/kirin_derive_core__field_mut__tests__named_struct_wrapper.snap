@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-core/src/field_mut.rs
+expression: generate(input)
+---
+impl<'a, T> kirin_ir::HasArguments<'a> for TestStruct<T> {
+    type Iter = <InnerStruct<T> as kirin_ir::HasArguments>::Iter;
+    fn arguments(&'a mut self) -> Self::Iter {
+        let Self { wrapped, .. } = self;
+        <InnerStruct<T> as kirin_ir::HasArguments>::arguments(wrapped)
+    }
+}

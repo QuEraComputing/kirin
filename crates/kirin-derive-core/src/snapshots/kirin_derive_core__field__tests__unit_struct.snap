@@ -1,0 +1,10 @@
+---
+source: crates/kirin-derive-core/src/field.rs
+expression: generate(input)
+---
+impl<'a> kirin_ir::HasArguments<'a> for TestStruct {
+    type Iter = std::iter::Empty<&'a ()>;
+    fn arguments(&'a self) -> Self::Iter {
+        std::iter::empty()
+    }
+}

@@ -1,0 +1,42 @@
+---
+source: crates/kirin-derive-core/src/field_mut.rs
+expression: generate(input)
+---
+impl<'a, T> kirin_ir::HasArguments<'a> for TestEnum<T> {
+    type Iter = TestEnumArgumentsIterMut<'a>;
+    fn arguments(&'a mut self) -> Self::Iter {
+        match self {
+            TestEnum::VariantA { a, c, .. } => {
+                TestEnumArgumentsIterMut::VariantA(std::iter::once(a).chain(std::iter::once(c)))
+            }
+            TestEnum::VariantB(field_0, field_1, field_2, ..) => {
+                TestEnumArgumentsIterMut::VariantB(
+                    std::iter::once(field_0).chain(std::iter::once(field_2)),
+                )
+            }
+        }
+    }
+}
+pub enum TestEnumArgumentsIterMut<'a> {
+    VariantA(
+        std::iter::Chain<
+            std::iter::Once<&'a kirin_ir::SSAValue>,
+            std::iter::Once<&'a kirin_ir::SSAValue>,
+        >,
+    ),
+    VariantB(
+        std::iter::Chain<
+            std::iter::Once<&'a mut kirin_ir::SSAValue>,
+            std::iter::Once<&'a mut kirin_ir::SSAValue>,
+        >,
+    ),
+}
+impl<'a> Iterator for TestEnumArgumentsIterMut<'a> {
+    type Item = &'a mut kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            TestEnumArgumentsIterMut::VariantA(iter) => iter.next(),
+            TestEnumArgumentsIterMut::VariantB(iter) => iter.next(),
+        }
+    }
+}
