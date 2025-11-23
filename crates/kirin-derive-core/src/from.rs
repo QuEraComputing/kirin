@@ -5,81 +5,46 @@ use crate::data::*;
 #[macro_export]
 macro_rules! derive_from {
     ($input:expr) => {{
-        let ctx = Context::new(FromTraitInfo::default(), $input);
-        let data = DataTrait::new(&ctx);
-        ctx.generate_from(&data)
+        let trait_info = FromInfo::default();
+        let data = Data::builder()
+            .trait_info(&trait_info)
+            .input($input)
+            .build();
+        trait_info.generate_from(&data)
     }};
 }
 
-pub struct FromTraitInfo {
-    method_name: syn::Ident,
-    trait_path: syn::Path,
-    generics: syn::Generics,
+#[derive(Clone, Default)]
+pub struct FromInfo(syn::Generics);
+
+impl StatementFields<'_> for FromInfo {
+    type FieldsType = ();
+    type InfoType = ();
 }
 
-impl Default for FromTraitInfo {
-    fn default() -> Self {
-        FromTraitInfo {
-            method_name: syn::Ident::new("from", proc_macro2::Span::call_site()),
-            trait_path: syn::parse_quote! { From },
-            generics: syn::Generics::default(),
-        }
-    }
-}
-
-impl<'input> TraitInfo<'input> for FromTraitInfo {
-    type GlobalAttributeData = ();
-    type MatchingFields = ();
-    fn method_name(&self) -> &syn::Ident {
-        &self.method_name
-    }
-
-    fn default_crate_path(&self) -> syn::Path {
-        syn::parse_quote! { ::core::convert }
-    }
-
-    fn relative_trait_path(&self) -> &syn::Path {
-        &self.trait_path
-    }
-
+impl HasTraitGenerics for FromInfo {
     fn trait_generics(&self) -> &syn::Generics {
-        &self.generics
+        &self.0
     }
 }
 
-impl FromStructFields<'_, FromTraitInfo> for () {
-    fn from_struct_fields(
-        _ctx: &crate::data::Context<'_, FromTraitInfo>,
-        _parent: &syn::DataStruct,
-        _fields: &syn::Fields,
-    ) -> Self {
-        ()
-    }
-}
-
-impl FromVariantFields<'_, FromTraitInfo> for () {
-    fn from_variant_fields(
-        _ctx: &crate::data::Context<'_, FromTraitInfo>,
-        _parent: &syn::Variant,
-        _fields: &syn::Fields,
-    ) -> Self {
-        ()
-    }
-}
-
-impl GenerateFrom<'_, NamedWrapperStruct<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(
-        &self,
-        data: &NamedWrapperStruct<'_, FromTraitInfo>,
-    ) -> proc_macro2::TokenStream {
-        let name = &data.ctx.input.ident;
+impl GenerateFrom<'_, NamedWrapperStruct<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, data: &NamedWrapperStruct<'_, FromInfo>) -> proc_macro2::TokenStream {
+        let name = &data.input.ident;
         let wraps = &data.wraps;
         let wraps_type = &data.wraps_type;
-        let (impl_generics, ty_generics, where_clause) = data.ctx.input.generics.split_for_impl();
 
-        let syn::Data::Struct(data) = &data.ctx.input.data else {
+        let SplitForImpl {
+            impl_generics,
+            trait_ty_generics: _,
+            input_ty_generics,
+            where_clause,
+        } = data.split_for_impl(&self);
+
+        let syn::Data::Struct(data) = &data.input.data else {
             panic!("GenerateFrom for FromTraitInfo only supports structs");
         };
+
         let initialization = data
             .fields
             .iter()
@@ -97,7 +62,10 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, FromTraitInfo>> for FromTraitInfo {
             .collect::<Vec<_>>();
 
         quote! {
-            impl #impl_generics From<#wraps_type> for #name #ty_generics #where_clause {
+            impl #impl_generics ::core::convert::From<#wraps_type>
+                for #name #input_ty_generics
+                #where_clause
+            {
                 fn from(v: #wraps_type) -> Self {
                     Self { #(#initialization),* }
                 }
@@ -106,19 +74,23 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, FromTraitInfo>> for FromTraitInfo {
     }
 }
 
-impl GenerateFrom<'_, UnnamedWrapperStruct<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(
-        &self,
-        data: &UnnamedWrapperStruct<'_, FromTraitInfo>,
-    ) -> proc_macro2::TokenStream {
-        let name = &data.ctx.input.ident;
+impl GenerateFrom<'_, UnnamedWrapperStruct<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, data: &UnnamedWrapperStruct<'_, FromInfo>) -> proc_macro2::TokenStream {
+        let name = &data.input.ident;
         let wraps = &data.wraps;
         let wraps_type = &data.wraps_type;
-        let (impl_generics, ty_generics, where_clause) = data.ctx.input.generics.split_for_impl();
 
-        let syn::Data::Struct(data) = &data.ctx.input.data else {
+        let SplitForImpl {
+            impl_generics,
+            trait_ty_generics: _,
+            input_ty_generics,
+            where_clause,
+        } = data.split_for_impl(&self);
+
+        let syn::Data::Struct(data) = &data.input.data else {
             panic!("GenerateFrom for FromTraitInfo only supports structs");
         };
+
         let initialization = data
             .fields
             .iter()
@@ -133,7 +105,10 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, FromTraitInfo>> for FromTraitInfo
             .collect::<Vec<_>>();
 
         quote! {
-            impl #impl_generics From<#wraps_type> for #name #ty_generics #where_clause {
+            impl #impl_generics ::core::convert::From<#wraps_type>
+                for #name #input_ty_generics
+                #where_clause
+            {
                 fn from(v: #wraps_type) -> Self {
                     Self(#(#initialization),*)
                 }
@@ -142,12 +117,28 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, FromTraitInfo>> for FromTraitInfo
     }
 }
 
-impl GenerateFrom<'_, WrapperEnum<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(&self, data: &WrapperEnum<'_, FromTraitInfo>) -> proc_macro2::TokenStream {
+impl GenerateFrom<'_, WrapperEnum<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, data: &WrapperEnum<'_, FromInfo>) -> proc_macro2::TokenStream {
+        let SplitForImpl {
+            impl_generics,
+            trait_ty_generics: _,
+            input_ty_generics,
+            where_clause,
+        } = data.split_for_impl(&self);
+
         let variants = data
             .variants
             .iter()
-            .map(|variant| self.generate_from(variant))
+            .map(|variant| {
+                let method = self.generate_from(variant);
+                let enum_name = &data.input.ident;
+                let wraps_type = &variant.wraps_type();
+                quote! {
+                    impl #impl_generics From<#wraps_type> for #enum_name #input_ty_generics #where_clause {
+                        #method
+                    }
+                }
+            })
             .collect::<Vec<_>>();
 
         quote! {
@@ -156,12 +147,33 @@ impl GenerateFrom<'_, WrapperEnum<'_, FromTraitInfo>> for FromTraitInfo {
     }
 }
 
-impl GenerateFrom<'_, EitherEnum<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(&self, data: &EitherEnum<'_, FromTraitInfo>) -> proc_macro2::TokenStream {
+impl GenerateFrom<'_, EitherEnum<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, data: &EitherEnum<'_, FromInfo>) -> proc_macro2::TokenStream {
+        let SplitForImpl {
+            impl_generics,
+            trait_ty_generics: _,
+            input_ty_generics,
+            where_clause,
+        } = data.split_for_impl(&self);
+
         let variants = data
             .variants
             .iter()
-            .map(|variant| self.generate_from(variant))
+            .map(|variant| {
+                let method = self.generate_from(variant);
+                match variant {
+                    EitherVariant::Wrapper(variant) => {
+                        let enum_name = &data.input.ident;
+                        let wraps_type = &variant.wraps_type();
+                        quote! {
+                            impl #impl_generics From<#wraps_type> for #enum_name #input_ty_generics #where_clause {
+                                #method
+                            }
+                        }
+                    }
+                    _ => quote! {},
+                }
+            })
             .collect::<Vec<_>>();
         quote! {
             #(#variants)*
@@ -169,20 +181,17 @@ impl GenerateFrom<'_, EitherEnum<'_, FromTraitInfo>> for FromTraitInfo {
     }
 }
 
-impl GenerateFrom<'_, WrapperOrRegularVariant<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(
-        &self,
-        data: &WrapperOrRegularVariant<'_, FromTraitInfo>,
-    ) -> proc_macro2::TokenStream {
+impl GenerateFrom<'_, EitherVariant<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, data: &EitherVariant<'_, FromInfo>) -> proc_macro2::TokenStream {
         match data {
-            WrapperOrRegularVariant::Wrapper(data) => self.generate_from(data),
-            WrapperOrRegularVariant::Regular(data) => self.generate_from(data),
+            EitherVariant::Wrapper(v) => self.generate_from(v),
+            EitherVariant::Regular(v) => self.generate_from(v),
         }
     }
 }
 
-impl GenerateFrom<'_, WrapperVariant<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(&self, data: &WrapperVariant<'_, FromTraitInfo>) -> proc_macro2::TokenStream {
+impl GenerateFrom<'_, WrapperVariant<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, data: &WrapperVariant<'_, FromInfo>) -> proc_macro2::TokenStream {
         match data {
             WrapperVariant::Named(data) => self.generate_from(data),
             WrapperVariant::Unnamed(data) => self.generate_from(data),
@@ -190,25 +199,14 @@ impl GenerateFrom<'_, WrapperVariant<'_, FromTraitInfo>> for FromTraitInfo {
     }
 }
 
-impl GenerateFrom<'_, NamedWrapperVariant<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(
-        &self,
-        data: &NamedWrapperVariant<'_, FromTraitInfo>,
-    ) -> proc_macro2::TokenStream {
-        let enum_name = &data.ctx.input.ident;
-        let variant_name = &data.variant_name;
+impl GenerateFrom<'_, NamedWrapperVariant<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, data: &NamedWrapperVariant<'_, FromInfo>) -> proc_macro2::TokenStream {
         let wraps = &data.wraps;
         let wraps_type = &data.wraps_type;
-        let (impl_generics, ty_generics, where_clause) = data.ctx.input.generics.split_for_impl();
-        let syn::Data::Enum(data) = &data.ctx.input.data else {
-            panic!("GenerateFrom for FromTraitInfo only supports enums");
-        };
-        let variant = data
-            .variants
-            .iter()
-            .find(|v| &v.ident == *variant_name)
-            .expect("Variant not found");
-        let initialization = variant
+        let variant_name = &data.variant_name;
+
+        let initialization = data
+            .variant
             .fields
             .iter()
             .map(|f| {
@@ -225,34 +223,24 @@ impl GenerateFrom<'_, NamedWrapperVariant<'_, FromTraitInfo>> for FromTraitInfo 
             .collect::<Vec<_>>();
 
         quote! {
-            impl #impl_generics From<#wraps_type> for #enum_name #ty_generics #where_clause {
-                fn from(v: #wraps_type) -> Self {
-                    Self::#variant_name { #(#initialization),* }
-                }
+            fn from(v: #wraps_type) -> Self {
+                Self::#variant_name { #(#initialization),* }
             }
         }
     }
 }
 
-impl GenerateFrom<'_, UnnamedWrapperVariant<'_, FromTraitInfo>> for FromTraitInfo {
+impl GenerateFrom<'_, UnnamedWrapperVariant<'_, FromInfo>> for FromInfo {
     fn generate_from(
         &self,
-        data: &UnnamedWrapperVariant<'_, FromTraitInfo>,
+        data: &UnnamedWrapperVariant<'_, FromInfo>,
     ) -> proc_macro2::TokenStream {
-        let enum_name = &data.ctx.input.ident;
-        let variant_name = &data.variant_name;
         let wraps = &data.wraps;
         let wraps_type = &data.wraps_type;
-        let (impl_generics, ty_generics, where_clause) = data.ctx.input.generics.split_for_impl();
-        let syn::Data::Enum(data) = &data.ctx.input.data else {
-            panic!("GenerateFrom for FromTraitInfo only supports enums");
-        };
-        let variant = data
-            .variants
-            .iter()
-            .find(|v| &v.ident == *variant_name)
-            .expect("Variant not found");
-        let initialization = variant
+        let variant_name = &data.variant_name;
+
+        let initialization = data
+            .variant
             .fields
             .iter()
             .enumerate()
@@ -266,32 +254,31 @@ impl GenerateFrom<'_, UnnamedWrapperVariant<'_, FromTraitInfo>> for FromTraitInf
             .collect::<Vec<_>>();
 
         quote! {
-            impl #impl_generics From<#wraps_type> for #enum_name #ty_generics #where_clause {
-                fn from(v: #wraps_type) -> Self {
-                    Self::#variant_name(#(#initialization),*)
-                }
+            fn from(v: #wraps_type) -> Self {
+                Self::#variant_name(#(#initialization),*)
             }
         }
     }
 }
 
-impl GenerateFrom<'_, RegularStruct<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(&self, _data: &RegularStruct<'_, FromTraitInfo>) -> proc_macro2::TokenStream {
+impl GenerateFrom<'_, RegularStruct<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, _data: &RegularStruct<'_, FromInfo>) -> proc_macro2::TokenStream {
         quote! {}
     }
 }
 
-impl GenerateFrom<'_, RegularEnum<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(&self, _data: &RegularEnum<'_, FromTraitInfo>) -> proc_macro2::TokenStream {
+impl GenerateFrom<'_, RegularEnum<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, _data: &RegularEnum<'_, FromInfo>) -> proc_macro2::TokenStream {
         quote! {}
     }
 }
 
-impl GenerateFrom<'_, RegularVariant<'_, FromTraitInfo>> for FromTraitInfo {
-    fn generate_from(&self, _data: &RegularVariant<'_, FromTraitInfo>) -> proc_macro2::TokenStream {
+impl GenerateFrom<'_, RegularVariant<'_, FromInfo>> for FromInfo {
+    fn generate_from(&self, _data: &RegularVariant<'_, FromInfo>) -> proc_macro2::TokenStream {
         quote! {}
     }
 }
+
 
 #[cfg(test)]
 mod tests {

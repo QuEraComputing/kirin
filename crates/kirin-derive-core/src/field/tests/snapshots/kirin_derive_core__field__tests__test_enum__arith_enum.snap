@@ -1,0 +1,60 @@
+---
+source: crates/kirin-derive-core/src/field/tests/test_enum.rs
+expression: generate(input)
+---
+impl<'a, T> ::kirin::ir::HasArguments<'a> for ArithInstruction<T> {
+    type Iter = ArithInstructionArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            ArithInstruction::Add(field_0, field_1, field_2, field_3, ..) => {
+                ArithInstructionArgumentsIter::Add(std::iter::once(field_0).chain(field_1.iter()))
+            }
+            ArithInstruction::Sub(field_0, field_1, field_2, field_3, ..) => {
+                ArithInstructionArgumentsIter::Sub(std::iter::once(field_0).chain(field_1.iter()))
+            }
+            ArithInstruction::Mul(field_0, field_1, field_2, ..) => {
+                ArithInstructionArgumentsIter::Mul(std::iter::once(field_0).chain(field_1.iter()))
+            }
+            ArithInstruction::Div(field_0, field_1, field_2, ..) => {
+                ArithInstructionArgumentsIter::Div(std::iter::once(field_0).chain(field_1.iter()))
+            }
+        }
+    }
+}
+pub enum ArithInstructionArgumentsIter<'a> {
+    Add(
+        std::iter::Chain<
+            std::iter::Once<&'a ::kirin::ir::SSAValue>,
+            std::slice::Iter<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+    Sub(
+        std::iter::Chain<
+            std::iter::Once<&'a ::kirin::ir::SSAValue>,
+            std::slice::Iter<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+    Mul(
+        std::iter::Chain<
+            std::iter::Once<&'a ::kirin::ir::SSAValue>,
+            std::slice::Iter<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+    Div(
+        std::iter::Chain<
+            std::iter::Once<&'a ::kirin::ir::SSAValue>,
+            std::slice::Iter<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+}
+impl<'a> Iterator for ArithInstructionArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ArithInstructionArgumentsIter::Add(iter) => iter.next(),
+            ArithInstructionArgumentsIter::Sub(iter) => iter.next(),
+            ArithInstructionArgumentsIter::Mul(iter) => iter.next(),
+            ArithInstructionArgumentsIter::Div(iter) => iter.next(),
+        }
+    }
+}

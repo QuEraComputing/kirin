@@ -2,9 +2,9 @@
 source: crates/kirin-derive-core/src/check.rs
 expression: generate(input)
 ---
-impl<T> ::kirin::ir::CheckConstant for WrapperStruct<T> {
+impl<T> ::kirin::ir::IsConstant for WrapperStruct<T> {
     fn is_constant(&self) -> bool {
         let Self { field, .. } = self;
-        <T as ::kirin::ir::CheckConstant>::is_constant(field)
+        <T as ::kirin::ir::IsConstant>::is_constant(field)
     }
 }

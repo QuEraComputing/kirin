@@ -5,7 +5,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum Type {
+pub enum SimpleTypeLattice {
     Any,
     Int,
     Float,
@@ -13,9 +13,9 @@ pub enum Type {
     Bottom,
 }
 
-pub use Type::*;
+pub use SimpleTypeLattice::*;
 
-impl Lattice for Type {
+impl Lattice for SimpleTypeLattice {
     fn is_subseteq(&self, other: &Self) -> bool {
         matches!((self, other), (a, b) if a == b)
     }
@@ -26,7 +26,7 @@ impl Lattice for Type {
         } else if other.is_subseteq(self) {
             self.clone()
         } else {
-            Type::Any
+            SimpleTypeLattice::Any
         }
     }
 
@@ -36,27 +36,28 @@ impl Lattice for Type {
         } else if other.is_subseteq(self) {
             other.clone()
         } else {
-            Type::Bottom
+            SimpleTypeLattice::Bottom
         }
     }
 }
 
-impl FiniteLattice for Type {
+impl FiniteLattice for SimpleTypeLattice {
     fn bottom() -> Self {
-        Type::Bottom
+        SimpleTypeLattice::Bottom
     }
 
     fn top() -> Self {
-        Type::Any
+        SimpleTypeLattice::Any
     }
 }
 
-impl TypeLattice for Type {}
-impl CompileTimeValue for Type {}
+impl crate::TypeLattice for SimpleTypeLattice {}
+
+impl CompileTimeValue for SimpleTypeLattice {}
 impl CompileTimeValue for i64 {}
-impl Typeof<SimpleLanguage> for i64 {
-    fn type_of(&self) -> Type {
-        Type::Int
+impl Typeof<SimpleTypeLattice> for i64 {
+    fn type_of(&self) -> SimpleTypeLattice {
+        SimpleTypeLattice::Int
     }
 }
 
@@ -81,11 +82,11 @@ impl std::hash::Hash for Value {
 }
 
 impl CompileTimeValue for Value {}
-impl Typeof<SimpleLanguage> for Value {
-    fn type_of(&self) -> Type {
+impl Typeof<SimpleTypeLattice> for Value {
+    fn type_of(&self) -> SimpleTypeLattice {
         match self {
-            Value::I64(_) => Type::Int,
-            Value::F64(_) => Type::Float,
+            Value::I64(_) => SimpleTypeLattice::Int,
+            Value::F64(_) => SimpleTypeLattice::Float,
         }
     }
 }
@@ -111,24 +112,32 @@ pub enum SimpleLanguage {
 }
 
 impl SimpleLanguage {
-    pub fn op_add(
-        arena: &mut Arena<Self>,
+    pub fn op_add<L: Language + From<Self>>(
+        arena: &mut Arena<L>,
         arg_0: impl Into<SSAValue>,
         arg_1: impl Into<SSAValue>,
-    ) -> AddRef {
+    ) -> AddRef
+    where
+        L::TypeLattice: From<SimpleTypeLattice>,
+    {
         let arg_0 = arg_0.into();
         let arg_1 = arg_1.into();
-        let parent = StatementId(arena.statements.len());
+        let id = StatementId(arena.statements.len());
         let result_id = ResultValue(arena.ssas.len());
-        let ssa = SSAInfo::new(result_id.into(), None, Float, SSAKind::Result(parent, 0));
+        let ssa = SSAInfo::new(
+            result_id.into(),
+            None,
+            L::TypeLattice::from(Float),
+            SSAKind::Result(id, 0),
+        );
         arena.ssas.push(ssa);
         arena.statements.push(StatementInfo {
-            node: LinkedListNode::new(parent),
+            node: LinkedListNode::new(id),
             parent: None,
-            definition: SimpleLanguage::Add(arg_0, arg_1, result_id),
+            definition: SimpleLanguage::Add(arg_0, arg_1, result_id).into(),
         });
         AddRef {
-            id: parent,
+            id,
             arg_0,
             arg_1,
             result_0: result_id,
@@ -166,7 +175,7 @@ impl SimpleLanguage {
         let ssa = SSAInfo::new(
             result_id.into(),
             None,
-            Type::Any,
+            SimpleTypeLattice::Any,
             SSAKind::Result(parent, 0),
         );
         arena.ssas.push(ssa);
@@ -245,7 +254,7 @@ impl From<ReturnRef> for StatementId {
 }
 
 impl Language for SimpleLanguage {
-    type Type = Type;
+    type TypeLattice = SimpleTypeLattice;
 }
 
 impl<'a> HasArguments<'a> for SimpleLanguage {
@@ -342,4 +351,4 @@ impl IsTerminator for SimpleLanguage {
     }
 }
 
-impl<'a> Statement<'a> for SimpleLanguage {}
+impl Statement for SimpleLanguage {}

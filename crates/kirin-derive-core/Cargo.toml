@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bon = "3.8.1"
 either = "1.15.0"
 eyre = "0.6.12"
 proc-macro2 = "1.0.103"

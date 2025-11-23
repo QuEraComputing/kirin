@@ -5,7 +5,7 @@ use crate::{Arena, Language};
 pub struct BlockBuilder<'a, L: Language> {
     arena: &'a mut Arena<L>,
     parent: Option<Region>,
-    arguments: Vec<(L::Type, Option<String>)>,
+    arguments: Vec<(L::TypeLattice, Option<String>)>,
     statements: Vec<StatementId>,
     terminator: Option<StatementId>,
 }
@@ -28,13 +28,13 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
     }
 
     /// Add an argument to the block.
-    pub fn argument<T: Into<L::Type>>(mut self, ty: T) -> Self {
+    pub fn argument<T: Into<L::TypeLattice>>(mut self, ty: T) -> Self {
         self.arguments.push((ty.into(), None));
         self
     }
 
     /// Add an argument with a name to the block.
-    pub fn argument_with_name<T: Into<L::Type>, S: Into<String>>(mut self, name: S, ty: T) -> Self {
+    pub fn argument_with_name<T: Into<L::TypeLattice>, S: Into<String>>(mut self, name: S, ty: T) -> Self {
         self.arguments.push((ty.into(), Some(name.into())));
         self
     }

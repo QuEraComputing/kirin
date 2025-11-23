@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-core/src/empty.rs
+expression: generate(input)
+---
+impl ::my_crate::EmptyTrait for MyStruct {}

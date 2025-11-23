@@ -1,0 +1,37 @@
+---
+source: crates/kirin-derive-core/src/field/tests/test_enum.rs
+expression: generate(input)
+---
+impl<'a> ::kirin::ir::HasArguments<'a> for ControlFlowInstruction {
+    type Iter = ControlFlowInstructionArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            ControlFlowInstruction::Branch { .. } => {
+                ControlFlowInstructionArgumentsIter::Branch(std::iter::empty::<
+                    &'a ::kirin::ir::SSAValue,
+                >())
+            }
+            ControlFlowInstruction::ConditionalBranch { condition, .. } => {
+                ControlFlowInstructionArgumentsIter::ConditionalBranch(std::iter::once(condition))
+            }
+            ControlFlowInstruction::Return(field_0, ..) => {
+                ControlFlowInstructionArgumentsIter::Return(std::iter::once(field_0))
+            }
+        }
+    }
+}
+pub enum ControlFlowInstructionArgumentsIter<'a> {
+    Branch(std::iter::Empty<&'a ::kirin::ir::SSAValue>),
+    ConditionalBranch(std::iter::Once<&'a ::kirin::ir::SSAValue>),
+    Return(std::iter::Once<&'a ::kirin::ir::SSAValue>),
+}
+impl<'a> Iterator for ControlFlowInstructionArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ControlFlowInstructionArgumentsIter::Branch(iter) => iter.next(),
+            ControlFlowInstructionArgumentsIter::ConditionalBranch(iter) => iter.next(),
+            ControlFlowInstructionArgumentsIter::Return(iter) => iter.next(),
+        }
+    }
+}

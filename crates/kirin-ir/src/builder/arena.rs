@@ -75,7 +75,7 @@ impl<L: Language> Arena<L> {
     pub fn ssa(
         &mut self,
         #[builder(into)] name: Option<String>,
-        ty: L::Type,
+        ty: L::TypeLattice,
         kind: SSAKind,
     ) -> SSAValue {
         let id = SSAValue(self.ssas.len());
@@ -95,7 +95,7 @@ impl<L: Language> Arena<L> {
         let ssa = SSAInfo::new(
             id.into(),
             None,
-            L::Type::top(),
+            L::TypeLattice::top(),
             SSAKind::BuilderBlockArgument(index),
         );
         self.ssas.push(ssa);
@@ -118,8 +118,8 @@ impl<L: Language> Arena<L> {
     pub fn staged_function(
         &mut self,
         #[builder(into)] name: Option<String>,
-        params_type: Option<&[L::Type]>,
-        return_type: Option<L::Type>,
+        params_type: Option<&[L::TypeLattice]>,
+        return_type: Option<L::TypeLattice>,
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
     ) -> StagedFunction {
@@ -130,7 +130,7 @@ impl<L: Language> Arena<L> {
             signature: params_type
                 .map(|pts| Signature(pts.to_vec()))
                 .unwrap_or(Signature(Vec::new())),
-            return_type: return_type.unwrap_or(L::Type::top()),
+            return_type: return_type.unwrap_or(L::TypeLattice::top()),
             specializations: specializations.unwrap_or_default(),
             backedges: backedges.unwrap_or_default(),
         };
@@ -142,8 +142,8 @@ impl<L: Language> Arena<L> {
     pub fn specialize(
         &mut self,
         f: StagedFunction,
-        params_type: Option<&[L::Type]>,
-        return_type: Option<L::Type>,
+        params_type: Option<&[L::TypeLattice]>,
+        return_type: Option<L::TypeLattice>,
         #[builder(into)] body: StatementId,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> SpecializedFunction {

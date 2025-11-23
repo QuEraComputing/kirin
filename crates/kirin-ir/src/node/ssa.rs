@@ -46,13 +46,13 @@ pub struct TestSSAValue(pub usize);
 pub struct SSAInfo<L: Language> {
     pub(crate) id: SSAValue,
     pub(crate) name: Option<Symbol>,
-    pub(crate) ty: L::Type,
+    pub(crate) ty: L::TypeLattice,
     pub(crate) kind: SSAKind,
     pub(crate) uses: HashSet<Use>,
 }
 
 impl<L: Language> SSAInfo<L> {
-    pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::Type, kind: SSAKind) -> Self {
+    pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::TypeLattice, kind: SSAKind) -> Self {
         Self {
             id,
             name,

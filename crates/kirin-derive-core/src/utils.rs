@@ -15,6 +15,24 @@ pub fn to_camel_case(s: impl AsRef<str>) -> String {
     result
 }
 
+pub fn to_snake_case(s: impl AsRef<str>) -> String {
+    let s = s.as_ref();
+    let mut result = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() {
+            if i != 0 {
+                result.push('_');
+            }
+            for lower_c in c.to_lowercase() {
+                result.push(lower_c);
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 pub fn is_type<I>(ty: &syn::Type, name: &I) -> bool
 where
     I: ?Sized,
@@ -75,6 +93,17 @@ mod tests {
         assert_eq!(
             to_camel_case("with__double__underscores"),
             "WithDoubleUnderscores"
+        );
+    }
+
+    #[test]
+    fn test_to_snake_case() {
+        assert_eq!(to_snake_case("MyStructName"), "my_struct_name");
+        assert_eq!(to_snake_case("AnotherExample"), "another_example");
+        assert_eq!(to_snake_case("Simple"), "simple");
+        assert_eq!(
+            to_snake_case("WithDoubleUnderscores"),
+            "with_double_underscores"
         );
     }
 

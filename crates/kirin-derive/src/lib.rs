@@ -2,46 +2,24 @@ extern crate proc_macro;
 
 use kirin_derive_core::{derive_from, prelude::*};
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 use syn::parse_macro_input;
 
 #[proc_macro_derive(Statement, attributes(kirin))]
 pub fn derive_statement(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    let arguments = derive_accessor!(&ast, "arguments", SSAValue, HasArguments);
-    let arguments_mut = derive_accessor_mut!(&ast, "arguments_mut", SSAValue, HasArgumentsMut);
-    let results = derive_accessor!(&ast, "results", ResultValue, HasResults);
-    let results_mut = derive_accessor_mut!(&ast, "results_mut", ResultValue, HasResultsMut);
-    let successors = derive_accessor!(&ast, "successors", Block, HasSuccessors);
-    let successors_mut = derive_accessor_mut!(&ast, "successors_mut", Block, HasSuccessorsMut);
-    let regions = derive_accessor!(&ast, "regions", Region, HasRegions);
-    let regions_mut = derive_accessor_mut!(&ast, "regions_mut", Region, HasRegionsMut);
+    let arguments = derive_field_iter!(&ast, "arguments", SSAValue, HasArguments);
+    let arguments_mut = derive_field_iter_mut!(&ast, "arguments_mut", SSAValue, HasArgumentsMut);
+    let results = derive_field_iter!(&ast, "results", ResultValue, HasResults);
+    let results_mut = derive_field_iter_mut!(&ast, "results_mut", ResultValue, HasResultsMut);
+    let successors = derive_field_iter!(&ast, "successors", Block, HasSuccessors);
+    let successors_mut = derive_field_iter_mut!(&ast, "successors_mut", Block, HasSuccessorsMut);
+    let regions = derive_field_iter!(&ast, "regions", Region, HasRegions);
+    let regions_mut = derive_field_iter_mut!(&ast, "regions_mut", Region, HasRegionsMut);
     let is_terminator = derive_check!(&ast, is_terminator, IsTerminator);
     let is_constant = derive_check!(&ast, is_constant, IsConstant);
     let is_pure = derive_check!(&ast, is_pure, IsPure);
     let from = derive_from!(&ast);
-
-    let name = &ast.ident;
-    let lifetime = syn::Lifetime::new("'a", Span::call_site());
-    let mut trait_generics = ast.generics.clone();
-    trait_generics
-        .params
-        .push(syn::GenericParam::Lifetime(syn::LifetimeParam::new(
-            lifetime.clone(),
-        )));
-    let attrs = KirinAttribute::from_global_attrs(&ast.attrs);
-    let (trait_impl_generics, _, _) = trait_generics.split_for_impl();
-    let (_, input_ty_generics, input_where_clause) = ast.generics.split_for_impl();
-    let trait_path = if let Some(crate_path) = attrs.crate_path {
-        let mut path = crate_path.clone();
-        path.segments.push(syn::PathSegment::from(syn::Ident::new(
-            "Statement",
-            Span::call_site(),
-        )));
-        path
-    } else {
-        syn::parse_quote! { ::kirin::ir::Statement }
-    };
+    let statement = derive_empty!(&ast, Statement, ::kirin::ir);
 
     let generated = quote::quote! {
         #arguments
@@ -57,7 +35,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
         #is_pure
         #from
 
-        impl #trait_impl_generics #trait_path<#lifetime> for #name #input_ty_generics #input_where_clause {} // Use the extracted name here
+        #statement
     };
     generated.into()
 }
@@ -65,65 +43,65 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(HasArguments, attributes(kirin))]
 pub fn derive_has_arguments(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    derive_accessor!(
-        &ast,
-        "arguments",
-        ::kirin::ir::SSAValue,
-        ::kirin::ir::HasArguments
-    )
-    .into()
+    derive_field_iter!(&ast, "arguments", SSAValue, HasArguments).into()
+}
+
+#[proc_macro_derive(HasArgumentsMut, attributes(kirin))]
+pub fn derive_has_arguments_mut(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    derive_field_iter_mut!(&ast, "arguments_mut", SSAValue, HasArgumentsMut).into()
 }
 
 #[proc_macro_derive(HasResults, attributes(kirin))]
 pub fn derive_has_results(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    derive_accessor!(
-        &ast,
-        "results",
-        ::kirin::ir::ResultValue,
-        ::kirin::ir::HasResults
-    )
-    .into()
+    derive_field_iter!(&ast, "results", ResultValue, HasResults).into()
+}
+
+#[proc_macro_derive(HasResultsMut, attributes(kirin))]
+pub fn derive_has_results_mut(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    derive_field_iter_mut!(&ast, "results_mut", ResultValue, HasResultsMut).into()
 }
 
 #[proc_macro_derive(HasSuccessors, attributes(kirin))]
 pub fn derive_has_successors(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    derive_accessor!(
-        &ast,
-        "successors",
-        ::kirin::ir::Block,
-        ::kirin::ir::HasSuccessors
-    )
-    .into()
+    derive_field_iter!(&ast, "successors", Block, HasSuccessors).into()
+}
+
+#[proc_macro_derive(HasSuccessorsMut, attributes(kirin))]
+pub fn derive_has_successors_mut(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    derive_field_iter_mut!(&ast, "successors_mut", Block, HasSuccessorsMut).into()
 }
 
 #[proc_macro_derive(HasRegions, attributes(kirin))]
 pub fn derive_has_regions(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    derive_accessor!(
-        &ast,
-        "regions",
-        ::kirin::ir::Region,
-        ::kirin::ir::HasRegions
-    )
-    .into()
+    derive_field_iter!(&ast, "regions", Region, HasRegions).into()
+}
+
+#[proc_macro_derive(HasRegionsMut, attributes(kirin))]
+pub fn derive_has_regions_mut(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    derive_field_iter_mut!(&ast, "regions_mut", Region, HasRegionsMut).into()
 }
 
 #[proc_macro_derive(IsTerminator, attributes(kirin))]
 pub fn derive_is_terminator(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    derive_check!(&ast, is_terminator, ::kirin::ir::IsTerminator).into()
+    derive_check!(&ast, is_terminator, IsTerminator).into()
 }
 
 #[proc_macro_derive(IsConstant, attributes(kirin))]
 pub fn derive_is_constant(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    derive_check!(&ast, is_constant, ::kirin::ir::IsConstant).into()
+    derive_check!(&ast, is_constant, IsConstant).into()
 }
 
 #[proc_macro_derive(IsPure, attributes(kirin))]
 pub fn derive_is_pure(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    derive_check!(&ast, is_pure, ::kirin::ir::IsPure).into()
+    derive_check!(&ast, is_pure, IsPure).into()
 }

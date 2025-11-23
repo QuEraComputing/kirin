@@ -2,7 +2,7 @@
 source: crates/kirin-derive-core/src/from.rs
 expression: generate(input)
 ---
-impl From<Other> for WrapperStruct {
+impl ::core::convert::From<Other> for WrapperStruct {
     fn from(v: Other) -> Self {
         Self {
             a: Default::default(),

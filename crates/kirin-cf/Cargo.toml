@@ -1,0 +1,7 @@
+[package]
+name = "kirin-cf"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin = { version = "0.1.0", path = "../.." }

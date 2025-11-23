@@ -1,0 +1,30 @@
+---
+source: crates/kirin-derive-core/src/field/tests/test_enum_mut.rs
+expression: generate(input)
+---
+impl<'a, T> ::kirin::ir::HasArgumentsMut<'a> for TestEnum<T> {
+    type Iter = TestEnumArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::Iter {
+        match self {
+            TestEnum::VariantA { wrapped, .. } => TestEnumArgumentsMutIter::VariantA(
+                <InnerStructA<T> as ::kirin::ir::HasArgumentsMut>::arguments_mut(wrapped),
+            ),
+            TestEnum::VariantB(field_0, ..) => TestEnumArgumentsMutIter::VariantB(
+                <InnerStructB as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+        }
+    }
+}
+pub enum TestEnumArgumentsMutIter<'a, T> {
+    VariantA(<InnerStructA<T> as ::kirin::ir::HasArgumentsMut<'a>>::Iter),
+    VariantB(<InnerStructB as ::kirin::ir::HasArgumentsMut<'a>>::Iter),
+}
+impl<'a, T> Iterator for TestEnumArgumentsMutIter<'a, T> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            TestEnumArgumentsMutIter::VariantA(iter) => iter.next(),
+            TestEnumArgumentsMutIter::VariantB(iter) => iter.next(),
+        }
+    }
+}

@@ -10,8 +10,19 @@ pub enum Stage {
     StageB(ir::Arena<LangB>),
 }
 
-#[derive(Clone, Debug, ir::Statement)]
-#[kirin(wraps)]
+impl ir::StageInfo for Stage {
+    fn add_function(&mut self, f: &kirin_ir::FunctionInfo) {
+        match self {
+            Stage::StageA(arena) => {
+                let _ = arena.get_staged_function_mut(f.staged_function);
+            }
+            Stage::StageB(arena) => {
+                let _ = arena.get_staged_function_mut(f.staged_function);
+            }
+        }
+    }
+}
+
 pub enum LangA {
     Arith(dialects::arith::ArithInstruction),
     Constant(dialects::constant::Constant<Value>),

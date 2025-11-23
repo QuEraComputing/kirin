@@ -95,7 +95,7 @@ pub struct StagedFunctionInfo<L: Language> {
     pub(crate) id: StagedFunction,
     pub(crate) name: Option<Symbol>,
     pub(crate) signature: Signature<L>,
-    pub(crate) return_type: L::Type,
+    pub(crate) return_type: L::TypeLattice,
     pub(crate) specializations: Vec<SpecializedFunctionInfo<L>>,
     /// Functions that call this staged function (used for inter-procedural analyses).
     /// note that the call statement must refer to the `StagedFunction` ID,
@@ -114,7 +114,7 @@ impl<L: Language> StagedFunctionInfo<L> {
         &self.signature
     }
 
-    pub fn return_type(&self) -> &L::Type {
+    pub fn return_type(&self) -> &L::TypeLattice {
         &self.return_type
     }
 
@@ -162,7 +162,7 @@ impl<L: Language> StagedFunctionInfo<L> {
 pub struct SpecializedFunctionInfo<L: Language> {
     id: SpecializedFunction,
     signature: Signature<L>,
-    return_type: L::Type,
+    return_type: L::TypeLattice,
     body: StatementId,
     /// Functions that call this function (used for inter-procedural analyses).
     backedges: Vec<SpecializedFunction>,
@@ -177,7 +177,7 @@ impl<L: Language> SpecializedFunctionInfo<L> {
         /// The signature of this specialized function.
         signature: Signature<L>,
         /// The return type of this specialized function.
-        return_type: L::Type,
+        return_type: L::TypeLattice,
         /// The body of this specialized function.
         body: StatementId,
         /// The functions that call this specialized function.
@@ -194,7 +194,7 @@ impl<L: Language> SpecializedFunctionInfo<L> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Signature<L: Language>(pub Vec<L::Type>);
+pub struct Signature<L: Language>(pub Vec<L::TypeLattice>);
 
 impl<L: Language> PartialEq for Signature<L> {
     fn eq(&self, other: &Self) -> bool {
@@ -251,7 +251,7 @@ impl<L: Language> SpecializedFunctionInfo<L> {
         &mut self.body
     }
 
-    pub fn return_type(&self) -> &L::Type {
+    pub fn return_type(&self) -> &L::TypeLattice {
         &self.return_type
     }
 

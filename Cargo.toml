@@ -9,11 +9,11 @@ salsa = "0.24.0"
 serde = { version = "1.0.228", optional = true }
 
 [workspace]
-members = ["crates/kirin-derive", "crates/kirin-derive-core", "crates/kirin-ir"]
+members = [ "crates/bloqade", "crates/kirin-cf", "crates/kirin-constant","crates/kirin-derive", "crates/kirin-derive-core", "crates/kirin-ir", "crates/kirin-scf", "crates/kirin-text-format"]
 
 [features]
 serde = ["dep:serde"]
 
-[[example]]
-name = "simple"
-path = "example/simple.rs"
+# [[example]]
+# name = "simple"
+# path = "example/simple.rs"

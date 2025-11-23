@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-core/src/field/tests/test_struct.rs
+expression: generate(input)
+---
+impl<'a, T> ::kirin::ir::HasArguments<'a> for TestStruct<T> {
+    type Iter = <T as ::kirin::ir::HasArguments>::Iter;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self(field_0, field_1, ..) = self;
+        <T as ::kirin::ir::HasArguments>::arguments(field_1)
+    }
+}

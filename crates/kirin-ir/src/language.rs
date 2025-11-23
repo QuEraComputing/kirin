@@ -53,20 +53,20 @@ pub trait IsPure {
 }
 
 /// An instruction combines several traits to provide a complete interface.
-pub trait Statement<'a>: HasArguments<'a>
-    + HasResults<'a>
-    + HasArgumentsMut<'a>
-    + HasResultsMut<'a>
-    + HasSuccessors<'a>
-    + HasSuccessorsMut<'a>
-    + HasRegions<'a>
-    + HasRegionsMut<'a>
+pub trait Statement: for<'a> HasArguments<'a>
+    + for<'a> HasResults<'a>
+    + for<'a> HasArgumentsMut<'a>
+    + for<'a> HasResultsMut<'a>
+    + for<'a> HasSuccessors<'a>
+    + for<'a> HasSuccessorsMut<'a>
+    + for<'a> HasRegions<'a>
+    + for<'a> HasRegionsMut<'a>
     + IsTerminator
     + IsConstant
     + IsPure
 {
 }
 
-pub trait Language: std::fmt::Debug + Clone + for<'a> Statement<'a> {
-    type Type: TypeLattice;
+pub trait Language: std::fmt::Debug + Clone + Statement {
+    type TypeLattice: TypeLattice;
 }

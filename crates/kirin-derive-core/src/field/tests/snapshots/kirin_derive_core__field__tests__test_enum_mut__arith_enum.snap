@@ -1,0 +1,68 @@
+---
+source: crates/kirin-derive-core/src/field/tests/test_enum_mut.rs
+expression: generate(input)
+---
+impl<'a, T> ::kirin::ir::HasArgumentsMut<'a> for ArithInstruction<T> {
+    type Iter = ArithInstructionArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::Iter {
+        match self {
+            ArithInstruction::Add(field_0, field_1, field_2, field_3, ..) => {
+                ArithInstructionArgumentsMutIter::Add(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
+            }
+            ArithInstruction::Sub(field_0, field_1, field_2, field_3, ..) => {
+                ArithInstructionArgumentsMutIter::Sub(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
+            }
+            ArithInstruction::Mul(field_0, field_1, field_2, ..) => {
+                ArithInstructionArgumentsMutIter::Mul(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
+            }
+            ArithInstruction::Div(field_0, field_1, field_2, ..) => {
+                ArithInstructionArgumentsMutIter::Div(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
+            }
+        }
+    }
+}
+pub enum ArithInstructionArgumentsMutIter<'a> {
+    Add(
+        std::iter::Chain<
+            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+            std::slice::IterMut<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+    Sub(
+        std::iter::Chain<
+            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+            std::slice::IterMut<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+    Mul(
+        std::iter::Chain<
+            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+            std::slice::IterMut<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+    Div(
+        std::iter::Chain<
+            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+            std::slice::IterMut<'a, ::kirin::ir::SSAValue>,
+        >,
+    ),
+}
+impl<'a> Iterator for ArithInstructionArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ArithInstructionArgumentsMutIter::Add(iter) => iter.next(),
+            ArithInstructionArgumentsMutIter::Sub(iter) => iter.next(),
+            ArithInstructionArgumentsMutIter::Mul(iter) => iter.next(),
+            ArithInstructionArgumentsMutIter::Div(iter) => iter.next(),
+        }
+    }
+}
