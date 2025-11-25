@@ -36,7 +36,6 @@ class HintLen(RewriteRule):
         if (coll_len := self._get_collection_len(node.value)) is None:
             return RewriteResult()
 
-        print(id(node), id(node.value), id(node.result), node.result.name, coll_len)
         existing_hint = node.result.hints.get("const")
         new_hint = const.Value(coll_len)
 
