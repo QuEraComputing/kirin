@@ -76,12 +76,44 @@ class FromPythonAST(ABC):
         raise BuildError(f"unreachable reached for {node.__class__.__name__}")
 
     @staticmethod
+    def _flatten_hint_binop(node: ast.expr) -> list[ast.expr]:
+        """Flatten a binary operation tree into a list of expressions.
+
+        This is useful for handling union types represented as binary operations.
+        """
+        hints = []
+
+        def _recurse(n: ast.expr):
+            if isinstance(n, ast.BinOp):
+                _recurse(n.left)
+                _recurse(n.right)
+            else:
+                hints.append(n)
+
+        _recurse(node)
+        return hints
+
+    @staticmethod
     def get_hint(state: State[ast.AST], node: ast.expr | None) -> types.TypeAttribute:
         if node is None:
             return types.AnyType()
 
+        # deal with union syntax
+        if isinstance(node, ast.BinOp):
+            hint_nodes = FromPythonAST._flatten_hint_binop(node)
+            hint_ts = []
+            for i in range(len(hint_nodes)):
+                hint_ts.append(
+                    FromPythonAST.get_hint(
+                        state,
+                        hint_nodes[i],
+                    )
+                )
+            return types.Union(hint_ts)
+
         try:
             t = state.get_global(node).data
+
             return types.hint2type(t)
         except Exception as e:  # noqa: E722
             raise BuildError(f"expect a type hint, got {ast.unparse(node)}") from e
