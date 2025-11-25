@@ -48,7 +48,6 @@ impl GenerateFrom<'_, RegularEnum<'_, FieldIterInfo>> for FieldIterInfo {
             .iter()
             .map(|variant| variant.generate_iterator_next_arm(&iter_name));
 
-
         quote::quote! {
             impl #impl_generics #trait_path #trait_ty_generics for #name #input_ty_generics #where_clause {
                 type Iter = #iter_name<#lifetime>;

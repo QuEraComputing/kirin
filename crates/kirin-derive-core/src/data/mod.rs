@@ -1,11 +1,11 @@
-mod traits;
 mod attrs;
+mod data;
 mod enum_impl;
 mod struct_impl;
-mod data;
+mod traits;
 
 pub use attrs::*;
-pub use traits::*;
+pub use data::Data;
 pub use enum_impl::*;
 pub use struct_impl::*;
-pub use data::Data;
+pub use traits::*;

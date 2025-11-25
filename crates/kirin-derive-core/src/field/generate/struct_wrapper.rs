@@ -8,7 +8,10 @@ use crate::data::{
 };
 
 impl GenerateFrom<'_, NamedWrapperStruct<'_, FieldIterInfo>> for FieldIterInfo {
-    fn generate_from(&self, data: &NamedWrapperStruct<'_, FieldIterInfo>) -> proc_macro2::TokenStream {
+    fn generate_from(
+        &self,
+        data: &NamedWrapperStruct<'_, FieldIterInfo>,
+    ) -> proc_macro2::TokenStream {
         let SplitForImpl {
             impl_generics,
             input_ty_generics,

@@ -29,11 +29,7 @@ impl NamedFields {
             .collect()
     }
 
-    pub fn iterator(
-        &self,
-        mutable: bool,
-        item: &TokenStream,
-    ) -> TokenStream {
+    pub fn iterator(&self, mutable: bool, item: &TokenStream) -> TokenStream {
         self.0
             .iter()
             .map(|f| match f {

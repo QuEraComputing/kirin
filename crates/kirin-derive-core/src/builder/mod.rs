@@ -184,4 +184,3 @@ mod tests {
         rustfmt(derive_builder!(input))
     }
 }
-

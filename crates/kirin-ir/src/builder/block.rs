@@ -34,7 +34,11 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
     }
 
     /// Add an argument with a name to the block.
-    pub fn argument_with_name<T: Into<L::TypeLattice>, S: Into<String>>(mut self, name: S, ty: T) -> Self {
+    pub fn argument_with_name<T: Into<L::TypeLattice>, S: Into<String>>(
+        mut self,
+        name: S,
+        ty: T,
+    ) -> Self {
         self.arguments.push((ty.into(), Some(name.into())));
         self
     }

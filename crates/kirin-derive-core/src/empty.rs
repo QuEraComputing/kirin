@@ -23,10 +23,7 @@ pub struct Empty {
 }
 
 impl Empty {
-    pub fn new(
-        crate_path: syn::Path,
-        trait_path: syn::Path,
-    ) -> Self {
+    pub fn new(crate_path: syn::Path, trait_path: syn::Path) -> Self {
         Self {
             crate_path,
             trait_path,
@@ -37,13 +34,13 @@ impl Empty {
 
 impl HasDefaultCratePath for Empty {
     fn default_crate_path(&self) -> syn::Path {
-        self.crate_path.clone()       
+        self.crate_path.clone()
     }
 }
 
 impl HasGenerics for Empty {
     fn generics(&self) -> &syn::Generics {
-        &self.generics       
+        &self.generics
     }
 }
 

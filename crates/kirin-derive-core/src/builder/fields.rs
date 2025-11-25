@@ -46,7 +46,11 @@ impl Fields {
             .collect()
     }
 
-    pub fn build_results(&self, crate_path: &syn::Path, statement_id: &syn::Ident) -> Vec<TokenStream> {
+    pub fn build_results(
+        &self,
+        crate_path: &syn::Path,
+        statement_id: &syn::Ident,
+    ) -> Vec<TokenStream> {
         self.0
             .iter()
             .filter(|f| f.is_result)

@@ -1,6 +1,10 @@
 use crate::{Language, node::region::Region};
 
-use super::{linked_list::{LinkedListNode, LinkedList}, ssa::BlockArgument, stmt::StatementId};
+use super::{
+    linked_list::{LinkedList, LinkedListNode},
+    ssa::BlockArgument,
+    stmt::StatementId,
+};
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

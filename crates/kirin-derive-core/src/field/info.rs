@@ -18,7 +18,8 @@ macro_rules! derive_field_iter {
         .and_then(|ti| {
             let data = Data::builder().trait_info(&ti).input($input).build();
             Ok(ti.generate_from(&data))
-        }).unwrap_or_else(|e| e.to_compile_error())
+        })
+        .unwrap_or_else(|e| e.to_compile_error())
     }};
 }
 
@@ -37,7 +38,8 @@ macro_rules! derive_field_iter_mut {
                 .input($input)
                 .build();
             Ok(trait_info.generate_from(&data))
-        }).unwrap_or_else(|e| e.to_compile_error())
+        })
+        .unwrap_or_else(|e| e.to_compile_error())
     }};
 }
 

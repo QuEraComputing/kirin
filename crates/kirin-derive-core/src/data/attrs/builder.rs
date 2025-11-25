@@ -57,7 +57,10 @@ impl std::fmt::Debug for FieldBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FieldBuilder")
             .field("into", &self.into)
-            .field("default", &self.default.as_ref().map(|e| e.to_token_stream()))
+            .field(
+                "default",
+                &self.default.as_ref().map(|e| e.to_token_stream()),
+            )
             .field("ty", &self.ty.as_ref().map(|e| e.to_token_stream()))
             .finish()
     }

@@ -53,7 +53,8 @@ pub trait IsPure {
 }
 
 /// An instruction combines several traits to provide a complete interface.
-pub trait Statement: for<'a> HasArguments<'a>
+pub trait Statement:
+    for<'a> HasArguments<'a>
     + for<'a> HasResults<'a>
     + for<'a> HasArgumentsMut<'a>
     + for<'a> HasResultsMut<'a>

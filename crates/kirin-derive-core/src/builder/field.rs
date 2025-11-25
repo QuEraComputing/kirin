@@ -45,7 +45,9 @@ impl FieldInfo {
     }
 
     pub fn build_input(&self, crate_path: &syn::Path) -> TokenStream {
-        let FieldInfo { name, is_input_ssa, .. } = self;
+        let FieldInfo {
+            name, is_input_ssa, ..
+        } = self;
         if *is_input_ssa {
             return quote! { let #name: #crate_path::SSAValue = #name.into(); };
         }

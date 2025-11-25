@@ -21,14 +21,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
-name = "bloqade"
-version = "0.1.0"
-dependencies = [
- "kirin",
- "kirin-constant",
-]
-
-[[package]]
 name = "bon"
 version = "3.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -290,7 +282,6 @@ dependencies = [
 name = "kirin-derive"
 version = "0.1.0"
 dependencies = [
- "eyre",
  "kirin-derive-core",
  "proc-macro2",
  "quote",
@@ -302,8 +293,6 @@ name = "kirin-derive-core"
 version = "0.1.0"
 dependencies = [
  "bon",
- "either",
- "eyre",
  "insta",
  "proc-macro2",
  "quote",

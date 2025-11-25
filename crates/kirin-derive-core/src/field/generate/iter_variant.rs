@@ -85,24 +85,20 @@ impl IteratorVariant for WrapperVariant<'_, FieldIterInfo> {
         item: &TokenStream,
     ) -> TokenStream {
         match self {
-            WrapperVariant::Named(variant) => {
-                variant.generate_iterator_variant(
-                    trait_info,
-                    trait_path,
-                    trait_ty_generics,
-                    matching_type,
-                    item,
-                )
-            }
-            WrapperVariant::Unnamed(variant) => {
-                variant.generate_iterator_variant(
-                    trait_info,
-                    trait_path,
-                    trait_ty_generics,
-                    matching_type,
-                    item,
-                )
-            }
+            WrapperVariant::Named(variant) => variant.generate_iterator_variant(
+                trait_info,
+                trait_path,
+                trait_ty_generics,
+                matching_type,
+                item,
+            ),
+            WrapperVariant::Unnamed(variant) => variant.generate_iterator_variant(
+                trait_info,
+                trait_path,
+                trait_ty_generics,
+                matching_type,
+                item,
+            ),
         }
     }
 }
@@ -117,24 +113,20 @@ impl IteratorVariant for EitherVariant<'_, FieldIterInfo> {
         item: &TokenStream,
     ) -> TokenStream {
         match self {
-            EitherVariant::Regular(variant) => {
-                variant.generate_iterator_variant(
-                    trait_info,
-                    trait_path,
-                    trait_ty_generics,
-                    matching_type,
-                    item,
-                )
-            }
-            EitherVariant::Wrapper(variant) => {
-                variant.generate_iterator_variant(
-                    trait_info,
-                    trait_path,
-                    trait_ty_generics,
-                    matching_type,
-                    item,
-                )
-            }
+            EitherVariant::Regular(variant) => variant.generate_iterator_variant(
+                trait_info,
+                trait_path,
+                trait_ty_generics,
+                matching_type,
+                item,
+            ),
+            EitherVariant::Wrapper(variant) => variant.generate_iterator_variant(
+                trait_info,
+                trait_path,
+                trait_ty_generics,
+                matching_type,
+                item,
+            ),
         }
     }
 }

@@ -42,11 +42,8 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, FromInfo>> for FromInfo {
         } = data.split_for_impl(&self);
 
         let syn::Data::Struct(data) = &data.input.data else {
-            return syn::Error::new_spanned(
-                &data.input.ident,
-                "only supports structs",
-            )
-            .to_compile_error();
+            return syn::Error::new_spanned(&data.input.ident, "only supports structs")
+                .to_compile_error();
         };
 
         let initialization = data
@@ -60,11 +57,8 @@ impl GenerateFrom<'_, NamedWrapperStruct<'_, FromInfo>> for FromInfo {
                         quote! { #name: Default::default() }
                     }
                 } else {
-                    return syn::Error::new_spanned(
-                        &f,
-                        "only supports named fields",
-                    )
-                    .to_compile_error();
+                    return syn::Error::new_spanned(&f, "only supports named fields")
+                        .to_compile_error();
                 }
             })
             .collect::<Vec<_>>();
@@ -96,11 +90,8 @@ impl GenerateFrom<'_, UnnamedWrapperStruct<'_, FromInfo>> for FromInfo {
         } = data.split_for_impl(&self);
 
         let syn::Data::Struct(data) = &data.input.data else {
-            return syn::Error::new_spanned(
-                &data.input.ident,
-                "only supports structs",
-            )
-            .to_compile_error();
+            return syn::Error::new_spanned(&data.input.ident, "only supports structs")
+                .to_compile_error();
         };
 
         let initialization = data
@@ -229,11 +220,8 @@ impl GenerateFrom<'_, NamedWrapperVariant<'_, FromInfo>> for FromInfo {
                         quote! { #name: Default::default() }
                     }
                 } else {
-                    return syn::Error::new_spanned(
-                        &f,
-                        "only supports named fields",
-                    )
-                    .to_compile_error();
+                    return syn::Error::new_spanned(&f, "only supports named fields")
+                        .to_compile_error();
                 }
             })
             .collect::<Vec<_>>();

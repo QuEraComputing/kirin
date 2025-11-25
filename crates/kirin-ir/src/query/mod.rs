@@ -1,3 +1,3 @@
 mod info;
 
-pub use info::{Info, LinkedListInfo, LinkedListElem, ParentInfo};
+pub use info::{Info, LinkedListElem, LinkedListInfo, ParentInfo};
