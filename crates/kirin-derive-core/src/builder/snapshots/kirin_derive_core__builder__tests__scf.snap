@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-core/src/builder/mod.rs
+expression: generate(&input)
+---
+

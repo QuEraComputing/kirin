@@ -13,7 +13,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
     {
         let teststruct_statement_id = arena.new_statement_id();
         let value = value.into();
-        let input_ssa = input_ssa.into();
+        let input_ssa: ::kirin::ir::SSAValue = input_ssa.into();
         let marker = std::marker::PhantomData;
         let result: ::kirin::ir::ResultValue = arena
             .ssa()

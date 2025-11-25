@@ -21,11 +21,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
         let crate_path = data.crate_root_path(self);
         let statement = format_ident!("{}_statement", name.to_string().to_lowercase());
         let statement_id = format_ident!("{}_statement_id", name.to_string().to_lowercase());
-        let type_lattice = data
-            .attrs
-            .ty_lattice
-            .clone()
-            .expect("missing #[kirin(type_lattice = ...)], cannot generate the builder");
+        let type_lattice = data.attrs.ty_lattice.clone();
 
         let builder_name = data.attrs.builder.builder_name(&format_ident!("new"));
         let ref_struct_name =
@@ -40,14 +36,34 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
 
         let (impl_generics, ty_generics, where_clause) = data.input.generics.split_for_impl();
 
-        quote! {
-            impl #impl_generics #name #ty_generics #where_clause {
+        let header = if results.is_empty() {
+            quote! {
+                pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+                    arena: &mut #crate_path::Arena<Lang>,
+                    #(#inputs,)*
+                ) -> #ref_struct_name
+            }
+        } else if type_lattice.is_none() {
+            return syn::Error::new_spanned(
+                &data.input.ident,
+                "missing #[kirin(type_lattice = ...)], cannot generate the builder",
+            )
+            .to_compile_error();
+        } else {
+            let type_lattice = type_lattice.unwrap();
+            quote! {
                 pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
                     arena: &mut #crate_path::Arena<Lang>,
                     #(#inputs,)*
                 ) -> #ref_struct_name
                 where
                     Lang::TypeLattice: From<#type_lattice>,
+            }
+        };
+
+        quote! {
+            impl #impl_generics #name #ty_generics #where_clause {
+                #header
                 {
                     let #statement_id = arena.new_statement_id();
                     #(#others)*

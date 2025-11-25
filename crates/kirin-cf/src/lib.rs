@@ -1,7 +1,7 @@
 use kirin::ir::*;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Statement)]
-#[kirin(terminator)]
+#[kirin(terminator, fn)]
 pub enum ControlFlow {
     Branch {
         target: Block,
@@ -12,32 +12,6 @@ pub enum ControlFlow {
         false_target: Block,
     },
     Return(SSAValue),
-}
-
-impl ControlFlow {
-    pub fn branch<L: Language + From<ControlFlow>>(arena: &mut Arena<L>, target: Block) -> StatementId {
-        let instr = ControlFlow::Branch { target };
-        arena.statement().definition(instr).new()
-    }
-
-    pub fn conditional_branch<L: Language + From<ControlFlow>>(
-        arena: &mut Arena<L>,
-        condition: SSAValue,
-        true_target: Block,
-        false_target: Block,
-    ) -> StatementId {
-        let instr = ControlFlow::ConditionalBranch {
-            condition,
-            true_target,
-            false_target,
-        };
-        arena.statement().definition(instr).new()
-    }
-
-    pub fn return_instr<L: Language + From<ControlFlow>>(arena: &mut Arena<L>, value: SSAValue) -> StatementId {
-        let instr = ControlFlow::Return(value);
-        arena.statement().definition(instr).new()
-    }
 }
 
 #[cfg(test)]

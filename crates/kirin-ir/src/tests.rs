@@ -108,6 +108,7 @@ pub enum SimpleLanguage {
         #[kirin(into)] Value,
         #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
     ),
+    #[kirin(terminator)]
     Return(SSAValue),
     Function(
         Region,

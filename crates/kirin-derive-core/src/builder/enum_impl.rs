@@ -9,6 +9,10 @@ use crate::{
 
 impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
     fn generate_from(&self, data: &RegularEnum<'a, Builder>) -> TokenStream {
+        if !data.attrs.builder.is_enabled() {
+            return quote! {};
+        }
+
         let name = &data.input.ident;
         let crate_path = data.crate_root_path(self);
         let snake_case_name = to_snake_case(name.to_string());
@@ -16,20 +20,13 @@ impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
         let statement_id = format_ident!("{}_statement_id", snake_case_name);
 
         let (impl_generics, ty_generics, where_clause) = data.input.generics.split_for_impl();
-
-        let type_lattice = data
-            .attrs
-            .ty_lattice
-            .clone()
-            .expect("missing #[kirin(type_lattice = ...)], cannot generate the builder");
-
         let variants = data.variants.iter().map(|variant| {
             variant_builder(
                 &crate_path,
                 name,
                 &statement,
                 &statement_id,
-                &type_lattice,
+                &data.attrs.ty_lattice,
                 &data.input.generics,
                 variant,
             )
@@ -51,6 +48,10 @@ impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
 
 impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
     fn generate_from(&self, data: &EitherEnum<'a, Builder>) -> TokenStream {
+        if !data.attrs.builder.is_enabled() {
+            return quote! {};
+        }
+
         let name = &data.input.ident;
         let crate_path = data.crate_root_path(self);
         let snake_case_name = to_snake_case(name.to_string());
@@ -58,12 +59,6 @@ impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
         let statement_id = format_ident!("{}_statement_id", snake_case_name);
 
         let (impl_generics, ty_generics, where_clause) = data.input.generics.split_for_impl();
-
-        let type_lattice = data
-            .attrs
-            .ty_lattice
-            .clone()
-            .expect("missing #[kirin(type_lattice = ...)], cannot generate the builder");
 
         let regular_variants = data
             .variants
@@ -80,7 +75,7 @@ impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
                 name,
                 &statement,
                 &statement_id,
-                &type_lattice,
+                &data.attrs.ty_lattice,
                 &data.input.generics,
                 variant,
             )
@@ -104,7 +99,7 @@ fn variant_builder(
     name: &syn::Ident,
     statement: &syn::Ident,
     statement_id: &syn::Ident,
-    type_lattice: &syn::Type,
+    type_lattice: &Option<syn::Type>,
     generics: &syn::Generics,
     variant: &RegularVariant<'_, Builder>,
 ) -> TokenStream {
@@ -123,13 +118,33 @@ fn variant_builder(
     let result_names = variant.fields.result_names();
     let initialization = variant.fields.initialization(&variant.variant.fields);
 
+    let header = if results.is_empty() {
+        quote! {
+            pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+                arena: &mut #crate_path::Arena<Lang>,
+                #(#inputs,)*
+            ) -> #ref_struct_name
+        }
+    } else if type_lattice.is_none() {
+        return syn::Error::new_spanned(
+            &variant_name,
+            "missing #[kirin(type_lattice = ...)], cannot generate the builder",
+        )
+        .to_compile_error();
+    } else {
+        let type_lattice = type_lattice.clone().unwrap();
+        quote! {
+            pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+                arena: &mut #crate_path::Arena<Lang>,
+                #(#inputs,)*
+            ) -> #ref_struct_name
+            where
+                Lang::TypeLattice: From<#type_lattice>,
+        }
+    };
+
     quote! {
-        pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
-            arena: &mut #crate_path::Arena<Lang>,
-            #(#inputs,)*
-        ) -> #ref_struct_name
-        where
-            Lang::TypeLattice: From<#type_lattice>,
+        #header
         {
             let #statement_id = arena.new_statement_id();
             #(#others)*

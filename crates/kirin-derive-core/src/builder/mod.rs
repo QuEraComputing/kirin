@@ -144,7 +144,44 @@ mod tests {
         insta::assert_snapshot!(generate(&input));
     }
 
+    #[test]
+    fn test_multi_results_struct_disabled() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type_lattice = L)]
+            struct MultiResult<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
+                #[kirin(into)]
+                value: T,
+                #[kirin(type = value.type_of())]
+                result1: ResultValue,
+                #[kirin(type = value.type_of())]
+                result2: ResultValue,
+                #[kirin(default = std::marker::PhantomData)]
+                marker: std::marker::PhantomData<L>,
+            }
+        };
+        insta::assert_snapshot!(generate(&input));
+    }
+
+    #[test]
+    fn test_scf() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            pub enum StructuredControlFlow {
+                If {
+                    condition: SSAValue,
+                    then_block: Block,
+                    else_block: Block,
+                },
+                Loop {
+                    body_block: Block,
+                    exit_block: Block,
+                },
+            }
+        };
+        insta::assert_snapshot!(generate(&input));
+    }
+
     fn generate(input: &syn::DeriveInput) -> String {
         rustfmt(derive_builder!(input))
     }
 }
+
