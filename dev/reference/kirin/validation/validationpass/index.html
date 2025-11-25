@@ -97,17 +97,15 @@
 <span class=normal>184</span>
 <span class=normal>185</span>
 <span class=normal>186</span>
-<span class=normal>187</span>
-<span class=normal>188</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>raise_if_invalid</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
+<span class=normal>187</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>raise_if_invalid</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Raise an exception if validation failed.&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_valid</span><span class=p>:</span>
         <span class=n>exceptions</span> <span class=o>=</span> <span class=p>[]</span>
-        <span class=k>for</span> <span class=n>pass_name</span><span class=p>,</span> <span class=n>pass_errors</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>errors</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
-            <span class=k>for</span> <span class=n>err</span> <span class=ow>in</span> <span class=n>pass_errors</span><span class=p>:</span>
-                <span class=n>exceptions</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>err</span><span class=p>)</span>
+        <span class=k>for</span> <span class=n>_</span><span class=p>,</span> <span class=n>pass_errors</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>errors</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
+            <span class=n>exceptions</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=n>pass_errors</span><span class=p>)</span>
 
         <span class=n>message</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_format_errors</span><span class=p>()</span>
-        <span class=k>raise</span> <span class=n>ExceptionGroup</span><span class=p>(</span><span class=n>message</span><span class=p>,</span> <span class=n>exceptions</span><span class=p>)</span>
+        <span class=k>raise</span> <span class=n>ValidationErrorGroup</span><span class=p>(</span><span class=n>message</span><span class=p>,</span> <span class=n>errors</span><span class=o>=</span><span class=n>exceptions</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h2 id=kirin.validation.validationpass.ValidationSuite class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">ValidationSuite</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>ValidationSuite</span><span class=p>(</span>
     <span class=n>passes</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>type</span><span class=p>[</span><span class=n>ValidationPass</span><span class=p>]]</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(),</span>
     <span class=n>fail_fast</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span><span class=p>,</span>
