@@ -1,6 +1,6 @@
 use quote::ToTokens;
 
-use crate::data::{VariantAttribute};
+use crate::data::VariantAttribute;
 
 pub enum WrapperVariant<'input, T> {
     Named(NamedWrapperVariant<'input, T>),
@@ -14,23 +14,26 @@ impl<'input, T> WrapperVariant<'input, T> {
         trait_info: &T,
         attrs: Option<VariantAttribute>,
         variant: &'input syn::Variant,
-    ) -> Self {
+    ) -> syn::Result<Self> {
         match &variant.fields {
-            syn::Fields::Named(_) => Self::Named(
+            syn::Fields::Named(_) => Ok(Self::Named(
                 NamedWrapperVariant::builder()
                     .trait_info(trait_info)
                     .maybe_attrs(attrs)
                     .variant(variant)
-                    .build(),
-            ),
-            syn::Fields::Unnamed(_) => Self::Unnamed(
+                    .build()?,
+            )),
+            syn::Fields::Unnamed(_) => Ok(Self::Unnamed(
                 UnnamedWrapperVariant::builder()
                     .trait_info(trait_info)
                     .maybe_attrs(attrs)
                     .variant(variant)
-                    .build(),
-            ),
-            _ => panic!("WrapperVariant can only be created from named or unnamed fields"),
+                    .build()?,
+            )),
+            _ => Err(syn::Error::new_spanned(
+                variant,
+                "WrapperVariant can only be created from named or unnamed fields",
+            )),
         }
     }
 
@@ -72,47 +75,65 @@ impl<'input, T> NamedWrapperVariant<'input, T> {
         _trait_info: &T,
         attrs: Option<VariantAttribute>,
         variant: &'input syn::Variant,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| VariantAttribute::new(variant));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => VariantAttribute::new(variant)?,
+        };
 
         let syn::Fields::Named(fields) = &variant.fields else {
-            panic!("NamedWrapperVariant can only be created from named fields");
+            return Err(syn::Error::new_spanned(
+                variant,
+                "NamedWrapperVariant can only be created from named fields",
+            ));
         };
 
         if fields.named.len() == 1 {
-            let f = fields.named.first().unwrap();
-            return NamedWrapperVariant {
+            let f = fields
+                .named
+                .first()
+                .ok_or_else(|| syn::Error::new_spanned(variant, "Expected one named field"))?;
+            return Ok(NamedWrapperVariant {
                 variant,
                 attrs,
                 variant_name: &variant.ident,
-                wraps: f.ident.clone().unwrap(),
+                wraps: f.ident.clone().ok_or_else(|| {
+                    syn::Error::new_spanned(f.ident.clone(), "Expected one named field")
+                })?,
                 wraps_type: f.ty.clone(),
                 _marker: std::marker::PhantomData,
-            };
+            });
         }
 
         if let Some(field_attrs) = &attrs.fields {
             for (f, f_attr) in fields.named.iter().zip(field_attrs.iter()) {
                 if let Some(f_attr) = f_attr {
                     if f_attr.wraps {
-                        return NamedWrapperVariant {
+                        return Ok(NamedWrapperVariant {
                             variant,
                             attrs,
                             variant_name: &variant.ident,
-                            wraps: f.ident.clone().unwrap(),
+                            wraps: f.ident.clone().ok_or_else(|| {
+                                syn::Error::new_spanned(
+                                    f.ident.clone(),
+                                    "Expected named field to have an ident",
+                                )
+                            })?,
                             wraps_type: f.ty.clone(),
                             _marker: std::marker::PhantomData,
-                        };
+                        });
                     }
                 }
             }
         }
-        panic!("Variant {} marked as wrapper but could not be parsed as one", variant.ident);
+        return Err(syn::Error::new_spanned(
+            variant,
+            "Variant marked as wrapper but no field marked as wrapper or no single field present",
+        ));
     }
 }
 
-impl<'input, T> std::fmt::Debug for NamedWrapperVariant<'input, T>
-{
+impl<'input, T> std::fmt::Debug for NamedWrapperVariant<'input, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NamedWrapperVariant")
             .field("variant_name", &self.variant_name)
@@ -138,45 +159,56 @@ impl<'input, T> UnnamedWrapperVariant<'input, T> {
         _trait_info: &T,
         attrs: Option<VariantAttribute>,
         variant: &'input syn::Variant,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| VariantAttribute::new(variant));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => VariantAttribute::new(variant)?,
+        };
         let syn::Fields::Unnamed(fields) = &variant.fields else {
-            panic!("UnnamedWrapperVariant can only be created from unnamed fields");
+            return Err(syn::Error::new_spanned(
+                variant,
+                "UnnamedWrapperVariant can only be created from unnamed fields",
+            ));
         };
         if fields.unnamed.len() == 1 {
-            let f = fields.unnamed.first().unwrap();
-            return UnnamedWrapperVariant {
+            let f = fields
+                .unnamed
+                .first()
+                .ok_or_else(|| syn::Error::new_spanned(variant, "Expected one unnamed field"))?;
+            return Ok(UnnamedWrapperVariant {
                 variant,
                 attrs,
                 variant_name: &variant.ident,
                 wraps: 0,
                 wraps_type: f.ty.clone(),
                 _marker: std::marker::PhantomData,
-            };
+            });
         }
 
         if let Some(field_attrs) = &attrs.fields {
             for (index, (f, f_attr)) in fields.unnamed.iter().zip(field_attrs.iter()).enumerate() {
                 if let Some(f_attr) = f_attr {
                     if f_attr.wraps {
-                        return UnnamedWrapperVariant {
+                        return Ok(UnnamedWrapperVariant {
                             variant,
                             attrs,
                             variant_name: &variant.ident,
                             wraps: index,
                             wraps_type: f.ty.clone(),
                             _marker: std::marker::PhantomData,
-                        };
+                        });
                     }
                 }
             }
         }
-        panic!("Variant marked as wrapper but could not be parsed as one");
+        return Err(syn::Error::new_spanned(
+            variant,
+            "Variant marked as wrapper but no field marked as wrapper or no single field present",
+        ));
     }
 }
 
-impl<'input, T> std::fmt::Debug for UnnamedWrapperVariant<'input, T>
-{
+impl<'input, T> std::fmt::Debug for UnnamedWrapperVariant<'input, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UnnamedWrapperVariant")
             .field("variant_name", &self.variant_name)

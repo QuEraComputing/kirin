@@ -5,16 +5,19 @@ use quote::{format_ident, quote};
 #[macro_export]
 macro_rules! derive_check {
     ($input:expr, $method_name:ident, $trait_path:expr) => {{
-        let trait_info = CheckInfo::new(
+        CheckInfo::new(
             stringify!($method_name),
             syn::parse_quote! {$trait_path},
             |attr: &dyn PropertyAttribute| attr.$method_name(),
-        );
-        let data = Data::builder()
-            .trait_info(&trait_info)
-            .input($input)
-            .build();
-        trait_info.generate_from(&data)
+        )
+        .and_then(|trait_info| {
+            let data = Data::builder()
+                .trait_info(&trait_info)
+                .input($input)
+                .build();
+            Ok(trait_info.generate_from(&data))
+        })
+        .unwrap_or_else(|e| e.to_compile_error())
     }};
 }
 
@@ -30,13 +33,13 @@ impl CheckInfo {
         method_name: impl AsRef<str>,
         trait_path: syn::Path,
         f: fn(&dyn PropertyAttribute) -> Option<bool>,
-    ) -> Self {
-        Self {
+    ) -> syn::Result<Self> {
+        Ok(Self {
             f,
             method_name: format_ident!("{}", method_name.as_ref()),
             trait_path,
             generics: syn::Generics::default(),
-        }
+        })
     }
 }
 
@@ -62,8 +65,8 @@ impl FromStruct<'_, CheckInfo> for Option<bool> {
         trait_info: &CheckInfo,
         attrs: &StructAttribute,
         _input: &'_ syn::DeriveInput,
-    ) -> Self {
-        (trait_info.f)(attrs)
+    ) -> syn::Result<Self> {
+        Ok((trait_info.f)(attrs))
     }
 }
 
@@ -72,8 +75,8 @@ impl FromEnum<'_, CheckInfo> for Option<bool> {
         trait_info: &CheckInfo,
         attrs: &EnumAttribute,
         _input: &'_ syn::DeriveInput,
-    ) -> Self {
-        (trait_info.f)(attrs)
+    ) -> syn::Result<Self> {
+        Ok((trait_info.f)(attrs))
     }
 }
 
@@ -83,8 +86,8 @@ impl FromStructFields<'_, CheckInfo> for Option<bool> {
         attrs: &StructAttribute,
         _parent: &'_ syn::DataStruct,
         _fields: &'_ syn::Fields,
-    ) -> Self {
-        (trait_info.f)(attrs)
+    ) -> syn::Result<Self> {
+        Ok((trait_info.f)(attrs))
     }
 }
 
@@ -94,8 +97,8 @@ impl FromVariantFields<'_, CheckInfo> for Option<bool> {
         attrs: &VariantAttribute,
         _parent: &'_ syn::Variant,
         _fields: &'_ syn::Fields,
-    ) -> Self {
-        (trait_info.f)(attrs)
+    ) -> syn::Result<Self> {
+        Ok((trait_info.f)(attrs))
     }
 }
 

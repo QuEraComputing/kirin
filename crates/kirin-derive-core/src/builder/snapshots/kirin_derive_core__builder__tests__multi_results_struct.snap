@@ -4,7 +4,7 @@ expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
     pub fn new<Lang: Language + From<MultiResult<T, L>>>(
-        arena: &mut Arena<Lang>,
+        arena: &mut ::kirin::ir::Arena<Lang>,
         value: impl Into<T>,
     ) -> MultiResultNewRef
     where
@@ -13,13 +13,13 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
         let multiresult_statement_id = arena.new_statement_id();
         let value = value.into();
         let marker = std::marker::PhantomData;
-        let result1: ResultValue = arena
+        let result1: ::kirin::ir::ResultValue = arena
             .ssa()
             .kind(SSAKind::Result(multiresult_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
             .new()
             .into();
-        let result2: ResultValue = arena
+        let result2: ::kirin::ir::ResultValue = arena
             .ssa()
             .kind(SSAKind::Result(multiresult_statement_id, 1usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
@@ -42,7 +42,12 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
     }
 }
 pub struct MultiResultNewRef {
-    pub id: StatementId,
-    pub result1: ResultValue,
-    pub result2: ResultValue,
+    pub id: ::kirin::ir::StatementId,
+    pub result1: ::kirin::ir::ResultValue,
+    pub result2: ::kirin::ir::ResultValue,
+}
+impl From<MultiResultNewRef> for ::kirin::ir::StatementId {
+    fn from(value: MultiResultNewRef) -> Self {
+        value.id
+    }
 }

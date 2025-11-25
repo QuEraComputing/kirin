@@ -15,24 +15,27 @@ impl<'input, T: StatementFields<'input>> EitherVariant<'input, T> {
         trait_info: &T,
         attrs: Option<VariantAttribute>,
         variant: &'input syn::Variant,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| VariantAttribute::new(variant));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => VariantAttribute::new(variant)?,
+        };
         if attrs.is_wrapper() {
-            EitherVariant::Wrapper(
+            Ok(EitherVariant::Wrapper(
                 WrapperVariant::builder()
                     .trait_info(trait_info)
                     .maybe_attrs(Some(attrs))
                     .variant(variant)
-                    .build(),
-            )
+                    .build()?,
+            ))
         } else {
-            EitherVariant::Regular(
+            Ok(EitherVariant::Regular(
                 RegularVariant::builder()
                     .trait_info(trait_info)
                     .maybe_attrs(Some(attrs))
                     .variant(variant)
-                    .build(),
-            )
+                    .build()?,
+            ))
         }
     }
 

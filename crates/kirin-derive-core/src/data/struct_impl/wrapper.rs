@@ -17,29 +17,33 @@ impl<'input, T: CombineGenerics> WrapperStruct<'input, T> {
         trait_info: &T,
         attrs: Option<StructAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
+    ) -> syn::Result<Self> {
         let syn::Data::Struct(data) = &input.data else {
-            panic!("WrapperStruct can only be created from struct data");
+            return Err(syn::Error::new_spanned(
+                input,
+                "WrapperStruct can only be created from struct data",
+            ));
         };
 
         match &data.fields {
-            syn::Fields::Named(_) => Self::Named(
+            syn::Fields::Named(_) => Ok(Self::Named(
                 NamedWrapperStruct::builder()
                     .trait_info(trait_info)
                     .maybe_attrs(attrs)
                     .input(input)
-                    .build(),
-            ),
-            syn::Fields::Unnamed(_) => Self::Unnamed(
+                    .build()?,
+            )),
+            syn::Fields::Unnamed(_) => Ok(Self::Unnamed(
                 UnnamedWrapperStruct::builder()
                     .trait_info(trait_info)
                     .maybe_attrs(attrs)
                     .input(input)
-                    .build(),
-            ),
-            _ => panic!(
-                "WrapperStruct can only be created from named or unnamed fields, got unit struct"
-            ),
+                    .build()?,
+            )),
+            _ => Err(syn::Error::new_spanned(
+                input,
+                "WrapperStruct can only be created from named or unnamed struct data",
+            )),
         }
     }
 
@@ -105,49 +109,59 @@ impl<'input, T: CombineGenerics> NamedWrapperStruct<'input, T> {
         trait_info: &T,
         attrs: Option<StructAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| StructAttribute::new(input));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => StructAttribute::new(input)?,
+        };
         let combined_generics = trait_info.combine_generics(&input.generics);
 
         let syn::Data::Struct(data) = &input.data else {
-            panic!("NamedWrapperStruct can only be created from struct data");
+            return Err(syn::Error::new_spanned(
+                input,
+                "NamedWrapperStruct can only be created from struct data",
+            ));
         };
 
         let syn::Fields::Named(fields) = &data.fields else {
-            panic!("NamedWrapperStruct can only be created from named fields");
+            return Err(syn::Error::new_spanned(
+                input,
+                "NamedWrapperStruct can only be created from named fields",
+            ));
         };
 
         if attrs.wraps && fields.named.len() == 1 {
             let f = fields.named.first().unwrap();
-            return NamedWrapperStruct {
+            return Ok(NamedWrapperStruct {
                 input,
                 combined_generics,
                 attrs,
                 wraps: f.ident.clone().unwrap(),
                 wraps_type: f.ty.clone(),
                 _marker: std::marker::PhantomData,
-            };
+            });
         }
 
         if let Some(field_attrs) = &attrs.fields {
             for (f, f_attr) in fields.named.iter().zip(field_attrs.iter()) {
                 if let Some(f_attr) = f_attr {
                     if f_attr.wraps {
-                        return NamedWrapperStruct {
+                        return Ok(NamedWrapperStruct {
                             input,
                             combined_generics,
                             attrs,
                             wraps: f.ident.clone().unwrap(),
                             wraps_type: f.ty.clone(),
                             _marker: std::marker::PhantomData,
-                        };
+                        });
                     }
                 }
             }
         }
-        panic!(
-            "Struct is marked as wrapper but no field marked as wrapper or no single field present"
-        );
+        Err(syn::Error::new_spanned(
+            input,
+            "Struct is marked as wrapper but no field marked as wrapper or no single field present",
+        ))
     }
 
     pub fn input(&self) -> &'input syn::DeriveInput {
@@ -200,49 +214,59 @@ impl<'input, T: CombineGenerics> UnnamedWrapperStruct<'input, T> {
         trait_info: &T,
         attrs: Option<StructAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| StructAttribute::new(input));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => StructAttribute::new(input)?,
+        };
         let combined_generics = trait_info.combine_generics(&input.generics);
 
         let syn::Data::Struct(data) = &input.data else {
-            panic!("UnnamedWrapperStruct can only be created from struct data");
+            return Err(syn::Error::new_spanned(
+                input,
+                "UnnamedWrapperStruct can only be created from struct data",
+            ));
         };
 
         let syn::Fields::Unnamed(fields) = &data.fields else {
-            panic!("UnnamedWrapperStruct can only be created from unnamed fields");
+            return Err(syn::Error::new_spanned(
+                input,
+                "UnnamedWrapperStruct can only be created from unnamed fields",
+            ));
         };
 
         if attrs.wraps && fields.unnamed.len() == 1 {
             let f = fields.unnamed.iter().next().unwrap();
-            return Self {
+            return Ok(Self {
                 input,
                 combined_generics,
                 attrs,
                 wraps: 0,
                 wraps_type: f.ty.clone(),
                 _marker: std::marker::PhantomData,
-            };
+            });
         }
 
         if let Some(field_attrs) = &attrs.fields {
             for (i, (f, f_attr)) in fields.unnamed.iter().zip(field_attrs.iter()).enumerate() {
                 if let Some(f_attr) = f_attr {
                     if f_attr.wraps {
-                        return Self {
+                        return Ok(Self {
                             input,
                             combined_generics,
                             attrs,
                             wraps: i,
                             wraps_type: f.ty.clone(),
                             _marker: std::marker::PhantomData,
-                        };
+                        });
                     }
                 }
             }
         }
-        panic!(
-            "NamedWrapperStruct::from_fields called on non-wrapper struct, no field marked as wrapper or no single field present"
-        );
+        Err(syn::Error::new_spanned(
+            input,
+            "Struct is marked as wrapper but no field marked as wrapper or no single field present",
+        ))
     }
 
     pub fn input(&self) -> &'input syn::DeriveInput {

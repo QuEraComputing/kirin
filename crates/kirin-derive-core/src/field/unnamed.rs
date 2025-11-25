@@ -6,16 +6,19 @@ use crate::field::field::UnnamedMatchingField;
 pub struct UnnamedFields(usize, Vec<UnnamedMatchingField>);
 
 impl UnnamedFields {
-    pub fn new(fields: &syn::FieldsUnnamed, matching_type: &syn::Ident) -> Self {
-        UnnamedFields(
+    pub fn new(fields: &syn::FieldsUnnamed, matching_type: &syn::Ident) -> syn::Result<Self> {
+        Ok(UnnamedFields(
             fields.unnamed.len(),
             fields
                 .unnamed
                 .iter()
                 .enumerate()
-                .filter_map(|(i, f)| UnnamedMatchingField::try_from_field(i, f, matching_type))
+                .map(|(i, f)| UnnamedMatchingField::try_from_field(i, f, matching_type))
+                .collect::<syn::Result<Vec<_>>>()?
+                .into_iter()
+                .filter_map(|f| f)
                 .collect(),
-        )
+        ))
     }
 
     pub fn vars(&self) -> Vec<syn::Ident> {

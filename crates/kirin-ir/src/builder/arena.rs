@@ -195,10 +195,10 @@ mod tests {
 
         let a = SimpleLanguage::op_constant(&mut arena, 1.2);
         let b = SimpleLanguage::op_constant(&mut arena, 3.4);
-        let c = SimpleLanguage::op_add(&mut arena, a.result_0, b.result_0);
+        let c = SimpleLanguage::op_add(&mut arena, a.result, b.result);
         let block_arg_x = arena.block_argument(0);
-        let d = SimpleLanguage::op_add(&mut arena, c.result_0, block_arg_x);
-        let ret = SimpleLanguage::op_return(&mut arena, d.result_0);
+        let d = SimpleLanguage::op_add(&mut arena, c.result, block_arg_x);
+        let ret = SimpleLanguage::op_return(&mut arena, d.result);
 
         let block = arena
             .block()

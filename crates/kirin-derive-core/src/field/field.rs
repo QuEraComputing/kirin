@@ -11,29 +11,43 @@ pub enum UnnamedMatchingField {
 }
 
 impl NamedMatchingField {
-    pub fn try_from_field(f: &syn::Field, matching_type: &syn::Ident) -> Option<Self> {
+    pub fn try_from_field(f: &syn::Field, matching_type: &syn::Ident) -> syn::Result<Option<Self>> {
         if is_type(&f.ty, matching_type) {
-            Some(NamedMatchingField::One(f.ident.clone().unwrap()))
+            Ok(Some(NamedMatchingField::One(f.ident.clone().ok_or_else(
+                || syn::Error::new_spanned(f, "Expected named field to have an ident"),
+            )?)))
         } else if is_vec_type(&f.ty, matching_type) {
-            Some(NamedMatchingField::Vec(f.ident.clone().unwrap()))
+            Ok(Some(NamedMatchingField::Vec(f.ident.clone().ok_or_else(
+                || syn::Error::new_spanned(f, "Expected named field to have an ident"),
+            )?)))
         } else if is_type_in_generic(&f.ty, matching_type) {
-            panic!("generic types other than Vec are not supported");
+            Err(syn::Error::new_spanned(
+                f,
+                "generic types other than Vec are not supported",
+            ))
         } else {
-            None
+            Ok(None)
         }
     }
 }
 
 impl UnnamedMatchingField {
-    pub fn try_from_field(index: usize, f: &syn::Field, matching_type: &syn::Ident) -> Option<Self> {
+    pub fn try_from_field(
+        index: usize,
+        f: &syn::Field,
+        matching_type: &syn::Ident,
+    ) -> syn::Result<Option<Self>> {
         if is_type(&f.ty, matching_type) {
-            Some(UnnamedMatchingField::One(index))
+            Ok(Some(UnnamedMatchingField::One(index)))
         } else if is_vec_type(&f.ty, matching_type) {
-            Some(UnnamedMatchingField::Vec(index))
+            Ok(Some(UnnamedMatchingField::Vec(index)))
         } else if is_type_in_generic(&f.ty, matching_type) {
-            panic!("generic types other than Vec are not supported");
+            Err(syn::Error::new_spanned(
+                f,
+                "generic types other than Vec are not supported",
+            ))
         } else {
-            None
+            Ok(None)
         }
     }
 }

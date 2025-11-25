@@ -12,6 +12,7 @@ pub mod prelude {
     pub use crate::empty::Empty;
     pub use crate::field::FieldIterInfo;
     pub use crate::from::FromInfo;
+    pub use crate::builder::Builder;
     pub use crate::utils::*;
     pub use crate::{
         derive_builder, derive_check, derive_empty, derive_field_iter, derive_field_iter_mut,

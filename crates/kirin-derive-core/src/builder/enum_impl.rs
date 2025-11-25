@@ -3,13 +3,14 @@ use quote::{format_ident, quote};
 
 use super::data::Builder;
 use crate::{
-    data::{EitherEnum, EitherVariant, Enum, GenerateFrom, RegularEnum, RegularVariant},
+    data::*,
     utils::{to_camel_case, to_snake_case},
 };
 
 impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
     fn generate_from(&self, data: &RegularEnum<'a, Builder>) -> TokenStream {
         let name = &data.input.ident;
+        let crate_path = data.crate_root_path(self);
         let snake_case_name = to_snake_case(name.to_string());
         let statement = format_ident!("{}_statement", snake_case_name);
         let statement_id = format_ident!("{}_statement_id", snake_case_name);
@@ -24,6 +25,7 @@ impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
 
         let variants = data.variants.iter().map(|variant| {
             variant_builder(
+                &crate_path,
                 name,
                 &statement,
                 &statement_id,
@@ -36,7 +38,7 @@ impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
         let ref_structs = data
             .variants
             .iter()
-            .map(|variant| ref_struct_builder(variant, name));
+            .map(|variant| ref_struct_builder(&crate_path, variant, name));
 
         quote! {
             impl #impl_generics #name #ty_generics #where_clause {
@@ -50,6 +52,7 @@ impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
 impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
     fn generate_from(&self, data: &EitherEnum<'a, Builder>) -> TokenStream {
         let name = &data.input.ident;
+        let crate_path = data.crate_root_path(self);
         let snake_case_name = to_snake_case(name.to_string());
         let statement = format_ident!("{}_statement", snake_case_name);
         let statement_id = format_ident!("{}_statement_id", snake_case_name);
@@ -73,6 +76,7 @@ impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
 
         let variant_builders = regular_variants.iter().map(|variant| {
             variant_builder(
+                &crate_path,
                 name,
                 &statement,
                 &statement_id,
@@ -84,7 +88,7 @@ impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
 
         let ref_structs = regular_variants
             .iter()
-            .map(|variant| ref_struct_builder(variant, name));
+            .map(|variant| ref_struct_builder(&crate_path, variant, name));
 
         quote! {
             impl #impl_generics #name #ty_generics #where_clause {
@@ -96,6 +100,7 @@ impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
 }
 
 fn variant_builder(
+    crate_path: &syn::Path,
     name: &syn::Ident,
     statement: &syn::Ident,
     statement_id: &syn::Ident,
@@ -112,15 +117,15 @@ fn variant_builder(
         .builder_name(&format_ident!("op_{}", snake_case_variant_name));
     let ref_struct_name = format_ident!("{}{}Ref", name, to_camel_case(builder_name.to_string()));
 
-    let inputs = variant.fields.inputs();
-    let results = variant.fields.build_results(&statement_id);
-    let others = variant.fields.build_inputs();
+    let inputs = variant.fields.inputs(crate_path);
+    let results = variant.fields.build_results(crate_path, &statement_id);
+    let others = variant.fields.build_inputs(crate_path);
     let result_names = variant.fields.result_names();
     let initialization = variant.fields.initialization(&variant.variant.fields);
 
     quote! {
         pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
-            arena: &mut Arena<Lang>,
+            arena: &mut #crate_path::Arena<Lang>,
             #(#inputs,)*
         ) -> #ref_struct_name
         where
@@ -131,7 +136,7 @@ fn variant_builder(
             #(#results)*
             let #statement = arena
                 .statement()
-                .definition(Self #initialization)
+                .definition(#name::#variant_name #initialization)
                 .new();
 
             #ref_struct_name {
@@ -142,7 +147,11 @@ fn variant_builder(
     }
 }
 
-fn ref_struct_builder(variant: &RegularVariant<'_, Builder>, name: &syn::Ident) -> TokenStream {
+fn ref_struct_builder(
+    crate_path: &syn::Path,
+    variant: &RegularVariant<'_, Builder>,
+    name: &syn::Ident,
+) -> TokenStream {
     let variant_name = variant.variant_name;
     let snake_case_variant_name = to_snake_case(variant_name.to_string());
     let builder_name = variant
@@ -150,7 +159,7 @@ fn ref_struct_builder(variant: &RegularVariant<'_, Builder>, name: &syn::Ident) 
         .builder
         .builder_name(&format_ident!("op_{}", snake_case_variant_name));
     let ref_struct_name = format_ident!("{}{}Ref", name, to_camel_case(builder_name.to_string()));
-    variant.fields.ref_struct(&ref_struct_name)
+    variant.fields.ref_struct(crate_path, &ref_struct_name)
 }
 
 impl<'a> GenerateFrom<'a, Enum<'a, Builder>> for Builder {

@@ -11,13 +11,13 @@ pub enum Fields {
 }
 
 impl Fields {
-    pub fn new(fields: &syn::Fields, matching_type: &syn::Ident) -> Self {
+    pub fn new(fields: &syn::Fields, matching_type: &syn::Ident) -> syn::Result<Self> {
         match fields {
-            syn::Fields::Named(named) => Fields::Named(NamedFields::new(named, matching_type)),
+            syn::Fields::Named(named) => Ok(Fields::Named(NamedFields::new(named, matching_type)?)),
             syn::Fields::Unnamed(unnamed) => {
-                Fields::Unnamed(UnnamedFields::new(unnamed, matching_type))
+                Ok(Fields::Unnamed(UnnamedFields::new(unnamed, matching_type)?))
             }
-            syn::Fields::Unit => Fields::Unit,
+            syn::Fields::Unit => Ok(Fields::Unit),
         }
     }
 }
@@ -28,7 +28,7 @@ impl<'a> FromStructFields<'a, FieldIterInfo> for Fields {
         _attrs: &crate::data::StructAttribute,
         _parent: &'a syn::DataStruct,
         fields: &'a syn::Fields,
-    ) -> Self {
+    ) -> syn::Result<Self> {
         Self::new(fields, &trait_info.matching_type_name)
     }
 }
@@ -39,7 +39,7 @@ impl<'a> FromVariantFields<'a, FieldIterInfo> for Fields {
         _attrs: &crate::data::VariantAttribute,
         _parent: &'a syn::Variant,
         fields: &'a syn::Fields,
-    ) -> Self {
+    ) -> syn::Result<Self> {
         Self::new(fields, &trait_info.matching_type_name)
     }
 }

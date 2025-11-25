@@ -14,17 +14,20 @@ impl<'input, T: StatementFields<'input>> RegularVariant<'input, T> {
         trait_info: &T,
         attrs: Option<VariantAttribute>,
         variant: &'input syn::Variant,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| VariantAttribute::new(variant));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => VariantAttribute::new(variant)?,
+        };
         let fields =
-            T::FieldsType::from_variant_fields(&trait_info, &attrs, variant, &variant.fields);
+            T::FieldsType::from_variant_fields(&trait_info, &attrs, variant, &variant.fields)?;
 
-        RegularVariant {
+        Ok(RegularVariant {
             variant,
             attrs,
             variant_name: &variant.ident,
             fields,
-        }
+        })
     }
 }
 

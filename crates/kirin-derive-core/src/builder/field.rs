@@ -1,5 +1,5 @@
-use proc_macro2::{TokenStream};
-use quote::{quote, ToTokens};
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 
 use crate::data::*;
 
@@ -7,53 +7,79 @@ pub struct FieldInfo {
     pub attr: Option<FieldAttribute>,
     pub name: syn::Ident,
     pub ty: syn::Type,
+    pub is_input_ssa: bool,
     pub is_result: bool,
     pub default: Option<syn::Expr>,
 }
 
 impl FieldInfo {
-    pub fn input_signature(&self) -> TokenStream {
-        let FieldInfo { name, ty, .. } = self;
+    pub fn input_signature(&self, crate_path: &syn::Path) -> TokenStream {
+        let FieldInfo {
+            name,
+            ty,
+            is_input_ssa,
+            ..
+        } = self;
+        if *is_input_ssa {
+            return quote! { #name: impl Into<#crate_path::SSAValue> };
+        }
+
         match &self.attr {
             Some(FieldAttribute {
                 builder: Some(FieldBuilder { into: true, .. }),
                 ..
             }) => {
                 quote! { #name: impl Into<#ty> }
-            },
+            }
             Some(FieldAttribute {
-                builder: Some(FieldBuilder { default: Some(_), .. }),
+                builder:
+                    Some(FieldBuilder {
+                        default: Some(_), ..
+                    }),
                 ..
             }) => {
                 quote! {}
-            },
-            _ => quote! { #name: #ty }
+            }
+            _ => quote! { #name: #ty },
         }
     }
 
-    pub fn build_input(&self) -> TokenStream {
-        let FieldInfo { name, .. } = self;
+    pub fn build_input(&self, crate_path: &syn::Path) -> TokenStream {
+        let FieldInfo { name, is_input_ssa, .. } = self;
+        if *is_input_ssa {
+            return quote! { let #name: #crate_path::SSAValue = #name.into(); };
+        }
+
         match &self.attr {
             Some(FieldAttribute {
                 builder: Some(FieldBuilder { into: true, .. }),
                 ..
             }) => {
                 quote! { let #name = #name.into(); }
-            },
+            }
             Some(FieldAttribute {
-                builder: Some(FieldBuilder { default: Some(init), .. }),
+                builder:
+                    Some(FieldBuilder {
+                        default: Some(init),
+                        ..
+                    }),
                 ..
             }) => {
                 quote! { let #name = #init; }
-            },
-            _ => quote! {}
+            }
+            _ => quote! {},
         }
     }
 
     /// generate the builder code for ResultValue field
     /// - `statement_id` the statement id variable name
     /// - `index` the index of the result field in the result list
-    pub fn build_result(&self, statement_id: &syn::Ident, index: usize) -> TokenStream {
+    pub fn build_result(
+        &self,
+        crate_path: &syn::Path,
+        statement_id: &syn::Ident,
+        index: usize,
+    ) -> TokenStream {
         let name = &self.name;
         let msg = "expect #[kirin(type = ...)] attribute for ResultValue field";
         let ty = self
@@ -64,10 +90,14 @@ impl FieldInfo {
             .as_ref()
             .expect(msg)
             .ty
-            .as_ref()
-            .expect(msg);
+            .as_ref();
+
+        if ty.is_none() {
+            return syn::Error::new_spanned(&self.ty, msg).to_compile_error();
+        }
+
         quote! {
-            let #name: ResultValue = arena
+            let #name: #crate_path::ResultValue = arena
                 .ssa()
                 .kind(SSAKind::Result(#statement_id, #index))
                 .ty(Lang::TypeLattice::from(#ty))

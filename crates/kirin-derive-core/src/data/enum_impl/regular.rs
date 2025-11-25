@@ -1,4 +1,7 @@
-use crate::data::{CombineGenerics, CrateRootPath, EnumAttribute, FromEnum, HasDefaultCratePath, HasGenerics, SplitForImplTrait, StatementFields, enum_impl::variant_ref::VariantIter};
+use crate::data::{
+    CombineGenerics, CrateRootPath, EnumAttribute, FromEnum, HasDefaultCratePath, HasGenerics,
+    SplitForImplTrait, StatementFields, enum_impl::variant_ref::VariantIter,
+};
 
 use super::variant_regular::RegularVariant;
 
@@ -18,12 +21,18 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> RegularEnum<'input, T
         trait_info: &T,
         attrs: Option<EnumAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| EnumAttribute::new(input));
-        let syn::Data::Enum(data) = &input.data else {
-            panic!("RegularEnum can only be created from enum data");
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => EnumAttribute::new(input)?,
         };
-        let enum_info = T::InfoType::from_enum(&trait_info, &attrs, input);
+        let syn::Data::Enum(data) = &input.data else {
+            return Err(syn::Error::new_spanned(
+                input,
+                "RegularEnum can only be created from enum data",
+            ));
+        };
+        let enum_info = T::InfoType::from_enum(&trait_info, &attrs, input)?;
         let combined_generics = trait_info.combine_generics(&input.generics);
 
         let variants = data
@@ -35,15 +44,15 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> RegularEnum<'input, T
                     .variant(variant)
                     .build()
             })
-            .collect();
+            .collect::<syn::Result<Vec<_>>>()?;
 
-        Self {
+        Ok(Self {
             input,
             combined_generics,
             attrs,
             enum_info,
             variants,
-        }
+        })
     }
 
     pub fn iter(&self) -> VariantIter<'_, Self> {

@@ -28,7 +28,7 @@ pub struct EnumAttribute {
 }
 
 impl EnumAttribute {
-    pub fn new<'a>(input: &'a syn::DeriveInput) -> Self {
+    pub fn new<'a>(input: &'a syn::DeriveInput) -> syn::Result<Self> {
         let mut enum_attr = Self::default();
         parse_kirin_attributes(&input.attrs, |meta| {
             if meta.path.is_ident("wraps") {
@@ -60,9 +60,8 @@ impl EnumAttribute {
                 return Err(error_unknown_attribute(&meta));
             }
             Ok(())
-        })
-        .unwrap();
-        enum_attr
+        })?;
+        Ok(enum_attr)
     }
 }
 
@@ -117,7 +116,7 @@ impl VariantAttribute {
         None
     }
 
-    pub fn new(variant: &syn::Variant) -> Self {
+    pub fn new(variant: &syn::Variant) -> syn::Result<Self> {
         let mut variant_attr = Self::default();
         parse_kirin_attributes(&variant.attrs, |meta| {
             if meta.path.is_ident("wraps") {
@@ -143,15 +142,14 @@ impl VariantAttribute {
                 return Err(error_unknown_attribute(&meta));
             }
             Ok(())
-        })
-        .unwrap();
+        })?;
         let fields = variant
             .fields
             .iter()
             .map(|field| FieldAttribute::from_field_attrs(&field.attrs))
-            .collect();
+            .collect::<syn::Result<Vec<_>>>()?;
         variant_attr.fields = Some(fields);
-        variant_attr
+        Ok(variant_attr)
     }
 }
 

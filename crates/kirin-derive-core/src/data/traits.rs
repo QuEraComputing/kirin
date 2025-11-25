@@ -34,12 +34,24 @@ pub trait GenerateFrom<'input, Data> {
     fn generate_from(&self, data: &Data) -> TokenStream;
 }
 
-pub trait FromStruct<'input, T> {
+impl<'a, T, Data> GenerateFrom<'a, syn::Result<Data>> for T
+where
+    T: GenerateFrom<'a, Data>,
+{
+    fn generate_from(&self, data: &syn::Result<Data>) -> TokenStream {
+        match data {
+            Ok(d) => self.generate_from(d),
+            Err(e) => e.to_compile_error(),
+        }
+    }
+}
+
+pub trait FromStruct<'input, T>: Sized {
     fn from_struct(
         trait_info: &T,
         attrs: &StructAttribute,
         input: &'input syn::DeriveInput,
-    ) -> Self;
+    ) -> syn::Result<Self>;
 }
 
 impl<'input, T> FromStruct<'input, T> for () {
@@ -47,13 +59,17 @@ impl<'input, T> FromStruct<'input, T> for () {
         _trait_info: &T,
         _attrs: &StructAttribute,
         _input: &'input syn::DeriveInput,
-    ) -> Self {
-        ()
+    ) -> syn::Result<Self> {
+        Ok(())
     }
 }
 
-pub trait FromEnum<'input, T> {
-    fn from_enum(trait_info: &T, attrs: &EnumAttribute, input: &'input syn::DeriveInput) -> Self;
+pub trait FromEnum<'input, T>: Sized {
+    fn from_enum(
+        trait_info: &T,
+        attrs: &EnumAttribute,
+        input: &'input syn::DeriveInput,
+    ) -> syn::Result<Self>;
 }
 
 impl<'input, T> FromEnum<'input, T> for () {
@@ -61,20 +77,20 @@ impl<'input, T> FromEnum<'input, T> for () {
         _trait_info: &T,
         _attrs: &EnumAttribute,
         _input: &'input syn::DeriveInput,
-    ) -> Self {
-        ()
+    ) -> syn::Result<Self> {
+        Ok(())
     }
 }
 
 /// If the statement is not a wrapper statement,
 /// extract relevant info from them
-pub trait FromStructFields<'input, T> {
+pub trait FromStructFields<'input, T>: Sized {
     fn from_struct_fields(
         trait_info: &T,
         attrs: &StructAttribute,
         parent: &'input syn::DataStruct,
         fields: &'input syn::Fields,
-    ) -> Self;
+    ) -> syn::Result<Self>;
 }
 
 impl<'input, T> FromStructFields<'input, T> for () {
@@ -83,18 +99,18 @@ impl<'input, T> FromStructFields<'input, T> for () {
         _attrs: &StructAttribute,
         _parent: &syn::DataStruct,
         _fields: &syn::Fields,
-    ) -> Self {
-        ()
+    ) -> syn::Result<Self> {
+        Ok(())
     }
 }
 
-pub trait FromVariantFields<'input, T> {
+pub trait FromVariantFields<'input, T>: Sized {
     fn from_variant_fields(
         trait_info: &T,
         attrs: &VariantAttribute,
         parent: &'input syn::Variant,
         fields: &'input syn::Fields,
-    ) -> Self;
+    ) -> syn::Result<Self>;
 }
 
 impl<'input, T> FromVariantFields<'input, T> for () {
@@ -103,8 +119,8 @@ impl<'input, T> FromVariantFields<'input, T> for () {
         _attrs: &VariantAttribute,
         _parent: &'input syn::Variant,
         _fields: &'input syn::Fields,
-    ) -> Self {
-        ()
+    ) -> syn::Result<Self> {
+        Ok(())
     }
 }
 

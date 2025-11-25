@@ -1,7 +1,8 @@
 use super::regular::RegularStruct;
 use super::wrapper::WrapperStruct;
 use crate::data::{
-    CombineGenerics, CrateRootPath, GenerateFrom, HasDefaultCratePath, HasGenerics, SplitForImplTrait, StatementFields, StructAttribute
+    CombineGenerics, CrateRootPath, GenerateFrom, HasDefaultCratePath, HasGenerics,
+    SplitForImplTrait, StatementFields, StructAttribute,
 };
 
 use proc_macro2::TokenStream;
@@ -18,24 +19,27 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> Struct<'input, T> {
         trait_info: &T,
         attrs: Option<StructAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| StructAttribute::new(input));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => StructAttribute::new(input)?,
+        };
         if attrs.is_wrapper() {
-            Self::Wrapper(
+            Ok(Self::Wrapper(
                 WrapperStruct::builder()
                     .trait_info(trait_info)
                     .attrs(attrs)
                     .input(input)
-                    .build(),
-            )
+                    .build()?,
+            ))
         } else {
-            Self::Regular(
+            Ok(Self::Regular(
                 RegularStruct::builder()
                     .trait_info(trait_info)
                     .attrs(attrs)
                     .input(input)
-                    .build(),
-            )
+                    .build()?,
+            ))
         }
     }
 

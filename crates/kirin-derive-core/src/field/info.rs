@@ -9,34 +9,35 @@ use crate::{
 #[macro_export]
 macro_rules! derive_field_iter {
     ($input:expr, $method_name:expr, $matching_type:expr, $trait_path:expr) => {{
-        let trait_info = FieldIterInfo::new(
+        FieldIterInfo::new(
             false,
             $method_name,
             syn::parse_quote! {$matching_type},
             syn::parse_quote! {$trait_path},
-        );
-        let data = Data::builder()
-            .trait_info(&trait_info)
-            .input($input)
-            .build();
-        trait_info.generate_from(&data)
+        )
+        .and_then(|ti| {
+            let data = Data::builder().trait_info(&ti).input($input).build();
+            Ok(ti.generate_from(&data))
+        }).unwrap_or_else(|e| e.to_compile_error())
     }};
 }
 
 #[macro_export]
 macro_rules! derive_field_iter_mut {
     ($input:expr, $method_name:expr, $matching_type:expr, $trait_path:expr) => {{
-        let trait_info = FieldIterInfo::new(
+        FieldIterInfo::new(
             true,
             $method_name,
             syn::parse_quote! {$matching_type},
             syn::parse_quote! {$trait_path},
-        );
-        let data = Data::builder()
-            .trait_info(&trait_info)
-            .input($input)
-            .build();
-        trait_info.generate_from(&data)
+        )
+        .and_then(|trait_info| {
+            let data = Data::builder()
+                .trait_info(&trait_info)
+                .input($input)
+                .build();
+            Ok(trait_info.generate_from(&data))
+        }).unwrap_or_else(|e| e.to_compile_error())
     }};
 }
 
@@ -65,7 +66,7 @@ impl FieldIterInfo {
         method_name: impl AsRef<str>,
         matching_type: syn::Path,
         trait_path: syn::Path,
-    ) -> Self {
+    ) -> syn::Result<Self> {
         let method_name_str = method_name.as_ref();
         let iter_name = format_ident!(
             "{}Iter",
@@ -80,9 +81,19 @@ impl FieldIterInfo {
                 lifetime.clone(),
             )));
 
-        let matching_type_name = matching_type.segments.last().unwrap().ident.clone();
+        let matching_type_name = matching_type
+            .segments
+            .last()
+            .ok_or_else(|| {
+                syn::Error::new(
+                    Span::call_site(),
+                    "Expected matching type to have at least one segment",
+                )
+            })?
+            .ident
+            .clone();
 
-        Self {
+        Ok(Self {
             mutable,
             method_name: format_ident!("{}", method_name_str),
             iter_name,
@@ -91,7 +102,7 @@ impl FieldIterInfo {
             matching_type_name,
             lifetime,
             generics,
-        }
+        })
     }
 
     pub fn mutability(&self) -> proc_macro2::TokenStream {

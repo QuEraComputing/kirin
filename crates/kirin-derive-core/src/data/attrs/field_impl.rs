@@ -11,9 +11,9 @@ pub struct FieldAttribute {
 }
 
 impl FieldAttribute {
-    pub fn from_field_attrs(attrs: &Vec<syn::Attribute>) -> Option<Self> {
+    pub fn from_field_attrs(attrs: &Vec<syn::Attribute>) -> syn::Result<Option<Self>> {
         if !attrs.iter().any(|attr| attr.path().is_ident("kirin")) {
-            return None;
+            return Ok(None);
         }
 
         let mut field_attr = FieldAttribute::default();
@@ -24,7 +24,10 @@ impl FieldAttribute {
                 field_attr.builder.get_or_insert_with(Default::default).into = true;
             } else if meta.path.is_ident("default") {
                 let expr: syn::Expr = meta.value()?.parse()?;
-                field_attr.builder.get_or_insert_with(Default::default).default = Some(expr);
+                field_attr
+                    .builder
+                    .get_or_insert_with(Default::default)
+                    .default = Some(expr);
             } else if meta.path.is_ident("type") {
                 let expr: syn::Expr = meta.value()?.parse()?;
                 field_attr.builder.get_or_insert_with(Default::default).ty = Some(expr);
@@ -32,8 +35,7 @@ impl FieldAttribute {
                 return Err(error_unknown_attribute(&meta));
             }
             Ok(())
-        })
-        .unwrap();
-        Some(field_attr)
+        })?;
+        Ok(Some(field_attr))
     }
 }

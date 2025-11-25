@@ -5,3 +5,5 @@ pub trait CompileTimeValue: Clone + std::fmt::Debug + std::hash::Hash + PartialE
 pub trait Typeof<L: TypeLattice> {
     fn type_of(&self) -> L;
 }
+
+impl<T> CompileTimeValue for T where T: Clone + std::fmt::Debug + std::hash::Hash + PartialEq {}

@@ -19,6 +19,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
     let is_constant = derive_check!(&ast, is_constant, IsConstant);
     let is_pure = derive_check!(&ast, is_pure, IsPure);
     let from = derive_from!(&ast);
+    let builder = derive_builder!(&ast);
     let statement = derive_empty!(&ast, Statement, ::kirin::ir);
 
     let generated = quote::quote! {
@@ -34,6 +35,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
         #is_constant
         #is_pure
         #from
+        #builder
 
         #statement
     };

@@ -1,5 +1,7 @@
 use crate::data::{
-    CombineGenerics, CrateRootPath, EnumAttribute, FromEnum, HasDefaultCratePath, HasGenerics, SplitForImplTrait, StatementFields, enum_impl::{variant_either::EitherVariant, variant_ref::VariantIter}
+    CombineGenerics, CrateRootPath, EnumAttribute, FromEnum, HasDefaultCratePath, HasGenerics,
+    SplitForImplTrait, StatementFields,
+    enum_impl::{variant_either::EitherVariant, variant_ref::VariantIter},
 };
 
 /// An enum that contains a mix of wrapper and regular instruction definitions.
@@ -18,12 +20,18 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> EitherEnum<'input, T>
         trait_info: &T,
         attrs: Option<EnumAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| EnumAttribute::new(input));
-        let syn::Data::Enum(data) = &input.data else {
-            panic!("EitherEnum can only be created from enum data");
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => EnumAttribute::new(input)?,
         };
-        let enum_info = T::InfoType::from_enum(&trait_info, &attrs, input);
+        let syn::Data::Enum(data) = &input.data else {
+            return Err(syn::Error::new_spanned(
+                input,
+                "EitherEnum can only be created from enum data",
+            ));
+        };
+        let enum_info = T::InfoType::from_enum(&trait_info, &attrs, input)?;
 
         let combined_generics = trait_info.combine_generics(&input.generics);
 
@@ -36,15 +44,15 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> EitherEnum<'input, T>
                     .variant(variant)
                     .build()
             })
-            .collect();
+            .collect::<syn::Result<Vec<_>>>()?;
 
-        Self {
+        Ok(Self {
             input,
             combined_generics,
             attrs,
             enum_info,
             variants,
-        }
+        })
     }
 
     pub fn iter(&self) -> VariantIter<'_, Self> {

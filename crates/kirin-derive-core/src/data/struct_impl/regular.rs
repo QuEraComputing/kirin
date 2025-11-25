@@ -21,30 +21,44 @@ where
         trait_info: &T,
         attrs: Option<StructAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| StructAttribute::new(input));
-        let struct_info = T::InfoType::from_struct(&trait_info, &attrs, input);
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => StructAttribute::new(input)?,
+        };
+
+        let struct_info = T::InfoType::from_struct(&trait_info, &attrs, input)?;
         let fields = T::FieldsType::from_struct_fields(
             trait_info,
             &attrs,
             match &input.data {
                 syn::Data::Struct(data) => data,
-                _ => panic!("RegularStruct can only be created from struct data"),
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        input,
+                        "RegularStruct can only be created from struct data",
+                    ));
+                }
             },
             match &input.data {
                 syn::Data::Struct(data) => &data.fields,
-                _ => panic!("RegularStruct can only be created from struct data"),
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        input,
+                        "RegularStruct can only be created from struct data",
+                    ));
+                }
             },
-        );
+        )?;
         let combined_generics = trait_info.combine_generics(&input.generics);
 
-        RegularStruct {
+        Ok(RegularStruct {
             input,
             combined_generics,
             attrs,
             struct_info,
             fields,
-        }
+        })
     }
 
     pub fn input(&self) -> &'input syn::DeriveInput {

@@ -6,14 +6,17 @@ use crate::field::field::NamedMatchingField;
 pub struct NamedFields(Vec<NamedMatchingField>);
 
 impl NamedFields {
-    pub fn new(fields: &syn::FieldsNamed, matching_type: &syn::Ident) -> Self {
-        NamedFields(
+    pub fn new(fields: &syn::FieldsNamed, matching_type: &syn::Ident) -> syn::Result<Self> {
+        Ok(NamedFields(
             fields
                 .named
                 .iter()
-                .filter_map(|f| NamedMatchingField::try_from_field(f, matching_type))
+                .map(|f| NamedMatchingField::try_from_field(f, matching_type))
+                .collect::<syn::Result<Vec<_>>>()?
+                .into_iter()
+                .filter_map(|f| f)
                 .collect(),
-        )
+        ))
     }
 
     pub fn vars(&self) -> Vec<syn::Ident> {

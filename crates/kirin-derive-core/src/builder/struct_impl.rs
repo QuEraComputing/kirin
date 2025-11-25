@@ -10,10 +10,15 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
         }
 
         let syn::Data::Struct(data_struct) = &data.input.data else {
-            panic!("RegularStruct can only be created from struct data");
+            return syn::Error::new_spanned(
+                &data.input.ident,
+                "RegularStruct can only be created from struct data",
+            )
+            .to_compile_error();
         };
 
         let name = &data.input.ident;
+        let crate_path = data.crate_root_path(self);
         let statement = format_ident!("{}_statement", name.to_string().to_lowercase());
         let statement_id = format_ident!("{}_statement_id", name.to_string().to_lowercase());
         let type_lattice = data
@@ -26,11 +31,11 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
         let ref_struct_name =
             format_ident!("{}{}Ref", name, to_camel_case(builder_name.to_string()));
 
-        let inputs = data.fields.inputs();
-        let results = data.fields.build_results(&statement_id);
-        let others = data.fields.build_inputs();
+        let inputs = data.fields.inputs(&crate_path);
+        let results = data.fields.build_results(&crate_path, &statement_id);
+        let others = data.fields.build_inputs(&crate_path);
         let result_names = data.fields.result_names();
-        let ref_struct = data.fields.ref_struct(&ref_struct_name);
+        let ref_struct = data.fields.ref_struct(&crate_path, &ref_struct_name);
         let initialization = data.fields.initialization(&data_struct.fields);
 
         let (impl_generics, ty_generics, where_clause) = data.input.generics.split_for_impl();
@@ -38,7 +43,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
         quote! {
             impl #impl_generics #name #ty_generics #where_clause {
                 pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
-                    arena: &mut Arena<Lang>,
+                    arena: &mut #crate_path::Arena<Lang>,
                     #(#inputs,)*
                 ) -> #ref_struct_name
                 where

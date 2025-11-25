@@ -14,14 +14,14 @@ impl StatementFields<'_> for Builder {
 pub struct Fields(pub Vec<FieldInfo>);
 
 impl Fields {
-    pub fn inputs(&self) -> Vec<TokenStream> {
+    pub fn inputs(&self, crate_path: &syn::Path) -> Vec<TokenStream> {
         self.0
             .iter()
             .filter_map(|f| {
                 if f.is_result || f.default.is_some() {
                     return None;
                 }
-                Some(f.input_signature())
+                Some(f.input_signature(crate_path))
             })
             .collect()
     }
@@ -38,20 +38,20 @@ impl Fields {
             .collect()
     }
 
-    pub fn build_inputs(&self) -> Vec<TokenStream> {
+    pub fn build_inputs(&self, crate_path: &syn::Path) -> Vec<TokenStream> {
         self.0
             .iter()
             .filter(|f| !f.is_result)
-            .map(|f| f.build_input())
+            .map(|f| f.build_input(crate_path))
             .collect()
     }
 
-    pub fn build_results(&self, statement_id: &syn::Ident) -> Vec<TokenStream> {
+    pub fn build_results(&self, crate_path: &syn::Path, statement_id: &syn::Ident) -> Vec<TokenStream> {
         self.0
             .iter()
             .filter(|f| f.is_result)
             .enumerate()
-            .map(|(i, f)| f.build_result(statement_id, i))
+            .map(|(i, f)| f.build_result(crate_path, statement_id, i))
             .collect()
     }
 
@@ -78,16 +78,22 @@ impl Fields {
         }
     }
 
-    pub fn ref_struct(&self, name: &syn::Ident) -> TokenStream {
+    pub fn ref_struct(&self, crate_path: &syn::Path, name: &syn::Ident) -> TokenStream {
         let field_names = self.result_names();
         let field_defs = field_names.iter().map(|name| {
-            quote! { pub #name: ResultValue }
+            quote! { pub #name: #crate_path::ResultValue }
         });
 
         quote! {
             pub struct #name {
-                pub id: StatementId,
+                pub id: #crate_path::StatementId,
                 #(#field_defs,)*
+            }
+
+            impl From<#name> for #crate_path::StatementId {
+                fn from(value: #name) -> Self {
+                    value.id
+                }
             }
         }
     }
@@ -99,10 +105,10 @@ impl<'input> FromStructFields<'input, Builder> for Fields {
         attrs: &StructAttribute,
         _parent: &'input syn::DataStruct,
         fields: &'input syn::Fields,
-    ) -> Self {
-        Fields(from_fields(fields, |i| {
+    ) -> syn::Result<Self> {
+        Ok(Fields(from_fields(fields, |i| {
             attrs.get_field_attribute(i).cloned()
-        }))
+        })))
     }
 }
 
@@ -112,10 +118,10 @@ impl<'input> FromVariantFields<'input, Builder> for Fields {
         attrs: &VariantAttribute,
         _parent: &'input syn::Variant,
         fields: &'input syn::Fields,
-    ) -> Self {
-        Fields(from_fields(fields, |i| {
+    ) -> syn::Result<Self> {
+        Ok(Fields(from_fields(fields, |i| {
             attrs.get_field_attribute(i).cloned()
-        }))
+        })))
     }
 }
 
@@ -151,6 +157,7 @@ fn from_field(
         None
     };
 
+    let is_input_ssa = is_type(&f.ty, "SSAValue");
     let is_result = is_type(&f.ty, "ResultValue");
     let name = match &f.ident {
         Some(ident) => ident.clone(),
@@ -164,6 +171,7 @@ fn from_field(
         attr,
         name,
         ty: f.ty.clone(),
+        is_input_ssa,
         is_result,
         default,
     }

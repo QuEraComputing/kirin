@@ -33,8 +33,7 @@ pub struct StructAttribute {
 }
 
 impl StructAttribute {
-    pub fn new<'a>(input: &'a syn::DeriveInput) -> Self
-    {
+    pub fn new<'a>(input: &'a syn::DeriveInput) -> syn::Result<Self> {
         let mut struct_attr = Self::default();
         parse_kirin_attributes(&input.attrs, |meta| {
             if meta.path.is_ident("wraps") {
@@ -66,25 +65,27 @@ impl StructAttribute {
                 return Err(error_unknown_attribute(&meta));
             }
             Ok(())
-        })
-        .unwrap();
+        })?;
 
         let syn::Data::Struct(data) = &input.data else {
-            panic!("StructAttribute can only be created from struct data");
+            return Err(syn::Error::new_spanned(
+                input,
+                "StructAttribute can only be created from struct data",
+            ));
         };
 
         let fields: Vec<Option<FieldAttribute>> = data
             .fields
             .iter()
             .map(|field| FieldAttribute::from_field_attrs(&field.attrs))
-            .collect();
+            .collect::<syn::Result<Vec<_>>>()?;
 
         // if all fields are None, set to None
         if fields.iter().all(|f| f.is_none()) {
-            return struct_attr;
+            return Ok(struct_attr);
         }
         struct_attr.fields = Some(fields);
-        struct_attr
+        Ok(struct_attr)
     }
 
     pub fn is_wrapper(&self) -> bool {
@@ -97,9 +98,9 @@ impl StructAttribute {
     }
 
     pub fn get_field_attribute(&self, index: usize) -> Option<&FieldAttribute> {
-        self.fields.as_ref().and_then(|fields| {
-            fields.get(index).and_then(|f| f.as_ref())
-        })
+        self.fields
+            .as_ref()
+            .and_then(|fields| fields.get(index).and_then(|f| f.as_ref()))
     }
 }
 
@@ -121,8 +122,14 @@ impl std::fmt::Debug for StructAttribute {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StructAttribute")
             .field("wraps", &self.wraps)
-            .field("crate_path", &self.crate_path.as_ref().map(|p| p.to_token_stream()))
-            .field("ty_lattice", &self.ty_lattice.as_ref().map(|t| t.to_token_stream()))
+            .field(
+                "crate_path",
+                &self.crate_path.as_ref().map(|p| p.to_token_stream()),
+            )
+            .field(
+                "ty_lattice",
+                &self.ty_lattice.as_ref().map(|t| t.to_token_stream()),
+            )
             .field("is_constant", &self.is_constant)
             .field("is_pure", &self.is_pure)
             .field("is_terminator", &self.is_terminator)

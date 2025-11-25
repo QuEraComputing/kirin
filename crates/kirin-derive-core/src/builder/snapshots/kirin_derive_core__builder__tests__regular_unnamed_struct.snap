@@ -4,7 +4,7 @@ expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
     pub fn op_constant<Lang: Language + From<Constant<T, L>>>(
-        arena: &mut Arena<Lang>,
+        arena: &mut ::kirin::ir::Arena<Lang>,
         field_0: impl Into<T>,
     ) -> ConstantOpConstantRef
     where
@@ -13,7 +13,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
         let constant_statement_id = arena.new_statement_id();
         let field_0 = field_0.into();
         let field_2 = std::marker::PhantomData;
-        let result: ResultValue = arena
+        let result: ::kirin::ir::ResultValue = arena
             .ssa()
             .kind(SSAKind::Result(constant_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
@@ -30,6 +30,11 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
     }
 }
 pub struct ConstantOpConstantRef {
-    pub id: StatementId,
-    pub result: ResultValue,
+    pub id: ::kirin::ir::StatementId,
+    pub result: ::kirin::ir::ResultValue,
+}
+impl From<ConstantOpConstantRef> for ::kirin::ir::StatementId {
+    fn from(value: ConstantOpConstantRef) -> Self {
+        value.id
+    }
 }

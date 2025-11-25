@@ -1,6 +1,6 @@
 use crate::data::{
-    CombineGenerics, CrateRootPath, EnumAttribute, GenerateFrom,
-    HasDefaultCratePath, HasGenerics, SplitForImplTrait, StatementFields, VariantAttribute,
+    CombineGenerics, CrateRootPath, EnumAttribute, GenerateFrom, HasDefaultCratePath, HasGenerics,
+    SplitForImplTrait, StatementFields, VariantAttribute,
 };
 use proc_macro2::TokenStream;
 
@@ -19,40 +19,50 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> Enum<'input, T> {
         trait_info: &T,
         attrs: Option<EnumAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self {
-        let attrs = attrs.unwrap_or_else(|| EnumAttribute::new(input));
+    ) -> syn::Result<Self> {
+        let attrs = match attrs {
+            Some(a) => a,
+            None => EnumAttribute::new(input)?,
+        };
+
         let syn::Data::Enum(data) = &input.data else {
-            panic!("EnumTrait can only be created from enum data");
+            return Err(syn::Error::new_spanned(
+                input,
+                "Enum can only be created from enum data",
+            ));
         };
 
         if attrs.wraps {
-            return Self::Wrapper(
+            return Ok(Self::Wrapper(
                 WrapperEnum::builder()
                     .attrs(attrs)
                     .input(input)
                     .trait_info(trait_info)
-                    .build(),
-            );
+                    .build()?,
+            ));
         } else if data
             .variants
             .iter()
-            .any(|variant| VariantAttribute::new(variant).is_wrapper())
+            .map(|variant| VariantAttribute::new(variant))
+            .collect::<syn::Result<Vec<_>>>()?
+            .iter()
+            .any(|variant| variant.is_wrapper())
         {
-            return Self::Either(
+            return Ok(Self::Either(
                 EitherEnum::builder()
                     .attrs(attrs)
                     .input(input)
                     .trait_info(trait_info)
-                    .build(),
-            );
+                    .build()?,
+            ));
         } else {
-            return Self::Regular(
+            return Ok(Self::Regular(
                 RegularEnum::builder()
                     .attrs(attrs)
                     .input(input)
                     .trait_info(trait_info)
-                    .build(),
-            );
+                    .build()?,
+            ));
         }
     }
 

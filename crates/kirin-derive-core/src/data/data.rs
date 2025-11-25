@@ -14,18 +14,24 @@ pub enum Data<'input, T: CombineGenerics + StatementFields<'input>> {
 #[bon::bon]
 impl<'input, T: CombineGenerics + StatementFields<'input>> Data<'input, T> {
     #[builder]
-    pub fn new(trait_info: &T, input: &'input syn::DeriveInput) -> Self {
+    pub fn new(trait_info: &T, input: &'input syn::DeriveInput) -> syn::Result<Self> {
         match &input.data {
-            syn::Data::Struct(_) => Data::Struct(
+            syn::Data::Struct(_) => Ok(Data::Struct(
                 Struct::builder()
                     .trait_info(trait_info)
                     .input(input)
-                    .build(),
-            ),
-            syn::Data::Enum(_) => {
-                Data::Enum(Enum::builder().trait_info(trait_info).input(input).build())
-            }
-            _ => panic!("only structs and enums are supported"),
+                    .build()?,
+            )),
+            syn::Data::Enum(_) => Ok(Data::Enum(
+                Enum::builder()
+                    .trait_info(trait_info)
+                    .input(input)
+                    .build()?,
+            )),
+            _ => Err(syn::Error::new_spanned(
+                input,
+                "Data can only be created from struct or enum data",
+            )),
         }
     }
 

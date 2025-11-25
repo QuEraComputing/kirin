@@ -4,7 +4,7 @@ expression: generate(&input)
 ---
 impl EitherEnum {
     pub fn op_abc<Lang: Language + From<EitherEnum>>(
-        arena: &mut Arena<Lang>,
+        arena: &mut ::kirin::ir::Arena<Lang>,
         value: impl Into<u32>,
     ) -> EitherEnumOpAbcRef
     where
@@ -12,13 +12,16 @@ impl EitherEnum {
     {
         let either_enum_statement_id = arena.new_statement_id();
         let value = value.into();
-        let result: ResultValue = arena
+        let result: ::kirin::ir::ResultValue = arena
             .ssa()
             .kind(SSAKind::Result(either_enum_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(u32_type))
             .new()
             .into();
-        let either_enum_statement = arena.statement().definition(Self { value, result }).new();
+        let either_enum_statement = arena
+            .statement()
+            .definition(EitherEnum::A { value, result })
+            .new();
         EitherEnumOpAbcRef {
             id: either_enum_statement_id,
             result,
@@ -26,6 +29,11 @@ impl EitherEnum {
     }
 }
 pub struct EitherEnumOpAbcRef {
-    pub id: StatementId,
-    pub result: ResultValue,
+    pub id: ::kirin::ir::StatementId,
+    pub result: ::kirin::ir::ResultValue,
+}
+impl From<EitherEnumOpAbcRef> for ::kirin::ir::StatementId {
+    fn from(value: EitherEnumOpAbcRef) -> Self {
+        value.id
+    }
 }

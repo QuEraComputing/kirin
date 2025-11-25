@@ -2,43 +2,46 @@
 source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
-impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
-    pub fn new<Lang: Language + From<Constant<T, L>>>(
+impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
+    pub fn new<Lang: Language + From<TestStruct<T, L>>>(
         arena: &mut ::kirin::ir::Arena<Lang>,
         value: impl Into<T>,
-    ) -> ConstantNewRef
+        input_ssa: impl Into<::kirin::ir::SSAValue>,
+    ) -> TestStructNewRef
     where
         Lang::TypeLattice: From<L>,
     {
-        let constant_statement_id = arena.new_statement_id();
+        let teststruct_statement_id = arena.new_statement_id();
         let value = value.into();
+        let input_ssa = input_ssa.into();
         let marker = std::marker::PhantomData;
         let result: ::kirin::ir::ResultValue = arena
             .ssa()
-            .kind(SSAKind::Result(constant_statement_id, 0usize))
+            .kind(SSAKind::Result(teststruct_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
             .new()
             .into();
-        let constant_statement = arena
+        let teststruct_statement = arena
             .statement()
             .definition(Self {
                 value,
                 result,
+                input_ssa,
                 marker,
             })
             .new();
-        ConstantNewRef {
-            id: constant_statement_id,
+        TestStructNewRef {
+            id: teststruct_statement_id,
             result,
         }
     }
 }
-pub struct ConstantNewRef {
+pub struct TestStructNewRef {
     pub id: ::kirin::ir::StatementId,
     pub result: ::kirin::ir::ResultValue,
 }
-impl From<ConstantNewRef> for ::kirin::ir::StatementId {
-    fn from(value: ConstantNewRef) -> Self {
+impl From<TestStructNewRef> for ::kirin::ir::StatementId {
+    fn from(value: TestStructNewRef) -> Self {
         value.id
     }
 }
