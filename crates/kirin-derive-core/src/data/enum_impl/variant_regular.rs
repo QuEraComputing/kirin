@@ -1,6 +1,6 @@
-use crate::data::{FromVariantFields, HasTraitGenerics, StatementFields, VariantAttribute};
+use crate::data::{FromVariantFields, StatementFields, VariantAttribute};
 
-pub struct RegularVariant<'input, T: HasTraitGenerics + StatementFields<'input>> {
+pub struct RegularVariant<'input, T: StatementFields<'input>> {
     pub variant: &'input syn::Variant,
     pub attrs: VariantAttribute,
     pub variant_name: &'input syn::Ident,
@@ -8,7 +8,7 @@ pub struct RegularVariant<'input, T: HasTraitGenerics + StatementFields<'input>>
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics + StatementFields<'input>> RegularVariant<'input, T> {
+impl<'input, T: StatementFields<'input>> RegularVariant<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -30,7 +30,7 @@ impl<'input, T: HasTraitGenerics + StatementFields<'input>> RegularVariant<'inpu
 
 impl<'input, T> std::fmt::Debug for RegularVariant<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: StatementFields<'input>,
     T::FieldsType: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

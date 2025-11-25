@@ -2,7 +2,7 @@ use crate::data::attrs::utils::{error_unknown_attribute, parse_kirin_attributes}
 
 use super::builder::FieldBuilder;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct FieldAttribute {
     /// whether the field wraps another instruction
     pub wraps: bool,
@@ -22,9 +22,9 @@ impl FieldAttribute {
                 field_attr.wraps = true;
             } else if meta.path.is_ident("into") {
                 field_attr.builder.get_or_insert_with(Default::default).into = true;
-            } else if meta.path.is_ident("init") {
+            } else if meta.path.is_ident("default") {
                 let expr: syn::Expr = meta.value()?.parse()?;
-                field_attr.builder.get_or_insert_with(Default::default).init = Some(expr);
+                field_attr.builder.get_or_insert_with(Default::default).default = Some(expr);
             } else if meta.path.is_ident("type") {
                 let expr: syn::Expr = meta.value()?.parse()?;
                 field_attr.builder.get_or_insert_with(Default::default).ty = Some(expr);

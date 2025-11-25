@@ -1,12 +1,11 @@
 use crate::data::{
-    CrateRootPath, EnumAttribute, HasDefaultCratePath, HasTraitGenerics, SplitForImplTrait,
-    enum_impl::variant_ref::VariantIter,
+    CombineGenerics, CrateRootPath, EnumAttribute, HasDefaultCratePath, HasGenerics, SplitForImplTrait, enum_impl::variant_ref::VariantIter
 };
 
 use super::variant_wrapper::WrapperVariant;
 
 /// An enum that contains only wrapper instruction definitions.
-pub struct WrapperEnum<'input, T: HasTraitGenerics> {
+pub struct WrapperEnum<'input, T> {
     pub input: &'input syn::DeriveInput,
     pub combined_generics: syn::Generics,
     pub attrs: EnumAttribute,
@@ -14,7 +13,7 @@ pub struct WrapperEnum<'input, T: HasTraitGenerics> {
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics> WrapperEnum<'input, T> {
+impl<'input, T: CombineGenerics> WrapperEnum<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -59,7 +58,7 @@ impl<'input, T: HasTraitGenerics> WrapperEnum<'input, T> {
     }
 }
 
-impl<'input, T: HasTraitGenerics> std::fmt::Debug for WrapperEnum<'input, T> {
+impl<'input, T> std::fmt::Debug for WrapperEnum<'input, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WrapperEnum")
             .field("variants", &self.variants)
@@ -69,12 +68,12 @@ impl<'input, T: HasTraitGenerics> std::fmt::Debug for WrapperEnum<'input, T> {
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for WrapperEnum<'input, T>
 where
-    T: HasTraitGenerics,
+    T: HasGenerics,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         let (impl_generics, _, where_clause) = self.combined_generics.split_for_impl();
         let (_, input_ty_generics, _) = self.input.generics.split_for_impl();
-        let (_, trait_ty_generics, _) = trait_info.trait_generics().split_for_impl();
+        let (_, trait_ty_generics, _) = trait_info.generics().split_for_impl();
         crate::data::SplitForImpl {
             impl_generics,
             input_ty_generics,
@@ -86,7 +85,7 @@ where
 
 impl<'input, T> CrateRootPath<T> for WrapperEnum<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics,
+    T: HasDefaultCratePath,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         self.attrs

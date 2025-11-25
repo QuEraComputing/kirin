@@ -1,17 +1,17 @@
 use crate::data::{
-    CrateRootPath, GenerateFrom, HasDefaultCratePath, HasTraitGenerics, SplitForImplTrait,
-    StructAttribute,
+    CombineGenerics, CrateRootPath, GenerateFrom, HasDefaultCratePath, HasGenerics,
+    SplitForImplTrait, StructAttribute,
 };
 
 use proc_macro2::TokenStream;
 
-pub enum WrapperStruct<'input, T: HasTraitGenerics> {
+pub enum WrapperStruct<'input, T> {
     Named(NamedWrapperStruct<'input, T>),
     Unnamed(UnnamedWrapperStruct<'input, T>),
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics> WrapperStruct<'input, T> {
+impl<'input, T: CombineGenerics> WrapperStruct<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -53,7 +53,7 @@ impl<'input, T: HasTraitGenerics> WrapperStruct<'input, T> {
 
 impl<'input, T> GenerateFrom<'input, WrapperStruct<'input, T>> for T
 where
-    T: HasTraitGenerics
+    T: HasGenerics
         + GenerateFrom<'input, UnnamedWrapperStruct<'input, T>>
         + GenerateFrom<'input, NamedWrapperStruct<'input, T>>,
 {
@@ -67,7 +67,7 @@ where
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for WrapperStruct<'input, T>
 where
-    T: HasTraitGenerics,
+    T: HasGenerics,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         match self {
@@ -79,7 +79,7 @@ where
 
 impl<'input, T> CrateRootPath<T> for WrapperStruct<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics,
+    T: HasDefaultCratePath,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         match self {
@@ -89,7 +89,7 @@ where
     }
 }
 
-pub struct NamedWrapperStruct<'input, T: HasTraitGenerics> {
+pub struct NamedWrapperStruct<'input, T> {
     pub input: &'input syn::DeriveInput,
     pub combined_generics: syn::Generics,
     pub attrs: StructAttribute,
@@ -99,16 +99,13 @@ pub struct NamedWrapperStruct<'input, T: HasTraitGenerics> {
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics> NamedWrapperStruct<'input, T> {
+impl<'input, T: CombineGenerics> NamedWrapperStruct<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
         attrs: Option<StructAttribute>,
         input: &'input syn::DeriveInput,
-    ) -> Self
-    where
-        T: HasTraitGenerics,
-    {
+    ) -> Self {
         let attrs = attrs.unwrap_or_else(|| StructAttribute::new(input));
         let combined_generics = trait_info.combine_generics(&input.generics);
 
@@ -160,12 +157,12 @@ impl<'input, T: HasTraitGenerics> NamedWrapperStruct<'input, T> {
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for NamedWrapperStruct<'input, T>
 where
-    T: HasTraitGenerics,
+    T: HasGenerics,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         let (impl_generics, _, where_clause) = self.combined_generics.split_for_impl();
         let (_, input_ty_generics, _) = self.input.generics.split_for_impl();
-        let (_, trait_ty_generics, _) = trait_info.trait_generics().split_for_impl();
+        let (_, trait_ty_generics, _) = trait_info.generics().split_for_impl();
         crate::data::SplitForImpl {
             impl_generics,
             trait_ty_generics,
@@ -177,7 +174,7 @@ where
 
 impl<'input, T> CrateRootPath<T> for NamedWrapperStruct<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics,
+    T: HasDefaultCratePath,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         self.attrs
@@ -187,7 +184,7 @@ where
     }
 }
 
-pub struct UnnamedWrapperStruct<'input, T: HasTraitGenerics> {
+pub struct UnnamedWrapperStruct<'input, T> {
     pub input: &'input syn::DeriveInput,
     pub combined_generics: syn::Generics,
     pub attrs: StructAttribute,
@@ -197,7 +194,7 @@ pub struct UnnamedWrapperStruct<'input, T: HasTraitGenerics> {
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics> UnnamedWrapperStruct<'input, T> {
+impl<'input, T: CombineGenerics> UnnamedWrapperStruct<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -255,12 +252,12 @@ impl<'input, T: HasTraitGenerics> UnnamedWrapperStruct<'input, T> {
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for UnnamedWrapperStruct<'input, T>
 where
-    T: HasTraitGenerics,
+    T: HasGenerics,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         let (impl_generics, _, where_clause) = self.combined_generics.split_for_impl();
         let (_, input_ty_generics, _) = self.input.generics.split_for_impl();
-        let (_, trait_ty_generics, _) = trait_info.trait_generics().split_for_impl();
+        let (_, trait_ty_generics, _) = trait_info.generics().split_for_impl();
         crate::data::SplitForImpl {
             impl_generics,
             trait_ty_generics,
@@ -272,12 +269,27 @@ where
 
 impl<'input, T> CrateRootPath<T> for UnnamedWrapperStruct<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics,
+    T: HasDefaultCratePath,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         self.attrs
             .crate_path
             .clone()
             .unwrap_or_else(|| trait_info.default_crate_path())
+    }
+}
+
+impl<'input, T> std::fmt::Debug for WrapperStruct<'input, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WrapperStruct::Named(data) => f
+                .debug_struct("NamedWrapperStruct")
+                .field("wraps", &data.wraps)
+                .finish(),
+            WrapperStruct::Unnamed(data) => f
+                .debug_struct("UnnamedWrapperStruct")
+                .field("wraps", &data.wraps)
+                .finish(),
+        }
     }
 }

@@ -27,7 +27,7 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
             "the '{}' attribute is only allowed on the per statement #[kirin(...)]",
             meta.path.get_ident().unwrap()
         ));
-    } else if ["into", "init", "type"]
+    } else if ["into", "default", "type"]
         .iter()
         .any(|name| meta.path.is_ident(name))
     {
@@ -36,6 +36,9 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
             meta.path.get_ident().unwrap()
         ));
     } else {
-        return meta.error("unknown attribute inside #[kirin(...)]");
+        return meta.error(format!(
+            "unknown attribute '{}' for #[kirin(...)]",
+            meta.path.get_ident().unwrap()
+        ));
     }
 }

@@ -1,9 +1,9 @@
 use crate::data::{
-    CrateRootPath, FromStruct, FromStructFields, HasDefaultCratePath, HasTraitGenerics,
+    CombineGenerics, CrateRootPath, FromStruct, FromStructFields, HasDefaultCratePath, HasGenerics,
     SplitForImplTrait, StatementFields, StructAttribute,
 };
 
-pub struct RegularStruct<'input, T: HasTraitGenerics + StatementFields<'input>> {
+pub struct RegularStruct<'input, T: StatementFields<'input>> {
     pub input: &'input syn::DeriveInput,
     pub combined_generics: syn::Generics,
     pub attrs: StructAttribute,
@@ -14,7 +14,7 @@ pub struct RegularStruct<'input, T: HasTraitGenerics + StatementFields<'input>> 
 #[bon::bon]
 impl<'input, T> RegularStruct<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: CombineGenerics + StatementFields<'input>,
 {
     #[builder]
     pub fn new(
@@ -54,12 +54,12 @@ where
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for RegularStruct<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: HasGenerics + StatementFields<'input>,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         let (impl_generics, _, where_clause) = self.combined_generics.split_for_impl();
         let (_, input_ty_generics, _) = self.input.generics.split_for_impl();
-        let (_, trait_ty_generics, _) = trait_info.trait_generics().split_for_impl();
+        let (_, trait_ty_generics, _) = trait_info.generics().split_for_impl();
         crate::data::SplitForImpl {
             impl_generics,
             trait_ty_generics,
@@ -71,12 +71,27 @@ where
 
 impl<'input, T> CrateRootPath<T> for RegularStruct<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics + StatementFields<'input>,
+    T: HasDefaultCratePath + StatementFields<'input>,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         self.attrs
             .crate_path
             .clone()
             .unwrap_or_else(|| trait_info.default_crate_path())
+    }
+}
+
+impl<'input, T> std::fmt::Debug for RegularStruct<'input, T>
+where
+    T: StatementFields<'input>,
+    T::FieldsType: std::fmt::Debug,
+    T::InfoType: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegularStruct")
+            .field("fields", &self.fields)
+            .field("attrs", &self.attrs)
+            .field("struct_info", &self.struct_info)
+            .finish()
     }
 }

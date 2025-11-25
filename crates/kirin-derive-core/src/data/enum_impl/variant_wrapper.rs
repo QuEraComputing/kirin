@@ -1,14 +1,14 @@
 use quote::ToTokens;
 
-use crate::data::{HasTraitGenerics, VariantAttribute};
+use crate::data::{VariantAttribute};
 
-pub enum WrapperVariant<'input, T: HasTraitGenerics> {
+pub enum WrapperVariant<'input, T> {
     Named(NamedWrapperVariant<'input, T>),
     Unnamed(UnnamedWrapperVariant<'input, T>),
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics> WrapperVariant<'input, T> {
+impl<'input, T> WrapperVariant<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -42,7 +42,7 @@ impl<'input, T: HasTraitGenerics> WrapperVariant<'input, T> {
     }
 }
 
-impl<'input, T: HasTraitGenerics> std::fmt::Debug for WrapperVariant<'input, T> {
+impl<'input, T> std::fmt::Debug for WrapperVariant<'input, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             WrapperVariant::Named(data) => {
@@ -56,7 +56,7 @@ impl<'input, T: HasTraitGenerics> std::fmt::Debug for WrapperVariant<'input, T> 
     }
 }
 
-pub struct NamedWrapperVariant<'input, T: HasTraitGenerics> {
+pub struct NamedWrapperVariant<'input, T> {
     pub variant: &'input syn::Variant,
     pub attrs: VariantAttribute,
     pub variant_name: &'input syn::Ident,
@@ -66,7 +66,7 @@ pub struct NamedWrapperVariant<'input, T: HasTraitGenerics> {
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics> NamedWrapperVariant<'input, T> {
+impl<'input, T> NamedWrapperVariant<'input, T> {
     #[builder]
     pub fn new(
         _trait_info: &T,
@@ -111,7 +111,7 @@ impl<'input, T: HasTraitGenerics> NamedWrapperVariant<'input, T> {
     }
 }
 
-impl<'input, T: HasTraitGenerics> std::fmt::Debug for NamedWrapperVariant<'input, T>
+impl<'input, T> std::fmt::Debug for NamedWrapperVariant<'input, T>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NamedWrapperVariant")
@@ -122,7 +122,7 @@ impl<'input, T: HasTraitGenerics> std::fmt::Debug for NamedWrapperVariant<'input
     }
 }
 
-pub struct UnnamedWrapperVariant<'input, T: HasTraitGenerics> {
+pub struct UnnamedWrapperVariant<'input, T> {
     pub variant: &'input syn::Variant,
     pub attrs: VariantAttribute,
     pub variant_name: &'input syn::Ident,
@@ -132,7 +132,7 @@ pub struct UnnamedWrapperVariant<'input, T: HasTraitGenerics> {
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics> UnnamedWrapperVariant<'input, T> {
+impl<'input, T> UnnamedWrapperVariant<'input, T> {
     #[builder]
     pub fn new(
         _trait_info: &T,
@@ -175,7 +175,7 @@ impl<'input, T: HasTraitGenerics> UnnamedWrapperVariant<'input, T> {
     }
 }
 
-impl<'input, T: HasTraitGenerics> std::fmt::Debug for UnnamedWrapperVariant<'input, T>
+impl<'input, T> std::fmt::Debug for UnnamedWrapperVariant<'input, T>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UnnamedWrapperVariant")

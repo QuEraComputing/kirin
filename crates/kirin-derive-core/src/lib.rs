@@ -14,7 +14,8 @@ pub mod prelude {
     pub use crate::from::FromInfo;
     pub use crate::utils::*;
     pub use crate::{
-        derive_check, derive_empty, derive_field_iter, derive_field_iter_mut, derive_from,
+        derive_builder, derive_check, derive_empty, derive_field_iter, derive_field_iter_mut,
+        derive_from,
     };
 }
 

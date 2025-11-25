@@ -1,0 +1,31 @@
+---
+source: crates/kirin-derive-core/src/builder/mod.rs
+expression: generate(&input)
+---
+impl EitherEnum {
+    pub fn op_abc<Lang: Language + From<EitherEnum>>(
+        arena: &mut Arena<Lang>,
+        value: impl Into<u32>,
+    ) -> EitherEnumOpAbcRef
+    where
+        Lang::TypeLattice: From<SomeLattice>,
+    {
+        let either_enum_statement_id = arena.new_statement_id();
+        let value = value.into();
+        let result: ResultValue = arena
+            .ssa()
+            .kind(SSAKind::Result(either_enum_statement_id, 0usize))
+            .ty(Lang::TypeLattice::from(u32_type))
+            .new()
+            .into();
+        let either_enum_statement = arena.statement().definition(Self { value, result }).new();
+        EitherEnumOpAbcRef {
+            id: either_enum_statement_id,
+            result,
+        }
+    }
+}
+pub struct EitherEnumOpAbcRef {
+    pub id: StatementId,
+    pub result: ResultValue,
+}

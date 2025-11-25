@@ -28,8 +28,7 @@ pub struct EnumAttribute {
 }
 
 impl EnumAttribute {
-    pub fn new<'a>(input: &'a syn::DeriveInput) -> Self
-    {
+    pub fn new<'a>(input: &'a syn::DeriveInput) -> Self {
         let mut enum_attr = Self::default();
         parse_kirin_attributes(&input.attrs, |meta| {
             if meta.path.is_ident("wraps") {
@@ -91,21 +90,31 @@ pub struct VariantAttribute {
     pub is_pure: Option<bool>,
     /// whether the instruction is a terminator
     pub is_terminator: Option<bool>,
+    /// options for the builder method to generate
+    pub builder: Builder,
     /// field attributes for each field in the variant
     pub fields: Option<Vec<Option<FieldAttribute>>>,
 }
 
 impl VariantAttribute {
     pub fn is_wrapper(&self) -> bool {
-        self.wraps || self.fields.as_ref().map_or(false, |fields| {
-            fields.iter().any(|f_attr_opt| {
-                if let Some(f_attr) = f_attr_opt {
-                    f_attr.wraps
-                } else {
-                    false
-                }
+        self.wraps
+            || self.fields.as_ref().map_or(false, |fields| {
+                fields.iter().any(|f_attr_opt| {
+                    if let Some(f_attr) = f_attr_opt {
+                        f_attr.wraps
+                    } else {
+                        false
+                    }
+                })
             })
-        })
+    }
+
+    pub fn get_field_attribute(&self, index: usize) -> Option<&FieldAttribute> {
+        if let Some(fields) = &self.fields {
+            return fields.get(index).and_then(|f_attr_opt| f_attr_opt.as_ref());
+        }
+        None
     }
 
     pub fn new(variant: &syn::Variant) -> Self {
@@ -113,6 +122,17 @@ impl VariantAttribute {
         parse_kirin_attributes(&variant.attrs, |meta| {
             if meta.path.is_ident("wraps") {
                 variant_attr.wraps = true;
+            } else if meta.path.is_ident("fn") {
+                match meta.value() {
+                    Ok(v) => {
+                        let ident: syn::Ident = v.parse()?;
+                        variant_attr.builder = Builder::EnabledWithName(ident);
+                    }
+                    Err(_) => {
+                        // just pass through, #[kirin(fn)] means enable default builder name
+                        variant_attr.builder = Builder::Enabled;
+                    }
+                }
             } else if meta.path.is_ident("constant") {
                 variant_attr.is_constant = Some(true);
             } else if meta.path.is_ident("pure") {

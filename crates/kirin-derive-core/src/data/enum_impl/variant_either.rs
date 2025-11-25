@@ -1,15 +1,15 @@
-use crate::data::{HasTraitGenerics, StatementFields, VariantAttribute};
+use crate::data::{StatementFields, VariantAttribute};
 
 use super::variant_regular::RegularVariant;
 use super::variant_wrapper::WrapperVariant;
 
-pub enum EitherVariant<'input, T: HasTraitGenerics + StatementFields<'input>> {
+pub enum EitherVariant<'input, T: StatementFields<'input>> {
     Wrapper(WrapperVariant<'input, T>),
     Regular(RegularVariant<'input, T>),
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics + StatementFields<'input>> EitherVariant<'input, T> {
+impl<'input, T: StatementFields<'input>> EitherVariant<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -35,11 +35,15 @@ impl<'input, T: HasTraitGenerics + StatementFields<'input>> EitherVariant<'input
             )
         }
     }
+
+    pub fn is_regular(&self) -> bool {
+        matches!(self, EitherVariant::Regular(_))
+    }
 }
 
 impl<'input, T> std::fmt::Debug for EitherVariant<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: StatementFields<'input>,
     T::FieldsType: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

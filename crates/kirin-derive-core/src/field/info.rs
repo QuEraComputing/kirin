@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use quote::format_ident;
 
 use crate::{
-    data::{HasDefaultCratePath, HasTraitGenerics, StatementFields},
+    data::{HasDefaultCratePath, HasGenerics, StatementFields},
     utils::to_camel_case,
 };
 
@@ -122,8 +122,8 @@ impl HasDefaultCratePath for FieldIterInfo {
     }
 }
 
-impl HasTraitGenerics for FieldIterInfo {
-    fn trait_generics(&self) -> &syn::Generics {
+impl HasGenerics for FieldIterInfo {
+    fn generics(&self) -> &syn::Generics {
         &self.generics
     }
 }

@@ -1,10 +1,9 @@
 use crate::data::{
-    CrateRootPath, EnumAttribute, FromEnum, HasDefaultCratePath, HasTraitGenerics,
-    SplitForImplTrait, StatementFields, enum_impl::{variant_either::EitherVariant, variant_ref::VariantIter},
+    CombineGenerics, CrateRootPath, EnumAttribute, FromEnum, HasDefaultCratePath, HasGenerics, SplitForImplTrait, StatementFields, enum_impl::{variant_either::EitherVariant, variant_ref::VariantIter}
 };
 
 /// An enum that contains a mix of wrapper and regular instruction definitions.
-pub struct EitherEnum<'input, T: HasTraitGenerics + StatementFields<'input>> {
+pub struct EitherEnum<'input, T: StatementFields<'input>> {
     pub input: &'input syn::DeriveInput,
     pub combined_generics: syn::Generics,
     pub attrs: EnumAttribute,
@@ -13,7 +12,7 @@ pub struct EitherEnum<'input, T: HasTraitGenerics + StatementFields<'input>> {
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics + StatementFields<'input>> EitherEnum<'input, T> {
+impl<'input, T: CombineGenerics + StatementFields<'input>> EitherEnum<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -63,7 +62,7 @@ impl<'input, T: HasTraitGenerics + StatementFields<'input>> EitherEnum<'input, T
 
 impl<'input, T> std::fmt::Debug for EitherEnum<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: StatementFields<'input>,
     T::FieldsType: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -75,12 +74,12 @@ where
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for EitherEnum<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: HasGenerics + StatementFields<'input>,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         let (impl_generics, _, where_clause) = self.combined_generics.split_for_impl();
         let (_, input_ty_generics, _) = self.input.generics.split_for_impl();
-        let (_, trait_ty_generics, _) = trait_info.trait_generics().split_for_impl();
+        let (_, trait_ty_generics, _) = trait_info.generics().split_for_impl();
         crate::data::SplitForImpl {
             impl_generics,
             input_ty_generics,
@@ -92,7 +91,7 @@ where
 
 impl<'input, T> CrateRootPath<T> for EitherEnum<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics + StatementFields<'input>,
+    T: HasDefaultCratePath + StatementFields<'input>,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         self.attrs

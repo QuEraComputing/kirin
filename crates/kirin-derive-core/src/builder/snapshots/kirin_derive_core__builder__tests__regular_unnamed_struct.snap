@@ -1,0 +1,35 @@
+---
+source: crates/kirin-derive-core/src/builder/mod.rs
+expression: generate(&input)
+---
+impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
+    pub fn op_constant<Lang: Language + From<Constant<T, L>>>(
+        arena: &mut Arena<Lang>,
+        field_0: impl Into<T>,
+    ) -> ConstantOpConstantRef
+    where
+        Lang::TypeLattice: From<L>,
+    {
+        let constant_statement_id = arena.new_statement_id();
+        let field_0 = field_0.into();
+        let field_2 = std::marker::PhantomData;
+        let result: ResultValue = arena
+            .ssa()
+            .kind(SSAKind::Result(constant_statement_id, 0usize))
+            .ty(Lang::TypeLattice::from(value.type_of()))
+            .new()
+            .into();
+        let constant_statement = arena
+            .statement()
+            .definition(Self(field_0, result, field_2))
+            .new();
+        ConstantOpConstantRef {
+            id: constant_statement_id,
+            result,
+        }
+    }
+}
+pub struct ConstantOpConstantRef {
+    pub id: StatementId,
+    pub result: ResultValue,
+}

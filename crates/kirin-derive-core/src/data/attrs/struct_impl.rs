@@ -1,3 +1,5 @@
+use quote::ToTokens;
+
 use crate::data::PropertyAttribute;
 use crate::data::attrs::utils::parse_kirin_attributes;
 
@@ -93,6 +95,12 @@ impl StructAttribute {
                     .any(|f| f.as_ref().map_or(false, |fa| fa.wraps))
             })
     }
+
+    pub fn get_field_attribute(&self, index: usize) -> Option<&FieldAttribute> {
+        self.fields.as_ref().and_then(|fields| {
+            fields.get(index).and_then(|f| f.as_ref())
+        })
+    }
 }
 
 impl PropertyAttribute for StructAttribute {
@@ -106,5 +114,20 @@ impl PropertyAttribute for StructAttribute {
 
     fn is_terminator(&self) -> Option<bool> {
         self.is_terminator
+    }
+}
+
+impl std::fmt::Debug for StructAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StructAttribute")
+            .field("wraps", &self.wraps)
+            .field("crate_path", &self.crate_path.as_ref().map(|p| p.to_token_stream()))
+            .field("ty_lattice", &self.ty_lattice.as_ref().map(|t| t.to_token_stream()))
+            .field("is_constant", &self.is_constant)
+            .field("is_pure", &self.is_pure)
+            .field("is_terminator", &self.is_terminator)
+            .field("builder", &self.builder)
+            .field("fields", &self.fields)
+            .finish()
     }
 }

@@ -1,19 +1,19 @@
 use crate::data::{
-    CombinedGenerateFrom, CrateRootPath, EnumAttribute, GenerateFrom, HasDefaultCratePath,
-    HasTraitGenerics, SplitForImplTrait, StatementFields, VariantAttribute,
+    CombineGenerics, CrateRootPath, EnumAttribute, GenerateFrom,
+    HasDefaultCratePath, HasGenerics, SplitForImplTrait, StatementFields, VariantAttribute,
 };
 use proc_macro2::TokenStream;
 
 use super::{either::EitherEnum, regular::RegularEnum, wrapper::WrapperEnum};
 
-pub enum Enum<'input, T: HasTraitGenerics + StatementFields<'input>> {
+pub enum Enum<'input, T: CombineGenerics + StatementFields<'input>> {
     Wrapper(WrapperEnum<'input, T>),
     Either(EitherEnum<'input, T>),
     Regular(RegularEnum<'input, T>),
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics + StatementFields<'input>> Enum<'input, T> {
+impl<'input, T: CombineGenerics + StatementFields<'input>> Enum<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -67,7 +67,7 @@ impl<'input, T: HasTraitGenerics + StatementFields<'input>> Enum<'input, T> {
 
 impl<'input, T> std::fmt::Debug for Enum<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: CombineGenerics + StatementFields<'input>,
     T::FieldsType: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,7 +81,11 @@ where
 
 impl<'input, T> GenerateFrom<'input, Enum<'input, T>> for T
 where
-    T: CombinedGenerateFrom<'input>,
+    T: CombineGenerics
+        + StatementFields<'input>
+        + GenerateFrom<'input, WrapperEnum<'input, T>>
+        + GenerateFrom<'input, EitherEnum<'input, T>>
+        + GenerateFrom<'input, RegularEnum<'input, T>>,
 {
     fn generate_from(&self, data: &Enum<'input, T>) -> TokenStream {
         match data {
@@ -94,7 +98,7 @@ where
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for Enum<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: HasGenerics + StatementFields<'input>,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         match self {
@@ -107,7 +111,7 @@ where
 
 impl<'input, T> CrateRootPath<T> for Enum<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics + StatementFields<'input>,
+    T: CombineGenerics + HasDefaultCratePath + StatementFields<'input>,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         match self {

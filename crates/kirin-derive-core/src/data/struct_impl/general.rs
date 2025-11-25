@@ -1,19 +1,18 @@
 use super::regular::RegularStruct;
 use super::wrapper::WrapperStruct;
 use crate::data::{
-    CrateRootPath, GenerateFrom, HasDefaultCratePath, HasTraitGenerics, SplitForImplTrait,
-    StatementFields, StructAttribute,
+    CombineGenerics, CrateRootPath, GenerateFrom, HasDefaultCratePath, HasGenerics, SplitForImplTrait, StatementFields, StructAttribute
 };
 
 use proc_macro2::TokenStream;
 
-pub enum Struct<'input, T: HasTraitGenerics + StatementFields<'input>> {
+pub enum Struct<'input, T: CombineGenerics + StatementFields<'input>> {
     Wrapper(WrapperStruct<'input, T>),
     Regular(RegularStruct<'input, T>),
 }
 
 #[bon::bon]
-impl<'input, T: HasTraitGenerics + StatementFields<'input>> Struct<'input, T> {
+impl<'input, T: CombineGenerics + StatementFields<'input>> Struct<'input, T> {
     #[builder]
     pub fn new(
         trait_info: &T,
@@ -50,7 +49,7 @@ impl<'input, T: HasTraitGenerics + StatementFields<'input>> Struct<'input, T> {
 
 impl<'input, T> GenerateFrom<'input, Struct<'input, T>> for T
 where
-    T: HasTraitGenerics
+    T: HasGenerics
         + StatementFields<'input>
         + GenerateFrom<'input, WrapperStruct<'input, T>>
         + GenerateFrom<'input, RegularStruct<'input, T>>,
@@ -65,7 +64,7 @@ where
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for Struct<'input, T>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: HasGenerics + StatementFields<'input>,
 {
     fn split_for_impl(&'a self, trait_info: &'a T) -> crate::data::SplitForImpl<'a> {
         match self {
@@ -77,12 +76,26 @@ where
 
 impl<'input, T> CrateRootPath<T> for Struct<'input, T>
 where
-    T: HasDefaultCratePath + HasTraitGenerics + StatementFields<'input>,
+    T: HasDefaultCratePath + HasGenerics + StatementFields<'input>,
 {
     fn crate_root_path(&self, trait_info: &T) -> syn::Path {
         match self {
             Struct::Wrapper(data) => data.crate_root_path(trait_info),
             Struct::Regular(data) => data.crate_root_path(trait_info),
+        }
+    }
+}
+
+impl<'input, T> std::fmt::Debug for Struct<'input, T>
+where
+    T: CombineGenerics + StatementFields<'input>,
+    T::FieldsType: std::fmt::Debug,
+    T::InfoType: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Struct::Wrapper(data) => f.debug_tuple("StructTrait::Wrapper").field(data).finish(),
+            Struct::Regular(data) => f.debug_tuple("StructTrait::Regular").field(data).finish(),
         }
     }
 }

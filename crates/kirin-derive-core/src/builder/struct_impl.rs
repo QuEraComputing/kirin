@@ -1,0 +1,74 @@
+use super::data::Builder;
+use crate::{data::*, utils::to_camel_case};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+
+impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
+    fn generate_from(&self, data: &RegularStruct<'a, Builder>) -> TokenStream {
+        if !data.attrs.builder.is_enabled() {
+            return quote! {};
+        }
+
+        let syn::Data::Struct(data_struct) = &data.input.data else {
+            panic!("RegularStruct can only be created from struct data");
+        };
+
+        let name = &data.input.ident;
+        let statement = format_ident!("{}_statement", name.to_string().to_lowercase());
+        let statement_id = format_ident!("{}_statement_id", name.to_string().to_lowercase());
+        let type_lattice = data
+            .attrs
+            .ty_lattice
+            .clone()
+            .expect("missing #[kirin(type_lattice = ...)], cannot generate the builder");
+
+        let builder_name = data.attrs.builder.builder_name(&format_ident!("new"));
+        let ref_struct_name =
+            format_ident!("{}{}Ref", name, to_camel_case(builder_name.to_string()));
+
+        let inputs = data.fields.inputs();
+        let results = data.fields.build_results(&statement_id);
+        let others = data.fields.build_inputs();
+        let result_names = data.fields.result_names();
+        let ref_struct = data.fields.ref_struct(&ref_struct_name);
+        let initialization = data.fields.initialization(&data_struct.fields);
+
+        let (impl_generics, ty_generics, where_clause) = data.input.generics.split_for_impl();
+
+        quote! {
+            impl #impl_generics #name #ty_generics #where_clause {
+                pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+                    arena: &mut Arena<Lang>,
+                    #(#inputs,)*
+                ) -> #ref_struct_name
+                where
+                    Lang::TypeLattice: From<#type_lattice>,
+                {
+                    let #statement_id = arena.new_statement_id();
+                    #(#others)*
+
+                    #(#results)*
+                    let #statement = arena
+                        .statement()
+                        .definition(Self #initialization)
+                        .new();
+
+                    #ref_struct_name {
+                        id: #statement_id,
+                        #(#result_names),*
+                    }
+                }
+            }
+            #ref_struct
+        }
+    }
+}
+
+impl<'a> GenerateFrom<'a, Struct<'a, Builder>> for Builder {
+    fn generate_from(&self, data: &Struct<'a, Builder>) -> TokenStream {
+        match data {
+            Struct::Regular(data) => self.generate_from(data),
+            Struct::Wrapper(_data) => quote! {},
+        }
+    }
+}

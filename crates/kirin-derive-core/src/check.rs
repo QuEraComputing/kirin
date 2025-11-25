@@ -45,8 +45,8 @@ impl StatementFields<'_> for CheckInfo {
     type InfoType = Option<bool>;
 }
 
-impl HasTraitGenerics for CheckInfo {
-    fn trait_generics(&self) -> &syn::Generics {
+impl HasGenerics for CheckInfo {
+    fn generics(&self) -> &syn::Generics {
         &self.generics
     }
 }

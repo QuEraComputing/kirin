@@ -1,0 +1,48 @@
+---
+source: crates/kirin-derive-core/src/builder/mod.rs
+expression: generate(&input)
+---
+impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
+    pub fn new<Lang: Language + From<MultiResult<T, L>>>(
+        arena: &mut Arena<Lang>,
+        value: impl Into<T>,
+    ) -> MultiResultNewRef
+    where
+        Lang::TypeLattice: From<L>,
+    {
+        let multiresult_statement_id = arena.new_statement_id();
+        let value = value.into();
+        let marker = std::marker::PhantomData;
+        let result1: ResultValue = arena
+            .ssa()
+            .kind(SSAKind::Result(multiresult_statement_id, 0usize))
+            .ty(Lang::TypeLattice::from(value.type_of()))
+            .new()
+            .into();
+        let result2: ResultValue = arena
+            .ssa()
+            .kind(SSAKind::Result(multiresult_statement_id, 1usize))
+            .ty(Lang::TypeLattice::from(value.type_of()))
+            .new()
+            .into();
+        let multiresult_statement = arena
+            .statement()
+            .definition(Self {
+                value,
+                result1,
+                result2,
+                marker,
+            })
+            .new();
+        MultiResultNewRef {
+            id: multiresult_statement_id,
+            result1,
+            result2,
+        }
+    }
+}
+pub struct MultiResultNewRef {
+    pub id: StatementId,
+    pub result1: ResultValue,
+    pub result2: ResultValue,
+}

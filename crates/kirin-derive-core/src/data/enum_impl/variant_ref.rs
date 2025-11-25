@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::data::{HasTraitGenerics, StatementFields};
+use crate::data::StatementFields;
 
 use super::either::EitherEnum;
 use super::regular::RegularEnum;
@@ -39,17 +39,14 @@ pub struct VariantRef<'a, T> {
 
 impl<'a, 'input, T> VariantRef<'a, RegularEnum<'input, T>>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: StatementFields<'input>,
 {
     pub fn variant(&'a self) -> &'a RegularVariant<'input, T> {
         &self.parent.variants[self.variant_index]
     }
 }
 
-impl<'a, 'input, T> VariantRef<'a, WrapperEnum<'input, T>>
-where
-    T: HasTraitGenerics + StatementFields<'input>,
-{
+impl<'a, 'input, T> VariantRef<'a, WrapperEnum<'input, T>> {
     pub fn variant(&'a self) -> &'a WrapperVariant<'input, T> {
         &self.parent.variants[self.variant_index]
     }
@@ -57,7 +54,7 @@ where
 
 impl<'a, 'input, T> VariantRef<'a, EitherEnum<'input, T>>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: StatementFields<'input>,
 {
     pub fn variant(&'a self) -> &'a EitherVariant<'input, T> {
         &self.parent.variants[self.variant_index]
@@ -66,7 +63,7 @@ where
 
 impl<'a, 'input, T> Deref for VariantRef<'a, RegularEnum<'input, T>>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: StatementFields<'input>,
 {
     type Target = RegularVariant<'input, T>;
 
@@ -75,10 +72,7 @@ where
     }
 }
 
-impl<'a, 'input, T> Deref for VariantRef<'a, WrapperEnum<'input, T>>
-where
-    T: HasTraitGenerics + StatementFields<'input>,
-{
+impl<'a, 'input, T> Deref for VariantRef<'a, WrapperEnum<'input, T>> {
     type Target = WrapperVariant<'input, T>;
 
     fn deref(&self) -> &Self::Target {
@@ -88,7 +82,7 @@ where
 
 impl<'a, 'input, T> Deref for VariantRef<'a, EitherEnum<'input, T>>
 where
-    T: HasTraitGenerics + StatementFields<'input>,
+    T: StatementFields<'input>,
 {
     type Target = EitherVariant<'input, T>;
 

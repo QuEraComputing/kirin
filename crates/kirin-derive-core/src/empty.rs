@@ -41,8 +41,8 @@ impl HasDefaultCratePath for Empty {
     }
 }
 
-impl HasTraitGenerics for Empty {
-    fn trait_generics(&self) -> &syn::Generics {
+impl HasGenerics for Empty {
+    fn generics(&self) -> &syn::Generics {
         &self.generics       
     }
 }

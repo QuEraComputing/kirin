@@ -22,8 +22,8 @@ impl StatementFields<'_> for FromInfo {
     type InfoType = ();
 }
 
-impl HasTraitGenerics for FromInfo {
-    fn trait_generics(&self) -> &syn::Generics {
+impl HasGenerics for FromInfo {
+    fn generics(&self) -> &syn::Generics {
         &self.0
     }
 }
