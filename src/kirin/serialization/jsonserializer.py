@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Optional
 
 from kirin.serialization.core.serializationunit import SerializationUnit
 from kirin.serialization.core.serializationmodule import SerializationModule
@@ -74,3 +74,14 @@ class JSONSerializer:
         if not isinstance(result, SerializationModule):
             raise TypeError("decoded payload is not a SerializationModule")
         return result
+
+
+_json_serializer_instance: Optional[JSONSerializer] = None
+
+
+def get_json_serializer() -> JSONSerializer:
+    """Lazily return a single JSONSerializer instance (module-level singleton)."""
+    global _json_serializer_instance
+    if _json_serializer_instance is None:
+        _json_serializer_instance = JSONSerializer()
+    return _json_serializer_instance
