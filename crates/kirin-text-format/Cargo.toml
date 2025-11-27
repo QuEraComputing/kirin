@@ -1,7 +1,0 @@
-[package]
-name = "kirin-text-format"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
