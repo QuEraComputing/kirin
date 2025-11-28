@@ -16,6 +16,9 @@ class FlattenAdd(RewriteRule):
         ):
             return RewriteResult()
 
+        assert isinstance(rhs_type, types.Generic), "Expecting generic type for IList"
+        assert isinstance(lhs_type, types.Generic), "Expecting generic type for IList"
+
         # check if we are adding two ilist.New objects
         new_data = ()
 
@@ -47,9 +50,6 @@ class FlattenAdd(RewriteRule):
             or len(const_rhs.data) > 0
         ):
             return RewriteResult()
-
-        assert isinstance(rhs_type := rhs.type, types.Generic), "Impossible"
-        assert isinstance(lhs_type := lhs.type, types.Generic), "Impossible"
 
         lhs_elem_type = lhs_type.vars[0]
         rhs_elem_type = rhs_type.vars[0]
