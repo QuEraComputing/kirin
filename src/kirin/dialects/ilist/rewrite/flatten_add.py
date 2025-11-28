@@ -9,10 +9,15 @@ class FlattenAdd(RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not (
             isinstance(node, py.binop.Add)
-            and node.lhs.type.is_subseteq(ilist.IListType)
-            and node.rhs.type.is_subseteq(ilist.IListType)
+            and (lhs_type := node.lhs.type).is_subseteq(ilist.IListType)
+            and (rhs_type := node.rhs.type).is_subseteq(ilist.IListType)
+            and not lhs_type.is_structurally_equal(types.Bottom)
+            and not rhs_type.is_structurally_equal(types.Bottom)
         ):
             return RewriteResult()
+
+        assert isinstance(rhs_type, types.Generic), "Expecting generic type for IList"
+        assert isinstance(lhs_type, types.Generic), "Expecting generic type for IList"
 
         # check if we are adding two ilist.New objects
         new_data = ()
@@ -45,9 +50,6 @@ class FlattenAdd(RewriteRule):
             or len(const_rhs.data) > 0
         ):
             return RewriteResult()
-
-        assert isinstance(rhs_type := rhs.type, types.Generic), "Impossible"
-        assert isinstance(lhs_type := lhs.type, types.Generic), "Impossible"
 
         lhs_elem_type = lhs_type.vars[0]
         rhs_elem_type = rhs_type.vars[0]
