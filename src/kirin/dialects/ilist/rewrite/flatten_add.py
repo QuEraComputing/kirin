@@ -9,8 +9,10 @@ class FlattenAdd(RewriteRule):
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not (
             isinstance(node, py.binop.Add)
-            and node.lhs.type.is_subseteq(ilist.IListType)
-            and node.rhs.type.is_subseteq(ilist.IListType)
+            and (lhs_type := node.lhs.type).is_subseteq(ilist.IListType)
+            and (rhs_type := node.rhs.type).is_subseteq(ilist.IListType)
+            and not lhs_type.is_structurally_equal(types.Bottom)
+            and not rhs_type.is_structurally_equal(types.Bottom)
         ):
             return RewriteResult()
 
