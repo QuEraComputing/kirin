@@ -4,22 +4,22 @@ expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
     pub fn new<Lang: Language + From<Constant<T, L>>>(
-        arena: &mut ::kirin::ir::Arena<Lang>,
+        context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<T>,
     ) -> ConstantNewRef
     where
         Lang::TypeLattice: From<L>,
     {
-        let constant_statement_id = arena.new_statement_id();
+        let constant_statement_id = context.new_statement_id();
         let value = value.into();
         let marker = std::marker::PhantomData;
-        let result: ::kirin::ir::ResultValue = arena
+        let result: ::kirin::ir::ResultValue = context
             .ssa()
             .kind(SSAKind::Result(constant_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
             .new()
             .into();
-        let constant_statement = arena
+        let constant_statement = context
             .statement()
             .definition(Self {
                 value,

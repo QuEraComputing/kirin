@@ -1,16 +1,16 @@
 use crate::node::{Block, StatementId};
 use crate::query::{Info, LinkedListElem, LinkedListInfo, ParentInfo};
-use crate::{Arena, Language};
+use crate::{Context, Language};
 
 pub trait Detach {
     /// Detach the IR node from its parent.
-    fn detach<L: Language>(&self, ctx: &mut Arena<L>) -> eyre::Result<()>;
+    fn detach<L: Language>(&self, ctx: &mut Context<L>) -> eyre::Result<()>;
 }
 
 macro_rules! impl_detach {
     ($ty:ty) => {
         impl Detach for $ty {
-            fn detach<L: Language>(&self, ctx: &mut Arena<L>) -> eyre::Result<()> {
+            fn detach<L: Language>(&self, ctx: &mut Context<L>) -> eyre::Result<()> {
                 let (prev, next, parent) = if let Some(info) = self.get_info_mut(ctx) {
                     let prev = info.get_prev_mut().take();
                     let next = info.get_next_mut().take();

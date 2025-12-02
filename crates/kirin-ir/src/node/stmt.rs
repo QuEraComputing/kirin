@@ -29,31 +29,31 @@ impl StatementId {
 impl StatementId {
     pub fn results<'a, L: Language>(
         &self,
-        arena: &'a crate::Arena<L>,
+        context: &'a crate::Context<L>,
     ) -> <L as crate::HasResults<'a>>::Iter {
-        self.expect_info(arena).definition.results()
+        self.expect_info(context).definition.results()
     }
 
     pub fn arguments<'a, L: Language>(
         &self,
-        arena: &'a crate::Arena<L>,
+        context: &'a crate::Context<L>,
     ) -> <L as crate::HasArguments<'a>>::Iter {
-        self.expect_info(arena).definition.arguments()
+        self.expect_info(context).definition.arguments()
     }
 
-    pub fn parent<'a, L: Language>(&self, arena: &'a crate::Arena<L>) -> &'a Option<Block> {
-        &self.expect_info(arena).parent
+    pub fn parent<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a Option<Block> {
+        &self.expect_info(context).parent
     }
 
-    pub fn next<'a, L: Language>(&self, arena: &'a crate::Arena<L>) -> &'a Option<StatementId> {
-        &self.expect_info(arena).node.next
+    pub fn next<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
+        &self.expect_info(context).node.next
     }
 
-    pub fn prev<'a, L: Language>(&self, arena: &'a crate::Arena<L>) -> &'a Option<StatementId> {
-        &self.expect_info(arena).node.prev
+    pub fn prev<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
+        &self.expect_info(context).node.prev
     }
 
-    pub fn definition<'a, L: Language>(&self, arena: &'a crate::Arena<L>) -> &'a L {
-        &self.expect_info(arena).definition
+    pub fn definition<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a L {
+        &self.expect_info(context).definition
     }
 }

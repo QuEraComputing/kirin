@@ -4,21 +4,21 @@ expression: generate(&input)
 ---
 impl EitherEnum {
     pub fn op_abc<Lang: Language + From<EitherEnum>>(
-        arena: &mut ::kirin::ir::Arena<Lang>,
+        context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<u32>,
     ) -> EitherEnumOpAbcRef
     where
         Lang::TypeLattice: From<SomeLattice>,
     {
-        let either_enum_statement_id = arena.new_statement_id();
+        let either_enum_statement_id = context.new_statement_id();
         let value = value.into();
-        let result: ::kirin::ir::ResultValue = arena
+        let result: ::kirin::ir::ResultValue = context
             .ssa()
             .kind(SSAKind::Result(either_enum_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(u32_type))
             .new()
             .into();
-        let either_enum_statement = arena
+        let either_enum_statement = context
             .statement()
             .definition(EitherEnum::A { value, result })
             .new();

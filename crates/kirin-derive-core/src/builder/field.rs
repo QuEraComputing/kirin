@@ -99,7 +99,7 @@ impl FieldInfo {
         }
 
         quote! {
-            let #name: #crate_path::ResultValue = arena
+            let #name: #crate_path::ResultValue = context
                 .ssa()
                 .kind(SSAKind::Result(#statement_id, #index))
                 .ty(Lang::TypeLattice::from(#ty))

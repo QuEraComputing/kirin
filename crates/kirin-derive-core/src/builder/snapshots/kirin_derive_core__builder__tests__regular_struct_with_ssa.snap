@@ -4,24 +4,24 @@ expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
     pub fn new<Lang: Language + From<TestStruct<T, L>>>(
-        arena: &mut ::kirin::ir::Arena<Lang>,
+        context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<T>,
         input_ssa: impl Into<::kirin::ir::SSAValue>,
     ) -> TestStructNewRef
     where
         Lang::TypeLattice: From<L>,
     {
-        let teststruct_statement_id = arena.new_statement_id();
+        let teststruct_statement_id = context.new_statement_id();
         let value = value.into();
         let input_ssa: ::kirin::ir::SSAValue = input_ssa.into();
         let marker = std::marker::PhantomData;
-        let result: ::kirin::ir::ResultValue = arena
+        let result: ::kirin::ir::ResultValue = context
             .ssa()
             .kind(SSAKind::Result(teststruct_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
             .new()
             .into();
-        let teststruct_statement = arena
+        let teststruct_statement = context
             .statement()
             .definition(Self {
                 value,

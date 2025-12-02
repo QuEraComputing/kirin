@@ -1,9 +1,9 @@
 use crate::node::*;
 use crate::query::Info;
-use crate::{Arena, Language};
+use crate::{Context, Language};
 
 pub struct BlockBuilder<'a, L: Language> {
-    arena: &'a mut Arena<L>,
+    context: &'a mut Context<L>,
     parent: Option<Region>,
     arguments: Vec<(L::TypeLattice, Option<String>)>,
     statements: Vec<StatementId>,
@@ -11,9 +11,9 @@ pub struct BlockBuilder<'a, L: Language> {
 }
 
 impl<'a, L: Language> BlockBuilder<'a, L> {
-    pub(crate) fn from_arena(arena: &'a mut Arena<L>) -> Self {
+    pub(crate) fn from_context(context: &'a mut Context<L>) -> Self {
         BlockBuilder {
-            arena,
+            context,
             parent: None,
             arguments: Vec::new(),
             statements: Vec::new(),
@@ -46,7 +46,7 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
     /// Add a statement to the block.
     pub fn stmt(mut self, stmt: impl Into<StatementId>) -> Self {
         let stmt = stmt.into();
-        let info = stmt.expect_info(self.arena);
+        let info = stmt.expect_info(self.context);
 
         info.definition.is_terminator().then(|| {
             panic!(
@@ -61,7 +61,7 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
     /// Set the terminator statement of the block.
     pub fn terminator(mut self, term: impl Into<StatementId>) -> Self {
         let term = term.into();
-        let info = term.expect_info(self.arena);
+        let info = term.expect_info(self.context);
 
         let _ = info.definition.is_terminator() || {
             panic!(
@@ -73,31 +73,31 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
         self
     }
 
-    /// Finalize the block and add it to the arena.
+    /// Finalize the block and add it to the context.
     pub fn new(self) -> Block {
-        let id = Block(self.arena.blocks.len());
+        let id = Block(self.context.blocks.len());
         let args = self
             .arguments
             .into_iter()
             .enumerate()
             .map(|(index, (ty, name))| {
-                let arg = BlockArgument(self.arena.ssas.len());
+                let arg = BlockArgument(self.context.ssas.len());
                 let ssa = SSAInfo::new(
                     arg.into(),
-                    name.map(|n| self.arena.symbols.borrow_mut().intern(n)),
+                    name.map(|n| self.context.symbols.borrow_mut().intern(n)),
                     ty,
                     SSAKind::BlockArgument(id, index),
                 );
-                self.arena.ssas.push(ssa);
+                self.context.ssas.push(ssa);
                 arg
             })
             .collect::<Vec<_>>();
 
         for &stmt_id in &self.statements {
-            let info = &mut self.arena.statements[stmt_id.0];
+            let info = &mut self.context.statements[stmt_id.0];
             for arg in info.definition.arguments_mut() {
                 let ssa_info = self
-                    .arena
+                    .context
                     .ssas
                     .get_mut(arg.0)
                     .expect(format!("undefined SSAValue {}", arg.0).as_str());
@@ -113,10 +113,10 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
             .maybe_parent(self.parent)
             .node(LinkedListNode::new(id))
             .arguments(args)
-            .statements(self.arena.link_statements(&self.statements))
+            .statements(self.context.link_statements(&self.statements))
             .maybe_terminator(self.terminator)
             .new();
-        self.arena.blocks.push(block);
+        self.context.blocks.push(block);
         id
     }
 }

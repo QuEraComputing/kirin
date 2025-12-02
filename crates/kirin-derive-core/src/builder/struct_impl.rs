@@ -39,7 +39,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
         let header = if results.is_empty() {
             quote! {
                 pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
-                    arena: &mut #crate_path::Arena<Lang>,
+                    context: &mut #crate_path::Context<Lang>,
                     #(#inputs,)*
                 ) -> #ref_struct_name
             }
@@ -53,7 +53,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
             let type_lattice = type_lattice.unwrap();
             quote! {
                 pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
-                    arena: &mut #crate_path::Arena<Lang>,
+                    context: &mut #crate_path::Context<Lang>,
                     #(#inputs,)*
                 ) -> #ref_struct_name
                 where
@@ -65,11 +65,11 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
             impl #impl_generics #name #ty_generics #where_clause {
                 #header
                 {
-                    let #statement_id = arena.new_statement_id();
+                    let #statement_id = context.new_statement_id();
                     #(#others)*
 
                     #(#results)*
-                    let #statement = arena
+                    let #statement = context
                         .statement()
                         .definition(Self #initialization)
                         .new();

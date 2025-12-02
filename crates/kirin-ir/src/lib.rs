@@ -1,4 +1,4 @@
-mod arena;
+mod context;
 mod builder;
 mod comptime;
 mod detach;
@@ -12,7 +12,7 @@ pub mod query;
 #[cfg(test)]
 pub mod tests;
 
-pub use arena::Arena;
+pub use context::Context;
 pub use comptime::{CompileTimeValue, Typeof};
 pub use detach::Detach;
 pub use intern::InternTable;

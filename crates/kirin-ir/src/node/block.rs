@@ -51,11 +51,4 @@ impl Block {
     pub fn id(&self) -> usize {
         self.0
     }
-
-    // pub fn insert_after<L: Language>(&self, arena: &mut crate::Arena<L>, stmt: StatementId) {
-    //     let block_info = arena
-    //         .get_block_mut(*self)
-    //         .expect("Invalid Block in given arena");
-    //     block_info.statements
-    // }
 }

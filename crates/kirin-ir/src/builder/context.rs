@@ -4,15 +4,15 @@ use super::region::RegionBuilder;
 use crate::lattice::{FiniteLattice, Lattice};
 use crate::node::*;
 use crate::query::Info;
-use crate::{Arena, Language};
+use crate::{Context, Language};
 
-impl<L: Language> Arena<L> {
+impl<L: Language> Context<L> {
     pub fn block(&mut self) -> BlockBuilder<L> {
-        BlockBuilder::from_arena(self)
+        BlockBuilder::from_context(self)
     }
 
     pub fn region(&mut self) -> RegionBuilder<L> {
-        RegionBuilder::from_arena(self)
+        RegionBuilder::from_context(self)
     }
 
     pub fn link_statements(&mut self, ptrs: &[StatementId]) -> LinkedList<StatementId> {
@@ -70,7 +70,7 @@ impl<L: Language> Arena<L> {
 }
 
 #[bon::bon]
-impl<L: Language> Arena<L> {
+impl<L: Language> Context<L> {
     #[builder(finish_fn = new)]
     pub fn ssa(
         &mut self,
@@ -147,8 +147,8 @@ impl<L: Language> Arena<L> {
         #[builder(into)] body: StatementId,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> SpecializedFunction {
-        // the only way to create a staged function is through the arena
-        // and unless the whole arena is dropped, the staged function should exist
+        // the only way to create a staged function is through the context
+        // and unless the whole context is dropped, the staged function should exist
         let staged_function_info = f.expect_info_mut(self);
         let id = SpecializedFunction(f.id(), staged_function_info.specializations.len());
 
@@ -185,22 +185,22 @@ mod tests {
 
     #[test]
     fn test_block() {
-        let mut arena: Arena<SimpleLanguage> = Arena::default();
-        let staged_function = arena
+        let mut context: Context<SimpleLanguage> = Context::default();
+        let staged_function = context
             .staged_function()
             .name("foo")
             .params_type(&[tests::Int])
             .return_type(tests::Int)
             .new();
 
-        let a = SimpleLanguage::op_constant(&mut arena, 1.2);
-        let b = SimpleLanguage::op_constant(&mut arena, 3.4);
-        let c = SimpleLanguage::op_add(&mut arena, a.result, b.result);
-        let block_arg_x = arena.block_argument(0);
-        let d = SimpleLanguage::op_add(&mut arena, c.result, block_arg_x);
-        let ret = SimpleLanguage::op_return(&mut arena, d.result);
+        let a = SimpleLanguage::op_constant(&mut context, 1.2);
+        let b = SimpleLanguage::op_constant(&mut context, 3.4);
+        let c = SimpleLanguage::op_add(&mut context, a.result, b.result);
+        let block_arg_x = context.block_argument(0);
+        let d = SimpleLanguage::op_add(&mut context, c.result, block_arg_x);
+        let ret = SimpleLanguage::op_return(&mut context, d.result);
 
-        let block = arena
+        let block = context
             .block()
             .argument(tests::Int)
             .argument_with_name("y", tests::Float)
@@ -211,10 +211,10 @@ mod tests {
             .terminator(ret)
             .new();
 
-        let body = arena.region().add_block(block).new();
-        let fdef = SimpleLanguage::op_function(&mut arena, body);
-        arena.specialize().f(staged_function).body(fdef).new();
+        let body = context.region().add_block(block).new();
+        let fdef = SimpleLanguage::op_function(&mut context, body);
+        context.specialize().f(staged_function).body(fdef).new();
 
-        println!("Arena: {:?}", arena);
+        println!("Context: {:?}", context);
     }
 }

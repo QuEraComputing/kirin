@@ -121,7 +121,7 @@ fn variant_builder(
     let header = if results.is_empty() {
         quote! {
             pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
-                arena: &mut #crate_path::Arena<Lang>,
+                context: &mut #crate_path::Context<Lang>,
                 #(#inputs,)*
             ) -> #ref_struct_name
         }
@@ -135,7 +135,7 @@ fn variant_builder(
         let type_lattice = type_lattice.clone().unwrap();
         quote! {
             pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
-                arena: &mut #crate_path::Arena<Lang>,
+                context: &mut #crate_path::Context<Lang>,
                 #(#inputs,)*
             ) -> #ref_struct_name
             where
@@ -146,10 +146,10 @@ fn variant_builder(
     quote! {
         #header
         {
-            let #statement_id = arena.new_statement_id();
+            let #statement_id = context.new_statement_id();
             #(#others)*
             #(#results)*
-            let #statement = arena
+            let #statement = context
                 .statement()
                 .definition(#name::#variant_name #initialization)
                 .new();
