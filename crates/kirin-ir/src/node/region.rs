@@ -1,12 +1,14 @@
-use crate::Language;
+use crate::arena::{GetInfo, Id, Item};
+use crate::{Language, identifier};
 
 use super::block::Block;
 use super::linked_list::LinkedList;
 use super::stmt::StatementId;
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Region(pub(crate) usize);
+identifier! {
+    /// A unique identifier for a region.
+    struct Region
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct RegionInfo<L: Language> {
@@ -36,8 +38,20 @@ impl<L: Language> RegionInfo<L> {
     }
 }
 
-impl Region {
-    pub fn id(&self) -> usize {
-        self.0
+impl<L: Language> GetInfo<L> for Region {
+    type Info = Item<RegionInfo<L>>;
+
+    fn get_info<'a>(
+        &self,
+        context: &'a crate::Context<L>,
+    ) -> Option<&'a Self::Info> {
+        context.regions.get(*self)
+    }
+
+    fn get_info_mut<'a>(
+        &self,
+        context: &'a mut crate::Context<L>,
+    ) -> Option<&'a mut Self::Info> {
+        context.regions.get_mut(*self)
     }
 }

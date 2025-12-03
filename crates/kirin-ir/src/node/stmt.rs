@@ -1,10 +1,13 @@
-use crate::{language::Language, node::linked_list::LinkedListNode, query::Info};
+use crate::arena::{GetInfo, Id, Item};
+use crate::identifier;
+use crate::{language::Language, node::linked_list::LinkedListNode};
 
 use super::block::Block;
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StatementId(pub(crate) usize);
+identifier! {
+    /// An Id reference to statement in arena.
+    struct StatementId
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -21,7 +24,7 @@ impl<'a, L: Language> From<&'a StatementInfo<L>> for &'a LinkedListNode<Statemen
 }
 
 impl StatementId {
-    pub fn id(&self) -> usize {
+    pub fn id(&self) -> Id {
         self.0
     }
 }
@@ -55,5 +58,20 @@ impl StatementId {
 
     pub fn definition<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a L {
         &self.expect_info(context).definition
+    }
+}
+
+impl<L: Language> GetInfo<L> for StatementId {
+    type Info = Item<StatementInfo<L>>;
+
+    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
+        context.statements.get(*self)
+    }
+
+    fn get_info_mut<'a>(
+            &self,
+            context: &'a mut crate::Context<L>,
+        ) -> Option<&'a mut Self::Info> {
+        context.statements.get_mut(*self)
     }
 }

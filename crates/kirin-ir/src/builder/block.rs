@@ -1,5 +1,5 @@
+use crate::arena::GetInfo;
 use crate::node::*;
-use crate::query::Info;
 use crate::{Context, Language};
 
 pub struct BlockBuilder<'a, L: Language> {
@@ -75,36 +75,35 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
 
     /// Finalize the block and add it to the context.
     pub fn new(self) -> Block {
-        let id = Block(self.context.blocks.len());
-        let args = self
+        let id = self.context.blocks.next_id();
+        let block_args = self
             .arguments
             .into_iter()
             .enumerate()
             .map(|(index, (ty, name))| {
-                let arg = BlockArgument(self.context.ssas.len());
+                let arg: BlockArgument = self.context.ssas.next_id().into();
                 let ssa = SSAInfo::new(
                     arg.into(),
                     name.map(|n| self.context.symbols.borrow_mut().intern(n)),
                     ty,
                     SSAKind::BlockArgument(id, index),
                 );
-                self.context.ssas.push(ssa);
+                self.context.ssas.alloc(ssa);
                 arg
             })
             .collect::<Vec<_>>();
 
         for &stmt_id in &self.statements {
-            let info = &mut self.context.statements[stmt_id.0];
+            let info = &mut self.context.statements[stmt_id];
             for arg in info.definition.arguments_mut() {
                 let ssa_info = self
                     .context
                     .ssas
-                    .get_mut(arg.0)
-                    .expect(format!("undefined SSAValue {}", arg.0).as_str());
-
+                    .get(*arg)
+                    .expect("SSAValue not found in context");
                 if let SSAKind::BuilderBlockArgument(arg_index) = ssa_info.kind {
-                    arg.0 = args[arg_index].0;
-                    ssa_info.kind = SSAKind::Deleted;
+                    self.context.ssas.delete(*arg);
+                    *arg = block_args[arg_index].into();
                 }
             }
         }
@@ -112,11 +111,11 @@ impl<'a, L: Language> BlockBuilder<'a, L> {
         let block = BlockInfo::builder()
             .maybe_parent(self.parent)
             .node(LinkedListNode::new(id))
-            .arguments(args)
+            .arguments(block_args)
             .statements(self.context.link_statements(&self.statements))
             .maybe_terminator(self.terminator)
             .new();
-        self.context.blocks.push(block);
+        self.context.blocks.alloc(block);
         id
     }
 }

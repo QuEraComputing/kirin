@@ -65,7 +65,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
             impl #impl_generics #name #ty_generics #where_clause {
                 #header
                 {
-                    let #statement_id = context.new_statement_id();
+                    let #statement_id = context.statement_arena().next_id();
                     #(#others)*
 
                     #(#results)*

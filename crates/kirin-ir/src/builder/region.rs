@@ -26,13 +26,13 @@ impl<'a, L: Language> RegionBuilder<'a, L> {
     }
 
     pub fn new(self) -> Region {
-        let id = Region(self.context.regions.len());
+        let id = self.context.regions.next_id();
         let info = RegionInfo::builder()
             .id(id)
             .blocks(self.context.link_blocks(&self.blocks))
             .maybe_parent(self.parent)
             .new();
-        self.context.regions.push(info);
+        self.context.regions.alloc(info);
         id
     }
 }

@@ -1,7 +1,6 @@
 pub mod block;
 pub mod function;
 pub mod linked_list;
-pub mod module;
 pub mod region;
 pub mod ssa;
 pub mod stmt;

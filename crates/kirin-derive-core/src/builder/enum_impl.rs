@@ -146,7 +146,7 @@ fn variant_builder(
     quote! {
         #header
         {
-            let #statement_id = context.new_statement_id();
+            let #statement_id = context.statement_arena().next_id();
             #(#others)*
             #(#results)*
             let #statement = context

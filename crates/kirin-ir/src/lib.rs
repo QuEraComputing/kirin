@@ -1,3 +1,4 @@
+mod arena;
 mod context;
 mod builder;
 mod comptime;

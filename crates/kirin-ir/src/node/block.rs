@@ -1,4 +1,9 @@
-use crate::{Language, node::region::Region};
+use crate::{
+    Language,
+    arena::{GetInfo, Id, Item},
+    identifier,
+    node::region::Region,
+};
 
 use super::{
     linked_list::{LinkedList, LinkedListNode},
@@ -6,9 +11,10 @@ use super::{
     stmt::StatementId,
 };
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Block(pub(crate) usize);
+identifier! {
+    /// A unique identifier for a block.
+    struct Block
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -47,8 +53,14 @@ impl<L: Language> BlockInfo<L> {
     }
 }
 
-impl Block {
-    pub fn id(&self) -> usize {
-        self.0
+impl<L: Language> GetInfo<L> for Block {
+    type Info = Item<BlockInfo<L>>;
+
+    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
+        context.blocks.get(*self)
+    }
+
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
+        context.blocks.get_mut(*self)
     }
 }

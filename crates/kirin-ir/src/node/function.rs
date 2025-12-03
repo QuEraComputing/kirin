@@ -1,51 +1,45 @@
 use std::collections::HashMap;
 
+use crate::arena::{GetInfo, Id, Item};
 use crate::language::Language;
-use crate::{Lattice, StatementId};
+use crate::{Lattice, StatementId, identifier};
 
 use super::symbol::Symbol;
 
-/// A unique identifier for a compilation stage.
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct CompileStage(pub(crate) usize);
+identifier! {
+    /// A unique identifier for a compilation stage.
+    ///
+    /// Compilation stages represent different phases in the compilation pipeline,
+    /// such as parsing, optimization, code generation, etc.
+    struct CompileStage
+}
 
 impl CompileStage {
-    pub fn new(stage: usize) -> Self {
+    pub fn new(stage: Id) -> Self {
         CompileStage(stage)
     }
-
-    pub fn id(&self) -> usize {
-        self.0
-    }
 }
 
-/// A unique identifier for a function.
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct Function(pub(crate) usize);
-
-impl Function {
-    pub fn id(&self) -> usize {
-        self.0
-    }
+identifier! {
+    /// A unique identifier for a generic function.
+    ///
+    /// Functions can have multiple staged versions corresponding to different
+    /// compilation stages.
+    struct Function
 }
 
-/// A unique identifier for a staged function.
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct StagedFunction(pub(crate) usize);
-
-impl StagedFunction {
-    pub fn id(&self) -> usize {
-        self.0
-    }
+identifier! {
+    /// A unique identifier for a function at a specific compile stage.
+    struct StagedFunction
 }
 
 /// A specialized version of a function, identified by its function ID and specialization ID.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
-pub struct SpecializedFunction(pub(crate) usize, pub(crate) usize);
+pub struct SpecializedFunction(pub(crate) StagedFunction, pub(crate) usize);
 
 impl SpecializedFunction {
     pub fn id(&self) -> (StagedFunction, usize) {
-        (StagedFunction(self.0), self.1)
+        (self.0, self.1)
     }
 }
 
@@ -301,5 +295,37 @@ impl<L: Language> Lattice for Signature<L> {
             }
         }
         true
+    }
+}
+
+impl<L: Language> GetInfo<L> for StagedFunction {
+    type Info = Item<StagedFunctionInfo<L>>;
+
+    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
+        context.staged_functions.get(*self)
+    }
+
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
+        context.staged_functions.get_mut(*self)
+    }
+}
+
+impl<L: Language> GetInfo<L> for SpecializedFunction {
+    type Info = SpecializedFunctionInfo<L>;
+
+    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
+        let (staged_func, idx) = self.id();
+        context
+            .staged_functions
+            .get(staged_func)
+            .and_then(|f| f.specializations.get(idx))
+    }
+
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
+        let (staged_func, idx) = self.id();
+        context
+            .staged_functions
+            .get_mut(staged_func)
+            .and_then(|f| f.specializations.get_mut(idx))
     }
 }

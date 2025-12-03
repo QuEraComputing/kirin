@@ -1,39 +1,41 @@
-use std::collections::HashSet;
-
+use crate::arena::{GetInfo, Id, Identifier};
+use crate::identifier;
 use crate::{Symbol, language::Language};
+use std::collections::HashSet;
 
 use super::{block::Block, stmt::StatementId};
 
-/// Represents a general SSA value that can be either
-/// a value produced by a statement or an argument to a block.
-///
-/// If you are certain about the kind of SSA value, consider using
-/// `ResultValue` or `BlockArgument` instead.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SSAValue(pub(crate) usize);
+identifier! {
+    /// Represents a general SSA value that can be either
+    /// a value produced by a statement or an argument to a block.
 
-impl SSAValue {
-    /// Get the underlying ID of the SSA value.
-    pub fn id(&self) -> usize {
-        self.0
-    }
+    /// If you are certain about the kind of SSA value, consider using
+    /// `ResultValue` or `BlockArgument` instead.
+    struct SSAValue
 }
 
-/// Represents a value produced by a statement.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ResultValue(pub(crate) usize);
+identifier! {
+    /// Represents a value produced by a statement.
+    struct ResultValue
+}
 
-/// Represents an argument to a block.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BlockArgument(pub(crate) usize);
+identifier! {
+    /// Represents an argument to a block.
+    struct BlockArgument
+}
 
-/// Represents a deleted SSA value. Used as a placeholder.
-/// This points to the original SSA value's ID.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct DeletedSSAValue(pub(crate) usize);
+identifier! {
+    /// Represents a deleted SSA value. Used as a placeholder.
+    ///
+    /// This points to the original SSA value's ID.
+    struct DeletedSSAValue
+}
+
+impl std::fmt::Display for SSAValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "%{}", self.0.raw())
+    }
+}
 
 /// Represents a test SSA value. Used in tests only.
 /// This SSAValue may not exist in the SSA database.
@@ -74,7 +76,6 @@ pub struct Use {
 pub enum SSAKind {
     Result(StatementId, usize),
     BlockArgument(Block, usize),
-    Deleted,
     // should not appear in final SSA IR
     /// A placeholder for builders to update the Block information later.
     /// It holds the index of the argument in the block's argument list.
@@ -86,62 +87,82 @@ pub enum SSAKind {
     Test,
 }
 
+impl From<TestSSAValue> for Id {
+    fn from(value: TestSSAValue) -> Self {
+        Id(value.0)
+    }
+}
+
+macro_rules! impl_from_ssa {
+    ($name:ident) => {
+        impl From<SSAValue> for $name {
+            fn from(ssa: SSAValue) -> Self {
+                $name(ssa.into())
+            }
+        }
+
+        impl From<$name> for SSAValue {
+            fn from(value: $name) -> Self {
+                SSAValue(value.into())
+            }
+        }
+    };
+}
+
+impl_from_ssa!(ResultValue);
+impl_from_ssa!(BlockArgument);
+impl_from_ssa!(DeletedSSAValue);
+
+impl From<SSAValue> for TestSSAValue {
+    fn from(ssa: SSAValue) -> Self {
+        TestSSAValue(ssa.0.raw())
+    }
+}
+
+impl From<TestSSAValue> for SSAValue {
+    fn from(value: TestSSAValue) -> Self {
+        SSAValue(value.into())
+    }
+}
+
 impl From<&SSAValue> for SSAValue {
     fn from(ssa: &SSAValue) -> Self {
         SSAValue(ssa.0)
     }
 }
 
-impl From<SSAValue> for ResultValue {
-    fn from(ssa: SSAValue) -> Self {
-        ResultValue(ssa.0)
-    }
+macro_rules! impl_from_test {
+    ($name:ident) => {
+        impl From<TestSSAValue> for $name {
+            fn from(tsv: TestSSAValue) -> Self {
+                $name(tsv.into())
+            }
+        }
+    };
 }
 
-impl From<SSAValue> for BlockArgument {
-    fn from(ssa: SSAValue) -> Self {
-        BlockArgument(ssa.0)
-    }
-}
+impl_from_test!(ResultValue);
+impl_from_test!(BlockArgument);
+impl_from_test!(DeletedSSAValue);
 
-impl From<ResultValue> for SSAValue {
-    fn from(rv: ResultValue) -> Self {
-        SSAValue(rv.0)
-    }
-}
-impl From<BlockArgument> for SSAValue {
-    fn from(ba: BlockArgument) -> Self {
-        SSAValue(ba.0)
-    }
-}
+impl<L: Language, T> GetInfo<L> for T
+where
+    T: Into<SSAValue> + Identifier,
+{
+    type Info = crate::arena::Item<SSAInfo<L>>;
 
-impl From<TestSSAValue> for SSAValue {
-    fn from(tsv: TestSSAValue) -> Self {
-        SSAValue(tsv.0)
+    fn get_info<'a>(
+        &self,
+        context: &'a crate::Context<L>,
+    ) -> Option<&'a Self::Info> {
+        context.ssas.get(*self)
     }
-}
 
-impl From<TestSSAValue> for ResultValue {
-    fn from(tsv: TestSSAValue) -> Self {
-        ResultValue(tsv.0)
-    }
-}
-
-impl From<TestSSAValue> for BlockArgument {
-    fn from(tsv: TestSSAValue) -> Self {
-        BlockArgument(tsv.0)
-    }
-}
-
-impl From<TestSSAValue> for DeletedSSAValue {
-    fn from(tsv: TestSSAValue) -> Self {
-        DeletedSSAValue(tsv.0)
-    }
-}
-
-impl From<TestSSAValue> for usize {
-    fn from(tsv: TestSSAValue) -> Self {
-        tsv.0
+    fn get_info_mut<'a>(
+        &self,
+        context: &'a mut crate::Context<L>,
+    ) -> Option<&'a mut Self::Info> {
+        context.ssas.get_mut(*self)
     }
 }
 
@@ -151,13 +172,13 @@ mod tests {
 
     #[test]
     fn test_ssa_value_conversion() {
-        let rv = ResultValue(42);
-        let ba = BlockArgument(84);
+        let rv = ResultValue(Id(42));
+        let ba = BlockArgument(Id(84));
 
         let ssa_from_rv: SSAValue = rv.into();
         let ssa_from_ba: SSAValue = ba.into();
 
-        assert_eq!(ssa_from_rv, SSAValue(42));
-        assert_eq!(ssa_from_ba, SSAValue(84));
+        assert_eq!(ssa_from_rv, SSAValue(Id(42)));
+        assert_eq!(ssa_from_ba, SSAValue(Id(84)));
     }
 }

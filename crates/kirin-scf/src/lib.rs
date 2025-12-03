@@ -15,7 +15,7 @@ pub enum StructuredControlFlow {
 
 impl StructuredControlFlow {
     pub fn op_if<L>(
-        arena: &mut Context<L>,
+        context: &mut Context<L>,
         condition: SSAValue,
         then_block: Block,
         else_block: Block,
@@ -28,6 +28,6 @@ impl StructuredControlFlow {
             then_block,
             else_block,
         };
-        arena.statement().definition(instr).new()
+        context.statement().definition(instr).new()
     }
 }

@@ -1,9 +1,9 @@
 use super::block::BlockBuilder;
 use super::region::RegionBuilder;
 
+use crate::arena::GetInfo;
 use crate::lattice::{FiniteLattice, Lattice};
 use crate::node::*;
-use crate::query::Info;
 use crate::{Context, Language};
 
 impl<L: Language> Context<L> {
@@ -78,39 +78,39 @@ impl<L: Language> Context<L> {
         ty: L::TypeLattice,
         kind: SSAKind,
     ) -> SSAValue {
-        let id = SSAValue(self.ssas.len());
+        let id = self.ssas.next_id();
         let ssa = SSAInfo::new(
             id.into(),
             name.map(|n| self.symbols.borrow_mut().intern(n)),
             ty,
             kind,
         );
-        self.ssas.push(ssa);
+        self.ssas.alloc(ssa);
         id
     }
 
     /// create a placeholder block argument SSAValue
     pub fn block_argument(&mut self, index: usize) -> BlockArgument {
-        let id = BlockArgument(self.ssas.len());
+        let id: BlockArgument = self.ssas.next_id().into();
         let ssa = SSAInfo::new(
             id.into(),
             None,
             L::TypeLattice::top(),
             SSAKind::BuilderBlockArgument(index),
         );
-        self.ssas.push(ssa);
+        self.ssas.alloc(ssa);
         id
     }
 
     #[builder(finish_fn = new)]
     pub fn statement(&mut self, #[builder(into)] definition: L) -> StatementId {
-        let id = StatementId(self.statements.len());
+        let id = self.statements.next_id();
         let statement = StatementInfo {
             node: LinkedListNode::new(id),
             parent: None,
             definition,
         };
-        self.statements.push(statement);
+        self.statements.alloc(statement);
         id
     }
 
@@ -123,7 +123,7 @@ impl<L: Language> Context<L> {
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
     ) -> StagedFunction {
-        let id = StagedFunction(self.staged_functions.len());
+        let id = self.staged_functions.next_id();
         let staged_function = StagedFunctionInfo {
             id,
             name: name.map(|n| self.symbols.borrow_mut().intern(n)),
@@ -134,7 +134,7 @@ impl<L: Language> Context<L> {
             specializations: specializations.unwrap_or_default(),
             backedges: backedges.unwrap_or_default(),
         };
-        self.staged_functions.push(staged_function);
+        self.staged_functions.alloc(staged_function);
         id
     }
 
@@ -150,7 +150,7 @@ impl<L: Language> Context<L> {
         // the only way to create a staged function is through the context
         // and unless the whole context is dropped, the staged function should exist
         let staged_function_info = f.expect_info_mut(self);
-        let id = SpecializedFunction(f.id(), staged_function_info.specializations.len());
+        let id = SpecializedFunction(f, staged_function_info.specializations.len());
 
         let signature = Signature(
             params_type

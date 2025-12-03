@@ -1,5 +1,6 @@
 use crate::node::{Block, StatementId};
-use crate::query::{Info, LinkedListElem, LinkedListInfo, ParentInfo};
+use crate::arena::GetInfo;
+use crate::query::{LinkedListElem, LinkedListInfo, ParentInfo};
 use crate::{Context, Language};
 
 pub trait Detach {

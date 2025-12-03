@@ -1,17 +1,18 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
+use crate::arena::Arena;
 use crate::language::Language;
 use crate::node::region::RegionInfo;
 use crate::{InternTable, node::*};
 
 #[derive(Debug)]
 pub struct Context<L: Language> {
-    pub(crate) staged_functions: Vec<StagedFunctionInfo<L>>,
-    pub(crate) regions: Vec<RegionInfo<L>>,
-    pub(crate) blocks: Vec<BlockInfo<L>>,
-    pub(crate) statements: Vec<StatementInfo<L>>,
-    pub(crate) ssas: Vec<SSAInfo<L>>,
+    pub(crate) staged_functions: Arena<StagedFunctionInfo<L>, StagedFunction>,
+    pub(crate) regions: Arena<RegionInfo<L>, Region>,
+    pub(crate) blocks: Arena<BlockInfo<L>, Block>,
+    pub(crate) statements: Arena<StatementInfo<L>, StatementId>,
+    pub(crate) ssas: Arena<SSAInfo<L>, SSAValue>,
     pub(crate) symbols: Arc<RefCell<InternTable<String, Symbol>>>,
 }
 
@@ -21,11 +22,11 @@ where
 {
     fn default() -> Self {
         Self {
-            staged_functions: Vec::new(),
-            regions: Vec::new(),
-            blocks: Vec::new(),
-            statements: Vec::new(),
-            ssas: Vec::new(),
+            staged_functions: Arena::default(),
+            regions: Arena::default(),
+            blocks: Arena::default(),
+            statements: Arena::default(),
+            ssas: Arena::default(),
             symbols: Arc::new(RefCell::new(InternTable::default())),
         }
     }
@@ -50,7 +51,44 @@ where
 }
 
 impl<L: Language> Context<L> {
-    pub fn new_statement_id(&self) -> StatementId {
-        StatementId(self.statements.len())
+    /// Get a reference to the statements arena.
+    /// 
+    /// Read-only access. Use `get_info_mut` on `StatementId` for mutable access.
+    pub fn statement_arena(&self) -> &Arena<StatementInfo<L>, StatementId> {
+        &self.statements
+    }
+
+    /// Get a reference to the SSA values arena.
+    /// 
+    /// Read-only access. Use `get_info_mut` on `SSAValue` for mutable access.
+    pub fn ssa_arena(&self) -> &Arena<SSAInfo<L>, SSAValue> {
+        &self.ssas
+    }
+
+    /// Get a reference to the symbols intern table.
+    /// Read-only access. Use `borrow_mut` on the returned `RefCell` for mutable access.
+    pub fn symbol_table(&self) -> Arc<RefCell<InternTable<String, Symbol>>> {
+        self.symbols.clone()
+    }
+
+    /// Get a reference to the staged functions arena.
+    /// 
+    /// Read-only access. Use `get_info_mut` on `StagedFunction` for mutable access.
+    pub fn staged_function_arena(&self) -> &Arena<StagedFunctionInfo<L>, StagedFunction> {
+        &self.staged_functions
+    }
+
+    /// Get a reference to the regions arena.
+    /// 
+    /// Read-only access. Use `get_info_mut` on `Region` for mutable access.
+    pub fn region_arena(&self) -> &Arena<RegionInfo<L>, Region> {
+        &self.regions
+    }
+
+    /// Get a reference to the blocks arena.
+    /// 
+    /// Read-only access. Use `get_info_mut` on `Block` for mutable access.
+    pub fn block_arena(&self) -> &Arena<BlockInfo<L>, Block> {
+        &self.blocks
     }
 }
