@@ -16,7 +16,7 @@ pub struct EnumAttribute {
     /// this is different from the field-level `type` attribute
     /// e.g #[kirin(type = ...)]
     /// which specifies the type of the SSAValue/ResultValue field
-    pub ty_lattice: Option<syn::Type>,
+    pub type_lattice: Option<syn::Type>,
     /// whether the instruction is constant
     pub is_constant: Option<bool>,
     /// whether the instruction is pure
@@ -38,7 +38,7 @@ impl EnumAttribute {
                 enum_attr.crate_path = Some(path);
             } else if meta.path.is_ident("type_lattice") {
                 let ty: syn::Type = meta.value()?.parse()?;
-                enum_attr.ty_lattice = Some(ty);
+                enum_attr.type_lattice = Some(ty);
             } else if meta.path.is_ident("fn") {
                 match meta.value() {
                     Ok(v) => {

@@ -1,9 +1,9 @@
 use crate::{
-    Language, LinkedList,
+    Dialect, LinkedList,
     node::{Block, BlockInfo, LinkedListNode, Region, RegionInfo, StatementId, StatementInfo},
 };
 
-pub trait ParentInfo<L: Language> {
+pub trait ParentInfo<L: Dialect> {
     type ParentPtr: Copy + PartialEq;
     /// Get a reference to the parent pointer.
     fn get_parent(&self) -> &Option<Self::ParentPtr>;
@@ -11,7 +11,7 @@ pub trait ParentInfo<L: Language> {
     fn get_parent_mut(&mut self) -> &mut Option<Self::ParentPtr>;
 }
 
-impl<L: Language> ParentInfo<L> for StatementInfo<L> {
+impl<L: Dialect> ParentInfo<L> for StatementInfo<L> {
     type ParentPtr = Block;
     fn get_parent(&self) -> &Option<Self::ParentPtr> {
         &self.parent
@@ -22,7 +22,7 @@ impl<L: Language> ParentInfo<L> for StatementInfo<L> {
     }
 }
 
-impl<L: Language> ParentInfo<L> for BlockInfo<L> {
+impl<L: Dialect> ParentInfo<L> for BlockInfo<L> {
     type ParentPtr = Region;
     fn get_parent(&self) -> &Option<Self::ParentPtr> {
         &self.parent
@@ -68,7 +68,7 @@ pub trait LinkedListInfo {
     }
 }
 
-impl<L: Language> LinkedListInfo for BlockInfo<L> {
+impl<L: Dialect> LinkedListInfo for BlockInfo<L> {
     type Ptr = StatementId;
     fn get_linked_list(&self) -> &LinkedList<Self::Ptr> {
         &self.statements
@@ -79,7 +79,7 @@ impl<L: Language> LinkedListInfo for BlockInfo<L> {
     }
 }
 
-impl<L: Language> LinkedListInfo for RegionInfo<L> {
+impl<L: Dialect> LinkedListInfo for RegionInfo<L> {
     type Ptr = Block;
     fn get_linked_list(&self) -> &LinkedList<Self::Ptr> {
         &self.blocks
@@ -90,7 +90,7 @@ impl<L: Language> LinkedListInfo for RegionInfo<L> {
     }
 }
 
-pub trait LinkedListElem<L: Language> {
+pub trait LinkedListElem<L: Dialect> {
     type Ptr: Copy + PartialEq;
     /// Get a reference to the linked list node.
     fn get_node(&self) -> &LinkedListNode<Self::Ptr>;
@@ -115,7 +115,7 @@ pub trait LinkedListElem<L: Language> {
     }
 }
 
-impl<L: Language> LinkedListElem<L> for StatementInfo<L> {
+impl<L: Dialect> LinkedListElem<L> for StatementInfo<L> {
     type Ptr = StatementId;
     fn get_node(&self) -> &LinkedListNode<Self::Ptr> {
         &self.node
@@ -126,7 +126,7 @@ impl<L: Language> LinkedListElem<L> for StatementInfo<L> {
     }
 }
 
-impl<L: Language> LinkedListElem<L> for BlockInfo<L> {
+impl<L: Dialect> LinkedListElem<L> for BlockInfo<L> {
     type Ptr = Block;
     fn get_node(&self) -> &LinkedListNode<Self::Ptr> {
         &self.node

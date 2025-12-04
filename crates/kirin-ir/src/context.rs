@@ -2,12 +2,11 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use crate::arena::Arena;
-use crate::language::Language;
 use crate::node::region::RegionInfo;
-use crate::{InternTable, node::*};
+use crate::{Dialect, InternTable, node::*};
 
 #[derive(Debug)]
-pub struct Context<L: Language> {
+pub struct Context<L: Dialect> {
     pub(crate) staged_functions: Arena<StagedFunctionInfo<L>, StagedFunction>,
     pub(crate) regions: Arena<RegionInfo<L>, Region>,
     pub(crate) blocks: Arena<BlockInfo<L>, Block>,
@@ -18,7 +17,7 @@ pub struct Context<L: Language> {
 
 impl<L> Default for Context<L>
 where
-    L: Language,
+    L: Dialect,
 {
     fn default() -> Self {
         Self {
@@ -34,7 +33,7 @@ where
 
 impl<L> Clone for Context<L>
 where
-    L: Language,
+    L: Dialect,
     StatementInfo<L>: Clone,
     SSAInfo<L>: Clone,
 {
@@ -50,7 +49,7 @@ where
     }
 }
 
-impl<L: Language> Context<L> {
+impl<L: Dialect> Context<L> {
     /// Get a reference to the statements arena.
     /// 
     /// Read-only access. Use `get_info_mut` on `StatementId` for mutable access.

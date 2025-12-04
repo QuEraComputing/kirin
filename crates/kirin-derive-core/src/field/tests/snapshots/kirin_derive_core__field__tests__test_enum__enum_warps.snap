@@ -1,0 +1,30 @@
+---
+source: crates/kirin-derive-core/src/field/tests/test_enum.rs
+expression: generate(input)
+---
+impl<'a, T: TypeLattice> ::kirin::ir::HasArguments<'a> for StructuredControlFlow<T> {
+    type Iter = StructuredControlFlowArgumentsIter<'a, T>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            StructuredControlFlow::If(field_0, ..) => StructuredControlFlowArgumentsIter::If(
+                <If<T> as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+            StructuredControlFlow::For(field_0, ..) => StructuredControlFlowArgumentsIter::For(
+                <For<T> as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+        }
+    }
+}
+pub enum StructuredControlFlowArgumentsIter<'a, T: TypeLattice> {
+    If(<If<T> as ::kirin::ir::HasArguments<'a>>::Iter),
+    For(<For<T> as ::kirin::ir::HasArguments<'a>>::Iter),
+}
+impl<'a, T: TypeLattice> Iterator for StructuredControlFlowArgumentsIter<'a, T> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            StructuredControlFlowArgumentsIter::If(iter) => iter.next(),
+            StructuredControlFlowArgumentsIter::For(iter) => iter.next(),
+        }
+    }
+}

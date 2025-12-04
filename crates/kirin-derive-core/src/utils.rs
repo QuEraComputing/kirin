@@ -38,7 +38,12 @@ where
     I: ?Sized,
     syn::Ident: PartialEq<I>,
 {
-    matches!(ty, syn::Type::Path(type_path) if type_path.path.is_ident(name))
+    if let syn::Type::Path(syn::TypePath { path, .. }) = ty {
+        if let Some(seg) = path.segments.last() {
+            return seg.ident == *name;
+        }
+    }
+    false
 }
 
 pub fn is_vec_type<I>(ty: &syn::Type, name: &I) -> bool
@@ -112,6 +117,12 @@ mod tests {
         let ty: syn::Type = syn::parse_str("String").unwrap();
         assert!(is_type(&ty, "String"));
         assert!(!is_type(&ty, "i32"));
+    }
+
+    #[test]
+    fn test_is_type_phantom() {
+        let ty: syn::Type = syn::parse_str("std::marker::PhantomData<T>").unwrap();
+        assert!(is_type(&ty, "PhantomData"));
     }
 
     #[test]

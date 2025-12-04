@@ -7,6 +7,8 @@ mod intern;
 mod language;
 mod lattice;
 mod node;
+mod visitor;
+
 /// Queries from the IRContext.
 pub mod query;
 
@@ -19,7 +21,7 @@ pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
     HasArguments, HasArgumentsMut, HasRegions, HasRegionsMut, HasResults, HasResultsMut,
-    HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsTerminator, Language, Statement,
+    HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsTerminator, Dialect,
 };
 pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{
@@ -32,5 +34,5 @@ pub use node::{
 #[cfg(feature = "derive")]
 pub use kirin_derive::{
     HasArguments, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure, IsTerminator,
-    Statement,
+    Dialect,
 };

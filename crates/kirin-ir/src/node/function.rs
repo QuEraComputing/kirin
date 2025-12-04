@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::arena::{GetInfo, Id, Item};
-use crate::language::Language;
+use crate::language::Dialect;
 use crate::{Lattice, StatementId, identifier};
 
 use super::symbol::Symbol;
@@ -85,7 +85,7 @@ impl FunctionInfo {
 }
 
 #[derive(Clone, Debug)]
-pub struct StagedFunctionInfo<L: Language> {
+pub struct StagedFunctionInfo<L: Dialect> {
     pub(crate) id: StagedFunction,
     pub(crate) name: Option<Symbol>,
     pub(crate) signature: Signature<L>,
@@ -99,7 +99,7 @@ pub struct StagedFunctionInfo<L: Language> {
     pub(crate) backedges: Vec<StagedFunction>,
 }
 
-impl<L: Language> StagedFunctionInfo<L> {
+impl<L: Dialect> StagedFunctionInfo<L> {
     pub fn name(&self) -> Option<&Symbol> {
         self.name.as_ref()
     }
@@ -153,7 +153,7 @@ impl<L: Language> StagedFunctionInfo<L> {
 }
 
 #[derive(Clone, Debug)]
-pub struct SpecializedFunctionInfo<L: Language> {
+pub struct SpecializedFunctionInfo<L: Dialect> {
     id: SpecializedFunction,
     signature: Signature<L>,
     return_type: L::TypeLattice,
@@ -163,7 +163,7 @@ pub struct SpecializedFunctionInfo<L: Language> {
 }
 
 #[bon::bon]
-impl<L: Language> SpecializedFunctionInfo<L> {
+impl<L: Dialect> SpecializedFunctionInfo<L> {
     #[builder(finish_fn = new)]
     pub fn new(
         /// The unique identifier for this specialized function.
@@ -188,9 +188,9 @@ impl<L: Language> SpecializedFunctionInfo<L> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Signature<L: Language>(pub Vec<L::TypeLattice>);
+pub struct Signature<L: Dialect>(pub Vec<L::TypeLattice>);
 
-impl<L: Language> PartialEq for Signature<L> {
+impl<L: Dialect> PartialEq for Signature<L> {
     fn eq(&self, other: &Self) -> bool {
         if self.0.len() != other.0.len() {
             return false;
@@ -204,7 +204,7 @@ impl<L: Language> PartialEq for Signature<L> {
     }
 }
 
-impl<L: Language> PartialOrd for Signature<L> {
+impl<L: Dialect> PartialOrd for Signature<L> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self.0.len() != other.0.len() {
             return None;
@@ -224,19 +224,19 @@ impl From<FunctionInfo> for Function {
     }
 }
 
-impl<L: Language> From<StagedFunctionInfo<L>> for StagedFunction {
+impl<L: Dialect> From<StagedFunctionInfo<L>> for StagedFunction {
     fn from(sfi: StagedFunctionInfo<L>) -> Self {
         sfi.id
     }
 }
 
-impl<L: Language> From<SpecializedFunctionInfo<L>> for SpecializedFunction {
+impl<L: Dialect> From<SpecializedFunctionInfo<L>> for SpecializedFunction {
     fn from(sfi: SpecializedFunctionInfo<L>) -> Self {
         sfi.id
     }
 }
 
-impl<L: Language> SpecializedFunctionInfo<L> {
+impl<L: Dialect> SpecializedFunctionInfo<L> {
     pub fn body(&self) -> &StatementId {
         &self.body
     }
@@ -258,7 +258,7 @@ impl<L: Language> SpecializedFunctionInfo<L> {
     }
 }
 
-impl<L: Language> Lattice for Signature<L> {
+impl<L: Dialect> Lattice for Signature<L> {
     fn join(&self, other: &Self) -> Self {
         if self.0.len() != other.0.len() {
             panic!("Cannot join signatures of different lengths");
@@ -298,7 +298,7 @@ impl<L: Language> Lattice for Signature<L> {
     }
 }
 
-impl<L: Language> GetInfo<L> for StagedFunction {
+impl<L: Dialect> GetInfo<L> for StagedFunction {
     type Info = Item<StagedFunctionInfo<L>>;
 
     fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
@@ -310,7 +310,7 @@ impl<L: Language> GetInfo<L> for StagedFunction {
     }
 }
 
-impl<L: Language> GetInfo<L> for SpecializedFunction {
+impl<L: Dialect> GetInfo<L> for SpecializedFunction {
     type Info = SpecializedFunctionInfo<L>;
 
     fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {

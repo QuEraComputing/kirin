@@ -3,14 +3,14 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
-    pub fn new<Lang: Language + From<Constant<T, L>>>(
+    pub fn new<Lang: Dialect + From<Constant<T, L>>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<T>,
     ) -> ConstantNewRef
     where
         Lang::TypeLattice: From<L>,
     {
-        let constant_statement_id = context.new_statement_id();
+        let constant_statement_id = context.statement_arena().next_id();
         let value = value.into();
         let marker = std::marker::PhantomData;
         let result: ::kirin::ir::ResultValue = context

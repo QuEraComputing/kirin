@@ -58,7 +58,7 @@ impl GenerateFrom<'_, WrapperEnum<'_, FieldIterInfo>> for FieldIterInfo {
 
         quote! {
             impl #impl_generics #trait_path #trait_ty_generics for #name #input_ty_generics #where_clause {
-                type Iter = #iter_name<#lifetime>;
+                type Iter = #iter_name #iter_ty_generics;
                 fn #method_name(&#lifetime #mutability self) -> Self::Iter {
                     match self {
                         #(#method_arms)*

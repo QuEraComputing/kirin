@@ -26,7 +26,7 @@ impl<'a> GenerateFrom<'a, RegularEnum<'a, Builder>> for Builder {
                 name,
                 &statement,
                 &statement_id,
-                &data.attrs.ty_lattice,
+                &data.attrs.type_lattice,
                 &data.input.generics,
                 variant,
             )
@@ -75,7 +75,7 @@ impl<'a> GenerateFrom<'a, EitherEnum<'a, Builder>> for Builder {
                 name,
                 &statement,
                 &statement_id,
-                &data.attrs.ty_lattice,
+                &data.attrs.type_lattice,
                 &data.input.generics,
                 variant,
             )
@@ -120,7 +120,7 @@ fn variant_builder(
 
     let header = if results.is_empty() {
         quote! {
-            pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+            pub fn #builder_name<Lang: #crate_path::Dialect + From<#name #ty_generics>> (
                 context: &mut #crate_path::Context<Lang>,
                 #(#inputs,)*
             ) -> #ref_struct_name
@@ -134,7 +134,7 @@ fn variant_builder(
     } else {
         let type_lattice = type_lattice.clone().unwrap();
         quote! {
-            pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+            pub fn #builder_name<Lang: #crate_path::Dialect + From<#name #ty_generics>> (
                 context: &mut #crate_path::Context<Lang>,
                 #(#inputs,)*
             ) -> #ref_struct_name

@@ -21,7 +21,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
         let crate_path = data.crate_root_path(self);
         let statement = format_ident!("{}_statement", name.to_string().to_lowercase());
         let statement_id = format_ident!("{}_statement_id", name.to_string().to_lowercase());
-        let type_lattice = data.attrs.ty_lattice.clone();
+        let type_lattice = data.attrs.type_lattice.clone();
 
         let builder_name = data.attrs.builder.builder_name(&format_ident!("new"));
         let ref_struct_name =
@@ -38,7 +38,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
 
         let header = if results.is_empty() {
             quote! {
-                pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+                pub fn #builder_name<Lang: #crate_path::Dialect + From<#name #ty_generics>> (
                     context: &mut #crate_path::Context<Lang>,
                     #(#inputs,)*
                 ) -> #ref_struct_name
@@ -52,7 +52,7 @@ impl<'a> GenerateFrom<'a, RegularStruct<'a, Builder>> for Builder {
         } else {
             let type_lattice = type_lattice.unwrap();
             quote! {
-                pub fn #builder_name<Lang: Language + From<#name #ty_generics>> (
+                pub fn #builder_name<Lang: #crate_path::Dialect + From<#name #ty_generics>> (
                     context: &mut #crate_path::Context<Lang>,
                     #(#inputs,)*
                 ) -> #ref_struct_name

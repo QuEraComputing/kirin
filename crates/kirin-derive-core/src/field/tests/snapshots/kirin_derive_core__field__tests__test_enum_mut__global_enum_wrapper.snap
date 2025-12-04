@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/field/tests/test_enum_mut.rs
 expression: generate(input)
 ---
 impl<'a, T> ::kirin::ir::HasArgumentsMut<'a> for TestEnum<T> {
-    type Iter = TestEnumArgumentsMutIter<'a>;
+    type Iter = TestEnumArgumentsMutIter<'a, T>;
     fn arguments_mut(&'a mut self) -> Self::Iter {
         match self {
             TestEnum::VariantA { wrapped, .. } => TestEnumArgumentsMutIter::VariantA(

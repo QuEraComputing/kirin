@@ -1,0 +1,14 @@
+---
+source: crates/kirin-derive-core/src/from.rs
+expression: generate(input)
+---
+impl<T: TypeLattice> From<If<T>> for StructuredControlFlow<T> {
+    fn from(v: If<T>) -> Self {
+        Self::If(v)
+    }
+}
+impl<T: TypeLattice> From<For<T>> for StructuredControlFlow<T> {
+    fn from(v: For<T>) -> Self {
+        Self::For(v)
+    }
+}

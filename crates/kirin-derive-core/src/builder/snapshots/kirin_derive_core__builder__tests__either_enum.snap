@@ -3,14 +3,14 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl EitherEnum {
-    pub fn op_abc<Lang: Language + From<EitherEnum>>(
+    pub fn op_abc<Lang: Dialect + From<EitherEnum>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<u32>,
     ) -> EitherEnumOpAbcRef
     where
         Lang::TypeLattice: From<SomeLattice>,
     {
-        let either_enum_statement_id = context.new_statement_id();
+        let either_enum_statement_id = context.statement_arena().next_id();
         let value = value.into();
         let result: ::kirin::ir::ResultValue = context
             .ssa()

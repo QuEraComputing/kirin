@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, Id, Identifier};
 use crate::identifier;
-use crate::{Symbol, language::Language};
+use crate::{Symbol, Dialect};
 use std::collections::HashSet;
 
 use super::{block::Block, stmt::StatementId};
@@ -45,7 +45,7 @@ pub struct TestSSAValue(pub usize);
 /// Information about an SSA value in the database.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SSAInfo<L: Language> {
+pub struct SSAInfo<L: Dialect> {
     pub(crate) id: SSAValue,
     pub(crate) name: Option<Symbol>,
     pub(crate) ty: L::TypeLattice,
@@ -53,7 +53,7 @@ pub struct SSAInfo<L: Language> {
     pub(crate) uses: HashSet<Use>,
 }
 
-impl<L: Language> SSAInfo<L> {
+impl<L: Dialect> SSAInfo<L> {
     pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::TypeLattice, kind: SSAKind) -> Self {
         Self {
             id,
@@ -145,7 +145,7 @@ impl_from_test!(ResultValue);
 impl_from_test!(BlockArgument);
 impl_from_test!(DeletedSSAValue);
 
-impl<L: Language, T> GetInfo<L> for T
+impl<L: Dialect, T> GetInfo<L> for T
 where
     T: Into<SSAValue> + Identifier,
 {

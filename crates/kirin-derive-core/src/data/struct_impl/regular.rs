@@ -64,6 +64,10 @@ where
     pub fn input(&self) -> &'input syn::DeriveInput {
         self.input
     }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        self.attrs.type_lattice.as_ref()
+    }
 }
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for RegularStruct<'input, T>

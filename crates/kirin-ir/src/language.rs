@@ -53,7 +53,7 @@ pub trait IsPure {
 }
 
 /// An instruction combines several traits to provide a complete interface.
-pub trait Statement:
+pub trait Dialect:
     for<'a> HasArguments<'a>
     + for<'a> HasResults<'a>
     + for<'a> HasArgumentsMut<'a>
@@ -65,9 +65,9 @@ pub trait Statement:
     + IsTerminator
     + IsConstant
     + IsPure
+    + Clone
+    + PartialEq
+    + std::fmt::Debug
 {
-}
-
-pub trait Language: std::fmt::Debug + Clone + Statement {
     type TypeLattice: TypeLattice;
 }

@@ -1,8 +1,8 @@
 use crate::arena::GetInfo;
 use crate::node::*;
-use crate::{Context, Language};
+use crate::{Context, Dialect};
 
-pub struct BlockBuilder<'a, L: Language> {
+pub struct BlockBuilder<'a, L: Dialect> {
     context: &'a mut Context<L>,
     parent: Option<Region>,
     arguments: Vec<(L::TypeLattice, Option<String>)>,
@@ -10,7 +10,7 @@ pub struct BlockBuilder<'a, L: Language> {
     terminator: Option<StatementId>,
 }
 
-impl<'a, L: Language> BlockBuilder<'a, L> {
+impl<'a, L: Dialect> BlockBuilder<'a, L> {
     pub(crate) fn from_context(context: &'a mut Context<L>) -> Self {
         BlockBuilder {
             context,

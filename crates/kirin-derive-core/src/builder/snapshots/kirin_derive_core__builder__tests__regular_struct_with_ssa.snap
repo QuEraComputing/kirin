@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
-    pub fn new<Lang: Language + From<TestStruct<T, L>>>(
+    pub fn new<Lang: Dialect + From<TestStruct<T, L>>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<T>,
         input_ssa: impl Into<::kirin::ir::SSAValue>,
@@ -11,7 +11,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
     where
         Lang::TypeLattice: From<L>,
     {
-        let teststruct_statement_id = context.new_statement_id();
+        let teststruct_statement_id = context.statement_arena().next_id();
         let value = value.into();
         let input_ssa: ::kirin::ir::SSAValue = input_ssa.into();
         let marker = std::marker::PhantomData;

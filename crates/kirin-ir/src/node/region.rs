@@ -1,5 +1,5 @@
 use crate::arena::{GetInfo, Id, Item};
-use crate::{Language, identifier};
+use crate::{Dialect, identifier};
 
 use super::block::Block;
 use super::linked_list::LinkedList;
@@ -11,7 +11,7 @@ identifier! {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct RegionInfo<L: Language> {
+pub struct RegionInfo<L: Dialect> {
     pub(crate) id: Region,
     pub(crate) parent: Option<StatementId>,
     pub(crate) blocks: LinkedList<Block>,
@@ -19,7 +19,7 @@ pub struct RegionInfo<L: Language> {
 }
 
 #[bon::bon]
-impl<L: Language> RegionInfo<L> {
+impl<L: Dialect> RegionInfo<L> {
     #[builder(finish_fn = new)]
     pub fn new(
         /// The unique identifier for this region.
@@ -38,7 +38,7 @@ impl<L: Language> RegionInfo<L> {
     }
 }
 
-impl<L: Language> GetInfo<L> for Region {
+impl<L: Dialect> GetInfo<L> for Region {
     type Info = Item<RegionInfo<L>>;
 
     fn get_info<'a>(

@@ -49,6 +49,13 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> Struct<'input, T> {
             Struct::Regular(data) => data.input(),
         }
     }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        match self {
+            Struct::Wrapper(data) => data.type_lattice(),
+            Struct::Regular(data) => data.type_lattice(),
+        }
+    }
 }
 
 impl<'input, T> GenerateFrom<'input, Struct<'input, T>> for T

@@ -53,6 +53,13 @@ impl<'input, T: CombineGenerics> WrapperStruct<'input, T> {
             WrapperStruct::Unnamed(data) => data.input(),
         }
     }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        match self {
+            WrapperStruct::Named(data) => data.type_lattice(),
+            WrapperStruct::Unnamed(data) => data.type_lattice(),
+        }
+    }
 }
 
 impl<'input, T> GenerateFrom<'input, WrapperStruct<'input, T>> for T
@@ -167,6 +174,10 @@ impl<'input, T: CombineGenerics> NamedWrapperStruct<'input, T> {
     pub fn input(&self) -> &'input syn::DeriveInput {
         self.input
     }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        self.attrs.type_lattice.as_ref()
+    }
 }
 
 impl<'a, 'input, T> SplitForImplTrait<'a, T> for NamedWrapperStruct<'input, T>
@@ -271,6 +282,10 @@ impl<'input, T: CombineGenerics> UnnamedWrapperStruct<'input, T> {
 
     pub fn input(&self) -> &'input syn::DeriveInput {
         self.input
+    }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        self.attrs.type_lattice.as_ref()
     }
 }
 

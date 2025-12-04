@@ -96,7 +96,7 @@ impl From<f64> for Value {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Statement)]
+#[derive(Clone, Debug, PartialEq, Dialect)]
 #[kirin(fn, type_lattice = SimpleTypeLattice, crate = crate)]
 pub enum SimpleLanguage {
     Add(
@@ -114,8 +114,4 @@ pub enum SimpleLanguage {
         Region,
         #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
     ),
-}
-
-impl Language for SimpleLanguage {
-    type TypeLattice = SimpleTypeLattice;
 }

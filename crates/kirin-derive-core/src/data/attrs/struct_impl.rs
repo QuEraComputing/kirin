@@ -19,7 +19,7 @@ pub struct StructAttribute {
     /// this is different from the field-level `type` attribute
     /// e.g #[kirin(type = ...)]
     /// which specifies the type of the SSAValue/ResultValue field
-    pub ty_lattice: Option<syn::Type>,
+    pub type_lattice: Option<syn::Type>,
     /// whether the instruction is constant
     pub is_constant: Option<bool>,
     /// whether the instruction is pure
@@ -43,7 +43,7 @@ impl StructAttribute {
                 struct_attr.crate_path = Some(path);
             } else if meta.path.is_ident("type_lattice") {
                 let ty: syn::Type = meta.value()?.parse()?;
-                struct_attr.ty_lattice = Some(ty);
+                struct_attr.type_lattice = Some(ty);
             } else if meta.path.is_ident("fn") {
                 match meta.value() {
                     Ok(v) => {
@@ -127,8 +127,8 @@ impl std::fmt::Debug for StructAttribute {
                 &self.crate_path.as_ref().map(|p| p.to_token_stream()),
             )
             .field(
-                "ty_lattice",
-                &self.ty_lattice.as_ref().map(|t| t.to_token_stream()),
+                "type_lattice",
+                &self.type_lattice.as_ref().map(|t| t.to_token_stream()),
             )
             .field("is_constant", &self.is_constant)
             .field("is_pure", &self.is_pure)

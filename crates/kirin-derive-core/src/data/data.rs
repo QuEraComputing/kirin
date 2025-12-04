@@ -41,6 +41,13 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> Data<'input, T> {
             Data::Enum(data) => data.input(),
         }
     }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        match self {
+            Data::Struct(data) => data.type_lattice(),
+            Data::Enum(data) => data.type_lattice(),
+        }
+    }
 }
 
 impl<'input, T> GenerateFrom<'input, Data<'input, T>> for T

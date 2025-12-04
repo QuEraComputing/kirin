@@ -1,5 +1,5 @@
 use crate::{
-    Language,
+    Dialect,
     arena::{GetInfo, Id, Item},
     identifier,
     node::region::Region,
@@ -18,7 +18,7 @@ identifier! {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BlockInfo<L: Language> {
+pub struct BlockInfo<L: Dialect> {
     pub parent: Option<Region>,
     pub node: LinkedListNode<Block>,
     pub arguments: Vec<BlockArgument>,
@@ -28,7 +28,7 @@ pub struct BlockInfo<L: Language> {
 }
 
 #[bon::bon]
-impl<L: Language> BlockInfo<L> {
+impl<L: Dialect> BlockInfo<L> {
     #[builder(finish_fn = new)]
     pub(crate) fn new(
         /// The parent region of this block.
@@ -53,7 +53,7 @@ impl<L: Language> BlockInfo<L> {
     }
 }
 
-impl<L: Language> GetInfo<L> for Block {
+impl<L: Dialect> GetInfo<L> for Block {
     type Info = Item<BlockInfo<L>>;
 
     fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {

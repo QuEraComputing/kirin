@@ -81,6 +81,18 @@ fn test_unit_enum() {
     insta::assert_snapshot!(generate(input));
 }
 
+#[test]
+fn test_enum_warps() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(fn, type_lattice = T, wraps)]
+        pub enum StructuredControlFlow<T: TypeLattice> {
+            If(If<T>),
+            For(For<T>),
+        }
+    };
+    insta::assert_snapshot!(generate(input));
+}
+
 fn generate(input: syn::DeriveInput) -> String {
     rustfmt(derive_field_iter!(
         &input,

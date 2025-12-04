@@ -108,6 +108,18 @@ mod tests {
     }
 
     #[test]
+    fn test_wrapper_enum_generic() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(fn, type_lattice = T, wraps)]
+            pub enum StructuredControlFlow<T: TypeLattice> {
+                If(If<T>),
+                For(For<T>),
+            }
+        };
+        insta::assert_snapshot!(generate(&input));
+    }
+
+    #[test]
     fn test_either_enum() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(fn, type_lattice = SomeLattice)]

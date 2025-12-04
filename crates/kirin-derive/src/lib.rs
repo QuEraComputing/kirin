@@ -4,7 +4,7 @@ use kirin_derive_core::{derive_from, prelude::*};
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
-#[proc_macro_derive(Statement, attributes(kirin))]
+#[proc_macro_derive(Dialect, attributes(kirin))]
 pub fn derive_statement(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     let arguments = derive_field_iter!(&ast, "arguments", SSAValue, HasArguments);
@@ -20,7 +20,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
     let is_pure = derive_check!(&ast, is_pure, IsPure);
     let from = derive_from!(&ast);
     let builder = derive_builder!(&ast);
-    let statement = derive_empty!(&ast, Statement, ::kirin::ir);
+    let dialect = derive_dialect!(&ast);
 
     let generated = quote::quote! {
         #arguments
@@ -37,7 +37,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
         #from
         #builder
 
-        #statement
+        #dialect
     };
     generated.into()
 }

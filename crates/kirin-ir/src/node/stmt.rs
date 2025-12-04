@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, Id, Item};
 use crate::identifier;
-use crate::{language::Language, node::linked_list::LinkedListNode};
+use crate::{Dialect, node::linked_list::LinkedListNode};
 
 use super::block::Block;
 
@@ -11,13 +11,13 @@ identifier! {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StatementInfo<L: Language> {
+pub struct StatementInfo<L: Dialect> {
     pub(crate) node: LinkedListNode<StatementId>,
     pub(crate) parent: Option<Block>,
     pub(crate) definition: L,
 }
 
-impl<'a, L: Language> From<&'a StatementInfo<L>> for &'a LinkedListNode<StatementId> {
+impl<'a, L: Dialect> From<&'a StatementInfo<L>> for &'a LinkedListNode<StatementId> {
     fn from(info: &'a StatementInfo<L>) -> Self {
         &info.node
     }
@@ -30,38 +30,38 @@ impl StatementId {
 }
 
 impl StatementId {
-    pub fn results<'a, L: Language>(
+    pub fn results<'a, L: Dialect>(
         &self,
         context: &'a crate::Context<L>,
     ) -> <L as crate::HasResults<'a>>::Iter {
         self.expect_info(context).definition.results()
     }
 
-    pub fn arguments<'a, L: Language>(
+    pub fn arguments<'a, L: Dialect>(
         &self,
         context: &'a crate::Context<L>,
     ) -> <L as crate::HasArguments<'a>>::Iter {
         self.expect_info(context).definition.arguments()
     }
 
-    pub fn parent<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a Option<Block> {
+    pub fn parent<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<Block> {
         &self.expect_info(context).parent
     }
 
-    pub fn next<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
+    pub fn next<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
         &self.expect_info(context).node.next
     }
 
-    pub fn prev<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
+    pub fn prev<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
         &self.expect_info(context).node.prev
     }
 
-    pub fn definition<'a, L: Language>(&self, context: &'a crate::Context<L>) -> &'a L {
+    pub fn definition<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a L {
         &self.expect_info(context).definition
     }
 }
 
-impl<L: Language> GetInfo<L> for StatementId {
+impl<L: Dialect> GetInfo<L> for StatementId {
     type Info = Item<StatementInfo<L>>;
 
     fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {

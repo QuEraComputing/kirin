@@ -1,12 +1,12 @@
-use crate::{Block, Language, Region, StatementId, node::RegionInfo};
+use crate::{Block, Dialect, Region, StatementId, node::RegionInfo};
 
-pub struct RegionBuilder<'a, L: Language> {
+pub struct RegionBuilder<'a, L: Dialect> {
     pub(super) context: &'a mut crate::Context<L>,
     pub(super) parent: Option<StatementId>,
     pub(super) blocks: Vec<Block>,
 }
 
-impl<'a, L: Language> RegionBuilder<'a, L> {
+impl<'a, L: Dialect> RegionBuilder<'a, L> {
     pub fn from_context(context: &'a mut crate::Context<L>) -> Self {
         Self {
             context,

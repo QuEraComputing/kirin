@@ -3,14 +3,14 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl TestEnum {
-    pub fn op_a<Lang: Language + From<TestEnum>>(
+    pub fn op_a<Lang: Dialect + From<TestEnum>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<u32>,
     ) -> TestEnumOpARef
     where
         Lang::TypeLattice: From<SomeLattice>,
     {
-        let test_enum_statement_id = context.new_statement_id();
+        let test_enum_statement_id = context.statement_arena().next_id();
         let value = value.into();
         let result: ::kirin::ir::ResultValue = context
             .ssa()
@@ -27,14 +27,14 @@ impl TestEnum {
             result,
         }
     }
-    pub fn op_b<Lang: Language + From<TestEnum>>(
+    pub fn op_b<Lang: Dialect + From<TestEnum>>(
         context: &mut ::kirin::ir::Context<Lang>,
         field_0: impl Into<u64>,
     ) -> TestEnumOpBRef
     where
         Lang::TypeLattice: From<SomeLattice>,
     {
-        let test_enum_statement_id = context.new_statement_id();
+        let test_enum_statement_id = context.statement_arena().next_id();
         let field_0 = field_0.into();
         let result: ::kirin::ir::ResultValue = context
             .ssa()

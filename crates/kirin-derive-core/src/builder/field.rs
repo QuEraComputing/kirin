@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
-use crate::data::*;
+use crate::{data::*, utils::is_type};
 
 pub struct FieldInfo {
     pub attr: Option<FieldAttribute>,
@@ -13,6 +13,7 @@ pub struct FieldInfo {
 }
 
 impl FieldInfo {
+    /// generate the input signature for the builder function parameter
     pub fn input_signature(&self, crate_path: &syn::Path) -> TokenStream {
         let FieldInfo {
             name,
@@ -69,7 +70,16 @@ impl FieldInfo {
             }) => {
                 quote! { let #name = #init; }
             }
-            _ => quote! {},
+            _ => {
+                if is_type(&self.ty, "PhantomData") {
+                    syn::Error::new_spanned(
+                        &self.ty,
+                        "use `#[kirin(default = std::marker::PhantomData)]` to initialize PhantomData fields",
+                    ).to_compile_error()
+                } else {
+                    quote! {}
+                }
+            },
         }
     }
 

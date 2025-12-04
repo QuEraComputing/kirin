@@ -63,6 +63,10 @@ impl<'input, T: CombineGenerics> WrapperEnum<'input, T> {
     pub fn input(&self) -> &'input syn::DeriveInput {
         self.input
     }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        self.attrs.type_lattice.as_ref()
+    }
 }
 
 impl<'input, T> std::fmt::Debug for WrapperEnum<'input, T> {

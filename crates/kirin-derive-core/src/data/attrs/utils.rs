@@ -11,7 +11,7 @@ pub fn parse_kirin_attributes(
 }
 
 pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error {
-    if ["crate_path", "ty_lattice"]
+    if ["crate_path", "type_lattice"]
         .iter()
         .any(|name| meta.path.is_ident(name))
     {

@@ -4,9 +4,9 @@ use super::region::RegionBuilder;
 use crate::arena::GetInfo;
 use crate::lattice::{FiniteLattice, Lattice};
 use crate::node::*;
-use crate::{Context, Language};
+use crate::{Context, Dialect};
 
-impl<L: Language> Context<L> {
+impl<L: Dialect> Context<L> {
     pub fn block(&mut self) -> BlockBuilder<L> {
         BlockBuilder::from_context(self)
     }
@@ -70,7 +70,7 @@ impl<L: Language> Context<L> {
 }
 
 #[bon::bon]
-impl<L: Language> Context<L> {
+impl<L: Dialect> Context<L> {
     #[builder(finish_fn = new)]
     pub fn ssa(
         &mut self,

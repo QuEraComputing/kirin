@@ -73,6 +73,14 @@ impl<'input, T: CombineGenerics + StatementFields<'input>> Enum<'input, T> {
             Enum::Regular(data) => data.input(),
         }
     }
+
+    pub fn type_lattice(&self) -> Option<&syn::Type> {
+        match self {
+            Enum::Wrapper(data) => data.type_lattice(),
+            Enum::Either(data) => data.type_lattice(),
+            Enum::Regular(data) => data.type_lattice(),
+        }
+    }
 }
 
 impl<'input, T> std::fmt::Debug for Enum<'input, T>
