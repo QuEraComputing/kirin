@@ -6,6 +6,8 @@ use super::field_impl::FieldAttribute;
 
 #[derive(Clone, Default)]
 pub struct EnumAttribute {
+    /// name for the enum statement, e.g a dialect name
+    pub name: Option<syn::Expr>,
     /// whether the instruction wraps another instruction
     pub wraps: bool,
     /// path to the kirin crate
@@ -33,6 +35,9 @@ impl EnumAttribute {
         parse_kirin_attributes(&input.attrs, |meta| {
             if meta.path.is_ident("wraps") {
                 enum_attr.wraps = true;
+            } else if meta.path.is_ident("name") {
+                let expr: syn::Expr = meta.value()?.parse()?;
+                enum_attr.name = Some(expr);
             } else if meta.path.is_ident("crate") {
                 let path: syn::Path = meta.value()?.parse()?;
                 enum_attr.crate_path = Some(path);
@@ -81,6 +86,8 @@ impl PropertyAttribute for EnumAttribute {
 
 #[derive(Clone, Default)]
 pub struct VariantAttribute {
+    /// name for the variant statement
+    pub name: Option<syn::Expr>,
     /// whether the instruction wraps another instruction
     pub wraps: bool,
     /// whether the instruction is constant
@@ -121,6 +128,9 @@ impl VariantAttribute {
         parse_kirin_attributes(&variant.attrs, |meta| {
             if meta.path.is_ident("wraps") {
                 variant_attr.wraps = true;
+            } else if meta.path.is_ident("name") {
+                let expr: syn::Expr = meta.value()?.parse()?;
+                variant_attr.name = Some(expr);
             } else if meta.path.is_ident("fn") {
                 match meta.value() {
                     Ok(v) => {

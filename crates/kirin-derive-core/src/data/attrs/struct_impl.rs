@@ -9,6 +9,8 @@ use super::utils::error_unknown_attribute;
 
 #[derive(Clone, Default)]
 pub struct StructAttribute {
+    /// name for the struct statement
+    pub name: Option<syn::Expr>,
     /// whether the instruction wraps another instruction
     pub wraps: bool,
     /// path to the kirin crate
@@ -38,6 +40,9 @@ impl StructAttribute {
         parse_kirin_attributes(&input.attrs, |meta| {
             if meta.path.is_ident("wraps") {
                 struct_attr.wraps = true;
+            } else if meta.path.is_ident("name") {
+                let expr: syn::Expr = meta.value()?.parse()?;
+                struct_attr.name = Some(expr);
             } else if meta.path.is_ident("crate") {
                 let path: syn::Path = meta.value()?.parse()?;
                 struct_attr.crate_path = Some(path);
