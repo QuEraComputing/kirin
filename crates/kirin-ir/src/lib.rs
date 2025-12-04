@@ -27,7 +27,7 @@ pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{
     Block, BlockArgument, BlockInfo, CompileStage, Function, FunctionInfo, LinkedList,
     LinkedListNode, Region, ResultValue, SSAInfo, SSAKind, SSAValue, Signature,
-    SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo, StatementId,
+    SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo, Statement,
     StatementInfo, Symbol, TestSSAValue,
 };
 

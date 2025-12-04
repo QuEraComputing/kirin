@@ -6,30 +6,30 @@ use super::block::Block;
 
 identifier! {
     /// An Id reference to statement in arena.
-    struct StatementId
+    struct Statement
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StatementInfo<L: Dialect> {
-    pub(crate) node: LinkedListNode<StatementId>,
+    pub(crate) node: LinkedListNode<Statement>,
     pub(crate) parent: Option<Block>,
     pub(crate) definition: L,
 }
 
-impl<'a, L: Dialect> From<&'a StatementInfo<L>> for &'a LinkedListNode<StatementId> {
+impl<'a, L: Dialect> From<&'a StatementInfo<L>> for &'a LinkedListNode<Statement> {
     fn from(info: &'a StatementInfo<L>) -> Self {
         &info.node
     }
 }
 
-impl StatementId {
+impl Statement {
     pub fn id(&self) -> Id {
         self.0
     }
 }
 
-impl StatementId {
+impl Statement {
     pub fn results<'a, L: Dialect>(
         &self,
         context: &'a crate::Context<L>,
@@ -48,11 +48,11 @@ impl StatementId {
         &self.expect_info(context).parent
     }
 
-    pub fn next<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
+    pub fn next<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<Statement> {
         &self.expect_info(context).node.next
     }
 
-    pub fn prev<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<StatementId> {
+    pub fn prev<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<Statement> {
         &self.expect_info(context).node.prev
     }
 
@@ -61,7 +61,7 @@ impl StatementId {
     }
 }
 
-impl<L: Dialect> GetInfo<L> for StatementId {
+impl<L: Dialect> GetInfo<L> for Statement {
     type Info = Item<StatementInfo<L>>;
 
     fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {

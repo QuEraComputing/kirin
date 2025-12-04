@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
-    pub fn new<Lang: Dialect + From<TestStruct<T, L>>>(
+    pub fn new<Lang: ::kirin::ir::Dialect + From<TestStruct<T, L>>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<T>,
         input_ssa: impl Into<::kirin::ir::SSAValue>,
@@ -37,10 +37,10 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
     }
 }
 pub struct TestStructNewRef {
-    pub id: ::kirin::ir::StatementId,
+    pub id: ::kirin::ir::Statement,
     pub result: ::kirin::ir::ResultValue,
 }
-impl From<TestStructNewRef> for ::kirin::ir::StatementId {
+impl From<TestStructNewRef> for ::kirin::ir::Statement {
     fn from(value: TestStructNewRef) -> Self {
         value.id
     }

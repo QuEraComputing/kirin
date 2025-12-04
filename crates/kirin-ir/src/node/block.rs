@@ -8,7 +8,7 @@ use crate::{
 use super::{
     linked_list::{LinkedList, LinkedListNode},
     ssa::BlockArgument,
-    stmt::StatementId,
+    stmt::Statement,
 };
 
 identifier! {
@@ -22,8 +22,8 @@ pub struct BlockInfo<L: Dialect> {
     pub parent: Option<Region>,
     pub node: LinkedListNode<Block>,
     pub arguments: Vec<BlockArgument>,
-    pub statements: LinkedList<StatementId>,
-    pub terminator: Option<StatementId>,
+    pub statements: LinkedList<Statement>,
+    pub terminator: Option<Statement>,
     _marker: std::marker::PhantomData<L>,
 }
 
@@ -38,9 +38,9 @@ impl<L: Dialect> BlockInfo<L> {
         /// The arguments of this block.
         arguments: Vec<BlockArgument>,
         /// The statements contained in this block.
-        statements: Option<LinkedList<StatementId>>,
+        statements: Option<LinkedList<Statement>>,
         /// The terminator statement of this block, if any.
-        terminator: Option<StatementId>,
+        terminator: Option<Statement>,
     ) -> Self {
         Self {
             parent,

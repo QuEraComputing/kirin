@@ -3,7 +3,7 @@ use crate::identifier;
 use crate::{Symbol, Dialect};
 use std::collections::HashSet;
 
-use super::{block::Block, stmt::StatementId};
+use super::{block::Block, stmt::Statement};
 
 identifier! {
     /// Represents a general SSA value that can be either
@@ -67,14 +67,14 @@ impl<L: Dialect> SSAInfo<L> {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Use {
-    stmt: StatementId,
+    stmt: Statement,
     operand_index: usize,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SSAKind {
-    Result(StatementId, usize),
+    Result(Statement, usize),
     BlockArgument(Block, usize),
     // should not appear in final SSA IR
     /// A placeholder for builders to update the Block information later.

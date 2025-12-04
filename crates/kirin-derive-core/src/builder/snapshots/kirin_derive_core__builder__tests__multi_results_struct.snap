@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
-    pub fn new<Lang: Dialect + From<MultiResult<T, L>>>(
+    pub fn new<Lang: ::kirin::ir::Dialect + From<MultiResult<T, L>>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<T>,
     ) -> MultiResultNewRef
@@ -42,11 +42,11 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
     }
 }
 pub struct MultiResultNewRef {
-    pub id: ::kirin::ir::StatementId,
+    pub id: ::kirin::ir::Statement,
     pub result1: ::kirin::ir::ResultValue,
     pub result2: ::kirin::ir::ResultValue,
 }
-impl From<MultiResultNewRef> for ::kirin::ir::StatementId {
+impl From<MultiResultNewRef> for ::kirin::ir::Statement {
     fn from(value: MultiResultNewRef) -> Self {
         value.id
     }

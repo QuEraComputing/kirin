@@ -1,6 +1,6 @@
 use crate::{
     Dialect, LinkedList,
-    node::{Block, BlockInfo, LinkedListNode, Region, RegionInfo, StatementId, StatementInfo},
+    node::{Block, BlockInfo, LinkedListNode, Region, RegionInfo, Statement, StatementInfo},
 };
 
 pub trait ParentInfo<L: Dialect> {
@@ -69,7 +69,7 @@ pub trait LinkedListInfo {
 }
 
 impl<L: Dialect> LinkedListInfo for BlockInfo<L> {
-    type Ptr = StatementId;
+    type Ptr = Statement;
     fn get_linked_list(&self) -> &LinkedList<Self::Ptr> {
         &self.statements
     }
@@ -116,7 +116,7 @@ pub trait LinkedListElem<L: Dialect> {
 }
 
 impl<L: Dialect> LinkedListElem<L> for StatementInfo<L> {
-    type Ptr = StatementId;
+    type Ptr = Statement;
     fn get_node(&self) -> &LinkedListNode<Self::Ptr> {
         &self.node
     }

@@ -10,7 +10,7 @@ pub struct Context<L: Dialect> {
     pub(crate) staged_functions: Arena<StagedFunctionInfo<L>, StagedFunction>,
     pub(crate) regions: Arena<RegionInfo<L>, Region>,
     pub(crate) blocks: Arena<BlockInfo<L>, Block>,
-    pub(crate) statements: Arena<StatementInfo<L>, StatementId>,
+    pub(crate) statements: Arena<StatementInfo<L>, Statement>,
     pub(crate) ssas: Arena<SSAInfo<L>, SSAValue>,
     pub(crate) symbols: Arc<RefCell<InternTable<String, Symbol>>>,
 }
@@ -52,8 +52,8 @@ where
 impl<L: Dialect> Context<L> {
     /// Get a reference to the statements arena.
     /// 
-    /// Read-only access. Use `get_info_mut` on `StatementId` for mutable access.
-    pub fn statement_arena(&self) -> &Arena<StatementInfo<L>, StatementId> {
+    /// Read-only access. Use `get_info_mut` on `Statement` for mutable access.
+    pub fn statement_arena(&self) -> &Arena<StatementInfo<L>, Statement> {
         &self.statements
     }
 

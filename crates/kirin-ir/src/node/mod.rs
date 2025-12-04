@@ -14,5 +14,5 @@ pub use function::{
 pub use linked_list::{LinkedList, LinkedListNode};
 pub use region::{Region, RegionInfo};
 pub use ssa::{BlockArgument, ResultValue, SSAInfo, SSAKind, SSAValue, TestSSAValue};
-pub use stmt::{StatementId, StatementInfo};
+pub use stmt::{Statement, StatementInfo};
 pub use symbol::Symbol;

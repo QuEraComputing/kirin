@@ -1,5 +1,5 @@
 use super::block::Block;
-use super::stmt::StatementId;
+use super::stmt::Statement;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -19,8 +19,8 @@ impl<Ptr: Copy + PartialEq> LinkedListNode<Ptr> {
     }
 }
 
-impl From<LinkedListNode<StatementId>> for StatementId {
-    fn from(value: LinkedListNode<StatementId>) -> Self {
+impl From<LinkedListNode<Statement>> for Statement {
+    fn from(value: LinkedListNode<Statement>) -> Self {
         value.ptr
     }
 }

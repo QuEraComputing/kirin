@@ -6,8 +6,8 @@ pub struct BlockBuilder<'a, L: Dialect> {
     context: &'a mut Context<L>,
     parent: Option<Region>,
     arguments: Vec<(L::TypeLattice, Option<String>)>,
-    statements: Vec<StatementId>,
-    terminator: Option<StatementId>,
+    statements: Vec<Statement>,
+    terminator: Option<Statement>,
 }
 
 impl<'a, L: Dialect> BlockBuilder<'a, L> {
@@ -44,7 +44,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     }
 
     /// Add a statement to the block.
-    pub fn stmt(mut self, stmt: impl Into<StatementId>) -> Self {
+    pub fn stmt(mut self, stmt: impl Into<Statement>) -> Self {
         let stmt = stmt.into();
         let info = stmt.expect_info(self.context);
 
@@ -59,7 +59,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     }
 
     /// Set the terminator statement of the block.
-    pub fn terminator(mut self, term: impl Into<StatementId>) -> Self {
+    pub fn terminator(mut self, term: impl Into<Statement>) -> Self {
         let term = term.into();
         let info = term.expect_info(self.context);
 

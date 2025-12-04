@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::arena::{GetInfo, Id, Item};
 use crate::language::Dialect;
-use crate::{Lattice, StatementId, identifier};
+use crate::{Lattice, Statement, identifier};
 
 use super::symbol::Symbol;
 
@@ -157,7 +157,7 @@ pub struct SpecializedFunctionInfo<L: Dialect> {
     id: SpecializedFunction,
     signature: Signature<L>,
     return_type: L::TypeLattice,
-    body: StatementId,
+    body: Statement,
     /// Functions that call this function (used for inter-procedural analyses).
     backedges: Vec<SpecializedFunction>,
 }
@@ -173,7 +173,7 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         /// The return type of this specialized function.
         return_type: L::TypeLattice,
         /// The body of this specialized function.
-        body: StatementId,
+        body: Statement,
         /// The functions that call this specialized function.
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Self {
@@ -237,11 +237,11 @@ impl<L: Dialect> From<SpecializedFunctionInfo<L>> for SpecializedFunction {
 }
 
 impl<L: Dialect> SpecializedFunctionInfo<L> {
-    pub fn body(&self) -> &StatementId {
+    pub fn body(&self) -> &Statement {
         &self.body
     }
 
-    pub fn body_mut(&mut self) -> &mut StatementId {
+    pub fn body_mut(&mut self) -> &mut Statement {
         &mut self.body
     }
 

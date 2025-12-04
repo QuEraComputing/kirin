@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl EitherEnum {
-    pub fn op_abc<Lang: Dialect + From<EitherEnum>>(
+    pub fn op_abc<Lang: ::kirin::ir::Dialect + From<EitherEnum>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<u32>,
     ) -> EitherEnumOpAbcRef
@@ -29,10 +29,10 @@ impl EitherEnum {
     }
 }
 pub struct EitherEnumOpAbcRef {
-    pub id: ::kirin::ir::StatementId,
+    pub id: ::kirin::ir::Statement,
     pub result: ::kirin::ir::ResultValue,
 }
-impl From<EitherEnumOpAbcRef> for ::kirin::ir::StatementId {
+impl From<EitherEnumOpAbcRef> for ::kirin::ir::Statement {
     fn from(value: EitherEnumOpAbcRef) -> Self {
         value.id
     }

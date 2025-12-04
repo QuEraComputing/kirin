@@ -15,7 +15,7 @@ impl<L: Dialect> Context<L> {
         RegionBuilder::from_context(self)
     }
 
-    pub fn link_statements(&mut self, ptrs: &[StatementId]) -> LinkedList<StatementId> {
+    pub fn link_statements(&mut self, ptrs: &[Statement]) -> LinkedList<Statement> {
         for window in ptrs.windows(2) {
             let current = window[0];
             let next = window[1];
@@ -103,7 +103,7 @@ impl<L: Dialect> Context<L> {
     }
 
     #[builder(finish_fn = new)]
-    pub fn statement(&mut self, #[builder(into)] definition: L) -> StatementId {
+    pub fn statement(&mut self, #[builder(into)] definition: L) -> Statement {
         let id = self.statements.next_id();
         let statement = StatementInfo {
             node: LinkedListNode::new(id),
@@ -144,7 +144,7 @@ impl<L: Dialect> Context<L> {
         f: StagedFunction,
         params_type: Option<&[L::TypeLattice]>,
         return_type: Option<L::TypeLattice>,
-        #[builder(into)] body: StatementId,
+        #[builder(into)] body: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> SpecializedFunction {
         // the only way to create a staged function is through the context

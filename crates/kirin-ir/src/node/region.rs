@@ -3,7 +3,7 @@ use crate::{Dialect, identifier};
 
 use super::block::Block;
 use super::linked_list::LinkedList;
-use super::stmt::StatementId;
+use super::stmt::Statement;
 
 identifier! {
     /// A unique identifier for a region.
@@ -13,7 +13,7 @@ identifier! {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct RegionInfo<L: Dialect> {
     pub(crate) id: Region,
-    pub(crate) parent: Option<StatementId>,
+    pub(crate) parent: Option<Statement>,
     pub(crate) blocks: LinkedList<Block>,
     _marker: std::marker::PhantomData<L>,
 }
@@ -25,7 +25,7 @@ impl<L: Dialect> RegionInfo<L> {
         /// The unique identifier for this region.
         id: Region,
         /// The parent statement of this region, if any.
-        parent: Option<StatementId>,
+        parent: Option<Statement>,
         /// The blocks contained in this region.
         blocks: LinkedList<Block>,
     ) -> Self {

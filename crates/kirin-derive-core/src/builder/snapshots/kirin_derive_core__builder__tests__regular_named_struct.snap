@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
-    pub fn new<Lang: Dialect + From<Constant<T, L>>>(
+    pub fn new<Lang: ::kirin::ir::Dialect + From<Constant<T, L>>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<T>,
     ) -> ConstantNewRef
@@ -34,10 +34,10 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
     }
 }
 pub struct ConstantNewRef {
-    pub id: ::kirin::ir::StatementId,
+    pub id: ::kirin::ir::Statement,
     pub result: ::kirin::ir::ResultValue,
 }
-impl From<ConstantNewRef> for ::kirin::ir::StatementId {
+impl From<ConstantNewRef> for ::kirin::ir::Statement {
     fn from(value: ConstantNewRef) -> Self {
         value.id
     }

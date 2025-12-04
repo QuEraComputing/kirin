@@ -90,11 +90,11 @@ impl Fields {
 
         quote! {
             pub struct #name {
-                pub id: #crate_path::StatementId,
+                pub id: #crate_path::Statement,
                 #(#field_defs,)*
             }
 
-            impl From<#name> for #crate_path::StatementId {
+            impl From<#name> for #crate_path::Statement {
                 fn from(value: #name) -> Self {
                     value.id
                 }

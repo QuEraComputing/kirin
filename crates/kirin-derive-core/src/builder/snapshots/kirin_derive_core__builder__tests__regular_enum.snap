@@ -3,7 +3,7 @@ source: crates/kirin-derive-core/src/builder/mod.rs
 expression: generate(&input)
 ---
 impl TestEnum {
-    pub fn op_a<Lang: Dialect + From<TestEnum>>(
+    pub fn op_a<Lang: ::kirin::ir::Dialect + From<TestEnum>>(
         context: &mut ::kirin::ir::Context<Lang>,
         value: impl Into<u32>,
     ) -> TestEnumOpARef
@@ -27,7 +27,7 @@ impl TestEnum {
             result,
         }
     }
-    pub fn op_b<Lang: Dialect + From<TestEnum>>(
+    pub fn op_b<Lang: ::kirin::ir::Dialect + From<TestEnum>>(
         context: &mut ::kirin::ir::Context<Lang>,
         field_0: impl Into<u64>,
     ) -> TestEnumOpBRef
@@ -53,19 +53,19 @@ impl TestEnum {
     }
 }
 pub struct TestEnumOpARef {
-    pub id: ::kirin::ir::StatementId,
+    pub id: ::kirin::ir::Statement,
     pub result: ::kirin::ir::ResultValue,
 }
-impl From<TestEnumOpARef> for ::kirin::ir::StatementId {
+impl From<TestEnumOpARef> for ::kirin::ir::Statement {
     fn from(value: TestEnumOpARef) -> Self {
         value.id
     }
 }
 pub struct TestEnumOpBRef {
-    pub id: ::kirin::ir::StatementId,
+    pub id: ::kirin::ir::Statement,
     pub result: ::kirin::ir::ResultValue,
 }
-impl From<TestEnumOpBRef> for ::kirin::ir::StatementId {
+impl From<TestEnumOpBRef> for ::kirin::ir::Statement {
     fn from(value: TestEnumOpBRef) -> Self {
         value.id
     }
