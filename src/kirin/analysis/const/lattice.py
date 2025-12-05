@@ -268,7 +268,7 @@ class PartialLambda(PartialConst):
 @final
 @dataclass
 class Predecessor(Result):
-    """Predecessor block in CFG."""
+    """Predecessor block in CFG with incoming constant value."""
 
     block: ir.Block
     value: Result

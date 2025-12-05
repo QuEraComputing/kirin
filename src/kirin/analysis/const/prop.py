@@ -4,7 +4,7 @@ from dataclasses import field, dataclass
 from kirin import ir, types, interp
 from kirin.analysis.forward import ForwardExtra, ForwardFrame
 
-from .lattice import Value, Result, Unknown
+from .lattice import Value, Result, Unknown, Predecessor, Union
 
 
 @dataclass
@@ -70,6 +70,8 @@ class Propagate(ForwardExtra[Frame, Result]):
                 return self.try_eval_const_pure(frame, node, ())
             elif node.has_trait(ir.Pure):
                 values = frame.get_values(node.args)
+                values = tuple(val.value if isinstance(val, Predecessor) else val
+                                                   for val in values)
                 if types.is_tuple_of(values, Value):
                     return self.try_eval_const_pure(frame, node, values)
 
