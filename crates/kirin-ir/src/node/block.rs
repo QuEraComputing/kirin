@@ -12,8 +12,40 @@ use super::{
 };
 
 identifier! {
-    /// A unique identifier for a block.
+    /// A unique identifier for a block, used in statement declarations
+    /// means the statement owns a block.
     struct Block
+}
+
+identifier! {
+    /// A unique identifier for a successor block, if used in statement
+    /// declarations means the statement may transfer control to the
+    /// successor block.
+    struct Successor
+}
+
+impl From<Successor> for Block {
+    fn from(succ: Successor) -> Self {
+        Block(succ.0)
+    }
+}
+
+impl From<Block> for Successor {
+    fn from(block: Block) -> Self {
+        Successor(block.0)
+    }
+}
+
+impl std::fmt::Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "^{}", self.0.raw())
+    }
+}
+
+impl std::fmt::Display for Successor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "^{}", self.0.raw())
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -62,5 +94,50 @@ impl<L: Dialect> GetInfo<L> for Block {
 
     fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
         context.blocks.get_mut(*self)
+    }
+}
+
+impl Block {
+    pub fn statements<'a, L: Dialect>(
+        &self,
+        context: &'a crate::Context<L>,
+    ) -> StatementIter<'a, L> {
+        let info = self.expect_info(context);
+        StatementIter {
+            current: info.statements.head,
+            len: info.statements.len,
+            context,
+        }
+    }
+}
+
+pub struct StatementIter<'a, L: Dialect> {
+    current: Option<Statement>,
+    len: usize,
+    context: &'a crate::Context<L>,
+}
+
+impl<'a, L: Dialect> Iterator for StatementIter<'a, L> {
+    type Item = Statement;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(current) = self.current {
+            let info = current.expect_info(self.context);
+            self.current = info.node.next;
+            self.len -= 1;
+            Some(current)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl<'a, L: Dialect> ExactSizeIterator for StatementIter<'a, L> {
+    fn len(&self) -> usize {
+        self.len
     }
 }

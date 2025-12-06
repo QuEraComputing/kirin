@@ -42,7 +42,8 @@ impl<T: Clone + Eq + std::hash::Hash, Key: InternKey> InternTable<T, Key> {
         idx
     }
 
-    pub fn resolve(&self, idx: Key) -> Option<&T> {
-        self.items.get(idx.into())
+    pub fn resolve(&self, idx: impl Into<Key>) -> Option<&T> {
+        let idx: usize = idx.into().into();
+        self.items.get(idx)
     }
 }

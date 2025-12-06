@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use kirin_derive_core::{derive_from, prelude::*};
+use kirin_derive_core::prelude::*;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
@@ -11,13 +11,17 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
     let arguments_mut = derive_field_iter_mut!(&ast, "arguments_mut", SSAValue, HasArgumentsMut);
     let results = derive_field_iter!(&ast, "results", ResultValue, HasResults);
     let results_mut = derive_field_iter_mut!(&ast, "results_mut", ResultValue, HasResultsMut);
-    let successors = derive_field_iter!(&ast, "successors", Block, HasSuccessors);
-    let successors_mut = derive_field_iter_mut!(&ast, "successors_mut", Block, HasSuccessorsMut);
+    let blocks = derive_field_iter!(&ast, "blocks", Block, HasBlocks);
+    let blocks_mut = derive_field_iter_mut!(&ast, "blocks_mut", Block, HasBlocksMut);
+    let successors = derive_field_iter!(&ast, "successors", Successor, HasSuccessors);
+    let successors_mut =
+        derive_field_iter_mut!(&ast, "successors_mut", Successor, HasSuccessorsMut);
     let regions = derive_field_iter!(&ast, "regions", Region, HasRegions);
     let regions_mut = derive_field_iter_mut!(&ast, "regions_mut", Region, HasRegionsMut);
     let is_terminator = derive_check!(&ast, is_terminator, IsTerminator);
     let is_constant = derive_check!(&ast, is_constant, IsConstant);
     let is_pure = derive_check!(&ast, is_pure, IsPure);
+    let name = derive_name!(&ast);
     let from = derive_from!(&ast);
     let builder = derive_builder!(&ast);
     let dialect = derive_dialect!(&ast);
@@ -27,6 +31,8 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
         #arguments_mut
         #results
         #results_mut
+        #blocks
+        #blocks_mut
         #successors
         #successors_mut
         #regions
@@ -36,6 +42,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
         #is_pure
         #from
         #builder
+        #name
 
         #dialect
     };

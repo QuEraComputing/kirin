@@ -1,0 +1,13 @@
+[package]
+name = "kirin-prettyless"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bon = "3.8.1"
+kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
+prettyless = "0.3.0"
+serde = { version = "1.0.228", optional = true }
+
+[features]
+serde = ["dep:serde"]

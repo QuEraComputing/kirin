@@ -1,33 +1,30 @@
 use kirin::ir::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Statement)]
-pub enum StructuredControlFlow {
-    If {
-        condition: SSAValue,
-        then_block: Block,
-        else_block: Block,
-    },
-    Loop {
-        body_block: Block,
-        exit_block: Block,
-    },
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(fn, type_lattice = T, wraps)]
+pub enum StructuredControlFlow<T: TypeLattice> {
+    If(If<T>),
+    For(For<T>),
 }
 
-impl StructuredControlFlow {
-    pub fn op_if<L>(
-        context: &mut Context<L>,
-        condition: SSAValue,
-        then_block: Block,
-        else_block: Block,
-    ) -> StatementId
-    where
-        L: Language + From<StructuredControlFlow>,
-    {
-        let instr = StructuredControlFlow::If {
-            condition,
-            then_block,
-            else_block,
-        };
-        context.statement().definition(instr).new()
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(fn, type_lattice = T)]
+pub struct If<T: TypeLattice> {
+    condition: SSAValue,
+    then_body: Block,
+    else_body: Block,
+    #[kirin(default = std::marker::PhantomData)]
+    marker: std::marker::PhantomData<T>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(fn, type_lattice = T)]
+pub struct For<T: TypeLattice> {
+    induction_var: SSAValue,
+    start: SSAValue,
+    end: SSAValue,
+    step: SSAValue,
+    body: Block,
+    #[kirin(default = std::marker::PhantomData)]
+    marker: std::marker::PhantomData<T>,
 }

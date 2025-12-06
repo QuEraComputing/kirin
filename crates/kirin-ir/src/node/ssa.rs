@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, Id, Identifier};
 use crate::identifier;
-use crate::{Symbol, Dialect};
+use crate::{Dialect, Symbol};
 use std::collections::HashSet;
 
 use super::{block::Block, stmt::Statement};
@@ -31,11 +31,20 @@ identifier! {
     struct DeletedSSAValue
 }
 
-impl std::fmt::Display for SSAValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "%{}", self.0.raw())
-    }
+macro_rules! impl_ssa_display {
+    ($name:ident) => {
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "%{}", self.0.raw())
+            }
+        }
+    };
 }
+
+impl_ssa_display!(SSAValue);
+impl_ssa_display!(ResultValue);
+impl_ssa_display!(BlockArgument);
+impl_ssa_display!(DeletedSSAValue);
 
 /// Represents a test SSA value. Used in tests only.
 /// This SSAValue may not exist in the SSA database.
@@ -151,17 +160,11 @@ where
 {
     type Info = crate::arena::Item<SSAInfo<L>>;
 
-    fn get_info<'a>(
-        &self,
-        context: &'a crate::Context<L>,
-    ) -> Option<&'a Self::Info> {
+    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
         context.ssas.get(*self)
     }
 
-    fn get_info_mut<'a>(
-        &self,
-        context: &'a mut crate::Context<L>,
-    ) -> Option<&'a mut Self::Info> {
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
         context.ssas.get_mut(*self)
     }
 }

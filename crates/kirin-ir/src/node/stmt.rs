@@ -17,6 +17,12 @@ pub struct StatementInfo<L: Dialect> {
     pub(crate) definition: L,
 }
 
+impl<L: Dialect> StatementInfo<L> {
+    pub fn definition(&self) -> &L {
+        &self.definition
+    }
+}
+
 impl<'a, L: Dialect> From<&'a StatementInfo<L>> for &'a LinkedListNode<Statement> {
     fn from(info: &'a StatementInfo<L>) -> Self {
         &info.node

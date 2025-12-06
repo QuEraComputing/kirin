@@ -41,17 +41,65 @@ impl<L: Dialect> RegionInfo<L> {
 impl<L: Dialect> GetInfo<L> for Region {
     type Info = Item<RegionInfo<L>>;
 
-    fn get_info<'a>(
-        &self,
-        context: &'a crate::Context<L>,
-    ) -> Option<&'a Self::Info> {
+    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
         context.regions.get(*self)
     }
 
-    fn get_info_mut<'a>(
-        &self,
-        context: &'a mut crate::Context<L>,
-    ) -> Option<&'a mut Self::Info> {
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
         context.regions.get_mut(*self)
+    }
+}
+
+impl Region {
+    pub fn blocks<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> BlockIter<'a, L> {
+        let info = self.expect_info(context);
+        BlockIter {
+            current: info.blocks.head,
+            len: info.blocks.len,
+            context,
+        }
+    }
+}
+
+pub struct BlockIter<'a, L: Dialect> {
+    current: Option<Block>,
+    len: usize,
+    context: &'a crate::Context<L>,
+}
+
+impl<'a, L: Dialect> Iterator for BlockIter<'a, L> {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(current) = self.current {
+            let current_info = current.expect_info(self.context);
+            self.current = current_info.node.next;
+            self.len -= 1;
+            Some(current)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl<'a, L: Dialect> ExactSizeIterator for BlockIter<'a, L> {
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<'a, L: Dialect> DoubleEndedIterator for BlockIter<'a, L> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if let Some(tail) = self.current {
+            let tail_info = tail.expect_info(self.context);
+            self.current = tail_info.node.prev;
+            Some(tail)
+        } else {
+            None
+        }
     }
 }

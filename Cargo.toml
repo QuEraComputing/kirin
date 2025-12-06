@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
+kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless" }
 salsa = "0.24.0"
 serde = { version = "1.0.228", optional = true }
 
@@ -14,7 +15,7 @@ members = [
     "crates/kirin-constant",
     "crates/kirin-derive",
     "crates/kirin-derive-core",
-    "crates/kirin-ir",
+    "crates/kirin-ir", "crates/kirin-prettyless",
     "crates/kirin-scf",
 ]
 

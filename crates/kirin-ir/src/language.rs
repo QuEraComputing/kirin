@@ -1,5 +1,9 @@
 use crate::lattice::TypeLattice;
 
+pub trait HasName {
+    fn name(&self) -> String;
+}
+
 pub trait HasArguments<'a> {
     type Iter: Iterator<Item = &'a crate::SSAValue>;
     fn arguments(&'a self) -> Self::Iter;
@@ -20,13 +24,23 @@ pub trait HasResultsMut<'a> {
     fn results_mut(&'a mut self) -> Self::Iter;
 }
 
-pub trait HasSuccessors<'a> {
+pub trait HasBlocks<'a> {
     type Iter: Iterator<Item = &'a crate::Block>;
+    fn blocks(&'a self) -> Self::Iter;
+}
+
+pub trait HasBlocksMut<'a> {
+    type Iter: Iterator<Item = &'a mut crate::Block>;
+    fn blocks_mut(&'a mut self) -> Self::Iter;
+}
+
+pub trait HasSuccessors<'a> {
+    type Iter: Iterator<Item = &'a crate::Successor>;
     fn successors(&'a self) -> Self::Iter;
 }
 
 pub trait HasSuccessorsMut<'a> {
-    type Iter: Iterator<Item = &'a mut crate::Block>;
+    type Iter: Iterator<Item = &'a mut crate::Successor>;
     fn successors_mut(&'a mut self) -> Self::Iter;
 }
 
@@ -54,10 +68,13 @@ pub trait IsPure {
 
 /// An instruction combines several traits to provide a complete interface.
 pub trait Dialect:
-    for<'a> HasArguments<'a>
+    HasName
+    + for<'a> HasArguments<'a>
     + for<'a> HasResults<'a>
     + for<'a> HasArgumentsMut<'a>
     + for<'a> HasResultsMut<'a>
+    + for<'a> HasBlocks<'a>
+    + for<'a> HasBlocksMut<'a>
     + for<'a> HasSuccessors<'a>
     + for<'a> HasSuccessorsMut<'a>
     + for<'a> HasRegions<'a>

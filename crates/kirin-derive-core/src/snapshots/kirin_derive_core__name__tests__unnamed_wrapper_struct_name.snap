@@ -1,0 +1,10 @@
+---
+source: crates/kirin-derive-core/src/name.rs
+expression: generate(input)
+---
+impl ::kirin::ir::HasName for TestStruct {
+    fn name(&self) -> String {
+        let Self(field_0, ..) = self;
+        <InnerStruct as ::kirin::ir::HasName>::name(field_0)
+    }
+}
