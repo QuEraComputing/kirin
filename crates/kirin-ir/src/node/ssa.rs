@@ -72,6 +72,30 @@ impl<L: Dialect> SSAInfo<L> {
             uses: HashSet::new(),
         }
     }
+
+    pub fn name(&self) -> Option<Symbol> {
+        self.name
+    }
+
+    pub fn ty(&self) -> &L::TypeLattice {
+        &self.ty
+    }
+
+    pub fn set_ty(&mut self, ty: L::TypeLattice) {
+        self.ty = ty;
+    }
+
+    pub fn kind(&self) -> &SSAKind {
+        &self.kind
+    }
+
+    pub fn uses(&self) -> &HashSet<Use> {
+        &self.uses
+    }
+
+    pub fn uses_mut(&mut self) -> &mut HashSet<Use> {
+        &mut self.uses
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

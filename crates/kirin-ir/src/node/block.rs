@@ -1,5 +1,5 @@
 use crate::{
-    Dialect,
+    Dialect, Symbol,
     arena::{GetInfo, Id, Item},
     identifier,
     node::region::Region,
@@ -52,6 +52,7 @@ impl std::fmt::Display for Successor {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlockInfo<L: Dialect> {
     pub parent: Option<Region>,
+    pub name: Option<Symbol>,
     pub node: LinkedListNode<Block>,
     pub arguments: Vec<BlockArgument>,
     pub statements: LinkedList<Statement>,
@@ -65,6 +66,8 @@ impl<L: Dialect> BlockInfo<L> {
     pub(crate) fn new(
         /// The parent region of this block.
         parent: Option<Region>,
+        /// The name of this block.
+        name: Option<Symbol>,
         /// The linked list node for this block.
         node: LinkedListNode<Block>,
         /// The arguments of this block.
@@ -76,12 +79,18 @@ impl<L: Dialect> BlockInfo<L> {
     ) -> Self {
         Self {
             parent,
+            name,
             node,
             arguments,
             statements: statements.unwrap_or_default(),
             terminator,
             _marker: std::marker::PhantomData,
         }
+    }
+
+    /// Returns the name of this block, if any.
+    pub fn name(&self) -> Option<Symbol> {
+        self.name
     }
 }
 
@@ -97,6 +106,18 @@ impl<L: Dialect> GetInfo<L> for Block {
     }
 }
 
+impl<L: Dialect> GetInfo<L> for Successor {
+    type Info = Item<BlockInfo<L>>;
+
+    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
+        context.blocks.get(Block(self.0))
+    }
+
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
+        context.blocks.get_mut(Block(self.0))
+    }
+}
+
 impl Block {
     pub fn statements<'a, L: Dialect>(
         &self,
@@ -108,6 +129,11 @@ impl Block {
             len: info.statements.len,
             context,
         }
+    }
+
+    pub fn terminator<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> Option<Statement> {
+        let info = self.expect_info(context);
+        info.terminator
     }
 }
 
