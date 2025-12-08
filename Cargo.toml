@@ -15,7 +15,8 @@ members = [
     "crates/kirin-constant",
     "crates/kirin-derive",
     "crates/kirin-derive-core",
-    "crates/kirin-ir", "crates/kirin-prettyless",
+    "crates/kirin-ir",
+    "crates/kirin-prettyless",
     "crates/kirin-scf",
 ]
 

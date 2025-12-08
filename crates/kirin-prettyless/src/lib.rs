@@ -291,3 +291,6 @@ impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for StagedFunction {
             ))
     }
 }
+
+#[cfg(feature = "bat")]
+mod bat;

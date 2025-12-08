@@ -118,78 +118,34 @@ pub enum SimpleLanguage {
 }
 
 impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
-    fn pretty_print<'a>(&self, printer: &'a Printer<'a>, context: &Context<SimpleLanguage>) -> ArenaDoc<'a> {
+    fn pretty_print<'a>(&self, doc: &'a Document<'a, SimpleLanguage>) -> ArenaDoc<'a> {
         match self {
-            SimpleLanguage::Add(lhs, rhs, result) => {
-                let doc = printer.arena.text(format!(
-                    "{} = add {}, {}",
-                    result,
-                    *lhs,
-                    *rhs
-                ));
+            SimpleLanguage::Add(lhs, rhs, _) => {
+                let doc = doc
+                    .text(format!("add {}, {}", *lhs, *rhs));
                 doc
             }
-            SimpleLanguage::Constant(value, result) => {
+            SimpleLanguage::Constant(value, _) => {
                 let doc = match value {
-                    Value::I64(v) => printer.arena.text(format!("{} = constant {}", result, v)),
-                    Value::F64(v) => printer.arena.text(format!("{} = constant {}", result, v)),
+                    Value::I64(v) => doc.text(format!("constant {}", v)),
+                    Value::F64(v) => doc.text(format!("constant {}", v)),
                 };
                 doc
             }
             SimpleLanguage::Return(retval) => {
-                let doc = printer.arena.text(format!(
-                    "return {}",
-                    *retval
-                ));
+                let doc = doc.text(format!("return {}", *retval));
                 doc
             }
-            SimpleLanguage::Function(region, result) => {
-                let region_doc = region.pretty_print(printer, context);
-                let doc = printer
-                    .arena
-                    .text(format!("{} = function ", result))
+            SimpleLanguage::Function(region, _) => {
+                let region_doc = region.pretty_print(doc);
+                let doc = doc
+                    .text("function ")
                     .append(region_doc);
                 doc
             }
         }
     }
 }
-// impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
-//     fn pretty_print<'a>(&self, printer: &'a Printer<'a, SimpleLanguage>) -> ArenaDoc<'a> {
-//         match self {
-//             SimpleLanguage::Add(lhs, rhs, _result) => {
-//                 let doc = printer.arena.text(format!(
-//                     "add {}, {}",
-//                     *lhs,
-//                     *rhs
-//                 ));
-//                 doc
-//             }
-//             SimpleLanguage::Constant(value, _result) => {
-//                 let doc = match value {
-//                     Value::I64(v) => printer.arena.text(format!("constant {}", v)),
-//                     Value::F64(v) => printer.arena.text(format!("constant {}", v)),
-//                 };
-//                 doc
-//             }
-//             SimpleLanguage::Return(retval) => {
-//                 let doc = printer.arena.text(format!(
-//                     "return {}",
-//                     *retval
-//                 ));
-//                 doc
-//             }
-//             SimpleLanguage::Function(region, _result) => {
-//                 let region_doc = printer.print_region(*region);
-//                 let doc = printer
-//                     .arena
-//                     .text("function ")
-//                     .append(printer.block_indent(region_doc));
-//                 doc
-//             }
-//         }
-//     }
-// }
 
 #[test]
 fn test_block() {
@@ -208,7 +164,7 @@ fn test_block() {
     let d = SimpleLanguage::op_add(&mut context, c.result, block_arg_x);
     let ret = SimpleLanguage::op_return(&mut context, d.result);
 
-    let block: Block = context
+    let block_a: Block = context
         .block()
         .argument(Int)
         .argument_with_name("y", Float)
@@ -219,15 +175,22 @@ fn test_block() {
         .terminator(ret)
         .new();
 
-    let body = context.region().add_block(block).new();
+    let ret = SimpleLanguage::op_return(&mut context, block_arg_x);
+    let block_b = context.block().argument(Float).terminator(ret).new();
+
+    let body = context.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut context, body);
     let f = context.specialize().f(staged_function).body(fdef).new();
-    let printer = Printer::new(Default::default());
-    let doc = f.pretty_print(&printer, &context);
-    let mut buf = String::new();
-    doc.render_fmt(printer.config().max_width, &mut buf).unwrap();
-    let result = strip_trailing_whitespace(&buf);
-    println!("{}", result);
+    let mut doc = Document::new(Default::default(), &context);
+    doc.pager(f).unwrap();
+    // println!("{}", doc.render(f).unwrap());
+    // let max_width = doc.config().max_width;
+    // let doc_ = doc.build(f);
+    // let mut buf = String::new();
+    // doc_.render_fmt(max_width, &mut buf)
+    //     .unwrap();
+    // let result = strip_trailing_whitespace(&buf);
+    // println!("{}", result);
 }
 
 /// Strip trailing whitespace in each line of the input string.
