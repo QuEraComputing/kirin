@@ -7,11 +7,11 @@ use crate::{Dialect, InternTable, node::*};
 
 #[derive(Debug)]
 pub struct Context<L: Dialect> {
-    pub(crate) staged_functions: Arena<StagedFunctionInfo<L>, StagedFunction>,
-    pub(crate) regions: Arena<RegionInfo<L>, Region>,
-    pub(crate) blocks: Arena<BlockInfo<L>, Block>,
-    pub(crate) statements: Arena<StatementInfo<L>, Statement>,
-    pub(crate) ssas: Arena<SSAInfo<L>, SSAValue>,
+    pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
+    pub(crate) regions: Arena<Region, RegionInfo<L>>,
+    pub(crate) blocks: Arena<Block, BlockInfo<L>>,
+    pub(crate) statements: Arena<Statement, StatementInfo<L>>,
+    pub(crate) ssas: Arena<SSAValue, SSAInfo<L>>,
     pub(crate) symbols: Arc<RefCell<InternTable<String, Symbol>>>,
 }
 
@@ -53,14 +53,14 @@ impl<L: Dialect> Context<L> {
     /// Get a reference to the statements arena.
     /// 
     /// Read-only access. Use `get_info_mut` on `Statement` for mutable access.
-    pub fn statement_arena(&self) -> &Arena<StatementInfo<L>, Statement> {
+    pub fn statement_arena(&self) -> &Arena<Statement, StatementInfo<L>> {
         &self.statements
     }
 
     /// Get a reference to the SSA values arena.
     /// 
     /// Read-only access. Use `get_info_mut` on `SSAValue` for mutable access.
-    pub fn ssa_arena(&self) -> &Arena<SSAInfo<L>, SSAValue> {
+    pub fn ssa_arena(&self) -> &Arena<SSAValue, SSAInfo<L>> {
         &self.ssas
     }
 
@@ -73,21 +73,21 @@ impl<L: Dialect> Context<L> {
     /// Get a reference to the staged functions arena.
     /// 
     /// Read-only access. Use `get_info_mut` on `StagedFunction` for mutable access.
-    pub fn staged_function_arena(&self) -> &Arena<StagedFunctionInfo<L>, StagedFunction> {
+    pub fn staged_function_arena(&self) -> &Arena<StagedFunction, StagedFunctionInfo<L>> {
         &self.staged_functions
     }
 
     /// Get a reference to the regions arena.
     /// 
     /// Read-only access. Use `get_info_mut` on `Region` for mutable access.
-    pub fn region_arena(&self) -> &Arena<RegionInfo<L>, Region> {
+    pub fn region_arena(&self) -> &Arena<Region, RegionInfo<L>> {
         &self.regions
     }
 
     /// Get a reference to the blocks arena.
     /// 
     /// Read-only access. Use `get_info_mut` on `Block` for mutable access.
-    pub fn block_arena(&self) -> &Arena<BlockInfo<L>, Block> {
+    pub fn block_arena(&self) -> &Arena<Block, BlockInfo<L>> {
         &self.blocks
     }
 }

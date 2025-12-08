@@ -12,7 +12,7 @@ mod visitor;
 /// Queries from the IRContext.
 pub mod query;
 
-pub use arena::GetInfo;
+pub use arena::{GetInfo, Arena, Id, Identifier, Item, DenseHint, SparseHint};
 pub use comptime::{CompileTimeValue, Typeof};
 pub use context::Context;
 pub use detach::Detach;

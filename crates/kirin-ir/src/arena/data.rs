@@ -2,12 +2,12 @@ use super::id::{Id, Identifier};
 use super::item::Item;
 
 #[derive(Debug, Clone)]
-pub struct Arena<T, I: Identifier> {
+pub struct Arena<I: Identifier, T> {
     pub(super) items: Vec<Item<T>>,
     marker: std::marker::PhantomData<I>,
 }
 
-impl<T, I: Identifier> Default for Arena<T, I> {
+impl<I: Identifier, T> Default for Arena<I, T> {
     fn default() -> Self {
         Self {
             items: Vec::new(),
@@ -16,7 +16,7 @@ impl<T, I: Identifier> Default for Arena<T, I> {
     }
 }
 
-impl<T, I: Identifier> Arena<T, I> {
+impl<I: Identifier, T> Arena<I, T> {
     pub fn next_id(&self) -> I {
         I::from(Id(self.items.len()))
     }
@@ -66,7 +66,7 @@ impl<T, I: Identifier> Arena<T, I> {
     }
 }
 
-impl<T, I: Identifier> std::ops::Index<I> for Arena<T, I> {
+impl<T, I: Identifier> std::ops::Index<I> for Arena<I, T> {
     type Output = Item<T>;
 
     fn index(&self, index: I) -> &Self::Output {
@@ -74,7 +74,7 @@ impl<T, I: Identifier> std::ops::Index<I> for Arena<T, I> {
     }
 }
 
-impl<T, I: Identifier> std::ops::IndexMut<I> for Arena<T, I> {
+impl<T, I: Identifier> std::ops::IndexMut<I> for Arena<I, T> {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         &mut self.items[index.into().raw()]
     }

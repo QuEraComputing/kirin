@@ -50,6 +50,27 @@ impl Statement {
         self.expect_info(context).definition.arguments()
     }
 
+    pub fn regions<'a, L: Dialect>(
+        &self,
+        context: &'a crate::Context<L>,
+    ) -> <L as crate::HasRegions<'a>>::Iter {
+        self.expect_info(context).definition.regions()
+    }
+
+    pub fn blocks<'a, L: Dialect>(
+        &self,
+        context: &'a crate::Context<L>,
+    ) -> <L as crate::HasBlocks<'a>>::Iter {
+        self.expect_info(context).definition.blocks()
+    }
+
+    pub fn successors<'a, L: Dialect>(
+        &self,
+        context: &'a crate::Context<L>,
+    ) -> <L as crate::HasSuccessors<'a>>::Iter {
+        self.expect_info(context).definition.successors()
+    }
+
     pub fn parent<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<Block> {
         &self.expect_info(context).parent
     }

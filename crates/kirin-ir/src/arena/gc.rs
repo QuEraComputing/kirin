@@ -13,7 +13,7 @@ impl<I: Identifier> IdMap<I> {
     }
 }
 
-impl<T, I: Identifier> Arena<T, I> {
+impl<I: Identifier, T> Arena<I, T> {
     pub fn gc(&mut self) -> IdMap<I> {
         let mut counter = 0;
         let raw = self
