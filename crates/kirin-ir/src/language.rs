@@ -1,5 +1,7 @@
 use crate::lattice::TypeLattice;
 
+// TODO: use Cow<'a, str> for name to avoid allocations in some cases
+
 pub trait HasName {
     fn name(&self) -> String;
 }

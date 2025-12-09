@@ -6,7 +6,7 @@ pub struct IdMap<I: Identifier>(Vec<Option<I>>);
 
 impl<I: Identifier> IdMap<I> {
     pub fn get(&self, old: I) -> Option<I> {
-        if old.into().raw() > self.0.len() {
+        if old.into().raw() >= self.0.len() {
             panic!("unexpected Id")
         }
         self.0[old.into().raw()]

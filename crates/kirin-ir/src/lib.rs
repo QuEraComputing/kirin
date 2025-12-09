@@ -7,7 +7,6 @@ mod intern;
 mod language;
 mod lattice;
 mod node;
-mod visitor;
 
 /// Queries from the IRContext.
 pub mod query;

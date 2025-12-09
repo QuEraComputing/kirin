@@ -97,6 +97,7 @@ impl<'a, L: Dialect> DoubleEndedIterator for BlockIter<'a, L> {
         if let Some(tail) = self.current {
             let tail_info = tail.expect_info(self.context);
             self.current = tail_info.node.prev;
+            self.len -= 1;
             Some(tail)
         } else {
             None
