@@ -33,6 +33,14 @@ impl<I: Identifier, T> Arena<I, T> {
         id
     }
 
+    pub fn alloc_with_id(&mut self, f: impl FnOnce(I) -> T) -> I {
+        let id = self.next_id();
+        let item = f(id);
+        self.items
+            .push(Item::builder().data(item).deleted(false).build());
+        id
+    }
+
     pub fn get(&self, id: impl Into<I>) -> Option<&Item<T>> {
         self.items.get(id.into().into().raw())
     }
