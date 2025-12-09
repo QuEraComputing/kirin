@@ -1,0 +1,14 @@
+---
+source: crates/kirin-prettyless/src/tests.rs
+expression: doc.render(f).unwrap()
+---
+function {
+  ^0:
+    %0 = constant 1.2
+    %1 = constant 3.4
+    %2 = add %0, %1
+    %4 = add %2, %5
+    return %4
+  ^1:
+    return %3
+}

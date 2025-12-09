@@ -21,7 +21,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            tab_spaces: 4,
+            tab_spaces: 2,
             max_width: 120,
             line_numbers: true,
         }
@@ -294,3 +294,6 @@ impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for StagedFunction {
 
 #[cfg(feature = "bat")]
 mod bat;
+
+#[cfg(test)]
+mod tests;

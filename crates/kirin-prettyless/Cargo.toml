@@ -14,3 +14,7 @@ serde = { version = "1.0.228", optional = true }
 default = ["serde", "bat"]
 serde = ["dep:serde"]
 bat = ["dep:bat"]
+
+[dev-dependencies]
+insta = "1.44.3"
+kirin-test-utils = { path = "../kirin-test-utils" }
