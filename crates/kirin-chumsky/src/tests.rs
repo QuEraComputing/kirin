@@ -24,7 +24,7 @@ pub enum SimpleAST<'tokens, 'src: 'tokens> {
     },
 }
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleTypeLattice
+impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src, SimpleLanguage> for SimpleTypeLattice
 where
     'src: 'tokens,
 {
@@ -39,7 +39,7 @@ where
     }
 }
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleLanguage
+impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src, SimpleLanguage> for SimpleLanguage
 where
     'src: 'tokens,
 {

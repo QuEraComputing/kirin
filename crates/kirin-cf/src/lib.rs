@@ -15,17 +15,3 @@ pub enum ControlFlow<T: TypeLattice> {
     },
     Return(SSAValue),
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn test_cf() {
-//         // ControlFlow::op_conditional_branch(context, condition, true_target, false_target);
-//         let inst = ControlFlow::Return(TestSSAValue(0).into());
-//         for succ in inst.successors() {
-//             println!("Successor: {:?}", succ);
-//         }
-//     }
-// }

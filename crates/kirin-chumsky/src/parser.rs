@@ -4,15 +4,14 @@ use super::traits::{HasParser, ParserError, TokenInput};
 use chumsky::prelude::*;
 use kirin_ir::*;
 
-// Box<dyn chumsky::Parser<'tokens, I, ast::Block<'tokens, 'src, L>, ParserError<'tokens, 'src>> + 'tokens>
 pub fn block_parser<'tokens, 'src: 'tokens, I, L>(
     dialect: impl Parser<'tokens, I, L::Output, ParserError<'tokens, 'src>> + 'tokens,
 ) -> Boxed<'tokens, 'tokens, I, ast::Block<'tokens, 'src, L>, ParserError<'tokens, 'src>>
 where
     'src: 'tokens,
     I: TokenInput<'tokens, 'src>,
-    L: Dialect + HasParser<'tokens, 'src> + 'tokens,
-    L::TypeLattice: HasParser<'tokens, 'src>,
+    L: Dialect + HasParser<'tokens, 'src, L> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src, L>,
 {
     let label = just(Token::Caret)
         .ignore_then(select! { Token::Identifier(name) => name })
@@ -56,8 +55,8 @@ pub fn region_parser<'tokens, 'src: 'tokens, I, L>(
 where
     'src: 'tokens,
     I: TokenInput<'tokens, 'src>,
-    L: Dialect + HasParser<'tokens, 'src> + 'tokens,
-    L::TypeLattice: HasParser<'tokens, 'src>,
+    L: Dialect + HasParser<'tokens, 'src, L> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src, L>,
 {
     block_parser(dialect)
         .repeated()
