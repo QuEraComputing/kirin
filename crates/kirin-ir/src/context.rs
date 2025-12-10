@@ -51,14 +51,14 @@ where
 
 impl<L: Dialect> Context<L> {
     /// Get a reference to the statements arena.
-    /// 
+    ///
     /// Read-only access. Use `get_info_mut` on `Statement` for mutable access.
     pub fn statement_arena(&self) -> &Arena<Statement, StatementInfo<L>> {
         &self.statements
     }
 
     /// Get a reference to the SSA values arena.
-    /// 
+    ///
     /// Read-only access. Use `get_info_mut` on `SSAValue` for mutable access.
     pub fn ssa_arena(&self) -> &Arena<SSAValue, SSAInfo<L>> {
         &self.ssas
@@ -71,21 +71,21 @@ impl<L: Dialect> Context<L> {
     }
 
     /// Get a reference to the staged functions arena.
-    /// 
+    ///
     /// Read-only access. Use `get_info_mut` on `StagedFunction` for mutable access.
     pub fn staged_function_arena(&self) -> &Arena<StagedFunction, StagedFunctionInfo<L>> {
         &self.staged_functions
     }
 
     /// Get a reference to the regions arena.
-    /// 
+    ///
     /// Read-only access. Use `get_info_mut` on `Region` for mutable access.
     pub fn region_arena(&self) -> &Arena<Region, RegionInfo<L>> {
         &self.regions
     }
 
     /// Get a reference to the blocks arena.
-    /// 
+    ///
     /// Read-only access. Use `get_info_mut` on `Block` for mutable access.
     pub fn block_arena(&self) -> &Arena<Block, BlockInfo<L>> {
         &self.blocks

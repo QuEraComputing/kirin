@@ -1,5 +1,5 @@
-use std::hash::Hash;
 use crate::Dialect;
+use std::hash::Hash;
 
 /// Arena ID
 /// an ID object can only be created by
@@ -25,10 +25,7 @@ pub trait GetInfo<L: Dialect>: std::fmt::Debug {
     /// Get a reference to the context info for the given node pointer.
     fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info>;
     /// Get a mutable reference to the context info for the given node pointer.
-    fn get_info_mut<'a>(
-        &self,
-        context: &'a mut crate::Context<L>,
-    ) -> Option<&'a mut Self::Info>;
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info>;
     /// Get a reference to the context info for the given node pointer, panicking if not found.
     fn expect_info<'a>(&self, context: &'a crate::Context<L>) -> &'a Self::Info {
         self.get_info(context).unwrap_or_else(|| {

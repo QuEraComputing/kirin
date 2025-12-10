@@ -11,12 +11,12 @@ pub mod utils;
 pub mod prelude {
     pub use crate::builder::Builder;
     pub use crate::check::CheckInfo;
-    pub use crate::name::NameInfo;
     pub use crate::data::*;
     pub use crate::dialect::DialectInfo;
     pub use crate::empty::Empty;
     pub use crate::field::FieldIterInfo;
     pub use crate::from::FromInfo;
+    pub use crate::name::NameInfo;
     pub use crate::utils::*;
     pub use crate::{
         derive_builder, derive_check, derive_dialect, derive_empty, derive_field_iter,

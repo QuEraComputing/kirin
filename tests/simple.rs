@@ -121,8 +121,7 @@ impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
     fn pretty_print<'a>(&self, doc: &'a Document<'a, SimpleLanguage>) -> ArenaDoc<'a> {
         match self {
             SimpleLanguage::Add(lhs, rhs, _) => {
-                let doc = doc
-                    .text(format!("add {}, {}", *lhs, *rhs));
+                let doc = doc.text(format!("add {}, {}", *lhs, *rhs));
                 doc
             }
             SimpleLanguage::Constant(value, _) => {
@@ -138,9 +137,7 @@ impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
             }
             SimpleLanguage::Function(region, _) => {
                 let region_doc = region.pretty_print(doc);
-                let doc = doc
-                    .text("function ")
-                    .append(region_doc);
+                let doc = doc.text("function ").append(region_doc);
                 doc
             }
         }

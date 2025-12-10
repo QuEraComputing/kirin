@@ -4,8 +4,8 @@ mod parser;
 mod traits;
 
 pub use lexer::Token;
-pub use traits::{HasParser, TokenInput, ParserError};
 pub use parser::{block_parser, region_parser};
+pub use traits::{HasParser, ParserError, TokenInput};
 
 #[cfg(test)]
 mod tests;

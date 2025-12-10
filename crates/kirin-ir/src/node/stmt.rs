@@ -95,10 +95,7 @@ impl<L: Dialect> GetInfo<L> for Statement {
         context.statements.get(*self)
     }
 
-    fn get_info_mut<'a>(
-            &self,
-            context: &'a mut crate::Context<L>,
-        ) -> Option<&'a mut Self::Info> {
+    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
         context.statements.get_mut(*self)
     }
 }

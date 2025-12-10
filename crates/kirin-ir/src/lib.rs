@@ -11,14 +11,15 @@ mod node;
 /// Queries from the IRContext.
 pub mod query;
 
-pub use arena::{GetInfo, Arena, Id, Identifier, Item, DenseHint, SparseHint};
+pub use arena::{Arena, DenseHint, GetInfo, Id, Identifier, Item, SparseHint};
 pub use comptime::{CompileTimeValue, Typeof};
 pub use context::Context;
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasName, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasRegions, HasRegionsMut,
-    HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsTerminator,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasName, HasRegions,
+    HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure,
+    IsTerminator,
 };
 pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{

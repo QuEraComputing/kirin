@@ -79,7 +79,7 @@ impl FieldInfo {
                 } else {
                     quote! {}
                 }
-            },
+            }
         }
     }
 

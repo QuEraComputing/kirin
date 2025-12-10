@@ -28,9 +28,7 @@ where
         .delimited_by(just(Token::LParen), just(Token::RParen))
         .or(empty().to(Vec::new()))
         .labelled("block arguments");
-    let header = label
-        .then(args_list)
-        .labelled("block header");
+    let header = label.then(args_list).labelled("block header");
     let statements = dialect
         .then_ignore(just(Token::Semicolon))
         .repeated()
