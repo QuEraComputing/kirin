@@ -6,21 +6,20 @@ use logos::Logos;
 #[derive(Debug, Clone)]
 pub enum SimpleAST<'tokens, 'src: 'tokens> {
     Add {
-        lhs: &'src str,
-        rhs: &'src str,
-        result: &'src str,
+        lhs: ast::Spanned<&'src str>,
+        rhs: ast::Spanned<&'src str>,
+        result: ast::Spanned<&'src str>,
     },
     Constant {
-        value: Value,
-        result: &'src str,
+        value: ast::Spanned<Value>,
+        result: ast::Spanned<&'src str>,
     },
-    Return(&'src str),
+    Return(ast::Spanned<&'src str>),
     Function {
-        name: &'src str,
-        input_types: Vec<SimpleTypeLattice>,
-        output_type: SimpleTypeLattice,
-        body: ast::Block<'tokens, 'src, SimpleLanguage>,
-        result: &'src str,
+        name: ast::Spanned<&'src str>,
+        function_type: ast::Spanned<ast::FunctionType<'tokens, 'src, SimpleLanguage>>,
+        body: ast::Spanned<ast::Block<'tokens, 'src, SimpleLanguage>>,
+        result: ast::Spanned<&'src str>,
     },
 }
 
@@ -47,65 +46,62 @@ where
     fn parser<I: TokenInput<'tokens, 'src>>()
     -> Boxed<'tokens, 'tokens, I, Self::Output, ParserError<'tokens, 'src>> {
         recursive(|dialect| {
-            let ssa = just(Token::Percent).ignore_then(select! { Token::Identifier(name) => name });
-            let operand_2 = ssa
-                .clone()
-                .then_ignore(just(Token::Comma))
-                .then(ssa.clone())
-                .labelled("2 operands");
-            let input_types = SimpleTypeLattice::parser::<I>()
-                .separated_by(just(Token::Comma))
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen))
-                .or(empty().to(Vec::new()))
-                .labelled("function input types");
-            let output_type = just(Token::Arrow)
-                .ignore_then(SimpleTypeLattice::parser::<I>())
-                .labelled("function output type");
-            choice((
-                // %result = add %lhs, %rhs
-                ssa.clone()
+            let add = // %result = add %lhs, %rhs
+                ssa_value()
                     .then_ignore(just(Token::Equal))
-                    .then_ignore(just(Token::Identifier("add")))
-                    .then(operand_2)
-                    .map(|(result, (lhs, rhs))| SimpleAST::Add { lhs, rhs, result })
-                    .labelled("addition instruction with result"),
-                // Parse a constant instruction
-                ssa.clone()
+                    .then_ignore(identifier("add"))
+                    .then(operand(2, Token::Comma))
+                    .map(|(result, operands)| SimpleAST::Add { lhs: operands[0], rhs: operands[1], result })
+                    .labelled("addition instruction with result");
+
+            // Parse a constant instruction 
+            let constant = ssa_value()
                     .then_ignore(just(Token::Equal))
-                    .then_ignore(just(Token::Identifier("constant")))
-                    .then(select! {
-                        Token::Integer(v) => Value::I64(v),
-                        Token::Float(v) => Value::F64(v),
-                    })
-                    .map(|(result, value)| SimpleAST::Constant { value, result })
-                    .labelled("constant instruction with result"),
-                // Parse a return instruction
-                just(Token::Return)
-                    .ignore_then(ssa.clone())
-                    .map(|result| SimpleAST::Return(result))
-                    .labelled("return instruction"),
-                // Parse a function definition
-                ssa.then_ignore(just(Token::Equal))
-                    .then_ignore(just(Token::Fn))
-                    .then_ignore(just(Token::At))
-                    .then(select! { Token::Identifier(name) => name })
-                    .then(input_types)
-                    .then(output_type)
+                    .then_ignore(identifier("constant"))
                     .then(
-                        block_parser(dialect)
-                            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+                        literal_int(|i, span| match i.parse() {
+                            Ok(v) => Ok(Value::I64(v)),
+                            Err(_) => Err(Rich::custom(span, "invalid integer literal")),
+                        })
+                        .or(literal_float(|f, span| match f.parse() {
+                            Ok(v) => Ok(Value::F64(v)),
+                            Err(_) => Err(Rich::custom(span, "invalid float literal")),
+                        }))
                     )
-                    .map(|((((result, name), input_types), output_type), body)| {
-                        SimpleAST::Function {
-                            name,
-                            input_types,
-                            output_type,
-                            body,
-                            result,
-                        }
-                    }),
-            ))
+                    .map(|(result, value)| {
+                        SimpleAST::Constant { value, result }
+                    })
+                    .labelled("constant instruction with result");
+
+            let ret = identifier("return")
+                    .ignore_then(ssa_value())
+                    .map(|result| SimpleAST::Return(result))
+                    .labelled("return instruction");
+
+            let func = ssa_value()
+                .then_ignore(just(Token::Equal))
+                .then_ignore(identifier("fn"))
+                .then(symbol())
+                .then(function_type())
+                .then(
+                    block(dialect)
+                        .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+                )
+                .map(|(((result, name), function_type), body)| {
+                    SimpleAST::Function {
+                        name,
+                        function_type,
+                        body,
+                        result,
+                    }
+                });
+
+            choice((
+                add,
+                constant,
+                ret,
+                func,
+            )).boxed()
         })
         .boxed()
     }
@@ -125,11 +121,12 @@ const SRC: &str = "
 
 #[test]
 fn test_simple_language_parser() {
+    use ariadne::{Color, Label, Report, ReportKind, Source};
+
     let token_iter = Token::lexer(SRC).spanned().map(|(tok, span)| match tok {
         Ok(tok) => (tok, span.into()),
         Err(()) => (Token::Error, span.into()),
     });
-
     let token_stream =
         Stream::from_iter(token_iter).map((0..SRC.len()).into(), |(t, s): (_, _)| (t, s));
 
@@ -143,9 +140,19 @@ fn test_simple_language_parser() {
         Err(errors) => {
             // Handle parsing errors
             for error in errors {
-                eprintln!("Parsing error: {:?}", error);
+                Report::build(ReportKind::Error, ((), error.span().into_range()))
+                    .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                    .with_code(3)
+                    .with_message(error.to_string())
+                    .with_label(
+                        Label::new(((), error.span().into_range()))
+                            .with_message(error.reason().to_string())
+                            .with_color(Color::Red),
+                    )
+                    .finish()
+                    .eprint(Source::from(SRC))
+                    .unwrap();
             }
-            panic!("Failed to parse the input source.");
         }
     }
 }

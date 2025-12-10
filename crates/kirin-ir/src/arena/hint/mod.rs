@@ -11,7 +11,7 @@ pub struct HintBuilder<'a, I: Identifier, T> {
 }
 
 impl<I: Identifier, T> Arena<I, T> {
-    pub fn hint(&self) -> HintBuilder<I, T> {
+    pub fn hint(&self) -> HintBuilder<'_, I, T> {
         HintBuilder { parent: self }
     }
 }

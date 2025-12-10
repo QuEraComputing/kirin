@@ -7,11 +7,11 @@ use crate::node::*;
 use crate::{Context, Dialect};
 
 impl<L: Dialect> Context<L> {
-    pub fn block(&mut self) -> BlockBuilder<L> {
+    pub fn block(&mut self) -> BlockBuilder<'_, L> {
         BlockBuilder::from_context(self)
     }
 
-    pub fn region(&mut self) -> RegionBuilder<L> {
+    pub fn region(&mut self) -> RegionBuilder<'_, L> {
         RegionBuilder::from_context(self)
     }
 
