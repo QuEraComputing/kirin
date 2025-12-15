@@ -71,6 +71,7 @@ impl<'src> Compile<'src, FieldsIter, Statement<'src, syn::Variant, FieldsIter>>
             variant_name: &node.src.ident,
             wrapped_type: &f.src.ty,
             trait_path: &ctx.trait_path,
+            trait_type_iter: &ctx.trait_type_iter,
         })
     }
 }
@@ -91,10 +92,11 @@ impl<'a> ToTokens for IteratorTypeDefVariantRegular<'a> {
     }
 }
 
-pub struct IteratorTypeDefVariantWrapper<'a> {
-    variant_name: &'a syn::Ident,
-    wrapped_type: &'a syn::Type,
-    trait_path: &'a syn::Path,
+pub struct IteratorTypeDefVariantWrapper<'src> {
+    variant_name: &'src syn::Ident,
+    wrapped_type: &'src syn::Type,
+    trait_path: &'src syn::Path,
+    trait_type_iter: &'src syn::Ident,
 }
 
 impl<'a> ToTokens for IteratorTypeDefVariantWrapper<'a> {
@@ -102,8 +104,9 @@ impl<'a> ToTokens for IteratorTypeDefVariantWrapper<'a> {
         let variant_name = self.variant_name;
         let wrapped_type = self.wrapped_type;
         let trait_path = self.trait_path;
+        let trait_type_iter = self.trait_type_iter;
         quote! {
-            #variant_name (<#wrapped_type as #trait_path>::Iter)
+            #variant_name (<#wrapped_type as #trait_path>::#trait_type_iter)
         }
         .to_tokens(tokens);
     }
@@ -249,6 +252,7 @@ mod tests {
             .default_crate_path("kirin::ir")
             .trait_path("HasParams")
             .trait_method("params")
+            .trait_type_iter("Iter")
             .build();
 
         for node in &data.variants {

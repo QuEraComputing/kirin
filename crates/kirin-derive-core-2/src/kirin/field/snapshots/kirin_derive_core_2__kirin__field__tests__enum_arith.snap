@@ -1,0 +1,102 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/tests.rs
+expression: "case!\n{\n    #[kirin(type_lattice = ArithLattice)] pub enum ArithInstruction<T>\n    {\n        Add(SSAValue, Vec<SSAValue>, ResultValue, T),\n        Sub(SSAValue, Vec<SSAValue>, ResultValue, T),\n        Mul(SSAValue, Vec<SSAValue>, ResultValue),\n        Div(SSAValue, Vec<SSAValue>, ResultValue),\n    }\n}"
+---
+#[automatically_derived]
+impl<'a, T> HasArguments<'a> for ArithInstruction<T> {
+    type Iter = ArithInstructionArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0, field_1, field_2, field_3) => {
+                ArgumentsIter::Add(std::iter::once(field_0).chain(field_1.iter()))
+            }
+            Self::Sub(field_0, field_1, field_2, field_3) => {
+                ArgumentsIter::Sub(std::iter::once(field_0).chain(field_1.iter()))
+            }
+            Self::Mul(field_0, field_1, field_2) => {
+                ArgumentsIter::Mul(std::iter::once(field_0).chain(field_1.iter()))
+            }
+            Self::Div(field_0, field_1, field_2) => {
+                ArgumentsIter::Div(std::iter::once(field_0).chain(field_1.iter()))
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum ArithInstructionArgumentsIter<'a> {
+    Add(std::iter::Chain<std::iter::Once<&'a SSAValue>, std::slice::Iter<'a, SSAValue>>),
+    Sub(std::iter::Chain<std::iter::Once<&'a SSAValue>, std::slice::Iter<'a, SSAValue>>),
+    Mul(std::iter::Chain<std::iter::Once<&'a SSAValue>, std::slice::Iter<'a, SSAValue>>),
+    Div(std::iter::Chain<std::iter::Once<&'a SSAValue>, std::slice::Iter<'a, SSAValue>>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithInstructionArgumentsIter<'a> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+            Self::Mul(inner) => inner.next(),
+            Self::Div(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T> HasArgumentsMut<'a> for ArithInstruction<T> {
+    type IterMut = ArithInstructionArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0, field_1, field_2, field_3) => {
+                ArgumentsMutIter::Add(std::iter::once(field_0).chain(field_1.iter_mut()))
+            }
+            Self::Sub(field_0, field_1, field_2, field_3) => {
+                ArgumentsMutIter::Sub(std::iter::once(field_0).chain(field_1.iter_mut()))
+            }
+            Self::Mul(field_0, field_1, field_2) => {
+                ArgumentsMutIter::Mul(std::iter::once(field_0).chain(field_1.iter_mut()))
+            }
+            Self::Div(field_0, field_1, field_2) => {
+                ArgumentsMutIter::Div(std::iter::once(field_0).chain(field_1.iter_mut()))
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum ArithInstructionArgumentsMutIter<'a> {
+    Add(
+        std::iter::Chain<
+            std::iter::Once<&'a mut SSAValue>,
+            std::slice::IterMut<'a, SSAValue>,
+        >,
+    ),
+    Sub(
+        std::iter::Chain<
+            std::iter::Once<&'a mut SSAValue>,
+            std::slice::IterMut<'a, SSAValue>,
+        >,
+    ),
+    Mul(
+        std::iter::Chain<
+            std::iter::Once<&'a mut SSAValue>,
+            std::slice::IterMut<'a, SSAValue>,
+        >,
+    ),
+    Div(
+        std::iter::Chain<
+            std::iter::Once<&'a mut SSAValue>,
+            std::slice::IterMut<'a, SSAValue>,
+        >,
+    ),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithInstructionArgumentsMutIter<'a> {
+    type Item = &'a mut SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+            Self::Mul(inner) => inner.next(),
+            Self::Div(inner) => inner.next(),
+        }
+    }
+}

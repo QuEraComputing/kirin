@@ -1,0 +1,55 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/tests.rs
+expression: "case!\n{\n    #[kirin(type_lattice = T)] struct TestStruct<T>\n    { a: SSAValue, b: SSAValue, c: Vec<SSAValue>, d: T, }\n}"
+---
+#[automatically_derived]
+impl<'a, T> HasArguments<'a> for TestStruct<T> {
+    type Iter = TestStructArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self { a, b, c, d } = self;
+        TestStructArgumentsIter {
+            inner: std::iter::once(a).chain(std::iter::once(b)).chain(c.iter()),
+        }
+    }
+}
+#[automatically_derived]
+pub struct TestStructArgumentsIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>,
+        std::slice::Iter<'a, SSAValue>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for TestStructArgumentsIter<'a> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a, T> HasArgumentsMut<'a> for TestStruct<T> {
+    type IterMut = TestStructArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        let Self { a, b, c, d } = self;
+        TestStructArgumentsMutIter {
+            inner: std::iter::once(a).chain(std::iter::once(b)).chain(c.iter_mut()),
+        }
+    }
+}
+#[automatically_derived]
+pub struct TestStructArgumentsMutIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Chain<
+            std::iter::Once<&'a mut SSAValue>,
+            std::iter::Once<&'a mut SSAValue>,
+        >,
+        std::slice::IterMut<'a, SSAValue>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for TestStructArgumentsMutIter<'a> {
+    type Item = &'a mut SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

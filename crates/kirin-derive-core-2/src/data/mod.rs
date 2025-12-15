@@ -8,7 +8,7 @@ mod traits;
 
 pub use core::Statement;
 pub use enum_impl::DialectEnum;
-pub use field::{Field, Fields};
+pub use field::{Field, Fields, FieldMember};
 pub use struct_impl::DialectStruct;
 pub use traits::{Compile, Context, FromContext, SimpleTraitDerive};
 

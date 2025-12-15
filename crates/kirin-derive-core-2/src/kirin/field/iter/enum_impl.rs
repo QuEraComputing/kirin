@@ -132,6 +132,7 @@ mod tests {
             .default_crate_path("kirin::ir")
             .trait_path("HasArguments")
             .trait_method("arguments")
+            .trait_type_iter("Iter")
             .build();
         let data = DialectEnum::from_context(&ctx, &input).unwrap();
         let t = syn::parse_file(
@@ -163,6 +164,7 @@ mod tests {
                 .default_crate_path("kirin::ir")
                 .trait_path("HasArguments")
                 .trait_method("arguments")
+                .trait_type_iter("Iter")
                 .build();
             let data = DialectEnum::from_context(&ctx, &input).unwrap();
             let t = syn::parse_file(

@@ -13,23 +13,65 @@ Statement {
         type_lattice: Ignored,
     },
     wraps: false,
-    fields: [
-        Field {
-            attrs: KirinFieldOptions {
-                into: false,
-                default: None,
-                ssa_ty: None,
+    fields: FieldMembers {
+        fields: [
+            Field {
+                wraps: false,
+                ident: Some(
+                    Ident(
+                        a,
+                    ),
+                ),
+                ty: Type::Path {
+                    qself: None,
+                    path: Path {
+                        leading_colon: None,
+                        segments: [
+                            PathSegment {
+                                ident: Ident(
+                                    i32,
+                                ),
+                                arguments: PathArguments::None,
+                            },
+                        ],
+                    },
+                },
+                attrs: KirinFieldOptions {
+                    into: false,
+                    default: None,
+                    ssa_ty: None,
+                },
+                extra: Other,
             },
-            extra: Other,
-        },
-        Field {
-            attrs: KirinFieldOptions {
-                into: false,
-                default: None,
-                ssa_ty: None,
+            Field {
+                wraps: false,
+                ident: Some(
+                    Ident(
+                        b,
+                    ),
+                ),
+                ty: Type::Path {
+                    qself: None,
+                    path: Path {
+                        leading_colon: None,
+                        segments: [
+                            PathSegment {
+                                ident: Ident(
+                                    i32,
+                                ),
+                                arguments: PathArguments::None,
+                            },
+                        ],
+                    },
+                },
+                attrs: KirinFieldOptions {
+                    into: false,
+                    default: None,
+                    ssa_ty: None,
+                },
+                extra: Other,
             },
-            extra: Other,
-        },
-    ],
+        ],
+    },
     extra: (),
 }

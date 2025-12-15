@@ -5,6 +5,7 @@ use super::traits::{Context, FromContext};
 
 pub struct DialectStruct<'src, Ctx: Context<'src>> {
     pub attrs: Ctx::AttrGlobal,
+    pub wraps: bool,
     pub statement: Statement<'src, syn::DeriveInput, Ctx>,
 }
 
@@ -18,9 +19,21 @@ impl<'src, Ctx: Context<'src>> FromContext<'src, Ctx, syn::DeriveInput>
     for DialectStruct<'src, Ctx>
 {
     fn from_context(ctx: &Ctx, node: &'src syn::DeriveInput) -> syn::Result<Self> {
+        let mut wraps = node.attrs.iter().any(|attr| attr.path().is_ident("wraps"));
+        let mut statement = Statement::from_context(ctx, node)?;
+        if wraps {
+            statement.wraps = true;
+            statement.fields.set_wrapper()?;
+        }
+
+        if statement.wraps {
+            wraps = true;
+        }
+
         Ok(DialectStruct {
             attrs: Ctx::AttrGlobal::from_derive_input(node)?,
-            statement: Statement::from_context(ctx, node)?,
+            wraps,
+            statement,
         })
     }
 }
@@ -32,6 +45,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DialectStruct")
+            .field("wraps", &self.wraps)
             .field("attrs", &self.attrs)
             .field("statement", &self.statement)
             .finish()

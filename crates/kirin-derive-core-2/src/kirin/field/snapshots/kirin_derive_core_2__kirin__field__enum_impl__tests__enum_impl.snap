@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-core-2/src/kirin/field/enum_impl.rs
-assertion_line: 107
 expression: "prettyplease::unparse(&t)"
 ---
 #[automatically_derived]
@@ -14,6 +13,7 @@ impl<'a> HasArguments<'a> for MyEnum {
         }
     }
 }
+#[automatically_derived]
 pub enum MyEnumArgumentsIter<'a> {
     A(std::iter::Empty<&'a SSAValue>),
     B(std::iter::Empty<&'a SSAValue>),

@@ -14,3 +14,4 @@ syn = "2.0.109"
 
 [dev-dependencies]
 insta = "1.43.2"
+paste = "1.0.15"

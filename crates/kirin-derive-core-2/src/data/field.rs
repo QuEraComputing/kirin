@@ -180,6 +180,9 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Field")
+            .field("wraps", &self.wraps)
+            .field("ident", &self.src.ident)
+            .field("ty", &self.src.ty)
             .field("attrs", &self.attrs)
             .field("extra", &self.extra)
             .finish()

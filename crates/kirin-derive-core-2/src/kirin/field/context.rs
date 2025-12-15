@@ -24,6 +24,8 @@ pub struct FieldsIter {
     pub trait_name: syn::Ident,
     #[builder(with = |s: impl Into<String>| from_str(s))]
     pub trait_lifetime: syn::Lifetime,
+    #[builder(with = |s: impl Into<String>| from_str(s))]
+    pub trait_type_iter: syn::Ident,
     // #[builder(default, with = |s: impl Into<String>| from_str(s))]
     // pub trait_generics: syn::Generics,
     #[builder(with = |s: impl Into<String>| from_str(s))]
@@ -79,6 +81,7 @@ mod tests {
             .trait_path("MyFieldIterTrait")
             .trait_lifetime("'a")
             .trait_method("my_field_iter")
+            .trait_type_iter("Iter")
             .matching_type("T")
             .build()
     }

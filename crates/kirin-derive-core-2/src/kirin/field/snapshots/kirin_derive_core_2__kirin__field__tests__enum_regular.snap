@@ -1,0 +1,80 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/tests.rs
+expression: "case!\n{\n    #[kirin(type_lattice = RegularLattice)] enum TestEnum<T>\n    {\n        VariantA { a: SSAValue, b: T, c: SSAValue },\n        VariantB(SSAValue, f64, SSAValue),\n    }\n}"
+---
+#[automatically_derived]
+impl<'a, T> HasArguments<'a> for TestEnum<T> {
+    type Iter = TestEnumArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::VariantA { a, b, c } => {
+                ArgumentsIter::VariantA(std::iter::once(a).chain(std::iter::once(c)))
+            }
+            Self::VariantB(field_0, field_1, field_2) => {
+                ArgumentsIter::VariantB(
+                    std::iter::once(field_0).chain(std::iter::once(field_2)),
+                )
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum TestEnumArgumentsIter<'a> {
+    VariantA(
+        std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>,
+    ),
+    VariantB(
+        std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>,
+    ),
+}
+#[automatically_derived]
+impl<'a> Iterator for TestEnumArgumentsIter<'a> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::VariantA(inner) => inner.next(),
+            Self::VariantB(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T> HasArgumentsMut<'a> for TestEnum<T> {
+    type IterMut = TestEnumArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::VariantA { a, b, c } => {
+                ArgumentsMutIter::VariantA(std::iter::once(a).chain(std::iter::once(c)))
+            }
+            Self::VariantB(field_0, field_1, field_2) => {
+                ArgumentsMutIter::VariantB(
+                    std::iter::once(field_0).chain(std::iter::once(field_2)),
+                )
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum TestEnumArgumentsMutIter<'a> {
+    VariantA(
+        std::iter::Chain<
+            std::iter::Once<&'a mut SSAValue>,
+            std::iter::Once<&'a mut SSAValue>,
+        >,
+    ),
+    VariantB(
+        std::iter::Chain<
+            std::iter::Once<&'a mut SSAValue>,
+            std::iter::Once<&'a mut SSAValue>,
+        >,
+    ),
+}
+#[automatically_derived]
+impl<'a> Iterator for TestEnumArgumentsMutIter<'a> {
+    type Item = &'a mut SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::VariantA(inner) => inner.next(),
+            Self::VariantB(inner) => inner.next(),
+        }
+    }
+}

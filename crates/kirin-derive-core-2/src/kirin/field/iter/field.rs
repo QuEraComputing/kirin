@@ -18,11 +18,11 @@ impl<'src> Compile<'src, FieldsIter, DialectEnum<'src, FieldsIter>> for Iterator
         ctx: &'src FieldsIter,
         node: &'src DialectEnum<'src, FieldsIter>,
     ) -> syn::Result<Self> {
-        Ok(IteratorTypeDefHead::new(
-            &node.src.ident,
-            &ctx.iter_name,
-            &ctx.trait_lifetime,
-        ))
+        let mut head = Self::new(&node.input().ident, &ctx.iter_name, &ctx.trait_lifetime);
+        if node.wraps || node.variants.iter().any(|v| v.wraps) {
+            head.with_generics(&node.input().generics);
+        }
+        Ok(head)
     }
 }
 
@@ -31,11 +31,11 @@ impl<'src> Compile<'src, FieldsIter, DialectStruct<'src, FieldsIter>> for Iterat
         ctx: &'src FieldsIter,
         node: &'src DialectStruct<'src, FieldsIter>,
     ) -> syn::Result<Self> {
-        Ok(IteratorTypeDefHead::new(
-            &node.input().ident,
-            &ctx.iter_name,
-            &ctx.trait_lifetime,
-        ))
+        let mut head = Self::new(&node.input().ident, &ctx.iter_name, &ctx.trait_lifetime);
+        if node.wraps {
+            head.with_generics(&node.input().generics);
+        }
+        Ok(head)
     }
 }
 
@@ -81,6 +81,13 @@ impl IteratorTypeDefHead {
             iter_name: format_ident!("{}{}", typename, iter_name),
             generics,
         }
+    }
+
+    fn with_generics<'a>(&mut self, generics: &syn::Generics) -> &mut Self {
+        for g in &generics.params {
+            self.generics.params.push(g.clone());
+        }
+        self
     }
 }
 
@@ -148,6 +155,16 @@ pub struct MatchingItem<'src> {
     matching_type: &'src syn::Path,
 }
 
+impl<'src, T> Compile<'src, FieldsIter, T> for MatchingItem<'src> {
+    fn compile(ctx: &'src FieldsIter, _node: &'src T) -> syn::Result<Self> {
+        Ok(MatchingItem::builder()
+            .mutable(ctx.mutable)
+            .lifetime(&ctx.trait_lifetime)
+            .matching_type(&ctx.matching_type)
+            .build())
+    }
+}
+
 impl ToTokens for MatchingItem<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let lifetime = &self.lifetime;
@@ -179,7 +196,7 @@ pub struct FieldIterator<'src> {
         .lifetime(lifetime)
         .matching_type(matching_type)
         .build())]
-    pub(crate) matching_item: MatchingItem<'src>,
+    matching_item: MatchingItem<'src>,
 }
 
 impl<'src> FieldIterator<'src> {

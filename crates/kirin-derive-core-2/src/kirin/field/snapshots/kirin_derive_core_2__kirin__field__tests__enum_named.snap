@@ -1,0 +1,68 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/tests.rs
+expression: "case!\n{\n    #[kirin(type_lattice = CFlowLattice)] pub enum ControlFlowInstruction\n    {\n        Branch { target: Block, }, ConditionalBranch\n        { condition: SSAValue, true_target: Block, false_target: Block, },\n        Return(SSAValue),\n    }\n}"
+---
+#[automatically_derived]
+impl<'a> HasArguments<'a> for ControlFlowInstruction {
+    type Iter = ControlFlowInstructionArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch { target } => {
+                ArgumentsIter::Branch(std::iter::empty::<&'a SSAValue>())
+            }
+            Self::ConditionalBranch { condition, true_target, false_target } => {
+                ArgumentsIter::ConditionalBranch(std::iter::once(condition))
+            }
+            Self::Return(field_0) => ArgumentsIter::Return(std::iter::once(field_0)),
+        }
+    }
+}
+#[automatically_derived]
+pub enum ControlFlowInstructionArgumentsIter<'a> {
+    Branch(std::iter::Empty<&'a SSAValue>),
+    ConditionalBranch(std::iter::Once<&'a SSAValue>),
+    Return(std::iter::Once<&'a SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ControlFlowInstructionArgumentsIter<'a> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::ConditionalBranch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> HasArgumentsMut<'a> for ControlFlowInstruction {
+    type IterMut = ControlFlowInstructionArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch { target } => {
+                ArgumentsMutIter::Branch(std::iter::empty::<&'a mut SSAValue>())
+            }
+            Self::ConditionalBranch { condition, true_target, false_target } => {
+                ArgumentsMutIter::ConditionalBranch(std::iter::once(condition))
+            }
+            Self::Return(field_0) => ArgumentsMutIter::Return(std::iter::once(field_0)),
+        }
+    }
+}
+#[automatically_derived]
+pub enum ControlFlowInstructionArgumentsMutIter<'a> {
+    Branch(std::iter::Empty<&'a mut SSAValue>),
+    ConditionalBranch(std::iter::Once<&'a mut SSAValue>),
+    Return(std::iter::Once<&'a mut SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ControlFlowInstructionArgumentsMutIter<'a> {
+    type Item = &'a mut SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::ConditionalBranch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}

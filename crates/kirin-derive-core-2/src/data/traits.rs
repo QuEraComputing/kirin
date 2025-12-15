@@ -1,5 +1,3 @@
-use quote::ToTokens;
-
 use crate::data::Dialect;
 
 pub trait FromContext<'src, Ctx: Context<'src>, Node>: Sized {

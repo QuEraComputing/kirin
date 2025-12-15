@@ -4,6 +4,7 @@ expression: "format!(\"{:#?}\", data)"
 ---
 Dialect::Struct(
     DialectStruct {
+        wraps: true,
         attrs: KirinGlobalOptions {
             crate_path: Some(
                 Path {
@@ -42,16 +43,38 @@ Dialect::Struct(
                 type_lattice: Ignored,
             },
             wraps: true,
-            fields: [
-                Field {
-                    attrs: KirinFieldOptions {
-                        into: false,
-                        default: None,
-                        ssa_ty: None,
+            fields: FieldMembers {
+                fields: [
+                    Field {
+                        wraps: true,
+                        ident: Some(
+                            Ident(
+                                other,
+                            ),
+                        ),
+                        ty: Type::Path {
+                            qself: None,
+                            path: Path {
+                                leading_colon: None,
+                                segments: [
+                                    PathSegment {
+                                        ident: Ident(
+                                            Other,
+                                        ),
+                                        arguments: PathArguments::None,
+                                    },
+                                ],
+                            },
+                        },
+                        attrs: KirinFieldOptions {
+                            into: false,
+                            default: None,
+                            ssa_ty: None,
+                        },
+                        extra: Other,
                     },
-                    extra: Other,
-                },
-            ],
+                ],
+            },
             extra: (),
         },
     },

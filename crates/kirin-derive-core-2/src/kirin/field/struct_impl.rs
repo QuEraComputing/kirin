@@ -2,10 +2,12 @@ use quote::{ToTokens, quote};
 
 use crate::data::gadgets::{TraitImpl, TraitItemFnImpl};
 use crate::data::*;
+use crate::kirin::attrs::KirinFieldOptions;
 use crate::kirin::field::context::FieldsIter;
+use crate::kirin::field::extra::FieldExtra;
 use crate::kirin::field::iter::IteratorImplStruct;
 
-impl<'src> Compile<'src, FieldsIter, DialectStruct<'src, FieldsIter>> for StructImpl<'src> {
+impl<'a, 'src> Compile<'src, FieldsIter, DialectStruct<'src, FieldsIter>> for StructImpl<'a, 'src> {
     fn compile(
         ctx: &'src FieldsIter,
         node: &'src DialectStruct<'src, FieldsIter>,
@@ -16,23 +18,28 @@ impl<'src> Compile<'src, FieldsIter, DialectStruct<'src, FieldsIter>> for Struct
             trait_name: &ctx.trait_name,
             trait_lifetime: &ctx.trait_lifetime,
             trait_method: &ctx.trait_method,
+            trait_type_iter: &ctx.trait_type_iter,
+            fields: &node.statement.fields,
             iter: IteratorImplStruct::compile(ctx, node)?,
         })
     }
 }
 
-pub struct StructImpl<'src> {
+pub struct StructImpl<'a, 'src> {
     src: &'src syn::DeriveInput,
     mutable: bool,
     trait_name: &'src syn::Ident,
     trait_lifetime: &'src syn::Lifetime,
     trait_method: &'src syn::Ident,
-    iter: IteratorImplStruct<'src>,
+    trait_type_iter: &'src syn::Ident,
+    fields: &'src Fields<'src, KirinFieldOptions, FieldExtra>,
+    iter: IteratorImplStruct<'a, 'src>,
 }
 
-impl ToTokens for StructImpl<'_> {
+impl ToTokens for StructImpl<'_, '_> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let iter = &self.iter;
+        let trait_type_iter = &self.trait_type_iter;
 
         let mut trait_generics = syn::Generics::default();
         trait_generics
@@ -41,14 +48,19 @@ impl ToTokens for StructImpl<'_> {
                 self.trait_lifetime.clone(),
             )));
 
+        let unpacking = self.fields.unpacking();
+        let iter_expr = self.iter.expr();
         let trait_impl = TraitImpl::new(self.src, self.trait_name, &trait_generics)
-            .add_type(quote! {Type}, self.iter.expr().ty())
+            .add_type(trait_type_iter, self.iter.ty())
             .add_method(
                 TraitItemFnImpl::new(self.trait_method)
                     .with_self_lifetime(self.trait_lifetime)
                     .with_mutable_self(self.mutable)
-                    .with_output(quote! {Self::Iter})
-                    .with_token_body(self.iter.expr()),
+                    .with_output(quote! {Self::#trait_type_iter})
+                    .with_token_body(quote! {
+                        let Self #unpacking = self;
+                        #iter_expr
+                    }),
             );
 
         quote! {
@@ -83,6 +95,7 @@ mod tests {
                 .default_crate_path("kirin::ir")
                 .trait_path("HasArguments")
                 .trait_method("arguments")
+                .trait_type_iter("Iter")
                 .build();
             let data = DialectStruct::from_context(&ctx, &input).unwrap();
             let t = syn::parse_file(

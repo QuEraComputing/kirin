@@ -4,12 +4,12 @@ expression: "prettyplease::unparse(&t)"
 ---
 #[automatically_derived]
 impl<'a, T: Bound> HasArguments<'a> for MyStruct<T> {
-    type Type = std::iter::Chain<
-        std::slice::IterMut<'a, SSAValue>,
-        std::iter::Once<&'a mut SSAValue>,
-    >;
+    type Iter = MyStructArgumentsIter<'a>;
     fn arguments(&'a mut self) -> Self::Iter {
-        values.iter_mut().chain(std::iter::once(count))
+        let Self { values, count, marker } = self;
+        MyStructArgumentsIter {
+            inner: values.iter_mut().chain(std::iter::once(count)),
+        }
     }
 }
 #[automatically_derived]

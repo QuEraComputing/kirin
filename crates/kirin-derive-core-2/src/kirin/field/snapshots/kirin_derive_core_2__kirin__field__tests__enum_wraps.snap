@@ -1,0 +1,64 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/tests.rs
+expression: "case!\n{\n    #[wraps] #[kirin(fn, type_lattice = T)] pub enum StructuredControlFlow<T:\n    TypeLattice> { If(If<T>), For(For<T>), }\n}"
+---
+#[automatically_derived]
+impl<'a, T: TypeLattice> HasArguments<'a> for StructuredControlFlow<T> {
+    type Iter = StructuredControlFlowArgumentsIter<'a, T>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::If(field_0) => {
+                ArgumentsIter::If(<If<T> as HasArguments>::arguments(field_0))
+            }
+            Self::For(field_0) => {
+                ArgumentsIter::For(<For<T> as HasArguments>::arguments(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum StructuredControlFlowArgumentsIter<'a, T: TypeLattice> {
+    If(<If<T> as HasArguments>::Iter),
+    For(<For<T> as HasArguments>::Iter),
+}
+#[automatically_derived]
+impl<'a, T: TypeLattice> Iterator for StructuredControlFlowArgumentsIter<'a, T> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::If(inner) => inner.next(),
+            Self::For(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: TypeLattice> HasArgumentsMut<'a> for StructuredControlFlow<T> {
+    type IterMut = StructuredControlFlowArgumentsMutIter<'a, T>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::If(field_0) => {
+                ArgumentsMutIter::If(<If<T> as HasArgumentsMut>::arguments_mut(field_0))
+            }
+            Self::For(field_0) => {
+                ArgumentsMutIter::For(
+                    <For<T> as HasArgumentsMut>::arguments_mut(field_0),
+                )
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum StructuredControlFlowArgumentsMutIter<'a, T: TypeLattice> {
+    If(<If<T> as HasArgumentsMut>::IterMut),
+    For(<For<T> as HasArgumentsMut>::IterMut),
+}
+#[automatically_derived]
+impl<'a, T: TypeLattice> Iterator for StructuredControlFlowArgumentsMutIter<'a, T> {
+    type Item = &'a mut SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::If(inner) => inner.next(),
+            Self::For(inner) => inner.next(),
+        }
+    }
+}

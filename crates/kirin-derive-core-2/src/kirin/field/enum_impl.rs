@@ -1,4 +1,4 @@
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, quote};
 
 use crate::{
     data::{
@@ -22,6 +22,7 @@ impl<'src> Compile<'src, FieldsIter, DialectEnum<'src, FieldsIter>> for EnumImpl
             trait_name: &ctx.trait_name,
             trait_lifetime: &ctx.trait_lifetime,
             trait_method: &ctx.trait_method,
+            trait_type_iter: &ctx.trait_type_iter,
             variants: node
                 .variants
                 .iter()
@@ -38,6 +39,7 @@ pub struct EnumImpl<'src> {
     trait_name: &'src syn::Ident,
     trait_lifetime: &'src syn::Lifetime,
     trait_method: &'src syn::Ident,
+    trait_type_iter: &'src syn::Ident,
     variants: Vec<TraitMatchArmVariant<'src>>,
     iter: IteratorImplEnum<'src>,
 }
@@ -45,6 +47,7 @@ pub struct EnumImpl<'src> {
 impl ToTokens for EnumImpl<'_> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let iter = &self.iter;
+        let trait_type_iter = &self.trait_type_iter;
 
         let mut trait_generics = syn::Generics::default();
         trait_generics
@@ -54,12 +57,12 @@ impl ToTokens for EnumImpl<'_> {
             )));
         let arms = &self.variants;
         let trait_impl = TraitImpl::new(self.src, self.trait_name, &trait_generics)
-            .add_type(format_ident!("Iter"), self.iter.ty())
+            .add_type(trait_type_iter, self.iter.ty())
             .add_method(
                 TraitItemFnImpl::new(self.trait_method)
                     .with_self_lifetime(self.trait_lifetime)
                     .with_mutable_self(self.mutable)
-                    .with_output(quote! {Self::Iter})
+                    .with_output(quote! {Self::#trait_type_iter})
                     .with_token_body(quote! {
                         match self {
                             #(#arms),*
@@ -98,6 +101,7 @@ mod tests {
             .default_crate_path("kirin::ir")
             .trait_path("HasArguments")
             .trait_method("arguments")
+            .trait_type_iter("Iter")
             .build();
 
         let data = DialectEnum::from_context(&ctx, &input).unwrap();
