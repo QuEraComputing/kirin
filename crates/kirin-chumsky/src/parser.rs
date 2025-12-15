@@ -1,8 +1,8 @@
 use super::ast;
-use super::lexer::Token;
 use super::traits::{HasParser, ParserError, TokenInput};
 use chumsky::prelude::*;
 use kirin_ir::*;
+use kirin_lexer::Token;
 
 pub fn identifier<'tokens, 'src: 'tokens, I>(
     name: &'src str,

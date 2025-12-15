@@ -1,0 +1,16 @@
+[package]
+name = "kirin-derive-core-2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bon = "3.8.1"
+darling = "0.23.0"
+kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
+prettyplease = "0.2.37"
+proc-macro2 = "1.0.103"
+quote = "1.0.42"
+syn = "2.0.109"
+
+[dev-dependencies]
+insta = "1.43.2"

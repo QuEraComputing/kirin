@@ -8,6 +8,9 @@ pub enum Token<'src> {
     SSAValue(&'src str),
     #[regex(r"\^[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
     Block(&'src str),
+    // {identifier}
+    #[regex(r"\{[\p{XID_Start}_][\p{XID_Continue}_$.]*\}", |lex| &lex.slice()[1..lex.slice().len()-1])]
+    Quote(&'src str),
     #[regex(r"[\p{XID_Start}_][\p{XID_Continue}_$.]*")]
     Identifier(&'src str),
     #[regex(r"@[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
@@ -65,6 +68,7 @@ impl std::fmt::Display for Token<'_> {
             Token::Error => write!(f, "error"),
             Token::SSAValue(name) => write!(f, "%{}", name),
             Token::Block(name) => write!(f, "^{}", name),
+            Token::Quote(name) => write!(f, "{{{}}}", name),
             Token::Identifier(name) => write!(f, "{}", name),
             Token::Symbol(name) => write!(f, "@{}", name),
             Token::AttrId(name) => write!(f, "#{}", name),
@@ -185,6 +189,14 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(Token::Identifier("x"))));
         assert_eq!(lexer.next(), Some(Ok(Token::Identifier("i32"))));
         assert_eq!(lexer.next(), Some(Ok(Token::RAngle)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_quote() {
+        let input = "{my_identifier}";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Quote("my_identifier"))));
         assert_eq!(lexer.next(), None);
     }
 }

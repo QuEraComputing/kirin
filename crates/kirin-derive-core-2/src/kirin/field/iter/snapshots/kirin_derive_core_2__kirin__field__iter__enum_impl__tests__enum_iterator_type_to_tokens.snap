@@ -1,0 +1,8 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/iter/enum_impl.rs
+expression: "prettyplease::unparse(&t)"
+---
+pub enum MyEnumArgumentsIter<T> {
+    A(std::iter::Chain<std::slice::Iter<'a, SSAValue>, std::iter::Once<&'a SSAValue>>),
+    B(std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>),
+}

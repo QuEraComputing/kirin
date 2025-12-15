@@ -1,6 +1,5 @@
 /// Some common AST structures for downstream dialect
 /// to use with chumsky parsers.
-
 use super::traits::HasParser;
 use kirin_ir::*;
 

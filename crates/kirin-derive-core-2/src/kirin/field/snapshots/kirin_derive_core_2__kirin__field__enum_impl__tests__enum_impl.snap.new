@@ -1,0 +1,32 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/enum_impl.rs
+assertion_line: 107
+expression: "prettyplease::unparse(&t)"
+---
+#[automatically_derived]
+impl<'a> HasArguments<'a> for MyEnum {
+    type Iter = MyEnumArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::A(field_0) => ArgumentsIter::A(std::iter::empty::<&'a SSAValue>()),
+            Self::B(field_0) => ArgumentsIter::B(std::iter::empty::<&'a SSAValue>()),
+            Self::C => ArgumentsIter::C(std::iter::empty::<&'a SSAValue>()),
+        }
+    }
+}
+pub enum MyEnumArgumentsIter<'a> {
+    A(std::iter::Empty<&'a SSAValue>),
+    B(std::iter::Empty<&'a SSAValue>),
+    C(std::iter::Empty<&'a SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MyEnumArgumentsIter<'a> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::A(inner) => inner.next(),
+            Self::B(inner) => inner.next(),
+            Self::C(inner) => inner.next(),
+        }
+    }
+}

@@ -1,5 +1,6 @@
 use super::*;
 use chumsky::{input::Stream, prelude::*};
+use kirin_lexer::Token;
 use kirin_test_utils::*;
 use logos::Logos;
 

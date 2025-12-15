@@ -1,0 +1,28 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/struct_impl.rs
+expression: "prettyplease::unparse(&t)"
+---
+#[automatically_derived]
+impl<'a, T: Bound> HasArguments<'a> for MyStruct<T> {
+    type Type = std::iter::Chain<
+        std::slice::IterMut<'a, SSAValue>,
+        std::iter::Once<&'a mut SSAValue>,
+    >;
+    fn arguments(&'a mut self) -> Self::Iter {
+        values.iter_mut().chain(std::iter::once(count))
+    }
+}
+#[automatically_derived]
+pub struct MyStructArgumentsIter<'a> {
+    inner: std::iter::Chain<
+        std::slice::IterMut<'a, SSAValue>,
+        std::iter::Once<&'a mut SSAValue>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for MyStructArgumentsIter<'a> {
+    type Item = &'a mut SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

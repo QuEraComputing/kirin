@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
-use super::lexer::Token;
 use chumsky::prelude::*;
 use kirin_ir::Dialect;
+use kirin_lexer::Token;
 
 pub trait TokenInput<'tokens, 'src: 'tokens>:
     chumsky::input::ValueInput<'tokens, Token = Token<'src>, Span = chumsky::span::SimpleSpan>

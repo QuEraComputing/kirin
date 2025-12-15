@@ -1,29 +1,13 @@
-// fn @main() {
-//     stage circuit {
-//     }
+type = FLAIRKernelFuncType
+new_type = BufStateKernelFuncType
 
-//     stage shuttle {
-//     }
+fn @kernel<[total_buf_state = 4]>(%x: i32) -> !pulse {
+    buffer.alloca() : !buffer
+    %buf = buffer.define_state(index = 1)
+    some_pulse_instruction
+}
 
-//     stage flair {
-//     }
-// }
-
-// stage "circuit" fn @main() {
-// }
-
-
-
-// wf.poly 0x01 5us
-// wf.poly 0x01 5us
-// wf.poly 0x01 5us
-// poly 3 AOD01XF
-// wf.poly 0x01 5us
-// poly 1 AOD02XF
-// play 2
-
-// .waveform
-// 0x01 | 0.0 1.0 0.5 1.0
-
-mov 0x0123
-x 0x45 // 0x45
+fn @main() [total_buf_state = 8] {
+    call<1, 3, 5, 7> @kernel(%arg0 : i32) : !pulse
+    call<2, 4, 6, 8> @kernel(%arg0 : i32) : !pulse
+}

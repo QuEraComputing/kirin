@@ -1,0 +1,35 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/context.rs
+expression: "format!(\"{:#?}\", data)"
+---
+Statement {
+    attrs: KirinStatementOptions {
+        format: None,
+        builder: None,
+        constant: false,
+        pure: false,
+        terminator: false,
+        crate_path: Ignored,
+        type_lattice: Ignored,
+    },
+    wraps: false,
+    fields: [
+        Field {
+            attrs: KirinFieldOptions {
+                into: false,
+                default: None,
+                ssa_ty: None,
+            },
+            extra: (),
+        },
+        Field {
+            attrs: KirinFieldOptions {
+                into: false,
+                default: None,
+                ssa_ty: None,
+            },
+            extra: (),
+        },
+    ],
+    extra: (),
+}

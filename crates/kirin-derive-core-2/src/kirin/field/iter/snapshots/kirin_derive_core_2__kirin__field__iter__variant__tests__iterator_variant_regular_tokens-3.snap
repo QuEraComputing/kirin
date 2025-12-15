@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/iter/variant.rs
+expression: variant.to_token_stream().to_string()
+---
+C (std :: slice :: IterMut < 'a , SSAValue >)

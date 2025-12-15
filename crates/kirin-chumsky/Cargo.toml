@@ -7,6 +7,7 @@ edition = "2024"
 ariadne = "0.6.0"
 chumsky = "0.11.2"
 kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
+kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
 logos = "0.16.0"
 
 [dev-dependencies]

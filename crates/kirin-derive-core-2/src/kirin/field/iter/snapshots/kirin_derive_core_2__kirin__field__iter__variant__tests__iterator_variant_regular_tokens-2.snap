@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/iter/variant.rs
+expression: variant.to_token_stream().to_string()
+---
+B (std :: iter :: Chain < std :: iter :: Once < & 'a mut SSAValue > , std :: iter :: Once < & 'a mut SSAValue > >)

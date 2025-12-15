@@ -1,0 +1,16 @@
+---
+source: crates/kirin-derive-core-2/src/kirin/field/iter/struct_impl.rs
+expression: "prettyplease::unparse(&t)"
+---
+pub struct MyStructArgumentsIter<'a, T: Bound> {
+    inner: std::iter::Chain<
+        std::slice::Iter<'a, SSAValue>,
+        std::iter::Once<&'a SSAValue>,
+    >,
+}
+impl<'a, T: Bound> Iterator for MyStructArgumentsIter<'a, T> {
+    type Item = &'a SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
