@@ -1,4 +1,6 @@
 use darling::FromDeriveInput;
+use proc_macro2::TokenStream;
+use quote::ToTokens;
 
 use super::core::Statement;
 use super::traits::*;
@@ -13,6 +15,44 @@ pub struct DialectEnum<'src, Ctx: Context<'src>> {
 impl<'src, Ctx: Context<'src>> DialectEnum<'src, Ctx> {
     pub fn input(&self) -> &'src syn::DeriveInput {
         self.src
+    }
+
+    /// Returns the idents of all variants in the enum.
+    ///
+    /// !!! Note
+    /// Usually used in conjunction with `unpacking` to form match arms.
+    pub fn variant_idents(&self) -> Vec<&syn::Ident> {
+        self.variants.iter().map(|v| &v.src.ident).collect()
+    }
+
+    /// Returns the unpacking patterns for all variants in the enum.
+    ///
+    /// !!! Note
+    /// Usually used in conjunction with `variant_idents` to form match arms.
+    pub fn unpacking(&self) -> Vec<TokenStream> {
+        self.variants
+            .iter()
+            .map(|v| v.fields.unpacking().to_token_stream())
+            .collect()
+    }
+
+    /// Compiles the match arm bodies for all variants in the enum.
+    ///
+    /// !!! Note
+    /// The type `T` is the output type of the compilation, usually `TokenStream`.
+    /// Usually used in conjunction with `variant_idents` and `unpacking` to form match arms.
+    pub fn match_action<T>(&self, ctx: &Ctx) -> Vec<T>
+    where
+        T: ToTokens,
+        Ctx: Compile<'src, Statement<'src, syn::Variant, Ctx>, T>,
+    {
+        self.variants.iter().map(|v| ctx.compile(v)).collect()
+    }
+}
+
+impl<'src, Ctx: Context<'src>> TopLevel<'src, Ctx> for DialectEnum<'src, Ctx> {
+    fn attrs_global(&self) -> &Ctx::AttrGlobal {
+        &self.attrs
     }
 }
 

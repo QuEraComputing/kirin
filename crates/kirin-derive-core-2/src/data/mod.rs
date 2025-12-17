@@ -7,6 +7,9 @@ mod gadgets;
 mod struct_impl;
 mod traits;
 
+#[cfg(feature = "debug")]
+mod debug;
+
 pub use core::Statement;
 pub use dialect_impl::Dialect;
 pub use enum_impl::DialectEnum;

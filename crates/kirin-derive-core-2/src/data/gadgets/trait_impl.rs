@@ -17,38 +17,36 @@ impl ToTokens for TraitTypeImpl {
     }
 }
 
-pub struct TraitImpl<'a> {
-    pub input: &'a syn::DeriveInput,
-    pub trait_name: &'a syn::Ident,
-    pub trait_generics: &'a syn::Generics,
-    pub combined_generics: syn::Generics,
+#[derive(Default)]
+pub struct TraitImpl {
+    pub input_ident: TokenStream,
+    pub input_generics: syn::Generics,
+    pub trait_path: TokenStream,
+    pub trait_generics: syn::Generics,
     pub types: Vec<TraitTypeImpl>,
     pub methods: TokenStream,
 }
 
-impl<'a> TraitImpl<'a> {
-    /// create a new TraitImpl for the given input and trait
-    /// name and generics
-    pub fn new(
-        input: &'a syn::DeriveInput,
-        trait_name: &'a syn::Ident,
-        trait_generics: &'a syn::Generics,
-    ) -> Self {
-        let combined_generics = {
-            let mut combined = input.generics.clone();
-            for param in trait_generics.params.iter() {
-                combined.params.push(param.clone());
-            }
-            combined
-        };
-        Self {
-            input,
-            trait_name,
-            trait_generics,
-            combined_generics,
-            types: Vec::new(),
-            methods: TokenStream::new(),
-        }
+impl TraitImpl {
+    pub fn input(mut self, input: &syn::DeriveInput) -> Self {
+        input.ident.to_tokens(&mut self.input_ident);
+        self.input_generics = input.generics.clone();
+        self
+    }
+
+    pub fn input_path(mut self, input_path: impl ToTokens) -> Self {
+        input_path.to_tokens(&mut self.input_ident);
+        self
+    }
+
+    pub fn trait_path(mut self, trait_path: impl ToTokens) -> Self {
+        trait_path.to_tokens(&mut self.trait_path);
+        self
+    }
+
+    pub fn trait_generics(mut self, trait_generics: syn::Generics) -> Self {
+        self.trait_generics = trait_generics;
+        self
     }
 
     /// add a associated type to the trait implementation
@@ -67,22 +65,31 @@ impl<'a> TraitImpl<'a> {
     }
 }
 
-impl ToTokens for TraitImpl<'_> {
+impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let input_name = &self.input.ident;
-        let trait_name = self.trait_name;
+        let trait_generics = &self.trait_generics;
+        let input_name = &self.input_ident;
+        let input_generics = &self.input_generics;
+        let trait_path = &self.trait_path;
+
+        let combined_generics = {
+            let mut combined = input_generics.clone();
+            combined.params.extend(trait_generics.params.clone());
+            combined
+        };
+
         let (combined_impl_generics, _combined_ty_generics, combined_where_clause) =
-            self.combined_generics.split_for_impl();
+            combined_generics.split_for_impl();
         let (_input_impl_generics, input_ty_generics, _input_where_clause) =
-            self.input.generics.split_for_impl();
+            input_generics.split_for_impl();
         let (_trait_impl_generics, trait_ty_generics, _trait_where_clause) =
-            self.trait_generics.split_for_impl();
+            trait_generics.split_for_impl();
         let types = &self.types;
         let methods = &self.methods;
 
         tokens.extend(quote! {
             #[automatically_derived]
-            impl #combined_impl_generics #trait_name #trait_ty_generics for #input_name #input_ty_generics
+            impl #combined_impl_generics #trait_path #trait_ty_generics for #input_name #input_ty_generics
             #combined_where_clause {
                 #(#types)*
                 #methods
@@ -107,11 +114,14 @@ mod tests {
             }
         };
 
-        let trait_name: syn::Ident = syn::parse_str("MyTrait").unwrap();
+        let trait_name: syn::Path = syn::parse_str("MyTrait").unwrap();
         let trait_lifetime = syn::parse_str("'a").unwrap();
         let trait_generics: syn::Generics = syn::parse_str("<'a, U>").unwrap();
         let trait_method = format_ident!("trait_method");
-        let trait_impl = TraitImpl::new(&input, &trait_name, &trait_generics)
+        let trait_impl = TraitImpl::default()
+            .input(&input)
+            .trait_path(&trait_name)
+            .trait_generics(trait_generics)
             .add_type(format_ident!("Iter"), quote! { i64 })
             .add_method(
                 TraitItemFnImpl::new(&trait_method)

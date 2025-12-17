@@ -90,6 +90,13 @@ pub trait Wrapper<'src, Attr, E>: Source {
     }
 }
 
+/// The top-level node in the procedural macro derivation, i.e.
+/// `DialectStruct`, `DialectEnum`
+pub trait TopLevel<'src, Ctx: Context<'src>> {
+    /// get the global attributes for the derivation
+    fn attrs_global(&self) -> &Ctx::AttrGlobal;
+}
+
 pub trait Context<'src>: Sized {
     /// Extra data for the helper attribute per statement or global
     type AttrGlobal: darling::FromDeriveInput;
@@ -104,17 +111,6 @@ pub trait Context<'src>: Sized {
     fn helper_attribute() -> &'static str {
         "kirin"
     }
-    fn crate_path(&self) -> &syn::Path;
-
-    // fn emit_inner<S, E>(&self, input: &'src syn::DeriveInput) -> syn::Result<TokenStream>
-    // where
-    //     S: Compile<'src, Self, impl ToTokens>,
-    //     E: Compile<'src, Self, impl ToTokens>,
-    // {
-    //     let dialect = Dialect::from_context(self, input)?;
-    //     let fi: DataImpl<S, E> = DataImpl::compile(self, &dialect)?;
-    //     Ok(fi.to_token_stream())
-    // }
 }
 
 impl Context<'_> for () {
@@ -127,10 +123,40 @@ impl Context<'_> for () {
     fn helper_attribute() -> &'static str {
         "kirin"
     }
+}
 
-    fn crate_path(&self) -> &syn::Path {
-        panic!("crate_path called on unit context")
+pub trait AttrCratePath {
+    fn crate_path(&self) -> Option<&syn::Path>;
+}
+
+impl AttrCratePath for () {
+    fn crate_path(&self) -> Option<&syn::Path> {
+        None
     }
+}
+
+pub trait AllowCratePath<'src>: Context<'src, AttrGlobal: AttrCratePath> {
+    /// get the default crate path to use for the derivation
+    /// if the derive macro allows specifying a crate path via global
+    /// attribute, this will be overridden
+    fn crate_path(&self) -> &syn::Path;
+    fn absolute_crate_path(&self, path: &syn::Path) -> syn::Path {
+        if path.leading_colon.is_some() {
+            path.clone()
+        } else {
+            let mut new_path = self.crate_path().clone();
+            new_path.segments.extend(path.segments.clone());
+            new_path
+        }
+    }
+}
+
+/// Context for deriving trait implementations
+pub trait TraitContext<'src>: Context<'src> {
+    /// get the relative path to the trait being implemented
+    /// the relative path is relative to the crate path
+    /// either specified by the user or defaulted
+    fn trait_path(&self) -> &syn::Path;
 }
 
 pub trait Emit<'src>: Context<'src> + Compile<'src, Dialect<'src, Self>, Self::Output> {
@@ -146,9 +172,18 @@ pub trait Emit<'src>: Context<'src> + Compile<'src, Dialect<'src, Self>, Self::O
         }
     }
 
+    #[cfg(feature = "debug")]
     fn print(self, input: &'src syn::DeriveInput) -> String {
-        let file = syn::parse_file(&self.emit(input).to_string()).unwrap();
-        prettyplease::unparse(&file)
+        use super::debug::rustfmt;
+        let source = self.emit(input).to_string();
+        match syn::parse_file(&source) {
+            Ok(_) => rustfmt(source),
+            Err(_) => {
+                // report_syn_error(&err, &source, "generated");
+                rustfmt(source);
+                panic!("Failed to parse generated code")
+            }
+        }
     }
 }
 

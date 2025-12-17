@@ -9,6 +9,12 @@ pub struct DialectStruct<'src, Ctx: Context<'src>> {
     pub statement: Statement<'src, syn::DeriveInput, Ctx>,
 }
 
+impl<'src, Ctx: Context<'src>> TopLevel<'src, Ctx> for DialectStruct<'src, Ctx> {
+    fn attrs_global(&self) -> &Ctx::AttrGlobal {
+        &self.attrs
+    }
+}
+
 impl<'src, Ctx: Context<'src>> Wrapper<'src, Ctx::AttrField, Ctx::FieldExtra>
     for DialectStruct<'src, Ctx>
 {
