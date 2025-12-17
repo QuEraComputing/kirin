@@ -3,30 +3,22 @@ source: crates/kirin-derive-core-2/src/kirin/field/tests.rs
 expression: "case!\n{\n    #[kirin(type_lattice = SomeLattice)] enum TestEnum<T>\n    {\n        VariantA { #[wraps] wrapped: InnerStructA<T> }, #[wraps]\n        VariantB(InnerStructB<T>), VariantC\n        { a: SSAValue, b: T, c: SSAValue }, VariantD(SSAValue, f64, SSAValue),\n    }\n}"
 ---
 #[automatically_derived]
-impl<'a, T> HasArguments<'a> for TestEnum<T> {
+impl<'a, T> kirin::ir::HasArguments<'a> for TestEnum<T> {
     type Iter = TestEnumArgumentsIter<'a, T>;
     fn arguments(&'a self) -> Self::Iter {
         match self {
-            Self::VariantA { wrapped } => {
-                TestEnumArgumentsIter::VariantA(
-                    <InnerStructA<T> as HasArguments>::arguments(wrapped),
-                )
-            }
-            Self::VariantB(field_0) => {
-                TestEnumArgumentsIter::VariantB(
-                    <InnerStructB<T> as HasArguments>::arguments(field_0),
-                )
-            }
+            Self::VariantA { wrapped } => TestEnumArgumentsIter::VariantA(
+                <InnerStructA<T> as HasArguments>::arguments(wrapped),
+            ),
+            Self::VariantB(field_0) => TestEnumArgumentsIter::VariantB(
+                <InnerStructB<T> as HasArguments>::arguments(field_0),
+            ),
             Self::VariantC { a, b, c } => {
-                TestEnumArgumentsIter::VariantC(
-                    std::iter::once(a).chain(std::iter::once(c)),
-                )
+                TestEnumArgumentsIter::VariantC(std::iter::once(a).chain(std::iter::once(c)))
             }
-            Self::VariantD(field_0, field_1, field_2) => {
-                TestEnumArgumentsIter::VariantD(
-                    std::iter::once(field_0).chain(std::iter::once(field_2)),
-                )
-            }
+            Self::VariantD(field_0, field_1, field_2) => TestEnumArgumentsIter::VariantD(
+                std::iter::once(field_0).chain(std::iter::once(field_2)),
+            ),
         }
     }
 }
@@ -35,15 +27,21 @@ pub enum TestEnumArgumentsIter<'a, T> {
     VariantA(<InnerStructA<T> as HasArguments>::Iter),
     VariantB(<InnerStructB<T> as HasArguments>::Iter),
     VariantC(
-        std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>,
+        std::iter::Chain<
+            std::iter::Once<&'a kirin::ir::SSAValue>,
+            std::iter::Once<&'a kirin::ir::SSAValue>,
+        >,
     ),
     VariantD(
-        std::iter::Chain<std::iter::Once<&'a SSAValue>, std::iter::Once<&'a SSAValue>>,
+        std::iter::Chain<
+            std::iter::Once<&'a kirin::ir::SSAValue>,
+            std::iter::Once<&'a kirin::ir::SSAValue>,
+        >,
     ),
 }
 #[automatically_derived]
 impl<'a, T> Iterator for TestEnumArgumentsIter<'a, T> {
-    type Item = &'a SSAValue;
+    type Item = &'a kirin::ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::VariantA(inner) => inner.next(),
@@ -54,30 +52,22 @@ impl<'a, T> Iterator for TestEnumArgumentsIter<'a, T> {
     }
 }
 #[automatically_derived]
-impl<'a, T> HasArgumentsMut<'a> for TestEnum<T> {
+impl<'a, T> kirin::ir::HasArgumentsMut<'a> for TestEnum<T> {
     type IterMut = TestEnumArgumentsMutIter<'a, T>;
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         match self {
-            Self::VariantA { wrapped } => {
-                TestEnumArgumentsMutIter::VariantA(
-                    <InnerStructA<T> as HasArgumentsMut>::arguments_mut(wrapped),
-                )
-            }
-            Self::VariantB(field_0) => {
-                TestEnumArgumentsMutIter::VariantB(
-                    <InnerStructB<T> as HasArgumentsMut>::arguments_mut(field_0),
-                )
-            }
+            Self::VariantA { wrapped } => TestEnumArgumentsMutIter::VariantA(
+                <InnerStructA<T> as HasArgumentsMut>::arguments_mut(wrapped),
+            ),
+            Self::VariantB(field_0) => TestEnumArgumentsMutIter::VariantB(
+                <InnerStructB<T> as HasArgumentsMut>::arguments_mut(field_0),
+            ),
             Self::VariantC { a, b, c } => {
-                TestEnumArgumentsMutIter::VariantC(
-                    std::iter::once(a).chain(std::iter::once(c)),
-                )
+                TestEnumArgumentsMutIter::VariantC(std::iter::once(a).chain(std::iter::once(c)))
             }
-            Self::VariantD(field_0, field_1, field_2) => {
-                TestEnumArgumentsMutIter::VariantD(
-                    std::iter::once(field_0).chain(std::iter::once(field_2)),
-                )
-            }
+            Self::VariantD(field_0, field_1, field_2) => TestEnumArgumentsMutIter::VariantD(
+                std::iter::once(field_0).chain(std::iter::once(field_2)),
+            ),
         }
     }
 }
@@ -87,20 +77,20 @@ pub enum TestEnumArgumentsMutIter<'a, T> {
     VariantB(<InnerStructB<T> as HasArgumentsMut>::IterMut),
     VariantC(
         std::iter::Chain<
-            std::iter::Once<&'a mut SSAValue>,
-            std::iter::Once<&'a mut SSAValue>,
+            std::iter::Once<&'a mut kirin::ir::SSAValue>,
+            std::iter::Once<&'a mut kirin::ir::SSAValue>,
         >,
     ),
     VariantD(
         std::iter::Chain<
-            std::iter::Once<&'a mut SSAValue>,
-            std::iter::Once<&'a mut SSAValue>,
+            std::iter::Once<&'a mut kirin::ir::SSAValue>,
+            std::iter::Once<&'a mut kirin::ir::SSAValue>,
         >,
     ),
 }
 #[automatically_derived]
 impl<'a, T> Iterator for TestEnumArgumentsMutIter<'a, T> {
-    type Item = &'a mut SSAValue;
+    type Item = &'a mut kirin::ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::VariantA(inner) => inner.next(),

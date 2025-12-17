@@ -20,8 +20,12 @@ impl<'src> Compile<'src, DialectStruct<'src, FieldsIter>, StructImpl> for Fields
         let unpacking = node.statement.fields.unpacking();
         let iter_expr: iter::StructExpr = self.compile(node);
         let iter_type: iter::FullType = self.compile(node);
+        let trait_path: TraitPath = self.compile(node);
 
-        let trait_impl = TraitImpl::new(node.source(), &self.trait_name, &trait_generics)
+        let trait_impl = TraitImpl::default()
+            .input(node.source())
+            .trait_path(trait_path)
+            .trait_generics(trait_generics)
             .add_type(trait_type_iter, iter_type)
             .add_method(
                 TraitItemFnImpl::new(&self.trait_method)

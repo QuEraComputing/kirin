@@ -17,7 +17,7 @@ target! {
 impl<'src, T> Compile<'src, T, MatchingItem> for FieldsIter {
     fn compile(&self, _node: &T) -> MatchingItem {
         let lifetime = &self.trait_lifetime;
-        let matching_type = &self.matching_type;
+        let matching_type = self.absolute_crate_path(&self.matching_type);
         if self.mutable {
             MatchingItem(quote! { &#lifetime mut #matching_type })
         } else {

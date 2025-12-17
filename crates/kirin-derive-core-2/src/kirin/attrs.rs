@@ -1,3 +1,4 @@
+use crate::data::AttrCratePath;
 use darling::{Error, FromDeriveInput, FromField, FromMeta, FromVariant, util::Ignored};
 
 #[derive(Debug, FromField)]
@@ -37,6 +38,18 @@ pub struct KirinGlobalOptions {
     pub type_lattice: syn::Path,
     #[darling(rename = "fn")]
     pub builder: Option<Builder>,
+    #[darling(default)]
+    pub constant: bool,
+    #[darling(default)]
+    pub pure: bool,
+    #[darling(default)]
+    pub terminator: bool,
+}
+
+impl AttrCratePath for KirinGlobalOptions {
+    fn crate_path(&self) -> Option<&syn::Path> {
+        self.crate_path.as_ref()
+    }
 }
 
 #[derive(Debug)]

@@ -1,7 +1,7 @@
 use bon::Builder;
 use proc_macro2::TokenStream;
 
-use crate::kirin::utils::{from_str, strip_path};
+use crate::utils::{from_str, strip_path};
 use crate::{
     data::*,
     kirin::attrs::{KirinFieldOptions, KirinGlobalOptions, KirinStatementOptions},
@@ -70,7 +70,15 @@ impl<'src, S: SearchProperty> Context<'src> for Property<S> {
     fn helper_attribute() -> &'static str {
         "kirin"
     }
+}
 
+impl<'src, S: SearchProperty> TraitContext<'src> for Property<S> {
+    fn trait_path(&self) -> &syn::Path {
+        &self.trait_path
+    }
+}
+
+impl<'src, S: SearchProperty> AllowCratePath<'src> for Property<S> {
     fn crate_path(&self) -> &syn::Path {
         &self.default_crate_path
     }

@@ -17,7 +17,7 @@ impl<'src, S> Compile<'src, Statement<'src, S, Self>, InnerType> for FieldsIter 
     fn compile(&self, node: &Statement<'src, S, Self>) -> InnerType {
         let item: MatchingItem = self.compile(node);
         let lifetime = &self.trait_lifetime;
-        let matching_type = &self.matching_type;
+        let matching_type = self.absolute_crate_path(&self.matching_type);
         let tokens = node
             .fields
             .iter()

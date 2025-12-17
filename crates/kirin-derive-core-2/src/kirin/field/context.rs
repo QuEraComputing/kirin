@@ -3,7 +3,7 @@ use bon::Builder;
 use super::extra::FieldExtra;
 use crate::data::*;
 use crate::kirin::attrs::*;
-use crate::utils::to_camel_case;
+use crate::utils::{to_camel_case, from_str, strip_path};
 
 /// context information for deriving field iterators with following signature:
 ///
@@ -54,18 +54,6 @@ impl FieldsIter {
     }
 }
 
-fn strip_path(path: &syn::Path) -> syn::Ident {
-    path.segments
-        .last()
-        .expect("matching_type_path must have at least one segment")
-        .ident
-        .clone()
-}
-
-fn from_str<T: syn::parse::Parse>(s: impl Into<String>) -> T {
-    syn::parse_str(&s.into()).unwrap()
-}
-
 impl<'src> Context<'src> for FieldsIter {
     type AttrGlobal = KirinGlobalOptions;
     type AttrStatement = KirinStatementOptions;
@@ -76,7 +64,15 @@ impl<'src> Context<'src> for FieldsIter {
     fn helper_attribute() -> &'static str {
         "kirin"
     }
+}
 
+impl<'src> TraitContext<'src> for FieldsIter {
+    fn trait_path(&self) -> &syn::Path {
+        &self.trait_path
+    }
+}
+
+impl<'src> AllowCratePath<'src> for FieldsIter {
     fn crate_path(&self) -> &syn::Path {
         &self.default_crate_path
     }

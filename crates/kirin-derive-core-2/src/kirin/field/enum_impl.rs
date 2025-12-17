@@ -20,14 +20,16 @@ impl<'src> Compile<'src, DialectEnum<'src, FieldsIter>, EnumImpl> for FieldsIter
         let iter: iter::EnumImpl = self.compile(node);
         let iter_name: iter::Name = self.compile(node);
         let iter_type: iter::FullType = self.compile(node);
-        let variant_name: Vec<&syn::Ident> =
-            node.variants.iter().map(|v| v.source_ident()).collect();
-        let unpacking: Vec<Unpacking<'_, '_, _, _>> =
-            node.variants.iter().map(|v| v.fields.unpacking()).collect();
-        let arm_body: Vec<TraitMatchArmBody> =
-            node.variants.iter().map(|v| self.compile(v)).collect();
+        let variant_ident = node.variant_idents();
+        let unpacking = node.unpacking();
+        // let action: Vec<TraitMatchArmBody> = node.variants.iter().map(|v| self.compile(v)).collect();
+        let action: Vec<TraitMatchArmBody> = node.match_action(self);
+        let trait_path: TraitPath = self.compile(node);
 
-        let trait_impl = TraitImpl::new(node.source(), &self.trait_name, &trait_generics)
+        let trait_impl = TraitImpl::default()
+            .input(node.source())
+            .trait_path(trait_path)
+            .trait_generics(trait_generics)
             .add_type(trait_type_iter, iter_type)
             .add_method(
                 TraitItemFnImpl::new(&self.trait_method)
@@ -37,8 +39,8 @@ impl<'src> Compile<'src, DialectEnum<'src, FieldsIter>, EnumImpl> for FieldsIter
                     .with_token_body(quote! {
                         match self {
                             #(
-                                Self::#variant_name #unpacking => {
-                                    #iter_name::#arm_body
+                                Self::#variant_ident #unpacking => {
+                                    #iter_name::#action
                                 }
                             ),*
                         }
