@@ -8,10 +8,12 @@ impl<'a, T> HasArguments<'a> for TestEnum<T> {
     fn arguments(&'a self) -> Self::Iter {
         match self {
             Self::VariantA { a, b, c } => {
-                ArgumentsIter::VariantA(std::iter::once(a).chain(std::iter::once(c)))
+                TestEnumArgumentsIter::VariantA(
+                    std::iter::once(a).chain(std::iter::once(c)),
+                )
             }
             Self::VariantB(field_0, field_1, field_2) => {
-                ArgumentsIter::VariantB(
+                TestEnumArgumentsIter::VariantB(
                     std::iter::once(field_0).chain(std::iter::once(field_2)),
                 )
             }
@@ -43,10 +45,12 @@ impl<'a, T> HasArgumentsMut<'a> for TestEnum<T> {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         match self {
             Self::VariantA { a, b, c } => {
-                ArgumentsMutIter::VariantA(std::iter::once(a).chain(std::iter::once(c)))
+                TestEnumArgumentsMutIter::VariantA(
+                    std::iter::once(a).chain(std::iter::once(c)),
+                )
             }
             Self::VariantB(field_0, field_1, field_2) => {
-                ArgumentsMutIter::VariantB(
+                TestEnumArgumentsMutIter::VariantB(
                     std::iter::once(field_0).chain(std::iter::once(field_2)),
                 )
             }

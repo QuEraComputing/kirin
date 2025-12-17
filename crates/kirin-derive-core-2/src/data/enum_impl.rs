@@ -1,7 +1,7 @@
 use darling::FromDeriveInput;
 
 use super::core::Statement;
-use super::traits::{Context, FromContext};
+use super::traits::*;
 
 pub struct DialectEnum<'src, Ctx: Context<'src>> {
     pub attrs: Ctx::AttrGlobal,
@@ -13,6 +13,25 @@ pub struct DialectEnum<'src, Ctx: Context<'src>> {
 impl<'src, Ctx: Context<'src>> DialectEnum<'src, Ctx> {
     pub fn input(&self) -> &'src syn::DeriveInput {
         self.src
+    }
+}
+
+impl<'src, Ctx: Context<'src>> Source for DialectEnum<'src, Ctx> {
+    type Output = syn::DeriveInput;
+    fn source(&self) -> &Self::Output {
+        self.src
+    }
+}
+
+impl<'src, Ctx: Context<'src>> HasGenerics for DialectEnum<'src, Ctx> {
+    fn generics(&self) -> &syn::Generics {
+        &self.src.generics
+    }
+}
+
+impl<'src, Ctx: Context<'src>> ContainsWrapper for DialectEnum<'src, Ctx> {
+    fn contains_wrapper(&self) -> bool {
+        self.wraps || self.variants.iter().any(|v| v.contains_wrapper())
     }
 }
 

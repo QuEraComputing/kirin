@@ -8,12 +8,18 @@ impl<'a> HasArguments<'a> for ControlFlowInstruction {
     fn arguments(&'a self) -> Self::Iter {
         match self {
             Self::Branch { target } => {
-                ArgumentsIter::Branch(std::iter::empty::<&'a SSAValue>())
+                ControlFlowInstructionArgumentsIter::Branch(
+                    std::iter::empty::<&'a SSAValue>(),
+                )
             }
             Self::ConditionalBranch { condition, true_target, false_target } => {
-                ArgumentsIter::ConditionalBranch(std::iter::once(condition))
+                ControlFlowInstructionArgumentsIter::ConditionalBranch(
+                    std::iter::once(condition),
+                )
             }
-            Self::Return(field_0) => ArgumentsIter::Return(std::iter::once(field_0)),
+            Self::Return(field_0) => {
+                ControlFlowInstructionArgumentsIter::Return(std::iter::once(field_0))
+            }
         }
     }
 }
@@ -40,12 +46,18 @@ impl<'a> HasArgumentsMut<'a> for ControlFlowInstruction {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         match self {
             Self::Branch { target } => {
-                ArgumentsMutIter::Branch(std::iter::empty::<&'a mut SSAValue>())
+                ControlFlowInstructionArgumentsMutIter::Branch(
+                    std::iter::empty::<&'a mut SSAValue>(),
+                )
             }
             Self::ConditionalBranch { condition, true_target, false_target } => {
-                ArgumentsMutIter::ConditionalBranch(std::iter::once(condition))
+                ControlFlowInstructionArgumentsMutIter::ConditionalBranch(
+                    std::iter::once(condition),
+                )
             }
-            Self::Return(field_0) => ArgumentsMutIter::Return(std::iter::once(field_0)),
+            Self::Return(field_0) => {
+                ControlFlowInstructionArgumentsMutIter::Return(std::iter::once(field_0))
+            }
         }
     }
 }

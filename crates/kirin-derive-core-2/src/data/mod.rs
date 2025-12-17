@@ -1,67 +1,53 @@
 /// representation of a statement, could either be a struct or enum variant
 mod core;
+mod dialect_impl;
 mod enum_impl;
 mod field;
-pub mod gadgets;
+mod gadgets;
 mod struct_impl;
 mod traits;
 
 pub use core::Statement;
+pub use dialect_impl::Dialect;
 pub use enum_impl::DialectEnum;
-pub use field::{Field, Fields, FieldMember};
+pub use field::{Field, FieldMember, Fields, Unpacking};
+pub use gadgets::*;
 pub use struct_impl::DialectStruct;
-pub use traits::{Compile, Context, FromContext, SimpleTraitDerive};
+pub use traits::*;
 
-pub enum Dialect<'src, Ctx: Context<'src>> {
-    Struct(struct_impl::DialectStruct<'src, Ctx>),
-    Enum(enum_impl::DialectEnum<'src, Ctx>),
-}
+/// Creates a wrapper over TokenStream to mark
+/// the compile target semantically for composability.
+/// See the default `kirin` module for usage examples.
+#[macro_export]
+macro_rules! target {
+    {$(#[$attr:meta])* $v:vis struct $name:ident} => {
+        #[derive(Clone)]
+        $(#[$attr])*
+        $v struct $name(proc_macro2::TokenStream);
 
-impl<'src, Ctx: Context<'src>> traits::FromContext<'src, Ctx, syn::DeriveInput>
-    for Dialect<'src, Ctx>
-{
-    fn from_context(ctx: &Ctx, node: &'src syn::DeriveInput) -> syn::Result<Self> {
-        match &node.data {
-            syn::Data::Struct(_) => Ok(Dialect::Struct(struct_impl::DialectStruct::from_context(
-                ctx, node,
-            )?)),
-            syn::Data::Enum(_) => Ok(Dialect::Enum(enum_impl::DialectEnum::from_context(
-                ctx, node,
-            )?)),
-            _ => Err(syn::Error::new_spanned(
-                node,
-                "Dialect can only be created from struct or enum data",
-            )),
+        impl std::ops::Deref for $name {
+            type Target = proc_macro2::TokenStream;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
         }
-    }
-}
 
-impl<'src, Ctx: Context<'src>> Dialect<'src, Ctx> {
-    pub fn attrs(&self) -> &Ctx::AttrGlobal {
-        match self {
-            Dialect::Struct(s) => &s.attrs,
-            Dialect::Enum(e) => &e.attrs,
+        impl quote::ToTokens for $name {
+            fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+                self.0.to_tokens(tokens);
+            }
         }
-    }
 
-    pub fn input(&self) -> &'src syn::DeriveInput {
-        match self {
-            Dialect::Struct(s) => s.input(),
-            Dialect::Enum(e) => e.input(),
+        impl From<$name> for proc_macro2::TokenStream {
+            fn from(value: $name) -> Self {
+                value.0
+            }
         }
-    }
-}
 
-impl<'src, Ctx: Context<'src>> std::fmt::Debug for Dialect<'src, Ctx>
-where
-    Ctx::AttrGlobal: std::fmt::Debug,
-    struct_impl::DialectStruct<'src, Ctx>: std::fmt::Debug,
-    enum_impl::DialectEnum<'src, Ctx>: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Dialect::Struct(s) => f.debug_tuple("Dialect::Struct").field(s).finish(),
-            Dialect::Enum(e) => f.debug_tuple("Dialect::Enum").field(e).finish(),
+        impl From<proc_macro2::TokenStream> for $name {
+            fn from(value: proc_macro2::TokenStream) -> Self {
+                $name(value)
+            }
         }
-    }
+    };
 }

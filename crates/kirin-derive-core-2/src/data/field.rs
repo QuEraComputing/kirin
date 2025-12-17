@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
-use super::traits::{Context, FromContext};
+use super::{
+    Source, Wrapper,
+    traits::{Context, FromContext},
+};
 use bon::Builder;
 use darling::FromField;
 use quote::{ToTokens, format_ident, quote};
@@ -37,15 +40,6 @@ impl<'src, Attr, E> Fields<'src, Attr, E> {
         Unpacking { inner: self }
     }
 
-    /// returns the field marked as wraps, if any
-    pub fn wrapper(&self) -> Option<FieldMember<'_, 'src, Attr, E>> {
-        let (idx, f) = self.inner.iter().enumerate().find(|(_, f)| f.wraps)?;
-        Some(FieldMember {
-            data: f,
-            index: idx,
-        })
-    }
-
     /// set the field marked as wraps, if only one field exists
     pub fn set_wrapper(&mut self) -> Result<(), syn::Error> {
         if self.len() == 1 {
@@ -57,6 +51,25 @@ impl<'src, Attr, E> Fields<'src, Attr, E> {
                 "Cannot infer wrapper field: #[wraps] is set but no field is marked as wraps",
             ))
         }
+    }
+}
+
+impl<'src, Attr, E> Wrapper<'src, Attr, E>
+    for Fields<'src, Attr, E>
+{
+    fn wrapper(&self) -> Option<FieldMember<'_, 'src, Attr, E>> {
+        let (idx, f) = self.inner.iter().enumerate().find(|(_, f)| f.wraps)?;
+        Some(FieldMember {
+            data: f,
+            index: idx,
+        })
+    }
+}
+
+impl<'src, Attr, E> Source for Fields<'src, Attr, E> {
+    type Output = syn::Fields;
+    fn source(&self) -> &Self::Output {
+        self.src
     }
 }
 

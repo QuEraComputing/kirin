@@ -1,9 +1,15 @@
 mod enum_impl;
-mod field;
+mod expr;
+mod ty;
+mod impl_head;
+mod item;
+mod name;
 mod struct_impl;
+mod type_head;
 mod variant;
 
-pub use enum_impl::IteratorImplEnum;
-pub use field::FieldIterator;
-pub use struct_impl::IteratorImplStruct;
-pub use variant::TraitMatchArmVariant;
+pub use name::Name;
+pub use enum_impl::EnumImpl;
+pub use struct_impl::{StructImpl, StructExpr};
+pub use ty::FullType;
+pub use variant::TraitMatchArmBody;

@@ -42,6 +42,18 @@ pub struct FieldsIter {
     pub matching_type_name: syn::Ident,
 }
 
+impl FieldsIter {
+    pub fn generics(&self) -> syn::Generics {
+        let mut generics = syn::Generics::default();
+        generics
+            .params
+            .push(syn::GenericParam::Lifetime(syn::LifetimeParam::new(
+                self.trait_lifetime.clone(),
+            )));
+        generics
+    }
+}
+
 fn strip_path(path: &syn::Path) -> syn::Ident {
     path.segments
         .last()

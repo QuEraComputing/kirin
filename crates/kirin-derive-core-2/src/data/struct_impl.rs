@@ -1,7 +1,7 @@
 use darling::FromDeriveInput;
 
 use super::core::Statement;
-use super::traits::{Context, FromContext};
+use super::{FieldMember, traits::*};
 
 pub struct DialectStruct<'src, Ctx: Context<'src>> {
     pub attrs: Ctx::AttrGlobal,
@@ -9,9 +9,30 @@ pub struct DialectStruct<'src, Ctx: Context<'src>> {
     pub statement: Statement<'src, syn::DeriveInput, Ctx>,
 }
 
-impl<'src, Ctx: Context<'src>> DialectStruct<'src, Ctx> {
-    pub fn input(&self) -> &'src syn::DeriveInput {
-        self.statement.src
+impl<'src, Ctx: Context<'src>> Wrapper<'src, Ctx::AttrField, Ctx::FieldExtra>
+    for DialectStruct<'src, Ctx>
+{
+    fn wrapper(&self) -> Option<FieldMember<'_, 'src, Ctx::AttrField, Ctx::FieldExtra>> {
+        self.statement.fields.wrapper()
+    }
+}
+
+impl<'src, Ctx: Context<'src>> Source for DialectStruct<'src, Ctx> {
+    type Output = syn::DeriveInput;
+    fn source(&self) -> &Self::Output {
+        self.statement.source()
+    }
+}
+
+impl<'src, Ctx: Context<'src>> HasGenerics for DialectStruct<'src, Ctx> {
+    fn generics(&self) -> &syn::Generics {
+        &self.statement.src.generics
+    }
+}
+
+impl<'src, Ctx: Context<'src>> ContainsWrapper for DialectStruct<'src, Ctx> {
+    fn contains_wrapper(&self) -> bool {
+        self.wraps
     }
 }
 

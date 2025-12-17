@@ -1,7 +1,8 @@
 use darling::{FromDeriveInput, FromVariant};
+use quote::ToTokens;
 
 use super::field::Fields;
-use super::traits::{Context, FromContext};
+use super::{FieldMember, traits::*};
 
 /// a dialect statement with its kirin attributes and fields
 #[derive(Clone)]
@@ -17,6 +18,41 @@ impl<'src, S, Ctx: Context<'src>> Statement<'src, S, Ctx> {
     /// Check if the statement is a wrapper
     pub fn is_wrapper(&self) -> bool {
         self.wraps
+    }
+}
+
+impl<'src, S: ToTokens, Ctx: Context<'src>> Source for Statement<'src, S, Ctx> {
+    type Output = S;
+    fn source(&self) -> &Self::Output {
+        self.src
+    }
+}
+
+impl<'src, Ctx: Context<'src>> SourceIdent for Statement<'src, syn::Variant, Ctx> {
+    fn source_ident(&self) -> &syn::Ident {
+        &self.src.ident
+    }
+}
+
+impl<'src, Ctx: Context<'src>> HasGenerics for Statement<'src, syn::DeriveInput, Ctx> {
+    fn generics(&self) -> &syn::Generics {
+        &self.src.generics
+    }
+}
+
+impl<'src, S, Ctx: Context<'src>> ContainsWrapper for Statement<'src, S, Ctx> {
+    fn contains_wrapper(&self) -> bool {
+        self.wraps
+    }
+}
+
+impl<'src, S, Ctx> Wrapper<'src, Ctx::AttrField, Ctx::FieldExtra> for Statement<'src, S, Ctx>
+where
+    S: ToTokens,
+    Ctx: Context<'src>,
+{
+    fn wrapper(&self) -> Option<FieldMember<'_, 'src, Ctx::AttrField, Ctx::FieldExtra>> {
+        self.fields.wrapper()
     }
 }
 

@@ -8,20 +8,22 @@ impl<'a, T> HasArguments<'a> for TestEnum<T> {
     fn arguments(&'a self) -> Self::Iter {
         match self {
             Self::VariantA { wrapped } => {
-                ArgumentsIter::VariantA(
+                TestEnumArgumentsIter::VariantA(
                     <InnerStructA<T> as HasArguments>::arguments(wrapped),
                 )
             }
             Self::VariantB(field_0) => {
-                ArgumentsIter::VariantB(
+                TestEnumArgumentsIter::VariantB(
                     <InnerStructB<T> as HasArguments>::arguments(field_0),
                 )
             }
             Self::VariantC { a, b, c } => {
-                ArgumentsIter::VariantC(std::iter::once(a).chain(std::iter::once(c)))
+                TestEnumArgumentsIter::VariantC(
+                    std::iter::once(a).chain(std::iter::once(c)),
+                )
             }
             Self::VariantD(field_0, field_1, field_2) => {
-                ArgumentsIter::VariantD(
+                TestEnumArgumentsIter::VariantD(
                     std::iter::once(field_0).chain(std::iter::once(field_2)),
                 )
             }
@@ -57,20 +59,22 @@ impl<'a, T> HasArgumentsMut<'a> for TestEnum<T> {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         match self {
             Self::VariantA { wrapped } => {
-                ArgumentsMutIter::VariantA(
+                TestEnumArgumentsMutIter::VariantA(
                     <InnerStructA<T> as HasArgumentsMut>::arguments_mut(wrapped),
                 )
             }
             Self::VariantB(field_0) => {
-                ArgumentsMutIter::VariantB(
+                TestEnumArgumentsMutIter::VariantB(
                     <InnerStructB<T> as HasArgumentsMut>::arguments_mut(field_0),
                 )
             }
             Self::VariantC { a, b, c } => {
-                ArgumentsMutIter::VariantC(std::iter::once(a).chain(std::iter::once(c)))
+                TestEnumArgumentsMutIter::VariantC(
+                    std::iter::once(a).chain(std::iter::once(c)),
+                )
             }
             Self::VariantD(field_0, field_1, field_2) => {
-                ArgumentsMutIter::VariantD(
+                TestEnumArgumentsMutIter::VariantD(
                     std::iter::once(field_0).chain(std::iter::once(field_2)),
                 )
             }

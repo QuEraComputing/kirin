@@ -1,14 +1,14 @@
 ---
-source: crates/kirin-derive-core-2/src/kirin/field/context.rs
+source: crates/kirin-derive-core-2/src/kirin/check/mod.rs
 expression: "format!(\"{:#?}\", data)"
 ---
 Statement {
     attrs: KirinStatementOptions {
         format: None,
         builder: None,
-        constant: false,
-        pure: false,
-        terminator: false,
+        constant: true,
+        pure: true,
+        terminator: true,
         crate_path: Ignored,
         type_lattice: Ignored,
     },
@@ -41,7 +41,7 @@ Statement {
                     default: None,
                     ssa_ty: None,
                 },
-                extra: Other,
+                extra: (),
             },
             Field {
                 wraps: false,
@@ -69,7 +69,7 @@ Statement {
                     default: None,
                     ssa_ty: None,
                 },
-                extra: Other,
+                extra: (),
             },
         ],
     },

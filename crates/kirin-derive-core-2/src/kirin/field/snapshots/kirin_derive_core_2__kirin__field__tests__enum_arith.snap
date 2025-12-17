@@ -8,16 +8,24 @@ impl<'a, T> HasArguments<'a> for ArithInstruction<T> {
     fn arguments(&'a self) -> Self::Iter {
         match self {
             Self::Add(field_0, field_1, field_2, field_3) => {
-                ArgumentsIter::Add(std::iter::once(field_0).chain(field_1.iter()))
+                ArithInstructionArgumentsIter::Add(
+                    std::iter::once(field_0).chain(field_1.iter()),
+                )
             }
             Self::Sub(field_0, field_1, field_2, field_3) => {
-                ArgumentsIter::Sub(std::iter::once(field_0).chain(field_1.iter()))
+                ArithInstructionArgumentsIter::Sub(
+                    std::iter::once(field_0).chain(field_1.iter()),
+                )
             }
             Self::Mul(field_0, field_1, field_2) => {
-                ArgumentsIter::Mul(std::iter::once(field_0).chain(field_1.iter()))
+                ArithInstructionArgumentsIter::Mul(
+                    std::iter::once(field_0).chain(field_1.iter()),
+                )
             }
             Self::Div(field_0, field_1, field_2) => {
-                ArgumentsIter::Div(std::iter::once(field_0).chain(field_1.iter()))
+                ArithInstructionArgumentsIter::Div(
+                    std::iter::once(field_0).chain(field_1.iter()),
+                )
             }
         }
     }
@@ -47,16 +55,24 @@ impl<'a, T> HasArgumentsMut<'a> for ArithInstruction<T> {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         match self {
             Self::Add(field_0, field_1, field_2, field_3) => {
-                ArgumentsMutIter::Add(std::iter::once(field_0).chain(field_1.iter_mut()))
+                ArithInstructionArgumentsMutIter::Add(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
             }
             Self::Sub(field_0, field_1, field_2, field_3) => {
-                ArgumentsMutIter::Sub(std::iter::once(field_0).chain(field_1.iter_mut()))
+                ArithInstructionArgumentsMutIter::Sub(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
             }
             Self::Mul(field_0, field_1, field_2) => {
-                ArgumentsMutIter::Mul(std::iter::once(field_0).chain(field_1.iter_mut()))
+                ArithInstructionArgumentsMutIter::Mul(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
             }
             Self::Div(field_0, field_1, field_2) => {
-                ArgumentsMutIter::Div(std::iter::once(field_0).chain(field_1.iter_mut()))
+                ArithInstructionArgumentsMutIter::Div(
+                    std::iter::once(field_0).chain(field_1.iter_mut()),
+                )
             }
         }
     }
