@@ -1,5 +1,0 @@
----
-source: crates/kirin-derive-core-2/src/data/debug.rs
-expression: report
----
-expected an expression

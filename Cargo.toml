@@ -18,7 +18,7 @@ members = [
     "crates/kirin-ir",
     "crates/kirin-prettyless",
     "crates/kirin-scf",
-    "crates/kirin-chumsky", "crates/kirin-test-utils", "crates/kirin-chumsky-derive", "crates/kirin-lexer", "crates/kirin-derive-core-2",
+    "crates/kirin-chumsky", "crates/kirin-test-utils", "crates/kirin-chumsky-derive", "crates/kirin-lexer", "crates/kirin-derive-core-3",
 ]
 
 [features]

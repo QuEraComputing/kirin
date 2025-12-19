@@ -1,0 +1,15 @@
+---
+source: crates/kirin-derive-core-3/src/kirin/property/mod.rs
+expression: content
+---
+#[automatically_derived]
+impl<T> ::kirin::ir::IsConstant for MyEnum<T> {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::VariantA { inner } => <InnerStructA<T> as IsConstant>::is_constant(inner),
+            Self::VariantB(field_0) => <InnerStructB as IsConstant>::is_constant(field_0),
+            Self::VariantC { a, b } => false || false,
+            Self::VariantD(field_0, field_1) => false || true,
+        }
+    }
+}

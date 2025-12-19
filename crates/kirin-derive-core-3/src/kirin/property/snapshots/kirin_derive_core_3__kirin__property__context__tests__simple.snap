@@ -1,0 +1,251 @@
+---
+source: crates/kirin-derive-core-3/src/kirin/property/context.rs
+expression: "format!(\"{:#?}\", data)"
+---
+Struct(
+    Struct {
+        input: DeriveInput {
+            attrs: [
+                Attribute {
+                    pound_token: Pound,
+                    style: AttrStyle::Outer,
+                    bracket_token: Bracket,
+                    meta: Meta::List {
+                        path: Path {
+                            leading_colon: None,
+                            segments: [
+                                PathSegment {
+                                    ident: Ident(
+                                        kirin,
+                                    ),
+                                    arguments: PathArguments::None,
+                                },
+                            ],
+                        },
+                        delimiter: MacroDelimiter::Paren(
+                            Paren,
+                        ),
+                        tokens: TokenStream [
+                            Ident {
+                                sym: constant,
+                            },
+                            Punct {
+                                char: ',',
+                                spacing: Alone,
+                            },
+                            Ident {
+                                sym: pure,
+                            },
+                            Punct {
+                                char: ',',
+                                spacing: Alone,
+                            },
+                            Ident {
+                                sym: terminator,
+                            },
+                            Punct {
+                                char: ',',
+                                spacing: Alone,
+                            },
+                            Ident {
+                                sym: type_lattice,
+                            },
+                            Punct {
+                                char: '=',
+                                spacing: Alone,
+                            },
+                            Ident {
+                                sym: L,
+                            },
+                        ],
+                    },
+                },
+            ],
+            vis: Visibility::Inherited,
+            ident: Ident(
+                MyStruct,
+            ),
+            generics: Generics {
+                lt_token: None,
+                params: [],
+                gt_token: None,
+                where_clause: None,
+            },
+            data: Data::Struct {
+                struct_token: Struct,
+                fields: Fields::Named {
+                    brace_token: Brace,
+                    named: [
+                        Field {
+                            attrs: [],
+                            vis: Visibility::Inherited,
+                            mutability: FieldMutability::None,
+                            ident: Some(
+                                Ident(
+                                    a,
+                                ),
+                            ),
+                            colon_token: Some(
+                                Colon,
+                            ),
+                            ty: Type::Path {
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                i32,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        Comma,
+                        Field {
+                            attrs: [],
+                            vis: Visibility::Inherited,
+                            mutability: FieldMutability::None,
+                            ident: Some(
+                                Ident(
+                                    b,
+                                ),
+                            ),
+                            colon_token: Some(
+                                Colon,
+                            ),
+                            ty: Type::Path {
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                i32,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        Comma,
+                    ],
+                },
+                semi_token: None,
+            },
+        },
+        src: DataStruct {
+            struct_token: Struct,
+            fields: Fields::Named {
+                brace_token: Brace,
+                named: [
+                    Field {
+                        attrs: [],
+                        vis: Visibility::Inherited,
+                        mutability: FieldMutability::None,
+                        ident: Some(
+                            Ident(
+                                a,
+                            ),
+                        ),
+                        colon_token: Some(
+                            Colon,
+                        ),
+                        ty: Type::Path {
+                            qself: None,
+                            path: Path {
+                                leading_colon: None,
+                                segments: [
+                                    PathSegment {
+                                        ident: Ident(
+                                            i32,
+                                        ),
+                                        arguments: PathArguments::None,
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    Comma,
+                    Field {
+                        attrs: [],
+                        vis: Visibility::Inherited,
+                        mutability: FieldMutability::None,
+                        ident: Some(
+                            Ident(
+                                b,
+                            ),
+                        ),
+                        colon_token: Some(
+                            Colon,
+                        ),
+                        ty: Type::Path {
+                            qself: None,
+                            path: Path {
+                                leading_colon: None,
+                                segments: [
+                                    PathSegment {
+                                        ident: Ident(
+                                            i32,
+                                        ),
+                                        arguments: PathArguments::None,
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    Comma,
+                ],
+            },
+            semi_token: None,
+        },
+        definition: DefinitionStruct(
+            DefinitionStatement {
+                attrs: KirinStructOptions {
+                    crate_path: None,
+                    type_lattice: Path {
+                        leading_colon: None,
+                        segments: [
+                            PathSegment {
+                                ident: Ident(
+                                    L,
+                                ),
+                                arguments: PathArguments::None,
+                            },
+                        ],
+                    },
+                    format: None,
+                    builder: None,
+                    constant: true,
+                    pure: true,
+                    terminator: true,
+                },
+                wraps: false,
+                fields: [
+                    DefinitionField {
+                        wraps: false,
+                        attrs: KirinFieldOptions {
+                            into: false,
+                            default: None,
+                            ssa_ty: None,
+                        },
+                        extra: (),
+                    },
+                    DefinitionField {
+                        wraps: false,
+                        attrs: KirinFieldOptions {
+                            into: false,
+                            default: None,
+                            ssa_ty: None,
+                        },
+                        extra: (),
+                    },
+                ],
+                extra: (),
+            },
+        ),
+    },
+)
