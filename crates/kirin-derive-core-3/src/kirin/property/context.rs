@@ -9,6 +9,7 @@ use crate::prelude::*;
 use super::enum_impl::EnumImpl;
 use super::struct_impl::StructImpl;
 
+/// Trait to define how to search for a property in parsed helper attributes
 pub trait SearchProperty: Sized {
     /// how to search for property in global-level struct attributes
     fn search_struct<'src>(data: &Struct<'src, Property<Self>>) -> TokenStream;
@@ -20,6 +21,8 @@ pub trait SearchProperty: Sized {
     fn combine(glob: &TokenStream, stmt: &TokenStream) -> TokenStream;
 }
 
+/// Macro to define searching boolean properties
+/// directly from attributes
 #[macro_export]
 macro_rules! boolean_property {
     ($name:ident, $key:ident) => {
@@ -53,6 +56,9 @@ boolean_property!(IsConstant, constant);
 boolean_property!(IsPure, pure);
 boolean_property!(IsTerminator, terminator);
 
+/// Derive a property for given statements.
+/// 
+/// The property is defined by implementing the `SearchProperty` trait.
 #[derive(Debug, Clone, Builder)]
 pub struct Property<S: SearchProperty> {
     #[builder(with = |s: impl Into<String>| from_str(s))]
