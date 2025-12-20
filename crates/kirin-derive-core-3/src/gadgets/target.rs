@@ -1,6 +1,15 @@
 /// Creates a wrapper over TokenStream to mark
 /// the compile target semantically for composability.
 /// See the default `kirin` module for usage examples.
+/// 
+/// # Examples
+/// 
+/// ```ignore
+/// target! {
+///    /// docstring for MyTarget
+///    pub struct MyTarget
+/// }
+/// ```
 #[macro_export]
 macro_rules! target {
     {$(#[$attr:meta])* $v:vis struct $name:ident} => {

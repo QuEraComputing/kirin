@@ -10,7 +10,7 @@ pub trait Emit<'src>:
     type StructImpl;
     type EnumImpl;
 
-    fn emit(&self, input: &'src syn::DeriveInput) -> TokenStream {
+    fn emit(&mut self, input: &'src syn::DeriveInput) -> TokenStream {
         self.scan(input)
             .and_then(|node| {
                 let fi: Alt<Self::StructImpl, Self::EnumImpl> = self.compile(&node);
@@ -20,7 +20,7 @@ pub trait Emit<'src>:
     }
 
     #[cfg(feature = "debug")]
-    fn print(self, input: &'src syn::DeriveInput) -> String {
+    fn print(&mut self, input: &'src syn::DeriveInput) -> String {
         use crate::debug::rustfmt;
         let source = self.emit(input).to_string();
         match syn::parse_file(&source) {

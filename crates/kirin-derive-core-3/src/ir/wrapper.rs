@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 
-use super::{HasFields, definition::*, source::Source};
+use super::{definition::*, source::Source};
 
 pub trait AnyWrapper {
     /// returns true if the structure is a wrapper over another dialect/statement
@@ -9,10 +9,10 @@ pub trait AnyWrapper {
     fn any_wrapper(&self) -> bool;
 }
 
-pub trait Wrapper<'src, Attr, L: Layout>: Source {
+pub trait Wrapper<'src, L: Layout>: Source {
     /// get the wrapper field if any
     #[must_use]
-    fn wrapper(&self) -> Option<Field<'_, 'src, Attr, L>>;
+    fn wrapper(&self) -> Option<Field<'_, 'src, L>>;
 
     #[must_use]
     fn wrapper_type(&self) -> Option<&'src syn::Type> {
@@ -20,7 +20,7 @@ pub trait Wrapper<'src, Attr, L: Layout>: Source {
     }
 
     #[must_use]
-    fn wrapper_or_error(&self) -> syn::Result<Field<'_, 'src, Attr, L>> {
+    fn wrapper_or_error(&self) -> syn::Result<Field<'_, 'src, L>> {
         self.wrapper().ok_or_else(|| {
             syn::Error::new_spanned(
                 self.source(), // assuming Source trait is in scope
@@ -49,11 +49,32 @@ pub trait Wrapper<'src, Attr, L: Layout>: Source {
     }
 }
 
-impl<'src, L> Wrapper<'src, L::VariantAttr, L> for Variant<'_, 'src, L>
+impl<'src, L> Wrapper<'src, L> for Fields<'_, 'src, L>
 where
     L: Layout,
 {
-    fn wrapper<'a>(&'a self) -> Option<Field<'a, 'src, L::VariantAttr, L>> {
+    fn wrapper(&self) -> Option<Field<'_, 'src, L>> {
+        let definition = self.definition();
+        definition
+            .fields()
+            .iter()
+            .zip(self.source().iter())
+            .enumerate()
+            .find(|(_, (f, _))| f.wraps)
+            .map(|(i, (_, src))| Field {
+                input: self.input,
+                src,
+                parent: definition.clone(),
+                index: i,
+            })
+    }
+}
+
+impl<'src, L> Wrapper<'src, L> for Variant<'_, 'src, L>
+where
+    L: Layout,
+{
+    fn wrapper<'a>(&'a self) -> Option<Field<'a, 'src, L>> {
         let definition = self.definition();
         definition
             .fields
@@ -64,17 +85,17 @@ where
             .map(|(i, (_, src))| Field {
                 input: self.input,
                 src,
-                parent: &definition.0,
+                parent: definition.into(),
                 index: i,
             })
     }
 }
 
-impl<'src, L> Wrapper<'src, L::StructAttr, L> for Struct<'src, L>
+impl<'src, L> Wrapper<'src, L> for Struct<'src, L>
 where
     L: Layout,
 {
-    fn wrapper(&self) -> Option<Field<'_, 'src, L::StructAttr, L>> {
+    fn wrapper(&self) -> Option<Field<'_, 'src, L>> {
         self.definition()
             .fields
             .iter()
@@ -84,7 +105,7 @@ where
             .map(|(i, (_, src))| Field {
                 input: self.input,
                 src,
-                parent: &self.definition().0,
+                parent: self.definition().into(),
                 index: i,
             })
     }

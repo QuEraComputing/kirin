@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-core-3/src/kirin/marker.rs
+expression: "Marker::builder().trait_path(syn::parse_quote!(MarkerTrait)).build().print(&input)"
+---
+impl ::my::path::MarkerTrait for StructuredControlFlow {}

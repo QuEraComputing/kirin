@@ -1,7 +1,7 @@
 use quote::quote;
 
-use crate::prelude::*;
 use crate::kirin::field::context::FieldsIter;
+use crate::prelude::*;
 use crate::target;
 
 use super::expr::Expr;

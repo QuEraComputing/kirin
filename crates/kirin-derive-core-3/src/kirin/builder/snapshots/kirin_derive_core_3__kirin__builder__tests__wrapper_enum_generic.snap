@@ -1,0 +1,16 @@
+---
+source: crates/kirin-derive-core-3/src/kirin/builder/mod.rs
+expression: "Builder::default().print(&input)"
+---
+impl<T: TypeLattice> From<If<T>> for StructuredControlFlow<T> {
+    fn from(value: If<T>) -> Self {
+        let field_0 = value;
+        Self::If(field_0)
+    }
+}
+impl<T: TypeLattice> From<For<T>> for StructuredControlFlow<T> {
+    fn from(value: For<T>) -> Self {
+        let field_0 = value;
+        Self::For(field_0)
+    }
+}

@@ -49,7 +49,7 @@ impl<'a, 'src, L: Layout> Attrs for Variant<'a, 'src, L> {
     }
 }
 
-impl<'a, 'src, Attr, L: Layout> Attrs for Field<'a, 'src, Attr, L> {
+impl<'a, 'src, L: Layout> Attrs for Field<'a, 'src, L> {
     type Output = L::FieldAttr;
     fn attrs(&self) -> &Self::Output {
         &self.definition().attrs

@@ -14,20 +14,8 @@ pub use generics::WithGenerics;
 pub use proc_macro2::TokenStream;
 pub use quote::ToTokens;
 pub use scan::{ScanExtra, ScanInto};
-pub use source::{Source, SourceIdent};
+pub use source::{Source, SourceIdent, WithInput};
 pub use wrapper::{AnyWrapper, Wrapper};
-
-pub trait StructOrVariant<'src, L: Layout>:
-    Attrs + Source + SourceIdent + HasFields<'src, L>
-{
-}
-
-impl<'src, T, L> StructOrVariant<'src, L> for T
-where
-    L: Layout,
-    T: Attrs + Source + SourceIdent + HasFields<'src, L>,
-{
-}
 
 #[cfg(test)]
 mod tests {
@@ -42,7 +30,7 @@ mod tests {
             }
         };
 
-        let node = EmptyLayout.scan(&input).unwrap();
+        let node = EmptyLayoutImpl.scan(&input).unwrap();
         insta::assert_debug_snapshot!(node);
     }
 
@@ -55,7 +43,7 @@ mod tests {
             }
         };
 
-        let node = EmptyLayout.scan(&input).unwrap();
+        let node = EmptyLayoutImpl.scan(&input).unwrap();
         insta::assert_debug_snapshot!(node);
     }
 
@@ -70,7 +58,7 @@ mod tests {
             }
         };
 
-        let node = EmptyLayout.scan(&input).unwrap();
+        let node = EmptyLayoutImpl.scan(&input).unwrap();
         insta::assert_debug_snapshot!(node);
     }
 
@@ -82,7 +70,7 @@ mod tests {
                 B { x: String },
             }
         };
-        let node = EmptyLayout.scan(&input).unwrap();
+        let node = EmptyLayoutImpl.scan(&input).unwrap();
         insta::assert_debug_snapshot!(node);
     }
 
@@ -95,7 +83,7 @@ mod tests {
                 B { x: String },
             }
         };
-        let node = EmptyLayout.scan(&input).unwrap();
+        let node = EmptyLayoutImpl.scan(&input).unwrap();
         insta::assert_debug_snapshot!(node);
     }
 }

@@ -8,7 +8,7 @@ pub struct KirinFieldOptions {
     pub into: bool,
     pub default: Option<syn::Expr>,
     #[darling(rename = "type")]
-    pub ssa_ty: Option<syn::Type>,
+    pub ssa_ty: Option<syn::Expr>,
 }
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(kirin))]
@@ -100,5 +100,37 @@ impl FromMeta for BuilderOptions {
                 "Expected identifier or string for builder name",
             )),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_struct_regular() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(constant, fn = new, type_lattice = L)]
+            pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
+                #[kirin(into)]
+                pub value: T,
+                #[kirin(type = value.type_of())]
+                pub result: ResultValue,
+                #[kirin(default = std::marker::PhantomData)]
+                pub marker: std::marker::PhantomData<L>,
+            }
+        };
+
+        let syn::Data::Struct(data) = &input.data else {
+            panic!("Expected struct data");
+        };
+        for f in data.fields.iter() {
+            let opts = KirinFieldOptions::from_field(f).unwrap();
+            insta::assert_debug_snapshot!(opts);
+        }
+
+        let opts = KirinStructOptions::from_derive_input(&input).unwrap();
+        insta::assert_debug_snapshot!(opts);
     }
 }

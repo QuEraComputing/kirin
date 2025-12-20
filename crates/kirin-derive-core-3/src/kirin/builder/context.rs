@@ -1,13 +1,19 @@
 use crate::{
-    prelude::*,
     kirin::attrs::{KirinEnumOptions, KirinFieldOptions, KirinStructOptions, KirinVariantOptions},
+    prelude::*,
 };
 
-pub struct Builder(syn::Path);
+use super::{enum_impl::EnumImpl, struct_impl::StructImpl};
+
+pub struct Builder {
+    crate_path: syn::Path,
+}
 
 impl Default for Builder {
     fn default() -> Self {
-        Builder(syn::parse_quote! { ::kirin::ir })
+        Builder {
+            crate_path: syn::parse_quote! { ::kirin::ir },
+        }
     }
 }
 
@@ -22,14 +28,19 @@ impl Layout for Builder {
 
 impl DeriveWithCratePath for Builder {
     fn crate_path(&self) -> &syn::Path {
-        &self.0
+        &self.crate_path
     }
+}
+
+impl Emit<'_> for Builder {
+    type EnumImpl = EnumImpl;
+    type StructImpl = StructImpl;
 }
 
 #[derive(Debug, Clone)]
 pub struct FieldExtra {
     pub(super) kind: FieldKind,
-    pub(super) container: FieldContainerKind,
+    pub(super) collection: FieldCollectionKind,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +54,7 @@ pub(super) enum FieldKind {
 }
 
 #[derive(Debug, Clone)]
-pub(super) enum FieldContainerKind {
+pub(super) enum FieldCollectionKind {
     Vec,
     Option,
     None,
@@ -58,23 +69,23 @@ macro_rules! impl_from_context {
                     if is_type(ty, stringify!($name)) {
                         FieldExtra {
                             kind: FieldKind::$name,
-                            container: FieldContainerKind::None,
+                            collection: FieldCollectionKind::None,
                         }
                     } else if is_type_in(ty, stringify!($name), |seg| seg.ident == "Vec") {
                         FieldExtra {
                             kind: FieldKind::$name,
-                            container: FieldContainerKind::Vec,
+                            collection: FieldCollectionKind::Vec,
                         }
                     } else if is_type_in(ty, stringify!($name), |seg| seg.ident == "Option") {
                         FieldExtra {
                             kind: FieldKind::$name,
-                            container: FieldContainerKind::Option,
+                            collection: FieldCollectionKind::Option,
                         }
                     } else
                 )* {
                     FieldExtra {
                         kind: FieldKind::Other,
-                        container: FieldContainerKind::None,
+                        collection: FieldCollectionKind::None,
                     }
                 };
                 Ok(extra)

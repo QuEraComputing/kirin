@@ -39,14 +39,14 @@ impl<'src, L: Layout> Source for Variant<'_, 'src, L> {
     }
 }
 
-impl<'a, 'src, Attr, L: Layout> Source for Field<'a, 'src, Attr, L> {
+impl<'a, 'src, L: Layout> Source for Field<'a, 'src, L> {
     type Output = &'src syn::Field;
     fn source(&self) -> Self::Output {
         self.src
     }
 }
 
-impl<'a, 'src, Attr, L: Layout> Source for Fields<'a, 'src, Attr, L> {
+impl<'a, 'src, L: Layout> Source for Fields<'a, 'src, L> {
     type Output = &'src syn::Fields;
     fn source(&self) -> Self::Output {
         &self.src
@@ -84,11 +84,60 @@ impl<'src, L: Layout> SourceIdent for Variant<'_, 'src, L> {
     }
 }
 
-impl<'a, 'src, Attr, L: Layout> SourceIdent for Field<'a, 'src, Attr, L> {
+impl<'a, 'src, L: Layout> SourceIdent for Fields<'a, 'src, L> {
+    fn source_ident(&self) -> syn::Ident {
+        self.ident.clone()
+    }
+}
+
+impl<'a, 'src, L: Layout> SourceIdent for Field<'a, 'src, L> {
     fn source_ident(&self) -> syn::Ident {
         self.src
             .ident
             .clone()
             .unwrap_or_else(|| format_ident!("field_{}", self.index))
+    }
+}
+
+pub trait WithInput<'src> {
+    fn input(&self) -> &'src syn::DeriveInput;
+}
+
+impl<'src, L: Layout> WithInput<'src> for Struct<'src, L> {
+    fn input(&self) -> &'src syn::DeriveInput {
+        self.input
+    }
+}
+
+impl<'src, L: Layout> WithInput<'src> for Enum<'src, L> {
+    fn input(&self) -> &'src syn::DeriveInput {
+        self.input
+    }
+}
+
+impl<'a, 'src, L: Layout> WithInput<'src> for Field<'a, 'src, L> {
+    fn input(&self) -> &'src syn::DeriveInput {
+        self.input
+    }
+}
+
+impl<'a, 'src, L: Layout> WithInput<'src> for Fields<'a, 'src, L> {
+    fn input(&self) -> &'src syn::DeriveInput {
+        self.input
+    }
+}
+
+impl<'a, 'src, L: Layout> WithInput<'src> for Variant<'a, 'src, L> {
+    fn input(&self) -> &'src syn::DeriveInput {
+        self.input
+    }
+}
+
+impl<'src, L: Layout> WithInput<'src> for Input<'src, L> {
+    fn input(&self) -> &'src syn::DeriveInput {
+        match self {
+            Input::Struct(s) => s.input(),
+            Input::Enum(e) => e.input(),
+        }
     }
 }

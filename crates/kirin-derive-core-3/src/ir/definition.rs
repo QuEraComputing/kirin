@@ -23,10 +23,9 @@ pub trait Layout {
     type FieldExtra;
 }
 
-#[cfg_attr(feature = "debug", derive(Debug))]
-pub struct EmptyLayout;
+pub trait EmptyLayout {}
 
-impl Layout for EmptyLayout {
+impl<T: EmptyLayout> Layout for T {
     type StructAttr = ();
     type EnumAttr = ();
     type VariantAttr = ();
@@ -34,6 +33,13 @@ impl Layout for EmptyLayout {
     type StatementExtra = ();
     type FieldExtra = ();
 }
+
+#[cfg(feature = "debug")]
+#[cfg_attr(feature = "debug", derive(Debug))]
+pub struct EmptyLayoutImpl;
+
+#[cfg(feature = "debug")]
+impl EmptyLayout for EmptyLayoutImpl {}
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DefinitionStruct<L: Layout>(pub(super) DefinitionStatement<L::StructAttr, L>);
@@ -83,6 +89,56 @@ pub struct DefinitionStatement<Attr, L: Layout> {
 }
 
 #[cfg_attr(feature = "debug", derive(Debug))]
+pub enum DefinitionStructOrVariant<'a, L: Layout> {
+    Struct(&'a DefinitionStruct<L>),
+    Variant(&'a DefinitionVariant<L>),
+}
+
+impl<L: Layout> Clone for DefinitionStructOrVariant<'_, L> {
+    fn clone(&self) -> Self {
+        match self {
+            DefinitionStructOrVariant::Struct(s) => DefinitionStructOrVariant::Struct(s),
+            DefinitionStructOrVariant::Variant(v) => DefinitionStructOrVariant::Variant(v),
+        }
+    }
+}
+
+impl<'a, L: Layout> DefinitionStructOrVariant<'a, L> {
+    pub fn is_wrapper(&self) -> bool {
+        match self {
+            DefinitionStructOrVariant::Struct(s) => s.wraps,
+            DefinitionStructOrVariant::Variant(v) => v.wraps,
+        }
+    }
+
+    pub fn fields(&self) -> &Vec<DefinitionField<L>> {
+        match self {
+            DefinitionStructOrVariant::Struct(s) => &s.fields,
+            DefinitionStructOrVariant::Variant(v) => &v.fields,
+        }
+    }
+
+    pub fn extra(&self) -> &L::StatementExtra {
+        match self {
+            DefinitionStructOrVariant::Struct(s) => &s.extra,
+            DefinitionStructOrVariant::Variant(v) => &v.extra,
+        }
+    }
+}
+
+impl<'a, L: Layout> From<&'a DefinitionStruct<L>> for DefinitionStructOrVariant<'a, L> {
+    fn from(s: &'a DefinitionStruct<L>) -> Self {
+        DefinitionStructOrVariant::Struct(s)
+    }
+}
+
+impl<'a, L: Layout> From<&'a DefinitionVariant<L>> for DefinitionStructOrVariant<'a, L> {
+    fn from(v: &'a DefinitionVariant<L>) -> Self {
+        DefinitionStructOrVariant::Variant(v)
+    }
+}
+
+#[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DefinitionField<L: Layout> {
     pub(super) wraps: bool,
     pub(super) attrs: L::FieldAttr,
@@ -90,7 +146,7 @@ pub struct DefinitionField<L: Layout> {
 }
 
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub enum Input<'src, L: Layout = EmptyLayout> {
+pub enum Input<'src, L: Layout = EmptyLayoutImpl> {
     Struct(Struct<'src, L>),
     Enum(Enum<'src, L>),
 }
@@ -114,10 +170,6 @@ impl<'src, L: Layout> Struct<'src, L> {
     pub fn extra(&self) -> &L::StatementExtra {
         &self.definition().0.extra
     }
-
-    pub fn input(&self) -> &'_ syn::DeriveInput {
-        self.input
-    }
 }
 
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -130,10 +182,6 @@ pub struct Enum<'src, L: Layout> {
 impl<'src, L: Layout> Enum<'src, L> {
     pub(super) fn definition(&self) -> &DefinitionEnum<L> {
         &self.definition
-    }
-
-    pub fn input(&self) -> &'_ syn::DeriveInput {
-        self.input
     }
 
     pub fn marked_wraps(&self) -> bool {
@@ -196,20 +244,22 @@ impl<L: Layout> Variant<'_, '_, L> {
         // if it is marked as #[wraps], it is only a syntax sugar for "has a wrapper field"
         self.definition().0.wraps
     }
-
-    pub fn input(&self) -> &'_ syn::DeriveInput {
-        self.input
-    }
 }
 
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct Fields<'a, 'src, Attr, L: Layout> {
+pub struct Fields<'a, 'src, L: Layout> {
     pub(super) input: &'src syn::DeriveInput,
+    pub(super) ident: &'src syn::Ident,
     pub(super) src: &'src syn::Fields,
-    pub(super) parent: &'a DefinitionStatement<Attr, L>,
+    pub(super) parent: DefinitionStructOrVariant<'a, L>,
 }
 
-impl<'a, 'src, Attr, L: Layout> Fields<'a, 'src, Attr, L> {
+impl<'a, 'src, L: Layout> Fields<'a, 'src, L> {
+    #[must_use]
+    pub fn definition(&self) -> &DefinitionStructOrVariant<'a, L> {
+        &self.parent
+    }
+
     #[must_use]
     pub fn len(&self) -> usize {
         self.src.len()
@@ -221,35 +271,31 @@ impl<'a, 'src, Attr, L: Layout> Fields<'a, 'src, Attr, L> {
     }
 
     #[must_use]
-    pub fn iter(&'a self) -> impl Iterator<Item = Field<'a, 'src, Attr, L>> + 'a {
+    pub fn iter(&'a self) -> impl Iterator<Item = Field<'a, 'src, L>> + 'a {
         self.src.iter().enumerate().map(move |(index, src)| Field {
             input: self.input,
             src,
-            parent: self.parent,
+            parent: self.parent.clone(),
             index,
         })
-    }
-
-    pub fn input(&self) -> &'_ syn::DeriveInput {
-        self.input
     }
 }
 
 #[cfg_attr(feature = "debug", derive(Debug))]
-pub struct Field<'a, 'src, Attr, L: Layout> {
+pub struct Field<'a, 'src, L: Layout> {
     pub(super) input: &'src syn::DeriveInput,
     pub(super) src: &'src syn::Field,
-    pub(super) parent: &'a DefinitionStatement<Attr, L>,
+    pub(super) parent: DefinitionStructOrVariant<'a, L>,
     pub(super) index: usize,
 }
 
-impl<Attr, L: Layout> Field<'_, '_, Attr, L> {
+impl<'a, L: Layout> Field<'a, '_, L> {
     pub(super) fn definition(&self) -> &DefinitionField<L> {
-        &self.parent.fields[self.index]
+        &self.parent.fields()[self.index]
     }
 
-    pub fn input(&self) -> &'_ syn::DeriveInput {
-        self.input
+    pub fn parent_definition(&self) -> &DefinitionStructOrVariant<'a, L> {
+        &self.parent
     }
 
     pub fn is_wrapper(&self) -> bool {
