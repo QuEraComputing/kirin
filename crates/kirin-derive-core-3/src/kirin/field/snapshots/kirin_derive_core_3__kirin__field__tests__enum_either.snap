@@ -24,8 +24,8 @@ impl<'a, T> kirin::ir::HasArguments<'a> for TestEnum<T> {
 }
 #[automatically_derived]
 pub enum TestEnumArgumentsIter<'a, T> {
-    VariantA(<InnerStructA<T> as HasArguments>::Iter),
-    VariantB(<InnerStructB<T> as HasArguments>::Iter),
+    VariantA(<InnerStructA<T> as HasArguments<'a>>::Iter),
+    VariantB(<InnerStructB<T> as HasArguments<'a>>::Iter),
     VariantC(
         std::iter::Chain<
             std::iter::Once<&'a kirin::ir::SSAValue>,
@@ -73,8 +73,8 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for TestEnum<T> {
 }
 #[automatically_derived]
 pub enum TestEnumArgumentsMutIter<'a, T> {
-    VariantA(<InnerStructA<T> as HasArgumentsMut>::IterMut),
-    VariantB(<InnerStructB<T> as HasArgumentsMut>::IterMut),
+    VariantA(<InnerStructA<T> as HasArgumentsMut<'a>>::IterMut),
+    VariantB(<InnerStructB<T> as HasArgumentsMut<'a>>::IterMut),
     VariantC(
         std::iter::Chain<
             std::iter::Once<&'a mut kirin::ir::SSAValue>,

@@ -12,7 +12,7 @@
 /// ```
 #[macro_export]
 macro_rules! target {
-    {$(#[$attr:meta])* $v:vis struct $name:ident} => {
+    {$(#[$attr:meta])* $v:vis struct $name:ident $(;)?} => {
         #[derive(Clone)]
         $(#[$attr])*
         $v struct $name(proc_macro2::TokenStream);

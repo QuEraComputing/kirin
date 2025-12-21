@@ -2,7 +2,7 @@ type = FLAIRKernelFuncType
 new_type = BufStateKernelFuncType
 
 fn @kernel<[total_buf_state = 4]>(%x: i32) -> !pulse {
-    buffer.alloca() : !buffer
+    %signal = transform.sample()
     %buf = buffer.define_state(index = 1)
     some_pulse_instruction
 }

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 bon = "3.8.1"
 darling = "0.23.0"
+kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
 proc-macro2 = "1.0.103"
 quote = "1.0.42"
 syn = "2.0.111"

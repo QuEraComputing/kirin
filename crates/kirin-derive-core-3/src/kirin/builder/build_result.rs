@@ -1,4 +1,5 @@
-use super::context::{Builder, FieldKind};
+use super::context::{Builder};
+use crate::kirin::extra::FieldKind;
 use crate::prelude::*;
 use quote::{format_ident, quote};
 

@@ -1,8 +1,6 @@
-use super::context::{Builder, FieldKind};
-use crate::{
-    kirin::builder::{context::FieldCollectionKind, name::StatementIdName},
-    prelude::*,
-};
+use super::{context::Builder, name::StatementIdName};
+use crate::kirin::extra::{FieldCollectionKind, FieldKind};
+use crate::prelude::*;
 use quote::quote;
 
 target! {

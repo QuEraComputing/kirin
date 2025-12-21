@@ -1,7 +1,8 @@
 use kirin::ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
-#[kirin(fn, type_lattice = T, wraps)]
+#[wraps]
+#[kirin(fn, type_lattice = T)]
 pub enum StructuredControlFlow<T: TypeLattice> {
     If(If<T>),
     For(For<T>),

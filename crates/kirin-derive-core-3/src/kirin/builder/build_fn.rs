@@ -1,11 +1,11 @@
 use quote::{format_ident, quote};
 
+use crate::kirin::extra::FieldKind;
 use crate::prelude::*;
 
 use super::{
     build_result::BuildResultFullPath,
     context::Builder,
-    context::FieldKind,
     initialization::Initialization,
     input::{InputSignature, LetNameEqInput},
     name::{BuildFnName, StatementIdName},

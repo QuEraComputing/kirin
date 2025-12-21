@@ -39,10 +39,7 @@ impl<'src> Compile<'src, Struct<'src, FieldsIter>, TypeGenerics> for FieldsIter 
 
 impl<'src> Compile<'src, Enum<'src, FieldsIter>, TypeGenerics> for FieldsIter {
     fn compile(&self, node: &Enum<'src, FieldsIter>) -> TypeGenerics {
-        if node.marked_wraps() {
-            // all wrapper no need to add lifetime
-            TypeGenerics(node.generics().clone())
-        } else if node.any_wrapper() {
+        if node.any_wrapper() {
             // contains wrapper, but has regular, add lifetime
             TypeGenerics(node.add_lifetime(self.trait_lifetime.clone()).clone())
         } else {

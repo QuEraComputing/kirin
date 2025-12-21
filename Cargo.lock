@@ -984,7 +984,8 @@ dependencies = [
 name = "kirin-derive"
 version = "0.1.0"
 dependencies = [
- "kirin-derive-core",
+ "kirin-derive-core-3",
+ "paste",
  "proc-macro2",
  "quote",
  "syn",
@@ -1008,6 +1009,7 @@ dependencies = [
  "bon",
  "darling 0.23.0",
  "insta",
+ "kirin-lexer",
  "proc-macro2",
  "quote",
  "syn",
@@ -1310,6 +1312,12 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "path_abs"

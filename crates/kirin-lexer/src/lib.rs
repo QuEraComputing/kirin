@@ -4,17 +4,34 @@ use logos::Logos;
 #[logos(skip r"[ \t\n\f]+")]
 pub enum Token<'src> {
     Error,
+    /// ```ignore
+    /// %<identifier>
+    /// ```
     #[regex(r"%[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
     SSAValue(&'src str),
     #[regex(r"\^[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
+    /// ```ignore
+    /// ^<identifier>
+    /// ```
     Block(&'src str),
-    // {identifier}
+    /// ```ignore
+    /// {<identifier>}
+    /// ```
     #[regex(r"\{[\p{XID_Start}_][\p{XID_Continue}_$.]*\}", |lex| &lex.slice()[1..lex.slice().len()-1])]
     Quote(&'src str),
+    /// ```ignore
+    /// <identifier>
+    /// ```
     #[regex(r"[\p{XID_Start}_][\p{XID_Continue}_$.]*")]
     Identifier(&'src str),
+    /// ```ignore
+    /// @<symbol>
+    /// ```
     #[regex(r"@[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
     Symbol(&'src str),
+    /// ```ignore
+    /// #<attr_id>
+    /// ```
     #[regex(r"#[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
     AttrId(&'src str),
 
@@ -93,6 +110,17 @@ impl std::fmt::Display for Token<'_> {
             Token::Semicolon => write!(f, ";"),
         }
     }
+}
+
+pub fn lex<'src>(input: &'src str) -> impl Iterator<Item = Result<Token<'src>, String>> + 'src {
+    Token::lexer(input)
+        .spanned()
+        .map(|(token, span)| match token {
+            Ok(Token::Error) | Err(_) => {
+                Err(format!("Unexpected token at position {}", span.start))
+            }
+            Ok(t) => Ok(t),
+        })
 }
 
 #[cfg(test)]

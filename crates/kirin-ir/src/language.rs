@@ -2,18 +2,14 @@ use crate::lattice::TypeLattice;
 
 // TODO: use Cow<'a, str> for name to avoid allocations in some cases
 
-pub trait HasName {
-    fn name(&self) -> String;
-}
-
 pub trait HasArguments<'a> {
     type Iter: Iterator<Item = &'a crate::SSAValue>;
     fn arguments(&'a self) -> Self::Iter;
 }
 
 pub trait HasArgumentsMut<'a> {
-    type Iter: Iterator<Item = &'a mut crate::SSAValue>;
-    fn arguments_mut(&'a mut self) -> Self::Iter;
+    type IterMut: Iterator<Item = &'a mut crate::SSAValue>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut;
 }
 
 pub trait HasResults<'a> {
@@ -22,8 +18,8 @@ pub trait HasResults<'a> {
 }
 
 pub trait HasResultsMut<'a> {
-    type Iter: Iterator<Item = &'a mut crate::ResultValue>;
-    fn results_mut(&'a mut self) -> Self::Iter;
+    type IterMut: Iterator<Item = &'a mut crate::ResultValue>;
+    fn results_mut(&'a mut self) -> Self::IterMut;
 }
 
 pub trait HasBlocks<'a> {
@@ -32,8 +28,8 @@ pub trait HasBlocks<'a> {
 }
 
 pub trait HasBlocksMut<'a> {
-    type Iter: Iterator<Item = &'a mut crate::Block>;
-    fn blocks_mut(&'a mut self) -> Self::Iter;
+    type IterMut: Iterator<Item = &'a mut crate::Block>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut;
 }
 
 pub trait HasSuccessors<'a> {
@@ -42,8 +38,8 @@ pub trait HasSuccessors<'a> {
 }
 
 pub trait HasSuccessorsMut<'a> {
-    type Iter: Iterator<Item = &'a mut crate::Successor>;
-    fn successors_mut(&'a mut self) -> Self::Iter;
+    type IterMut: Iterator<Item = &'a mut crate::Successor>;
+    fn successors_mut(&'a mut self) -> Self::IterMut;
 }
 
 pub trait HasRegions<'a> {
@@ -52,8 +48,8 @@ pub trait HasRegions<'a> {
 }
 
 pub trait HasRegionsMut<'a> {
-    type Iter: Iterator<Item = &'a mut crate::Region>;
-    fn regions_mut(&'a mut self) -> Self::Iter;
+    type IterMut: Iterator<Item = &'a mut crate::Region>;
+    fn regions_mut(&'a mut self) -> Self::IterMut;
 }
 
 pub trait IsTerminator {
@@ -70,8 +66,7 @@ pub trait IsPure {
 
 /// An instruction combines several traits to provide a complete interface.
 pub trait Dialect:
-    HasName
-    + for<'a> HasArguments<'a>
+    for<'a> HasArguments<'a>
     + for<'a> HasResults<'a>
     + for<'a> HasArgumentsMut<'a>
     + for<'a> HasResultsMut<'a>

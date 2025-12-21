@@ -18,6 +18,7 @@ use super::{enum_impl::EnumImpl, extra::FieldExtra, struct_impl::StructImpl};
 pub struct FieldsIter {
     #[builder(with = |s: impl Into<String>| from_str(s))]
     pub default_crate_path: syn::Path,
+    #[builder(default)]
     pub mutable: bool,
     #[builder(with = |s: impl Into<String>| from_str(s))]
     pub trait_path: syn::Path,

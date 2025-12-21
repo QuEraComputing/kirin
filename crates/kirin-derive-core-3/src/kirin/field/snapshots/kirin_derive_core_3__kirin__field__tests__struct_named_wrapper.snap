@@ -14,7 +14,7 @@ impl<'a, T> kirin::ir::HasArguments<'a> for NamedWrapper<T> {
 }
 #[automatically_derived]
 pub struct NamedWrapperArgumentsIter<'a, T> {
-    inner: <InnerStruct<T> as HasArguments>::Iter,
+    inner: <InnerStruct<T> as HasArguments<'a>>::Iter,
 }
 #[automatically_derived]
 impl<'a, T> Iterator for NamedWrapperArgumentsIter<'a, T> {
@@ -35,7 +35,7 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for NamedWrapper<T> {
 }
 #[automatically_derived]
 pub struct NamedWrapperArgumentsMutIter<'a, T> {
-    inner: <InnerStruct<T> as HasArgumentsMut>::IterMut,
+    inner: <InnerStruct<T> as HasArgumentsMut<'a>>::IterMut,
 }
 #[automatically_derived]
 impl<'a, T> Iterator for NamedWrapperArgumentsMutIter<'a, T> {

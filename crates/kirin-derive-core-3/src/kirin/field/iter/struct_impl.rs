@@ -68,10 +68,11 @@ impl<'src> Compile<'src, Struct<'src, Self>, WrapperStructTypeDef> for FieldsIte
         let trait_type_iter = &self.trait_type_iter;
         let head: TypeHead = self.compile(node);
         let wrapped_type = node.wrapper_type_tokens();
+        let (_, ty_generics, _) = &self.generics().split_for_impl();
         WrapperStructTypeDef(quote! {
             #[automatically_derived]
             pub struct #head {
-                inner: <#wrapped_type as #trait_path>::#trait_type_iter,
+                inner: <#wrapped_type as #trait_path #ty_generics>::#trait_type_iter,
             }
         })
     }

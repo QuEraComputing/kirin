@@ -34,9 +34,10 @@ impl<'a, 'src> Compile<'src, Variant<'a, 'src, Self>, WrapperVariantTypeDef> for
         let variant_name = node.source_ident();
         let wrapped_type = node.wrapper_type_tokens();
         let trait_path = &self.trait_path;
+        let (_, ty_generics, _) = &self.generics().split_for_impl();
         let trait_type_iter = &self.trait_type_iter;
         WrapperVariantTypeDef(quote! {
-            #variant_name (<#wrapped_type as #trait_path>::#trait_type_iter)
+            #variant_name (<#wrapped_type as #trait_path #ty_generics>::#trait_type_iter)
         })
     }
 }
@@ -48,9 +49,7 @@ target! {
     pub struct RegularTraitMatchArmBody
 }
 
-impl<'a, 'src> Compile<'src, Variant<'a, 'src, Self>, RegularTraitMatchArmBody>
-    for FieldsIter
-{
+impl<'a, 'src> Compile<'src, Variant<'a, 'src, Self>, RegularTraitMatchArmBody> for FieldsIter {
     fn compile(&self, node: &Variant<'a, 'src, Self>) -> RegularTraitMatchArmBody {
         let variant_name = node.source_ident();
         let expr: Expr = self.compile(node);
@@ -65,9 +64,7 @@ target! {
     pub struct WrapperTraitMatchArmBody
 }
 
-impl<'a, 'src> Compile<'src, Variant<'a, 'src, Self>, WrapperTraitMatchArmBody>
-    for FieldsIter
-{
+impl<'a, 'src> Compile<'src, Variant<'a, 'src, Self>, WrapperTraitMatchArmBody> for FieldsIter {
     fn compile(&self, node: &Variant<'a, 'src, Self>) -> WrapperTraitMatchArmBody {
         let variant_name = node.source_ident();
         let wrapper = node.wrapper_tokens();

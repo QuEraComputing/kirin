@@ -9,13 +9,14 @@ use super::attrs::{KirinEnumOptions, KirinFieldOptions, KirinStructOptions, Kiri
 /// is a trait without any methods or associated items,
 /// used to mark types for special behavior or categorization.
 #[derive(Builder)]
-pub struct Marker {
+pub struct DialectMarker {
+    #[builder(with = |s: impl Into<String>| from_str(s))]
     trait_path: syn::Path,
-    #[builder(default = syn::parse_quote!(::kirin::ir))]
+    #[builder(default = syn::parse_quote!(::kirin::ir), with = |s: impl Into<String>| from_str(s))]
     crate_path: syn::Path,
 }
 
-impl Layout for Marker {
+impl Layout for DialectMarker {
     type EnumAttr = KirinEnumOptions;
     type StructAttr = KirinStructOptions;
     type VariantAttr = KirinVariantOptions;
@@ -24,13 +25,13 @@ impl Layout for Marker {
     type StatementExtra = ();
 }
 
-impl DeriveTrait for Marker {
+impl DeriveTrait for DialectMarker {
     fn trait_path(&self) -> &syn::Path {
         &self.trait_path
     }
 }
 
-impl DeriveWithCratePath for Marker {
+impl DeriveWithCratePath for DialectMarker {
     fn crate_path(&self) -> &syn::Path {
         &self.crate_path
     }
@@ -38,14 +39,17 @@ impl DeriveWithCratePath for Marker {
 
 macro_rules! impl_compile {
     ($name:ident) => {
-        impl<'src> Compile<'src, $name<'src, Marker>, TokenStream> for Marker {
-            fn compile(&self, node: &$name<'src, Marker>) -> TokenStream {
+        impl<'src> Compile<'src, $name<'src, DialectMarker>, TokenStream> for DialectMarker {
+            fn compile(&self, node: &$name<'src, DialectMarker>) -> TokenStream {
                 let name = &node.input().ident;
                 let (impl_generics, ty_generics, where_clause) =
                     node.input().generics.split_for_impl();
                 let trait_path: TraitPath = self.compile(node);
+                let type_lattice = &node.attrs().type_lattice;
                 quote! {
-                    impl #impl_generics #trait_path for #name #ty_generics #where_clause {}
+                    impl #impl_generics #trait_path for #name #ty_generics #where_clause {
+                        type TypeLattice = #type_lattice;
+                    }
                 }
             }
         }
@@ -55,7 +59,7 @@ macro_rules! impl_compile {
 impl_compile!(Enum);
 impl_compile!(Struct);
 
-impl<'src> Emit<'src> for Marker {
+impl<'src> Emit<'src> for DialectMarker {
     type EnumImpl = TokenStream;
     type StructImpl = TokenStream;
 }
@@ -81,8 +85,8 @@ mod tests {
             }
         };
         insta::assert_snapshot!(
-            Marker::builder()
-                .trait_path(syn::parse_quote!(MarkerTrait))
+            DialectMarker::builder()
+                .trait_path("MarkerTrait")
                 .build()
                 .print(&input)
         );

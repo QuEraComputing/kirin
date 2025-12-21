@@ -17,7 +17,7 @@ pub use context::Context;
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasName, HasRegions,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasRegions,
     HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure,
     IsTerminator,
 };
