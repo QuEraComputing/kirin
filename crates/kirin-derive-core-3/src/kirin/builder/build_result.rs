@@ -1,5 +1,5 @@
-use super::context::{Builder};
-use crate::kirin::extra::FieldKind;
+use super::context::Builder;
+use crate::kirin::{builder::result::ResultNames, extra::FieldKind};
 use crate::prelude::*;
 use quote::{format_ident, quote};
 
@@ -58,12 +58,12 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, BuildResultImpl> for Builder
         }
 
         let build_result_name: BuildResultName = self.compile(node);
+        let result_names: ResultNames = self.compile(node);
         let fields: Vec<_> = node
             .iter()
             .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
-            .enumerate()
-            .map(|(index, f)| {
-                let field_name = f.source().ident.clone().unwrap_or_else(|| format_ident!("result_{}", index, span = f.source_ident().span()));
+            .zip(result_names)
+            .map(|(f, field_name)| {
                 let f_ty = &f.source().ty;
                 quote! {
                     pub #field_name: #f_ty,

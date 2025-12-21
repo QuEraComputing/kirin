@@ -13,7 +13,7 @@ impl TestEnum {
     {
         let a_statement_id = context.statement_arena().next_id();
         let value: u32 = value.into();
-        let result_0: ResultValue = context
+        let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(a_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(u32_type))
@@ -25,7 +25,7 @@ impl TestEnum {
             .new();
         test_enum_build_result::A {
             id: a_statement_id,
-            result_0,
+            result,
         }
     }
     pub fn op_b<Lang>(
@@ -38,7 +38,7 @@ impl TestEnum {
     {
         let b_statement_id = context.statement_arena().next_id();
         let field_0: u64 = field_0.into();
-        let result_0: ResultValue = context
+        let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(b_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(u64_type))
@@ -46,11 +46,11 @@ impl TestEnum {
             .into();
         context
             .statement()
-            .definition(Self::B(field_0, field_1))
+            .definition(Self::B(field_0, result))
             .new();
         test_enum_build_result::B {
             id: b_statement_id,
-            result_0,
+            result,
         }
     }
 }
@@ -58,7 +58,7 @@ pub mod test_enum_build_result {
     use kirin::ir::{ResultValue, Statement};
     pub struct A {
         pub id: Statement,
-        pub result_0: ResultValue,
+        pub result: ResultValue,
     }
     impl From<A> for Statement {
         fn from(value: A) -> Self {
@@ -67,7 +67,7 @@ pub mod test_enum_build_result {
     }
     pub struct B {
         pub id: Statement,
-        pub result_0: ResultValue,
+        pub result: ResultValue,
     }
     impl From<B> for Statement {
         fn from(value: B) -> Self {

@@ -1,6 +1,6 @@
-use super::context::Builder;
+use super::{context::Builder, result::ResultNames};
 use crate::{kirin::extra::FieldKind, prelude::*};
-use quote::{format_ident, quote};
+use quote::{quote};
 
 target! {
     pub struct InitializationHead
@@ -27,16 +27,15 @@ target! {
 
 impl<'src> Compile<'src, Fields<'_, 'src, Builder>, Initialization> for Builder {
     fn compile(&self, node: &Fields<'_, 'src, Builder>) -> Initialization {
-        let mut result_count = 0;
+        let mut result_count: usize = 0;
+        let result_names: ResultNames = self.compile(node);
         let names = node
             .iter()
             .map(|f| {
                 if matches!(f.extra().kind, FieldKind::ResultValue) {
-                    f.source().ident.clone().unwrap_or_else(|| {
-                        let idx = result_count.to_string();
-                        result_count += 1;
-                        format_ident!("result_{}", idx, span = f.source_ident().span())
-                    })
+                    let name = &result_names.0.as_slice()[result_count];
+                    result_count += 1;
+                    name.clone()
                 } else {
                     f.source_ident()
                 }

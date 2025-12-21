@@ -105,8 +105,7 @@ pub enum SimpleLanguage {
         SSAValue,
         #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
     ),
-    #[wraps]
-    Constant(Constant<Value>),
+    Constant(Value, #[kirin(type = SimpleTypeLattice::Float)] ResultValue),
     #[kirin(terminator)]
     Return(SSAValue),
     Function(

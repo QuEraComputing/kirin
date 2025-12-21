@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-core-3/src/kirin/builder/mod.rs
-assertion_line: 252
 expression: "Builder::default().print(&input)"
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
@@ -15,7 +14,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
         let constant_statement_id = context.statement_arena().next_id();
         let value: T = value.into();
         let marker: std::marker::PhantomData<L> = std::marker::PhantomData;
-        let result_0: ResultValue = context
+        let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(constant_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
@@ -31,7 +30,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
             .new();
         constant_build_result::Constant {
             id: constant_statement_id,
-            result_0,
+            result,
         }
     }
 }
@@ -39,7 +38,7 @@ pub mod constant_build_result {
     use kirin::ir::{ResultValue, Statement};
     pub struct Constant {
         pub id: Statement,
-        pub result_0: ResultValue,
+        pub result: ResultValue,
     }
     impl From<Constant> for Statement {
         fn from(value: Constant) -> Self {

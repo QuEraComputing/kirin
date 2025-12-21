@@ -9,23 +9,25 @@ target! {
 
 impl<'src> Compile<'src, Fields<'_, 'src, Builder>, LetNameEqResultValue> for Builder {
     fn compile(&self, node: &Fields<'_, 'src, Builder>) -> LetNameEqResultValue {
+        let result_names: ResultNames = self.compile(node);
         let results: Vec<TokenStream> = node
             .iter()
             .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
             .enumerate()
-            .map(|(index, f)| {
-                let name = f.source().ident.clone().unwrap_or_else(|| format_ident!("result_{}", index, span = f.source_ident().span()));
+            .zip(result_names)
+            .map(|((index, f), name)| {
                 let ty = &f.source().ty;
                 let statement_id: StatementIdName = self.compile(node);
 
                 let Some(ssa_ty) = &f.attrs().ssa_ty else {
                     return syn::Error::new_spanned(
-                        &f.source_ident(),
-                        "expect #[kirin(type = ...)] attribute for ResultValue field",
+                        f.source(),
+                        "expect #[kirin(type = ...)] attribute for 'ResultValue' field",
                     )
                     .to_compile_error()
                     .into();
                 };
+
                 if matches!(f.extra().collection, FieldCollectionKind::Vec) {
                     return syn::Error::new_spanned(
                         &f.source_ident(),
@@ -58,5 +60,50 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, LetNameEqResultValue> for Bu
             #(#results)*
         }
         .into()
+    }
+}
+
+pub struct ResultNames(pub(super) std::vec::IntoIter<syn::Ident>);
+
+impl<'src> Compile<'src, Fields<'_, 'src, Builder>, ResultNames> for Builder {
+    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> ResultNames {
+        let results = node
+            .iter()
+            .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
+            .collect::<Vec<_>>();
+
+        if results.len() == 1 {
+            return ResultNames(
+                results
+                    .iter()
+                    .map(|f| {
+                        f.source().ident.clone().unwrap_or_else(|| {
+                            format_ident!("result", span = f.source_ident().span())
+                        })
+                    })
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            );
+        }
+
+        let names: Vec<_> = results
+            .iter()
+            .enumerate()
+            .map(|(index, f)| {
+                f.source().ident.clone().unwrap_or_else(|| {
+                    format_ident!("result_{}", index, span = f.source_ident().span())
+                })
+            })
+            .collect();
+
+        ResultNames(names.into_iter())
+    }
+}
+
+impl Iterator for ResultNames {
+    type Item = syn::Ident;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
     }
 }

@@ -16,7 +16,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
         let value: T = value.into();
         let input_ssa: SSAValue = input_ssa.into();
         let marker: std::marker::PhantomData<L> = std::marker::PhantomData;
-        let result_0: ResultValue = context
+        let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(teststruct_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(value.type_of()))
@@ -33,7 +33,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
             .new();
         test_struct_build_result::TestStruct {
             id: teststruct_statement_id,
-            result_0,
+            result,
         }
     }
 }
@@ -41,7 +41,7 @@ pub mod test_struct_build_result {
     use kirin::ir::{ResultValue, Statement};
     pub struct TestStruct {
         pub id: Statement,
-        pub result_0: ResultValue,
+        pub result: ResultValue,
     }
     impl From<TestStruct> for Statement {
         fn from(value: TestStruct) -> Self {
