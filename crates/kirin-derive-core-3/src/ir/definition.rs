@@ -151,6 +151,18 @@ pub enum Input<'src, L: Layout = EmptyLayoutImpl> {
     Enum(Enum<'src, L>),
 }
 
+impl<'src, L: Layout> From<Struct<'src, L>> for Input<'src, L> {
+    fn from(s: Struct<'src, L>) -> Self {
+        Input::Struct(s)
+    }
+}
+
+impl<'src, L: Layout> From<Enum<'src, L>> for Input<'src, L> {
+    fn from(e: Enum<'src, L>) -> Self {
+        Input::Enum(e)
+    }
+}
+
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct Struct<'src, L: Layout> {
     pub(super) input: &'src syn::DeriveInput,

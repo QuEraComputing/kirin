@@ -1,8 +1,8 @@
 use quote::ToTokens;
 
 use crate::{
-    derive::{Compile, DeriveTrait, DeriveWithCratePath, WithUserCratePath},
-    ir::Attrs,
+    derive::{Compile, DeriveTrait, DeriveWithCratePath},
+    ir::{Attrs, WithUserCratePath},
     target,
 };
 
@@ -16,10 +16,10 @@ where
     L: DeriveTrait + DeriveWithCratePath,
 {
     fn compile(&self, node: &T) -> TraitPath {
-        let mut new_path = if let Some(path) = &node.attrs().crate_path() {
+        let mut new_path = if let Some(path) = &node.attrs().user_crate_path() {
             path
         } else {
-            self.crate_path()
+            self.default_crate_path()
         }
         .clone();
         new_path.segments.extend(self.trait_path().segments.clone());
@@ -33,14 +33,14 @@ target! {
 
 impl<'src, L, T> Compile<'src, T, CratePath> for L
 where
-    T: Attrs<Output: WithUserCratePath>,
+    T: WithUserCratePath,
     L: DeriveWithCratePath,
 {
     fn compile(&self, node: &T) -> CratePath {
-        let path = if let Some(path) = &node.attrs().crate_path() {
+        let path = if let Some(path) = &node.user_crate_path() {
             path
         } else {
-            self.crate_path()
+            self.default_crate_path()
         };
         CratePath(path.to_token_stream())
     }

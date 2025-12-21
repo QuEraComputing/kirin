@@ -13,7 +13,7 @@ target! {
 
 impl<'src, T> Compile<'src, T, Expr> for FieldsIter
 where
-    T: HasFields<'src, FieldsIter>,
+    T: WithUserCratePath + HasFields<'src, FieldsIter>,
 {
     fn compile(&self, node: &T) -> Expr {
         let item: MatchingItem = self.compile(node);

@@ -64,7 +64,7 @@ impl Layout for FieldsIter {
 }
 
 impl DeriveWithCratePath for FieldsIter {
-    fn crate_path(&self) -> &syn::Path {
+    fn default_crate_path(&self) -> &syn::Path {
         &self.default_crate_path
     }
 }

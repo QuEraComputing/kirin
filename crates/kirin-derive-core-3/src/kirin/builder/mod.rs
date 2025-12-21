@@ -2,10 +2,10 @@ mod build_fn;
 mod build_result;
 mod context;
 mod enum_impl;
+mod from;
 mod initialization;
 mod input;
 mod name;
-mod from;
 mod result;
 mod struct_impl;
 
@@ -184,6 +184,69 @@ mod tests {
                     body_block: Block,
                     exit_block: Block,
                 },
+            }
+        };
+        insta::assert_snapshot!(Builder::default().print(&input));
+    }
+
+    #[test]
+    fn test_cf() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(terminator, fn, type_lattice = T)]
+            pub enum ControlFlow<T: TypeLattice> {
+                #[kirin(format = "br {target}")]
+                Branch { target: Successor },
+                #[kirin(format = "cond_br {condition} then={true_target} else={false_target}")]
+                ConditionalBranch {
+                    condition: SSAValue,
+                    true_target: Successor,
+                    false_target: Successor,
+                    #[kirin(default = std::marker::PhantomData)]
+                    marker: std::marker::PhantomData<T>,
+                },
+                #[kirin(format = "ret {0}")]
+                Return(SSAValue),
+            }
+        };
+        insta::assert_snapshot!(Builder::default().print(&input));
+    }
+
+    #[test]
+    fn test_simple() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(fn, type_lattice = SimpleTypeLattice, crate = kirin_ir)]
+            pub enum SimpleLanguage {
+                Add(
+                    SSAValue,
+                    SSAValue,
+                    #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+                ),
+                Constant(
+                    #[kirin(into)] Value,
+                    #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+                ),
+                #[kirin(terminator)]
+                Return(SSAValue),
+                Function(
+                    Region,
+                    #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+                ),
+            }
+        };
+        insta::assert_snapshot!(Builder::default().print(&input));        
+    }
+
+    #[test]
+    fn test_constant_2() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(constant, fn = new, type_lattice = L)]
+            pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
+                #[kirin(into)]
+                pub value: T,
+                #[kirin(type = value.type_of())]
+                pub result: ResultValue,
+                #[kirin(default = std::marker::PhantomData)]
+                pub marker: std::marker::PhantomData<L>,
             }
         };
         insta::assert_snapshot!(Builder::default().print(&input));

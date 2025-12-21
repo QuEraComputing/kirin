@@ -1,32 +1,12 @@
 use crate::ir::*;
 
-/// This attribute can provide an explicit crate path
-/// as the root of the derive macro's paired runtime crate
-/// usually via a global attribute like `#[kirin(crate = some::path)]`
-pub trait WithUserCratePath {
-    fn crate_path(&self) -> Option<&syn::Path>;
-}
-
-impl WithUserCratePath for () {
-    fn crate_path(&self) -> Option<&syn::Path> {
-        None
-    }
-}
-
-pub trait DeriveWithCratePath: Layout<StructAttr: WithUserCratePath, EnumAttr: WithUserCratePath> {
+pub trait DeriveWithCratePath:
+    Layout<StructAttr: WithUserCratePath, EnumAttr: WithUserCratePath>
+{
     /// get the default crate path to use for the derivation
     /// if the derive macro allows specifying a crate path via global
     /// attribute, this will be overridden
-    fn crate_path(&self) -> &syn::Path;
-    fn absolute_crate_path(&self, path: &syn::Path) -> syn::Path {
-        if path.leading_colon.is_some() {
-            path.clone()
-        } else {
-            let mut new_path = self.crate_path().clone();
-            new_path.segments.extend(path.segments.clone());
-            new_path
-        }
-    }
+    fn default_crate_path(&self) -> &syn::Path;
 }
 
 /// A derive implementation context for a specific trait derivation

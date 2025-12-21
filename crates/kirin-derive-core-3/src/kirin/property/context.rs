@@ -85,7 +85,7 @@ impl<'src, S: SearchProperty> Layout for Property<S> {
 }
 
 impl<S: SearchProperty> DeriveWithCratePath for Property<S> {
-    fn crate_path(&self) -> &syn::Path {
+    fn default_crate_path(&self) -> &syn::Path {
         &self.default_crate_path
     }
 }

@@ -7,7 +7,7 @@ mod source;
 mod to_tokens;
 mod wrapper;
 
-pub use attrs::Attrs;
+pub use attrs::{Attrs, WithUserCratePath};
 pub use definition::*;
 pub use fields::HasFields;
 pub use generics::WithGenerics;

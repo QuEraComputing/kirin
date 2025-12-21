@@ -61,8 +61,9 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, BuildResultImpl> for Builder
         let fields: Vec<_> = node
             .iter()
             .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
-            .map(|f| {
-                let field_name = f.source_ident();
+            .enumerate()
+            .map(|(index, f)| {
+                let field_name = f.source().ident.clone().unwrap_or_else(|| format_ident!("result_{}", index, span = f.source_ident().span()));
                 let f_ty = &f.source().ty;
                 quote! {
                     pub #field_name: #f_ty,

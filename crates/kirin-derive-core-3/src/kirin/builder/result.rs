@@ -1,7 +1,7 @@
 use super::{context::Builder, name::StatementIdName};
 use crate::kirin::extra::{FieldCollectionKind, FieldKind};
 use crate::prelude::*;
-use quote::quote;
+use quote::{format_ident, quote};
 
 target! {
     pub struct LetNameEqResultValue
@@ -14,7 +14,7 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, LetNameEqResultValue> for Bu
             .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
             .enumerate()
             .map(|(index, f)| {
-                let name = f.source_ident();
+                let name = f.source().ident.clone().unwrap_or_else(|| format_ident!("result_{}", index, span = f.source_ident().span()));
                 let ty = &f.source().ty;
                 let statement_id: StatementIdName = self.compile(node);
 

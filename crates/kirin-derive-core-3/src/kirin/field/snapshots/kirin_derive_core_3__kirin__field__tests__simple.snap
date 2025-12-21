@@ -1,0 +1,94 @@
+---
+source: crates/kirin-derive-core-3/src/kirin/field/tests.rs
+expression: "case!\n{\n    #[kirin(fn, type_lattice = SimpleTypeLattice, crate = kirin_ir)] pub enum\n    SimpleLanguage\n    {\n        Add(SSAValue, SSAValue, #[kirin(type = SimpleTypeLattice::Float)]\n        ResultValue,),\n        Constant(#[kirin(into)] Value,\n        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,),\n        #[kirin(terminator)] Return(SSAValue),\n        Function(Region, #[kirin(type = SimpleTypeLattice::Float)]\n        ResultValue,),\n    }\n}"
+---
+#[automatically_derived]
+impl<'a> kirin_ir::HasArguments<'a> for SimpleLanguage {
+    type Iter = SimpleLanguageArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0, field_1, field_2) => SimpleLanguageArgumentsIter::Add(
+                std::iter::once(field_0).chain(std::iter::once(field_1)),
+            ),
+            Self::Constant(field_0, field_1) => {
+                SimpleLanguageArgumentsIter::Constant(std::iter::empty::<&'a kirin_ir::SSAValue>())
+            }
+            Self::Return(field_0) => SimpleLanguageArgumentsIter::Return(std::iter::once(field_0)),
+            Self::Function(field_0, field_1) => {
+                SimpleLanguageArgumentsIter::Function(std::iter::empty::<&'a kirin_ir::SSAValue>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum SimpleLanguageArgumentsIter<'a> {
+    Add(
+        std::iter::Chain<
+            std::iter::Once<&'a kirin_ir::SSAValue>,
+            std::iter::Once<&'a kirin_ir::SSAValue>,
+        >,
+    ),
+    Constant(std::iter::Empty<&'a kirin_ir::SSAValue>),
+    Return(std::iter::Once<&'a kirin_ir::SSAValue>),
+    Function(std::iter::Empty<&'a kirin_ir::SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for SimpleLanguageArgumentsIter<'a> {
+    type Item = &'a kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Constant(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+            Self::Function(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasArgumentsMut<'a> for SimpleLanguage {
+    type IterMut = SimpleLanguageArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0, field_1, field_2) => SimpleLanguageArgumentsMutIter::Add(
+                std::iter::once(field_0).chain(std::iter::once(field_1)),
+            ),
+            Self::Constant(field_0, field_1) => {
+                SimpleLanguageArgumentsMutIter::Constant(std::iter::empty::<
+                    &'a mut kirin_ir::SSAValue,
+                >())
+            }
+            Self::Return(field_0) => {
+                SimpleLanguageArgumentsMutIter::Return(std::iter::once(field_0))
+            }
+            Self::Function(field_0, field_1) => {
+                SimpleLanguageArgumentsMutIter::Function(std::iter::empty::<
+                    &'a mut kirin_ir::SSAValue,
+                >())
+            }
+        }
+    }
+}
+#[automatically_derived]
+pub enum SimpleLanguageArgumentsMutIter<'a> {
+    Add(
+        std::iter::Chain<
+            std::iter::Once<&'a mut kirin_ir::SSAValue>,
+            std::iter::Once<&'a mut kirin_ir::SSAValue>,
+        >,
+    ),
+    Constant(std::iter::Empty<&'a mut kirin_ir::SSAValue>),
+    Return(std::iter::Once<&'a mut kirin_ir::SSAValue>),
+    Function(std::iter::Empty<&'a mut kirin_ir::SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for SimpleLanguageArgumentsMutIter<'a> {
+    type Item = &'a mut kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Constant(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+            Self::Function(inner) => inner.next(),
+        }
+    }
+}

@@ -1,6 +1,6 @@
 use quote::{format_ident, quote};
 
-use crate::kirin::extra::FieldKind;
+use crate::kirin::{builder::initialization::InitializationHead, extra::FieldKind};
 use crate::prelude::*;
 
 use super::{
@@ -113,12 +113,19 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, BuildFnBody> for Builder {
             .map(|f| self.compile(&f))
             .collect();
         let let_name_eq_result: LetNameEqResultValue = self.compile(node);
+
+        let head_self: InitializationHead = self.compile(node);
         let initialization: Initialization = self.compile(node);
-        let statement = format_ident!("{}_statement", node.source_ident());
+
         let result_names: Vec<_> = node
             .iter()
             .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
-            .map(|f| f.source_ident())
+            .enumerate()
+            .map(|(index, f)| {
+                f.source().ident.clone().unwrap_or_else(|| {
+                    format_ident!("result_{}", index, span = f.source_ident().span())
+                })
+            })
             .collect();
 
         quote! {{
@@ -126,9 +133,9 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, BuildFnBody> for Builder {
             #(#let_name_eq_input)*
             #let_name_eq_result
 
-            let #statement = context
+            context
                 .statement()
-                .definition(Self #initialization)
+                .definition(#head_self #initialization)
                 .new();
 
             #build_result_path {

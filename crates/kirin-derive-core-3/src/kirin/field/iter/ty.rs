@@ -14,22 +14,23 @@ target! {
 
 impl<'src, T> Compile<'src, T, InnerType> for FieldsIter
 where
-    T: HasFields<'src, FieldsIter>,
+    T: HasFields<'src, FieldsIter> + WithUserCratePath,
 {
     fn compile(&self, node: &T) -> InnerType {
         let item: MatchingItem = self.compile(node);
         let lifetime = &self.trait_lifetime;
-        let matching_type = self.absolute_crate_path(&self.matching_type);
+        let crate_path: CratePath = self.compile(node);
+        let matching_type = &self.matching_type;
         let tokens = node
             .fields()
             .iter()
             .filter_map(|f| match f.extra() {
                 FieldExtra::One => Some(quote! { std::iter::Once<#item> }),
                 FieldExtra::Vec if self.mutable => Some(quote! {
-                    std::slice::IterMut<#lifetime, #matching_type>
+                    std::slice::IterMut<#lifetime, #crate_path :: #matching_type>
                 }),
                 FieldExtra::Vec => Some(quote! {
-                    std::slice::Iter<#lifetime, #matching_type>
+                    std::slice::Iter<#lifetime, #crate_path :: #matching_type>
                 }),
                 FieldExtra::Other => None,
             })

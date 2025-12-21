@@ -23,7 +23,7 @@ impl DeriveTrait for Name {
 }
 
 impl DeriveWithCratePath for Name {
-    fn crate_path(&self) -> &syn::Path {
+    fn default_crate_path(&self) -> &syn::Path {
         &self.crate_path
     }
 }

@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-derive-core-3/src/kirin/builder/mod.rs
+assertion_line: 252
 expression: "Builder::default().print(&input)"
 ---
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {

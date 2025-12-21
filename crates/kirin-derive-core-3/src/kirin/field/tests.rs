@@ -170,3 +170,27 @@ fn test_struct_unnamed_regular() {
         struct TestStruct<T>(SSAValue, T, SSAValue, String, f64);
     })
 }
+
+#[test]
+fn test_simple() {
+    insta::assert_snapshot!(case! {
+        #[kirin(fn, type_lattice = SimpleTypeLattice, crate = kirin_ir)]
+        pub enum SimpleLanguage {
+            Add(
+                SSAValue,
+                SSAValue,
+                #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+            ),
+            Constant(
+                #[kirin(into)] Value,
+                #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+            ),
+            #[kirin(terminator)]
+            Return(SSAValue),
+            Function(
+                Region,
+                #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+            ),
+        }
+    });
+}

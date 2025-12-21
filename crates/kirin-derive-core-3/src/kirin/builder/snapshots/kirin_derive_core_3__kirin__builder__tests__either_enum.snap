@@ -13,16 +13,19 @@ impl EitherEnum {
     {
         let a_statement_id = context.statement_arena().next_id();
         let value: u32 = value.into();
-        let result: ResultValue = context
+        let result_0: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(a_statement_id, 0usize))
             .ty(Lang::TypeLattice::from(u32_type))
             .new()
             .into();
-        let A_statement = context.statement().definition(Self { value, result }).new();
+        context
+            .statement()
+            .definition(Self::A { value, result })
+            .new();
         either_enum_build_result::A {
             id: a_statement_id,
-            result,
+            result_0,
         }
     }
 }
@@ -30,7 +33,7 @@ pub mod either_enum_build_result {
     use kirin::ir::{ResultValue, Statement};
     pub struct A {
         pub id: Statement,
-        pub result: ResultValue,
+        pub result_0: ResultValue,
     }
     impl From<A> for Statement {
         fn from(value: A) -> Self {

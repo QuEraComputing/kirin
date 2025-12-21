@@ -1,5 +1,5 @@
 use super::context::Builder;
-use crate::prelude::*;
+use crate::{kirin::extra::FieldKind, prelude::*};
 use quote::quote;
 
 target! {
@@ -9,7 +9,7 @@ target! {
 impl<'src> Compile<'src, Field<'_, 'src, Self>, InputSignature> for Builder {
     fn compile(&self, node: &Field<'_, 'src, Self>) -> InputSignature {
         let ty = &node.source().ty;
-        if node.attrs().into {
+        if !matches!(node.extra().kind, FieldKind::Other) || node.attrs().into {
             return quote! { #node: impl Into<#ty> }.into();
         } else {
             return quote! { #node: #ty }.into();
@@ -26,7 +26,7 @@ impl<'src> Compile<'src, Field<'_, 'src, Self>, LetNameEqInput> for Builder {
     fn compile(&self, node: &Field<'_, 'src, Self>) -> LetNameEqInput {
         let name = &node.source_ident();
         let ty = &node.source().ty;
-        if node.attrs().into {
+        if !matches!(node.extra().kind, FieldKind::Other) || node.attrs().into {
             quote! {
                 let #name: #ty = #name.into();
             }

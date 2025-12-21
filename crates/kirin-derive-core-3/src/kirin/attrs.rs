@@ -27,7 +27,7 @@ pub struct KirinEnumOptions {
 }
 
 impl WithUserCratePath for KirinEnumOptions {
-    fn crate_path(&self) -> Option<&syn::Path> {
+    fn user_crate_path(&self) -> Option<&syn::Path> {
         self.crate_path.as_ref()
     }
 }
@@ -50,7 +50,7 @@ pub struct KirinStructOptions {
 }
 
 impl WithUserCratePath for KirinStructOptions {
-    fn crate_path(&self) -> Option<&syn::Path> {
+    fn user_crate_path(&self) -> Option<&syn::Path> {
         self.crate_path.as_ref()
     }
 }
