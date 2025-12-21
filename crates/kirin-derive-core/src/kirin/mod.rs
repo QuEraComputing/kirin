@@ -7,8 +7,8 @@ pub mod extra;
 pub mod builder;
 /// derive macro for field iterators such as `HasArguments`, `HasArgumentMut` etc.
 pub mod field;
-/// derive macro for setting statement text format
-pub mod format;
+// /// derive macro for setting statement text format
+// pub mod format;
 /// derive macro for marker traits such as `Dialect`
 pub mod marker;
 /// derive macro for getting the name of an instruction or dialect

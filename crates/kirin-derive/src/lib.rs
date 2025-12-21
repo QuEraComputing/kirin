@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
-use kirin_derive_core_3::kirin::prelude::*;
-use kirin_derive_core_3::prelude::*;
+use kirin_derive_core::kirin::prelude::*;
+use kirin_derive_core::prelude::*;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 

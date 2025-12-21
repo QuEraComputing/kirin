@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
-kirin-derive-core-3 = { version = "0.1.0", path = "../kirin-derive-core-3" }
+kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
 paste = "1.0.15"
 proc-macro2 = "1.0.103"
 quote = "1.0.42"

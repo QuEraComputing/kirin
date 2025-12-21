@@ -1,7 +1,0 @@
----
-source: crates/kirin-derive-core/src/dialect.rs
-expression: generate(input)
----
-impl<T: TypeLattice> ::kirin::ir::Dialect for StructuredControlFlow<T> {
-    type TypeLattice = T;
-}

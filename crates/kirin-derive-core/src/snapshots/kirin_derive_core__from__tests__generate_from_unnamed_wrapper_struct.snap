@@ -1,9 +1,0 @@
----
-source: crates/kirin-derive-core/src/from.rs
-expression: generate(input)
----
-impl ::core::convert::From<Other> for WrapperStruct {
-    fn from(v: Other) -> Self {
-        Self(Default::default(), v, Default::default())
-    }
-}

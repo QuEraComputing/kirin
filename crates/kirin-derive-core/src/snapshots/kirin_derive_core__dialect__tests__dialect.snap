@@ -1,7 +1,0 @@
----
-source: crates/kirin-derive-core/src/dialect.rs
-expression: generate(input)
----
-impl ::kirin::ir::Dialect for TestDialect {
-    type TypeLattice = SimpleTypeLattice;
-}

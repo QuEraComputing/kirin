@@ -1,9 +1,0 @@
----
-source: crates/kirin-derive-core/src/name.rs
-expression: generate(input)
----
-impl ::kirin::ir::HasName for TestStruct {
-    fn name(&self) -> String {
-        "custom_struct".into()
-    }
-}
