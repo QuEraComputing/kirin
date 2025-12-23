@@ -47,6 +47,7 @@ macro_rules! impl_compile {
                 let trait_path: TraitPath = self.compile(node);
                 let type_lattice = &node.attrs().type_lattice;
                 quote! {
+                    #[automatically_derived]
                     impl #impl_generics #trait_path for #name #ty_generics #where_clause {
                         type TypeLattice = #type_lattice;
                     }

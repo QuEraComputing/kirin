@@ -1,6 +1,7 @@
 use kirin::ir::*;
+use kirin::parsers::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree)]
 #[kirin(constant, fn = new, type_lattice = L)]
 pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
     #[kirin(into)]
@@ -10,3 +11,50 @@ pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
     #[kirin(default = std::marker::PhantomData)]
     pub marker: std::marker::PhantomData<L>,
 }
+
+#[cfg(test)]
+mod tests {
+    use kirin::parsers::ast::{Operand, Spanned};
+
+    use super::*;
+    
+    #[test]
+    fn test_constant_creation() {
+    }
+}
+
+// mod parse {
+//     use kirin::ir::*;
+//     use kirin::parsers::prelude::*;
+//     #[derive(Debug, Clone)]
+//     pub struct Constant<'src, T> {
+//         pub value: T,
+//         pub result: ast::Spanned<&'src str>,
+//         pub marker: std::marker::PhantomData<&'src ()>,
+//     }
+
+//     impl<'tokens, 'src, D, T, L> HasParser<'tokens, 'src, D> for Constant<'src, T>
+//     where
+//         'src: 'tokens,
+//         D: Dialect<TypeLattice = L> + HasParser<'tokens, 'src, D>,
+//         T: CompileTimeValue + Typeof<L> + HasParser<'tokens, 'src, D, Output = T> + 'tokens,
+//         L: TypeLattice + HasParser<'tokens, 'src, D>,
+//     {
+//         type Output = Constant<'src, T>;
+//         fn parser<I: TokenInput<'tokens, 'src>>()
+//         -> Boxed<'tokens, 'tokens, I, Self::Output, ParserError<'tokens, 'src>> {
+//             ssa_value()
+//                 .then_ignore(just(Token::Equal))
+//                 .then_ignore(identifier("constant"))
+//                 .then(T::parser())
+//                 .then(empty())
+//                 .map(|((result, value), _)| Constant {
+//                     value,
+//                     result,
+//                     marker: std::marker::PhantomData,
+//                 })
+//                 .labelled("constant instruction with result")
+//                 .boxed()
+//         }
+//     }
+// }

@@ -20,7 +20,7 @@ pub(super) enum FieldKind {
 pub(super) enum FieldCollectionKind {
     Vec,
     Option,
-    None,
+    Single,
 }
 
 macro_rules! impl_from_context {
@@ -32,7 +32,7 @@ macro_rules! impl_from_context {
                     if is_type(ty, stringify!($name)) {
                         FieldMeta {
                             kind: FieldKind::$name,
-                            collection: FieldCollectionKind::None,
+                            collection: FieldCollectionKind::Single,
                         }
                     } else if is_type_in(ty, stringify!($name), |seg| seg.ident == "Vec") {
                         FieldMeta {
@@ -48,7 +48,7 @@ macro_rules! impl_from_context {
                 )* {
                     FieldMeta {
                         kind: FieldKind::Other,
-                        collection: FieldCollectionKind::None,
+                        collection: FieldCollectionKind::Single,
                     }
                 };
                 Ok(extra)

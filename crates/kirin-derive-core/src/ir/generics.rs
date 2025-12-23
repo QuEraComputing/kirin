@@ -1,4 +1,4 @@
-use super::{Enum, Layout, Source, Struct};
+use super::{Enum, Layout, Source, Struct, Variant};
 
 pub trait WithGenerics {
     fn generics(&self) -> &syn::Generics;
@@ -22,5 +22,11 @@ impl<'src, L: Layout> WithGenerics for Struct<'src, L> {
 impl<'src, L: Layout> WithGenerics for Enum<'src, L> {
     fn generics(&self) -> &syn::Generics {
         &self.source().generics
+    }
+}
+
+impl<'src, L: Layout> WithGenerics for Variant<'_, 'src, L> {
+    fn generics(&self) -> &syn::Generics {
+        &self.input.generics
     }
 }

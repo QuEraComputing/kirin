@@ -91,14 +91,16 @@ pub struct DefinitionStatement<Attr, L: Layout> {
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub enum DefinitionStructOrVariant<'a, L: Layout> {
     Struct(&'a DefinitionStruct<L>),
-    Variant(&'a DefinitionVariant<L>),
+    Variant(&'a DefinitionEnum<L>, usize),
 }
 
 impl<L: Layout> Clone for DefinitionStructOrVariant<'_, L> {
     fn clone(&self) -> Self {
         match self {
             DefinitionStructOrVariant::Struct(s) => DefinitionStructOrVariant::Struct(s),
-            DefinitionStructOrVariant::Variant(v) => DefinitionStructOrVariant::Variant(v),
+            DefinitionStructOrVariant::Variant(e, i) => {
+                DefinitionStructOrVariant::Variant(e, i.clone())
+            }
         }
     }
 }
@@ -107,34 +109,22 @@ impl<'a, L: Layout> DefinitionStructOrVariant<'a, L> {
     pub fn is_wrapper(&self) -> bool {
         match self {
             DefinitionStructOrVariant::Struct(s) => s.wraps,
-            DefinitionStructOrVariant::Variant(v) => v.wraps,
+            DefinitionStructOrVariant::Variant(e, i) => e.variants[*i].wraps,
         }
     }
 
     pub fn fields(&self) -> &Vec<DefinitionField<L>> {
         match self {
             DefinitionStructOrVariant::Struct(s) => &s.fields,
-            DefinitionStructOrVariant::Variant(v) => &v.fields,
+            DefinitionStructOrVariant::Variant(e, i) => &e.variants[*i].fields,
         }
     }
 
     pub fn extra(&self) -> &L::StatementExtra {
         match self {
             DefinitionStructOrVariant::Struct(s) => &s.extra,
-            DefinitionStructOrVariant::Variant(v) => &v.extra,
+            DefinitionStructOrVariant::Variant(e, i) => &e.variants[*i].extra,
         }
-    }
-}
-
-impl<'a, L: Layout> From<&'a DefinitionStruct<L>> for DefinitionStructOrVariant<'a, L> {
-    fn from(s: &'a DefinitionStruct<L>) -> Self {
-        DefinitionStructOrVariant::Struct(s)
-    }
-}
-
-impl<'a, L: Layout> From<&'a DefinitionVariant<L>> for DefinitionStructOrVariant<'a, L> {
-    fn from(v: &'a DefinitionVariant<L>) -> Self {
-        DefinitionStructOrVariant::Variant(v)
     }
 }
 
@@ -181,6 +171,15 @@ impl<'src, L: Layout> Struct<'src, L> {
 
     pub fn extra(&self) -> &L::StatementExtra {
         &self.definition().0.extra
+    }
+}
+
+impl<'a, 'src, L> From<&'a Struct<'src, L>> for DefinitionStructOrVariant<'a, L>
+where
+    L: Layout,
+{
+    fn from(s: &'a Struct<'src, L>) -> Self {
+        DefinitionStructOrVariant::Struct(&s.definition)
     }
 }
 
@@ -255,6 +254,15 @@ impl<L: Layout> Variant<'_, '_, L> {
         // despite of it is marked as #[wraps] or not
         // if it is marked as #[wraps], it is only a syntax sugar for "has a wrapper field"
         self.definition().0.wraps
+    }
+}
+
+impl<'a, 'src, L> From<&'_ Variant<'a, 'src, L>> for DefinitionStructOrVariant<'a, L>
+where
+    L: Layout,
+{
+    fn from(v: &Variant<'a, 'src, L>) -> Self {
+        DefinitionStructOrVariant::Variant(v.parent, v.index)
     }
 }
 

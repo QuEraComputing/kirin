@@ -85,7 +85,7 @@ where
             .map(|(i, (_, src))| Field {
                 input: self.input,
                 src,
-                parent: definition.into(),
+                parent: self.into(),
                 index: i,
             })
     }
@@ -105,7 +105,7 @@ where
             .map(|(i, (_, src))| Field {
                 input: self.input,
                 src,
-                parent: self.definition().into(),
+                parent: self.into(),
                 index: i,
             })
     }

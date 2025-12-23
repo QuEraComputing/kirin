@@ -13,7 +13,7 @@ impl<'src, L: Layout> HasFields<'src, L> for Struct<'src, L> {
             input: self.input,
             ident: &self.input.ident,
             src: &self.src.fields,
-            parent: (&self.definition).into(),
+            parent: self.into(),
         }
     }
 }
@@ -25,7 +25,7 @@ impl<'src, L: Layout> HasFields<'src, L> for Variant<'_, 'src, L> {
             input: self.input,
             ident: &self.src.ident,
             src: &self.src.fields,
-            parent: (&self.parent.variants[self.index]).into(),
+            parent: self.into(),
         }
     }
 }

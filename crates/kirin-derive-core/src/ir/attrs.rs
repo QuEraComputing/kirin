@@ -112,3 +112,17 @@ where
         self.parent.attrs.user_crate_path()
     }
 }
+
+impl<'src, L> WithUserCratePath for Fields<'_, 'src, L>
+where
+    L: Layout,
+    L::StructAttr: WithUserCratePath,
+    L::EnumAttr: WithUserCratePath,
+{
+    fn user_crate_path(&self) -> Option<&syn::Path> {
+        match &self.parent {
+            DefinitionStructOrVariant::Struct(s) => s.attrs.user_crate_path(),
+            DefinitionStructOrVariant::Variant(e, _) => e.attrs.user_crate_path(),
+        }
+    }
+}

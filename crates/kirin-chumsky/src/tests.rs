@@ -51,7 +51,7 @@ where
                 ssa_value()
                     .then_ignore(just(Token::Equal))
                     .then_ignore(identifier("add"))
-                    .then(operand(2, Token::Comma))
+                    .then(operands(2, Token::Comma))
                     .map(|(result, operands)| SimpleAST::Add { lhs: operands[0], rhs: operands[1], result })
                     .labelled("addition instruction with result");
 

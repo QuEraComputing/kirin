@@ -1,10 +1,10 @@
 /// Kirin's helper attribute definitions and property parsing
 pub mod attrs;
 
-/// Common extra information for statement definitions
-pub mod extra;
 /// the `fn` builder options
 pub mod builder;
+/// Common extra information for statement definitions
+pub mod extra;
 /// derive macro for field iterators such as `HasArguments`, `HasArgumentMut` etc.
 pub mod field;
 // /// derive macro for setting statement text format
@@ -16,9 +16,13 @@ pub mod name;
 /// derive macro for accessing properties such as `IsConstant`, `IsPure` etc.
 pub mod property;
 
+/// derive macro for generating AST types to be used with chumsky parsers
+pub mod ast;
+
 pub mod prelude {
     pub use super::builder::Builder;
     pub use super::field::FieldsIter;
     pub use super::marker::DialectMarker;
     pub use super::property::{IsConstant, IsPure, IsTerminator, Property, SearchProperty};
+    pub use super::ast::DeriveAST;
 }

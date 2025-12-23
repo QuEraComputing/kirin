@@ -146,3 +146,11 @@ macro_rules! derive_property {
 derive_property!(IsTerminator);
 derive_property!(IsConstant);
 derive_property!(IsPure);
+
+#[proc_macro_derive(WithAbstractSyntaxTree)]
+pub fn derive_with_abstract_syntax_tree(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    DeriveAST::builder()
+        .build()
+        .emit(&ast).into()
+}

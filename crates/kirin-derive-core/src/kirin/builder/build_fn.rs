@@ -33,6 +33,7 @@ impl<'src> Compile<'src, Struct<'src, Builder>, BuildFnImpl> for Builder {
         let body: BuildFnBody = self.compile(&node.fields());
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #name #ty_generics #where_clause {
                 pub fn #build_fn_name<Lang>(context: &mut #crate_path::Context<Lang>, #inputs) -> #build_result_path
                 where

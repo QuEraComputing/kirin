@@ -72,11 +72,13 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, BuildResultImpl> for Builder
             .collect();
 
         quote! {
+            #[automatically_derived]
             pub struct #build_result_name {
                 pub id: Statement,
                 #(#fields)*
             }
 
+            #[automatically_derived]
             impl From<#build_result_name> for Statement {
                 fn from(value: #build_result_name) -> Self {
                     value.id
@@ -102,6 +104,7 @@ impl<'src> Compile<'src, Struct<'src, Builder>, BuildResultModule> for Builder {
         let build_result_impl: BuildResultImpl = self.compile(&node.fields());
 
         quote! {
+            #[automatically_derived]
             pub mod #build_result_mod {
                 use #crate_path::{Statement, ResultValue};
                 #build_result_impl
@@ -124,6 +127,7 @@ impl<'src> Compile<'src, Enum<'src, Builder>, BuildResultModule> for Builder {
             node.variants().map(|v| self.compile(&v.fields())).collect();
 
         quote! {
+            #[automatically_derived]
             pub mod #build_result_mod {
                 use #crate_path::{Statement, ResultValue};
                 #(#build_result_impl)*

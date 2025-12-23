@@ -28,6 +28,31 @@ where
 }
 
 #[derive(Debug, Clone)]
+pub struct Operand<'tokens, 'src: 'tokens, L: Dialect + HasParser<'tokens, 'src, L>>
+where
+    'src: 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src, L>,
+{
+    pub name: Spanned<&'src str>,
+    pub ty: Spanned<<L::TypeLattice as HasParser<'tokens, 'src, L>>::Output>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResultValue<'tokens, 'src: 'tokens, L: Dialect + HasParser<'tokens, 'src, L>>
+where
+    'src: 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src, L>,
+{
+    pub name: Spanned<&'src str>,
+    pub ty: Spanned<<L::TypeLattice as HasParser<'tokens, 'src, L>>::Output>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockLabel<'src> {
+    pub name: Spanned<&'src str>,
+}
+
+#[derive(Debug, Clone)]
 pub struct BlockArgument<'tokens, 'src: 'tokens, L: Dialect + HasParser<'tokens, 'src, L>>
 where
     'src: 'tokens,
@@ -43,7 +68,7 @@ where
     'src: 'tokens,
     L::TypeLattice: HasParser<'tokens, 'src, L>,
 {
-    pub label: Spanned<&'src str>,
+    pub label: BlockLabel<'src>,
     pub arguments: Vec<Spanned<BlockArgument<'tokens, 'src, L>>>,
 }
 

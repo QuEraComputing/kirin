@@ -1,6 +1,6 @@
 use super::{context::Builder, result::ResultNames};
 use crate::{kirin::extra::FieldKind, prelude::*};
-use quote::{quote};
+use quote::quote;
 
 target! {
     pub struct InitializationHead
@@ -9,10 +9,10 @@ target! {
 impl<'src> Compile<'src, Fields<'_, 'src, Builder>, InitializationHead> for Builder {
     fn compile(&self, node: &Fields<'_, 'src, Builder>) -> InitializationHead {
         match node.definition() {
-            DefinitionStructOrVariant::Struct(_) => {
+            DefinitionStructOrVariant::Struct(..) => {
                 quote! { Self }
             }
-            DefinitionStructOrVariant::Variant(_) => {
+            DefinitionStructOrVariant::Variant(..) => {
                 let name = node.source_ident();
                 quote! { Self::#name }
             }

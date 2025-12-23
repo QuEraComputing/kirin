@@ -31,7 +31,7 @@ where
     .labelled("symbol")
 }
 
-pub fn operand<'tokens, 'src: 'tokens, I>(
+pub fn operands<'tokens, 'src: 'tokens, I>(
     n: usize,
     sep: Token<'src>,
 ) -> impl Parser<'tokens, I, Vec<ast::Spanned<&'src str>>, ParserError<'tokens, 'src>>
@@ -39,7 +39,11 @@ where
     'src: 'tokens,
     I: TokenInput<'tokens, 'src>,
 {
-    ssa_value().separated_by(just(sep)).exactly(n).collect()
+    ssa_value()
+        .separated_by(just(sep))
+        .exactly(n)
+        .collect()
+        .labelled(format!("{} operands", n))
 }
 
 pub fn literal_int<'tokens, 'src: 'tokens, T, I>(
@@ -126,7 +130,7 @@ where
 }
 
 pub fn block_label<'tokens, 'src: 'tokens, I>()
--> impl Parser<'tokens, I, ast::Spanned<&'src str>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, ast::BlockLabel<'src>, ParserError<'tokens, 'src>>
 where
     'src: 'tokens,
     I: TokenInput<'tokens, 'src>,
@@ -135,6 +139,12 @@ where
         value: name,
         span: e.span(),
     }}
+    .map(|spanned| ast::BlockLabel {
+        name: ast::Spanned {
+            value: spanned.value,
+            span: spanned.span,
+        },
+    })
     .labelled("block label")
 }
 

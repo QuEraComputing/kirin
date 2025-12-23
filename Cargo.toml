@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky" }
 kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
 kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless" }
 salsa = "0.24.0"
@@ -20,9 +21,7 @@ members = [
     "crates/kirin-scf",
     "crates/kirin-chumsky",
     "crates/kirin-test-utils",
-    "crates/kirin-chumsky-derive",
     "crates/kirin-lexer",
-    "crates/kirin-text-format",
 ]
 
 [features]
