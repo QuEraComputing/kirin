@@ -2,6 +2,7 @@ use kirin::ir::*;
 use kirin::parsers::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree)]
+#[chumsky(format = "constant {value} : {result:type}")]
 #[kirin(constant, fn = new, type_lattice = L)]
 pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
     #[kirin(into)]
@@ -17,10 +18,9 @@ mod tests {
     use kirin::parsers::ast::{Operand, Spanned};
 
     use super::*;
-    
+
     #[test]
-    fn test_constant_creation() {
-    }
+    fn test_constant_creation() {}
 }
 
 // mod parse {

@@ -1,8 +1,9 @@
 use bon::Builder;
 use quote::{format_ident, quote};
-use syn::TraitBound;
 
 use crate::prelude::*;
+
+use super::attrs::{ChumskyEnumOptions, ChumskyStructOptions, ChumskyVariantOptions};
 
 #[derive(Clone, Builder)]
 pub struct DeriveAST {
@@ -13,9 +14,9 @@ pub struct DeriveAST {
 }
 
 impl Layout for DeriveAST {
-    type EnumAttr = ();
-    type StructAttr = ();
-    type VariantAttr = ();
+    type EnumAttr = ChumskyEnumOptions;
+    type StructAttr = ChumskyStructOptions;
+    type VariantAttr = ChumskyVariantOptions;
     type FieldAttr = ();
     type FieldExtra = ();
     type StatementExtra = ();
@@ -44,12 +45,23 @@ target! {
 
 impl<'src> Compile<'src, Struct<'src, DeriveAST>, StructImpl> for DeriveAST {
     fn compile(&self, node: &Struct<'src, DeriveAST>) -> StructImpl {
+        let trait_path: TraitPath = self.compile(node);
+
         let name: syn::Ident = format_ident!("{}SyntaxTree", node.source_ident());
         let body: ASTNodeFields = self.compile(&node.fields());
         let generics: GenericsImpl = self.compile(node);
+
+        let src_name = node.source_ident();
+        let (_, src_ty_generics, _) = node.source().generics.split_for_impl();
+        let (impl_generics, ty_generics, where_clause) = generics.0.split_for_impl();
         quote! {
             #[automatically_derived]
             pub struct #name #generics #body
+
+            #[automatically_derived]
+            impl #impl_generics #trait_path<'tokens, 'src, _AnotherLanguage> for #src_name #src_ty_generics #where_clause {
+                type AbstractSyntaxTreeNode = #name #ty_generics;
+            }
         }
         .into()
     }
@@ -61,14 +73,26 @@ target! {
 
 impl<'src> Compile<'src, Enum<'src, DeriveAST>, EnumImpl> for DeriveAST {
     fn compile(&self, node: &Enum<'src, DeriveAST>) -> EnumImpl {
+        let trait_path: TraitPath = self.compile(node);
         let name: syn::Ident = format_ident!("{}SyntaxTree", node.source_ident());
         let generics: GenericsImpl = self.compile(node);
+
+        let src_name = node.source_ident();
+        let (_, src_ty_generics, _) = node.source().generics.split_for_impl();
+        let (impl_generics, ty_generics, where_clause) = generics.0.split_for_impl();
+
+        let variant_names = node.variant_names();
         let variant_impls: Vec<ASTNodeFields> =
             node.variants().map(|v| self.compile(&v.fields())).collect();
         quote! {
             #[automatically_derived]
             pub enum #name #generics {
-                #( #variant_impls ),*
+                #( #variant_names #variant_impls ),*
+            }
+
+            #[automatically_derived]
+            impl #impl_generics #trait_path<'tokens, 'src, _AnotherLanguage> for #src_name #src_ty_generics #where_clause {
+                type AbstractSyntaxTreeNode = #name #ty_generics;
             }
         }
         .into()
@@ -106,9 +130,7 @@ impl<'src> Compile<'src, Fields<'_, 'src, DeriveAST>, ASTNodeFields> for DeriveA
     }
 }
 
-target! {
-    pub struct GenericsImpl;
-}
+pub struct GenericsImpl(syn::Generics);
 
 impl<'src, T> Compile<'src, T, GenericsImpl> for DeriveAST
 where
@@ -125,7 +147,13 @@ where
         generics.params.push(syn::parse_quote!('tokens));
         generics.params.push(syn::parse_quote!('src: 'tokens));
         generics.params.push(syn::parse_quote!(_AnotherLanguage: Dialect<TypeLattice: HasParser<'tokens, 'src, _AnotherLanguage>> + HasParser<'tokens, 'src, _AnotherLanguage>));
-        generics.to_token_stream().into()
+        GenericsImpl(generics)
+    }
+}
+
+impl ToTokens for GenericsImpl {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens);
     }
 }
 

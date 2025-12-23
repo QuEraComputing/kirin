@@ -139,12 +139,10 @@ where
         value: name,
         span: e.span(),
     }}
-    .map(|spanned| ast::BlockLabel {
-        name: ast::Spanned {
-            value: spanned.value,
-            span: spanned.span,
-        },
-    })
+    .map(|spanned| ast::BlockLabel { name: ast::Spanned {
+        value: spanned.value,
+        span: spanned.span,
+    }})
     .labelled("block label")
 }
 

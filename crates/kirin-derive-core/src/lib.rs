@@ -24,6 +24,9 @@ pub mod misc;
 /// Kirin's built-in derive macros.
 pub mod kirin;
 
+/// Parse derive macros for kirin-chumsky integration
+pub mod chumsky;
+
 /// debugging utilities
 #[cfg(feature = "debug")]
 pub mod debug;
