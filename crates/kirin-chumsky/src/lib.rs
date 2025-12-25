@@ -16,7 +16,7 @@ pub mod prelude {
     pub use kirin_lexer::Token;
 
     #[cfg(feature = "derive")]
-    pub use kirin_derive::WithAbstractSyntaxTree;
+    pub use kirin_derive::{WithAbstractSyntaxTree, HasParser};
 }
 
 #[cfg(test)]

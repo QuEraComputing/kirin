@@ -7,4 +7,5 @@ pub mod format;
 
 pub mod prelude {
     pub use super::ast::DeriveAST;
+    pub use super::format::DeriveHasParser;
 }

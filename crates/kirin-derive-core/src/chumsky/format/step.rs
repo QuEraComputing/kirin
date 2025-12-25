@@ -13,16 +13,26 @@ use super::parse::{Format, FormatElement};
 pub struct ParseElements {
     crate_path: TokenStream,
     name: TokenStream,
+    unspecified: BTreeMap<String, TokenStream>,
+    results: Vec<String>,
     steps: Vec<ParseStep>,
     error: Option<syn::Error>,
 }
 
 impl ParseElements {
-    pub fn new(crate_path: TokenStream, name: TokenStream, steps: Vec<ParseStep>) -> Self {
+    pub fn new(
+        crate_path: TokenStream,
+        name: TokenStream,
+        steps: Vec<ParseStep>,
+        unspecified: BTreeMap<String, TokenStream>,
+        results: Vec<String>,
+    ) -> Self {
         Self {
             crate_path,
             name,
             steps,
+            unspecified,
+            results,
             error: None,
         }
     }
@@ -32,6 +42,8 @@ impl ParseElements {
             crate_path: quote! {},
             name: quote! {},
             steps: vec![],
+            unspecified: BTreeMap::new(),
+            results: Vec::new(),
             error: Some(syn::Error::new(Span::call_site(), msg)),
         }
     }
@@ -57,6 +69,7 @@ impl<'a, 'src: 'a> Compile<'src, DeriveHasParser, ParseElements>
         let trait_path: TraitPath = self.compile(ctx);
         let fields_map =
             BTreeMap::from_iter(self.iter().map(|f| (f.source_ident().to_string(), f)));
+        let mut fields_specified = BTreeMap::new();
 
         let Some(format) = (match self.definition() {
             DefinitionStructOrVariant::Struct(data) => &data.attrs.format,
@@ -79,9 +92,9 @@ impl<'a, 'src: 'a> Compile<'src, DeriveHasParser, ParseElements>
                         let msg = "Format string cannot be empty";
                         return ParseStep::error(msg);
                     };
-                    let mut expr = quote! { just(#first_token) };
+                    let mut expr = quote! { just(#crate_path::#first_token) };
                     for t in iter {
-                        expr = quote! { #expr.then(just(#t)) };
+                        expr = quote! { #expr.then(just(#crate_path::#t)) };
                     }
                     ParseStep::Ignore(expr)
                 }
@@ -90,6 +103,7 @@ impl<'a, 'src: 'a> Compile<'src, DeriveHasParser, ParseElements>
                         return ParseStep::error(format!("Field '{}' not found for format", name));
                     };
 
+                    fields_specified.insert(name.to_string(), f);
                     let ty = &f.source().ty;
                     let expr = match f.extra().kind {
                         FieldKind::SSAValue => quote! { #crate_path::operand() },
@@ -97,7 +111,7 @@ impl<'a, 'src: 'a> Compile<'src, DeriveHasParser, ParseElements>
                         FieldKind::Successor => quote! { #crate_path::successor() },
                         FieldKind::Region => quote! { #crate_path::region() },
                         FieldKind::Other => quote! {
-                            <#ty as #trait_path>::parser()
+                            <#ty as #trait_path<'tokens, 'src, _AnotherLanguage>>::parser()
                         },
                         _ => {
                             return ParseStep::error(format!(
@@ -113,7 +127,36 @@ impl<'a, 'src: 'a> Compile<'src, DeriveHasParser, ParseElements>
             .collect();
 
         let name = format_ident!("{}SyntaxTree", self.source_ident());
-        ParseElements::new(quote! {#crate_path}, quote! {#name}, steps)
+        let unspecified: BTreeMap<String, TokenStream> = fields_map
+            .iter()
+            .filter_map(|(name, f)| {
+                if fields_specified.contains_key(name)
+                    || matches!(f.extra().kind, FieldKind::ResultValue)
+                {
+                    None
+                } else {
+                    Some((name.clone(), quote! { #f: Default::default() }))
+                }
+            })
+            .collect();
+        let results: Vec<String> = self
+            .iter()
+            .filter_map(|f| {
+                if matches!(f.extra().kind, FieldKind::ResultValue) {
+                    Some(f.source_ident().to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        ParseElements::new(
+            quote! {#crate_path},
+            quote! {#name},
+            steps,
+            unspecified,
+            results,
+        )
     }
 }
 
@@ -173,8 +216,18 @@ impl ToTokens for ParseElements {
             }
         }
 
+        for unspecified in self.unspecified.values() {
+            vars.push(unspecified.clone());
+        }
+
+        let n_result = self.results.len();
+        for (idx, result) in self.results.iter().enumerate() {
+            let name = format_ident!("{}", result);
+            vars.push(quote! { #name: chumsky_parsed_results[#idx].clone() })
+        }
+
         quote! {
-            #chain.map(move |#pattern| {
+            #crate_path::result_values(#n_result).then(#chain).map(move |(chumsky_parsed_results, #pattern)| {
                 #name {
                     #( #vars ),*
                 }

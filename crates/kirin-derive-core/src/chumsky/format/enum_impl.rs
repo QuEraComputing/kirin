@@ -1,11 +1,9 @@
 use quote::quote;
 
-use crate::{
-    chumsky::ast::{ASTNodeName, GenericsImpl},
-    prelude::*,
-};
+use crate::{chumsky::ast::ASTNodeName, prelude::*};
 
 use super::context::DeriveHasParser;
+use super::generics::GenericsImpl;
 use super::step::ParseElements;
 
 target! {
@@ -17,7 +15,9 @@ impl<'src> Compile<'src, DeriveHasParser, EnumImpl> for Enum<'src, DeriveHasPars
         let trait_path: TraitPath = self.compile(ctx);
         let crate_path: CratePath = self.compile(ctx);
         let generics: GenericsImpl = self.compile(ctx);
-        let name: ASTNodeName = self.compile(ctx);
+
+        let name = self.source_ident();
+        let ast_name: ASTNodeName = self.compile(ctx);
         let (_, src_ty_generics, _) = self.source().generics.split_for_impl();
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -27,7 +27,7 @@ impl<'src> Compile<'src, DeriveHasParser, EnumImpl> for Enum<'src, DeriveHasPars
                 let variant_name = variant.source_ident();
                 if let Some(wrapper) = variant.wrapper() {
                     quote! {
-                        <#wrapper as #trait_path>::parser()
+                        <#wrapper as #trait_path<'tokens, 'src, _AnotherLanguage>>::parser()
                             .map(|inner| #name::#variant_name { #wrapper: inner })
                     }
                 } else {
@@ -46,8 +46,8 @@ impl<'src> Compile<'src, DeriveHasParser, EnumImpl> for Enum<'src, DeriveHasPars
             });
 
         quote! {
-            impl #impl_generics #trait_path for #name #src_ty_generics #where_clause {
-                type Output = #name #ty_generics;
+            impl #impl_generics #trait_path<'tokens, 'src, _AnotherLanguage> for #name #src_ty_generics #where_clause {
+                type Output = #ast_name #ty_generics;
                 fn parser<I: #crate_path::TokenInput<'tokens, 'src>>() -> #crate_path::Boxed<'tokens, 'tokens, I, Self::Output, #crate_path::ParserError<'tokens, 'src>> {
                     #crate_path::choice((
                         #body

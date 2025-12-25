@@ -1,6 +1,6 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
-use crate::{operand, ssa_value};
+use crate::operand;
 
 use super::ast;
 use chumsky::prelude::*;
@@ -39,8 +39,21 @@ where
     }
 }
 
+impl<'tokens, 'src, T, L> HasParser<'tokens, 'src, L> for PhantomData<T>
+where
+    'src: 'tokens,
+    T: 'tokens,
+    L: Dialect + HasParser<'tokens, 'src, L>,
+{
+    type Output = PhantomData<T>;
+    fn parser<I: TokenInput<'tokens, 'src>>()
+    -> Boxed<'tokens, 'tokens, I, Self::Output, ParserError<'tokens, 'src>> {
+        empty().to(std::marker::PhantomData::<T>).boxed()
+    }
+}
+
 pub trait WithAbstractSyntaxTree<'tokens, 'src: 'tokens, L: Dialect + HasParser<'tokens, 'src, L>> {
-    type AbstractSyntaxTreeNode;
+    type AbstractSyntaxTreeNode: Debug + Clone;
 }
 
 impl<'tokens, 'src, L, T> WithAbstractSyntaxTree<'tokens, 'src, L> for std::marker::PhantomData<T>

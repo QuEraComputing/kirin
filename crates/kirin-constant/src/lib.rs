@@ -1,8 +1,8 @@
 use kirin::ir::*;
 use kirin::parsers::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree)]
-#[chumsky(format = "constant {value} : {result:type}")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree, HasParser)]
+#[chumsky(format = "constant {value}")]
 #[kirin(constant, fn = new, type_lattice = L)]
 pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
     #[kirin(into)]

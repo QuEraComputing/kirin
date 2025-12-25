@@ -1,12 +1,13 @@
 use quote::quote;
 
 use crate::{
-    chumsky::ast::{ASTNodeName, GenericsImpl},
+    chumsky::ast::{ASTNodeName},
     prelude::*,
 };
 
 use super::context::DeriveHasParser;
 use super::step::ParseElements;
+use super::generics::GenericsImpl;
 
 target! {
     pub struct StructImpl
@@ -17,14 +18,17 @@ impl<'src> Compile<'src, DeriveHasParser, StructImpl> for Struct<'src, DeriveHas
         let trait_path: TraitPath = self.compile(ctx);
         let crate_path: CratePath = self.compile(ctx);
         let generics: GenericsImpl = self.compile(ctx);
-        let name: ASTNodeName = self.compile(ctx);
+
+        let name = self.source_ident();
+        let ast_name: ASTNodeName = self.compile(ctx);
+
         let (_, src_ty_generics, _) = self.source().generics.split_for_impl();
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         let body = if let Some(wrapper) = self.wrapper() {
             let ty_wrapper = &wrapper.source().ty;
             quote! {
-                <#ty_wrapper as #trait_path>::parser()
+                <#ty_wrapper as #trait_path<'tokens, 'src, _AnotherLanguage>>::parser()
                     .map(|inner| #name { #wrapper: inner })
                     .boxed()
             }
@@ -36,8 +40,8 @@ impl<'src> Compile<'src, DeriveHasParser, StructImpl> for Struct<'src, DeriveHas
         };
 
         quote! {
-            impl #impl_generics #trait_path for #name #src_ty_generics #where_clause {
-                type Output = #name #ty_generics;
+            impl #impl_generics #trait_path<'tokens, 'src, _AnotherLanguage> for #name #src_ty_generics #where_clause {
+                type Output = #ast_name #ty_generics;
                 fn parser<I: #crate_path::TokenInput<'tokens, 'src>>() -> #crate_path::Boxed<'tokens, 'tokens, I, Self::Output, #crate_path::ParserError<'tokens, 'src>> {
                     #body
                 }

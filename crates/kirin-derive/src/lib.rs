@@ -155,3 +155,11 @@ pub fn derive_with_abstract_syntax_tree(input: TokenStream) -> TokenStream {
         .build()
         .emit(&ast).into()
 }
+
+#[proc_macro_derive(HasParser, attributes(chumsky, wraps))]
+pub fn derive_has_parser(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    DeriveHasParser::builder()
+        .build()
+        .emit(&ast).into()
+}

@@ -67,6 +67,30 @@ where
         .labelled(format!("{} operands", n))
 }
 
+/// Parser for a list of result values, which are SSA values separated by commas,
+/// followed by an equal sign, i.e
+///
+/// ```ll
+/// %res1 = some_statement ...
+/// %res1, %res2, %res3 = some_statement ...
+/// ```
+pub fn result_values<'tokens, 'src: 'tokens, I, L>(
+    n: usize,
+) -> impl Parser<'tokens, I, Vec<ast::ResultValue<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+where
+    'src: 'tokens,
+    I: TokenInput<'tokens, 'src>,
+    L: HasParser<'tokens, 'src, L> + Dialect<TypeLattice: HasParser<'tokens, 'src, L>>,
+{
+    ssa_value()
+        .map(|name| ast::ResultValue { name, ty: None })
+        .separated_by(just(Token::Comma))
+        .exactly(n)
+        .collect()
+        .labelled(format!("{} result values", n))
+        .then_ignore(just(Token::Equal))
+}
+
 pub fn literal_int<'tokens, 'src: 'tokens, T, I>(
     f: impl Fn(&str, SimpleSpan) -> Result<T, Rich<'tokens, Token<'src>, chumsky::span::SimpleSpan>>
     + 'tokens,

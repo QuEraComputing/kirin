@@ -56,6 +56,7 @@ impl<'src> Compile<'src, DeriveAST, StructImpl> for Struct<'src, DeriveAST> {
         let (impl_generics, ty_generics, where_clause) = generics.0.split_for_impl();
         quote! {
             #[automatically_derived]
+            #[derive(Debug, Clone)]
             pub struct #name #generics #body
 
             #[automatically_derived]
@@ -86,6 +87,7 @@ impl<'src> Compile<'src, DeriveAST, EnumImpl> for Enum<'src, DeriveAST> {
             self.variants().map(|v| v.fields().compile(ctx)).collect();
         quote! {
             #[automatically_derived]
+            #[derive(Debug, Clone)]
             pub enum #name #generics {
                 #( #variant_names #variant_impls ),*
             }

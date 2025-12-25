@@ -5,9 +5,12 @@ use crate::{
 };
 use bon::Builder;
 
+use super::enum_impl::EnumImpl;
+use super::struct_impl::StructImpl;
+
 #[derive(Clone, Builder)]
 pub struct DeriveHasParser {
-    #[builder(default = syn::parse_quote!(kirin::parsers))]
+    #[builder(default = syn::parse_quote!(kirin::parsers::prelude))]
     pub default_crate_path: syn::Path,
     #[builder(default = syn::parse_quote!(HasParser))]
     pub trait_path: syn::Path,
@@ -32,4 +35,9 @@ impl DeriveTrait for DeriveHasParser {
     fn trait_path(&self) -> &syn::Path {
         &self.trait_path
     }
+}
+
+impl Emit<'_> for DeriveHasParser {
+    type EnumImpl = EnumImpl;
+    type StructImpl = StructImpl;
 }

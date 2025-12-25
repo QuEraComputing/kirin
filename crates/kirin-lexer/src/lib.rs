@@ -135,97 +135,96 @@ pub fn lex<'src>(input: &'src str) -> impl Iterator<Item = Result<Token<'src>, S
 #[cfg(feature = "quote")]
 impl quote::ToTokens for Token<'_> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let crate_path = quote::quote! { ::kirin_lexer::Token };
         match self {
             Token::Error => {
                 tokens.extend(quote::quote! { compile_error!("Unexpected token") });
             }
             Token::SSAValue(name) => {
-                tokens.extend(quote::quote! { #crate_path::SSAValue(#name) });
+                tokens.extend(quote::quote! { Token::SSAValue(#name) });
             }
             Token::Block(name) => {
-                tokens.extend(quote::quote! { #crate_path::Block(#name) });
+                tokens.extend(quote::quote! { Token::Block(#name) });
             }
             Token::Identifier(name) => {
-                tokens.extend(quote::quote! { #crate_path::Identifier(#name) });
+                tokens.extend(quote::quote! { Token::Identifier(#name) });
             }
             Token::Symbol(name) => {
-                tokens.extend(quote::quote! { #crate_path::Symbol(#name) });
+                tokens.extend(quote::quote! { Token::Symbol(#name) });
             }
             Token::AttrId(name) => {
-                tokens.extend(quote::quote! { #crate_path::AttrId(#name) });
+                tokens.extend(quote::quote! { Token::AttrId(#name) });
             }
             Token::Int(value) => {
-                tokens.extend(quote::quote! { #crate_path::Int(#value) });
+                tokens.extend(quote::quote! { Token::Int(#value) });
             }
             Token::Unsigned(value) => {
-                tokens.extend(quote::quote! { #crate_path::Unsigned(#value) });
+                tokens.extend(quote::quote! { Token::Unsigned(#value) });
             }
             Token::Float(value) => {
-                tokens.extend(quote::quote! { #crate_path::Float(#value) });
+                tokens.extend(quote::quote! { Token::Float(#value) });
             }
             Token::StringLit(value) => {
-                tokens.extend(quote::quote! { #crate_path::StringLit(#value.to_string()) });
+                tokens.extend(quote::quote! { Token::StringLit(#value.to_string()) });
             }
             Token::LParen => {
-                tokens.extend(quote::quote! { #crate_path::LParen });
+                tokens.extend(quote::quote! { Token::LParen });
             }
             Token::RParen => {
-                tokens.extend(quote::quote! { #crate_path::RParen });
+                tokens.extend(quote::quote! { Token::RParen });
             }
             Token::LBrace => {
-                tokens.extend(quote::quote! { #crate_path::LBrace });
+                tokens.extend(quote::quote! { Token::LBrace });
             }
             Token::EscapedLBrace => {
-                tokens.extend(quote::quote! { #crate_path::EscapedLBrace });
+                tokens.extend(quote::quote! { Token::EscapedLBrace });
             }
             Token::RBrace => {
-                tokens.extend(quote::quote! { #crate_path::RBrace });
+                tokens.extend(quote::quote! { Token::RBrace });
             }
             Token::EscapedRBrace => {
-                tokens.extend(quote::quote! { #crate_path::EscapedRBrace });
+                tokens.extend(quote::quote! { Token::EscapedRBrace });
             }
             Token::LBracket => {
-                tokens.extend(quote::quote! { #crate_path::LBracket });
+                tokens.extend(quote::quote! { Token::LBracket });
             }
             Token::RBracket => {
-                tokens.extend(quote::quote! { #crate_path::RBracket });
+                tokens.extend(quote::quote! { Token::RBracket });
             }
             Token::LAngle => {
-                tokens.extend(quote::quote! { #crate_path::LAngle });
+                tokens.extend(quote::quote! { Token::LAngle });
             }
             Token::RAngle => {
-                tokens.extend(quote::quote! { #crate_path::RAngle });
+                tokens.extend(quote::quote! { Token::RAngle });
             }
             Token::Dollar => {
-                tokens.extend(quote::quote! { #crate_path::Dollar });
+                tokens.extend(quote::quote! { Token::Dollar });
             }
             Token::Asterisk => {
-                tokens.extend(quote::quote! { #crate_path::Asterisk });
+                tokens.extend(quote::quote! { Token::Asterisk });
             }
             Token::QuestionMark => {
-                tokens.extend(quote::quote! { #crate_path::QuestionMark });
+                tokens.extend(quote::quote! { Token::QuestionMark });
             }
             Token::Colon => {
-                tokens.extend(quote::quote! { #crate_path::Colon });
+                tokens.extend(quote::quote! { Token::Colon });
             }
             Token::Comma => {
-                tokens.extend(quote::quote! { #crate_path::Comma });
+                tokens.extend(quote::quote! { Token::Comma });
             }
             Token::Equal => {
-                tokens.extend(quote::quote! { #crate_path::Equal });
+                tokens.extend(quote::quote! { Token::Equal });
             }
             Token::Arrow => {
-                tokens.extend(quote::quote! { #crate_path::Arrow });
+                tokens.extend(quote::quote! { Token::Arrow });
             }
             Token::Ellipsis => {
-                tokens.extend(quote::quote! { #crate_path::Ellipsis });
+                tokens.extend(quote::quote! { Token::Ellipsis });
             }
             Token::DoubleColon => {
-                tokens.extend(quote::quote! { #crate_path::DoubleColon });
+                tokens.extend(quote::quote! { Token::DoubleColon });
             }
             Token::Semicolon => {
-                tokens.extend(quote::quote! { #crate_path::Semicolon });
+                tokens.extend(quote::quote! { Token::Semicolon });
             }
         }
     }
