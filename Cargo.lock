@@ -293,6 +293,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "chumsky"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ba4a05c9ce83b07de31b31c874e87c069881ac4355db9e752e3a55c11ec75a6"
+dependencies = [
+ "hashbrown 0.15.5",
+ "regex-automata 0.3.9",
+ "serde",
+ "stacker",
+ "unicode-ident",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "clap"
 version = "4.5.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -965,7 +979,7 @@ name = "kirin-chumsky"
 version = "0.1.0"
 dependencies = [
  "ariadne",
- "chumsky",
+ "chumsky 0.11.2",
  "insta",
  "kirin-derive",
  "kirin-ir",
@@ -997,6 +1011,7 @@ name = "kirin-derive-core"
 version = "0.1.0"
 dependencies = [
  "bon",
+ "chumsky 0.12.0",
  "darling 0.23.0",
  "insta",
  "kirin-lexer",
@@ -1021,6 +1036,8 @@ name = "kirin-lexer"
 version = "0.1.0"
 dependencies = [
  "logos",
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]

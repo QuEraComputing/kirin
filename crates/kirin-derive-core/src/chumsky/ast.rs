@@ -43,16 +43,16 @@ target! {
     pub struct StructImpl;
 }
 
-impl<'src> Compile<'src, Struct<'src, DeriveAST>, StructImpl> for DeriveAST {
-    fn compile(&self, node: &Struct<'src, DeriveAST>) -> StructImpl {
-        let trait_path: TraitPath = self.compile(node);
+impl<'src> Compile<'src, DeriveAST, StructImpl> for Struct<'src, DeriveAST> {
+    fn compile(&self, ctx: &DeriveAST) -> StructImpl {
+        let trait_path: TraitPath = self.compile(ctx);
 
-        let name: syn::Ident = format_ident!("{}SyntaxTree", node.source_ident());
-        let body: ASTNodeFields = self.compile(&node.fields());
-        let generics: GenericsImpl = self.compile(node);
+        let name: ASTNodeName = self.compile(ctx);
+        let body: ASTNodeFields = self.fields().compile(ctx);
+        let generics: GenericsImpl = self.compile(ctx);
 
-        let src_name = node.source_ident();
-        let (_, src_ty_generics, _) = node.source().generics.split_for_impl();
+        let src_name = self.source_ident();
+        let (_, src_ty_generics, _) = self.source().generics.split_for_impl();
         let (impl_generics, ty_generics, where_clause) = generics.0.split_for_impl();
         quote! {
             #[automatically_derived]
@@ -71,19 +71,19 @@ target! {
     pub struct EnumImpl;
 }
 
-impl<'src> Compile<'src, Enum<'src, DeriveAST>, EnumImpl> for DeriveAST {
-    fn compile(&self, node: &Enum<'src, DeriveAST>) -> EnumImpl {
-        let trait_path: TraitPath = self.compile(node);
-        let name: syn::Ident = format_ident!("{}SyntaxTree", node.source_ident());
-        let generics: GenericsImpl = self.compile(node);
+impl<'src> Compile<'src, DeriveAST, EnumImpl> for Enum<'src, DeriveAST> {
+    fn compile(&self, ctx: &DeriveAST) -> EnumImpl {
+        let trait_path: TraitPath = self.compile(ctx);
+        let name: ASTNodeName = self.compile(ctx);
+        let generics: GenericsImpl = self.compile(ctx);
 
-        let src_name = node.source_ident();
-        let (_, src_ty_generics, _) = node.source().generics.split_for_impl();
+        let src_name = self.source_ident();
+        let (_, src_ty_generics, _) = self.source().generics.split_for_impl();
         let (impl_generics, ty_generics, where_clause) = generics.0.split_for_impl();
 
-        let variant_names = node.variant_names();
+        let variant_names = self.variant_names();
         let variant_impls: Vec<ASTNodeFields> =
-            node.variants().map(|v| self.compile(&v.fields())).collect();
+            self.variants().map(|v| v.fields().compile(ctx)).collect();
         quote! {
             #[automatically_derived]
             pub enum #name #generics {
@@ -103,11 +103,11 @@ target! {
     pub struct ASTNodeFields;
 }
 
-impl<'src> Compile<'src, Fields<'_, 'src, DeriveAST>, ASTNodeFields> for DeriveAST {
-    fn compile(&self, node: &Fields<'_, 'src, DeriveAST>) -> ASTNodeFields {
-        let crate_path: CratePath = self.compile(node);
+impl<'src> Compile<'src, DeriveAST, ASTNodeFields> for Fields<'_, 'src, DeriveAST> {
+    fn compile(&self, ctx: &DeriveAST) -> ASTNodeFields {
+        let crate_path: CratePath = self.compile(ctx);
 
-        if let Some(f) = node.wrapper() {
+        if let Some(f) = self.wrapper() {
             let ty = &f.source().ty;
             return quote! {
                 {
@@ -117,7 +117,7 @@ impl<'src> Compile<'src, Fields<'_, 'src, DeriveAST>, ASTNodeFields> for DeriveA
             .into();
         }
 
-        let field_impls = node.iter().map(|f| {
+        let field_impls = self.iter().map(|f| {
             let ty = &f.source().ty;
             quote! {
                 #f: <#ty as #crate_path::WithAbstractSyntaxTree<'tokens, 'src, _AnotherLanguage>>::AbstractSyntaxTreeNode
@@ -132,13 +132,14 @@ impl<'src> Compile<'src, Fields<'_, 'src, DeriveAST>, ASTNodeFields> for DeriveA
 
 pub struct GenericsImpl(syn::Generics);
 
-impl<'src, T> Compile<'src, T, GenericsImpl> for DeriveAST
+impl<'src, T, L> Compile<'src, L, GenericsImpl> for T
 where
     T: WithGenerics + WithUserCratePath,
+    L: DeriveWithCratePath,
 {
-    fn compile(&self, node: &T) -> GenericsImpl {
-        let crate_path: CratePath = self.compile(node);
-        let mut generics = node.generics().clone();
+    fn compile(&self, ctx: &L) -> GenericsImpl {
+        let crate_path: CratePath = self.compile(ctx);
+        let mut generics = self.generics().clone();
         for param in generics.type_params_mut() {
             param.bounds.push(
                 syn::parse_quote!(#crate_path::WithAbstractSyntaxTree<'tokens, 'src, _AnotherLanguage>),
@@ -154,6 +155,30 @@ where
 impl ToTokens for GenericsImpl {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.0.to_tokens(tokens);
+    }
+}
+
+impl std::ops::Deref for GenericsImpl {
+    type Target = syn::Generics;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+target! {
+    pub struct ASTNodeName;
+}
+
+impl<'src, T, L> Compile<'src, L, ASTNodeName> for T
+where
+    T: SourceIdent,
+    L: DeriveTrait,
+{
+    fn compile(&self, _ctx: &L) -> ASTNodeName {
+        let ident = self.source_ident();
+        let name = format_ident!("{}SyntaxTree", ident);
+        quote! { #name }.into()
     }
 }
 
@@ -184,6 +209,19 @@ mod tests {
                 p: u32,
                 q: MyType,
                 l: T,
+            }
+        };
+        insta::assert_snapshot!(DeriveAST::builder().build().print(&input));
+    }
+
+    #[test]
+    fn test_derive_simple() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[chumsky(format = "my_statement {condition} then={then_block} else={else_block}")]
+            struct MyStatement {
+                condition: SSAValue,
+                then_block: Block,
+                else_block: Block,
             }
         };
         insta::assert_snapshot!(DeriveAST::builder().build().print(&input));

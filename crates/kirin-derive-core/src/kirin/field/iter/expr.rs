@@ -11,20 +11,20 @@ target! {
     pub struct Expr
 }
 
-impl<'src, T> Compile<'src, T, Expr> for FieldsIter
+impl<'src, T> Compile<'src, FieldsIter, Expr> for T
 where
     T: WithUserCratePath + HasFields<'src, FieldsIter>,
 {
-    fn compile(&self, node: &T) -> Expr {
-        let item: MatchingItem = self.compile(node);
-        let tokens = node
+    fn compile(&self, ctx: &FieldsIter) -> Expr {
+        let item: MatchingItem = self.compile(ctx);
+        let tokens = self
             .fields()
             .iter()
             .filter_map(|f| match f.extra() {
                 FieldExtra::One => Some(quote! {
                     std::iter::once(#f)
                 }),
-                FieldExtra::Vec if self.mutable => Some(quote! {
+                FieldExtra::Vec if ctx.mutable => Some(quote! {
                     #f.iter_mut()
                 }),
                 FieldExtra::Vec => Some(quote! {

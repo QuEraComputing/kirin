@@ -39,13 +39,13 @@ impl DeriveWithCratePath for DialectMarker {
 
 macro_rules! impl_compile {
     ($name:ident) => {
-        impl<'src> Compile<'src, $name<'src, DialectMarker>, TokenStream> for DialectMarker {
-            fn compile(&self, node: &$name<'src, DialectMarker>) -> TokenStream {
-                let name = &node.input().ident;
+        impl<'src> Compile<'src, DialectMarker, TokenStream> for $name<'src, DialectMarker> {
+            fn compile(&self, ctx: &DialectMarker) -> TokenStream {
+                let name = &self.input().ident;
                 let (impl_generics, ty_generics, where_clause) =
-                    node.input().generics.split_for_impl();
-                let trait_path: TraitPath = self.compile(node);
-                let type_lattice = &node.attrs().type_lattice;
+                    self.input().generics.split_for_impl();
+                let trait_path: TraitPath = self.compile(ctx);
+                let type_lattice = &self.attrs().type_lattice;
                 quote! {
                     #[automatically_derived]
                     impl #impl_generics #trait_path for #name #ty_generics #where_clause {

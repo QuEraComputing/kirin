@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+use crate::{operand, ssa_value};
+
 use super::ast;
 use chumsky::prelude::*;
 use kirin_ir::*;
@@ -22,6 +24,19 @@ pub trait HasParser<'tokens, 'src: 'tokens, L: Dialect + HasParser<'tokens, 'src
     type Output: Clone + Debug;
     fn parser<I: TokenInput<'tokens, 'src>>()
     -> Boxed<'tokens, 'tokens, I, Self::Output, ParserError<'tokens, 'src>>;
+}
+
+impl<'tokens, 'src, L> HasParser<'tokens, 'src, L> for SSAValue
+where
+    'src: 'tokens,
+    L: Dialect + HasParser<'tokens, 'src, L> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src, L>,
+{
+    type Output = ast::Operand<'tokens, 'src, L>;
+    fn parser<I: TokenInput<'tokens, 'src>>()
+    -> Boxed<'tokens, 'tokens, I, Self::Output, ParserError<'tokens, 'src>> {
+        operand().boxed()
+    }
 }
 
 pub trait WithAbstractSyntaxTree<'tokens, 'src: 'tokens, L: Dialect + HasParser<'tokens, 'src, L>> {

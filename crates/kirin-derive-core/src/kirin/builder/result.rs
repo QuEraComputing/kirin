@@ -7,17 +7,17 @@ target! {
     pub struct LetNameEqResultValue
 }
 
-impl<'src> Compile<'src, Fields<'_, 'src, Builder>, LetNameEqResultValue> for Builder {
-    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> LetNameEqResultValue {
-        let result_names: ResultNames = self.compile(node);
-        let results: Vec<TokenStream> = node
+impl<'src> Compile<'src, Builder, LetNameEqResultValue> for Fields<'_, 'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> LetNameEqResultValue {
+        let result_names: ResultNames = self.compile(ctx);
+        let results: Vec<TokenStream> = self
             .iter()
             .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
             .enumerate()
             .zip(result_names)
             .map(|((index, f), name)| {
                 let ty = &f.source().ty;
-                let statement_id: StatementIdName = self.compile(node);
+                let statement_id: StatementIdName = self.compile(ctx);
 
                 let Some(ssa_ty) = &f.attrs().ssa_ty else {
                     return syn::Error::new_spanned(
@@ -65,9 +65,9 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, LetNameEqResultValue> for Bu
 
 pub struct ResultNames(pub(super) std::vec::IntoIter<syn::Ident>);
 
-impl<'src> Compile<'src, Fields<'_, 'src, Builder>, ResultNames> for Builder {
-    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> ResultNames {
-        let results = node
+impl<'src> Compile<'src, Builder, ResultNames> for Fields<'_, 'src, Builder> {
+    fn compile(&self, _ctx: &Builder) -> ResultNames {
+        let results = self
             .iter()
             .filter(|f| matches!(f.extra().kind, FieldKind::ResultValue))
             .collect::<Vec<_>>();

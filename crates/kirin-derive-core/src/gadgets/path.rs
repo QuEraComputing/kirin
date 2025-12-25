@@ -2,7 +2,7 @@ use quote::ToTokens;
 
 use crate::{
     derive::{Compile, DeriveTrait, DeriveWithCratePath},
-    ir::{Attrs, WithUserCratePath},
+    ir::WithUserCratePath,
     target,
 };
 
@@ -10,19 +10,19 @@ target! {
     pub struct TraitPath
 }
 
-impl<'src, L, T> Compile<'src, T, TraitPath> for L
+impl<'src, L, T> Compile<'src, L, TraitPath> for T
 where
-    T: Attrs<Output: WithUserCratePath>,
+    T: WithUserCratePath,
     L: DeriveTrait + DeriveWithCratePath,
 {
-    fn compile(&self, node: &T) -> TraitPath {
-        let mut new_path = if let Some(path) = &node.attrs().user_crate_path() {
+    fn compile(&self, ctx: &L) -> TraitPath {
+        let mut new_path = if let Some(path) = &self.user_crate_path() {
             path
         } else {
-            self.default_crate_path()
+            ctx.default_crate_path()
         }
         .clone();
-        new_path.segments.extend(self.trait_path().segments.clone());
+        new_path.segments.extend(ctx.trait_path().segments.clone());
         TraitPath(new_path.to_token_stream())
     }
 }
@@ -31,16 +31,16 @@ target! {
     pub struct CratePath
 }
 
-impl<'src, L, T> Compile<'src, T, CratePath> for L
+impl<'src, L, T> Compile<'src, L, CratePath> for T
 where
     T: WithUserCratePath,
     L: DeriveWithCratePath,
 {
-    fn compile(&self, node: &T) -> CratePath {
-        let path = if let Some(path) = &node.user_crate_path() {
+    fn compile(&self, ctx: &L) -> CratePath {
+        let path = if let Some(path) = &self.user_crate_path() {
             path
         } else {
-            self.default_crate_path()
+            ctx.default_crate_path()
         };
         CratePath(path.to_token_stream())
     }

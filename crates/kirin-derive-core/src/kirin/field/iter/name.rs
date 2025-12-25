@@ -7,12 +7,12 @@ target! {
     pub struct Name
 }
 
-impl<'src, S> Compile<'src, S, Name> for FieldsIter
+impl<'src, S> Compile<'src, FieldsIter, Name> for S
 where
     S: SourceIdent,
 {
-    fn compile(&self, node: &S) -> Name {
-        let ident = format_ident!("{}{}", &node.source_ident(), &self.iter_name);
+    fn compile(&self, ctx: &FieldsIter) -> Name {
+        let ident = format_ident!("{}{}", &self.source_ident(), &ctx.iter_name);
         Name(quote! { #ident })
     }
 }

@@ -46,9 +46,9 @@ pub struct DefinitionStruct<L: Layout>(pub(super) DefinitionStatement<L::StructA
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DefinitionEnum<L: Layout> {
-    pub(super) attrs: L::EnumAttr,
-    pub(super) marked_wraps: bool,
-    pub(super) variants: Vec<DefinitionVariant<L>>,
+    pub attrs: L::EnumAttr,
+    pub marked_wraps: bool,
+    pub variants: Vec<DefinitionVariant<L>>,
 }
 
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -82,10 +82,10 @@ impl<L: Layout> DerefMut for DefinitionVariant<L> {
 
 #[cfg_attr(feature = "debug", derive(Debug))]
 pub struct DefinitionStatement<Attr, L: Layout> {
-    pub(super) attrs: Attr,
-    pub(super) wraps: bool,
-    pub(super) fields: Vec<DefinitionField<L>>,
-    pub(super) extra: L::StatementExtra,
+    pub attrs: Attr,
+    pub wraps: bool,
+    pub fields: Vec<DefinitionField<L>>,
+    pub extra: L::StatementExtra,
 }
 
 #[cfg_attr(feature = "debug", derive(Debug))]
@@ -309,9 +309,24 @@ pub struct Field<'a, 'src, L: Layout> {
     pub(super) index: usize,
 }
 
+impl<'a, 'src, L: Layout> Clone for Field<'a, 'src, L> {
+    fn clone(&self) -> Self {
+        Field {
+            input: self.input,
+            src: self.src,
+            parent: self.parent.clone(),
+            index: self.index,
+        }
+    }
+}
+
 impl<'a, L: Layout> Field<'a, '_, L> {
     pub(super) fn definition(&self) -> &DefinitionField<L> {
         &self.parent.fields()[self.index]
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
     }
 
     pub fn parent_definition(&self) -> &DefinitionStructOrVariant<'a, L> {

@@ -12,21 +12,21 @@ target! {
     pub struct InnerType
 }
 
-impl<'src, T> Compile<'src, T, InnerType> for FieldsIter
+impl<'src, T> Compile<'src, FieldsIter, InnerType> for T
 where
     T: HasFields<'src, FieldsIter> + WithUserCratePath,
 {
-    fn compile(&self, node: &T) -> InnerType {
-        let item: MatchingItem = self.compile(node);
-        let lifetime = &self.trait_lifetime;
-        let crate_path: CratePath = self.compile(node);
-        let matching_type = &self.matching_type;
-        let tokens = node
+    fn compile(&self, ctx: &FieldsIter) -> InnerType {
+        let item: MatchingItem = self.compile(ctx);
+        let lifetime = &ctx.trait_lifetime;
+        let crate_path: CratePath = self.compile(ctx);
+        let matching_type = &ctx.matching_type;
+        let tokens = self
             .fields()
             .iter()
             .filter_map(|f| match f.extra() {
                 FieldExtra::One => Some(quote! { std::iter::Once<#item> }),
-                FieldExtra::Vec if self.mutable => Some(quote! {
+                FieldExtra::Vec if ctx.mutable => Some(quote! {
                     std::slice::IterMut<#lifetime, #crate_path :: #matching_type>
                 }),
                 FieldExtra::Vec => Some(quote! {
@@ -53,14 +53,16 @@ target! {
     pub struct FullType
 }
 
-impl<'src, T> Compile<'src, T, FullType> for FieldsIter
+impl<'src, T> Compile<'src, FieldsIter, FullType> for T
 where
-    Self: Compile<'src, T, TypeGenerics> + Compile<'src, T, Name>,
-    T: Source<Output = &'src syn::DeriveInput> + AnyWrapper,
+    T: Source<Output = &'src syn::DeriveInput>
+        + AnyWrapper
+        + Compile<'src, FieldsIter, TypeGenerics>
+        + Compile<'src, FieldsIter, Name>,
 {
-    fn compile(&self, node: &T) -> FullType {
-        let name: Name = self.compile(node);
-        let generics: TypeGenerics = self.compile(node);
+    fn compile(&self, ctx: &FieldsIter) -> FullType {
+        let name: Name = self.compile(ctx);
+        let generics: TypeGenerics = self.compile(ctx);
         let (_, ty_generics, _) = generics.split_for_impl();
         FullType(quote! {
             #name #ty_generics

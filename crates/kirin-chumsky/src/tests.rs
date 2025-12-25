@@ -7,8 +7,8 @@ use logos::Logos;
 #[derive(Debug, Clone)]
 pub enum SimpleAST<'tokens, 'src: 'tokens> {
     Add {
-        lhs: ast::Spanned<&'src str>,
-        rhs: ast::Spanned<&'src str>,
+        lhs: ast::Operand<'tokens, 'src, SimpleLanguage>,
+        rhs: ast::Operand<'tokens, 'src, SimpleLanguage>,
         result: ast::Spanned<&'src str>,
     },
     Constant {
@@ -52,7 +52,7 @@ where
                     .then_ignore(just(Token::Equal))
                     .then_ignore(identifier("add"))
                     .then(operands(2, Token::Comma))
-                    .map(|(result, operands)| SimpleAST::Add { lhs: operands[0], rhs: operands[1], result })
+                    .map(|(result, operands)| SimpleAST::Add { lhs: operands[0].clone(), rhs: operands[1].clone(), result })
                     .labelled("addition instruction with result");
 
             // Parse a constant instruction 

@@ -11,19 +11,19 @@ target! {
     pub struct EnumImpl
 }
 
-impl<'src> Compile<'src, Enum<'src, Builder>, EnumImpl> for Builder {
-    fn compile(&self, node: &Enum<'src, Builder>) -> EnumImpl {
-        if node.attrs().builder.is_none() {
+impl<'src> Compile<'src, Builder, EnumImpl> for Enum<'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> EnumImpl {
+        if self.attrs().builder.is_none() {
             return quote! {}.into();
         }
 
-        let build_result_mod: BuildResultModule = self.compile(node);
-        let build_fn: BuildFnImpl = self.compile(node);
-        let from_impls: Vec<FromImpl> = node
+        let build_result_mod: BuildResultModule = self.compile(ctx);
+        let build_fn: BuildFnImpl = self.compile(ctx);
+        let from_impls: Vec<FromImpl> = self
             .variants()
             .filter_map(|v| {
                 if v.is_wrapper() {
-                    Some(self.compile(&v.fields()))
+                    Some(v.fields().compile(ctx))
                 } else {
                     None
                 }

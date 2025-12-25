@@ -11,19 +11,19 @@ target! {
     pub struct StructImpl
 }
 
-impl<'src> Compile<'src, Struct<'src, Self>, StructImpl> for Builder {
-    fn compile(&self, node: &Struct<'src, Self>) -> StructImpl {
-        if node.attrs().builder.is_none() {
+impl<'src> Compile<'src, Builder, StructImpl> for Struct<'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> StructImpl {
+        if self.attrs().builder.is_none() {
             return quote! {}.into();
         }
 
-        if node.is_wrapper() {
-            let from_impl: FromImpl = self.compile(&node.fields());
+        if self.is_wrapper() {
+            let from_impl: FromImpl = self.fields().compile(ctx);
             return from_impl.to_token_stream().into();
         }
 
-        let build_result_mod: BuildResultModule = self.compile(node);
-        let build_fn: BuildFnImpl = self.compile(node);
+        let build_result_mod: BuildResultModule = self.compile(ctx);
+        let build_fn: BuildFnImpl = self.compile(ctx);
         quote! {
             #build_fn
             #build_result_mod

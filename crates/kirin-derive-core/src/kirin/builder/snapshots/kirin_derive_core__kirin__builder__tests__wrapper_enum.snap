@@ -1,0 +1,16 @@
+---
+source: crates/kirin-derive-core/src/kirin/builder/mod.rs
+expression: "Builder::default().print(&input)"
+---
+impl From<InnerA> for WrapperEnum {
+    fn from(value: InnerA) -> Self {
+        let field_0 = value;
+        Self::A(field_0)
+    }
+}
+impl From<InnerB> for WrapperEnum {
+    fn from(value: InnerB) -> Self {
+        let field_0 = value;
+        Self::B(field_0)
+    }
+}

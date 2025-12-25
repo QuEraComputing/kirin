@@ -1,22 +1,22 @@
 use quote::quote;
 
 use super::impl_head::ImplHead;
+use super::item::MatchingItem;
 use super::type_head::TypeHead;
 use super::variant::VariantTypeDef;
-use crate::prelude::*;
 use crate::kirin::field::context::FieldsIter;
-use super::item::MatchingItem;
+use crate::prelude::*;
 
 target! {
     pub struct EnumImpl
 }
 
-impl<'src> Compile<'src, Enum<'src, Self>, EnumImpl> for FieldsIter {
-    fn compile(&self, node: &Enum<'src, Self>) -> EnumImpl {
-        let head: ImplHead = self.compile(node);
-        let item: MatchingItem = self.compile(node);
-        let iter: EnumTypeDef = self.compile(node);
-        let variant_names = node
+impl<'src> Compile<'src, FieldsIter, EnumImpl> for Enum<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> EnumImpl {
+        let head: ImplHead = self.compile(ctx);
+        let item: MatchingItem = self.compile(ctx);
+        let iter: EnumTypeDef = self.compile(ctx);
+        let variant_names = self
             .variants()
             .map(|v| v.source_ident())
             .collect::<Vec<_>>();
@@ -40,12 +40,12 @@ target! {
     pub struct EnumTypeDef
 }
 
-impl<'src> Compile<'src, Enum<'src, Self>, EnumTypeDef> for FieldsIter {
-    fn compile(&self, node: &Enum<'src, Self>) -> EnumTypeDef {
-        let head: TypeHead = self.compile(node);
-        let variants = node
+impl<'src> Compile<'src, FieldsIter, EnumTypeDef> for Enum<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> EnumTypeDef {
+        let head: TypeHead = self.compile(ctx);
+        let variants = self
             .variants()
-            .map(|v| self.compile(&v))
+            .map(|v| v.compile(ctx))
             .collect::<Vec<VariantTypeDef>>();
 
         quote! {

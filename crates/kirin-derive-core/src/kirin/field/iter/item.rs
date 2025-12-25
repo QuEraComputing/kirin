@@ -11,15 +11,15 @@ target! {
     pub struct MatchingItem
 }
 
-impl<'src, T> Compile<'src, T, MatchingItem> for FieldsIter
+impl<'src, T> Compile<'src, FieldsIter, MatchingItem> for T
 where
     T: WithUserCratePath,
 {
-    fn compile(&self, node: &T) -> MatchingItem {
-        let crate_path: CratePath = self.compile(node);
-        let lifetime = &self.trait_lifetime;
-        let matching_type = &self.matching_type;
-        if self.mutable {
+    fn compile(&self, ctx: &FieldsIter) -> MatchingItem {
+        let crate_path: CratePath = self.compile(ctx);
+        let lifetime = &ctx.trait_lifetime;
+        let matching_type = &ctx.matching_type;
+        if ctx.mutable {
             MatchingItem(quote! { &#lifetime mut #crate_path :: #matching_type })
         } else {
             MatchingItem(quote! { &#lifetime #crate_path :: #matching_type })

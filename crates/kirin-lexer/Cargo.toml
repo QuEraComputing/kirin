@@ -5,3 +5,8 @@ edition = "2024"
 
 [dependencies]
 logos = "0.16.0"
+proc-macro2 = { version = "1.0.103", optional = true }
+quote = { version = "1.0.42", optional = true }
+
+[features]
+quote = ["dep:quote", "dep:proc-macro2"]

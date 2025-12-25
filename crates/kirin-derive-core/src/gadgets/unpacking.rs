@@ -1,7 +1,7 @@
 use quote::quote;
 
 use crate::ir::{Enum, HasFields, Layout, Source, Struct, Variant};
-use crate::{derive::Compile, target};
+use crate::target;
 
 target! {
     /// Returns the unpacking patterns for all variants in the enum.
@@ -9,29 +9,6 @@ target! {
     /// !!! Note
     /// Usually used in conjunction with `variant_idents` to form match arms.
     pub struct Unpacking
-}
-
-impl<'src, Node, L> Compile<'src, Node, Unpacking> for L
-where
-    L: Layout,
-    Node: HasFields<'src, L>,
-{
-    fn compile(&self, node: &Node) -> Unpacking {
-        let fields = node.fields();
-        let inner = fields.iter();
-        match fields.source() {
-            syn::Fields::Named(_) => {
-                quote! { { #(#inner),* }  }
-            }
-            syn::Fields::Unnamed(_) => {
-                quote! { ( #(#inner),* ) }
-            }
-            syn::Fields::Unit => {
-                quote! {}
-            }
-        }
-        .into()
-    }
 }
 
 impl<'src, L: Layout> Struct<'src, L> {

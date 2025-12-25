@@ -22,11 +22,11 @@ target! {
     pub struct StructImpl
 }
 
-impl<'src> Compile<'src, Struct<'src, Self>, StructImpl> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, Self>) -> StructImpl {
-        let iter: StructTypeDef = self.compile(node);
-        let item: MatchingItem = self.compile(node);
-        let impl_head: ImplHead = self.compile(node);
+impl<'src> Compile<'src, FieldsIter, StructImpl> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> StructImpl {
+        let iter: StructTypeDef = self.compile(ctx);
+        let item: MatchingItem = self.compile(ctx);
+        let impl_head: ImplHead = self.compile(ctx);
         StructImpl(quote! {
             #iter
             #impl_head {
@@ -44,10 +44,10 @@ target! {
     pub struct RegularStructTypeDef
 }
 
-impl<'src> Compile<'src, Struct<'src, Self>, RegularStructTypeDef> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, Self>) -> RegularStructTypeDef {
-        let head: TypeHead = self.compile(node);
-        let ty: InnerType = self.compile(node);
+impl<'src> Compile<'src, FieldsIter, RegularStructTypeDef> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> RegularStructTypeDef {
+        let head: TypeHead = self.compile(ctx);
+        let ty: InnerType = self.compile(ctx);
         RegularStructTypeDef(quote! {
             #[automatically_derived]
             pub struct #head {
@@ -62,12 +62,12 @@ target! {
     pub struct WrapperStructTypeDef
 }
 
-impl<'src> Compile<'src, Struct<'src, Self>, WrapperStructTypeDef> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, Self>) -> WrapperStructTypeDef {
-        let trait_path = &self.trait_path;
-        let trait_type_iter = &self.trait_type_iter;
-        let head: TypeHead = self.compile(node);
-        let wrapped_type = node.wrapper_type_tokens();
+impl<'src> Compile<'src, FieldsIter, WrapperStructTypeDef> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> WrapperStructTypeDef {
+        let trait_path = &ctx.trait_path;
+        let trait_type_iter = &ctx.trait_type_iter;
+        let head: TypeHead = self.compile(ctx);
+        let wrapped_type = self.wrapper_type_tokens();
         let (_, ty_generics, _) = &self.generics().split_for_impl();
         WrapperStructTypeDef(quote! {
             #[automatically_derived]
@@ -82,10 +82,10 @@ target! {
     pub struct RegularStructExpr
 }
 
-impl<'src> Compile<'src, Struct<'src, Self>, RegularStructExpr> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, Self>) -> RegularStructExpr {
-        let name: Name = self.compile(node);
-        let expr: Expr = self.compile(node);
+impl<'src> Compile<'src, FieldsIter, RegularStructExpr> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> RegularStructExpr {
+        let name: Name = self.compile(ctx);
+        let expr: Expr = self.compile(ctx);
         RegularStructExpr(quote! {
             #name {
                 inner: #expr,
@@ -98,13 +98,13 @@ target! {
     pub struct WrapperStructExpr
 }
 
-impl<'src> Compile<'src, Struct<'src, Self>, WrapperStructExpr> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, Self>) -> WrapperStructExpr {
-        let iter_name: Name = self.compile(node);
-        let trait_path = &self.trait_path;
-        let trait_method = &self.trait_method;
-        let wrapped_ty = node.wrapper_type_tokens();
-        let wrapper = node.wrapper_tokens();
+impl<'src> Compile<'src, FieldsIter, WrapperStructExpr> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> WrapperStructExpr {
+        let iter_name: Name = self.compile(ctx);
+        let trait_path = &ctx.trait_path;
+        let trait_method = &ctx.trait_method;
+        let wrapped_ty = self.wrapper_type_tokens();
+        let wrapper = self.wrapper_tokens();
         WrapperStructExpr(quote! {
             #iter_name {
                 inner: <#wrapped_ty as #trait_path>::#trait_method(#wrapper),

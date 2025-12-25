@@ -1,0 +1,9 @@
+---
+source: crates/kirin-derive-core/src/kirin/attrs.rs
+expression: opts
+---
+KirinFieldOptions {
+    into: true,
+    default: None,
+    ssa_ty: None,
+}

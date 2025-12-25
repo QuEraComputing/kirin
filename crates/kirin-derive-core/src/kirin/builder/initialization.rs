@@ -6,14 +6,14 @@ target! {
     pub struct InitializationHead
 }
 
-impl<'src> Compile<'src, Fields<'_, 'src, Builder>, InitializationHead> for Builder {
-    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> InitializationHead {
-        match node.definition() {
+impl<'src> Compile<'src, Builder, InitializationHead> for Fields<'_, 'src, Builder> {
+    fn compile(&self, _ctx: &Builder) -> InitializationHead {
+        match self.definition() {
             DefinitionStructOrVariant::Struct(..) => {
                 quote! { Self }
             }
             DefinitionStructOrVariant::Variant(..) => {
-                let name = node.source_ident();
+                let name = self.source_ident();
                 quote! { Self::#name }
             }
         }
@@ -25,11 +25,11 @@ target! {
     pub struct Initialization
 }
 
-impl<'src> Compile<'src, Fields<'_, 'src, Builder>, Initialization> for Builder {
-    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> Initialization {
+impl<'src> Compile<'src, Builder, Initialization> for Fields<'_, 'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> Initialization {
         let mut result_count: usize = 0;
-        let result_names: ResultNames = self.compile(node);
-        let names = node
+        let result_names: ResultNames = self.compile(ctx);
+        let names = self
             .iter()
             .map(|f| {
                 if matches!(f.extra().kind, FieldKind::ResultValue) {
@@ -42,7 +42,7 @@ impl<'src> Compile<'src, Fields<'_, 'src, Builder>, Initialization> for Builder 
             })
             .collect::<Vec<_>>();
 
-        match node.source() {
+        match self.source() {
             syn::Fields::Named(_) => {
                 quote! { { #(#names,)* }  }
             }

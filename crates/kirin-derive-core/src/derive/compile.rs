@@ -1,7 +1,7 @@
 use crate::ir::*;
 
-pub trait Compile<'src, N, T> {
-    fn compile(&self, node: &N) -> T;
+pub trait Compile<'src, Context: Layout, T> {
+    fn compile(&self, ctx: &Context) -> T;
 }
 
 /// Alternative between two implementations.
@@ -48,50 +48,54 @@ impl<A, B> From<Alt<A, B>> for TokenStream {
     }
 }
 
-impl<'src, L, S, E, Ctx> Compile<'src, Input<'src, L>, Alt<S, E>> for Ctx
+impl<'src, L, S, E, Ctx> Compile<'src, Ctx, Alt<S, E>> for Input<'src, L>
 where
     L: Layout + 'src,
     S: ToTokens,
     E: ToTokens,
-    Ctx: Compile<'src, Struct<'src, L>, S> + Compile<'src, Enum<'src, L>, E>,
+    Ctx: Layout,
+    Struct<'src, L>: Compile<'src, Ctx, S>,
+    Enum<'src, L>: Compile<'src, Ctx, E>,
 {
-    fn compile(&self, node: &Input<'src, L>) -> Alt<S, E> {
-        match node {
-            Input::Struct(s) => Alt::new(self.compile(s).into_token_stream()),
-            Input::Enum(e) => Alt::new(self.compile(e).into_token_stream()),
+    fn compile(&self, ctx: &Ctx) -> Alt<S, E> {
+        match self {
+            Input::Struct(s) => Alt::new(s.compile(ctx).into_token_stream()),
+            Input::Enum(e) => Alt::new(e.compile(ctx).into_token_stream()),
         }
     }
 }
 
-impl<'src, W, R, L> Compile<'src, Struct<'src, L>, Alt<W, R>> for L
+impl<'src, W, R, L> Compile<'src, L, Alt<W, R>> for Struct<'src, L>
 where
-    L: Layout + Compile<'src, Struct<'src, L>, W> + Compile<'src, Struct<'src, L>, R>,
+    L: Layout,
     W: ToTokens,
     R: ToTokens,
+    Struct<'src, L>: Compile<'src, L, W> + Compile<'src, L, R>,
 {
-    fn compile(&self, node: &Struct<'src, L>) -> Alt<W, R> {
-        if node.is_wrapper() {
-            let s: W = self.compile(node);
+    fn compile(&self, ctx: &L) -> Alt<W, R> {
+        if self.is_wrapper() {
+            let s: W = self.compile(ctx);
             Alt::new(s.to_token_stream())
         } else {
-            let e: R = self.compile(node);
+            let e: R = self.compile(ctx);
             Alt::new(e.to_token_stream())
         }
     }
 }
 
-impl<'a, 'src, W, R, L> Compile<'src, Variant<'a, 'src, L>, Alt<W, R>> for L
+impl<'a, 'src, W, R, L> Compile<'src, L, Alt<W, R>> for Variant<'a, 'src, L>
 where
-    L: Layout + Compile<'src, Variant<'a, 'src, L>, W> + Compile<'src, Variant<'a, 'src, L>, R>,
+    L: Layout,
     W: ToTokens,
     R: ToTokens,
+    Variant<'a, 'src, L>: Compile<'src, L, W> + Compile<'src, L, R>,
 {
-    fn compile(&self, node: &Variant<'a, 'src, L>) -> Alt<W, R> {
-        if node.is_wrapper() {
-            let s: W = self.compile(node);
+    fn compile(&self, ctx: &L) -> Alt<W, R> {
+        if self.is_wrapper() {
+            let s: W = self.compile(ctx);
             Alt::new(s.to_token_stream())
         } else {
-            let e: R = self.compile(node);
+            let e: R = self.compile(ctx);
             Alt::new(e.to_token_stream())
         }
     }

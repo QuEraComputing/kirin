@@ -20,35 +20,35 @@ impl Deref for TypeGenerics {
     }
 }
 
-impl<'src> Compile<'src, Struct<'src, FieldsIter>, TypeGenerics> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, FieldsIter>) -> TypeGenerics {
-        if node.is_wrapper() {
-            TypeGenerics(node.add_lifetime(self.trait_lifetime.clone()).clone())
+impl<'src> Compile<'src, FieldsIter, TypeGenerics> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> TypeGenerics {
+        if self.is_wrapper() {
+            TypeGenerics(self.add_lifetime(ctx.trait_lifetime.clone()).clone())
         } else {
             // no wrapper at all, just lifetime
             let mut generics = syn::Generics::default();
             generics
                 .params
                 .push(syn::GenericParam::Lifetime(syn::LifetimeParam::new(
-                    self.trait_lifetime.clone(),
+                    ctx.trait_lifetime.clone(),
                 )));
             TypeGenerics(generics)
         }
     }
 }
 
-impl<'src> Compile<'src, Enum<'src, FieldsIter>, TypeGenerics> for FieldsIter {
-    fn compile(&self, node: &Enum<'src, FieldsIter>) -> TypeGenerics {
-        if node.any_wrapper() {
+impl<'src> Compile<'src, FieldsIter, TypeGenerics> for Enum<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> TypeGenerics {
+        if self.any_wrapper() {
             // contains wrapper, but has regular, add lifetime
-            TypeGenerics(node.add_lifetime(self.trait_lifetime.clone()).clone())
+            TypeGenerics(self.add_lifetime(ctx.trait_lifetime.clone()).clone())
         } else {
             // no wrapper at all, just lifetime
             let mut generics = syn::Generics::default();
             generics
                 .params
                 .push(syn::GenericParam::Lifetime(syn::LifetimeParam::new(
-                    self.trait_lifetime.clone(),
+                    ctx.trait_lifetime.clone(),
                 )));
             TypeGenerics(generics)
         }
@@ -60,20 +60,20 @@ target! {
     pub struct TypeHead
 }
 
-impl<'src> Compile<'src, Struct<'src, FieldsIter>, TypeHead> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, FieldsIter>) -> TypeHead {
-        let iter_name: Name = self.compile(node);
-        let generics: TypeGenerics = self.compile(node);
+impl<'src> Compile<'src, FieldsIter, TypeHead> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> TypeHead {
+        let iter_name: Name = self.compile(ctx);
+        let generics: TypeGenerics = self.compile(ctx);
         TypeHead(quote! {
             #iter_name #generics
         })
     }
 }
 
-impl<'src> Compile<'src, Enum<'src, FieldsIter>, TypeHead> for FieldsIter {
-    fn compile(&self, node: &Enum<'src, FieldsIter>) -> TypeHead {
-        let iter_name: Name = self.compile(node);
-        let generics: TypeGenerics = self.compile(node);
+impl<'src> Compile<'src, FieldsIter, TypeHead> for Enum<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> TypeHead {
+        let iter_name: Name = self.compile(ctx);
+        let generics: TypeGenerics = self.compile(ctx);
         TypeHead(quote! {
             #iter_name #generics
         })

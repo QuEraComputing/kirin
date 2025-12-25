@@ -35,7 +35,7 @@ where
 {
     pub name: Spanned<&'src str>,
     /// the type of the result value, if specified
-    pub ty: Option<Spanned<<L::TypeLattice as HasParser<'tokens, 'src, L>>::Output>>,
+    pub ty: Option<<L::TypeLattice as HasParser<'tokens, 'src, L>>::Output>,
 }
 
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ where
 {
     pub name: Spanned<&'src str>,
     /// the type of the result value, if specified
-    pub ty: Option<Spanned<<L::TypeLattice as HasParser<'tokens, 'src, L>>::Output>>,
+    pub ty: Option<<L::TypeLattice as HasParser<'tokens, 'src, L>>::Output>,
 }
 
 #[derive(Debug, Clone)]

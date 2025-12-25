@@ -2,12 +2,12 @@ use crate::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct FieldMeta {
-    pub(super) kind: FieldKind,
-    pub(super) collection: FieldCollectionKind,
+    pub kind: FieldKind,
+    pub collection: FieldCollectionKind,
 }
 
 #[derive(Debug, Clone)]
-pub(super) enum FieldKind {
+pub enum FieldKind {
     SSAValue,
     ResultValue,
     Block,
@@ -16,8 +16,21 @@ pub(super) enum FieldKind {
     Other,
 }
 
+impl std::fmt::Display for FieldKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FieldKind::SSAValue => write!(f, "SSAValue"),
+            FieldKind::ResultValue => write!(f, "ResultValue"),
+            FieldKind::Block => write!(f, "Block"),
+            FieldKind::Region => write!(f, "Region"),
+            FieldKind::Successor => write!(f, "Successor"),
+            FieldKind::Other => write!(f, "Other"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
-pub(super) enum FieldCollectionKind {
+pub enum FieldCollectionKind {
     Vec,
     Option,
     Single,

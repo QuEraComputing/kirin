@@ -8,12 +8,12 @@ target! {
     pub struct BuildFnName
 }
 
-impl<'src> Compile<'src, Struct<'src, Self>, BuildFnName> for Builder {
-    fn compile(&self, node: &Struct<'src, Self>) -> BuildFnName {
-        let default_name = format_ident!("new", span = node.source_ident().span());
-        match &node.attrs().builder {
+impl<'src> Compile<'src, Builder, BuildFnName> for Struct<'src, Builder> {
+    fn compile(&self, _ctx: &Builder) -> BuildFnName {
+        let default_name = format_ident!("new", span = self.source_ident().span());
+        match &self.attrs().builder {
             Some(BuilderOptions::Named(name)) => {
-                format_ident!("{}", name, span = node.source_ident().span())
+                format_ident!("{}", name, span = self.source_ident().span())
                     .to_token_stream()
                     .into()
             }
@@ -22,12 +22,16 @@ impl<'src> Compile<'src, Struct<'src, Self>, BuildFnName> for Builder {
     }
 }
 
-impl<'src> Compile<'src, Variant<'_, 'src, Self>, BuildFnName> for Builder {
-    fn compile(&self, node: &Variant<'_, 'src, Self>) -> BuildFnName {
-        let default_name = format_ident!("op_{}", to_snake_case(node.source_ident().to_string()), span = node.source_ident().span());
-        match &node.attrs().builder {
+impl<'src> Compile<'src, Builder, BuildFnName> for Variant<'_, 'src, Builder> {
+    fn compile(&self, _ctx: &Builder) -> BuildFnName {
+        let default_name = format_ident!(
+            "op_{}",
+            to_snake_case(self.source_ident().to_string()),
+            span = self.source_ident().span()
+        );
+        match &self.attrs().builder {
             Some(BuilderOptions::Named(name)) => {
-                format_ident!("{}", name, span = node.source_ident().span())
+                format_ident!("{}", name, span = self.source_ident().span())
                     .to_token_stream()
                     .into()
             }
@@ -40,10 +44,14 @@ target! {
     pub struct StatementIdName
 }
 
-impl<'src> Compile<'src, Fields<'_, 'src, Builder>, StatementIdName> for Builder {
-    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> StatementIdName {
-        let name = node.source_ident();
-        let statement_id = format_ident!("{}_statement_id", name.to_string().to_lowercase(), span = name.span());
+impl<'src> Compile<'src, Builder, StatementIdName> for Fields<'_, 'src, Builder> {
+    fn compile(&self, _ctx: &Builder) -> StatementIdName {
+        let name = self.source_ident();
+        let statement_id = format_ident!(
+            "{}_statement_id",
+            name.to_string().to_lowercase(),
+            span = name.span()
+        );
         quote! { #statement_id }.into()
     }
 }

@@ -11,26 +11,26 @@ target! {
     pub struct StructImpl
 }
 
-impl<'src> Compile<'src, Struct<'src, FieldsIter>, StructImpl> for FieldsIter {
-    fn compile(&self, node: &Struct<'src, FieldsIter>) -> StructImpl {
-        let iter: iter::StructImpl = self.compile(node);
-        let trait_type_iter = &self.trait_type_iter;
-        let trait_generics = self.generics();
+impl<'src> Compile<'src, FieldsIter, StructImpl> for Struct<'src, FieldsIter> {
+    fn compile(&self, ctx: &FieldsIter) -> StructImpl {
+        let iter: iter::StructImpl = self.compile(ctx);
+        let trait_type_iter = &ctx.trait_type_iter;
+        let trait_generics = ctx.generics();
 
-        let unpacking = node.unpacking();
-        let iter_expr: iter::StructExpr = self.compile(node);
-        let iter_type: iter::FullType = self.compile(node);
-        let trait_path: TraitPath = self.compile(node);
+        let unpacking = self.unpacking();
+        let iter_expr: iter::StructExpr = self.compile(ctx);
+        let iter_type: iter::FullType = self.compile(ctx);
+        let trait_path: TraitPath = self.compile(ctx);
 
         let trait_impl = TraitImpl::default()
-            .input(node.source())
+            .input(self.source())
             .trait_path(trait_path)
             .trait_generics(trait_generics.clone())
             .add_type(trait_type_iter, iter_type)
             .add_method(
-                TraitItemFnImpl::new(&self.trait_method)
-                    .with_self_lifetime(&self.trait_lifetime)
-                    .with_mutable_self(self.mutable)
+                TraitItemFnImpl::new(&ctx.trait_method)
+                    .with_self_lifetime(&ctx.trait_lifetime)
+                    .with_mutable_self(ctx.mutable)
                     .with_output(quote! {Self::#trait_type_iter})
                     .with_token_body(quote! {
                         let Self #unpacking = self;

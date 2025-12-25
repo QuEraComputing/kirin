@@ -10,14 +10,14 @@ use crate::{
 /// Usually used in conjunction with `Enum::variant_names` and `Unpacking` to form match arms.
 pub struct Action<T>(std::vec::IntoIter<T>);
 
-impl<'src, L: Layout, T> Compile<'src, Enum<'src, Self>, Action<T>> for L
+impl<'src, L: Layout, T> Compile<'src, L, Action<T>> for Enum<'src, L>
 where
-    L: for<'a> Compile<'src, Variant<'a, 'src, L>, T>,
+    for<'a> Variant<'a, 'src, L>: Compile<'src, L, T>,
 {
-    fn compile(&self, node: &Enum<'src, Self>) -> Action<T> {
-        let variants = node
+    fn compile(&self, ctx: &L) -> Action<T> {
+        let variants = self
             .variants()
-            .map(|v| self.compile(&v))
+            .map(|v| v.compile(&ctx))
             .collect::<Vec<T>>();
         Action(variants.into_iter())
     }

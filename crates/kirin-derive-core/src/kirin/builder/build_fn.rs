@@ -17,20 +17,20 @@ target! {
     pub struct BuildFnImpl
 }
 
-impl<'src> Compile<'src, Struct<'src, Builder>, BuildFnImpl> for Builder {
-    fn compile(&self, node: &Struct<'src, Builder>) -> BuildFnImpl {
-        if node.is_wrapper() {
+impl<'src> Compile<'src, Builder, BuildFnImpl> for Struct<'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> BuildFnImpl {
+        if self.is_wrapper() {
             return quote! {}.into();
         }
 
-        let name = node.source_ident();
-        let build_fn_name: BuildFnName = self.compile(node);
-        let type_lattice = &node.attrs().type_lattice;
-        let crate_path: CratePath = self.compile(node);
-        let (impl_generics, ty_generics, where_clause) = node.source().generics.split_for_impl();
-        let inputs: Inputs = self.compile(&node.fields());
-        let build_result_path: BuildResultFullPath = self.compile(&node.fields());
-        let body: BuildFnBody = self.compile(&node.fields());
+        let name = self.source_ident();
+        let build_fn_name: BuildFnName = self.compile(ctx);
+        let type_lattice = &self.attrs().type_lattice;
+        let crate_path: CratePath = self.compile(ctx);
+        let (impl_generics, ty_generics, where_clause) = self.source().generics.split_for_impl();
+        let inputs: Inputs = self.fields().compile(ctx);
+        let build_result_path: BuildResultFullPath = self.fields().compile(ctx);
+        let body: BuildFnBody = self.fields().compile(ctx);
 
         quote! {
             #[automatically_derived]
@@ -46,26 +46,26 @@ impl<'src> Compile<'src, Struct<'src, Builder>, BuildFnImpl> for Builder {
     }
 }
 
-impl<'src> Compile<'src, Enum<'src, Builder>, BuildFnImpl> for Builder {
-    fn compile(&self, node: &Enum<'src, Builder>) -> BuildFnImpl {
-        if node.marked_wraps() || node.variants().all(|v| v.is_wrapper()) {
+impl<'src> Compile<'src, Builder, BuildFnImpl> for Enum<'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> BuildFnImpl {
+        if self.marked_wraps() || self.variants().all(|v| v.is_wrapper()) {
             return quote! {}.into();
         }
 
-        let name = node.source_ident();
-        let (impl_generics, ty_generics, where_clause) = node.generics().split_for_impl();
-        let type_lattice = &node.attrs().type_lattice;
+        let name = self.source_ident();
+        let (impl_generics, ty_generics, where_clause) = self.generics().split_for_impl();
+        let type_lattice = &self.attrs().type_lattice;
 
-        let crate_path: CratePath = self.compile(node);
-        let functions: Vec<_> = node.variants().map(|v| {
+        let crate_path: CratePath = self.compile(ctx);
+        let functions: Vec<_> = self.variants().map(|v| {
             if v.is_wrapper() {
                 return quote! {};
             }
 
-            let build_fn_name: BuildFnName = self.compile(&v);
-            let build_result_path: BuildResultFullPath = self.compile(&v.fields());
-            let inputs: Inputs = self.compile(&v.fields());
-            let body: BuildFnBody = self.compile(&v.fields());
+            let build_fn_name: BuildFnName = v.compile(ctx);
+            let build_result_path: BuildResultFullPath = v.fields().compile(ctx);
+            let inputs: Inputs = v.fields().compile(ctx);
+            let body: BuildFnBody = v.fields().compile(ctx);
             quote! {
                 pub fn #build_fn_name<Lang>(context: &mut #crate_path::Context<Lang>, #inputs) -> #build_result_path
                 where
@@ -88,14 +88,14 @@ target! {
     pub struct Inputs
 }
 
-impl<'src> Compile<'src, Fields<'_, 'src, Builder>, Inputs> for Builder {
-    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> Inputs {
-        let inputs: Vec<InputSignature> = node
+impl<'src> Compile<'src, Builder, Inputs> for Fields<'_, 'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> Inputs {
+        let inputs: Vec<InputSignature> = self
             .iter()
             .filter(|f| {
                 f.attrs().default.is_none() && !matches!(&f.extra().kind, FieldKind::ResultValue)
             })
-            .map(|f| self.compile(&f))
+            .map(|f| f.compile(ctx))
             .collect();
         quote! { #(#inputs),* }.into()
     }
@@ -105,20 +105,20 @@ target! {
     pub struct BuildFnBody
 }
 
-impl<'src> Compile<'src, Fields<'_, 'src, Builder>, BuildFnBody> for Builder {
-    fn compile(&self, node: &Fields<'_, 'src, Builder>) -> BuildFnBody {
-        let build_result_path: BuildResultFullPath = self.compile(node);
-        let statement_id: StatementIdName = self.compile(node);
-        let let_name_eq_input: Vec<LetNameEqInput> = node
+impl<'src> Compile<'src, Builder, BuildFnBody> for Fields<'_, 'src, Builder> {
+    fn compile(&self, ctx: &Builder) -> BuildFnBody {
+        let build_result_path: BuildResultFullPath = self.compile(ctx);
+        let statement_id: StatementIdName = self.compile(ctx);
+        let let_name_eq_input: Vec<LetNameEqInput> = self
             .iter()
             .filter(|f| !matches!(f.extra().kind, FieldKind::ResultValue))
-            .map(|f| self.compile(&f))
+            .map(|f| f.compile(ctx))
             .collect();
-        let let_name_eq_result: LetNameEqResultValue = self.compile(node);
+        let let_name_eq_result: LetNameEqResultValue = self.compile(ctx);
 
-        let head_self: InitializationHead = self.compile(node);
-        let initialization: Initialization = self.compile(node);
-        let result_names: ResultNames = self.compile(node);
+        let head_self: InitializationHead = self.compile(ctx);
+        let initialization: Initialization = self.compile(ctx);
+        let result_names: ResultNames = self.compile(ctx);
 
         quote! {{
             let #statement_id = context.statement_arena().next_id();

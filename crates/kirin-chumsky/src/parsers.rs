@@ -18,6 +18,7 @@ where
     .labelled(format!("identifier '{}'", name))
 }
 
+/// Parser for a symbol token, which is a string starting with `@`
 pub fn symbol<'tokens, 'src: 'tokens, I>()
 -> impl Parser<'tokens, I, ast::Spanned<&'src str>, ParserError<'tokens, 'src>>
 where
@@ -31,15 +32,35 @@ where
     .labelled("symbol")
 }
 
-pub fn operands<'tokens, 'src: 'tokens, I>(
-    n: usize,
-    sep: Token<'src>,
-) -> impl Parser<'tokens, I, Vec<ast::Spanned<&'src str>>, ParserError<'tokens, 'src>>
+/// Parser for an operand, which is an SSA value with an optional type annotation
+/// of the form `%name[: type]`
+pub fn operand<'tokens, 'src: 'tokens, I, L>()
+-> impl Parser<'tokens, I, ast::Operand<'tokens, 'src, L>, ParserError<'tokens, 'src>>
 where
     'src: 'tokens,
     I: TokenInput<'tokens, 'src>,
+    L: HasParser<'tokens, 'src, L> + Dialect<TypeLattice: HasParser<'tokens, 'src, L>>,
 {
     ssa_value()
+        .then(
+            just(Token::Colon)
+                .ignore_then(L::TypeLattice::parser())
+                .or_not(),
+        )
+        .map(|(name, ty)| ast::Operand { name, ty })
+        .labelled("operand")
+}
+
+pub fn operands<'tokens, 'src: 'tokens, I, L>(
+    n: usize,
+    sep: Token<'src>,
+) -> impl Parser<'tokens, I, Vec<ast::Operand<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+where
+    'src: 'tokens,
+    I: TokenInput<'tokens, 'src>,
+    L: HasParser<'tokens, 'src, L> + Dialect<TypeLattice: HasParser<'tokens, 'src, L>>,
+{
+    operand()
         .separated_by(just(sep))
         .exactly(n)
         .collect()
@@ -139,10 +160,12 @@ where
         value: name,
         span: e.span(),
     }}
-    .map(|spanned| ast::BlockLabel { name: ast::Spanned {
-        value: spanned.value,
-        span: spanned.span,
-    }})
+    .map(|spanned| ast::BlockLabel {
+        name: ast::Spanned {
+            value: spanned.value,
+            span: spanned.span,
+        },
+    })
     .labelled("block label")
 }
 
