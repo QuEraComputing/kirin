@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-core/src/chumsky/format/enum_impl.rs
-assertion_line: 97
 expression: rustfmt(token.to_token_stream())
 ---
 impl<

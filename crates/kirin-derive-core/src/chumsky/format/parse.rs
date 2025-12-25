@@ -86,3 +86,16 @@ impl<'src> Format<'src> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_parser() {
+        let input = "load something {value:type} from {address}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+}
