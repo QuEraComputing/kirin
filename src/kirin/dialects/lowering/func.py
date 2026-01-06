@@ -155,7 +155,8 @@ class Lowering(lowering.FromPythonAST):
             func_frame.exhaust()
 
             last_stmt = func_frame.curr_region.blocks[0].last_stmt
-            rtrn_stmt = func.Return(last_stmt.result)
+            # assert hasattr(last_stmt,"result"), "python lambda should always have a return value"
+            rtrn_stmt = func.Return(last_stmt)
             func_frame.curr_block.stmts.append(rtrn_stmt)
 
         first_stmt = func_frame.curr_region.blocks[0].first_stmt
