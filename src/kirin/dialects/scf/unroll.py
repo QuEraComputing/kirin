@@ -3,6 +3,7 @@ from kirin.analysis import const
 from kirin.dialects import func
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.py.constant import Constant
+from kirin.dialects.py.indexing import GetItem
 
 from .stmts import For, Yield, IfElse
 
@@ -54,21 +55,35 @@ class PickIfElse(RewriteRule):
 
 class ForLoop(RewriteRule):
 
+    def yield_item_results_const(self, node: For, hint: const.Value):
+        for item in hint.data:
+            item_stmt = Constant(item)
+            item_stmt.insert_before(node)
+            yield item_stmt.result
+
+    def yield_item_results_from_len(self, node: For, len_iterable: int):
+        for i in range(len_iterable):
+            (index_stmt := Constant(i)).insert_before(node)
+            (item_stmt := GetItem(node.iterable, index_stmt.result)).insert_before(node)
+            yield item_stmt.result
+
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if not isinstance(node, For):
             return RewriteResult()
 
-        # TODO: support for PartialTuple and IList with known length
-        if not isinstance(hint := node.iterable.hints.get("const"), const.Value):
+        if isinstance(hint := node.iterable.hints.get("const"), const.Value):
+            item_results = self.yield_item_results_const(node, hint)
+        elif isinstance(hint, const.PartialTuple):
+            item_results = self.yield_item_results_from_len(node, len(hint.data))
+        else:
             return RewriteResult()
 
         loop_vars = node.initializers
-        for item in hint.data:
+
+        for item_result in item_results:
             body = node.body.clone()
             block = body.blocks[0]
-            item_stmt = Constant(item)
-            item_stmt.insert_before(node)
-            block.args[0].replace_by(item_stmt.result)
+            block.args[0].replace_by(item_result)
             for var, input in zip(block.args[1:], loop_vars):
                 var.replace_by(input)
 
