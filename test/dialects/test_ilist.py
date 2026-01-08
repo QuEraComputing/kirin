@@ -477,12 +477,13 @@ def test_rewrite_to_range_for():
     rewrite.Walk(ilist.rewrite.ToRangeFor()).rewrite(test.code)
     rewrite.Walk(ilist.rewrite.HintLen()).rewrite(test.code)
     Fold(structural)(test)
-    # should be able to unroll for loop now
+    # should be able to unroll for loop now as
+    # the inserted range iterator is constant now
     aggressive.UnrollScf(structural).fixpoint(test)
     # remove getitem and use arguments of function directly
     rewrite.Walk(ilist.rewrite.InlineGetItem()).rewrite(test.code)
     rewrite.Fixpoint(rewrite.Walk(rewrite.DeadCodeElimination())).rewrite(test.code)
-
+    # check final structure
     assert len(test.callable_region.blocks) == 1
     block = test.callable_region.blocks[0]
     args = block.args
