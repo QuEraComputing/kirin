@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from kirin import ir, types, rewrite
 from kirin.decl import info, statement
-from kirin.passes import aggressive
+from kirin.passes import Fold, aggressive
 from kirin.prelude import structural, basic_no_opt, python_basic
 from kirin.analysis import const
 from kirin.dialects import py, func, ilist, lowering
@@ -461,6 +461,41 @@ def test_ilist_new_eltype():
 
     assert x.result.type == stmt.elem_type
     assert stmt.result.type.is_subseteq(ilist.IListType[types.Int, types.Literal(2)])
+
+
+def test_rewrite_to_range_for():
+
+    @structural
+    def test(a: int, b: int, c: int):
+        container = [a, b, c]
+        x = 0
+        for item in container:
+            x = x + item
+
+        return x
+
+    rewrite.Walk(ilist.rewrite.ToRangeFor()).rewrite(test.code)
+    rewrite.Walk(ilist.rewrite.HintLen()).rewrite(test.code)
+    Fold(structural)(test)
+    # should be able to unroll for loop now as
+    # the inserted range iterator is constant now
+    aggressive.UnrollScf(structural).fixpoint(test)
+    # remove getitem and use arguments of function directly
+    rewrite.Walk(ilist.rewrite.InlineGetItem()).rewrite(test.code)
+    rewrite.Fixpoint(rewrite.Walk(rewrite.DeadCodeElimination())).rewrite(test.code)
+    # check final structure
+    assert len(test.callable_region.blocks) == 1
+    block = test.callable_region.blocks[0]
+    args = block.args
+    stmts = block.stmts
+    assert isinstance(stmts.at(0), py.Constant)
+    assert isinstance(stmt := stmts.at(1), py.Add)
+    assert stmt.rhs is args[1]
+    assert isinstance(stmt := stmts.at(2), py.Add)
+    assert stmt.rhs is args[2]
+    assert isinstance(stmt := stmts.at(3), py.Add)
+    assert stmt.rhs is args[3]
+    assert isinstance(stmts.at(4), func.Return)
 
 
 rule = rewrite.Fixpoint(rewrite.Walk(ilist.rewrite.Unroll()))

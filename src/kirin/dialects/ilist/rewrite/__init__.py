@@ -3,4 +3,5 @@ from .const import ConstList2IList as ConstList2IList
 from .unroll import Unroll as Unroll
 from .hint_len import HintLen as HintLen
 from .flatten_add import FlattenAdd as FlattenAdd
+from .to_range_loop import ToRangeFor as ToRangeFor
 from .inline_getitem import InlineGetItem as InlineGetItem
