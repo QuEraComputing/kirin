@@ -1,7 +1,7 @@
 use kirin::ir::*;
 use kirin::parsers::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree, HasParser)]
 #[wraps]
 #[kirin(fn, type_lattice = T)]
 pub enum StructuredControlFlow<T: TypeLattice> {
@@ -9,7 +9,7 @@ pub enum StructuredControlFlow<T: TypeLattice> {
     For(For<T>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree, HasParser)]
 #[chumsky(format = "if {condition} then {{ {then_body} }} else {{ {else_body} }}")]
 #[kirin(fn, type_lattice = T)]
 pub struct If<T: TypeLattice> {
@@ -20,7 +20,7 @@ pub struct If<T: TypeLattice> {
     marker: std::marker::PhantomData<T>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, WithAbstractSyntaxTree, HasParser)]
 #[chumsky(format = "for {induction_var} = {start} to {end} step {step} {{ {body} }}")]
 #[kirin(fn, type_lattice = T)]
 pub struct For<T: TypeLattice> {

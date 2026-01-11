@@ -1,0 +1,12 @@
+[package]
+name = "kirin-chumsky-derive"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+kirin-chumsky-format = { version = "0.1.0", path = "../kirin-chumsky-format" }
+kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
+kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }

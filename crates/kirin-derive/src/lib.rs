@@ -1,7 +1,6 @@
 extern crate proc_macro;
 
 use kirin_derive_core::kirin::prelude::*;
-use kirin_derive_core::chumsky::prelude::*;
 use kirin_derive_core::prelude::*;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -148,18 +147,18 @@ derive_property!(IsTerminator);
 derive_property!(IsConstant);
 derive_property!(IsPure);
 
-#[proc_macro_derive(WithAbstractSyntaxTree, attributes(chumsky, wraps))]
-pub fn derive_with_abstract_syntax_tree(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as syn::DeriveInput);
-    DeriveAST::builder()
-        .build()
-        .emit(&ast).into()
-}
+// #[proc_macro_derive(WithAbstractSyntaxTree, attributes(chumsky, wraps))]
+// pub fn derive_with_abstract_syntax_tree(input: TokenStream) -> TokenStream {
+//     let ast = parse_macro_input!(input as syn::DeriveInput);
+//     DeriveAST::builder()
+//         .build()
+//         .emit(&ast).into()
+// }
 
-#[proc_macro_derive(HasParser, attributes(chumsky, wraps))]
-pub fn derive_has_parser(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as syn::DeriveInput);
-    DeriveHasParser::builder()
-        .build()
-        .emit(&ast).into()
-}
+// #[proc_macro_derive(HasParser, attributes(chumsky, wraps))]
+// pub fn derive_has_parser(input: TokenStream) -> TokenStream {
+//     let ast = parse_macro_input!(input as syn::DeriveInput);
+//     DeriveHasParser::builder()
+//         .build()
+//         .emit(&ast).into()
+// }
