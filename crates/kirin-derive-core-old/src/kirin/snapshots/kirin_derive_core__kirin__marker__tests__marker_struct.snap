@@ -1,8 +1,0 @@
----
-source: crates/kirin-derive-core/src/kirin/marker.rs
-expression: "DialectMarker::builder().trait_path(\"MarkerTrait\").build().print(&input)"
----
-#[automatically_derived]
-impl ::my::path::MarkerTrait for StructuredControlFlow {
-    type TypeLattice = T;
-}
