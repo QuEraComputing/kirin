@@ -1,0 +1,126 @@
+---
+source: crates/kirin-derive-core-3/src/ir/mod.rs
+expression: node
+---
+Struct(
+    Struct {
+        input: DeriveInput {
+            attrs: [
+                Attribute {
+                    pound_token: Pound,
+                    style: AttrStyle::Outer,
+                    bracket_token: Bracket,
+                    meta: Meta::Path {
+                        leading_colon: None,
+                        segments: [
+                            PathSegment {
+                                ident: Ident(
+                                    wraps,
+                                ),
+                                arguments: PathArguments::None,
+                            },
+                        ],
+                    },
+                },
+            ],
+            vis: Visibility::Inherited,
+            ident: Ident(
+                MyStruct,
+            ),
+            generics: Generics {
+                lt_token: None,
+                params: [],
+                gt_token: None,
+                where_clause: None,
+            },
+            data: Data::Struct {
+                struct_token: Struct,
+                fields: Fields::Named {
+                    brace_token: Brace,
+                    named: [
+                        Field {
+                            attrs: [],
+                            vis: Visibility::Inherited,
+                            mutability: FieldMutability::None,
+                            ident: Some(
+                                Ident(
+                                    value,
+                                ),
+                            ),
+                            colon_token: Some(
+                                Colon,
+                            ),
+                            ty: Type::Path {
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                u32,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        Comma,
+                    ],
+                },
+                semi_token: None,
+            },
+        },
+        src: DataStruct {
+            struct_token: Struct,
+            fields: Fields::Named {
+                brace_token: Brace,
+                named: [
+                    Field {
+                        attrs: [],
+                        vis: Visibility::Inherited,
+                        mutability: FieldMutability::None,
+                        ident: Some(
+                            Ident(
+                                value,
+                            ),
+                        ),
+                        colon_token: Some(
+                            Colon,
+                        ),
+                        ty: Type::Path {
+                            qself: None,
+                            path: Path {
+                                leading_colon: None,
+                                segments: [
+                                    PathSegment {
+                                        ident: Ident(
+                                            u32,
+                                        ),
+                                        arguments: PathArguments::None,
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    Comma,
+                ],
+            },
+            semi_token: None,
+        },
+        definition: DefinitionStruct(
+            DefinitionStatement {
+                attrs: (),
+                wraps: true,
+                fields: [
+                    DefinitionField {
+                        wraps: true,
+                        attrs: (),
+                        extra: (),
+                    },
+                ],
+                extra: (),
+            },
+        ),
+    },
+)

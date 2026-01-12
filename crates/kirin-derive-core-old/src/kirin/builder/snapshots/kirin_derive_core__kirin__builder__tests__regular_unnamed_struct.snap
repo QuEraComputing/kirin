@@ -1,0 +1,48 @@
+---
+source: crates/kirin-derive-core/src/kirin/builder/mod.rs
+expression: "Builder::default().print(&input)"
+---
+#[automatically_derived]
+impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
+    pub fn op_constant<Lang>(
+        context: &mut ::kirin::ir::Context<Lang>,
+        field_0: impl Into<T>,
+    ) -> constant_build_result::Constant
+    where
+        Lang: ::kirin::ir::Dialect + From<Constant<T, L>>,
+        Lang::TypeLattice: From<L>,
+    {
+        let constant_statement_id = context.statement_arena().next_id();
+        let field_0: T = field_0.into();
+        let field_2: std::marker::PhantomData<L> = std::marker::PhantomData;
+        let result: ResultValue = context
+            .ssa()
+            .kind(SSAKind::Result(constant_statement_id, 0usize))
+            .ty(Lang::TypeLattice::from(value.type_of()))
+            .new()
+            .into();
+        context
+            .statement()
+            .definition(Self(field_0, result, field_2))
+            .new();
+        constant_build_result::Constant {
+            id: constant_statement_id,
+            result,
+        }
+    }
+}
+#[automatically_derived]
+pub mod constant_build_result {
+    use kirin::ir::{ResultValue, Statement};
+    #[automatically_derived]
+    pub struct Constant {
+        pub id: Statement,
+        pub result: ResultValue,
+    }
+    #[automatically_derived]
+    impl From<Constant> for Statement {
+        fn from(value: Constant) -> Self {
+            value.id
+        }
+    }
+}

@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-core/src/kirin/property/mod.rs
+expression: content
+---
+#[automatically_derived]
+impl<T> IsConstant for Wrapper<T> {
+    fn is_constant(&self) -> bool {
+        let Self { inner } = self;
+        <InnerStruct<T> as ::kirin::ir::IsConstant>::is_constant(inner)
+    }
+}

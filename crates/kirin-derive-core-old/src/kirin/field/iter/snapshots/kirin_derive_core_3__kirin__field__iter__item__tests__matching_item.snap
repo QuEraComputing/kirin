@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-core-3/src/kirin/field/iter/item.rs
+expression: item.to_string()
+---
+& 'a kirin :: ir :: SSAValue

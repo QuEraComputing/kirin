@@ -1,0 +1,39 @@
+---
+source: crates/kirin-derive-core/src/chumsky/format/struct_impl.rs
+expression: rustfmt(output.to_token_stream())
+---
+impl<
+        'tokens,
+        'src: 'tokens,
+        _AnotherLanguage: Dialect<TypeLattice: HasParser<'tokens, 'src, _AnotherLanguage>>
+            + HasParser<'tokens, 'src, _AnotherLanguage>,
+    > kirin::parsers::HasParser for MyStatementSyntaxTree
+{
+    type Output = MyStatementSyntaxTree<'tokens, 'src, _AnotherLanguage>;
+    fn parser<I: kirin::parsers::TokenInput<'tokens, 'src>>() -> kirin::parsers::Boxed<
+        'tokens,
+        'tokens,
+        I,
+        Self::Output,
+        kirin::parsers::ParserError<'tokens, 'src>,
+    > {
+        just(::kirin_lexer::Token::Identifier("my_statement"))
+            .ignore_then(kirin::parsers::operand())
+            .then_ignore(
+                just(::kirin_lexer::Token::Identifier("then"))
+                    .then(just(::kirin_lexer::Token::Equal)),
+            )
+            .then(kirin::parsers::block())
+            .then_ignore(
+                just(::kirin_lexer::Token::Identifier("else"))
+                    .then(just(::kirin_lexer::Token::Equal)),
+            )
+            .then(kirin::parsers::block())
+            .map(move |((condition, then_block), else_block)| MyStatement {
+                condition,
+                then_block,
+                else_block,
+            })
+            .boxed()
+    }
+}

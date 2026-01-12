@@ -1,0 +1,192 @@
+---
+source: crates/kirin-derive-core-2/src/ir/mod.rs
+expression: ast
+---
+Input {
+    name: Ident(
+        MyEnumAST,
+    ),
+    generics: Generics {
+        lt_token: None,
+        params: [],
+        gt_token: None,
+        where_clause: None,
+    },
+    attrs: GlobalOptions {
+        crate_path: Some(
+            Path {
+                leading_colon: None,
+                segments: [
+                    PathSegment {
+                        ident: Ident(
+                            my_crate,
+                        ),
+                        arguments: PathArguments::None,
+                    },
+                ],
+            },
+        ),
+        type_lattice: Path {
+            leading_colon: None,
+            segments: [
+                PathSegment {
+                    ident: Ident(
+                        MyLattice,
+                    ),
+                    arguments: PathArguments::None,
+                },
+            ],
+        },
+        builder: None,
+        constant: false,
+        pure: false,
+        terminator: false,
+    },
+    extra_attrs: (),
+    data: Enum(
+        DataEnum {
+            variants: [
+                Statement {
+                    name: Ident(
+                        VariantA,
+                    ),
+                    attrs: StatementOptions {
+                        format: None,
+                        builder: None,
+                        constant: false,
+                        pure: false,
+                        terminator: false,
+                    },
+                    arguments: Arguments {
+                        data: [],
+                    },
+                    results: Results {
+                        data: [],
+                    },
+                    blocks: Blocks {
+                        data: [],
+                    },
+                    successors: Successors {
+                        data: [],
+                    },
+                    regions: Regions {
+                        data: [],
+                    },
+                    values: CompileTimeValues {
+                        data: [
+                            CompileTimeValue {
+                                field: FieldIndex {
+                                    ident: None,
+                                    index: 1,
+                                },
+                                ty: Type::Path {
+                                    qself: None,
+                                    path: Path {
+                                        leading_colon: None,
+                                        segments: [
+                                            PathSegment {
+                                                ident: Ident(
+                                                    String,
+                                                ),
+                                                arguments: PathArguments::None,
+                                            },
+                                        ],
+                                    },
+                                },
+                                into: false,
+                                default: None,
+                                extra: (),
+                            },
+                        ],
+                    },
+                    wraps: Some(
+                        Wrapper {
+                            field: FieldIndex {
+                                ident: None,
+                                index: 0,
+                            },
+                            ty: Type::Path {
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                AnotherA,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                    ),
+                    extra: (),
+                    extra_attrs: (),
+                },
+                Statement {
+                    name: Ident(
+                        VariantB,
+                    ),
+                    attrs: StatementOptions {
+                        format: None,
+                        builder: None,
+                        constant: false,
+                        pure: false,
+                        terminator: false,
+                    },
+                    arguments: Arguments {
+                        data: [],
+                    },
+                    results: Results {
+                        data: [
+                            Result(
+                                Value {
+                                    field: FieldIndex {
+                                        ident: Some(
+                                            Ident(
+                                                field2,
+                                            ),
+                                        ),
+                                        index: 0,
+                                    },
+                                    ty: Expr::Path {
+                                        attrs: [],
+                                        qself: None,
+                                        path: Path {
+                                            leading_colon: None,
+                                            segments: [
+                                                PathSegment {
+                                                    ident: Ident(
+                                                        ResultType,
+                                                    ),
+                                                    arguments: PathArguments::None,
+                                                },
+                                            ],
+                                        },
+                                    },
+                                    collection: Single,
+                                },
+                            ),
+                        ],
+                    },
+                    blocks: Blocks {
+                        data: [],
+                    },
+                    successors: Successors {
+                        data: [],
+                    },
+                    regions: Regions {
+                        data: [],
+                    },
+                    values: CompileTimeValues {
+                        data: [],
+                    },
+                    wraps: None,
+                    extra: (),
+                    extra_attrs: (),
+                },
+            ],
+        },
+    ),
+}

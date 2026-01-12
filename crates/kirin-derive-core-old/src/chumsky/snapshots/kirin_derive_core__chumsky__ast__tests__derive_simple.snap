@@ -1,0 +1,37 @@
+---
+source: crates/kirin-derive-core/src/chumsky/ast.rs
+expression: "DeriveAST::builder().build().print(&input)"
+---
+#[automatically_derived]
+pub struct MyStatementSyntaxTree<
+    'tokens,
+    'src: 'tokens,
+    _AnotherLanguage: Dialect<TypeLattice: HasParser<'tokens, 'src, _AnotherLanguage>>
+        + HasParser<'tokens, 'src, _AnotherLanguage>,
+> {
+    condition: <SSAValue as kirin::parsers::WithAbstractSyntaxTree<
+        'tokens,
+        'src,
+        _AnotherLanguage,
+    >>::AbstractSyntaxTreeNode,
+    then_block: <Block as kirin::parsers::WithAbstractSyntaxTree<
+        'tokens,
+        'src,
+        _AnotherLanguage,
+    >>::AbstractSyntaxTreeNode,
+    else_block: <Block as kirin::parsers::WithAbstractSyntaxTree<
+        'tokens,
+        'src,
+        _AnotherLanguage,
+    >>::AbstractSyntaxTreeNode,
+}
+#[automatically_derived]
+impl<
+        'tokens,
+        'src: 'tokens,
+        _AnotherLanguage: Dialect<TypeLattice: HasParser<'tokens, 'src, _AnotherLanguage>>
+            + HasParser<'tokens, 'src, _AnotherLanguage>,
+    > kirin::parsers::WithAbstractSyntaxTree<'tokens, 'src, _AnotherLanguage> for MyStatement
+{
+    type AbstractSyntaxTreeNode = MyStatementSyntaxTree<'tokens, 'src, _AnotherLanguage>;
+}

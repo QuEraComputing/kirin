@@ -1,0 +1,38 @@
+---
+source: crates/kirin-derive-core/src/chumsky/format/enum_impl.rs
+expression: rustfmt(token.to_token_stream())
+---
+impl<
+        'tokens,
+        'src: 'tokens,
+        _AnotherLanguage: Dialect<TypeLattice: HasParser<'tokens, 'src, _AnotherLanguage>>
+            + HasParser<'tokens, 'src, _AnotherLanguage>,
+    > kirin::parsers::HasParser for SimpleLanguageSyntaxTree
+{
+    type Output = SimpleLanguageSyntaxTree<'tokens, 'src, _AnotherLanguage>;
+    fn parser<I: kirin::parsers::TokenInput<'tokens, 'src>>() -> kirin::parsers::Boxed<
+        'tokens,
+        'tokens,
+        I,
+        Self::Output,
+        kirin::parsers::ParserError<'tokens, 'src>,
+    > {
+        kirin::parsers::choice((
+            just(::kirin_lexer::Token::Identifier("add"))
+                .ignore_then(kirin::parsers::operand())
+                .then_ignore(just(::kirin_lexer::Token::Identifier("and")))
+                .then(kirin::parsers::operand())
+                .map(move |(field_0, field_1)| AddSyntaxTree { field_0, field_1 }),
+            just(::kirin_lexer::Token::Identifier("constant"))
+                .ignore_then(<Value as kirin::parsers::DeriveHasParser>::parser())
+                .map(move |field_0| ConstantSyntaxTree { field_0 }),
+            just(::kirin_lexer::Token::Identifier("return"))
+                .ignore_then(kirin::parsers::operand())
+                .map(move |field_0| ReturnSyntaxTree { field_0 }),
+            just(::kirin_lexer::Token::Identifier("call"))
+                .ignore_then(kirin::parsers::region())
+                .map(move |field_0| FunctionSyntaxTree { field_0 }),
+        ))
+        .boxed()
+    }
+}
