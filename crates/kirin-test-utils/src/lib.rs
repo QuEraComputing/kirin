@@ -47,6 +47,12 @@ impl FiniteLattice for SimpleTypeLattice {
     }
 }
 
+impl Default for SimpleTypeLattice {
+    fn default() -> Self {
+        Self::bottom()
+    }
+}
+
 impl crate::TypeLattice for SimpleTypeLattice {}
 
 impl Typeof<SimpleTypeLattice> for i64 {
