@@ -1,0 +1,35 @@
+---
+source: crates/kirin-chumsky-format/src/parser/tests.rs
+expression: formatted
+---
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct IdAST<
+    'tokens,
+    'src: 'tokens,
+    Language: custom_chumsky::parser::LanguageChumskyParser<'tokens, 'src>,
+>(custom_chumsky::parser::SSAValue<'tokens, 'src, Language>);
+impl<
+        'tokens,
+        'src: 'tokens,
+        Language: custom_chumsky::parser::LanguageChumskyParser<'tokens, 'src>,
+    > custom_chumsky::parser::WithRecursiveChumskyParser<'tokens, 'src, Language>
+    for IdAST<'tokens, 'src, Language>
+{
+    type Output = Self;
+    fn recursive<I>(
+        language: custom_chumsky::parser::RecursiveParser<'tokens, 'src, I, Language::Output>,
+    ) -> custom_chumsky::parser::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: custom_chumsky::parser::TokenInput<'tokens, 'src>,
+    {
+        {
+            use kirin_lexer::Token;
+            chumsky::prelude::just(Token::Identifier("id"))
+                .ignored()
+                .then(custom_chumsky::parser::parsers::ssa())
+                .map(|field_0| IdAST::<'tokens, 'src, Language>(field_0))
+        }
+        .boxed()
+    }
+}

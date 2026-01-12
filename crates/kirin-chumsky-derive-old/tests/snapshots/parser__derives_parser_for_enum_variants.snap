@@ -1,0 +1,66 @@
+---
+source: crates/kirin-chumsky-derive/tests/parser.rs
+expression: formatted
+---
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum CfAST<
+    'tokens,
+    'src: 'tokens,
+    Language: ::kirin_chumsky_2::LanguageChumskyParser<'tokens, 'src>,
+> {
+    Br {
+        target: ::kirin_chumsky_2::Successor<'tokens, 'src, Language>,
+    },
+    CondBr {
+        cond_name: ::kirin_chumsky_2::NameofSSAValue<'tokens, 'src, Language>,
+        then_target: ::kirin_chumsky_2::Successor<'tokens, 'src, Language>,
+        else_target: ::kirin_chumsky_2::Successor<'tokens, 'src, Language>,
+    },
+}
+impl<'tokens, 'src: 'tokens, Language: ::kirin_chumsky_2::LanguageChumskyParser<'tokens, 'src>>
+    ::kirin_chumsky_2::WithRecursiveChumskyParser<'tokens, 'src, Language>
+    for CfAST<'tokens, 'src, Language>
+{
+    type Output = Self;
+    fn recursive<I>(
+        language: ::kirin_chumsky_2::RecursiveParser<'tokens, 'src, I, Language::Output>,
+    ) -> ::kirin_chumsky_2::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky_2::TokenInput<'tokens, 'src>,
+    {
+        {
+            use kirin_lexer::Token;
+            chumsky::prelude::just(Token::Identifier("br"))
+                .ignored()
+                .then(::kirin_chumsky_2::parsers::block(language.clone()))
+                .map(|target| CfAST::<'tokens, 'src, Language>::Br { target: target })
+        }
+        .or({
+            use kirin_lexer::Token;
+            chumsky::prelude::just(Token::Identifier("cond_br"))
+                .ignored()
+                .then(::kirin_chumsky_2::parsers::nameof_ssa())
+                .then_ignore(
+                    chumsky::prelude::just(Token::Identifier("then"))
+                        .then_ignore(chumsky::prelude::just(Token::Equal))
+                        .ignored(),
+                )
+                .then(::kirin_chumsky_2::parsers::block(language.clone()))
+                .then_ignore(
+                    chumsky::prelude::just(Token::Identifier("else"))
+                        .then_ignore(chumsky::prelude::just(Token::Equal))
+                        .ignored(),
+                )
+                .then(::kirin_chumsky_2::parsers::block(language.clone()))
+                .map(|((cond_name, then_target), else_target)| {
+                    CfAST::<'tokens, 'src, Language>::CondBr {
+                        cond_name: cond_name,
+                        then_target: then_target,
+                        else_target: else_target,
+                    }
+                })
+        })
+        .boxed()
+    }
+}

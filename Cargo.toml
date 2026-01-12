@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky" }
 kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
 kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless" }
 serde = { version = "1.0.228", optional = true }
@@ -14,16 +13,13 @@ members = [
     "crates/kirin-cf",
     "crates/kirin-constant",
     "crates/kirin-derive",
-    "crates/kirin-derive-core",
     "crates/kirin-ir",
     "crates/kirin-prettyless",
     "crates/kirin-scf",
-    "crates/kirin-chumsky",
     "crates/kirin-test-utils",
     "crates/kirin-lexer",
-    "crates/kirin-chumsky-2",
-    "crates/kirin-chumsky-derive",
-    "crates/kirin-chumsky-format", "crates/kirin-derive-core-2", "crates/kirin-derive-dialect",
+    "crates/kirin-derive-core-2",
+    "crates/kirin-derive-dialect",
 ]
 
 [features]

@@ -1,0 +1,24 @@
+[package]
+name = "kirin-chumsky-derive"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+kirin-chumsky-format = { version = "0.1.0", path = "../kirin-chumsky-format" }
+kirin-derive-core-2 = { version = "0.1.0", path = "../kirin-derive-core-2" }
+proc-macro2 = "1.0.105"
+quote = "1.0.43"
+syn = "2.0.113"
+
+[dev-dependencies]
+insta = "1.39.0"
+kirin-chumsky = { version = "0.1.0", path = "../kirin-chumsky" }
+kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
+kirin-test-utils = { version = "0.1.0", path = "../kirin-test-utils" }
+kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
+chumsky = "0.12.0"
+kirin-derive = { version = "0.1.0", path = "../kirin-derive" }
+kirin-chumsky-2 = { version = "0.1.0", path = "../kirin-chumsky-2" }

@@ -1,0 +1,37 @@
+---
+source: crates/kirin-chumsky-format/src/parse.rs
+expression: format
+---
+Format {
+    elements: [
+        Token(
+            [
+                Identifier(
+                    "load",
+                ),
+                Identifier(
+                    "something",
+                ),
+            ],
+        ),
+        Field(
+            "value",
+            Type,
+        ),
+        Token(
+            [
+                Identifier(
+                    "from",
+                ),
+            ],
+        ),
+        Field(
+            "address",
+            Default,
+        ),
+    ],
+    fields: {
+        "value": 0,
+        "address": 1,
+    },
+}

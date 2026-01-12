@@ -1,0 +1,18 @@
+---
+source: crates/kirin-chumsky-format/src/ast/tests.rs
+expression: formatted
+---
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum FlowAST<
+    'tokens,
+    'src: 'tokens,
+    Language: ::kirin_chumsky_2::LanguageChumskyParser<'tokens, 'src>,
+> {
+    Wrap(::kirin_chumsky_2::Region<'tokens, 'src, Language>),
+    Branch(
+        ::kirin_chumsky_2::SSAValue<'tokens, 'src, Language>,
+        ::kirin_chumsky_2::Successor<'tokens, 'src, Language>,
+    ),
+    Done,
+}

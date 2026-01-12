@@ -1,0 +1,36 @@
+---
+source: crates/kirin-chumsky-format/src/parser/tests.rs
+expression: formatted
+---
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct FuncAST<
+    'tokens,
+    'src: 'tokens,
+    L: kirin_ir::TypeLattice,
+    Language: ::kirin_chumsky_2::LanguageChumskyParser<'tokens, 'src>,
+> {
+    name: <String as ::kirin_chumsky_2::WithChumskyParser<'tokens, 'src>>::Output,
+    input_signature:
+        <InputSignature as ::kirin_chumsky_2::WithChumskyParser<'tokens, 'src>>::Output,
+    ret_type: <L as ::kirin_chumsky_2::WithChumskyParser<'tokens, 'src>>::Output,
+    body: ::kirin_chumsky_2::Region<'tokens, 'src, Language>,
+}
+impl<
+        'tokens,
+        'src: 'tokens,
+        L: kirin_ir::TypeLattice,
+        Language: ::kirin_chumsky_2::LanguageChumskyParser<'tokens, 'src>,
+    > ::kirin_chumsky_2::WithRecursiveChumskyParser<'tokens, 'src, Language>
+    for FuncAST<'tokens, 'src, L, Language>
+{
+    type Output = Self;
+    fn recursive<I>(
+        language: ::kirin_chumsky_2::RecursiveParser<'tokens, 'src, I, Language::Output>,
+    ) -> ::kirin_chumsky_2::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky_2::TokenInput<'tokens, 'src>,
+    {
+        { use :: kirin_lexer :: Token ; chumsky :: prelude :: just (Token :: Identifier ("fn")) . ignored () . then (< < String as :: kirin_chumsky_2 :: WithChumskyParser < 'tokens , 'src >> :: Output as :: kirin_chumsky_2 :: WithChumskyParser < 'tokens , 'src >> :: parser ()) . then_ignore (chumsky :: prelude :: just (Token :: LParen) . ignored ()) . then (< < InputSignature as :: kirin_chumsky_2 :: WithChumskyParser < 'tokens , 'src >> :: Output as :: kirin_chumsky_2 :: WithChumskyParser < 'tokens , 'src >> :: parser ()) . then_ignore (chumsky :: prelude :: just (Token :: RParen) . then_ignore (chumsky :: prelude :: just (Token :: Arrow)) . ignored ()) . then (< < L as :: kirin_chumsky_2 :: WithChumskyParser < 'tokens , 'src >> :: Output as :: kirin_chumsky_2 :: WithChumskyParser < 'tokens , 'src >> :: parser ()) . then (:: kirin_chumsky_2 :: parsers :: region (language . clone ())) . map (| (((name , input_signature) , ret_type) , body) | FuncAST :: < 'tokens , 'src , L , Language > { name : name , input_signature : input_signature , ret_type : ret_type , body : body }) } . boxed ()
+    }
+}
