@@ -1,0 +1,6 @@
+---
+source: crates/kirin-derive-dialect/src/marker.rs
+assertion_line: 36
+expression: tokens.to_string()
+---
+# [automatically_derived] impl MarkerTrait for MyStruct { type TypeLattice = T ; }

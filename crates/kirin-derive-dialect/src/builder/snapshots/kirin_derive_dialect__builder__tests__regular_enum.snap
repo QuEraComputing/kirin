@@ -1,0 +1,82 @@
+---
+source: crates/kirin-derive-core/src/kirin/builder/mod.rs
+expression: "Builder::default().print(&input)"
+---
+impl TestEnum {
+    pub fn op_a<Lang>(
+        context: &mut ::kirin::ir::Context<Lang>,
+        value: impl Into<u32>,
+    ) -> test_enum_build_result::A
+    where
+        Lang: ::kirin::ir::Dialect + From<TestEnum>,
+        Lang::TypeLattice: From<SomeLattice>,
+    {
+        let a_statement_id = context.statement_arena().next_id();
+        let value: u32 = value.into();
+        let result: ResultValue = context
+            .ssa()
+            .kind(SSAKind::Result(a_statement_id, 0usize))
+            .ty(Lang::TypeLattice::from(u32_type))
+            .new()
+            .into();
+        context
+            .statement()
+            .definition(Self::A { value, result })
+            .new();
+        test_enum_build_result::A {
+            id: a_statement_id,
+            result,
+        }
+    }
+    pub fn op_b<Lang>(
+        context: &mut ::kirin::ir::Context<Lang>,
+        field_0: impl Into<u64>,
+    ) -> test_enum_build_result::B
+    where
+        Lang: ::kirin::ir::Dialect + From<TestEnum>,
+        Lang::TypeLattice: From<SomeLattice>,
+    {
+        let b_statement_id = context.statement_arena().next_id();
+        let field_0: u64 = field_0.into();
+        let result: ResultValue = context
+            .ssa()
+            .kind(SSAKind::Result(b_statement_id, 0usize))
+            .ty(Lang::TypeLattice::from(u64_type))
+            .new()
+            .into();
+        context
+            .statement()
+            .definition(Self::B(field_0, result))
+            .new();
+        test_enum_build_result::B {
+            id: b_statement_id,
+            result,
+        }
+    }
+}
+#[automatically_derived]
+pub mod test_enum_build_result {
+    use kirin::ir::{ResultValue, Statement};
+    #[automatically_derived]
+    pub struct A {
+        pub id: Statement,
+        pub result: ResultValue,
+    }
+    #[automatically_derived]
+    impl From<A> for Statement {
+        fn from(value: A) -> Self {
+            value.id
+        }
+    }
+    #[automatically_derived]
+    pub struct B {
+        pub id: Statement,
+        pub result: ResultValue,
+    }
+    #[automatically_derived]
+    impl From<B> for Statement {
+        fn from(value: B) -> Self {
+            value.id
+        }
+    }
+}

@@ -1,0 +1,13 @@
+---
+source: crates/kirin-derive-core/src/kirin/property/mod.rs
+expression: content
+---
+#[automatically_derived]
+impl<T> ::kirin::ir::IsConstant for MyEnum<T> {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::VariantA { a, b } => false || false,
+            Self::VariantB(field_0, field_1) => false || true,
+        }
+    }
+}
