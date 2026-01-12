@@ -7,6 +7,7 @@ mod statement;
 pub use input::{Data, DataEnum, DataStruct, Input};
 pub use layout::{Layout, StandardLayout};
 pub use statement::Statement;
+pub use attrs::BuilderOptions;
 
 #[cfg(test)]
 mod tests {
