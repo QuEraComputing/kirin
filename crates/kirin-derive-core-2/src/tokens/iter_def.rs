@@ -1,8 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 
-use super::to_stream;
-
 pub struct IterStructDefTokens {
     pub name: TokenStream,
     pub generics: TokenStream,
@@ -27,17 +25,17 @@ impl IterStructDefTokens {
 
 impl IterStructDefTokensBuilder {
     pub fn name(mut self, value: impl ToTokens) -> Self {
-        self.name = Some(to_stream(value));
+        self.name = Some(value.to_token_stream());
         self
     }
 
     pub fn generics(mut self, value: impl ToTokens) -> Self {
-        self.generics = Some(to_stream(value));
+        self.generics = Some(value.to_token_stream());
         self
     }
 
     pub fn inner_type(mut self, value: impl ToTokens) -> Self {
-        self.inner_type = Some(to_stream(value));
+        self.inner_type = Some(value.to_token_stream());
         self
     }
 
@@ -90,7 +88,7 @@ impl VariantDefTokensBuilder {
     }
 
     pub fn inner_type(mut self, value: impl ToTokens) -> Self {
-        self.inner_type = Some(to_stream(value));
+        self.inner_type = Some(value.to_token_stream());
         self
     }
 
@@ -134,12 +132,12 @@ impl IterEnumDefTokens {
 
 impl IterEnumDefTokensBuilder {
     pub fn name(mut self, value: impl ToTokens) -> Self {
-        self.name = Some(to_stream(value));
+        self.name = Some(value.to_token_stream());
         self
     }
 
     pub fn generics(mut self, value: impl ToTokens) -> Self {
-        self.generics = Some(to_stream(value));
+        self.generics = Some(value.to_token_stream());
         self
     }
 

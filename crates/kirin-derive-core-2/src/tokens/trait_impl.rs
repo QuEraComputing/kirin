@@ -1,8 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 
-use super::to_stream;
-
 pub struct TraitImplTokens {
     pub impl_generics: TokenStream,
     pub trait_path: TokenStream,
@@ -55,9 +53,9 @@ impl TraitImplTokensBuilder {
     pub fn generics(mut self, generics: &syn::Generics) -> Self {
         let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
         self.generics = Some(GenericsTokens {
-            impl_generics: to_stream(impl_generics),
-            type_generics: to_stream(type_generics),
-            where_clause: to_stream(where_clause),
+            impl_generics: impl_generics.to_token_stream(),
+            type_generics: type_generics.to_token_stream(),
+            where_clause: where_clause.to_token_stream(),
         });
         self
     }
@@ -70,25 +68,25 @@ impl TraitImplTokensBuilder {
         let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
         let (_, type_generics, _) = type_generics.split_for_impl();
         self.generics = Some(GenericsTokens {
-            impl_generics: to_stream(impl_generics),
-            type_generics: to_stream(type_generics),
-            where_clause: to_stream(where_clause),
+            impl_generics: impl_generics.to_token_stream(),
+            type_generics: type_generics.to_token_stream(),
+            where_clause: where_clause.to_token_stream(),
         });
         self
     }
 
     pub fn trait_path(mut self, value: impl ToTokens) -> Self {
-        self.trait_path = Some(to_stream(value));
+        self.trait_path = Some(value.to_token_stream());
         self
     }
 
     pub fn trait_generics(mut self, value: impl ToTokens) -> Self {
-        self.trait_generics = Some(to_stream(value));
+        self.trait_generics = Some(value.to_token_stream());
         self
     }
 
     pub fn type_name(mut self, value: impl ToTokens) -> Self {
-        self.type_name = Some(to_stream(value));
+        self.type_name = Some(value.to_token_stream());
         self
     }
 
@@ -98,7 +96,7 @@ impl TraitImplTokensBuilder {
     }
 
     pub fn assoc_type(mut self, value: impl ToTokens) -> Self {
-        self.assoc_type = Some(to_stream(value));
+        self.assoc_type = Some(value.to_token_stream());
         self
     }
 
@@ -108,12 +106,12 @@ impl TraitImplTokensBuilder {
     }
 
     pub fn self_arg(mut self, value: impl ToTokens) -> Self {
-        self.self_arg = Some(to_stream(value));
+        self.self_arg = Some(value.to_token_stream());
         self
     }
 
     pub fn body(mut self, value: impl ToTokens) -> Self {
-        self.body = Some(to_stream(value));
+        self.body = Some(value.to_token_stream());
         self
     }
 
@@ -210,9 +208,9 @@ impl TraitMethodImplTokensBuilder {
     pub fn generics(mut self, generics: &syn::Generics) -> Self {
         let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
         self.generics = Some(GenericsTokens {
-            impl_generics: to_stream(impl_generics),
-            type_generics: to_stream(type_generics),
-            where_clause: to_stream(where_clause),
+            impl_generics: impl_generics.to_token_stream(),
+            type_generics: type_generics.to_token_stream(),
+            where_clause: where_clause.to_token_stream(),
         });
         self
     }
@@ -225,25 +223,25 @@ impl TraitMethodImplTokensBuilder {
         let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
         let (_, type_generics, _) = type_generics.split_for_impl();
         self.generics = Some(GenericsTokens {
-            impl_generics: to_stream(impl_generics),
-            type_generics: to_stream(type_generics),
-            where_clause: to_stream(where_clause),
+            impl_generics: impl_generics.to_token_stream(),
+            type_generics: type_generics.to_token_stream(),
+            where_clause: where_clause.to_token_stream(),
         });
         self
     }
 
     pub fn trait_path(mut self, value: impl ToTokens) -> Self {
-        self.trait_path = Some(to_stream(value));
+        self.trait_path = Some(value.to_token_stream());
         self
     }
 
     pub fn trait_generics(mut self, value: impl ToTokens) -> Self {
-        self.trait_generics = Some(to_stream(value));
+        self.trait_generics = Some(value.to_token_stream());
         self
     }
 
     pub fn type_name(mut self, value: impl ToTokens) -> Self {
-        self.type_name = Some(to_stream(value));
+        self.type_name = Some(value.to_token_stream());
         self
     }
 
@@ -253,17 +251,17 @@ impl TraitMethodImplTokensBuilder {
     }
 
     pub fn self_arg(mut self, value: impl ToTokens) -> Self {
-        self.self_arg = Some(to_stream(value));
+        self.self_arg = Some(value.to_token_stream());
         self
     }
 
     pub fn output_type(mut self, value: impl ToTokens) -> Self {
-        self.output_type = Some(to_stream(value));
+        self.output_type = Some(value.to_token_stream());
         self
     }
 
     pub fn body(mut self, value: impl ToTokens) -> Self {
-        self.body = Some(to_stream(value));
+        self.body = Some(value.to_token_stream());
         self
     }
 
@@ -351,9 +349,9 @@ impl TraitAssocTypeImplTokensBuilder {
     pub fn generics(mut self, generics: &syn::Generics) -> Self {
         let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
         self.generics = Some(GenericsTokens {
-            impl_generics: to_stream(impl_generics),
-            type_generics: to_stream(type_generics),
-            where_clause: to_stream(where_clause),
+            impl_generics: impl_generics.to_token_stream(),
+            type_generics: type_generics.to_token_stream(),
+            where_clause: where_clause.to_token_stream(),
         });
         self
     }
@@ -366,25 +364,25 @@ impl TraitAssocTypeImplTokensBuilder {
         let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
         let (_, type_generics, _) = type_generics.split_for_impl();
         self.generics = Some(GenericsTokens {
-            impl_generics: to_stream(impl_generics),
-            type_generics: to_stream(type_generics),
-            where_clause: to_stream(where_clause),
+            impl_generics: impl_generics.to_token_stream(),
+            type_generics: type_generics.to_token_stream(),
+            where_clause: where_clause.to_token_stream(),
         });
         self
     }
 
     pub fn trait_path(mut self, value: impl ToTokens) -> Self {
-        self.trait_path = Some(to_stream(value));
+        self.trait_path = Some(value.to_token_stream());
         self
     }
 
     pub fn trait_generics(mut self, value: impl ToTokens) -> Self {
-        self.trait_generics = Some(to_stream(value));
+        self.trait_generics = Some(value.to_token_stream());
         self
     }
 
     pub fn type_name(mut self, value: impl ToTokens) -> Self {
-        self.type_name = Some(to_stream(value));
+        self.type_name = Some(value.to_token_stream());
         self
     }
 
@@ -394,7 +392,7 @@ impl TraitAssocTypeImplTokensBuilder {
     }
 
     pub fn assoc_type(mut self, value: impl ToTokens) -> Self {
-        self.assoc_type = Some(to_stream(value));
+        self.assoc_type = Some(value.to_token_stream());
         self
     }
 

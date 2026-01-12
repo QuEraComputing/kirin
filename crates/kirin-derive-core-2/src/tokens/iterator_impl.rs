@@ -1,8 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 
-use super::to_stream;
-
 pub struct IteratorImplTokens {
     pub impl_generics: TokenStream,
     pub name: TokenStream,
@@ -36,32 +34,32 @@ impl IteratorImplTokens {
 
 impl IteratorImplTokensBuilder {
     pub fn impl_generics(mut self, value: impl ToTokens) -> Self {
-        self.impl_generics = Some(to_stream(value));
+        self.impl_generics = Some(value.to_token_stream());
         self
     }
 
     pub fn name(mut self, value: impl ToTokens) -> Self {
-        self.name = Some(to_stream(value));
+        self.name = Some(value.to_token_stream());
         self
     }
 
     pub fn type_generics(mut self, value: impl ToTokens) -> Self {
-        self.type_generics = Some(to_stream(value));
+        self.type_generics = Some(value.to_token_stream());
         self
     }
 
     pub fn where_clause(mut self, value: impl ToTokens) -> Self {
-        self.where_clause = Some(to_stream(value));
+        self.where_clause = Some(value.to_token_stream());
         self
     }
 
     pub fn item(mut self, value: impl ToTokens) -> Self {
-        self.item = Some(to_stream(value));
+        self.item = Some(value.to_token_stream());
         self
     }
 
     pub fn next_body(mut self, value: impl ToTokens) -> Self {
-        self.next_body = Some(to_stream(value));
+        self.next_body = Some(value.to_token_stream());
         self
     }
 

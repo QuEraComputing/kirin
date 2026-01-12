@@ -1,8 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 
-use super::to_stream;
-
 pub struct WrapperCallTokens {
     pub wrapper_ty: TokenStream,
     pub trait_path: TokenStream,
@@ -40,12 +38,12 @@ impl WrapperCallTokens {
 
 impl WrapperCallTokensBuilder {
     pub fn wrapper_ty(mut self, value: impl ToTokens) -> Self {
-        self.wrapper_ty = Some(to_stream(value));
+        self.wrapper_ty = Some(value.to_token_stream());
         self
     }
 
     pub fn trait_path(mut self, value: impl ToTokens) -> Self {
-        self.trait_path = Some(to_stream(value));
+        self.trait_path = Some(value.to_token_stream());
         self
     }
 
@@ -55,7 +53,7 @@ impl WrapperCallTokensBuilder {
     }
 
     pub fn field(mut self, value: impl ToTokens) -> Self {
-        self.field = Some(to_stream(value));
+        self.field = Some(value.to_token_stream());
         self
     }
 
@@ -102,17 +100,17 @@ impl WrapperIterTypeTokens {
 
 impl WrapperIterTypeTokensBuilder {
     pub fn wrapper_ty(mut self, value: impl ToTokens) -> Self {
-        self.wrapper_ty = Some(to_stream(value));
+        self.wrapper_ty = Some(value.to_token_stream());
         self
     }
 
     pub fn trait_path(mut self, value: impl ToTokens) -> Self {
-        self.trait_path = Some(to_stream(value));
+        self.trait_path = Some(value.to_token_stream());
         self
     }
 
     pub fn trait_generics(mut self, value: impl ToTokens) -> Self {
-        self.trait_generics = Some(to_stream(value));
+        self.trait_generics = Some(value.to_token_stream());
         self
     }
 
