@@ -1,164 +1,209 @@
 extern crate proc_macro;
 
-use kirin_derive_core::kirin::prelude::*;
-use kirin_derive_core::prelude::*;
 use proc_macro::TokenStream;
+use quote::ToTokens;
 use syn::parse_macro_input;
+
+use kirin_derive_dialect::{
+    builder::DeriveBuilder,
+    field::{DeriveFieldIter, FieldIterKind},
+    marker,
+    property::{DeriveProperty, PropertyKind},
+};
 
 #[proc_macro_derive(Dialect, attributes(kirin, wraps))]
 pub fn derive_statement(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-
     let mut tokens = proc_macro2::TokenStream::new();
 
-    for (mutable, trait_name, matching_type, trait_method, trait_type_iter) in [
-        (false, "HasArguments", "SSAValue", "arguments", "Iter"),
-        (
-            true,
-            "HasArgumentsMut",
-            "SSAValue",
-            "arguments_mut",
-            "IterMut",
-        ),
-        (false, "HasResults", "ResultValue", "results", "Iter"),
-        (
-            true,
-            "HasResultsMut",
-            "ResultValue",
-            "results_mut",
-            "IterMut",
-        ),
-        (false, "HasBlocks", "Block", "blocks", "Iter"),
-        (true, "HasBlocksMut", "Block", "blocks_mut", "IterMut"),
-        (false, "HasSuccessors", "Successor", "successors", "Iter"),
-        (
-            true,
-            "HasSuccessorsMut",
-            "Successor",
-            "successors_mut",
-            "IterMut",
-        ),
-        (false, "HasRegions", "Region", "regions", "Iter"),
-        (true, "HasRegionsMut", "Region", "regions_mut", "IterMut"),
-    ] {
-        FieldsIter::builder()
-            .trait_lifetime("'a")
-            .default_crate_path("::kirin::ir")
-            .mutable(mutable)
-            .trait_path(trait_name)
-            .matching_type(matching_type)
-            .trait_method(trait_method)
-            .trait_type_iter(trait_type_iter)
-            .build()
-            .emit(&ast)
-            .to_tokens(&mut tokens);
+    // FieldsIter
+    let iter_configs = [
+        (FieldIterKind::Arguments, false, "HasArguments", "SSAValue", "arguments", "Iter"),
+        (FieldIterKind::Arguments, true, "HasArgumentsMut", "SSAValue", "arguments_mut", "IterMut"),
+        (FieldIterKind::Results, false, "HasResults", "ResultValue", "results", "Iter"),
+        (FieldIterKind::Results, true, "HasResultsMut", "ResultValue", "results_mut", "IterMut"),
+        (FieldIterKind::Blocks, false, "HasBlocks", "Block", "blocks", "Iter"),
+        (FieldIterKind::Blocks, true, "HasBlocksMut", "Block", "blocks_mut", "IterMut"),
+        (FieldIterKind::Successors, false, "HasSuccessors", "Successor", "successors", "Iter"),
+        (FieldIterKind::Successors, true, "HasSuccessorsMut", "Successor", "successors_mut", "IterMut"),
+        (FieldIterKind::Regions, false, "HasRegions", "Region", "regions", "Iter"),
+        (FieldIterKind::Regions, true, "HasRegionsMut", "Region", "regions_mut", "IterMut"),
+    ];
+
+    for (kind, mutable, trait_name, matching_type, trait_method, trait_type_iter) in iter_configs {
+        let res = DeriveFieldIter::new(
+            kind,
+            mutable,
+            "::kirin::ir",
+            trait_name,
+            matching_type,
+            trait_method,
+            trait_type_iter,
+        )
+        .with_trait_lifetime("'a")
+        .emit(&ast);
+        
+        match res {
+            Ok(t) => tokens.extend(t),
+            Err(e) => tokens.extend(e.write_errors()),
+        }
     }
 
-    Property::<IsTerminator>::builder()
-        .default_crate_path("::kirin::ir")
-        .trait_path("IsTerminator")
-        .trait_method("is_terminator")
-        .value_type("bool")
-        .build()
-        .emit(&ast)
-        .to_tokens(&mut tokens);
+    // Properties
+    let props = [
+        (PropertyKind::Terminator, "IsTerminator", "is_terminator"),
+        (PropertyKind::Constant, "IsConstant", "is_constant"),
+        (PropertyKind::Pure, "IsPure", "is_pure"),
+    ];
 
-    Property::<IsConstant>::builder()
-        .default_crate_path("::kirin::ir")
-        .trait_path("IsConstant")
-        .trait_method("is_constant")
-        .value_type("bool")
-        .build()
-        .emit(&ast)
-        .to_tokens(&mut tokens);
+    for (kind, trait_path, trait_method) in props {
+        let res = DeriveProperty::new(
+            kind,
+            "::kirin::ir",
+            trait_path,
+            trait_method,
+            "bool",
+        )
+        .emit(&ast);
+        match res {
+            Ok(t) => tokens.extend(t),
+            Err(e) => tokens.extend(e.write_errors()),
+        }
+    }
 
-    Property::<IsPure>::builder()
-        .default_crate_path("::kirin::ir")
-        .trait_path("IsPure")
-        .trait_method("is_pure")
-        .value_type("bool")
-        .build()
-        .emit(&ast)
-        .to_tokens(&mut tokens);
+    // Builder
+    match DeriveBuilder::default().emit(&ast) {
+        Ok(t) => tokens.extend(t),
+        Err(e) => tokens.extend(e.write_errors()),
+    }
 
-    Builder::default().emit(&ast).to_tokens(&mut tokens);
-    DialectMarker::builder()
-        .crate_path("::kirin::ir")
-        .trait_path("Dialect")
-        .build()
-        .emit(&ast)
-        .to_tokens(&mut tokens);
-    // let name = derive_name!(&ast);
+    // Marker
+    let ir_input = kirin_derive_core_2::ir::Input::<
+        kirin_derive_core_2::ir::StandardLayout,
+    >::from_derive_input(&ast);
+    
+    match ir_input {
+        Ok(ir) => {
+             let default_crate: syn::Path = syn::parse_quote!(::kirin::ir);
+             let crate_path = ir.attrs.crate_path.as_ref().unwrap_or(&default_crate);
+             let trait_path: syn::Path = syn::parse_quote!(#crate_path::Dialect);
+             marker::derive_marker(&ir, &trait_path).to_tokens(&mut tokens);
+        }
+        Err(e) => tokens.extend(e.write_errors()),
+    }
+
     tokens.into()
 }
 
-macro_rules! derive_fields_iter {
-    ($mutable:expr, $name:ident, $matching_type:ident, $trait_method:ident, $trait_type_iter:ident) => {
-        paste::paste! {
-            #[proc_macro_derive($name, attributes(kirin, wraps))]
-            pub fn [<derive_ $name:snake>](input: TokenStream) -> TokenStream {
-                let ast = parse_macro_input!(input as syn::DeriveInput);
-                FieldsIter::builder()
-                        .trait_lifetime("'a")
-                        .default_crate_path("::kirin::ir")
-                        .mutable($mutable)
-                        .trait_path(stringify!($name))
-                        .matching_type(stringify!($matching_type))
-                        .trait_method(stringify!($trait_method))
-                        .trait_type_iter(stringify!($trait_type_iter))
-                        .build()
-                        .emit(&ast).into()
-            }
-        }
-    };
+fn do_derive_field_iter(
+    input: TokenStream,
+    kind: FieldIterKind,
+    mutable: bool,
+    trait_name: &str,
+    matching_type: &str,
+    trait_method: &str,
+    trait_type_iter: &str,
+) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    let res = DeriveFieldIter::new(
+        kind,
+        mutable,
+        "::kirin::ir",
+        trait_name,
+        matching_type,
+        trait_method,
+        trait_type_iter,
+    )
+    .with_trait_lifetime("'a")
+    .emit(&ast);
+    match res {
+        Ok(t) => t.into(),
+        Err(e) => e.write_errors().into(),
+    }
 }
 
-derive_fields_iter!(false, HasArguments, SSAValue, arguments, Iter);
-derive_fields_iter!(true, HasArgumentsMut, SSAValue, arguments_mut, IterMut);
-derive_fields_iter!(false, HasResults, ResultValue, results, Iter);
-derive_fields_iter!(true, HasResultsMut, ResultValue, results_mut, IterMut);
-derive_fields_iter!(false, HasBlocks, Block, blocks, Iter);
-derive_fields_iter!(true, HasBlocksMut, Block, blocks_mut, IterMut);
-derive_fields_iter!(false, HasSuccessors, Successor, successors, Iter);
-derive_fields_iter!(true, HasSuccessorsMut, Successor, successors_mut, IterMut);
-derive_fields_iter!(false, HasRegions, Region, regions, Iter);
-derive_fields_iter!(true, HasRegionsMut, Region, regions_mut, IterMut);
-
-macro_rules! derive_property {
-    ($name:ident) => {
-        paste::paste! {
-            #[proc_macro_derive($name, attributes(kirin, wraps))]
-            pub fn [<derive_ $name:snake>](input: TokenStream) -> TokenStream {
-                let ast = parse_macro_input!(input as syn::DeriveInput);
-                Property::<$name>::builder()
-                    .default_crate_path("::kirin::ir")
-                    .trait_path(stringify!($name))
-                    .trait_method(stringify!($name:snake))
-                    .value_type("bool")
-                    .build()
-                    .emit(&ast)
-                    .into()
-            }
-        }
-    };
+#[proc_macro_derive(HasArguments, attributes(kirin, wraps))]
+pub fn derive_has_arguments(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Arguments, false, "HasArguments", "SSAValue", "arguments", "Iter")
 }
 
-derive_property!(IsTerminator);
-derive_property!(IsConstant);
-derive_property!(IsPure);
+#[proc_macro_derive(HasArgumentsMut, attributes(kirin, wraps))]
+pub fn derive_has_arguments_mut(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Arguments, true, "HasArgumentsMut", "SSAValue", "arguments_mut", "IterMut")
+}
 
-// #[proc_macro_derive(WithAbstractSyntaxTree, attributes(chumsky, wraps))]
-// pub fn derive_with_abstract_syntax_tree(input: TokenStream) -> TokenStream {
-//     let ast = parse_macro_input!(input as syn::DeriveInput);
-//     DeriveAST::builder()
-//         .build()
-//         .emit(&ast).into()
-// }
+#[proc_macro_derive(HasResults, attributes(kirin, wraps))]
+pub fn derive_has_results(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Results, false, "HasResults", "ResultValue", "results", "Iter")
+}
 
-// #[proc_macro_derive(HasParser, attributes(chumsky, wraps))]
-// pub fn derive_has_parser(input: TokenStream) -> TokenStream {
-//     let ast = parse_macro_input!(input as syn::DeriveInput);
-//     DeriveHasParser::builder()
-//         .build()
-//         .emit(&ast).into()
-// }
+#[proc_macro_derive(HasResultsMut, attributes(kirin, wraps))]
+pub fn derive_has_results_mut(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Results, true, "HasResultsMut", "ResultValue", "results_mut", "IterMut")
+}
+
+#[proc_macro_derive(HasBlocks, attributes(kirin, wraps))]
+pub fn derive_has_blocks(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Blocks, false, "HasBlocks", "Block", "blocks", "Iter")
+}
+
+#[proc_macro_derive(HasBlocksMut, attributes(kirin, wraps))]
+pub fn derive_has_blocks_mut(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Blocks, true, "HasBlocksMut", "Block", "blocks_mut", "IterMut")
+}
+
+#[proc_macro_derive(HasSuccessors, attributes(kirin, wraps))]
+pub fn derive_has_successors(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Successors, false, "HasSuccessors", "Successor", "successors", "Iter")
+}
+
+#[proc_macro_derive(HasSuccessorsMut, attributes(kirin, wraps))]
+pub fn derive_has_successors_mut(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Successors, true, "HasSuccessorsMut", "Successor", "successors_mut", "IterMut")
+}
+
+#[proc_macro_derive(HasRegions, attributes(kirin, wraps))]
+pub fn derive_has_regions(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Regions, false, "HasRegions", "Region", "regions", "Iter")
+}
+
+#[proc_macro_derive(HasRegionsMut, attributes(kirin, wraps))]
+pub fn derive_has_regions_mut(input: TokenStream) -> TokenStream {
+    do_derive_field_iter(input, FieldIterKind::Regions, true, "HasRegionsMut", "Region", "regions_mut", "IterMut")
+}
+
+fn do_derive_property(
+    input: TokenStream,
+    kind: PropertyKind,
+    trait_name: &str,
+    trait_method: &str,
+) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    let res = DeriveProperty::new(
+        kind,
+        "::kirin::ir",
+        trait_name,
+        trait_method,
+        "bool",
+    )
+    .emit(&ast);
+    match res {
+        Ok(t) => t.into(),
+        Err(e) => e.write_errors().into(),
+    }
+}
+
+#[proc_macro_derive(IsTerminator, attributes(kirin, wraps))]
+pub fn derive_is_terminator(input: TokenStream) -> TokenStream {
+    do_derive_property(input, PropertyKind::Terminator, "IsTerminator", "is_terminator")
+}
+
+#[proc_macro_derive(IsConstant, attributes(kirin, wraps))]
+pub fn derive_is_constant(input: TokenStream) -> TokenStream {
+    do_derive_property(input, PropertyKind::Constant, "IsConstant", "is_constant")
+}
+
+#[proc_macro_derive(IsPure, attributes(kirin, wraps))]
+pub fn derive_is_pure(input: TokenStream) -> TokenStream {
+    do_derive_property(input, PropertyKind::Pure, "IsPure", "is_pure")
+}
