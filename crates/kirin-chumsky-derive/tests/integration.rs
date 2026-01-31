@@ -532,3 +532,4 @@ fn test_parse_block_missing_braces() {
     let result = parse_block_region_input("loop ^bb0() -> i32");
     assert!(result.is_err(), "Expected parse to fail for missing braces");
 }
+

@@ -72,15 +72,31 @@ impl GenerateHasRecursiveParser {
         crate_path: &syn::Path,
     ) -> TokenStream {
         let original_name = &ir_input.name;
-        let (impl_generics, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+
+        // Build impl generics that include both the lifetimes and the original type parameters
+        let impl_generics = self.build_original_type_impl_generics(ir_input);
+        let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
+
+        let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+
+        // Combine where clauses if both exist
+        let combined_where = match (where_clause, impl_where_clause) {
+            (Some(orig), Some(impl_wc)) => {
+                let mut combined = orig.clone();
+                combined.predicates.extend(impl_wc.predicates.iter().cloned());
+                Some(combined)
+            }
+            (Some(wc), None) | (None, Some(wc)) => Some(wc.clone()),
+            (None, None) => None,
+        };
 
         // Use the trait's associated type instead of directly referencing the AST type name.
         // This ensures a clear error message if WithAbstractSyntaxTree is not implemented:
         // "the trait `WithAbstractSyntaxTree` is not implemented for `MyType`"
         quote! {
-            impl<'tokens, 'src: 'tokens> #crate_path::HasRecursiveParser<'tokens, 'src, #original_name #ty_generics>
-                for #original_name #impl_generics
-            #where_clause
+            impl #impl_generics #crate_path::HasRecursiveParser<'tokens, 'src, #original_name #ty_generics>
+                for #original_name #ty_generics
+            #combined_where
             {
                 type Output = <#original_name #ty_generics as #crate_path::WithAbstractSyntaxTree<'tokens, 'src, #original_name #ty_generics>>::AbstractSyntaxTreeNode;
 
@@ -102,6 +118,44 @@ impl GenerateHasRecursiveParser {
                 }
             }
         }
+    }
+
+    /// Builds impl generics for the original type's HasRecursiveParser impl.
+    /// This includes 'tokens, 'src: 'tokens, plus the original type's type parameters.
+    fn build_original_type_impl_generics(
+        &self,
+        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+    ) -> syn::Generics {
+        let mut generics = ir_input.generics.clone();
+
+        // Add 'tokens lifetime at the beginning if not present
+        let tokens_lt = syn::Lifetime::new("'tokens", proc_macro2::Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
+        {
+            generics.params.insert(
+                0,
+                syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
+            );
+        }
+
+        // Add 'src: 'tokens lifetime after 'tokens if not present
+        let src_lt = syn::Lifetime::new("'src", proc_macro2::Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
+        {
+            let mut src_param = syn::LifetimeParam::new(src_lt);
+            src_param.bounds.push(tokens_lt);
+            generics
+                .params
+                .insert(1, syn::GenericParam::Lifetime(src_param));
+        }
+
+        generics
     }
 
     fn build_ast_generics(
@@ -390,7 +444,6 @@ impl GenerateHasRecursiveParser {
         }
 
         let mut occurrences = Vec::new();
-        let mut occurrence_counts: HashMap<usize, usize> = HashMap::new();
 
         for elem in format.elements() {
             if let FormatElement::Field(name, opt) = elem {
@@ -409,9 +462,6 @@ impl GenerateHasRecursiveParser {
                 let field = collected.iter().find(|f| f.index == index).ok_or_else(|| {
                     syn::Error::new(stmt.name.span(), format!("field index {} not found", index))
                 })?;
-
-                // Track occurrences by option type for validation
-                let count = occurrence_counts.entry(index).or_insert(0);
                 
                 // Validate that :name and :type options are only used on SSA/Result fields
                 if matches!(opt, FormatOption::Name | FormatOption::Type) {
@@ -487,7 +537,7 @@ impl GenerateHasRecursiveParser {
                         syn::Ident::new(&format!("{}_type", base), proc_macro2::Span::call_site())
                     }
                     FormatOption::Default => {
-                        // Since we reject duplicate defaults above, count is always 0 here
+                        // Since we reject duplicate defaults above, this is the only default occurrence
                         field.ident.clone().unwrap_or_else(|| {
                             syn::Ident::new(
                                 &format!("field_{}", index),
@@ -496,7 +546,6 @@ impl GenerateHasRecursiveParser {
                         })
                     }
                 };
-                *count += 1;
 
                 occurrences.push(FieldOccurrence {
                     field,

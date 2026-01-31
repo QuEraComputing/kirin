@@ -761,8 +761,11 @@ impl GenerateWithAbstractSyntaxTree {
         let name = &ir_input.name;
         let (impl_generics, ty_generics, where_clause) = ast_generics.split_for_impl();
 
+        // Get the original type's type generics (without 'tokens, 'src, Language)
+        let (_, original_ty_generics, _) = ir_input.generics.split_for_impl();
+
         quote! {
-            impl #impl_generics #crate_path::WithAbstractSyntaxTree<'tokens, 'src, Language> for #name
+            impl #impl_generics #crate_path::WithAbstractSyntaxTree<'tokens, 'src, Language> for #name #original_ty_generics
             #where_clause
             {
                 type AbstractSyntaxTreeNode = #ast_name #ty_generics;

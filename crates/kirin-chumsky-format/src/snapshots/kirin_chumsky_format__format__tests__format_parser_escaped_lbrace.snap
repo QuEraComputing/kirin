@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-chumsky-format/src/format.rs
-assertion_line: 218
+assertion_line: 225
 expression: format
 ---
 Format {
@@ -10,6 +10,10 @@ Format {
                 Identifier(
                     "dict",
                 ),
+            ],
+        ),
+        Token(
+            [
                 EscapedLBrace,
             ],
         ),
@@ -20,6 +24,10 @@ Format {
         Token(
             [
                 EscapedRBrace,
+            ],
+        ),
+        Token(
+            [
                 Equal,
             ],
         ),

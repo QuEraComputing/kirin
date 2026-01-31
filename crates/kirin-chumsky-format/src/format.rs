@@ -99,12 +99,13 @@ impl<'src> Format<'src> {
         'src: 'tokens,
         I: chumsky::input::ValueInput<'tokens, Token = Token<'src>, Span = SimpleSpan>,
     {
-        // Parse escaped opening brace: {{ -> literal {
-        // Note: }} escaping is not supported because it conflicts with the closing }
-        // of interpolations. Use `}` directly in the format string if needed.
-        let escaped_lbrace = just(Token::LBrace)
-            .then_ignore(just(Token::LBrace))
-            .to(FormatElement::Token(vec![Token::LBrace]));
+        // Parse escaped braces: {{ -> literal {, }} -> literal }
+        // The lexer produces EscapedLBrace/EscapedRBrace tokens for {{ and }}
+        let escaped_lbrace = just(Token::EscapedLBrace)
+            .to(FormatElement::Token(vec![Token::EscapedLBrace]));
+
+        let escaped_rbrace = just(Token::EscapedRBrace)
+            .to(FormatElement::Token(vec![Token::EscapedRBrace]));
 
         // Parse field interpolations like {name} or {name:type}
         let interpolation = just(Token::LBrace)
@@ -125,17 +126,23 @@ impl<'src> Format<'src> {
             .then_ignore(just(Token::RBrace))
             .map(|(name, opt)| FormatElement::Field(name, opt.unwrap_or_default()));
 
-        // Parse literal tokens (anything that's not `{`)
-        // Note: `}` is allowed in literal tokens since it's only special after `{`
+        // Parse literal tokens (anything that's not `{` or escaped braces)
+        // Note: Regular `}` is allowed in literal tokens since it's only special after `{`
         let other = any()
-            .filter(|t: &Token| *t != Token::LBrace)
+            .filter(|t: &Token| {
+                !matches!(
+                    t,
+                    Token::LBrace | Token::EscapedLBrace | Token::EscapedRBrace
+                )
+            })
             .repeated()
             .at_least(1)
             .collect()
             .map(FormatElement::Token);
 
-        // Order matters: try escaped brace first, then interpolation, then other
+        // Order matters: try escaped braces first, then interpolation, then other
         escaped_lbrace
+            .or(escaped_rbrace)
             .or(interpolation)
             .or(other)
             .repeated()
