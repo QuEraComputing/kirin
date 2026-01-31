@@ -478,6 +478,32 @@ impl GenerateHasRecursiveParser {
             }
         }
 
+        // Validate that SSAValue/ResultValue fields have at least {field} or {field:name}.
+        // These field types require a name to be parsed; only having {field:type} is insufficient.
+        for field in collected {
+            if matches!(field.kind, FieldKind::SSAValue | FieldKind::ResultValue) {
+                let has_name_occurrence = occurrences.iter().any(|o| {
+                    o.field.index == field.index
+                        && matches!(o.option, FormatOption::Default | FormatOption::Name)
+                });
+                if !has_name_occurrence {
+                    let field_name = field
+                        .ident
+                        .as_ref()
+                        .map(|i| i.to_string())
+                        .unwrap_or_else(|| format!("field at index {}", field.index));
+                    return Err(syn::Error::new(
+                        stmt.name.span(),
+                        format!(
+                            "SSA/Result field '{}' must have {{{}}} or {{{}:name}} in the format string. \
+                             Using only {{{}:type}} is not sufficient because the name cannot be inferred.",
+                            field_name, field_name, field_name, field_name
+                        ),
+                    ));
+                }
+            }
+        }
+
         Ok(occurrences)
     }
 
@@ -606,7 +632,9 @@ impl GenerateHasRecursiveParser {
             FieldKind::ResultValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
                 FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, Language>() },
-                FormatOption::Default => quote! { #crate_path::result_value::<_, Language>() },
+                FormatOption::Default => {
+                    quote! { #crate_path::result_value_with_optional_type::<_, Language>() }
+                }
             },
             FieldKind::Block => {
                 quote! { #crate_path::block::<_, Language>(language.clone()) }

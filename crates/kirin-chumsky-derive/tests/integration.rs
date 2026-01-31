@@ -231,17 +231,17 @@ pub enum BlockRegionLang {
     Id { res: ResultValue, arg: SSAValue },
 
     // Statement with a single Block field
-    // Syntax: `loop ^entry(%i: i32) { %x = id %i -> i32; } -> i64`
+    // Syntax: `%res = loop ^entry(%i: i32) { %x = id %i -> i32; }`
     // The block parses: ^label(args) { statements }
-    #[chumsky(format = "loop {body} -> {res:type}")]
+    #[chumsky(format = "{res} = loop {body}")]
     Loop {
         res: ResultValue,
         body: kirin::ir::Block,
     },
 
     // Statement with a Region field (contains multiple blocks)
-    // Syntax: `scope { ^bb0() { ... }; ^bb1() { ... }; } -> bool`
-    #[chumsky(format = "scope {body} -> {res:type}")]
+    // Syntax: `%res = scope { ^bb0() { ... }; ^bb1() { ... }; }`
+    #[chumsky(format = "{res} = scope {body}")]
     Scope {
         res: ResultValue,
         body: kirin::ir::Region,
@@ -282,13 +282,14 @@ fn parse_block_region_input(
 fn test_parse_block_empty_body() {
     // A loop with an empty block (no statements inside)
     // Block syntax: ^label(args) { }
-    let result = parse_block_region_input("loop ^entry() { } -> i32");
+    let result = parse_block_region_input("%out = loop ^entry() { }");
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
-            assert_eq!(res.ty, Some(SimpleType::I32));
+            assert_eq!(res.name.value, "out");
+            assert_eq!(res.ty, None);
             // Check block header (body is Spanned<Block>, so access .value first)
             assert_eq!(body.value.header.value.label.name.value, "entry");
             assert!(body.value.header.value.arguments.is_empty());
@@ -302,12 +303,13 @@ fn test_parse_block_empty_body() {
 #[test]
 fn test_parse_block_with_arguments() {
     // A loop with block arguments
-    let result = parse_block_region_input("loop ^bb0(%x: i32, %y: f64) { } -> bool");
+    let result = parse_block_region_input("%res: bool = loop ^bb0(%x: i32, %y: f64) { }");
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
+            assert_eq!(res.name.value, "res");
             assert_eq!(res.ty, Some(SimpleType::Bool));
             assert_eq!(body.value.header.value.label.name.value, "bb0");
             // Check arguments
@@ -330,12 +332,13 @@ fn test_parse_block_with_arguments() {
 #[test]
 fn test_parse_block_with_statements() {
     // A loop with statements inside the block
-    let result = parse_block_region_input("loop ^body(%n: i32) { %r = id %n -> i32; } -> i64");
+    let result = parse_block_region_input("%res: i64 = loop ^body(%n: i32) { %r = id %n -> i32; }");
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
+            assert_eq!(res.name.value, "res");
             assert_eq!(res.ty, Some(SimpleType::I64));
             assert_eq!(body.value.header.value.label.name.value, "body");
             assert_eq!(body.value.header.value.arguments.len(), 1);
@@ -359,13 +362,14 @@ fn test_parse_block_with_statements() {
 fn test_parse_block_with_multiple_statements() {
     // A block with multiple statements
     let result = parse_block_region_input(
-        "loop ^main(%a: i32) { %b = id %a -> i32; %c = id %b -> f32; } -> unit",
+        "%res: unit = loop ^main(%a: i32) { %b = id %a -> i32; %c = id %b -> f32; }",
     );
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
+            assert_eq!(res.name.value, "res");
             assert_eq!(res.ty, Some(SimpleType::Unit));
             assert_eq!(body.value.statements.len(), 2);
 
@@ -396,12 +400,13 @@ fn test_parse_block_with_multiple_statements() {
 #[test]
 fn test_parse_region_empty() {
     // A scope with an empty region (no blocks)
-    let result = parse_block_region_input("scope { } -> i32");
+    let result = parse_block_region_input("%out: i32 = scope { }");
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::I32));
             assert!(body.blocks.is_empty());
         }
@@ -412,12 +417,13 @@ fn test_parse_region_empty() {
 #[test]
 fn test_parse_region_single_block() {
     // A scope with one block inside the region
-    let result = parse_block_region_input("scope { ^entry() { }; } -> f32");
+    let result = parse_block_region_input("%out: f32 = scope { ^entry() { }; }");
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::F32));
             assert_eq!(body.blocks.len(), 1);
             assert_eq!(body.blocks[0].value.header.value.label.name.value, "entry");
@@ -429,13 +435,15 @@ fn test_parse_region_single_block() {
 #[test]
 fn test_parse_region_multiple_blocks() {
     // A scope with multiple blocks
-    let result =
-        parse_block_region_input("scope { ^bb0(%x: i32) { }; ^bb1() { }; ^exit() { }; } -> bool");
+    let result = parse_block_region_input(
+        "%out: bool = scope { ^bb0(%x: i32) { }; ^bb1() { }; ^exit() { }; }",
+    );
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::Bool));
             assert_eq!(body.blocks.len(), 3);
 
@@ -465,13 +473,14 @@ fn test_parse_region_multiple_blocks() {
 fn test_parse_region_with_statements_in_blocks() {
     // A region with blocks containing statements
     let result = parse_block_region_input(
-        "scope { ^bb0(%a: i32) { %b = id %a -> i64; }; ^bb1() { %c = id %b -> f32; }; } -> unit",
+        "%out: unit = scope { ^bb0(%a: i32) { %b = id %a -> i64; }; ^bb1() { %c = id %b -> f32; }; }",
     );
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::Unit));
             assert_eq!(body.blocks.len(), 2);
 
@@ -502,12 +511,13 @@ fn test_parse_region_with_statements_in_blocks() {
 #[test]
 fn test_parse_region_without_trailing_semicolon() {
     // Region blocks can optionally omit trailing semicolon on last block
-    let result = parse_block_region_input("scope { ^only() { } } -> i32");
+    let result = parse_block_region_input("%out: i32 = scope { ^only() { } }");
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::I32));
             assert_eq!(body.blocks.len(), 1);
             assert_eq!(body.blocks[0].value.header.value.label.name.value, "only");
@@ -521,7 +531,7 @@ fn test_parse_region_without_trailing_semicolon() {
 #[test]
 fn test_parse_block_missing_label() {
     // Block requires a label like ^name
-    let result = parse_block_region_input("loop () { } -> i32");
+    let result = parse_block_region_input("%out = loop () { }");
     assert!(
         result.is_err(),
         "Expected parse to fail for missing block label"
@@ -531,7 +541,7 @@ fn test_parse_block_missing_label() {
 #[test]
 fn test_parse_block_missing_braces() {
     // Block requires { } around statements
-    let result = parse_block_region_input("loop ^bb0() -> i32");
+    let result = parse_block_region_input("%out = loop ^bb0()");
     assert!(result.is_err(), "Expected parse to fail for missing braces");
 }
 
@@ -993,13 +1003,15 @@ fn test_parse_compile_time_value_different() {
 #[test]
 fn test_parse_nested_loop_in_scope() {
     // A scope containing a block with a loop statement inside
-    let result =
-        parse_block_region_input("scope { ^bb0() { loop ^inner() { } -> i32; }; } -> unit");
+    let result = parse_block_region_input(
+        "%out: unit = scope { ^bb0() { %inner_res: i32 = loop ^inner() { }; }; }",
+    );
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::Unit));
             assert_eq!(body.blocks.len(), 1);
             assert_eq!(body.blocks[0].value.header.value.label.name.value, "bb0");
@@ -1008,6 +1020,7 @@ fn test_parse_nested_loop_in_scope() {
             assert_eq!(body.blocks[0].value.statements.len(), 1);
             match &body.blocks[0].value.statements[0].value {
                 BlockRegionLangAST::Loop { res, body } => {
+                    assert_eq!(res.name.value, "inner_res");
                     assert_eq!(res.ty, Some(SimpleType::I32));
                     assert_eq!(body.value.header.value.label.name.value, "inner");
                 }
@@ -1021,13 +1034,15 @@ fn test_parse_nested_loop_in_scope() {
 #[test]
 fn test_parse_nested_scope_in_loop() {
     // A loop containing a scope statement inside its block
-    let result =
-        parse_block_region_input("loop ^outer() { scope { ^inner() { } } -> i32; } -> unit");
+    let result = parse_block_region_input(
+        "%out: unit = loop ^outer() { %inner_res: i32 = scope { ^inner() { } }; }",
+    );
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::Unit));
             assert_eq!(body.value.header.value.label.name.value, "outer");
 
@@ -1035,6 +1050,7 @@ fn test_parse_nested_scope_in_loop() {
             assert_eq!(body.value.statements.len(), 1);
             match &body.value.statements[0].value {
                 BlockRegionLangAST::Scope { res, body } => {
+                    assert_eq!(res.name.value, "inner_res");
                     assert_eq!(res.ty, Some(SimpleType::I32));
                     assert_eq!(body.blocks.len(), 1);
                     assert_eq!(body.blocks[0].value.header.value.label.name.value, "inner");
@@ -1050,13 +1066,14 @@ fn test_parse_nested_scope_in_loop() {
 fn test_parse_deeply_nested_structure() {
     // scope -> block -> loop -> block -> scope -> block
     let result = parse_block_region_input(
-        "scope { ^bb0() { loop ^loop0() { scope { ^bb1() { } } -> bool; } -> i64; }; } -> unit",
+        "%out: unit = scope { ^bb0() { %loop_res: i64 = loop ^loop0() { %scope_res: bool = scope { ^bb1() { } }; }; }; }",
     );
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::Unit));
 
             // First level: bb0
@@ -1067,6 +1084,7 @@ fn test_parse_deeply_nested_structure() {
             // Second level: loop -> loop0
             match &bb0.statements[0].value {
                 BlockRegionLangAST::Loop { res, body } => {
+                    assert_eq!(res.name.value, "loop_res");
                     assert_eq!(res.ty, Some(SimpleType::I64));
                     assert_eq!(body.value.header.value.label.name.value, "loop0");
                     assert_eq!(body.value.statements.len(), 1);
@@ -1074,6 +1092,7 @@ fn test_parse_deeply_nested_structure() {
                     // Third level: scope -> bb1
                     match &body.value.statements[0].value {
                         BlockRegionLangAST::Scope { res, body } => {
+                            assert_eq!(res.name.value, "scope_res");
                             assert_eq!(res.ty, Some(SimpleType::Bool));
                             assert_eq!(body.blocks.len(), 1);
                             assert_eq!(body.blocks[0].value.header.value.label.name.value, "bb1");
@@ -1096,13 +1115,15 @@ fn test_parse_deeply_nested_structure() {
 fn test_parse_block_argument_with_all_types() {
     // Test block arguments with various type lattice values
     let result = parse_block_region_input(
-        "loop ^bb0(%a: i32, %b: i64, %c: f32, %d: f64, %e: bool, %f: unit) { } -> i32",
+        "%out: i32 = loop ^bb0(%a: i32, %b: i64, %c: f32, %d: f64, %e: bool, %f: unit) { }",
     );
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let ast = result.unwrap();
     match ast {
-        BlockRegionLangAST::Loop { body, .. } => {
+        BlockRegionLangAST::Loop { res, body } => {
+            assert_eq!(res.name.value, "out");
+            assert_eq!(res.ty, Some(SimpleType::I32));
             let args = &body.value.header.value.arguments;
             assert_eq!(args.len(), 6);
             assert_eq!(args[0].value.ty.value, SimpleType::I32);

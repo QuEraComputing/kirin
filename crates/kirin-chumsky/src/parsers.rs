@@ -109,9 +109,12 @@ where
         .labelled("SSA value with type")
 }
 
-/// Parses a result value (left-hand side of assignment).
+/// Parses a result value (left-hand side of assignment) without type annotation.
 ///
 /// Matches: `%result`
+///
+/// For parsing result values with optional type annotations, use
+/// [`result_value_with_optional_type`].
 pub fn result_value<'tokens, 'src: 'tokens, I, L>()
 -> impl Parser<'tokens, I, ResultValue<'tokens, 'src, L>, ParserError<'tokens, 'src>>
 where
@@ -120,6 +123,30 @@ where
 {
     ssa_name()
         .map(|name| ResultValue { name, ty: None })
+        .labelled("result value")
+}
+
+/// Parses a result value with optional type annotation.
+///
+/// Matches:
+/// - `%result` (without type)
+/// - `%result: type` (with type)
+///
+/// This is the parser used by format strings with `{result}` (Default option)
+/// for ResultValue fields, allowing users to optionally annotate result types.
+pub fn result_value_with_optional_type<'tokens, 'src: 'tokens, I, L>()
+-> impl Parser<'tokens, I, ResultValue<'tokens, 'src, L>, ParserError<'tokens, 'src>>
+where
+    I: TokenInput<'tokens, 'src>,
+    L: LanguageParser<'tokens, 'src> + 'tokens,
+{
+    ssa_name()
+        .then(
+            just(Token::Colon)
+                .ignore_then(L::TypeLattice::parser())
+                .or_not(),
+        )
+        .map(|(name, ty)| ResultValue { name, ty })
         .labelled("result value")
 }
 
