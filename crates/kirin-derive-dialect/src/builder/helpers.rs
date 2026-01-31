@@ -1,7 +1,7 @@
 use crate::builder::statement::{FieldInfo, FieldKind, StatementInfo};
 use kirin_derive_core_2::derive::InputContext;
-use kirin_derive_core_2::ir::fields::Collection;
 use kirin_derive_core_2::ir::BuilderOptions;
+use kirin_derive_core_2::ir::fields::Collection;
 use kirin_derive_core_2::misc::{is_type, to_snake_case};
 use kirin_derive_core_2::prelude::*;
 use quote::{format_ident, quote};
@@ -14,7 +14,10 @@ enum FieldStyle {
     Unit,
 }
 
-pub(crate) fn build_fn_name(is_enum: bool, statement: &ir::Statement<StandardLayout>) -> syn::Ident {
+pub(crate) fn build_fn_name(
+    is_enum: bool,
+    statement: &ir::Statement<StandardLayout>,
+) -> syn::Ident {
     let default_name = if is_enum {
         format_ident!(
             "op_{}",
@@ -143,10 +146,12 @@ fn result_names(info: &StatementInfo) -> Vec<syn::Ident> {
         .collect();
     if results.len() == 1 {
         let field = results[0];
-        return vec![field
-            .ident
-            .clone()
-            .unwrap_or_else(|| format_ident!("result", span = info.name.span()))];
+        return vec![
+            field
+                .ident
+                .clone()
+                .unwrap_or_else(|| format_ident!("result", span = info.name.span())),
+        ];
     }
 
     results
@@ -257,9 +262,10 @@ fn let_name_eq_result_value(
             continue;
         }
 
-        let name = result_name_map.get(&field.index).cloned().unwrap_or_else(|| {
-            format_ident!("result", span = info.name.span())
-        });
+        let name = result_name_map
+            .get(&field.index)
+            .cloned()
+            .unwrap_or_else(|| format_ident!("result", span = info.name.span()));
         let index = result_index;
         result_index += 1;
         results.push(quote! {
@@ -339,8 +345,7 @@ pub(crate) fn struct_build_fn(
     info: &StatementInfo,
     crate_path: &syn::Path,
 ) -> proc_macro2::TokenStream {
-    build_fn_for_statement(info, input, crate_path, false)
-        .unwrap_or_else(|err| err.write_errors())
+    build_fn_for_statement(info, input, crate_path, false).unwrap_or_else(|err| err.write_errors())
 }
 
 pub(crate) fn enum_build_fn<F>(

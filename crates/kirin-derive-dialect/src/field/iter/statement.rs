@@ -1,8 +1,8 @@
 use crate::field::iter::context::{DeriveFieldIter, FieldIterKind};
-use crate::field::iter::helpers::{field_name_tokens, FieldInputBuilder};
+use crate::field::iter::helpers::{FieldInputBuilder, field_name_tokens};
 use kirin_derive_core_2::prelude::*;
 use kirin_derive_core_2::tokens::{FieldPatternTokens, WrapperCallTokens, WrapperIterTypeTokens};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 
 pub(crate) struct StatementBuilder<'a> {
     ctx: &'a DeriveFieldIter,
@@ -23,8 +23,7 @@ impl<'a> StatementBuilder<'a> {
             return FieldPatternTokens::new(false, Vec::new());
         }
         let named = fields.iter().any(|field| field.ident.is_some());
-        let names: Vec<proc_macro2::TokenStream> =
-            fields.iter().map(field_name_tokens).collect();
+        let names: Vec<proc_macro2::TokenStream> = fields.iter().map(field_name_tokens).collect();
         FieldPatternTokens::new(named, names)
     }
 
@@ -128,10 +127,7 @@ impl<'a> StatementBuilder<'a> {
         }
     }
 
-    fn all_fields(
-        &self,
-        statement: &ir::Statement<StandardLayout>,
-    ) -> Vec<ir::fields::FieldIndex> {
+    fn all_fields(&self, statement: &ir::Statement<StandardLayout>) -> Vec<ir::fields::FieldIndex> {
         let mut fields = Vec::new();
         if let Some(wrapper) = &statement.wraps {
             fields.push(wrapper.field.clone());

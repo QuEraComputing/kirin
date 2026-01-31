@@ -40,8 +40,7 @@ impl<'ir> Scan<'ir, StandardLayout> for DeriveFieldIter {
             inner_type,
             is_wrapper,
         };
-        self.statements
-            .insert(statement.name.to_string(), info);
+        self.statements.insert(statement.name.to_string(), info);
         Ok(())
     }
 }

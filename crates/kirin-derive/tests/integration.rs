@@ -27,7 +27,7 @@ fn test_dialect_properties() {
     let v1 = val(1);
     let v2 = val(2);
     let res = res_val(3);
-    
+
     let add = MyLang::Add(v1, v2, res);
     assert!(add.is_pure());
     assert!(!add.is_terminator());

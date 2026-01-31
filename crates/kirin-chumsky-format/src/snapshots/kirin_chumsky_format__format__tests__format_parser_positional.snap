@@ -1,0 +1,47 @@
+---
+source: crates/kirin-chumsky-format/src/format.rs
+expression: format
+---
+Format {
+    elements: [
+        Field(
+            "0",
+            Name,
+        ),
+        Token(
+            [
+                Equal,
+                Identifier(
+                    "add",
+                ),
+            ],
+        ),
+        Field(
+            "1",
+            Default,
+        ),
+        Token(
+            [
+                Comma,
+            ],
+        ),
+        Field(
+            "2",
+            Default,
+        ),
+        Token(
+            [
+                Arrow,
+            ],
+        ),
+        Field(
+            "0",
+            Type,
+        ),
+    ],
+    fields: {
+        "0": 0,
+        "1": 1,
+        "2": 2,
+    },
+}

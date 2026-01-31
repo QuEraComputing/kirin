@@ -20,6 +20,9 @@ members = [
     "crates/kirin-lexer",
     "crates/kirin-derive-core-2",
     "crates/kirin-derive-dialect",
+    "crates/kirin-chumsky",
+    "crates/kirin-chumsky-format",
+    "crates/kirin-chumsky-derive",
 ]
 
 [features]

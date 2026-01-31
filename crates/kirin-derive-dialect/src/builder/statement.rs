@@ -19,12 +19,25 @@ pub(crate) struct FieldInfo {
 
 #[derive(Clone, Debug)]
 pub(crate) enum FieldKind {
-    Wrapper { ty: syn::Type },
-    Argument { collection: Collection },
-    Result { collection: Collection, ssa_ty: syn::Expr },
-    Block { collection: Collection },
-    Successor { collection: Collection },
-    Region { collection: Collection },
+    Wrapper {
+        ty: syn::Type,
+    },
+    Argument {
+        collection: Collection,
+    },
+    Result {
+        collection: Collection,
+        ssa_ty: syn::Expr,
+    },
+    Block {
+        collection: Collection,
+    },
+    Successor {
+        collection: Collection,
+    },
+    Region {
+        collection: Collection,
+    },
     Value {
         ty: syn::Type,
         into: bool,

@@ -30,8 +30,7 @@ impl<'ir> Scan<'ir, StandardLayout> for DeriveProperty {
             value_expr,
             is_wrapper: statement.wraps.is_some(),
         };
-        self.statements
-            .insert(statement.name.to_string(), info);
+        self.statements.insert(statement.name.to_string(), info);
         Ok(())
     }
 }

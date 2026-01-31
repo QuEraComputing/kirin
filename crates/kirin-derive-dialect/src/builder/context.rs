@@ -54,8 +54,6 @@ impl DeriveBuilder {
     }
 
     pub(crate) fn full_crate_path(&self, input: &InputContext) -> syn::Path {
-        input
-            .builder(&self.default_crate_path)
-            .full_crate_path()
+        input.builder(&self.default_crate_path).full_crate_path()
     }
 }

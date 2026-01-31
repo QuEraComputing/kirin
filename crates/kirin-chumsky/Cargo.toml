@@ -1,0 +1,22 @@
+[package]
+name = "kirin-chumsky"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chumsky = "0.10"
+kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
+kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
+
+[features]
+default = []
+derive = ["kirin-chumsky-derive"]
+
+[dependencies.kirin-chumsky-derive]
+version = "0.1.0"
+path = "../kirin-chumsky-derive"
+optional = true
+
+[dev-dependencies]
+insta = "1.42"
+kirin-derive = { path = "../kirin-derive" }

@@ -76,10 +76,11 @@ where
 
 /// check if the type `ty` is a generic type containing `name` as one of its generic arguments
 /// for which the predicate `f` on the generic type's last path segment holds
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
+/// use kirin_derive_core_2::misc::is_type_in;
 /// let expr = syn::parse_str::<syn::Type>("Result<String, i32>").unwrap();
 /// assert!(is_type_in(&expr, "String", |seg| seg.ident == "Result"));
 /// ```

@@ -1,11 +1,12 @@
-use kirin_derive_core_2::{ir::{self, Layout}, prelude::*, tokens::TraitAssocTypeImplTokens};
+use kirin_derive_core_2::{
+    ir::{self, Layout},
+    prelude::*,
+    tokens::TraitAssocTypeImplTokens,
+};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 
-pub fn derive_marker<L: Layout>(
-    input: &ir::Input<L>,
-    trait_path: &syn::Path,
-) -> TokenStream {
+pub fn derive_marker<L: Layout>(input: &ir::Input<L>, trait_path: &syn::Path) -> TokenStream {
     let type_lattice = &input.attrs.type_lattice;
     TraitAssocTypeImplTokens::builder()
         .generics(&input.generics)

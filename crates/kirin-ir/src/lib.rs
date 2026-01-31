@@ -17,9 +17,8 @@ pub use context::Context;
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasRegions,
-    HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure,
-    IsTerminator,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasRegions, HasRegionsMut,
+    HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsTerminator,
 };
 pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{
