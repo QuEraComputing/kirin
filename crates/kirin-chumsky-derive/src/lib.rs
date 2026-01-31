@@ -67,7 +67,9 @@ pub fn derive_has_recursive_parser(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
     let ir_input =
-        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(&ast) {
+        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(
+            &ast,
+        ) {
             Ok(ir) => ir,
             Err(err) => return err.write_errors().into(),
         };
@@ -106,7 +108,9 @@ pub fn derive_with_abstract_syntax_tree(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
     let ir_input =
-        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(&ast) {
+        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(
+            &ast,
+        ) {
             Ok(ir) => ir,
             Err(err) => return err.write_errors().into(),
         };
@@ -134,7 +138,9 @@ pub fn derive_dialect_parser(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
     let ir_input =
-        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(&ast) {
+        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(
+            &ast,
+        ) {
             Ok(ir) => ir,
             Err(err) => return err.write_errors().into(),
         };

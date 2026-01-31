@@ -37,10 +37,7 @@ impl GenerateHasRecursiveParser {
     }
 
     /// Generates the `HasRecursiveParser` implementation.
-    pub fn generate(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-    ) -> TokenStream {
+    pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let ast_generics = self.build_ast_generics(ir_input);
         let crate_path = &self.crate_path;
@@ -83,7 +80,9 @@ impl GenerateHasRecursiveParser {
         let combined_where = match (where_clause, impl_where_clause) {
             (Some(orig), Some(impl_wc)) => {
                 let mut combined = orig.clone();
-                combined.predicates.extend(impl_wc.predicates.iter().cloned());
+                combined
+                    .predicates
+                    .extend(impl_wc.predicates.iter().cloned());
                 Some(combined)
             }
             (Some(wc), None) | (None, Some(wc)) => Some(wc.clone()),
@@ -462,10 +461,11 @@ impl GenerateHasRecursiveParser {
                 let field = collected.iter().find(|f| f.index == index).ok_or_else(|| {
                     syn::Error::new(stmt.name.span(), format!("field index {} not found", index))
                 })?;
-                
+
                 // Validate that :name and :type options are only used on SSA/Result fields
                 if matches!(opt, FormatOption::Name | FormatOption::Type) {
-                    let is_ssa_like = matches!(field.kind, FieldKind::SSAValue | FieldKind::ResultValue);
+                    let is_ssa_like =
+                        matches!(field.kind, FieldKind::SSAValue | FieldKind::ResultValue);
                     if !is_ssa_like {
                         let field_name = field
                             .ident
@@ -494,7 +494,7 @@ impl GenerateHasRecursiveParser {
                         ));
                     }
                 }
-                
+
                 // Check for duplicate default occurrences
                 if matches!(opt, FormatOption::Default) {
                     let existing_default = occurrences.iter().any(|o: &FieldOccurrence<'_>| {
@@ -517,7 +517,7 @@ impl GenerateHasRecursiveParser {
                         ));
                     }
                 }
-                
+
                 // Generate unique variable name based on field and option
                 let var_name = match opt {
                     FormatOption::Name => {
@@ -789,7 +789,11 @@ impl GenerateHasRecursiveParser {
                 // build_field_occurrences, so this case is unreachable in practice.
                 unreachable!(
                     "field '{}' not in format string - this should have been caught earlier",
-                    field.ident.as_ref().map(|i| i.to_string()).unwrap_or_else(|| format!("index {}", field.index))
+                    field
+                        .ident
+                        .as_ref()
+                        .map(|i| i.to_string())
+                        .unwrap_or_else(|| format!("index {}", field.index))
                 )
             }
             Some(occs) if occs.len() == 1 => {

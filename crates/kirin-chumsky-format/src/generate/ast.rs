@@ -23,10 +23,7 @@ impl GenerateWithAbstractSyntaxTree {
     }
 
     /// Generates the AST type and `WithAbstractSyntaxTree` implementation.
-    pub fn generate(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-    ) -> TokenStream {
+    pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let ast_generics = self.build_ast_generics(ir_input);
 

@@ -2,9 +2,11 @@
 
 use chumsky::input::Stream;
 use chumsky::prelude::*;
-use kirin::ir::{Dialect, FiniteLattice, Lattice, ResultValue, SSAValue, TypeLattice};
+use kirin::ir::{Dialect, FiniteLattice, Lattice, ResultValue, SSAValue, Successor, TypeLattice};
 use kirin_chumsky::{BoxedParser, HasParser, TokenInput};
-use kirin_chumsky_derive::{HasRecursiveParser as DeriveRecursiveParser, WithAbstractSyntaxTree};
+use kirin_chumsky_derive::{
+    DialectParser, HasRecursiveParser as DeriveRecursiveParser, WithAbstractSyntaxTree,
+};
 use kirin_lexer::{Logos, Token};
 
 // === Simple Type Lattice ===
@@ -533,3 +535,609 @@ fn test_parse_block_missing_braces() {
     assert!(result.is_err(), "Expected parse to fail for missing braces");
 }
 
+// ============================================================================
+// Tests for Successor fields
+// ============================================================================
+
+/// A language that includes control flow operations with Successor fields.
+#[derive(Debug, Clone, PartialEq, Dialect, DeriveRecursiveParser, WithAbstractSyntaxTree)]
+#[kirin(type_lattice = SimpleType)]
+#[chumsky(crate = kirin_chumsky)]
+pub enum ControlFlowLang {
+    #[chumsky(format = "{res:name} = id {arg} -> {res:type}")]
+    Id { res: ResultValue, arg: SSAValue },
+    #[chumsky(format = "br {target}")]
+    Branch { target: Successor },
+    #[chumsky(format = "cond_br {cond} then = {true_target} else = {false_target}")]
+    CondBranch {
+        cond: SSAValue,
+        true_target: Successor,
+        false_target: Successor,
+    },
+}
+
+fn parse_control_flow_input(
+    input: &str,
+) -> Result<ControlFlowLangAST<'_, '_, ControlFlowLang>, Vec<String>> {
+    let tokens: Vec<_> = Token::lexer(input)
+        .spanned()
+        .map(|(tok, span)| {
+            let token = tok.unwrap_or(Token::Error);
+            (token, chumsky::span::SimpleSpan::from(span))
+        })
+        .collect();
+
+    let stream = Stream::from_iter(tokens).map((0..input.len()).into(), |(t, s): (_, _)| (t, s));
+    let parser = <ControlFlowLang as HasParser<'_, '_>>::parser();
+    let result = parser.parse(stream);
+
+    if result.has_output() {
+        Ok(result.into_output().unwrap())
+    } else {
+        Err(result.errors().map(|e| format!("{:?}", e)).collect())
+    }
+}
+
+#[test]
+fn test_parse_successor_branch() {
+    let result = parse_control_flow_input("br ^exit");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        ControlFlowLangAST::Branch { target } => {
+            assert_eq!(target.name.value, "exit");
+        }
+        _ => panic!("Expected Branch variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_successor_cond_branch() {
+    let result = parse_control_flow_input("cond_br %flag then = ^bb1 else = ^bb2");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        ControlFlowLangAST::CondBranch {
+            cond,
+            true_target,
+            false_target,
+        } => {
+            assert_eq!(cond.name.value, "flag");
+            assert_eq!(true_target.name.value, "bb1");
+            assert_eq!(false_target.name.value, "bb2");
+        }
+        _ => panic!("Expected CondBranch variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_successor_numeric_label() {
+    let result = parse_control_flow_input("br ^0");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        ControlFlowLangAST::Branch { target } => {
+            assert_eq!(target.name.value, "0");
+        }
+        _ => panic!("Expected Branch variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_successor_missing_caret() {
+    // Successor requires a block label starting with ^
+    let result = parse_control_flow_input("br exit");
+    assert!(
+        result.is_err(),
+        "Expected parse to fail for missing ^ in block label"
+    );
+}
+
+// ============================================================================
+// Tests for struct-based dialects
+// ============================================================================
+
+// Note: Struct-based dialects are not tested here because the Dialect derive
+// macro for structs requires additional trait implementations that aren't
+// auto-generated the same way as for enums. This is a known limitation.
+
+// ============================================================================
+// Tests for DialectParser combined derive
+// ============================================================================
+
+/// A dialect using the combined DialectParser derive macro.
+#[derive(Debug, Clone, PartialEq, Dialect, DialectParser)]
+#[kirin(type_lattice = SimpleType)]
+#[chumsky(crate = kirin_chumsky)]
+pub enum CombinedLang {
+    #[chumsky(format = "{res:name} = inc {arg} -> {res:type}")]
+    Inc { res: ResultValue, arg: SSAValue },
+    #[chumsky(format = "{res:name} = dec {arg} -> {res:type}")]
+    Dec { res: ResultValue, arg: SSAValue },
+}
+
+fn parse_combined_lang_input(
+    input: &str,
+) -> Result<CombinedLangAST<'_, '_, CombinedLang>, Vec<String>> {
+    let tokens: Vec<_> = Token::lexer(input)
+        .spanned()
+        .map(|(tok, span)| {
+            let token = tok.unwrap_or(Token::Error);
+            (token, chumsky::span::SimpleSpan::from(span))
+        })
+        .collect();
+
+    let stream = Stream::from_iter(tokens).map((0..input.len()).into(), |(t, s): (_, _)| (t, s));
+    let parser = <CombinedLang as HasParser<'_, '_>>::parser();
+    let result = parser.parse(stream);
+
+    if result.has_output() {
+        Ok(result.into_output().unwrap())
+    } else {
+        Err(result.errors().map(|e| format!("{:?}", e)).collect())
+    }
+}
+
+#[test]
+fn test_parse_combined_derive_inc() {
+    let result = parse_combined_lang_input("%r = inc %x -> i32");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        CombinedLangAST::Inc { res, arg } => {
+            assert_eq!(res.name.value, "r");
+            assert_eq!(res.ty, Some(SimpleType::I32));
+            assert_eq!(arg.name.value, "x");
+        }
+        _ => panic!("Expected Inc variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_combined_derive_dec() {
+    // Second variant using combined DialectParser derive
+    let result = parse_combined_lang_input("%y = dec %z -> f64");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        CombinedLangAST::Dec { res, arg } => {
+            assert_eq!(res.name.value, "y");
+            assert_eq!(res.ty, Some(SimpleType::F64));
+            assert_eq!(arg.name.value, "z");
+        }
+        _ => panic!("Expected Dec variant, got {:?}", ast),
+    }
+}
+
+// ============================================================================
+// Tests for SSAValue default format with inline type
+// ============================================================================
+
+#[test]
+fn test_parse_ssa_default_with_type() {
+    // SSAValue default format parses optional type: %x: i32
+    let result = parse_input("return %x: i32");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        TestLangAST::Return(ssa) => {
+            assert_eq!(ssa.name.value, "x");
+            assert_eq!(ssa.ty, Some(SimpleType::I32));
+        }
+        _ => panic!("Expected Return variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_ssa_default_without_type() {
+    // SSAValue default format with no type annotation
+    let result = parse_input("return %x");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        TestLangAST::Return(ssa) => {
+            assert_eq!(ssa.name.value, "x");
+            assert!(ssa.ty.is_none());
+        }
+        _ => panic!("Expected Return variant, got {:?}", ast),
+    }
+}
+
+// ============================================================================
+// Tests for multiple positional tuple fields
+// ============================================================================
+
+/// A dialect with tuple variants using multiple positional fields.
+#[derive(Debug, Clone, PartialEq, Dialect, DeriveRecursiveParser, WithAbstractSyntaxTree)]
+#[kirin(type_lattice = SimpleType)]
+#[chumsky(crate = kirin_chumsky)]
+pub enum TupleLang {
+    #[chumsky(format = "swap {0} {1}")]
+    Swap(SSAValue, SSAValue),
+    // Use named fields for more complex operations to avoid tuple ordering issues
+    #[chumsky(format = "{res:name} = sel {cond} {left} {right} -> {res:type}")]
+    Select {
+        res: ResultValue,
+        cond: SSAValue,
+        left: SSAValue,
+        right: SSAValue,
+    },
+}
+
+fn parse_tuple_lang_input(input: &str) -> Result<TupleLangAST<'_, '_, TupleLang>, Vec<String>> {
+    let tokens: Vec<_> = Token::lexer(input)
+        .spanned()
+        .map(|(tok, span)| {
+            let token = tok.unwrap_or(Token::Error);
+            (token, chumsky::span::SimpleSpan::from(span))
+        })
+        .collect();
+
+    let stream = Stream::from_iter(tokens).map((0..input.len()).into(), |(t, s): (_, _)| (t, s));
+    let parser = <TupleLang as HasParser<'_, '_>>::parser();
+    let result = parser.parse(stream);
+
+    if result.has_output() {
+        Ok(result.into_output().unwrap())
+    } else {
+        Err(result.errors().map(|e| format!("{:?}", e)).collect())
+    }
+}
+
+#[test]
+fn test_parse_tuple_two_positional() {
+    let result = parse_tuple_lang_input("swap %a %b");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        TupleLangAST::Swap(first, second) => {
+            assert_eq!(first.name.value, "a");
+            assert_eq!(second.name.value, "b");
+        }
+        _ => panic!("Expected Swap variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_named_fields_four_fields() {
+    let result = parse_tuple_lang_input("%out = sel %cond %left %right -> i32");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        TupleLangAST::Select {
+            res,
+            cond,
+            left,
+            right,
+        } => {
+            assert_eq!(res.name.value, "out");
+            assert_eq!(res.ty, Some(SimpleType::I32));
+            assert_eq!(cond.name.value, "cond");
+            assert_eq!(left.name.value, "left");
+            assert_eq!(right.name.value, "right");
+        }
+        _ => panic!("Expected Select variant, got {:?}", ast),
+    }
+}
+
+// ============================================================================
+// Tests for ResultValue :name only (no :type)
+// ============================================================================
+
+/// A dialect where some operations don't have a result type in the syntax.
+#[derive(Debug, Clone, PartialEq, Dialect, DeriveRecursiveParser, WithAbstractSyntaxTree)]
+#[kirin(type_lattice = SimpleType)]
+#[chumsky(crate = kirin_chumsky)]
+pub enum UnaryLang {
+    // Result type not in syntax - inferred later
+    #[chumsky(format = "{res:name} = neg {arg}")]
+    Neg { res: ResultValue, arg: SSAValue },
+    // Result type explicitly in syntax
+    #[chumsky(format = "{res:name} = abs {arg} -> {res:type}")]
+    Abs { res: ResultValue, arg: SSAValue },
+}
+
+fn parse_unary_lang_input(input: &str) -> Result<UnaryLangAST<'_, '_, UnaryLang>, Vec<String>> {
+    let tokens: Vec<_> = Token::lexer(input)
+        .spanned()
+        .map(|(tok, span)| {
+            let token = tok.unwrap_or(Token::Error);
+            (token, chumsky::span::SimpleSpan::from(span))
+        })
+        .collect();
+
+    let stream = Stream::from_iter(tokens).map((0..input.len()).into(), |(t, s): (_, _)| (t, s));
+    let parser = <UnaryLang as HasParser<'_, '_>>::parser();
+    let result = parser.parse(stream);
+
+    if result.has_output() {
+        Ok(result.into_output().unwrap())
+    } else {
+        Err(result.errors().map(|e| format!("{:?}", e)).collect())
+    }
+}
+
+#[test]
+fn test_parse_result_name_only() {
+    let result = parse_unary_lang_input("%x = neg %y");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        UnaryLangAST::Neg { res, arg } => {
+            assert_eq!(res.name.value, "x");
+            assert!(res.ty.is_none(), "Expected ty to be None for :name only");
+            assert_eq!(arg.name.value, "y");
+        }
+        _ => panic!("Expected Neg variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_result_name_and_type() {
+    let result = parse_unary_lang_input("%x = abs %y -> i32");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        UnaryLangAST::Abs { res, arg } => {
+            assert_eq!(res.name.value, "x");
+            assert_eq!(res.ty, Some(SimpleType::I32));
+            assert_eq!(arg.name.value, "y");
+        }
+        _ => panic!("Expected Abs variant, got {:?}", ast),
+    }
+}
+
+// ============================================================================
+// Tests for compile-time value fields (non-IR types with HasParser)
+// ============================================================================
+
+/// A custom compile-time value type that parses any identifier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Opcode(pub String);
+
+impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Opcode {
+    type Output = Opcode;
+
+    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: TokenInput<'tokens, 'src>,
+    {
+        select! {
+            Token::Identifier(name) => Opcode(name.to_string())
+        }
+        .labelled("opcode")
+        .boxed()
+    }
+}
+
+/// A dialect that uses a compile-time value field.
+#[derive(Debug, Clone, PartialEq, Dialect, DeriveRecursiveParser, WithAbstractSyntaxTree)]
+#[kirin(type_lattice = SimpleType)]
+#[chumsky(crate = kirin_chumsky)]
+pub enum ValueLang {
+    #[chumsky(format = "{res:name} = apply {op} {arg} -> {res:type}")]
+    Apply {
+        res: ResultValue,
+        op: Opcode,
+        arg: SSAValue,
+    },
+}
+
+fn parse_value_lang_input(input: &str) -> Result<ValueLangAST<'_, '_, ValueLang>, Vec<String>> {
+    let tokens: Vec<_> = Token::lexer(input)
+        .spanned()
+        .map(|(tok, span)| {
+            let token = tok.unwrap_or(Token::Error);
+            (token, chumsky::span::SimpleSpan::from(span))
+        })
+        .collect();
+
+    let stream = Stream::from_iter(tokens).map((0..input.len()).into(), |(t, s): (_, _)| (t, s));
+    let parser = <ValueLang as HasParser<'_, '_>>::parser();
+    let result = parser.parse(stream);
+
+    if result.has_output() {
+        Ok(result.into_output().unwrap())
+    } else {
+        Err(result.errors().map(|e| format!("{:?}", e)).collect())
+    }
+}
+
+#[test]
+fn test_parse_compile_time_value() {
+    let result = parse_value_lang_input("%r = apply custom_op %x -> i32");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        ValueLangAST::Apply { res, op, arg } => {
+            assert_eq!(res.name.value, "r");
+            assert_eq!(res.ty, Some(SimpleType::I32));
+            assert_eq!(op, Opcode("custom_op".to_string()));
+            assert_eq!(arg.name.value, "x");
+        }
+    }
+}
+
+#[test]
+fn test_parse_compile_time_value_different() {
+    let result = parse_value_lang_input("%r = apply another %x -> f32");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        ValueLangAST::Apply { res, op, arg } => {
+            assert_eq!(res.name.value, "r");
+            assert_eq!(res.ty, Some(SimpleType::F32));
+            assert_eq!(op, Opcode("another".to_string()));
+            assert_eq!(arg.name.value, "x");
+        }
+    }
+}
+
+// ============================================================================
+// Tests for deep recursive nesting
+// ============================================================================
+
+#[test]
+fn test_parse_nested_loop_in_scope() {
+    // A scope containing a block with a loop statement inside
+    let result =
+        parse_block_region_input("scope { ^bb0() { loop ^inner() { } -> i32; }; } -> unit");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.ty, Some(SimpleType::Unit));
+            assert_eq!(body.blocks.len(), 1);
+            assert_eq!(body.blocks[0].value.header.value.label.name.value, "bb0");
+
+            // Check the nested loop statement
+            assert_eq!(body.blocks[0].value.statements.len(), 1);
+            match &body.blocks[0].value.statements[0].value {
+                BlockRegionLangAST::Loop { res, body } => {
+                    assert_eq!(res.ty, Some(SimpleType::I32));
+                    assert_eq!(body.value.header.value.label.name.value, "inner");
+                }
+                _ => panic!("Expected Loop statement inside block"),
+            }
+        }
+        _ => panic!("Expected Scope variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_nested_scope_in_loop() {
+    // A loop containing a scope statement inside its block
+    let result =
+        parse_block_region_input("loop ^outer() { scope { ^inner() { } } -> i32; } -> unit");
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        BlockRegionLangAST::Loop { res, body } => {
+            assert_eq!(res.ty, Some(SimpleType::Unit));
+            assert_eq!(body.value.header.value.label.name.value, "outer");
+
+            // Check the nested scope statement
+            assert_eq!(body.value.statements.len(), 1);
+            match &body.value.statements[0].value {
+                BlockRegionLangAST::Scope { res, body } => {
+                    assert_eq!(res.ty, Some(SimpleType::I32));
+                    assert_eq!(body.blocks.len(), 1);
+                    assert_eq!(body.blocks[0].value.header.value.label.name.value, "inner");
+                }
+                _ => panic!("Expected Scope statement inside loop"),
+            }
+        }
+        _ => panic!("Expected Loop variant, got {:?}", ast),
+    }
+}
+
+#[test]
+fn test_parse_deeply_nested_structure() {
+    // scope -> block -> loop -> block -> scope -> block
+    let result = parse_block_region_input(
+        "scope { ^bb0() { loop ^loop0() { scope { ^bb1() { } } -> bool; } -> i64; }; } -> unit",
+    );
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        BlockRegionLangAST::Scope { res, body } => {
+            assert_eq!(res.ty, Some(SimpleType::Unit));
+
+            // First level: bb0
+            let bb0 = &body.blocks[0].value;
+            assert_eq!(bb0.header.value.label.name.value, "bb0");
+            assert_eq!(bb0.statements.len(), 1);
+
+            // Second level: loop -> loop0
+            match &bb0.statements[0].value {
+                BlockRegionLangAST::Loop { res, body } => {
+                    assert_eq!(res.ty, Some(SimpleType::I64));
+                    assert_eq!(body.value.header.value.label.name.value, "loop0");
+                    assert_eq!(body.value.statements.len(), 1);
+
+                    // Third level: scope -> bb1
+                    match &body.value.statements[0].value {
+                        BlockRegionLangAST::Scope { res, body } => {
+                            assert_eq!(res.ty, Some(SimpleType::Bool));
+                            assert_eq!(body.blocks.len(), 1);
+                            assert_eq!(body.blocks[0].value.header.value.label.name.value, "bb1");
+                        }
+                        _ => panic!("Expected nested Scope"),
+                    }
+                }
+                _ => panic!("Expected Loop at second level"),
+            }
+        }
+        _ => panic!("Expected Scope variant, got {:?}", ast),
+    }
+}
+
+// ============================================================================
+// Additional edge case tests
+// ============================================================================
+
+#[test]
+fn test_parse_block_argument_with_all_types() {
+    // Test block arguments with various type lattice values
+    let result = parse_block_region_input(
+        "loop ^bb0(%a: i32, %b: i64, %c: f32, %d: f64, %e: bool, %f: unit) { } -> i32",
+    );
+    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+    let ast = result.unwrap();
+    match ast {
+        BlockRegionLangAST::Loop { body, .. } => {
+            let args = &body.value.header.value.arguments;
+            assert_eq!(args.len(), 6);
+            assert_eq!(args[0].value.ty.value, SimpleType::I32);
+            assert_eq!(args[1].value.ty.value, SimpleType::I64);
+            assert_eq!(args[2].value.ty.value, SimpleType::F32);
+            assert_eq!(args[3].value.ty.value, SimpleType::F64);
+            assert_eq!(args[4].value.ty.value, SimpleType::Bool);
+            assert_eq!(args[5].value.ty.value, SimpleType::Unit);
+        }
+        _ => panic!("Expected Loop variant"),
+    }
+}
+
+#[test]
+fn test_parse_multiple_variants_same_dialect() {
+    // Ensure multiple variants work correctly in the same dialect
+    // First try parsing Inc variant
+    let result1 = parse_combined_lang_input("%r = inc %x -> i32");
+    assert!(result1.is_ok(), "Failed to parse Inc: {:?}", result1.err());
+    match result1.unwrap() {
+        CombinedLangAST::Inc { res, arg } => {
+            assert_eq!(res.name.value, "r");
+            assert_eq!(arg.name.value, "x");
+        }
+        _ => panic!("Expected Inc variant"),
+    }
+
+    // Then parse Dec variant
+    let result2 = parse_combined_lang_input("%y = dec %z -> f64");
+    assert!(result2.is_ok(), "Failed to parse Dec: {:?}", result2.err());
+    match result2.unwrap() {
+        CombinedLangAST::Dec { res, arg } => {
+            assert_eq!(res.name.value, "y");
+            assert_eq!(arg.name.value, "z");
+        }
+        _ => panic!("Expected Dec variant"),
+    }
+}

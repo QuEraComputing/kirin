@@ -101,11 +101,11 @@ impl<'src> Format<'src> {
     {
         // Parse escaped braces: {{ -> literal {, }} -> literal }
         // The lexer produces EscapedLBrace/EscapedRBrace tokens for {{ and }}
-        let escaped_lbrace = just(Token::EscapedLBrace)
-            .to(FormatElement::Token(vec![Token::EscapedLBrace]));
+        let escaped_lbrace =
+            just(Token::EscapedLBrace).to(FormatElement::Token(vec![Token::EscapedLBrace]));
 
-        let escaped_rbrace = just(Token::EscapedRBrace)
-            .to(FormatElement::Token(vec![Token::EscapedRBrace]));
+        let escaped_rbrace =
+            just(Token::EscapedRBrace).to(FormatElement::Token(vec![Token::EscapedRBrace]));
 
         // Parse field interpolations like {name} or {name:type}
         let interpolation = just(Token::LBrace)
