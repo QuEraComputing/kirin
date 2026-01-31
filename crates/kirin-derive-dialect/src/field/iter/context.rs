@@ -1,6 +1,6 @@
-use kirin_derive_core_2::misc::{from_str, to_camel_case};
-use kirin_derive_core_2::prelude::*;
-use kirin_derive_core_2::tokens::FieldPatternTokens;
+use kirin_derive_core::misc::{from_str, to_camel_case};
+use kirin_derive_core::prelude::*;
+use kirin_derive_core::tokens::FieldPatternTokens;
 use quote::format_ident;
 use std::collections::HashMap;
 

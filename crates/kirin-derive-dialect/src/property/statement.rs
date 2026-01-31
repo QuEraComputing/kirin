@@ -1,6 +1,6 @@
 use crate::property::context::{DeriveProperty, InputContext};
-use kirin_derive_core_2::prelude::*;
-use kirin_derive_core_2::tokens::{FieldPatternTokens, WrapperCallTokens};
+use kirin_derive_core::prelude::*;
+use kirin_derive_core::tokens::{FieldPatternTokens, WrapperCallTokens};
 use quote::{ToTokens, quote};
 
 #[derive(Clone, Debug)]
@@ -105,7 +105,7 @@ fn field_name_tokens(field: &ir::fields::FieldIndex) -> proc_macro2::TokenStream
 mod tests {
     use super::*;
     use crate::property::context::{DeriveProperty, InputContext, PropertyKind};
-    use kirin_derive_core_2::derive::InputContext as CoreInputContext;
+    use kirin_derive_core::derive::InputContext as CoreInputContext;
 
     #[test]
     fn test_statement_pattern_unnamed() {

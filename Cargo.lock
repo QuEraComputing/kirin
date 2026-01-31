@@ -934,7 +934,7 @@ dependencies = [
  "kirin",
  "kirin-chumsky",
  "kirin-chumsky-format",
- "kirin-derive-core-2",
+ "kirin-derive-core",
  "kirin-ir",
  "kirin-lexer",
  "proc-macro2",
@@ -950,7 +950,7 @@ dependencies = [
  "darling 0.23.0",
  "indexmap",
  "insta",
- "kirin-derive-core-2",
+ "kirin-derive-core",
  "kirin-lexer",
  "proc-macro2",
  "quote",
@@ -968,7 +968,7 @@ dependencies = [
 name = "kirin-derive"
 version = "0.1.0"
 dependencies = [
- "kirin-derive-core-2",
+ "kirin-derive-core",
  "kirin-derive-dialect",
  "kirin-ir",
  "kirin-test-utils",
@@ -979,7 +979,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kirin-derive-core-2"
+name = "kirin-derive-core"
 version = "0.1.0"
 dependencies = [
  "darling 0.23.0",
@@ -995,7 +995,7 @@ name = "kirin-derive-dialect"
 version = "0.1.0"
 dependencies = [
  "insta",
- "kirin-derive-core-2",
+ "kirin-derive-core",
  "kirin-test-utils",
  "proc-macro2",
  "quote",

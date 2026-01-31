@@ -14,7 +14,7 @@ pub use attrs::{ChumskyFieldAttrs, ChumskyGlobalAttrs, ChumskyStatementAttrs};
 pub use format::{Format, FormatElement, FormatOption};
 pub use generate::{GenerateHasRecursiveParser, GenerateWithAbstractSyntaxTree};
 
-use kirin_derive_core_2::ir::Layout;
+use kirin_derive_core::ir::Layout;
 
 /// The layout for chumsky derive macros.
 #[derive(Debug, Clone)]

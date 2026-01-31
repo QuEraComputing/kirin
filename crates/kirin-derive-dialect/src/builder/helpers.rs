@@ -1,9 +1,9 @@
 use crate::builder::statement::{FieldInfo, FieldKind, StatementInfo};
-use kirin_derive_core_2::derive::InputContext;
-use kirin_derive_core_2::ir::BuilderOptions;
-use kirin_derive_core_2::ir::fields::Collection;
-use kirin_derive_core_2::misc::{is_type, to_snake_case};
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::derive::InputContext;
+use kirin_derive_core::ir::BuilderOptions;
+use kirin_derive_core::ir::fields::Collection;
+use kirin_derive_core::misc::{is_type, to_snake_case};
+use kirin_derive_core::prelude::*;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
 

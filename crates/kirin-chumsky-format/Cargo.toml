@@ -7,7 +7,7 @@ edition = "2024"
 chumsky = "0.10"
 darling = "0.23"
 indexmap = "2.7"
-kirin-derive-core-2 = { version = "0.1.0", path = "../kirin-derive-core-2" }
+kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
 kirin-lexer = { version = "0.1.0", path = "../kirin-lexer", features = ["quote"] }
 proc-macro2 = "1.0"
 quote = "1.0"

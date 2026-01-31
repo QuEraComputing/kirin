@@ -12,7 +12,7 @@ pub struct GenerateWithAbstractSyntaxTree {
 
 impl GenerateWithAbstractSyntaxTree {
     /// Creates a new generator.
-    pub fn new(ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>) -> Self {
+    pub fn new(ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> Self {
         let crate_path = ir_input
             .extra_attrs
             .crate_path
@@ -25,7 +25,7 @@ impl GenerateWithAbstractSyntaxTree {
     /// Generates the AST type and `WithAbstractSyntaxTree` implementation.
     pub fn generate(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> TokenStream {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let ast_generics = self.build_ast_generics(ir_input);
@@ -43,7 +43,7 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn build_ast_generics(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
         let mut generics = ir_input.generics.clone();
 
@@ -94,7 +94,7 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn generate_ast_definition(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
     ) -> TokenStream {
@@ -102,7 +102,7 @@ impl GenerateWithAbstractSyntaxTree {
         let (_, ty_generics, _) = ast_generics.split_for_impl();
 
         match &ir_input.data {
-            kirin_derive_core_2::ir::Data::Struct(data) => {
+            kirin_derive_core::ir::Data::Struct(data) => {
                 let fields = self.generate_struct_fields(&data.0, true);
                 let is_tuple = self.is_tuple_style(&data.0);
 
@@ -126,7 +126,7 @@ impl GenerateWithAbstractSyntaxTree {
                     }
                 }
             }
-            kirin_derive_core_2::ir::Data::Enum(data) => {
+            kirin_derive_core::ir::Data::Enum(data) => {
                 let variants = self.generate_enum_variants(data);
                 quote! {
                     pub enum #ast_name #ty_generics
@@ -142,7 +142,7 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn generate_derive_impls(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
     ) -> TokenStream {
@@ -190,12 +190,12 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn generate_debug_impl(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
         _ast_generics: &syn::Generics,
     ) -> TokenStream {
         match &ir_input.data {
-            kirin_derive_core_2::ir::Data::Struct(data) => {
+            kirin_derive_core::ir::Data::Struct(data) => {
                 let name = ast_name.to_string();
                 let is_tuple = self.is_tuple_style(&data.0);
 
@@ -231,7 +231,7 @@ impl GenerateWithAbstractSyntaxTree {
                     }
                 }
             }
-            kirin_derive_core_2::ir::Data::Enum(data) => {
+            kirin_derive_core::ir::Data::Enum(data) => {
                 let arms: Vec<_> = data
                     .variants
                     .iter()
@@ -296,12 +296,12 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn generate_clone_impl(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         _ast_name: &syn::Ident,
         _ast_generics: &syn::Generics,
     ) -> TokenStream {
         match &ir_input.data {
-            kirin_derive_core_2::ir::Data::Struct(data) => {
+            kirin_derive_core::ir::Data::Struct(data) => {
                 let is_tuple = self.is_tuple_style(&data.0);
 
                 if is_tuple {
@@ -327,7 +327,7 @@ impl GenerateWithAbstractSyntaxTree {
                     }
                 }
             }
-            kirin_derive_core_2::ir::Data::Enum(data) => {
+            kirin_derive_core::ir::Data::Enum(data) => {
                 let arms: Vec<_> = data
                     .variants
                     .iter()
@@ -379,12 +379,12 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn generate_partialeq_impl(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         _ast_name: &syn::Ident,
         _ast_generics: &syn::Generics,
     ) -> TokenStream {
         match &ir_input.data {
-            kirin_derive_core_2::ir::Data::Struct(data) => {
+            kirin_derive_core::ir::Data::Struct(data) => {
                 let is_tuple = self.is_tuple_style(&data.0);
 
                 if is_tuple {
@@ -441,7 +441,7 @@ impl GenerateWithAbstractSyntaxTree {
                     }
                 }
             }
-            kirin_derive_core_2::ir::Data::Enum(data) => {
+            kirin_derive_core::ir::Data::Enum(data) => {
                 let arms: Vec<_> = data
                     .variants
                     .iter()
@@ -517,7 +517,7 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn field_list(
         &self,
-        stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
     ) -> Vec<syn::Ident> {
         let mut fields = Vec::new();
         for arg in stmt.arguments.iter() {
@@ -553,7 +553,7 @@ impl GenerateWithAbstractSyntaxTree {
         fields
     }
 
-    fn count_fields(&self, stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>) -> usize {
+    fn count_fields(&self, stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>) -> usize {
         stmt.arguments.iter().count()
             + stmt.results.iter().count()
             + stmt.blocks.iter().count()
@@ -562,7 +562,7 @@ impl GenerateWithAbstractSyntaxTree {
             + stmt.values.iter().count()
     }
 
-    fn is_tuple_style(&self, stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>) -> bool {
+    fn is_tuple_style(&self, stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>) -> bool {
         stmt.arguments.iter().all(|a| a.field.ident.is_none())
             && stmt.results.iter().all(|r| r.field.ident.is_none())
             && stmt.blocks.iter().all(|b| b.field.ident.is_none())
@@ -573,7 +573,7 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn generate_struct_fields(
         &self,
-        stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         with_pub: bool,
     ) -> TokenStream {
         let crate_path = &self.crate_path;
@@ -687,7 +687,7 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn generate_enum_variants(
         &self,
-        data: &kirin_derive_core_2::ir::DataEnum<ChumskyLayout>,
+        data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
     ) -> TokenStream {
         let variants: Vec<TokenStream> = data
             .variants
@@ -721,7 +721,7 @@ impl GenerateWithAbstractSyntaxTree {
 
     fn field_ast_type(
         &self,
-        collection: &kirin_derive_core_2::ir::fields::Collection,
+        collection: &kirin_derive_core::ir::fields::Collection,
         kind: FieldKind,
     ) -> TokenStream {
         let crate_path = &self.crate_path;
@@ -745,15 +745,15 @@ impl GenerateWithAbstractSyntaxTree {
         };
 
         match collection {
-            kirin_derive_core_2::ir::fields::Collection::Single => base,
-            kirin_derive_core_2::ir::fields::Collection::Vec => quote! { Vec<#base> },
-            kirin_derive_core_2::ir::fields::Collection::Option => quote! { Option<#base> },
+            kirin_derive_core::ir::fields::Collection::Single => base,
+            kirin_derive_core::ir::fields::Collection::Vec => quote! { Vec<#base> },
+            kirin_derive_core::ir::fields::Collection::Option => quote! { Option<#base> },
         }
     }
 
     fn generate_trait_impl(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
     ) -> TokenStream {

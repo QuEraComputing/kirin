@@ -142,8 +142,8 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
     }
 
     // Marker
-    let ir_input = kirin_derive_core_2::ir::Input::<
-        kirin_derive_core_2::ir::StandardLayout,
+    let ir_input = kirin_derive_core::ir::Input::<
+        kirin_derive_core::ir::StandardLayout,
     >::from_derive_input(&ast);
 
     match ir_input {

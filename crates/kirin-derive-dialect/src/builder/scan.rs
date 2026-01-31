@@ -1,8 +1,8 @@
 use crate::builder::context::DeriveBuilder;
 use crate::builder::helpers::build_fn_name;
 use crate::builder::statement::{StatementBuilder, StatementInfo};
-use kirin_derive_core_2::derive::InputContext;
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::derive::InputContext;
+use kirin_derive_core::prelude::*;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveBuilder {
     fn scan_input(&mut self, input: &'ir ir::Input<StandardLayout>) -> darling::Result<()> {

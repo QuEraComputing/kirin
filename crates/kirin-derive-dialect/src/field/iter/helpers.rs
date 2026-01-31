@@ -1,5 +1,5 @@
 use crate::field::iter::context::DeriveFieldIter;
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::prelude::*;
 use quote::{format_ident, quote};
 
 pub(crate) struct FieldInputBuilder<'a> {

@@ -1,7 +1,7 @@
 use crate::property::context::{DeriveProperty, InputContext};
 use crate::property::statement::{StatementBuilder, StatementInfo};
-use kirin_derive_core_2::derive::InputContext as CoreInputContext;
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::derive::InputContext as CoreInputContext;
+use kirin_derive_core::prelude::*;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveProperty {
     fn scan_input(&mut self, input: &'ir ir::Input<StandardLayout>) -> darling::Result<()> {

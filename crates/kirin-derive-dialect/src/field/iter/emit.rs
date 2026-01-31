@@ -1,7 +1,7 @@
 use crate::field::iter::context::DeriveFieldIter;
 use crate::field::iter::helpers::FieldInputBuilder;
-use kirin_derive_core_2::prelude::*;
-use kirin_derive_core_2::tokens::{
+use kirin_derive_core::prelude::*;
+use kirin_derive_core::tokens::{
     IterEnumDefTokens, IterStructDefTokens, IteratorImplTokens, TraitImplTokens, VariantDefTokens,
 };
 use quote::quote;

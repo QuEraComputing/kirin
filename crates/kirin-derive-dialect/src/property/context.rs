@@ -1,7 +1,7 @@
 use crate::property::statement::StatementInfo;
-use kirin_derive_core_2::derive::InputContext as CoreInputContext;
-use kirin_derive_core_2::misc::from_str;
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::derive::InputContext as CoreInputContext;
+use kirin_derive_core::misc::from_str;
+use kirin_derive_core::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, Debug)]

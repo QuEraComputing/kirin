@@ -1,7 +1,7 @@
 use crate::field::iter::context::{DeriveFieldIter, StatementInfo};
 use crate::field::iter::helpers::FieldInputBuilder;
 use crate::field::iter::statement::StatementBuilder;
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::prelude::*;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveFieldIter {
     fn scan_input(&mut self, input: &'ir ir::Input<StandardLayout>) -> darling::Result<()> {

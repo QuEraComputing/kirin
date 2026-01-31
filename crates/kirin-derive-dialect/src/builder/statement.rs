@@ -1,5 +1,5 @@
-use kirin_derive_core_2::ir::fields::Collection;
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::ir::fields::Collection;
+use kirin_derive_core::prelude::*;
 use quote::format_ident;
 
 #[derive(Clone, Debug)]

@@ -3,7 +3,7 @@ use crate::builder::helpers::{
     build_fn_for_statement, build_result_impl, build_result_module, build_result_module_enum,
     enum_build_fn, from_impl, struct_build_fn,
 };
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::prelude::*;
 use quote::quote;
 
 impl<'ir> Emit<'ir, StandardLayout> for DeriveBuilder {

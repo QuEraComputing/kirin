@@ -1,7 +1,7 @@
 use crate::field::iter::context::{DeriveFieldIter, FieldIterKind};
 use crate::field::iter::helpers::{FieldInputBuilder, field_name_tokens};
-use kirin_derive_core_2::prelude::*;
-use kirin_derive_core_2::tokens::{FieldPatternTokens, WrapperCallTokens, WrapperIterTypeTokens};
+use kirin_derive_core::prelude::*;
+use kirin_derive_core::tokens::{FieldPatternTokens, WrapperCallTokens, WrapperIterTypeTokens};
 use quote::{ToTokens, quote};
 
 pub(crate) struct StatementBuilder<'a> {

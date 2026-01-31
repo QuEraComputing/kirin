@@ -1,6 +1,6 @@
 use crate::builder::statement::StatementInfo;
-use kirin_derive_core_2::derive::InputContext;
-use kirin_derive_core_2::prelude::*;
+use kirin_derive_core::derive::InputContext;
+use kirin_derive_core::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

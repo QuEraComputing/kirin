@@ -1,4 +1,4 @@
-use kirin_derive_core_2::{
+use kirin_derive_core::{
     ir::{self, Layout},
     prelude::*,
     tokens::TraitAssocTypeImplTokens,
@@ -21,7 +21,7 @@ pub fn derive_marker<L: Layout>(input: &ir::Input<L>, trait_path: &syn::Path) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kirin_derive_core_2::ir::StandardLayout;
+    use kirin_derive_core::ir::StandardLayout;
 
     #[test]
     fn test_marker_struct() {

@@ -8,7 +8,7 @@ proc-macro = true
 
 [dependencies]
 kirin-chumsky-format = { version = "0.1.0", path = "../kirin-chumsky-format" }
-kirin-derive-core-2 = { version = "0.1.0", path = "../kirin-derive-core-2" }
+kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "extra-traits"] }

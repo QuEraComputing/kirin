@@ -1,6 +1,6 @@
 use crate::property::context::DeriveProperty;
-use kirin_derive_core_2::prelude::*;
-use kirin_derive_core_2::tokens::TraitMethodImplTokens;
+use kirin_derive_core::prelude::*;
+use kirin_derive_core::tokens::TraitMethodImplTokens;
 use quote::quote;
 
 impl<'ir> Emit<'ir, StandardLayout> for DeriveProperty {

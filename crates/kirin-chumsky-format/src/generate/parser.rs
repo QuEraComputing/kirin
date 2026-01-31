@@ -26,7 +26,7 @@ pub struct GenerateHasRecursiveParser {
 
 impl GenerateHasRecursiveParser {
     /// Creates a new generator.
-    pub fn new(ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>) -> Self {
+    pub fn new(ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> Self {
         let crate_path = ir_input
             .extra_attrs
             .crate_path
@@ -39,7 +39,7 @@ impl GenerateHasRecursiveParser {
     /// Generates the `HasRecursiveParser` implementation.
     pub fn generate(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> TokenStream {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let ast_generics = self.build_ast_generics(ir_input);
@@ -67,7 +67,7 @@ impl GenerateHasRecursiveParser {
     /// `WithAbstractSyntaxTree` is not also derived (or implemented manually).
     fn generate_original_type_impl(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         _ast_name: &syn::Ident,
         crate_path: &syn::Path,
     ) -> TokenStream {
@@ -124,7 +124,7 @@ impl GenerateHasRecursiveParser {
     /// This includes 'tokens, 'src: 'tokens, plus the original type's type parameters.
     fn build_original_type_impl_generics(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
         let mut generics = ir_input.generics.clone();
 
@@ -160,7 +160,7 @@ impl GenerateHasRecursiveParser {
 
     fn build_ast_generics(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
         let mut generics = ir_input.generics.clone();
 
@@ -208,16 +208,16 @@ impl GenerateHasRecursiveParser {
 
     fn generate_parser_impl(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
         crate_path: &syn::Path,
     ) -> TokenStream {
         match &ir_input.data {
-            kirin_derive_core_2::ir::Data::Struct(s) => {
+            kirin_derive_core::ir::Data::Struct(s) => {
                 self.generate_struct_parser(ir_input, &s.0, ast_name, ast_generics, crate_path)
             }
-            kirin_derive_core_2::ir::Data::Enum(e) => {
+            kirin_derive_core::ir::Data::Enum(e) => {
                 self.generate_enum_parser(ir_input, e, ast_name, ast_generics, crate_path)
             }
         }
@@ -225,8 +225,8 @@ impl GenerateHasRecursiveParser {
 
     fn generate_struct_parser(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
-        stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
         crate_path: &syn::Path,
@@ -268,8 +268,8 @@ impl GenerateHasRecursiveParser {
 
     fn generate_enum_parser(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
-        data: &kirin_derive_core_2::ir::DataEnum<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
         crate_path: &syn::Path,
@@ -325,8 +325,8 @@ impl GenerateHasRecursiveParser {
 
     fn build_statement_parser(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
-        stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
         variant: Option<&syn::Ident>,
@@ -366,7 +366,7 @@ impl GenerateHasRecursiveParser {
     /// Each field in the format string becomes an occurrence with a unique variable name.
     fn build_field_occurrences<'a>(
         &self,
-        stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         format: &Format<'_>,
         collected: &'a [CollectedField],
     ) -> syn::Result<Vec<FieldOccurrence<'a>>> {
@@ -407,7 +407,7 @@ impl GenerateHasRecursiveParser {
         // Format strings don't support list/optional syntax, so these must be rejected.
         for field in collected {
             match field.collection {
-                kirin_derive_core_2::ir::fields::Collection::Vec => {
+                kirin_derive_core::ir::fields::Collection::Vec => {
                     let field_name = field
                         .ident
                         .as_ref()
@@ -423,7 +423,7 @@ impl GenerateHasRecursiveParser {
                         ),
                     ));
                 }
-                kirin_derive_core_2::ir::fields::Collection::Option => {
+                kirin_derive_core::ir::fields::Collection::Option => {
                     let field_name = field
                         .ident
                         .as_ref()
@@ -439,7 +439,7 @@ impl GenerateHasRecursiveParser {
                         ),
                     ));
                 }
-                kirin_derive_core_2::ir::fields::Collection::Single => {}
+                kirin_derive_core::ir::fields::Collection::Single => {}
             }
         }
 
@@ -722,11 +722,11 @@ impl GenerateHasRecursiveParser {
         };
 
         match field.collection {
-            kirin_derive_core_2::ir::fields::Collection::Single => base,
-            kirin_derive_core_2::ir::fields::Collection::Vec => {
+            kirin_derive_core::ir::fields::Collection::Single => base,
+            kirin_derive_core::ir::fields::Collection::Vec => {
                 quote! { #base.repeated().collect() }
             }
-            kirin_derive_core_2::ir::fields::Collection::Option => {
+            kirin_derive_core::ir::fields::Collection::Option => {
                 quote! { #base.or_not() }
             }
         }
@@ -865,7 +865,7 @@ impl GenerateHasRecursiveParser {
         ast_name: &syn::Ident,
         _ast_generics: &syn::Generics,
         variant: Option<&syn::Ident>,
-        wrapper: &kirin_derive_core_2::ir::fields::Wrapper,
+        wrapper: &kirin_derive_core::ir::fields::Wrapper,
         crate_path: &syn::Path,
     ) -> syn::Result<TokenStream> {
         let wrapped_ty = &wrapper.ty;
@@ -883,8 +883,8 @@ impl GenerateHasRecursiveParser {
 
     fn format_for_statement(
         &self,
-        ir_input: &kirin_derive_core_2::ir::Input<ChumskyLayout>,
-        stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
     ) -> Option<String> {
         stmt.extra_attrs
             .format
@@ -895,7 +895,7 @@ impl GenerateHasRecursiveParser {
 
     fn collect_fields(
         &self,
-        stmt: &kirin_derive_core_2::ir::Statement<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
     ) -> Vec<CollectedField> {
         let mut fields = Vec::new();
 
@@ -948,7 +948,7 @@ impl GenerateHasRecursiveParser {
             fields.push(CollectedField {
                 index: value.field.index,
                 ident: value.field.ident.clone(),
-                collection: kirin_derive_core_2::ir::fields::Collection::Single,
+                collection: kirin_derive_core::ir::fields::Collection::Single,
                 kind: FieldKind::Value(value.ty.clone()),
             });
         }
@@ -979,7 +979,7 @@ enum ParserPart {
 struct CollectedField {
     index: usize,
     ident: Option<syn::Ident>,
-    collection: kirin_derive_core_2::ir::fields::Collection,
+    collection: kirin_derive_core::ir::fields::Collection,
     kind: FieldKind,
 }
 

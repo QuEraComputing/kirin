@@ -18,7 +18,7 @@ members = [
     "crates/kirin-scf",
     "crates/kirin-test-utils",
     "crates/kirin-lexer",
-    "crates/kirin-derive-core-2",
+    "crates/kirin-derive-core",
     "crates/kirin-derive-dialect",
     "crates/kirin-chumsky",
     "crates/kirin-chumsky-format",
