@@ -17,6 +17,10 @@ Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
 
 Snapshot tests use `insta`. After changing generated code, run `cargo insta review` to accept/reject updated snapshots in `crates/kirin-chumsky-format/src/snapshots/`.
 
+## Commit Messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format: `<type>(<scope>): <description>`, e.g. `feat(chumsky): add region parser`, `fix(derive): handle empty enum variants`, `refactor(lexer): rename Token variants`.
+
 ## Architecture
 
 Kirin is a compiler IR framework. The active work centers on derive macros that auto-generate chumsky parsers for dialect definitions. The codebase follows a three-layer architecture:
