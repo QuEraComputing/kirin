@@ -4,6 +4,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
+use crate::field_kind::{CollectedField, FieldKind, collect_fields};
+use crate::generics::GenericsBuilder;
 
 /// Generator for the `WithAbstractSyntaxTree` trait implementation.
 pub struct GenerateWithAbstractSyntaxTree {
@@ -42,51 +44,7 @@ impl GenerateWithAbstractSyntaxTree {
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
-        let mut generics = ir_input.generics.clone();
-
-        // Add 'tokens lifetime if not present
-        let tokens_lt = syn::Lifetime::new("'tokens", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
-        {
-            generics.params.insert(
-                0,
-                syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
-            );
-        }
-
-        // Add 'src lifetime with bound 'tokens if not present
-        let src_lt = syn::Lifetime::new("'src", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
-        {
-            let mut src_param = syn::LifetimeParam::new(src_lt.clone());
-            src_param.bounds.push(tokens_lt.clone());
-            generics
-                .params
-                .insert(1, syn::GenericParam::Lifetime(src_param));
-        }
-
-        // Add Language type parameter if not present
-        let lang_ident = syn::Ident::new("Language", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == lang_ident))
-        {
-            let crate_path = &self.crate_path;
-            let mut lang_param = syn::TypeParam::from(lang_ident.clone());
-            lang_param
-                .bounds
-                .push(syn::parse_quote!(#crate_path::LanguageParser<'tokens, 'src>));
-            generics.params.push(syn::GenericParam::Type(lang_param));
-        }
-
-        generics
+        GenericsBuilder::new(&self.crate_path).with_language(&ir_input.generics)
     }
 
     fn generate_ast_definition(
@@ -516,56 +474,15 @@ impl GenerateWithAbstractSyntaxTree {
         &self,
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
     ) -> Vec<syn::Ident> {
-        let mut fields = Vec::new();
-        for arg in stmt.arguments.iter() {
-            if let Some(ident) = &arg.field.ident {
-                fields.push(ident.clone());
-            }
-        }
-        for res in stmt.results.iter() {
-            if let Some(ident) = &res.field.ident {
-                fields.push(ident.clone());
-            }
-        }
-        for block in stmt.blocks.iter() {
-            if let Some(ident) = &block.field.ident {
-                fields.push(ident.clone());
-            }
-        }
-        for succ in stmt.successors.iter() {
-            if let Some(ident) = &succ.field.ident {
-                fields.push(ident.clone());
-            }
-        }
-        for region in stmt.regions.iter() {
-            if let Some(ident) = &region.field.ident {
-                fields.push(ident.clone());
-            }
-        }
-        for value in stmt.values.iter() {
-            if let Some(ident) = &value.field.ident {
-                fields.push(ident.clone());
-            }
-        }
-        fields
+        stmt.named_field_idents()
     }
 
     fn count_fields(&self, stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>) -> usize {
-        stmt.arguments.iter().count()
-            + stmt.results.iter().count()
-            + stmt.blocks.iter().count()
-            + stmt.successors.iter().count()
-            + stmt.regions.iter().count()
-            + stmt.values.iter().count()
+        stmt.field_count()
     }
 
     fn is_tuple_style(&self, stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>) -> bool {
-        stmt.arguments.iter().all(|a| a.field.ident.is_none())
-            && stmt.results.iter().all(|r| r.field.ident.is_none())
-            && stmt.blocks.iter().all(|b| b.field.ident.is_none())
-            && stmt.successors.iter().all(|s| s.field.ident.is_none())
-            && stmt.regions.iter().all(|r| r.field.ident.is_none())
-            && stmt.values.iter().all(|v| v.field.ident.is_none())
+        stmt.is_tuple_style()
     }
 
     fn generate_struct_fields(
@@ -573,13 +490,12 @@ impl GenerateWithAbstractSyntaxTree {
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         with_pub: bool,
     ) -> TokenStream {
-        let crate_path = &self.crate_path;
+        let collected = collect_fields(stmt);
         let mut fields = Vec::new();
 
-        // Generate fields for arguments
-        for arg in stmt.arguments.iter() {
-            let ty = self.field_ast_type(&arg.collection, FieldKind::SSAValue);
-            if let Some(ident) = &arg.field.ident {
+        for field in &collected {
+            let ty = self.field_ast_type(&field.collection, &field.kind);
+            if let Some(ident) = &field.ident {
                 if with_pub {
                     fields.push(quote! { pub #ident: #ty });
                 } else {
@@ -592,88 +508,7 @@ impl GenerateWithAbstractSyntaxTree {
             }
         }
 
-        // Generate fields for results
-        for res in stmt.results.iter() {
-            let ty = self.field_ast_type(&res.collection, FieldKind::ResultValue);
-            if let Some(ident) = &res.field.ident {
-                if with_pub {
-                    fields.push(quote! { pub #ident: #ty });
-                } else {
-                    fields.push(quote! { #ident: #ty });
-                }
-            } else if with_pub {
-                fields.push(quote! { pub #ty });
-            } else {
-                fields.push(quote! { #ty });
-            }
-        }
-
-        // Generate fields for blocks
-        for block in stmt.blocks.iter() {
-            let ty = self.field_ast_type(&block.collection, FieldKind::Block);
-            if let Some(ident) = &block.field.ident {
-                if with_pub {
-                    fields.push(quote! { pub #ident: #ty });
-                } else {
-                    fields.push(quote! { #ident: #ty });
-                }
-            } else if with_pub {
-                fields.push(quote! { pub #ty });
-            } else {
-                fields.push(quote! { #ty });
-            }
-        }
-
-        // Generate fields for successors
-        for succ in stmt.successors.iter() {
-            let ty = self.field_ast_type(&succ.collection, FieldKind::Successor);
-            if let Some(ident) = &succ.field.ident {
-                if with_pub {
-                    fields.push(quote! { pub #ident: #ty });
-                } else {
-                    fields.push(quote! { #ident: #ty });
-                }
-            } else if with_pub {
-                fields.push(quote! { pub #ty });
-            } else {
-                fields.push(quote! { #ty });
-            }
-        }
-
-        // Generate fields for regions
-        for region in stmt.regions.iter() {
-            let ty = self.field_ast_type(&region.collection, FieldKind::Region);
-            if let Some(ident) = &region.field.ident {
-                if with_pub {
-                    fields.push(quote! { pub #ident: #ty });
-                } else {
-                    fields.push(quote! { #ident: #ty });
-                }
-            } else if with_pub {
-                fields.push(quote! { pub #ty });
-            } else {
-                fields.push(quote! { #ty });
-            }
-        }
-
-        // Generate fields for compile-time values
-        for value in stmt.values.iter() {
-            let original_ty = &value.ty;
-            let ty = quote! { <#original_ty as #crate_path::HasParser<'tokens, 'src>>::Output };
-            if let Some(ident) = &value.field.ident {
-                if with_pub {
-                    fields.push(quote! { pub #ident: #ty });
-                } else {
-                    fields.push(quote! { #ident: #ty });
-                }
-            } else if with_pub {
-                fields.push(quote! { pub #ty });
-            } else {
-                fields.push(quote! { #ty });
-            }
-        }
-
-        let is_tuple = self.is_tuple_style(stmt);
+        let is_tuple = stmt.is_tuple_style();
 
         if is_tuple {
             quote! { #(#fields),* }
@@ -719,7 +554,7 @@ impl GenerateWithAbstractSyntaxTree {
     fn field_ast_type(
         &self,
         collection: &kirin_derive_core::ir::fields::Collection,
-        kind: FieldKind,
+        kind: &FieldKind,
     ) -> TokenStream {
         let crate_path = &self.crate_path;
         let base = match kind {
@@ -738,6 +573,9 @@ impl GenerateWithAbstractSyntaxTree {
             }
             FieldKind::Region => {
                 quote! { #crate_path::Region<'tokens, 'src, Language> }
+            }
+            FieldKind::Value(ty) => {
+                quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
             }
         };
 
@@ -769,13 +607,4 @@ impl GenerateWithAbstractSyntaxTree {
             }
         }
     }
-}
-
-#[derive(Clone, Copy)]
-enum FieldKind {
-    SSAValue,
-    ResultValue,
-    Block,
-    Successor,
-    Region,
 }

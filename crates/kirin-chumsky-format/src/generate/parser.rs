@@ -6,7 +6,9 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
+use crate::field_kind::{CollectedField, FieldKind, collect_fields};
 use crate::format::{Format, FormatElement, FormatOption};
+use crate::generics::GenericsBuilder;
 
 /// Represents an occurrence of a field in the format string.
 #[derive(Debug)]
@@ -125,84 +127,14 @@ impl GenerateHasRecursiveParser {
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
-        let mut generics = ir_input.generics.clone();
-
-        // Add 'tokens lifetime at the beginning if not present
-        let tokens_lt = syn::Lifetime::new("'tokens", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
-        {
-            generics.params.insert(
-                0,
-                syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
-            );
-        }
-
-        // Add 'src: 'tokens lifetime after 'tokens if not present
-        let src_lt = syn::Lifetime::new("'src", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
-        {
-            let mut src_param = syn::LifetimeParam::new(src_lt);
-            src_param.bounds.push(tokens_lt);
-            generics
-                .params
-                .insert(1, syn::GenericParam::Lifetime(src_param));
-        }
-
-        generics
+        GenericsBuilder::new(&self.crate_path).with_lifetimes(&ir_input.generics)
     }
 
     fn build_ast_generics(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
-        let mut generics = ir_input.generics.clone();
-
-        let tokens_lt = syn::Lifetime::new("'tokens", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
-        {
-            generics.params.insert(
-                0,
-                syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
-            );
-        }
-
-        let src_lt = syn::Lifetime::new("'src", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
-        {
-            let mut src_param = syn::LifetimeParam::new(src_lt.clone());
-            src_param.bounds.push(tokens_lt.clone());
-            generics
-                .params
-                .insert(1, syn::GenericParam::Lifetime(src_param));
-        }
-
-        let lang_ident = syn::Ident::new("Language", proc_macro2::Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == lang_ident))
-        {
-            let crate_path = &self.crate_path;
-            let mut lang_param = syn::TypeParam::from(lang_ident.clone());
-            lang_param
-                .bounds
-                .push(syn::parse_quote!(#crate_path::LanguageParser<'tokens, 'src>));
-            generics.params.push(syn::GenericParam::Type(lang_param));
-        }
-
-        generics
+        GenericsBuilder::new(&self.crate_path).with_language(&ir_input.generics)
     }
 
     fn generate_parser_impl(
@@ -369,38 +301,7 @@ impl GenerateHasRecursiveParser {
         format: &Format<'_>,
         collected: &'a [CollectedField],
     ) -> syn::Result<Vec<FieldOccurrence<'a>>> {
-        let mut map_by_ident: HashMap<String, usize> = HashMap::new();
-
-        for arg in stmt.arguments.iter() {
-            if let Some(ident) = &arg.field.ident {
-                map_by_ident.insert(ident.to_string(), arg.field.index);
-            }
-        }
-        for res in stmt.results.iter() {
-            if let Some(ident) = &res.field.ident {
-                map_by_ident.insert(ident.to_string(), res.field.index);
-            }
-        }
-        for block in stmt.blocks.iter() {
-            if let Some(ident) = &block.field.ident {
-                map_by_ident.insert(ident.to_string(), block.field.index);
-            }
-        }
-        for succ in stmt.successors.iter() {
-            if let Some(ident) = &succ.field.ident {
-                map_by_ident.insert(ident.to_string(), succ.field.index);
-            }
-        }
-        for region in stmt.regions.iter() {
-            if let Some(ident) = &region.field.ident {
-                map_by_ident.insert(ident.to_string(), region.field.index);
-            }
-        }
-        for value in stmt.values.iter() {
-            if let Some(ident) = &value.field.ident {
-                map_by_ident.insert(ident.to_string(), value.field.index);
-            }
-        }
+        let map_by_ident = stmt.field_name_to_index();
 
         // Validate that no fields use Vec or Option collection types.
         // Format strings don't support list/optional syntax, so these must be rejected.
@@ -901,64 +802,7 @@ impl GenerateHasRecursiveParser {
         &self,
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
     ) -> Vec<CollectedField> {
-        let mut fields = Vec::new();
-
-        for arg in stmt.arguments.iter() {
-            fields.push(CollectedField {
-                index: arg.field.index,
-                ident: arg.field.ident.clone(),
-                collection: arg.collection.clone(),
-                kind: FieldKind::SSAValue,
-            });
-        }
-
-        for res in stmt.results.iter() {
-            fields.push(CollectedField {
-                index: res.field.index,
-                ident: res.field.ident.clone(),
-                collection: res.collection.clone(),
-                kind: FieldKind::ResultValue,
-            });
-        }
-
-        for block in stmt.blocks.iter() {
-            fields.push(CollectedField {
-                index: block.field.index,
-                ident: block.field.ident.clone(),
-                collection: block.collection.clone(),
-                kind: FieldKind::Block,
-            });
-        }
-
-        for succ in stmt.successors.iter() {
-            fields.push(CollectedField {
-                index: succ.field.index,
-                ident: succ.field.ident.clone(),
-                collection: succ.collection.clone(),
-                kind: FieldKind::Successor,
-            });
-        }
-
-        for region in stmt.regions.iter() {
-            fields.push(CollectedField {
-                index: region.field.index,
-                ident: region.field.ident.clone(),
-                collection: region.collection.clone(),
-                kind: FieldKind::Region,
-            });
-        }
-
-        for value in stmt.values.iter() {
-            fields.push(CollectedField {
-                index: value.field.index,
-                ident: value.field.ident.clone(),
-                collection: kirin_derive_core::ir::fields::Collection::Single,
-                kind: FieldKind::Value(value.ty.clone()),
-            });
-        }
-
-        fields.sort_by_key(|f| f.index);
-        fields
+        collect_fields(stmt)
     }
 
     fn token_parser(&self, tokens: &[kirin_lexer::Token<'_>]) -> TokenStream {
@@ -977,22 +821,4 @@ impl GenerateHasRecursiveParser {
 enum ParserPart {
     Token(TokenStream),
     Field(TokenStream),
-}
-
-#[derive(Debug)]
-struct CollectedField {
-    index: usize,
-    ident: Option<syn::Ident>,
-    collection: kirin_derive_core::ir::fields::Collection,
-    kind: FieldKind,
-}
-
-#[derive(Debug)]
-enum FieldKind {
-    SSAValue,
-    ResultValue,
-    Block,
-    Successor,
-    Region,
-    Value(syn::Type),
 }

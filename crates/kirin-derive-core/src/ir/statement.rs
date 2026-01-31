@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{attrs::StatementOptions, fields::*, layout::Layout};
 use darling::{FromDeriveInput, FromVariant};
 
@@ -118,5 +120,86 @@ impl<L: Layout> Statement<L> {
         }
         errors.finish()?;
         Ok(self)
+    }
+
+    /// Iterates over all fields in this statement, providing common field information.
+    ///
+    /// Fields are yielded in the order: arguments, results, blocks, successors, regions, values.
+    /// This is useful when you need to process all fields uniformly.
+    pub fn iter_all_fields(&self) -> impl Iterator<Item = FieldInfo<'_>> {
+        let args = self.arguments.iter().map(|a| FieldInfo {
+            field: &a.field,
+            collection: &a.collection,
+            category: FieldCategory::Argument,
+        });
+        let results = self.results.iter().map(|r| FieldInfo {
+            field: &r.field,
+            collection: &r.collection,
+            category: FieldCategory::Result,
+        });
+        let blocks = self.blocks.iter().map(|b| FieldInfo {
+            field: &b.field,
+            collection: &b.collection,
+            category: FieldCategory::Block,
+        });
+        let successors = self.successors.iter().map(|s| FieldInfo {
+            field: &s.field,
+            collection: &s.collection,
+            category: FieldCategory::Successor,
+        });
+        let regions = self.regions.iter().map(|r| FieldInfo {
+            field: &r.field,
+            collection: &r.collection,
+            category: FieldCategory::Region,
+        });
+        let values = self.values.iter().map(|v| FieldInfo {
+            field: &v.field,
+            collection: &Collection::Single,
+            category: FieldCategory::Value,
+        });
+
+        args.chain(results)
+            .chain(blocks)
+            .chain(successors)
+            .chain(regions)
+            .chain(values)
+    }
+
+    /// Returns the total count of fields across all categories.
+    pub fn field_count(&self) -> usize {
+        self.arguments.iter().count()
+            + self.results.iter().count()
+            + self.blocks.iter().count()
+            + self.successors.iter().count()
+            + self.regions.iter().count()
+            + self.values.iter().count()
+    }
+
+    /// Collects all named field identifiers.
+    ///
+    /// Returns identifiers only for fields that have names (not tuple fields).
+    pub fn named_field_idents(&self) -> Vec<syn::Ident> {
+        self.iter_all_fields()
+            .filter_map(|f| f.field.ident.clone())
+            .collect()
+    }
+
+    /// Returns true if all fields are unnamed (tuple-style).
+    pub fn is_tuple_style(&self) -> bool {
+        self.iter_all_fields().all(|f| f.field.ident.is_none())
+    }
+
+    /// Builds a map from field name to field index.
+    ///
+    /// Only includes fields that have names.
+    pub fn field_name_to_index(&self) -> HashMap<String, usize> {
+        self.iter_all_fields()
+            .filter_map(|f| {
+                f.field
+                    .ident
+                    .as_ref()
+                    .map(|id| (id.to_string(), f.field.index))
+            })
+            .collect()
     }
 }

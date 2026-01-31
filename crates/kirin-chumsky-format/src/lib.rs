@@ -7,12 +7,16 @@
 //! AST types and parser implementations.
 
 mod attrs;
+mod field_kind;
 mod format;
 mod generate;
+mod generics;
 
 pub use attrs::{ChumskyFieldAttrs, ChumskyGlobalAttrs, ChumskyStatementAttrs};
+pub use field_kind::{CollectedField, FieldKind, collect_fields};
 pub use format::{Format, FormatElement, FormatOption};
 pub use generate::{GenerateHasRecursiveParser, GenerateWithAbstractSyntaxTree};
+pub use generics::GenericsBuilder;
 
 use kirin_derive_core::ir::Layout;
 
