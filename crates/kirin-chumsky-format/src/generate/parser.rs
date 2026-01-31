@@ -273,7 +273,7 @@ impl GenerateHasRecursiveParser {
             .ok_or_else(|| syn::Error::new(stmt.name.span(), "missing chumsky format attribute"))?;
 
         let format = Format::parse(&format_str, None)?;
-        let collected = self.collect_fields(stmt);
+        let collected = collect_fields(stmt);
 
         // Build field occurrences - each format field becomes an occurrence
         let occurrences = self.build_field_occurrences(stmt, &format, &collected)?;
@@ -796,13 +796,6 @@ impl GenerateHasRecursiveParser {
             .clone()
             .or(stmt.attrs.format.clone())
             .or(ir_input.extra_attrs.format.clone())
-    }
-
-    fn collect_fields(
-        &self,
-        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
-    ) -> Vec<CollectedField> {
-        collect_fields(stmt)
     }
 
     fn token_parser(&self, tokens: &[kirin_lexer::Token<'_>]) -> TokenStream {

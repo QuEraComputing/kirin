@@ -1,3 +1,4 @@
+pub mod codegen;
 pub mod derive;
 pub mod emit;
 pub mod ir;

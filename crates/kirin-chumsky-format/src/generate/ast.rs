@@ -4,8 +4,9 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{CollectedField, FieldKind, collect_fields};
+use crate::field_kind::{FieldKind, collect_fields};
 use crate::generics::GenericsBuilder;
+use kirin_derive_core::codegen::{renamed_field_idents, tuple_field_idents};
 
 /// Generator for the `WithAbstractSyntaxTree` trait implementation.
 pub struct GenerateWithAbstractSyntaxTree {
@@ -59,7 +60,7 @@ impl GenerateWithAbstractSyntaxTree {
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
                 let fields = self.generate_struct_fields(&data.0, true);
-                let is_tuple = self.is_tuple_style(&data.0);
+                let is_tuple = data.0.is_tuple_style();
 
                 if is_tuple {
                     quote! {
@@ -152,15 +153,10 @@ impl GenerateWithAbstractSyntaxTree {
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
                 let name = ast_name.to_string();
-                let is_tuple = self.is_tuple_style(&data.0);
+                let is_tuple = data.0.is_tuple_style();
 
                 if is_tuple {
-                    let field_count = self.count_fields(&data.0);
-                    let field_names: Vec<_> = (0..field_count)
-                        .map(|i| {
-                            syn::Ident::new(&format!("f{}", i), proc_macro2::Span::call_site())
-                        })
-                        .collect();
+                    let field_names = tuple_field_idents("f", data.0.field_count());
                     let patterns = quote! { Self(#(#field_names),*) };
                     let debug_fields = field_names.iter().fold(
                         quote! { f.debug_tuple(#name) },
@@ -171,7 +167,7 @@ impl GenerateWithAbstractSyntaxTree {
                         #debug_fields.finish()
                     }
                 } else {
-                    let fields = self.field_list(&data.0);
+                    let fields = data.0.named_field_idents();
                     let patterns = quote! { Self { #(#fields),* } };
                     let debug_fields =
                         fields
@@ -193,23 +189,16 @@ impl GenerateWithAbstractSyntaxTree {
                     .map(|variant| {
                         let name = &variant.name;
                         let name_str = name.to_string();
-                        let is_tuple = self.is_tuple_style(variant);
+                        let is_tuple = variant.is_tuple_style();
 
                         if is_tuple {
-                            let field_count = self.count_fields(variant);
+                            let field_count = variant.field_count();
                             if field_count == 0 {
                                 quote! {
                                     Self::#name => f.write_str(#name_str)
                                 }
                             } else {
-                                let field_names: Vec<_> = (0..field_count)
-                                    .map(|i| {
-                                        syn::Ident::new(
-                                            &format!("f{}", i),
-                                            proc_macro2::Span::call_site(),
-                                        )
-                                    })
-                                    .collect();
+                                let field_names = tuple_field_idents("f", field_count);
                                 let debug_fields = field_names.iter().fold(
                                     quote! { f.debug_tuple(#name_str) },
                                     |acc, field| quote! { #acc.field(&#field) },
@@ -219,7 +208,7 @@ impl GenerateWithAbstractSyntaxTree {
                                 }
                             }
                         } else {
-                            let fields = self.field_list(variant);
+                            let fields = variant.named_field_idents();
                             if fields.is_empty() {
                                 quote! {
                                     Self::#name {} => f.write_str(#name_str)
@@ -257,15 +246,10 @@ impl GenerateWithAbstractSyntaxTree {
     ) -> TokenStream {
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
-                let is_tuple = self.is_tuple_style(&data.0);
+                let is_tuple = data.0.is_tuple_style();
 
                 if is_tuple {
-                    let field_count = self.count_fields(&data.0);
-                    let field_names: Vec<_> = (0..field_count)
-                        .map(|i| {
-                            syn::Ident::new(&format!("f{}", i), proc_macro2::Span::call_site())
-                        })
-                        .collect();
+                    let field_names = tuple_field_idents("f", data.0.field_count());
                     let patterns = quote! { Self(#(#field_names),*) };
                     let clones = quote! { Self(#(#field_names.clone()),*) };
                     quote! {
@@ -273,7 +257,7 @@ impl GenerateWithAbstractSyntaxTree {
                         #clones
                     }
                 } else {
-                    let fields = self.field_list(&data.0);
+                    let fields = data.0.named_field_idents();
                     let patterns = quote! { Self { #(#fields),* } };
                     let clones: Vec<_> = fields.iter().map(|f| quote! { #f: #f.clone() }).collect();
                     quote! {
@@ -288,28 +272,21 @@ impl GenerateWithAbstractSyntaxTree {
                     .iter()
                     .map(|variant| {
                         let name = &variant.name;
-                        let is_tuple = self.is_tuple_style(variant);
+                        let is_tuple = variant.is_tuple_style();
 
                         if is_tuple {
-                            let field_count = self.count_fields(variant);
+                            let field_count = variant.field_count();
                             if field_count == 0 {
                                 quote! { Self::#name => Self::#name }
                             } else {
-                                let field_names: Vec<_> = (0..field_count)
-                                    .map(|i| {
-                                        syn::Ident::new(
-                                            &format!("f{}", i),
-                                            proc_macro2::Span::call_site(),
-                                        )
-                                    })
-                                    .collect();
+                                let field_names = tuple_field_idents("f", field_count);
                                 let clones = quote! { Self::#name(#(#field_names.clone()),*) };
                                 quote! {
                                     Self::#name(#(#field_names),*) => #clones
                                 }
                             }
                         } else {
-                            let fields = self.field_list(variant);
+                            let fields = variant.named_field_idents();
                             if fields.is_empty() {
                                 quote! { Self::#name {} => Self::#name {} }
                             } else {
@@ -340,20 +317,12 @@ impl GenerateWithAbstractSyntaxTree {
     ) -> TokenStream {
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
-                let is_tuple = self.is_tuple_style(&data.0);
+                let is_tuple = data.0.is_tuple_style();
 
                 if is_tuple {
-                    let field_count = self.count_fields(&data.0);
-                    let self_fields: Vec<_> = (0..field_count)
-                        .map(|i| {
-                            syn::Ident::new(&format!("s{}", i), proc_macro2::Span::call_site())
-                        })
-                        .collect();
-                    let other_fields: Vec<_> = (0..field_count)
-                        .map(|i| {
-                            syn::Ident::new(&format!("o{}", i), proc_macro2::Span::call_site())
-                        })
-                        .collect();
+                    let field_count = data.0.field_count();
+                    let self_fields = tuple_field_idents("s", field_count);
+                    let other_fields = tuple_field_idents("o", field_count);
                     let comparisons = self_fields.iter().zip(&other_fields).map(|(s, o)| {
                         quote! { #s == #o }
                     });
@@ -363,19 +332,9 @@ impl GenerateWithAbstractSyntaxTree {
                         true #(&& #comparisons)*
                     }
                 } else {
-                    let fields = self.field_list(&data.0);
-                    let self_fields: Vec<_> = fields
-                        .iter()
-                        .map(|f| {
-                            syn::Ident::new(&format!("s_{}", f), proc_macro2::Span::call_site())
-                        })
-                        .collect();
-                    let other_fields: Vec<_> = fields
-                        .iter()
-                        .map(|f| {
-                            syn::Ident::new(&format!("o_{}", f), proc_macro2::Span::call_site())
-                        })
-                        .collect();
+                    let fields = data.0.named_field_idents();
+                    let self_fields = renamed_field_idents("s_", &fields);
+                    let other_fields = renamed_field_idents("o_", &fields);
                     let self_pattern: Vec<_> = fields
                         .iter()
                         .zip(&self_fields)
@@ -402,21 +361,17 @@ impl GenerateWithAbstractSyntaxTree {
                     .iter()
                     .map(|variant| {
                         let name = &variant.name;
-                        let is_tuple = self.is_tuple_style(variant);
+                        let is_tuple = variant.is_tuple_style();
 
                         if is_tuple {
-                            let field_count = self.count_fields(variant);
+                            let field_count = variant.field_count();
                             if field_count == 0 {
                                 quote! {
                                     (Self::#name, Self::#name) => true
                                 }
                             } else {
-                                let self_fields: Vec<_> = (0..field_count)
-                                    .map(|i| syn::Ident::new(&format!("s{}", i), proc_macro2::Span::call_site()))
-                                    .collect();
-                                let other_fields: Vec<_> = (0..field_count)
-                                    .map(|i| syn::Ident::new(&format!("o{}", i), proc_macro2::Span::call_site()))
-                                    .collect();
+                                let self_fields = tuple_field_idents("s", field_count);
+                                let other_fields = tuple_field_idents("o", field_count);
                                 let comparisons = self_fields.iter().zip(&other_fields).map(|(s, o)| {
                                     quote! { #s == #o }
                                 });
@@ -427,20 +382,14 @@ impl GenerateWithAbstractSyntaxTree {
                                 }
                             }
                         } else {
-                            let fields = self.field_list(variant);
+                            let fields = variant.named_field_idents();
                             if fields.is_empty() {
                                 quote! {
                                     (Self::#name {}, Self::#name {}) => true
                                 }
                             } else {
-                                let self_fields: Vec<_> = fields
-                                    .iter()
-                                    .map(|f| syn::Ident::new(&format!("s_{}", f), proc_macro2::Span::call_site()))
-                                    .collect();
-                                let other_fields: Vec<_> = fields
-                                    .iter()
-                                    .map(|f| syn::Ident::new(&format!("o_{}", f), proc_macro2::Span::call_site()))
-                                    .collect();
+                                let self_fields = renamed_field_idents("s_", &fields);
+                                let other_fields = renamed_field_idents("o_", &fields);
                                 let self_pattern: Vec<_> = fields.iter().zip(&self_fields)
                                     .map(|(f, s)| quote! { #f: #s })
                                     .collect();
@@ -468,21 +417,6 @@ impl GenerateWithAbstractSyntaxTree {
                 }
             }
         }
-    }
-
-    fn field_list(
-        &self,
-        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
-    ) -> Vec<syn::Ident> {
-        stmt.named_field_idents()
-    }
-
-    fn count_fields(&self, stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>) -> usize {
-        stmt.field_count()
-    }
-
-    fn is_tuple_style(&self, stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>) -> bool {
-        stmt.is_tuple_style()
     }
 
     fn generate_struct_fields(
@@ -538,7 +472,7 @@ impl GenerateWithAbstractSyntaxTree {
 
                 // For enum variants, don't use `pub`
                 let fields = self.generate_struct_fields(variant, false);
-                let is_tuple = self.is_tuple_style(variant);
+                let is_tuple = variant.is_tuple_style();
 
                 if is_tuple {
                     quote! { #name(#fields) }

@@ -3,7 +3,7 @@
 //! This module provides a unified `FieldKind` type used by both AST generation
 //! and parser generation.
 
-use kirin_derive_core::ir::fields::{Collection, FieldCategory, FieldIndex};
+use kirin_derive_core::ir::fields::Collection;
 
 use crate::ChumskyLayout;
 
