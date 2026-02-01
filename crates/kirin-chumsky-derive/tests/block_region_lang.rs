@@ -4,7 +4,7 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::parse;
+use kirin_chumsky::parse_ast;
 use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
@@ -31,7 +31,7 @@ pub enum BlockRegionLang {
 
 #[test]
 fn test_block_empty_body() {
-    let ast = parse::<BlockRegionLang>("%out = loop ^entry() { }").expect("parse failed");
+    let ast = parse_ast::<BlockRegionLang>("%out = loop ^entry() { }").expect("parse failed");
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
             assert_eq!(res.name.value, "out");
@@ -46,7 +46,7 @@ fn test_block_empty_body() {
 
 #[test]
 fn test_block_with_arguments() {
-    let ast = parse::<BlockRegionLang>("%res: bool = loop ^bb0(%x: i32, %y: f64) { }").expect("parse failed");
+    let ast = parse_ast::<BlockRegionLang>("%res: bool = loop ^bb0(%x: i32, %y: f64) { }").expect("parse failed");
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
             assert_eq!(res.name.value, "res");
@@ -66,7 +66,7 @@ fn test_block_with_arguments() {
 #[test]
 fn test_block_with_statements() {
     let ast =
-        parse::<BlockRegionLang>("%res: i64 = loop ^body(%n: i32) { %r = id %n -> i32; }").expect("parse failed");
+        parse_ast::<BlockRegionLang>("%res: i64 = loop ^body(%n: i32) { %r = id %n -> i32; }").expect("parse failed");
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
             assert_eq!(res.name.value, "res");
@@ -88,7 +88,7 @@ fn test_block_with_statements() {
 #[test]
 fn test_block_with_multiple_statements() {
     let ast =
-        parse::<BlockRegionLang>("%res: unit = loop ^main(%a: i32) { %b = id %a -> i32; %c = id %b -> f32; }")
+        parse_ast::<BlockRegionLang>("%res: unit = loop ^main(%a: i32) { %b = id %a -> i32; %c = id %b -> f32; }")
             .expect("parse failed");
     match ast {
         BlockRegionLangAST::Loop { res, body } => {
@@ -102,7 +102,7 @@ fn test_block_with_multiple_statements() {
 
 #[test]
 fn test_block_argument_with_all_types() {
-    let ast = parse::<BlockRegionLang>(
+    let ast = parse_ast::<BlockRegionLang>(
         "%out: i32 = loop ^bb0(%a: i32, %b: i64, %c: f32, %d: f64, %e: bool, %f: unit) { }",
     )
     .expect("parse failed");
@@ -125,7 +125,7 @@ fn test_block_argument_with_all_types() {
 
 #[test]
 fn test_region_empty() {
-    let ast = parse::<BlockRegionLang>("%out: i32 = scope { }").expect("parse failed");
+    let ast = parse_ast::<BlockRegionLang>("%out: i32 = scope { }").expect("parse failed");
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
             assert_eq!(res.name.value, "out");
@@ -138,7 +138,7 @@ fn test_region_empty() {
 
 #[test]
 fn test_region_single_block() {
-    let ast = parse::<BlockRegionLang>("%out: f32 = scope { ^entry() { }; }").expect("parse failed");
+    let ast = parse_ast::<BlockRegionLang>("%out: f32 = scope { ^entry() { }; }").expect("parse failed");
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
             assert_eq!(res.name.value, "out");
@@ -152,7 +152,7 @@ fn test_region_single_block() {
 
 #[test]
 fn test_region_multiple_blocks() {
-    let ast = parse::<BlockRegionLang>("%out: bool = scope { ^bb0(%x: i32) { }; ^bb1() { }; ^exit() { }; }")
+    let ast = parse_ast::<BlockRegionLang>("%out: bool = scope { ^bb0(%x: i32) { }; ^bb1() { }; ^exit() { }; }")
         .expect("parse failed");
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
@@ -169,7 +169,7 @@ fn test_region_multiple_blocks() {
 
 #[test]
 fn test_region_with_statements_in_blocks() {
-    let ast = parse::<BlockRegionLang>(
+    let ast = parse_ast::<BlockRegionLang>(
         "%out: unit = scope { ^bb0(%a: i32) { %b = id %a -> i64; }; ^bb1() { %c = id %b -> f32; }; }",
     )
     .expect("parse failed");
@@ -186,7 +186,7 @@ fn test_region_with_statements_in_blocks() {
 
 #[test]
 fn test_region_without_trailing_semicolon() {
-    let ast = parse::<BlockRegionLang>("%out: i32 = scope { ^only() { } }").expect("parse failed");
+    let ast = parse_ast::<BlockRegionLang>("%out: i32 = scope { ^only() { } }").expect("parse failed");
     match ast {
         BlockRegionLangAST::Scope { res, body } => {
             assert_eq!(res.name.value, "out");
@@ -200,7 +200,7 @@ fn test_region_without_trailing_semicolon() {
 
 #[test]
 fn test_nested_loop_in_scope() {
-    let ast = parse::<BlockRegionLang>("%out: unit = scope { ^bb0() { %inner_res: i32 = loop ^inner() { }; }; }")
+    let ast = parse_ast::<BlockRegionLang>("%out: unit = scope { ^bb0() { %inner_res: i32 = loop ^inner() { }; }; }")
         .expect("parse failed");
     match ast {
         BlockRegionLangAST::Scope { body, .. } => {
@@ -218,7 +218,7 @@ fn test_nested_loop_in_scope() {
 
 #[test]
 fn test_nested_scope_in_loop() {
-    let ast = parse::<BlockRegionLang>("%out: unit = loop ^outer() { %inner_res: i32 = scope { ^inner() { } }; }")
+    let ast = parse_ast::<BlockRegionLang>("%out: unit = loop ^outer() { %inner_res: i32 = scope { ^inner() { } }; }")
         .expect("parse failed");
     match ast {
         BlockRegionLangAST::Loop { body, .. } => {
@@ -236,7 +236,7 @@ fn test_nested_scope_in_loop() {
 
 #[test]
 fn test_deeply_nested_structure() {
-    let ast = parse::<BlockRegionLang>(
+    let ast = parse_ast::<BlockRegionLang>(
         "%out: unit = scope { ^bb0() { %loop_res: i64 = loop ^loop0() { %scope_res: bool = scope { ^bb1() { } }; }; }; }",
     )
     .expect("parse failed");
@@ -265,10 +265,10 @@ fn test_deeply_nested_structure() {
 
 #[test]
 fn test_block_missing_label() {
-    assert!(parse::<BlockRegionLang>("%out = loop () { }").is_err());
+    assert!(parse_ast::<BlockRegionLang>("%out = loop () { }").is_err());
 }
 
 #[test]
 fn test_block_missing_braces() {
-    assert!(parse::<BlockRegionLang>("%out = loop ^bb0()").is_err());
+    assert!(parse_ast::<BlockRegionLang>("%out = loop ^bb0()").is_err());
 }

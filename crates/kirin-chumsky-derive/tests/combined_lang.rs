@@ -4,7 +4,7 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::parse;
+use kirin_chumsky::parse_ast;
 use kirin_chumsky_derive::DialectParser;
 
 #[derive(Debug, Clone, PartialEq, Dialect, DialectParser)]
@@ -19,7 +19,7 @@ pub enum CombinedLang {
 
 #[test]
 fn test_combined_derive_inc() {
-    let ast = parse::<CombinedLang>("%r = inc %x -> i32").expect("parse failed");
+    let ast = parse_ast::<CombinedLang>("%r = inc %x -> i32").expect("parse failed");
     match ast {
         CombinedLangAST::Inc { res, arg } => {
             assert_eq!(res.name.value, "r");
@@ -32,7 +32,7 @@ fn test_combined_derive_inc() {
 
 #[test]
 fn test_combined_derive_dec() {
-    let ast = parse::<CombinedLang>("%y = dec %z -> f64").expect("parse failed");
+    let ast = parse_ast::<CombinedLang>("%y = dec %z -> f64").expect("parse failed");
     match ast {
         CombinedLangAST::Dec { res, arg } => {
             assert_eq!(res.name.value, "y");
@@ -45,9 +45,9 @@ fn test_combined_derive_dec() {
 
 #[test]
 fn test_multiple_variants_same_dialect() {
-    let ast1 = parse::<CombinedLang>("%r = inc %x -> i32").expect("parse failed");
+    let ast1 = parse_ast::<CombinedLang>("%r = inc %x -> i32").expect("parse failed");
     assert!(matches!(ast1, CombinedLangAST::Inc { .. }));
 
-    let ast2 = parse::<CombinedLang>("%y = dec %z -> f64").expect("parse failed");
+    let ast2 = parse_ast::<CombinedLang>("%y = dec %z -> f64").expect("parse failed");
     assert!(matches!(ast2, CombinedLangAST::Dec { .. }));
 }

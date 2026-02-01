@@ -185,9 +185,11 @@ impl std::fmt::Display for CollectedField {
     }
 }
 
-/// Collects all fields from a statement into a sorted vector.
+/// Collects all fields from a statement.
 ///
-/// Fields are sorted by their positional index to ensure consistent ordering.
+/// Fields are returned in the same order as `Statement::iter_all_fields()`:
+/// arguments, results, blocks, successors, regions, values.
+/// This ensures consistency with `Statement::field_bindings()`.
 pub fn collect_fields(
     stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
 ) -> Vec<CollectedField> {
@@ -247,6 +249,7 @@ pub fn collect_fields(
         });
     }
 
-    fields.sort_by_key(|f| f.index);
+    // NOTE: Do NOT sort here! The order must match Statement::iter_all_fields()
+    // which is used by Statement::field_bindings() for code generation.
     fields
 }

@@ -4,7 +4,7 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue, Successor};
-use kirin_chumsky::parse;
+use kirin_chumsky::parse_ast;
 use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
@@ -25,7 +25,7 @@ pub enum ControlFlowLang {
 
 #[test]
 fn test_successor_branch() {
-    let ast = parse::<ControlFlowLang>("br ^exit").expect("parse failed");
+    let ast = parse_ast::<ControlFlowLang>("br ^exit").expect("parse failed");
     match ast {
         ControlFlowLangAST::Branch { target } => {
             assert_eq!(target.name.value, "exit");
@@ -36,7 +36,7 @@ fn test_successor_branch() {
 
 #[test]
 fn test_successor_cond_branch() {
-    let ast = parse::<ControlFlowLang>("cond_br %flag then = ^bb1 else = ^bb2").expect("parse failed");
+    let ast = parse_ast::<ControlFlowLang>("cond_br %flag then = ^bb1 else = ^bb2").expect("parse failed");
     match ast {
         ControlFlowLangAST::CondBranch {
             cond,
@@ -53,7 +53,7 @@ fn test_successor_cond_branch() {
 
 #[test]
 fn test_successor_numeric_label() {
-    let ast = parse::<ControlFlowLang>("br ^0").expect("parse failed");
+    let ast = parse_ast::<ControlFlowLang>("br ^0").expect("parse failed");
     match ast {
         ControlFlowLangAST::Branch { target } => {
             assert_eq!(target.name.value, "0");
@@ -64,5 +64,5 @@ fn test_successor_numeric_label() {
 
 #[test]
 fn test_successor_missing_caret() {
-    assert!(parse::<ControlFlowLang>("br exit").is_err());
+    assert!(parse_ast::<ControlFlowLang>("br exit").is_err());
 }

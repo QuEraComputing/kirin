@@ -4,7 +4,7 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::parse;
+use kirin_chumsky::parse_ast;
 use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
@@ -29,7 +29,7 @@ pub enum TestLang {
 
 #[test]
 fn test_parse_add() {
-    let ast = parse::<TestLang>("%result = add %a %b -> i32").expect("parse failed");
+    let ast = parse_ast::<TestLang>("%result = add %a %b -> i32").expect("parse failed");
     match ast {
         TestLangAST::Add { res, lhs, rhs } => {
             assert_eq!(res.name.value, "result");
@@ -43,7 +43,7 @@ fn test_parse_add() {
 
 #[test]
 fn test_parse_mul() {
-    let ast = parse::<TestLang>("%x = mul %y: i32, %z -> i64").expect("parse failed");
+    let ast = parse_ast::<TestLang>("%x = mul %y: i32, %z -> i64").expect("parse failed");
     match ast {
         TestLangAST::Mul { res, lhs, rhs } => {
             assert_eq!(res.name.value, "x");
@@ -58,7 +58,7 @@ fn test_parse_mul() {
 
 #[test]
 fn test_parse_return() {
-    let ast = parse::<TestLang>("return %value").expect("parse failed");
+    let ast = parse_ast::<TestLang>("return %value").expect("parse failed");
     match ast {
         TestLangAST::Return(ssa) => {
             assert_eq!(ssa.name.value, "value");
@@ -69,12 +69,12 @@ fn test_parse_return() {
 
 #[test]
 fn test_parse_fails_on_invalid_input() {
-    assert!(parse::<TestLang>("invalid syntax here").is_err());
+    assert!(parse_ast::<TestLang>("invalid syntax here").is_err());
 }
 
 #[test]
 fn test_parse_ssa_default_with_type() {
-    let ast = parse::<TestLang>("return %x: i32").expect("parse failed");
+    let ast = parse_ast::<TestLang>("return %x: i32").expect("parse failed");
     match ast {
         TestLangAST::Return(ssa) => {
             assert_eq!(ssa.name.value, "x");
@@ -86,7 +86,7 @@ fn test_parse_ssa_default_with_type() {
 
 #[test]
 fn test_parse_ssa_default_without_type() {
-    let ast = parse::<TestLang>("return %x").expect("parse failed");
+    let ast = parse_ast::<TestLang>("return %x").expect("parse failed");
     match ast {
         TestLangAST::Return(ssa) => {
             assert_eq!(ssa.name.value, "x");

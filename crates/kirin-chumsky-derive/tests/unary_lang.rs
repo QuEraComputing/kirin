@@ -4,7 +4,7 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::parse;
+use kirin_chumsky::parse_ast;
 use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
@@ -19,7 +19,7 @@ pub enum UnaryLang {
 
 #[test]
 fn test_result_name_only() {
-    let ast = parse::<UnaryLang>("%x = neg %y").expect("parse failed");
+    let ast = parse_ast::<UnaryLang>("%x = neg %y").expect("parse failed");
     match ast {
         UnaryLangAST::Neg { res, arg } => {
             assert_eq!(res.name.value, "x");
@@ -32,7 +32,7 @@ fn test_result_name_only() {
 
 #[test]
 fn test_result_name_and_type() {
-    let ast = parse::<UnaryLang>("%x = abs %y -> i32").expect("parse failed");
+    let ast = parse_ast::<UnaryLang>("%x = abs %y -> i32").expect("parse failed");
     match ast {
         UnaryLangAST::Abs { res, arg } => {
             assert_eq!(res.name.value, "x");

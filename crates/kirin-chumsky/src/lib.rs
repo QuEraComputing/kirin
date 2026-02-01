@@ -4,9 +4,10 @@
 //! for parsing dialect definitions.
 //!
 //! This crate provides:
-//! - Core traits: `HasParser`, `HasRecursiveParser`, `WithAbstractSyntaxTree`
+//! - Core traits: `HasParser`, `HasRecursiveParser`, `WithAbstractSyntaxTree`, `EmitIR`
 //! - Common syntax nodes: `Spanned`, `SSAValue`, `ResultValue`, `Block`, `Region`, etc.
 //! - Parser combinators for common syntaxes
+//! - IR emission via `EmitContext` and `EmitIR` trait
 
 mod ast;
 mod parsers;
@@ -26,16 +27,16 @@ pub mod prelude {
     pub use crate::ast::*;
     pub use crate::parsers::*;
     pub use crate::traits::*;
-    pub use crate::{parse, ParseError};
+    pub use crate::{emit, parse, parse_ast, EmitContext, EmitIR, ParseError};
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;
 
     #[cfg(feature = "derive")]
-    pub use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
+    pub use kirin_chumsky_derive::{EmitIR as DeriveEmitIR, HasRecursiveParser, WithAbstractSyntaxTree, DialectParser};
 }
 
 #[cfg(feature = "derive")]
-pub use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
+pub use kirin_chumsky_derive::{EmitIR as DeriveEmitIR, HasRecursiveParser, WithAbstractSyntaxTree, DialectParser};
 
 #[cfg(test)]
 mod tests;

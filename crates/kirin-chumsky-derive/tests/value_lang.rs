@@ -5,7 +5,7 @@ mod common;
 use chumsky::prelude::*;
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::{parse, BoxedParser, HasParser, TokenInput};
+use kirin_chumsky::{parse_ast, BoxedParser, HasParser, TokenInput};
 use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
 use kirin_lexer::Token;
 
@@ -42,7 +42,7 @@ pub enum ValueLang {
 
 #[test]
 fn test_compile_time_value() {
-    let ast = parse::<ValueLang>("%r = apply custom_op %x -> i32").expect("parse failed");
+    let ast = parse_ast::<ValueLang>("%r = apply custom_op %x -> i32").expect("parse failed");
     match ast {
         ValueLangAST::Apply { res, op, arg } => {
             assert_eq!(res.name.value, "r");
@@ -55,7 +55,7 @@ fn test_compile_time_value() {
 
 #[test]
 fn test_compile_time_value_different() {
-    let ast = parse::<ValueLang>("%r = apply another %x -> f32").expect("parse failed");
+    let ast = parse_ast::<ValueLang>("%r = apply another %x -> f32").expect("parse failed");
     match ast {
         ValueLangAST::Apply { res, op, arg } => {
             assert_eq!(res.name.value, "r");

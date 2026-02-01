@@ -3,8 +3,9 @@
 use chumsky::input::Stream;
 use chumsky::prelude::*;
 use chumsky::recursive::{Direct, Recursive};
-use kirin_ir::Dialect;
+use kirin_ir::{Context, Dialect};
 use kirin_lexer::{Logos, Token};
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 /// An alias for token input types used in Kirin Chumsky parsers.
@@ -186,29 +187,32 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-/// Parses a source string using the given language's parser.
+/// Parses a source string into an AST using the given language's parser.
 ///
 /// This is a convenience function that wraps the common parsing boilerplate:
-/// tokenization, stream creation, and error handling.
+/// tokenization, stream creation, and error handling. It returns the AST
+/// representation without converting to IR.
+///
+/// For most use cases, prefer [`parse`] which combines parsing and IR emission.
 ///
 /// # Example
 ///
 /// ```ignore
-/// use kirin_chumsky::parse;
+/// use kirin_chumsky::parse_ast;
 ///
 /// // Define your dialect with HasRecursiveParser and WithAbstractSyntaxTree derives
-/// #[derive(Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
+/// #[derive(Dialect, DialectParser)]
 /// #[kirin(type_lattice = MyType)]
 /// #[chumsky(crate = kirin_chumsky)]
 /// enum MyLang {
-///     #[chumsky(format = "{res} = add {lhs} {rhs}")]
+///     #[chumsky(format = "{res:name} = add {lhs} {rhs}")]
 ///     Add { res: ResultValue, lhs: SSAValue, rhs: SSAValue },
 /// }
 ///
-/// // Parse a string directly
-/// let ast = parse::<MyLang>("%x = add %a %b")?;
+/// // Parse a string to get the AST
+/// let ast = parse_ast::<MyLang>("%x = add %a %b")?;
 /// ```
-pub fn parse<'src, L>(input: &'src str) -> Result<L::Output, Vec<ParseError>>
+pub fn parse_ast<'src, L>(input: &'src str) -> Result<L::Output, Vec<ParseError>>
 where
     L: HasParser<'src, 'src>,
 {
@@ -234,6 +238,51 @@ where
             })
             .collect()),
     }
+}
+
+/// Parses a source string and emits IR using the given language's parser.
+///
+/// This is a convenience function that combines parsing and IR emission:
+/// 1. Tokenizes the input string
+/// 2. Parses tokens into an AST
+/// 3. Emits IR from the AST
+///
+/// The function creates a fresh [`EmitContext`] for the emission, which means
+/// any SSA values referenced in the input must be defined within the same input.
+/// For more control over name resolution (e.g., when parsing multiple statements
+/// that reference previously defined SSAs), use [`parse_ast`] and [`EmitContext`]
+/// directly.
+///
+/// # Example
+///
+/// ```ignore
+/// use kirin_chumsky::parse;
+/// use kirin_ir::Context;
+///
+/// // Define your dialect with DialectParser derive
+/// #[derive(Dialect, DialectParser)]
+/// #[kirin(type_lattice = MyType)]
+/// #[chumsky(crate = kirin_chumsky)]
+/// enum MyLang {
+///     #[chumsky(format = "{res:name} = add {lhs} {rhs}")]
+///     Add { res: ResultValue, lhs: SSAValue, rhs: SSAValue },
+/// }
+///
+/// let mut context: Context<MyLang> = Context::default();
+/// // Parse and emit IR directly
+/// let statement = parse::<MyLang>("%x = add %a %b", &mut context)?;
+/// ```
+pub fn parse<'src, L>(
+    input: &'src str,
+    context: &mut Context<L>,
+) -> Result<<L::Output as EmitIR<L>>::Output, Vec<ParseError>>
+where
+    L: Dialect + HasParser<'src, 'src>,
+    L::Output: EmitIR<L>,
+{
+    let ast = parse_ast::<L>(input)?;
+    let mut emit_ctx = EmitContext::new(context);
+    Ok(ast.emit(&mut emit_ctx))
 }
 
 // === Implementations for standard library types ===
@@ -280,3 +329,122 @@ impl_with_ast_identity!(u8, u16, u32, u64, u128, usize);
 impl_with_ast_identity!(i8, i16, i32, i64, i128, isize);
 impl_with_ast_identity!(f32, f64);
 impl_with_ast_identity!(bool, char, String);
+
+// === EmitIR trait and EmitContext ===
+
+/// Context for emitting IR from parsed AST, tracking name mappings.
+///
+/// This struct maintains symbol tables for SSA values and blocks,
+/// allowing name resolution during IR emission. Names are preserved
+/// in the generated IR for roundtrip fidelity (e.g., `%x` in source
+/// becomes an SSA with `name = Some("x")`).
+pub struct EmitContext<'a, L: Dialect> {
+    /// The IR context used for building nodes.
+    pub context: &'a mut Context<L>,
+    /// Maps SSA names (e.g., "x" from "%x") to SSAValue handles.
+    ssa_names: HashMap<String, kirin_ir::SSAValue>,
+    /// Maps block names (e.g., "bb0" from "^bb0") to Block handles.
+    block_names: HashMap<String, kirin_ir::Block>,
+}
+
+impl<'a, L: Dialect> EmitContext<'a, L> {
+    /// Creates a new emit context wrapping the given IR context.
+    pub fn new(context: &'a mut Context<L>) -> Self {
+        Self {
+            context,
+            ssa_names: HashMap::new(),
+            block_names: HashMap::new(),
+        }
+    }
+
+    /// Looks up an SSA value by its name.
+    ///
+    /// Returns `None` if the name has not been registered.
+    pub fn lookup_ssa(&self, name: &str) -> Option<kirin_ir::SSAValue> {
+        self.ssa_names.get(name).copied()
+    }
+
+    /// Registers an SSA value with the given name.
+    ///
+    /// This should be called when emitting a result value or block argument
+    /// so that subsequent uses of the same name can resolve to the correct handle.
+    pub fn register_ssa(&mut self, name: String, ssa: kirin_ir::SSAValue) {
+        self.ssa_names.insert(name, ssa);
+    }
+
+    /// Looks up a block by its label name.
+    ///
+    /// Returns `None` if the block has not been registered.
+    pub fn lookup_block(&self, name: &str) -> Option<kirin_ir::Block> {
+        self.block_names.get(name).copied()
+    }
+
+    /// Registers a block with the given label name.
+    ///
+    /// This should be called when emitting a block so that branch targets
+    /// can resolve to the correct block handle.
+    pub fn register_block(&mut self, name: String, block: kirin_ir::Block) {
+        self.block_names.insert(name, block);
+    }
+}
+
+/// Trait for emitting IR nodes from parsed AST nodes.
+///
+/// This trait provides a way to convert parsed AST representations
+/// into actual IR nodes using the Context builder methods. It uses
+/// the `EmitContext` to track name-to-handle mappings for SSA values
+/// and blocks.
+///
+/// # Example
+///
+/// ```ignore
+/// impl<L> EmitIR<L> for MyDialectAST<'_, '_, L>
+/// where
+///     L: Dialect + From<MyDialect>,
+/// {
+///     type Output = kirin_ir::Statement;
+///
+///     fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output {
+///         match self {
+///             MyDialectAST::Add { lhs, rhs, res } => {
+///                 let lhs_ir = lhs.emit(ctx);
+///                 let rhs_ir = rhs.emit(ctx);
+///                 // ... create statement using ctx.context builders ...
+///             }
+///         }
+///     }
+/// }
+/// ```
+pub trait EmitIR<L: Dialect> {
+    /// The IR type this AST node emits.
+    type Output;
+
+    /// Emit this AST node as IR.
+    ///
+    /// This method converts the AST node into its corresponding IR representation,
+    /// using the `EmitContext` for name resolution and the underlying `Context`
+    /// for node creation.
+    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output;
+}
+
+/// Emits an AST node as IR using a fresh emit context.
+///
+/// This is a convenience function that creates an `EmitContext`, emits the AST,
+/// and returns the result.
+///
+/// # Example
+///
+/// ```ignore
+/// use kirin_chumsky::emit;
+///
+/// let ast = parse::<MyDialect>(source)?;
+/// let statement = emit(&ast, &mut context);
+/// ```
+pub fn emit<L, T>(ast: &T, context: &mut Context<L>) -> T::Output
+where
+    L: Dialect,
+    T: EmitIR<L>,
+{
+    let mut emit_ctx = EmitContext::new(context);
+    ast.emit(&mut emit_ctx)
+}
