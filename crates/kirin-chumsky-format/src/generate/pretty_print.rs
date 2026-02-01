@@ -1,0 +1,370 @@
+//! Code generation for the `PrettyPrint` derive macro.
+//!
+//! This generates `PrettyPrint` implementations for dialect types based on their
+//! `chumsky(format = "...")` attributes. The generated printer mirrors the parser,
+//! ensuring roundtrip compatibility.
+
+use indexmap::IndexMap;
+use proc_macro2::TokenStream;
+use quote::quote;
+
+use crate::field_kind::{CollectedField, collect_fields};
+use crate::format::{Format, FormatElement};
+use crate::ChumskyLayout;
+use kirin_lexer::Token;
+
+/// Generator for the `PrettyPrint` trait implementation.
+pub struct GeneratePrettyPrint {
+    /// Path to the kirin_prettyless crate
+    prettyless_path: syn::Path,
+}
+
+impl GeneratePrettyPrint {
+    /// Creates a new generator.
+    pub fn new(ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> Self {
+        // Get the prettyless crate path from attributes or use default
+        // We look for a `prettyless` attribute or fall back to `::kirin_prettyless`
+        let prettyless_path = ir_input
+            .attrs
+            .crate_path
+            .as_ref()
+            .map(|p| {
+                // If user specified a crate path like `kirin_chumsky`, try to derive prettyless path
+                // For now, just use the default
+                let _ = p;
+                syn::parse_quote!(::kirin_prettyless)
+            })
+            .unwrap_or_else(|| syn::parse_quote!(::kirin_prettyless));
+        Self { prettyless_path }
+    }
+
+    /// Generates the `PrettyPrint` implementation.
+    pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
+        let dialect_name = &ir_input.name;
+        let (_, ty_generics, _) = ir_input.generics.split_for_impl();
+        let prettyless_path = &self.prettyless_path;
+
+        // Generate the pretty print body based on struct/enum
+        let print_body = match &ir_input.data {
+            kirin_derive_core::ir::Data::Struct(s) => {
+                self.generate_struct_print(&s.0, dialect_name, None)
+            }
+            kirin_derive_core::ir::Data::Enum(e) => {
+                self.generate_enum_print(e, dialect_name)
+            }
+        };
+
+        // We need to add a Language type parameter for the impl
+        // The existing impl_generics from the type, plus a new Language parameter
+        let impl_generics_with_lang = if ir_input.generics.params.is_empty() {
+            quote! { <Language> }
+        } else {
+            let existing = &ir_input.generics.params;
+            quote! { <Language, #existing> }
+        };
+
+        // Build impl with appropriate bounds
+        // Note: we don't require Language: PrettyPrint<Language> because this IS the
+        // implementation for the dialect type. The bound would cause infinite recursion.
+        quote! {
+            impl #impl_generics_with_lang #prettyless_path::PrettyPrint<Language>
+                for #dialect_name #ty_generics
+            where
+                Language: ::kirin_ir::Dialect,
+                Language::TypeLattice: std::fmt::Display,
+            {
+                fn pretty_print<'a>(
+                    &self,
+                    doc: &'a #prettyless_path::Document<'a, Language>,
+                ) -> #prettyless_path::ArenaDoc<'a> {
+                    use #prettyless_path::DocAllocator;
+                    #print_body
+                }
+            }
+        }
+    }
+
+    fn generate_struct_print(
+        &self,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+        dialect_name: &syn::Ident,
+        variant_name: Option<&syn::Ident>,
+    ) -> TokenStream {
+        let format_str = stmt
+            .extra_attrs
+            .format
+            .as_ref()
+            .expect("Statement must have format string");
+
+        let format = Format::parse(format_str, None)
+            .expect("Format string should be valid");
+
+        let collected = collect_fields(stmt);
+        let field_map = build_field_map(&collected);
+        
+        // Generate field bindings for pattern matching
+        let bindings = stmt.field_bindings("f");
+        let fields = &bindings.field_idents;
+
+        let (pattern, print_expr) = if bindings.is_tuple {
+            let pattern = match variant_name {
+                Some(v) => quote! { #dialect_name::#v(#(#fields),*) },
+                None => quote! { #dialect_name(#(#fields),*) },
+            };
+
+            let print_expr = self.generate_format_print(
+                &format,
+                &field_map,
+                &collected,
+                fields,
+            );
+
+            (pattern, print_expr)
+        } else {
+            let orig_fields = &bindings.original_field_names;
+            let pat: Vec<_> = orig_fields
+                .iter()
+                .zip(fields)
+                .map(|(f, b)| quote! { #f: #b })
+                .collect();
+            let pattern = match variant_name {
+                Some(v) => quote! { #dialect_name::#v { #(#pat),* } },
+                None => quote! { #dialect_name { #(#pat),* } },
+            };
+
+            let print_expr = self.generate_format_print(
+                &format,
+                &field_map,
+                &collected,
+                fields,
+            );
+
+            (pattern, print_expr)
+        };
+
+        quote! {
+            let #pattern = self;
+            #print_expr
+        }
+    }
+
+    fn generate_enum_print(
+        &self,
+        data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
+        dialect_name: &syn::Ident,
+    ) -> TokenStream {
+        let arms: Vec<_> = data
+            .variants
+            .iter()
+            .map(|variant| {
+                let name = &variant.name;
+
+                // Check if this is a wrapper variant
+                if variant.wraps.is_some() {
+                    let prettyless_path = &self.prettyless_path;
+                    return quote! {
+                        #dialect_name::#name(inner) => {
+                            #prettyless_path::PrettyPrint::pretty_print(inner, doc)
+                        }
+                    };
+                }
+
+                let format_str = variant
+                    .extra_attrs
+                    .format
+                    .as_ref()
+                    .expect("Variant must have format string");
+
+                let format = Format::parse(format_str, None)
+                    .expect("Format string should be valid");
+
+                let collected = collect_fields(variant);
+                let field_map = build_field_map(&collected);
+                let bindings = variant.field_bindings("f");
+                let fields = &bindings.field_idents;
+
+                if bindings.is_empty() {
+                    let print_expr = self.generate_format_print(
+                        &format,
+                        &field_map,
+                        &collected,
+                        fields,
+                    );
+                    if bindings.is_tuple {
+                        quote! {
+                            #dialect_name::#name => {
+                                #print_expr
+                            }
+                        }
+                    } else {
+                        quote! {
+                            #dialect_name::#name {} => {
+                                #print_expr
+                            }
+                        }
+                    }
+                } else if bindings.is_tuple {
+                    let print_expr = self.generate_format_print(
+                        &format,
+                        &field_map,
+                        &collected,
+                        fields,
+                    );
+                    quote! {
+                        #dialect_name::#name(#(#fields),*) => {
+                            #print_expr
+                        }
+                    }
+                } else {
+                    let orig_fields = &bindings.original_field_names;
+                    let pat: Vec<_> = orig_fields
+                        .iter()
+                        .zip(fields)
+                        .map(|(f, b)| quote! { #f: #b })
+                        .collect();
+                    let print_expr = self.generate_format_print(
+                        &format,
+                        &field_map,
+                        &collected,
+                        fields,
+                    );
+                    quote! {
+                        #dialect_name::#name { #(#pat),* } => {
+                            #print_expr
+                        }
+                    }
+                }
+            })
+            .collect();
+
+        quote! {
+            match self {
+                #(#arms)*
+            }
+        }
+    }
+
+    fn generate_format_print(
+        &self,
+        format: &Format,
+        field_map: &IndexMap<String, (usize, &CollectedField)>,
+        _collected: &[CollectedField],
+        field_vars: &[syn::Ident],
+    ) -> TokenStream {
+        let prettyless_path = &self.prettyless_path;
+        let elements = format.elements();
+
+        // Build the document expression by combining format elements
+        let mut parts: Vec<TokenStream> = Vec::new();
+
+        for (i, elem) in elements.iter().enumerate() {
+            let is_first = i == 0;
+            let is_last = i == elements.len() - 1;
+            let prev_is_field = i > 0 && matches!(elements[i - 1], FormatElement::Field(_, _));
+            let next_is_field = !is_last && matches!(elements[i + 1], FormatElement::Field(_, _));
+
+            match elem {
+                FormatElement::Token(tokens) => {
+                    // Convert tokens to text with proper spacing
+                    let text = tokens_to_string_with_spacing(tokens, prev_is_field, next_is_field);
+                    parts.push(quote! { doc.text(#text) });
+                }
+                FormatElement::Field(name, opt) => {
+                    // Look up the field by name
+                    let name_str = name.to_string();
+                    if let Some((idx, field)) = field_map.get(&name_str) {
+                        let var = &field_vars[*idx];
+                        let var_ref = quote! { #var };
+                        
+                        let print_expr = field.kind.print_expr(
+                            prettyless_path,
+                            &var_ref,
+                            opt,
+                        );
+                        
+                        // Add space before field if preceded by another field (no Token between)
+                        if !is_first && prev_is_field {
+                            parts.push(quote! { doc.text(" ") });
+                        }
+                        
+                        parts.push(print_expr);
+                    }
+                }
+            }
+        }
+
+        // Combine parts with + operator
+        if parts.is_empty() {
+            quote! { doc.nil() }
+        } else {
+            let first = &parts[0];
+            let rest = &parts[1..];
+            quote! {
+                #first #(+ #rest)*
+            }
+        }
+    }
+}
+
+/// Build a map from field name (string) to (index, CollectedField)
+fn build_field_map(collected: &[CollectedField]) -> IndexMap<String, (usize, &CollectedField)> {
+    let mut map = IndexMap::new();
+    for (idx, field) in collected.iter().enumerate() {
+        let name = match &field.ident {
+            Some(ident) => ident.to_string(),
+            None => field.index.to_string(),
+        };
+        map.insert(name, (idx, field));
+    }
+    map
+}
+
+/// Convert a sequence of tokens to a string for printing with proper spacing.
+///
+/// - `add_leading_space`: Add a space before the first token
+/// - `add_trailing_space`: Add a space after the last token
+fn tokens_to_string_with_spacing(
+    tokens: &[Token],
+    add_leading_space: bool,
+    add_trailing_space: bool,
+) -> String {
+    let mut result = String::new();
+    
+    // Add leading space if preceded by a field
+    if add_leading_space && !tokens.is_empty() {
+        // Check if the first token is a punctuation that typically doesn't want leading space
+        let needs_leading_space = !matches!(
+            tokens.first(),
+            Some(Token::Comma) | Some(Token::RBrace) | Some(Token::RParen) | Some(Token::RBracket)
+        );
+        if needs_leading_space {
+            result.push(' ');
+        }
+    }
+    
+    for (i, token) in tokens.iter().enumerate() {
+        if i > 0 {
+            result.push(' ');
+        }
+        // Use Display impl for most tokens, special-case escaped braces
+        match token {
+            Token::EscapedLBrace => result.push('{'),
+            Token::EscapedRBrace => result.push('}'),
+            other => result.push_str(&other.to_string()),
+        }
+    }
+    
+    // Add trailing space if followed by a field
+    if add_trailing_space && !tokens.is_empty() {
+        // Check if the last token is a punctuation that typically doesn't want trailing space
+        let needs_trailing_space = !matches!(
+            tokens.last(),
+            Some(Token::LBrace) | Some(Token::LParen) | Some(Token::LBracket)
+        );
+        if needs_trailing_space {
+            result.push(' ');
+        }
+    }
+    
+    result
+}

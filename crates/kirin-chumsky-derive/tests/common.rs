@@ -50,6 +50,19 @@ impl FiniteLattice for SimpleType {
 
 impl TypeLattice for SimpleType {}
 
+impl std::fmt::Display for SimpleType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SimpleType::I32 => write!(f, "i32"),
+            SimpleType::I64 => write!(f, "i64"),
+            SimpleType::F32 => write!(f, "f32"),
+            SimpleType::F64 => write!(f, "f64"),
+            SimpleType::Bool => write!(f, "bool"),
+            SimpleType::Unit => write!(f, "unit"),
+        }
+    }
+}
+
 impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleType {
     type Output = SimpleType;
 

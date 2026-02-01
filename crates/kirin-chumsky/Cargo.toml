@@ -7,6 +7,7 @@ edition = "2024"
 chumsky = "0.10"
 kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
 kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
+kirin-prettyless = { version = "0.1.0", path = "../kirin-prettyless" }
 
 [features]
 default = []

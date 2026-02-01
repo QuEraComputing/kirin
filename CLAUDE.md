@@ -42,10 +42,11 @@ Proc-macro logic (but not the proc-macro entry points themselves):
 - **Attribute parsing** (`attrs.rs`) — handles `#[chumsky(...)]` and `#[kirin(...)]` attributes via the `ChumskyLayout` trait (built on `kirin-derive-core`'s `Layout` system and `darling`).
 
 ### Macro Entry Points (`kirin-chumsky-derive`)
-Thin proc-macro crate exposing three derives:
-- `HasRecursiveParser` — parser only
-- `WithAbstractSyntaxTree` — AST type only
-- `DialectParser` — both combined
+Thin proc-macro crate exposing two derives:
+- `HasParser` — generates AST type, parser impl (`HasRecursiveParser`), and `EmitIR` impl
+- `PrettyPrint` — roundtrip-compatible printing
+
+Both should be derived together: `#[derive(Dialect, HasParser, PrettyPrint)]`
 
 ### Supporting Crates
 - **`kirin-lexer`** — Logos-based tokenizer (`Token` enum with SSA values, blocks, symbols, identifiers, literals, punctuation)

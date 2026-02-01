@@ -78,10 +78,11 @@ where
 /// - `%value`
 /// - `%value: type`
 pub fn ssa_value<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, SSAValue<'tokens, 'src, L>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, SSAValue<'src, <L::TypeLattice as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then(
@@ -97,10 +98,11 @@ where
 ///
 /// Matches: `%value: type`
 pub fn ssa_value_with_type<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, SSAValue<'tokens, 'src, L>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, SSAValue<'src, <L::TypeLattice as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then_ignore(just(Token::Colon))
@@ -116,10 +118,11 @@ where
 /// For parsing result values with optional type annotations, use
 /// [`result_value_with_optional_type`].
 pub fn result_value<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, ResultValue<'tokens, 'src, L>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, ResultValue<'src, <L::TypeLattice as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src>,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .map(|name| ResultValue { name, ty: None })
@@ -135,10 +138,11 @@ where
 /// This is the parser used by format strings with `{result}` (Default option)
 /// for ResultValue fields, allowing users to optionally annotate result types.
 pub fn result_value_with_optional_type<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, ResultValue<'tokens, 'src, L>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, ResultValue<'src, <L::TypeLattice as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then(
@@ -155,10 +159,11 @@ where
 /// Matches: `%r1, %r2, %r3 =`
 pub fn result_values<'tokens, 'src: 'tokens, I, L>(
     n: usize,
-) -> impl Parser<'tokens, I, Vec<ResultValue<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+) -> impl Parser<'tokens, I, Vec<ResultValue<'src, <L::TypeLattice as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src>,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .map(|name| ResultValue { name, ty: None })
@@ -186,10 +191,11 @@ where
 
 /// Parses only the type portion (expects type parser output).
 pub fn typeof_ssa<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, TypeofSSAValue<'tokens, 'src, L>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, TypeofSSAValue<<L::TypeLattice as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     L::TypeLattice::parser()
         .map_with(|ty, extra| TypeofSSAValue {
@@ -245,14 +251,21 @@ where
     .labelled("block label")
 }
 
+/// Type alias for the parsed type output of a language.
+pub type TypeOutput<'tokens, 'src, L> = <<L as kirin_ir::Dialect>::TypeLattice as HasParser<'tokens, 'src>>::Output;
+
+/// Type alias for the parsed statement output of a language.
+pub type StmtOutput<'tokens, 'src, L> = <L as HasRecursiveParser<'tokens, 'src, L>>::Output;
+
 /// Parses a block argument.
 ///
 /// Matches: `%arg: type`
 pub fn block_argument<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, Spanned<BlockArgument<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, Spanned<BlockArgument<'src, TypeOutput<'tokens, 'src, L>>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then_ignore(just(Token::Colon))
@@ -272,10 +285,11 @@ where
 /// Matches: `(%arg0: i32, %arg1: f64)` or `()` for empty argument lists.
 /// Note: Parentheses are always required, even for empty argument lists.
 pub fn block_argument_list<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, Vec<Spanned<BlockArgument<'tokens, 'src, L>>>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, Vec<Spanned<BlockArgument<'src, TypeOutput<'tokens, 'src, L>>>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     block_argument::<_, L>()
         .separated_by(just(Token::Comma))
@@ -290,10 +304,11 @@ where
 /// Matches: `^bb0(%arg0: i32, %arg1: f64)` or `^bb0()` for blocks with no arguments.
 /// Note: Parentheses are always required, even for empty argument lists.
 pub fn block_header<'tokens, 'src: 'tokens, I, L>()
--> impl Parser<'tokens, I, Spanned<BlockHeader<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, Spanned<BlockHeader<'src, TypeOutput<'tokens, 'src, L>>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     block_label()
         .then(block_argument_list::<_, L>())
@@ -312,12 +327,13 @@ pub fn block<'tokens, 'src: 'tokens, I, L>(
         'tokens,
         'src,
         I,
-        <L as HasRecursiveParser<'tokens, 'src, L>>::Output,
+        StmtOutput<'tokens, 'src, L>,
     >,
-) -> impl Parser<'tokens, I, Spanned<Block<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+) -> impl Parser<'tokens, I, Spanned<Block<'src, TypeOutput<'tokens, 'src, L>, StmtOutput<'tokens, 'src, L>>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     let header = block_header::<_, L>();
     let statements = language
@@ -357,12 +373,13 @@ pub fn region<'tokens, 'src: 'tokens, I, L>(
         'tokens,
         'src,
         I,
-        <L as HasRecursiveParser<'tokens, 'src, L>>::Output,
+        StmtOutput<'tokens, 'src, L>,
     >,
-) -> impl Parser<'tokens, I, Region<'tokens, 'src, L>, ParserError<'tokens, 'src>>
+) -> impl Parser<'tokens, I, Region<'src, TypeOutput<'tokens, 'src, L>, StmtOutput<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     block::<_, L>(language)
         .then_ignore(just(Token::Semicolon).or_not())
@@ -371,6 +388,25 @@ where
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
         .map(|blocks| Region { blocks })
         .labelled("region")
+}
+
+/// Parses a region containing multiple blocks, returning a boxed parser.
+///
+/// This is a convenience function that boxes the region parser for use in recursive contexts.
+pub fn region_boxed<'tokens, 'src: 'tokens, I, L>(
+    language: RecursiveParser<
+        'tokens,
+        'src,
+        I,
+        StmtOutput<'tokens, 'src, L>,
+    >,
+) -> BoxedParser<'tokens, 'src, I, Region<'src, TypeOutput<'tokens, 'src, L>, StmtOutput<'tokens, 'src, L>>>
+where
+    I: TokenInput<'tokens, 'src>,
+    L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
+{
+    region::<_, L>(language).boxed()
 }
 
 /// Parses a function type signature.
@@ -385,6 +421,7 @@ pub fn function_type<'tokens, 'src: 'tokens, I, L>() -> impl Parser<
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     let input_types = L::TypeLattice::parser()
         .map_with(|ty, e| Spanned {
@@ -433,10 +470,11 @@ where
 pub fn ssa_values<'tokens, 'src: 'tokens, I, L>(
     n: usize,
     sep: Token<'src>,
-) -> impl Parser<'tokens, I, Vec<SSAValue<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+) -> impl Parser<'tokens, I, Vec<SSAValue<'src, TypeOutput<'tokens, 'src, L>>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: LanguageParser<'tokens, 'src> + 'tokens,
+    L::TypeLattice: HasParser<'tokens, 'src>,
 {
     ssa_value::<_, L>()
         .separated_by(just(sep))

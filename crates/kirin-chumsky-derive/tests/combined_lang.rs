@@ -1,13 +1,12 @@
-//! Tests for the combined DialectParser derive macro.
+//! Tests for the combined HasParser + PrettyPrint derive macros.
 
 mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::parse_ast;
-use kirin_chumsky_derive::DialectParser;
+use kirin_chumsky::{parse_ast, HasParser, PrettyPrint};
 
-#[derive(Debug, Clone, PartialEq, Dialect, DialectParser)]
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(type_lattice = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum CombinedLang {

@@ -1,4 +1,4 @@
-//! Code generation for the `WithAbstractSyntaxTree` derive macro.
+//! Code generation for AST types corresponding to dialect definitions.
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -7,12 +7,16 @@ use crate::ChumskyLayout;
 use crate::field_kind::{FieldKind, collect_fields};
 use crate::generics::GenericsBuilder;
 
-/// Generator for the `WithAbstractSyntaxTree` trait implementation.
-pub struct GenerateWithAbstractSyntaxTree {
+/// Generator for AST type definitions.
+///
+/// This generates the AST type (e.g., `MyDialectAST`) that corresponds to a dialect
+/// definition. The AST type is used during parsing to represent the syntax tree
+/// before it's converted to IR.
+pub struct GenerateAST {
     crate_path: syn::Path,
 }
 
-impl GenerateWithAbstractSyntaxTree {
+impl GenerateAST {
     /// Creates a new generator.
     pub fn new(ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> Self {
         let crate_path = ir_input
@@ -24,19 +28,17 @@ impl GenerateWithAbstractSyntaxTree {
         Self { crate_path }
     }
 
-    /// Generates the AST type and `WithAbstractSyntaxTree` implementation.
+    /// Generates the AST type definition with Debug, Clone, and PartialEq impls.
     pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let ast_generics = self.build_ast_generics(ir_input);
 
         let ast_definition = self.generate_ast_definition(ir_input, &ast_name, &ast_generics);
         let trait_impls = self.generate_derive_impls(ir_input, &ast_name, &ast_generics);
-        let trait_impl = self.generate_trait_impl(ir_input, &ast_name, &ast_generics);
 
         quote! {
             #ast_definition
             #trait_impls
-            #trait_impl
         }
     }
 
@@ -66,6 +68,7 @@ impl GenerateWithAbstractSyntaxTree {
                         pub struct #ast_name #ty_generics
                         where
                             Language: #crate_path::LanguageParser<'tokens, 'src>,
+                            <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
                         (
                             #fields
                         );
@@ -75,6 +78,7 @@ impl GenerateWithAbstractSyntaxTree {
                         pub struct #ast_name #ty_generics
                         where
                             Language: #crate_path::LanguageParser<'tokens, 'src>,
+                            <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
                         {
                             #fields
                         }
@@ -87,6 +91,7 @@ impl GenerateWithAbstractSyntaxTree {
                     pub enum #ast_name #ty_generics
                     where
                         Language: #crate_path::LanguageParser<'tokens, 'src>,
+                        <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
                     {
                         #variants
                     }
@@ -117,6 +122,7 @@ impl GenerateWithAbstractSyntaxTree {
             impl #impl_generics ::core::fmt::Debug for #ast_name #ty_generics
             where
                 Language: #crate_path::LanguageParser<'tokens, 'src>,
+                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
             {
                 fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                     #debug_impl
@@ -126,6 +132,7 @@ impl GenerateWithAbstractSyntaxTree {
             impl #impl_generics ::core::clone::Clone for #ast_name #ty_generics
             where
                 Language: #crate_path::LanguageParser<'tokens, 'src>,
+                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
             {
                 fn clone(&self) -> Self {
                     #clone_impl
@@ -135,6 +142,7 @@ impl GenerateWithAbstractSyntaxTree {
             impl #impl_generics ::core::cmp::PartialEq for #ast_name #ty_generics
             where
                 Language: #crate_path::LanguageParser<'tokens, 'src>,
+                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
             {
                 fn eq(&self, other: &Self) -> bool {
                     #partialeq_impl
@@ -181,9 +189,9 @@ impl GenerateWithAbstractSyntaxTree {
                     (pattern, debug)
                 };
 
-                quote! {
+                    quote! {
                     let #pattern = self;
-                    #debug_fields.finish()
+                        #debug_fields.finish()
                 }
             }
             kirin_derive_core::ir::Data::Enum(data) => {
@@ -204,9 +212,9 @@ impl GenerateWithAbstractSyntaxTree {
                             }
                         } else if bindings.is_tuple {
                             let debug_fields = fields.iter().fold(
-                                quote! { f.debug_tuple(#name_str) },
-                                |acc, field| quote! { #acc.field(&#field) },
-                            );
+                                    quote! { f.debug_tuple(#name_str) },
+                                    |acc, field| quote! { #acc.field(&#field) },
+                                );
                             quote! { Self::#name(#(#fields),*) => #debug_fields.finish() }
                         } else {
                             let orig_fields = &bindings.original_field_names;
@@ -216,12 +224,12 @@ impl GenerateWithAbstractSyntaxTree {
                                 .map(|(f, b)| quote! { #f: #b })
                                 .collect();
                             let debug_fields = orig_fields.iter().zip(fields).fold(
-                                quote! { f.debug_struct(#name_str) },
+                                    quote! { f.debug_struct(#name_str) },
                                 |acc, (orig, field)| {
                                     let field_name = orig.to_string();
-                                    quote! { #acc.field(#field_name, &#field) }
-                                },
-                            );
+                                        quote! { #acc.field(#field_name, &#field) }
+                                    },
+                                );
                             quote! { Self::#name { #(#pat),* } => #debug_fields.finish() }
                         }
                     })
@@ -270,7 +278,7 @@ impl GenerateWithAbstractSyntaxTree {
                     )
                 };
 
-                quote! {
+                    quote! {
                     let #pattern = self;
                     #cloned
                 }
@@ -291,7 +299,7 @@ impl GenerateWithAbstractSyntaxTree {
                                 quote! { Self::#name {} => Self::#name {} }
                             }
                         } else if bindings.is_tuple {
-                            quote! {
+                                quote! {
                                 Self::#name(#(#fields),*) => Self::#name(#(#fields.clone()),*)
                             }
                         } else {
@@ -306,7 +314,7 @@ impl GenerateWithAbstractSyntaxTree {
                                 .zip(fields)
                                 .map(|(f, b)| quote! { #f: #b.clone() })
                                 .collect();
-                            quote! {
+                                quote! {
                                 Self::#name { #(#pat),* } => Self::#name { #(#clones),* }
                             }
                         }
@@ -336,8 +344,8 @@ impl GenerateWithAbstractSyntaxTree {
                 let other_fields = &other_bindings.field_idents;
 
                 let comparisons = self_fields.iter().zip(other_fields).map(|(s, o)| {
-                    quote! { #s == #o }
-                });
+                        quote! { #s == #o }
+                    });
 
                 let (self_pattern, other_pattern) = if self_bindings.is_tuple {
                     (
@@ -362,10 +370,10 @@ impl GenerateWithAbstractSyntaxTree {
                     )
                 };
 
-                quote! {
+                    quote! {
                     let #self_pattern = self;
                     let #other_pattern = other;
-                    true #(&& #comparisons)*
+                        true #(&& #comparisons)*
                 }
             }
             kirin_derive_core::ir::Data::Enum(data) => {
@@ -387,31 +395,31 @@ impl GenerateWithAbstractSyntaxTree {
                             }
                         } else if self_bindings.is_tuple {
                             let comparisons = self_fields.iter().zip(other_fields).map(|(s, o)| {
-                                quote! { #s == #o }
-                            });
-                            quote! {
-                                (Self::#name(#(#self_fields),*), Self::#name(#(#other_fields),*)) => {
-                                    true #(&& #comparisons)*
+                                    quote! { #s == #o }
+                                });
+                                quote! {
+                                    (Self::#name(#(#self_fields),*), Self::#name(#(#other_fields),*)) => {
+                                        true #(&& #comparisons)*
                                 }
                             }
                         } else {
                             let orig_fields = &self_bindings.original_field_names;
                             let self_pat: Vec<_> = orig_fields
-                                .iter()
+                                    .iter()
                                 .zip(self_fields)
-                                .map(|(f, s)| quote! { #f: #s })
-                                .collect();
+                                    .map(|(f, s)| quote! { #f: #s })
+                                    .collect();
                             let other_pat: Vec<_> = orig_fields
                                 .iter()
                                 .zip(other_fields)
-                                .map(|(f, o)| quote! { #f: #o })
-                                .collect();
+                                    .map(|(f, o)| quote! { #f: #o })
+                                    .collect();
                             let comparisons = self_fields.iter().zip(other_fields).map(|(s, o)| {
-                                quote! { #s == #o }
-                            });
-                            quote! {
+                                    quote! { #s == #o }
+                                });
+                                quote! {
                                 (Self::#name { #(#self_pat),* }, Self::#name { #(#other_pat),* }) => {
-                                    true #(&& #comparisons)*
+                                        true #(&& #comparisons)*
                                 }
                             }
                         }
@@ -474,8 +482,9 @@ impl GenerateWithAbstractSyntaxTree {
                 if let Some(wrapper) = &variant.wraps {
                     let wrapped_ty = &wrapper.ty;
                     let crate_path = &self.crate_path;
+                    // Use HasParser::Output to get the AST type for wrapped dialects
                     return quote! {
-                        #name(<#wrapped_ty as #crate_path::WithAbstractSyntaxTree<'tokens, 'src, Language>>::AbstractSyntaxTreeNode)
+                        #name(<#wrapped_ty as #crate_path::HasParser<'tokens, 'src>>::Output)
                     };
                 }
 
@@ -501,27 +510,5 @@ impl GenerateWithAbstractSyntaxTree {
     ) -> TokenStream {
         let base = kind.ast_type(&self.crate_path);
         collection.wrap_type(base)
-    }
-
-    fn generate_trait_impl(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        ast_name: &syn::Ident,
-        ast_generics: &syn::Generics,
-    ) -> TokenStream {
-        let crate_path = &self.crate_path;
-        let name = &ir_input.name;
-        let (impl_generics, ty_generics, where_clause) = ast_generics.split_for_impl();
-
-        // Get the original type's type generics (without 'tokens, 'src, Language)
-        let (_, original_ty_generics, _) = ir_input.generics.split_for_impl();
-
-        quote! {
-            impl #impl_generics #crate_path::WithAbstractSyntaxTree<'tokens, 'src, Language> for #name #original_ty_generics
-            #where_clause
-            {
-                type AbstractSyntaxTreeNode = #ast_name #ty_generics;
-            }
-        }
     }
 }

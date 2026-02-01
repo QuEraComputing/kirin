@@ -66,11 +66,13 @@ impl GenerateEmitIR {
         };
 
         // IR type parameter for the EmitIR impl
-        // We need an additional type parameter that satisfies `Dialect + From<OriginalType>`
+        // We need `Dialect + From<OriginalType>` to convert the AST to IR statements
+        // We also need `TypeLattice: HasParser` because the AST type requires it
         quote! {
             impl #impl_generics #crate_path::EmitIR<Language> for #ast_name #ty_generics
             where
-                Language: ::kirin_ir::Dialect + From<#original_name #original_ty_generics> + #crate_path::LanguageParser<'tokens, 'src>,
+                Language: ::kirin_ir::Dialect + From<#original_name #original_ty_generics>,
+                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
             {
                 type Output = ::kirin_ir::Statement;
 

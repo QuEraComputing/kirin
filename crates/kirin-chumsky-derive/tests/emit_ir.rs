@@ -7,11 +7,10 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Context, Dialect, GetInfo, ResultValue, SSAValue};
-use kirin_chumsky::{parse, parse_ast, EmitContext, EmitIR};
-use kirin_chumsky_derive::DialectParser;
+use kirin_chumsky::{parse, parse_ast, EmitContext, EmitIR, HasParser, PrettyPrint};
 
 /// A simple dialect for testing EmitIR functionality.
-#[derive(Debug, Clone, PartialEq, Dialect, DialectParser)]
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(type_lattice = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum EmitLang {
@@ -333,4 +332,127 @@ fn test_combined_parse_workflow() {
     // Both SSAs should have been created
     assert!(x_ssa.get_info(emit_ctx.context).is_some());
     assert!(y_ssa.get_info(emit_ctx.context).is_some());
+}
+
+// ============================================================================
+// Roundtrip Tests
+// ============================================================================
+
+use kirin_prettyless::{Config, Document};
+
+/// Test roundtrip: parse -> emit -> print should produce output matching input.
+///
+/// This verifies that the parser and pretty printer are symmetric.
+#[test]
+fn test_roundtrip_add() {
+    let mut context: Context<EmitLang> = Context::default();
+
+    // Create operand SSAs
+    let ssa_a = context
+        .ssa()
+        .name("a".to_string())
+        .ty(SimpleType::I32)
+        .kind(kirin_ir::SSAKind::Test)
+        .new();
+    let ssa_b = context
+        .ssa()
+        .name("b".to_string())
+        .ty(SimpleType::I32)
+        .kind(kirin_ir::SSAKind::Test)
+        .new();
+
+    // Parse
+    let input = "%res = add %a, %b";
+    let ast = parse_ast::<EmitLang>(input).expect("parse failed");
+
+    // Emit to get the dialect variant
+    let mut emit_ctx = EmitContext::new(&mut context);
+    emit_ctx.register_ssa("a".to_string(), ssa_a);
+    emit_ctx.register_ssa("b".to_string(), ssa_b);
+
+    let statement = ast.emit(&mut emit_ctx);
+    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let dialect = stmt_info.definition();
+
+    // Pretty print directly using the trait
+    let config = Config::default();
+    let doc = Document::new(config, &context);
+    let arena_doc = dialect.pretty_print(&doc);
+    let mut output = String::new();
+    arena_doc.render_fmt(80, &mut output).expect("render failed");
+
+    // Compare (trim whitespace)
+    assert_eq!(output.trim(), input);
+}
+
+/// Test roundtrip for neg instruction.
+#[test]
+fn test_roundtrip_neg() {
+    let mut context: Context<EmitLang> = Context::default();
+
+    // Create operand SSA
+    let ssa_x = context
+        .ssa()
+        .name("x".to_string())
+        .ty(SimpleType::I32)
+        .kind(kirin_ir::SSAKind::Test)
+        .new();
+
+    // Parse
+    let input = "%y = neg %x";
+    let ast = parse_ast::<EmitLang>(input).expect("parse failed");
+
+    // Emit
+    let mut emit_ctx = EmitContext::new(&mut context);
+    emit_ctx.register_ssa("x".to_string(), ssa_x);
+
+    let statement = ast.emit(&mut emit_ctx);
+    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let dialect = stmt_info.definition();
+
+    // Pretty print directly using the trait
+    let config = Config::default();
+    let doc = Document::new(config, &context);
+    let arena_doc = dialect.pretty_print(&doc);
+    let mut output = String::new();
+    arena_doc.render_fmt(80, &mut output).expect("render failed");
+
+    // Compare
+    assert_eq!(output.trim(), input);
+}
+
+/// Test roundtrip for return instruction (tuple variant).
+#[test]
+fn test_roundtrip_return() {
+    let mut context: Context<EmitLang> = Context::default();
+
+    // Create operand SSA
+    let ssa_v = context
+        .ssa()
+        .name("v".to_string())
+        .ty(SimpleType::I32)
+        .kind(kirin_ir::SSAKind::Test)
+        .new();
+
+    // Parse
+    let input = "return %v";
+    let ast = parse_ast::<EmitLang>(input).expect("parse failed");
+
+    // Emit
+    let mut emit_ctx = EmitContext::new(&mut context);
+    emit_ctx.register_ssa("v".to_string(), ssa_v);
+
+    let statement = ast.emit(&mut emit_ctx);
+    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let dialect = stmt_info.definition();
+
+    // Pretty print directly using the trait
+    let config = Config::default();
+    let doc = Document::new(config, &context);
+    let arena_doc = dialect.pretty_print(&doc);
+    let mut output = String::new();
+    arena_doc.render_fmt(80, &mut output).expect("render failed");
+
+    // Compare
+    assert_eq!(output.trim(), input);
 }

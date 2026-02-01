@@ -6,9 +6,7 @@
 use chumsky::span::SimpleSpan;
 use kirin_ir::{Dialect, FiniteLattice, SSAKind};
 
-use crate::traits::{
-    EmitContext, EmitIR, HasParser, HasRecursiveParser, LanguageParser, WithAbstractSyntaxTree,
-};
+use crate::traits::{EmitContext, EmitIR};
 
 /// A value with an associated span.
 #[derive(Debug, Clone)]
@@ -51,110 +49,44 @@ impl<T> Spanned<T> {
 /// Represents syntax like:
 /// - `%value` (without type)
 /// - `%value: type` (with type)
-#[derive(Debug)]
-pub struct SSAValue<'tokens, 'src: 'tokens, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
+///
+/// The `TypeOutput` parameter is the parsed type representation, typically
+/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SSAValue<'src, TypeOutput> {
     /// The name of the SSA value (without the `%` prefix).
     pub name: Spanned<&'src str>,
     /// The optional type annotation.
-    pub ty: Option<<L::TypeLattice as HasParser<'tokens, 'src>>::Output>,
-}
-
-impl<'tokens, 'src: 'tokens, L> PartialEq for SSAValue<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.ty == other.ty
-    }
-}
-
-impl<'tokens, 'src: 'tokens, L> Clone for SSAValue<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            ty: self.ty.clone(),
-        }
-    }
+    pub ty: Option<TypeOutput>,
 }
 
 /// A result value (left-hand side of an SSA assignment).
 ///
 /// Represents syntax like: `%result` in `%result = add %a, %b`
-#[derive(Debug)]
-pub struct ResultValue<'tokens, 'src: 'tokens, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
+///
+/// The `TypeOutput` parameter is the parsed type representation, typically
+/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResultValue<'src, TypeOutput> {
     /// The name of the result value (without the `%` prefix).
     pub name: Spanned<&'src str>,
     /// The optional type annotation (often inferred).
-    pub ty: Option<<L::TypeLattice as HasParser<'tokens, 'src>>::Output>,
-}
-
-impl<'tokens, 'src: 'tokens, L> PartialEq for ResultValue<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.ty == other.ty
-    }
-}
-
-impl<'tokens, 'src: 'tokens, L> Clone for ResultValue<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            ty: self.ty.clone(),
-        }
-    }
+    pub ty: Option<TypeOutput>,
 }
 
 /// The type portion of an SSA value annotation.
 ///
 /// Used when the type is specified separately from the SSA value name,
 /// for example in `add %a, %b -> bool` where `bool` is the result type.
-#[derive(Debug)]
-pub struct TypeofSSAValue<'tokens, 'src: 'tokens, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
+///
+/// The `TypeOutput` parameter is the parsed type representation, typically
+/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeofSSAValue<TypeOutput> {
     /// The type value.
-    pub ty: <L::TypeLattice as HasParser<'tokens, 'src>>::Output,
+    pub ty: TypeOutput,
     /// The span of the type in the source.
     pub span: SimpleSpan,
-}
-
-impl<'tokens, 'src: 'tokens, L> PartialEq for TypeofSSAValue<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.ty == other.ty
-    }
-}
-
-impl<'tokens, 'src: 'tokens, L> Clone for TypeofSSAValue<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            ty: self.ty.clone(),
-            span: self.span,
-        }
-    }
 }
 
 /// The name portion of an SSA value.
@@ -180,73 +112,29 @@ pub struct BlockLabel<'src> {
 /// A block argument.
 ///
 /// Represents syntax like: `%arg: i32`
-#[derive(Debug)]
-pub struct BlockArgument<'tokens, 'src: 'tokens, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
+///
+/// The `TypeOutput` parameter is the parsed type representation, typically
+/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockArgument<'src, TypeOutput> {
     /// The name of the argument (without the `%` prefix).
     pub name: Spanned<&'src str>,
     /// The type of the argument.
-    pub ty: Spanned<<L::TypeLattice as HasParser<'tokens, 'src>>::Output>,
-}
-
-impl<'tokens, 'src: 'tokens, L> PartialEq for BlockArgument<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.ty == other.ty
-    }
-}
-
-impl<'tokens, 'src: 'tokens, L> Clone for BlockArgument<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            ty: self.ty.clone(),
-        }
-    }
+    pub ty: Spanned<TypeOutput>,
 }
 
 /// A block header containing the label and arguments.
 ///
 /// Represents syntax like: `^bb0(%arg0: i32, %arg1: f64)`
-#[derive(Debug)]
-pub struct BlockHeader<'tokens, 'src: 'tokens, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
+///
+/// The `TypeOutput` parameter is the parsed type representation, typically
+/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockHeader<'src, TypeOutput> {
     /// The block label.
     pub label: BlockLabel<'src>,
     /// The block arguments.
-    pub arguments: Vec<Spanned<BlockArgument<'tokens, 'src, L>>>,
-}
-
-impl<'tokens, 'src: 'tokens, L> PartialEq for BlockHeader<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.label == other.label && self.arguments == other.arguments
-    }
-}
-
-impl<'tokens, 'src: 'tokens, L> Clone for BlockHeader<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            label: self.label.clone(),
-            arguments: self.arguments.clone(),
-        }
-    }
+    pub arguments: Vec<Spanned<BlockArgument<'src, TypeOutput>>>,
 }
 
 /// A basic block containing a header and statements.
@@ -258,38 +146,15 @@ where
 ///     return %x;
 /// }
 /// ```
-#[derive(Debug)]
-pub struct Block<'tokens, 'src: 'tokens, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
+///
+/// The `TypeOutput` parameter is the parsed type representation.
+/// The `StmtOutput` parameter is the parsed statement representation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block<'src, TypeOutput, StmtOutput> {
     /// The block header with label and arguments.
-    pub header: Spanned<BlockHeader<'tokens, 'src, L>>,
+    pub header: Spanned<BlockHeader<'src, TypeOutput>>,
     /// The statements in the block.
-    pub statements: Vec<Spanned<<L as HasRecursiveParser<'tokens, 'src, L>>::Output>>,
-}
-
-impl<'tokens, 'src: 'tokens, L> PartialEq for Block<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: PartialEq,
-    <L as HasRecursiveParser<'tokens, 'src, L>>::Output: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.header == other.header && self.statements == other.statements
-    }
-}
-
-impl<'tokens, 'src: 'tokens, L> Clone for Block<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            header: self.header.clone(),
-            statements: self.statements.clone(),
-        }
-    }
+    pub statements: Vec<Spanned<StmtOutput>>,
 }
 
 /// A region containing multiple blocks.
@@ -301,35 +166,13 @@ where
 ///     ^bb1() { ... };
 /// }
 /// ```
-#[derive(Debug)]
-pub struct Region<'tokens, 'src: 'tokens, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
+///
+/// The `TypeOutput` parameter is the parsed type representation.
+/// The `StmtOutput` parameter is the parsed statement representation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Region<'src, TypeOutput, StmtOutput> {
     /// The blocks in the region.
-    pub blocks: Vec<Spanned<Block<'tokens, 'src, L>>>,
-}
-
-impl<'tokens, 'src: 'tokens, L> PartialEq for Region<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: PartialEq,
-    <L as HasRecursiveParser<'tokens, 'src, L>>::Output: PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.blocks == other.blocks
-    }
-}
-
-impl<'tokens, 'src: 'tokens, L> Clone for Region<'tokens, 'src, L>
-where
-    L: LanguageParser<'tokens, 'src>,
-{
-    fn clone(&self) -> Self {
-        Self {
-            blocks: self.blocks.clone(),
-        }
-    }
+    pub blocks: Vec<Spanned<Block<'src, TypeOutput, StmtOutput>>>,
 }
 
 /// A function type signature.
@@ -349,48 +192,6 @@ impl<T: PartialEq> PartialEq for FunctionType<T> {
     }
 }
 
-// === WithAbstractSyntaxTree implementations for kirin_ir types ===
-
-impl<'tokens, 'src, L> WithAbstractSyntaxTree<'tokens, 'src, L> for kirin_ir::SSAValue
-where
-    'src: 'tokens,
-    L: Dialect + LanguageParser<'tokens, 'src>,
-{
-    type AbstractSyntaxTreeNode = SSAValue<'tokens, 'src, L>;
-}
-
-impl<'tokens, 'src, L> WithAbstractSyntaxTree<'tokens, 'src, L> for kirin_ir::ResultValue
-where
-    'src: 'tokens,
-    L: Dialect + LanguageParser<'tokens, 'src>,
-{
-    type AbstractSyntaxTreeNode = ResultValue<'tokens, 'src, L>;
-}
-
-impl<'tokens, 'src, L> WithAbstractSyntaxTree<'tokens, 'src, L> for kirin_ir::Block
-where
-    'src: 'tokens,
-    L: Dialect + LanguageParser<'tokens, 'src>,
-{
-    type AbstractSyntaxTreeNode = Block<'tokens, 'src, L>;
-}
-
-impl<'tokens, 'src, L> WithAbstractSyntaxTree<'tokens, 'src, L> for kirin_ir::Successor
-where
-    'src: 'tokens,
-    L: Dialect + LanguageParser<'tokens, 'src>,
-{
-    type AbstractSyntaxTreeNode = BlockLabel<'src>;
-}
-
-impl<'tokens, 'src, L> WithAbstractSyntaxTree<'tokens, 'src, L> for kirin_ir::Region
-where
-    'src: 'tokens,
-    L: Dialect + LanguageParser<'tokens, 'src>,
-{
-    type AbstractSyntaxTreeNode = Region<'tokens, 'src, L>;
-}
-
 // === EmitIR implementations for AST types ===
 
 /// Implementation of EmitIR for SSAValue AST nodes.
@@ -398,9 +199,8 @@ where
 /// This looks up the SSA value by name in the emit context's symbol table.
 /// The name must have been previously registered (e.g., when emitting a
 /// ResultValue or block argument).
-impl<'tokens, 'src, L, IR> EmitIR<IR> for SSAValue<'tokens, 'src, L>
+impl<'src, TypeOutput, IR> EmitIR<IR> for SSAValue<'src, TypeOutput>
 where
-    L: LanguageParser<'tokens, 'src>,
     IR: Dialect,
 {
     type Output = kirin_ir::SSAValue;
@@ -419,9 +219,8 @@ where
 ///
 /// Note: The result index is set to 0 here. For statements with multiple results,
 /// the generated code should handle setting the correct indices.
-impl<'tokens, 'src, L, IR> EmitIR<IR> for ResultValue<'tokens, 'src, L>
+impl<'src, TypeOutput, IR> EmitIR<IR> for ResultValue<'src, TypeOutput>
 where
-    L: LanguageParser<'tokens, 'src>,
     IR: Dialect,
 {
     type Output = kirin_ir::ResultValue;
@@ -465,13 +264,11 @@ where
 ///
 /// This builds an IR block with the parsed label, arguments, and statements.
 /// Block arguments are created with their parsed names and types.
-impl<'tokens, 'src, L, IR> EmitIR<IR> for Block<'tokens, 'src, L>
+impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for Block<'src, TypeOutput, StmtOutput>
 where
-    'src: 'tokens,
-    L: LanguageParser<'tokens, 'src>,
     IR: Dialect,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: Into<IR::TypeLattice> + Clone,
-    <L as HasRecursiveParser<'tokens, 'src, L>>::Output: EmitIR<IR, Output = kirin_ir::Statement>,
+    TypeOutput: Into<IR::TypeLattice> + Clone,
+    StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
     type Output = kirin_ir::Block;
 
@@ -533,13 +330,11 @@ where
 /// Implementation of EmitIR for Region AST nodes.
 ///
 /// This builds an IR region containing all the parsed blocks.
-impl<'tokens, 'src, L, IR> EmitIR<IR> for Region<'tokens, 'src, L>
+impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for Region<'src, TypeOutput, StmtOutput>
 where
-    'src: 'tokens,
-    L: LanguageParser<'tokens, 'src>,
     IR: Dialect,
-    <L::TypeLattice as HasParser<'tokens, 'src>>::Output: Into<IR::TypeLattice> + Clone,
-    <L as HasRecursiveParser<'tokens, 'src, L>>::Output: EmitIR<IR, Output = kirin_ir::Statement>,
+    TypeOutput: Into<IR::TypeLattice> + Clone,
+    StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
     type Output = kirin_ir::Region;
 

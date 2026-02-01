@@ -51,22 +51,31 @@ impl FieldKind {
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
     pub fn ast_type(&self, crate_path: &syn::Path) -> TokenStream {
+        // Type alias for the parsed type output
+        let type_output = quote! { <
+            <Language as ::kirin_ir::Dialect>::TypeLattice as #crate_path::HasParser<'tokens, 'src>
+        >::Output };
+        // Type alias for the parsed statement output
+        let stmt_output = quote! { <
+            Language as #crate_path::HasRecursiveParser<'tokens, 'src, Language>
+        >::Output };
+
         match self {
             FieldKind::SSAValue => {
-                quote! { #crate_path::SSAValue<'tokens, 'src, Language> }
+                quote! { #crate_path::SSAValue<'src, #type_output> }
             }
             FieldKind::ResultValue => {
-                quote! { #crate_path::ResultValue<'tokens, 'src, Language> }
+                quote! { #crate_path::ResultValue<'src, #type_output> }
             }
             FieldKind::Block => {
                 // Block parser returns Spanned<Block>, so we need Spanned wrapper
-                quote! { #crate_path::Spanned<#crate_path::Block<'tokens, 'src, Language>> }
+                quote! { #crate_path::Spanned<#crate_path::Block<'src, #type_output, #stmt_output>> }
             }
             FieldKind::Successor => {
                 quote! { #crate_path::BlockLabel<'src> }
             }
             FieldKind::Region => {
-                quote! { #crate_path::Region<'tokens, 'src, Language> }
+                quote! { #crate_path::Region<'src, #type_output, #stmt_output> }
             }
             FieldKind::Value(ty) => {
                 quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
@@ -157,6 +166,47 @@ impl FieldKind {
                 ty: Some(#type_var.ty.clone()),
             }
         })
+    }
+
+    /// Generates pretty print expression for this field kind.
+    ///
+    /// For SSAValue/ResultValue fields, the `opt` parameter controls which printer to use:
+    /// - `Default`: full value printer (name + optional type)
+    /// - `Name`: name-only printer
+    /// - `Type`: type-only printer
+    ///
+    /// The `prettyless_path` should be the path to the kirin_prettyless crate.
+    /// Note: `field_ref` should be a variable that is already a reference (from pattern matching).
+    pub fn print_expr(
+        &self,
+        prettyless_path: &syn::Path,
+        field_ref: &TokenStream,
+        opt: &FormatOption,
+    ) -> TokenStream {
+        match self {
+            FieldKind::SSAValue | FieldKind::ResultValue => match opt {
+                FormatOption::Name => quote! {
+                    #prettyless_path::PrettyPrintName::pretty_print_name(#field_ref, doc)
+                },
+                FormatOption::Type => quote! {
+                    #prettyless_path::PrettyPrintType::pretty_print_type(#field_ref, doc)
+                },
+                FormatOption::Default => quote! {
+                    #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
+                },
+            },
+            FieldKind::Block
+            | FieldKind::Successor
+            | FieldKind::Region => quote! {
+                #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
+            },
+            FieldKind::Value(_ty) => {
+                // For compile-time values, use Display trait
+                quote! {
+                    doc.text(format!("{}", #field_ref))
+                }
+            }
+        }
     }
 }
 

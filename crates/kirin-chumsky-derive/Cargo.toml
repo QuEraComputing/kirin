@@ -20,3 +20,4 @@ kirin = { version = "0.1.0", path = "../.." }
 kirin-chumsky = { version = "0.1.0", path = "../kirin-chumsky" }
 kirin-ir = { version = "0.1.0", path = "../kirin-ir", features = ["derive"] }
 kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
+kirin-prettyless = { version = "0.1.0", path = "../kirin-prettyless" }

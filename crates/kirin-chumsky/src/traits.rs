@@ -69,6 +69,10 @@ pub trait HasParser<'tokens, 'src: 'tokens> {
 /// The `Language` type parameter represents the top-level language being parsed,
 /// which may be a composition of multiple dialects.
 ///
+/// **Important**: The `Output` type must implement `EmitIR<Language>`, which ensures
+/// that parsed AST nodes can be converted to IR. When implementing a custom parser,
+/// you must first implement `EmitIR` for your AST type.
+///
 /// # Example
 ///
 /// ```ignore
@@ -88,14 +92,22 @@ pub trait HasParser<'tokens, 'src: 'tokens> {
 ///     }
 /// }
 /// ```
-pub trait HasRecursiveParser<'tokens, 'src: 'tokens, Language> {
+pub trait HasRecursiveParser<'tokens, 'src: 'tokens, Language: Dialect> {
     /// The output type of the recursive parser.
+    ///
+    /// This type must implement `EmitIR<Language>` to enable conversion from AST to IR.
+    /// The `Language` type must implement `Dialect` when the trait is used.
     type Output: Clone + Debug + PartialEq;
 
     /// Returns a recursive parser for this type.
     ///
     /// The `language` parameter is a recursive parser handle that can be used
     /// to parse nested language constructs (like statements within blocks).
+    ///
+    /// The `TypeLattice: HasParser` bound ensures that the language's type lattice
+    /// can be parsed. This bound is on the method rather than the trait to allow
+    /// implementing `HasRecursiveParser` for types where the `TypeLattice` parser
+    /// is only available in certain contexts.
     fn recursive_parser<I>(
         language: RecursiveParser<
             'tokens,
@@ -106,65 +118,38 @@ pub trait HasRecursiveParser<'tokens, 'src: 'tokens, Language> {
     ) -> BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: TokenInput<'tokens, 'src>,
-        Language: HasRecursiveParser<'tokens, 'src, Language>;
-}
-
-/// Trait for types that have an associated abstract syntax tree type.
-///
-/// This trait maps IR types (like `kirin_ir::SSAValue`) to their corresponding
-/// AST types used during parsing.
-///
-/// # Example
-///
-/// ```ignore
-/// impl<'tokens, 'src: 'tokens, L> WithAbstractSyntaxTree<'tokens, 'src, L> for kirin_ir::SSAValue
-/// where
-///     L: Dialect,
-///     L::TypeLattice: HasParser<'tokens, 'src>,
-/// {
-///     type AbstractSyntaxTreeNode = ast::SSAValue<'tokens, 'src, L>;
-/// }
-/// ```
-pub trait WithAbstractSyntaxTree<'tokens, 'src: 'tokens, Language> {
-    /// The AST node type corresponding to this IR type.
-    type AbstractSyntaxTreeNode: Debug + Clone;
+        Language: HasRecursiveParser<'tokens, 'src, Language>,
+        Language::TypeLattice: HasParser<'tokens, 'src>;
 }
 
 /// Marker trait for a language that can be parsed with chumsky.
 ///
 /// A language is a dialect that:
-/// 1. Has a type lattice with a parser (`HasParser`)
+/// 1. Has a type lattice with a parser (`HasParser`) - checked at function level
 /// 2. Has a recursive parser (`HasRecursiveParser`)
 ///
 /// Types implementing this trait automatically get an implementation of `HasParser`
 /// that uses `chumsky::recursive` to handle nested parsing.
+///
+/// Note: The `TypeLattice: HasParser` bound is enforced at the function level
+/// (in `recursive_parser`) rather than at the trait level to avoid circular
+/// trait resolution when using the blanket `impl HasParser for LanguageParser`.
+///
+/// Note: For roundtrip support, dialects should also derive `PrettyPrint`.
+/// Use `#[derive(HasParser, PrettyPrint)]` to get both parser and printer.
 pub trait LanguageParser<'tokens, 'src: 'tokens>:
-    Dialect<TypeLattice: HasParser<'tokens, 'src>> + HasRecursiveParser<'tokens, 'src, Self>
+    Dialect + HasRecursiveParser<'tokens, 'src, Self> + Sized
 {
 }
 
 impl<'tokens, 'src: 'tokens, L> LanguageParser<'tokens, 'src> for L where
-    L: Dialect<TypeLattice: HasParser<'tokens, 'src>> + HasRecursiveParser<'tokens, 'src, Self>
+    L: Dialect + HasRecursiveParser<'tokens, 'src, Self> + Sized
 {
 }
 
-/// Blanket implementation of `HasParser` for types that implement `LanguageParser`.
-///
-/// This allows using `MyLanguage::parser()` instead of manually setting up
-/// the recursive parser.
-impl<'tokens, 'src: 'tokens, L> HasParser<'tokens, 'src> for L
-where
-    L: LanguageParser<'tokens, 'src> + 'tokens,
-{
-    type Output = <L as HasRecursiveParser<'tokens, 'src, L>>::Output;
-
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
-    where
-        I: TokenInput<'tokens, 'src>,
-    {
-        chumsky::recursive::recursive(|language| L::recursive_parser(language)).boxed()
-    }
-}
+// Note: HasParser is now generated directly by the derive macro instead of
+// using a blanket impl. This avoids circular trait resolution issues when
+// checking TypeLattice: HasParser bounds.
 
 /// A parse error with location information.
 #[derive(Debug, Clone)]
@@ -200,8 +185,8 @@ impl std::error::Error for ParseError {}
 /// ```ignore
 /// use kirin_chumsky::parse_ast;
 ///
-/// // Define your dialect with HasRecursiveParser and WithAbstractSyntaxTree derives
-/// #[derive(Dialect, DialectParser)]
+/// // Define your dialect with HasParser and PrettyPrint derives
+/// #[derive(Dialect, HasParser, PrettyPrint)]
 /// #[kirin(type_lattice = MyType)]
 /// #[chumsky(crate = kirin_chumsky)]
 /// enum MyLang {
@@ -259,8 +244,8 @@ where
 /// use kirin_chumsky::parse;
 /// use kirin_ir::Context;
 ///
-/// // Define your dialect with DialectParser derive
-/// #[derive(Dialect, DialectParser)]
+/// // Define your dialect with HasParser and PrettyPrint derives
+/// #[derive(Dialect, HasParser, PrettyPrint)]
 /// #[kirin(type_lattice = MyType)]
 /// #[chumsky(crate = kirin_chumsky)]
 /// enum MyLang {
@@ -284,51 +269,6 @@ where
     let mut emit_ctx = EmitContext::new(context);
     Ok(ast.emit(&mut emit_ctx))
 }
-
-// === Implementations for standard library types ===
-
-impl<'tokens, 'src, L, T> WithAbstractSyntaxTree<'tokens, 'src, L> for std::marker::PhantomData<T>
-where
-    'src: 'tokens,
-{
-    type AbstractSyntaxTreeNode = std::marker::PhantomData<T>;
-}
-
-impl<'tokens, 'src, L, T> WithAbstractSyntaxTree<'tokens, 'src, L> for Vec<T>
-where
-    'src: 'tokens,
-    T: WithAbstractSyntaxTree<'tokens, 'src, L>,
-{
-    type AbstractSyntaxTreeNode = Vec<T::AbstractSyntaxTreeNode>;
-}
-
-impl<'tokens, 'src, L, T> WithAbstractSyntaxTree<'tokens, 'src, L> for Option<T>
-where
-    'src: 'tokens,
-    T: WithAbstractSyntaxTree<'tokens, 'src, L>,
-{
-    type AbstractSyntaxTreeNode = Option<T::AbstractSyntaxTreeNode>;
-}
-
-// === Implementations for primitive types ===
-
-macro_rules! impl_with_ast_identity {
-    ($($ty:ty),* $(,)?) => {
-        $(
-            impl<'tokens, 'src, L> WithAbstractSyntaxTree<'tokens, 'src, L> for $ty
-            where
-                'src: 'tokens,
-            {
-                type AbstractSyntaxTreeNode = $ty;
-            }
-        )*
-    };
-}
-
-impl_with_ast_identity!(u8, u16, u32, u64, u128, usize);
-impl_with_ast_identity!(i8, i16, i32, i64, i128, isize);
-impl_with_ast_identity!(f32, f64);
-impl_with_ast_identity!(bool, char, String);
 
 // === EmitIR trait and EmitContext ===
 

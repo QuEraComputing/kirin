@@ -3,7 +3,9 @@
 mod ast;
 mod emit_ir;
 mod parser;
+mod pretty_print;
 
-pub use self::ast::GenerateWithAbstractSyntaxTree;
+pub use self::ast::GenerateAST;
 pub use self::emit_ir::GenerateEmitIR;
 pub use self::parser::GenerateHasRecursiveParser;
+pub use self::pretty_print::GeneratePrettyPrint;

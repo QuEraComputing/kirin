@@ -15,7 +15,7 @@ mod generics;
 pub use attrs::{ChumskyFieldAttrs, ChumskyGlobalAttrs, ChumskyStatementAttrs};
 pub use field_kind::{CollectedField, FieldKind, collect_fields};
 pub use format::{Format, FormatElement, FormatOption};
-pub use generate::{GenerateEmitIR, GenerateHasRecursiveParser, GenerateWithAbstractSyntaxTree};
+pub use generate::{GenerateAST, GenerateEmitIR, GenerateHasRecursiveParser, GeneratePrettyPrint};
 pub use generics::GenericsBuilder;
 
 use kirin_derive_core::ir::Layout;

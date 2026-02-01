@@ -97,6 +97,10 @@ impl From<f64> for Value {
     }
 }
 
+// TODO: HasParser + PrettyPrint derive for SimpleLanguage is temporarily disabled because:
+// 1. Region fields have complex EmitIR bounds
+// 2. Custom Value type needs additional trait implementations
+// Use manual PrettyPrint implementation below for now.
 #[derive(Clone, Debug, PartialEq, Dialect)]
 #[kirin(fn, type_lattice = SimpleTypeLattice)]
 pub enum SimpleLanguage {
@@ -178,9 +182,13 @@ fn test_block() {
     let body = context.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut context, body);
     let f = context.specialize().f(staged_function).body(fdef).new();
+    
+
     let mut doc = Document::new(Default::default(), &context);
-    doc.pager(f).unwrap();
-    // println!("{}", doc.render(f).unwrap());
+    // doc.pager(f).unwrap();
+    let _result = doc.render(f).unwrap();
+    // TODO: Add parser roundtrip test when HasParser is enabled for SimpleLanguage
+
     // let max_width = doc.config().max_width;
     // let doc_ = doc.build(f);
     // let mut buf = String::new();

@@ -77,6 +77,11 @@ impl<'a, L: Dialect> Document<'a, L> {
         &self.config
     }
 
+    /// Returns a reference to the IR context.
+    pub fn context(&self) -> &'a Context<L> {
+        self.context
+    }
+
     pub fn list<I, U: Clone + Into<Cow<'a, str>>>(
         &'a self,
         items: impl Iterator<Item = I>,
@@ -209,7 +214,7 @@ impl<L: Dialect> ScanResultWidth<L> for StagedFunction {
     }
 }
 
-impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for ResultValue {
+impl<L: Dialect> PrettyPrint<L> for ResultValue {
     fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
         let info = self.expect_info(doc.context);
         if let Some(name) = info.name() {
@@ -218,6 +223,99 @@ impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for ResultValue {
             }
         }
         doc.text(self.to_string())
+    }
+}
+
+impl<L: Dialect> PrettyPrint<L> for SSAValue {
+    fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        let info = self.expect_info(doc.context);
+        if let Some(name) = info.name() {
+            if let Some(resolved_name) = doc.context.symbol_table().borrow().resolve(name) {
+                return doc.text(format!("%{}", resolved_name));
+            }
+        }
+        doc.text(self.to_string())
+    }
+}
+
+impl<L: Dialect> PrettyPrint<L> for Successor {
+    fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        doc.text(self.to_string())
+    }
+}
+
+/// Trait for types that can print their name (e.g., SSA values).
+pub trait PrettyPrintName<L: Dialect> {
+    /// Pretty print just the name part (e.g., `%x` for an SSA value).
+    fn pretty_print_name<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>;
+}
+
+/// Trait for types that can print their type annotation.
+pub trait PrettyPrintType<L: Dialect> {
+    /// Pretty print just the type part (e.g., `i32` for a typed value).
+    fn pretty_print_type<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>;
+}
+
+impl<L: Dialect> PrettyPrintName<L> for SSAValue {
+    fn pretty_print_name<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        let info = self.expect_info(doc.context);
+        if let Some(name) = info.name() {
+            if let Some(resolved_name) = doc.context.symbol_table().borrow().resolve(name) {
+                return doc.text(format!("%{}", resolved_name));
+            }
+        }
+        doc.text(self.to_string())
+    }
+}
+
+impl<L: Dialect> PrettyPrintName<L> for ResultValue {
+    fn pretty_print_name<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        let info = self.expect_info(doc.context);
+        if let Some(name) = info.name() {
+            if let Some(resolved_name) = doc.context.symbol_table().borrow().resolve(name) {
+                return doc.text(format!("%{}", resolved_name));
+            }
+        }
+        doc.text(self.to_string())
+    }
+}
+
+impl<L: Dialect> PrettyPrintType<L> for SSAValue
+where
+    L::TypeLattice: std::fmt::Display,
+{
+    fn pretty_print_type<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        let info = self.expect_info(doc.context);
+        doc.text(format!("{}", info.ty()))
+    }
+}
+
+impl<L: Dialect> PrettyPrintType<L> for ResultValue
+where
+    L::TypeLattice: std::fmt::Display,
+{
+    fn pretty_print_type<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        let info = self.expect_info(doc.context);
+        doc.text(format!("{}", info.ty()))
+    }
+}
+
+// Blanket impls for references - allows calling on &T when the impl is on T
+impl<L: Dialect, T: PrettyPrintName<L>> PrettyPrintName<L> for &T {
+    fn pretty_print_name<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        (*self).pretty_print_name(doc)
+    }
+}
+
+impl<L: Dialect, T: PrettyPrintType<L>> PrettyPrintType<L> for &T {
+    fn pretty_print_type<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        (*self).pretty_print_type(doc)
+    }
+}
+
+impl<L: Dialect, T: PrettyPrint<L>> PrettyPrint<L> for &T {
+    fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        (*self).pretty_print(doc)
     }
 }
 

@@ -901,6 +901,7 @@ dependencies = [
 name = "kirin"
 version = "0.1.0"
 dependencies = [
+ "kirin-chumsky",
  "kirin-ir",
  "kirin-prettyless",
  "serde",
@@ -923,6 +924,7 @@ dependencies = [
  "kirin-derive",
  "kirin-ir",
  "kirin-lexer",
+ "kirin-prettyless",
 ]
 
 [[package]]
@@ -937,6 +939,7 @@ dependencies = [
  "kirin-derive-core",
  "kirin-ir",
  "kirin-lexer",
+ "kirin-prettyless",
  "proc-macro2",
  "quote",
  "syn",

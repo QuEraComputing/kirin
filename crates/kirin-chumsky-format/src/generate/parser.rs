@@ -52,22 +52,76 @@ impl GenerateHasRecursiveParser {
         let original_parser_impl =
             self.generate_original_type_impl(ir_input, &ast_name, crate_path);
 
+        // Generate HasParser impl for the original type
+        let has_parser_impl = self.generate_has_parser_impl(ir_input, &ast_name, crate_path);
+
         quote! {
             #ast_parser_impl
             #original_parser_impl
+            #has_parser_impl
+        }
+    }
+
+    /// Generates the `HasParser` impl for the original type.
+    /// This provides the `parser()` method that sets up recursive parsing.
+    fn generate_has_parser_impl(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        ast_name: &syn::Ident,
+        crate_path: &syn::Path,
+    ) -> TokenStream {
+        let original_name = &ir_input.name;
+
+        // Build impl generics that include both the lifetimes and the original type parameters
+        let impl_generics = self.build_original_type_impl_generics(ir_input);
+        let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
+
+        let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+
+        // Combine where clauses if both exist, and add TypeLattice: HasParser bound
+        let combined_where = match (where_clause, impl_where_clause) {
+            (Some(orig), Some(impl_wc)) => {
+                let mut combined = orig.clone();
+                combined
+                    .predicates
+                    .extend(impl_wc.predicates.iter().cloned());
+                Some(combined)
+            }
+            (Some(wc), None) | (None, Some(wc)) => Some(wc.clone()),
+            (None, None) => None,
+        };
+
+        quote! {
+            impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
+            where
+                <#original_name #ty_generics as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                #combined_where
+            {
+                type Output = #ast_name<'tokens, 'src, #original_name #ty_generics>;
+
+                fn parser<I>() -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output>
+                where
+                    I: #crate_path::TokenInput<'tokens, 'src>,
+                {
+                    use ::chumsky::prelude::*;
+                    ::chumsky::recursive::recursive(|language| {
+                        <#original_name #ty_generics as #crate_path::HasRecursiveParser<
+                            'tokens,
+                            'src,
+                            #original_name #ty_generics,
+                        >>::recursive_parser(language)
+                    }).boxed()
+                }
+            }
         }
     }
 
     /// Generates the `HasRecursiveParser` impl for the original type.
     /// This allows the original type to be used as its own Language parameter.
-    ///
-    /// Note: This impl uses `WithAbstractSyntaxTree::AbstractSyntaxTreeNode` instead of
-    /// directly referencing the AST type name. This produces a clear compile error if
-    /// `WithAbstractSyntaxTree` is not also derived (or implemented manually).
     fn generate_original_type_impl(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        _ast_name: &syn::Ident,
+        ast_name: &syn::Ident,
         crate_path: &syn::Path,
     ) -> TokenStream {
         let original_name = &ir_input.name;
@@ -91,27 +145,22 @@ impl GenerateHasRecursiveParser {
             (None, None) => None,
         };
 
-        // Use the trait's associated type instead of directly referencing the AST type name.
-        // This ensures a clear error message if WithAbstractSyntaxTree is not implemented:
-        // "the trait `WithAbstractSyntaxTree` is not implemented for `MyType`"
+        // Directly use the generated AST type name
         quote! {
             impl #impl_generics #crate_path::HasRecursiveParser<'tokens, 'src, #original_name #ty_generics>
                 for #original_name #ty_generics
             #combined_where
             {
-                type Output = <#original_name #ty_generics as #crate_path::WithAbstractSyntaxTree<'tokens, 'src, #original_name #ty_generics>>::AbstractSyntaxTreeNode;
+                type Output = #ast_name<'tokens, 'src, #original_name #ty_generics>;
 
                 fn recursive_parser<I>(
                     language: #crate_path::RecursiveParser<'tokens, 'src, I, Self::Output>,
                 ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output>
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
+                    <#original_name #ty_generics as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
                 {
-                    <<#original_name #ty_generics as #crate_path::WithAbstractSyntaxTree<
-                        'tokens,
-                        'src,
-                        #original_name #ty_generics,
-                    >>::AbstractSyntaxTreeNode as #crate_path::HasRecursiveParser<
+                    <#ast_name<'tokens, 'src, #original_name #ty_generics> as #crate_path::HasRecursiveParser<
                         'tokens,
                         'src,
                         #original_name #ty_generics,
@@ -122,7 +171,6 @@ impl GenerateHasRecursiveParser {
     }
 
     /// Builds impl generics for the original type's HasRecursiveParser impl.
-    /// This includes 'tokens, 'src: 'tokens, plus the original type's type parameters.
     fn build_original_type_impl_generics(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
@@ -162,6 +210,8 @@ impl GenerateHasRecursiveParser {
         ast_generics: &syn::Generics,
         crate_path: &syn::Path,
     ) -> TokenStream {
+        let original_name = &ir_input.name;
+        let (_, ty_generics_orig, _) = ir_input.generics.split_for_impl();
         let (impl_generics, ty_generics, _) = ast_generics.split_for_impl();
         let parser_body = match self.build_statement_parser(
             ir_input,
@@ -179,7 +229,8 @@ impl GenerateHasRecursiveParser {
             impl #impl_generics #crate_path::HasRecursiveParser<'tokens, 'src, Language>
                 for #ast_name #ty_generics
             where
-                Language: #crate_path::LanguageParser<'tokens, 'src> + 'tokens,
+                Language: #crate_path::LanguageParser<'tokens, 'src> + ::std::convert::From<#original_name #ty_generics_orig> + 'tokens,
+                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
             {
                 type Output = Self;
 
@@ -189,6 +240,7 @@ impl GenerateHasRecursiveParser {
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
                     Language: #crate_path::HasRecursiveParser<'tokens, 'src, Language>,
+                    <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
                 {
                     use ::chumsky::prelude::*;
                     #parser_body.boxed()
@@ -205,6 +257,8 @@ impl GenerateHasRecursiveParser {
         ast_generics: &syn::Generics,
         crate_path: &syn::Path,
     ) -> TokenStream {
+        let original_name = &ir_input.name;
+        let (_, ty_generics_orig, _) = ir_input.generics.split_for_impl();
         let (impl_generics, ty_generics, _) = ast_generics.split_for_impl();
 
         let mut variant_parsers = Vec::new();
@@ -236,7 +290,8 @@ impl GenerateHasRecursiveParser {
             impl #impl_generics #crate_path::HasRecursiveParser<'tokens, 'src, Language>
                 for #ast_name #ty_generics
             where
-                Language: #crate_path::LanguageParser<'tokens, 'src> + 'tokens,
+                Language: #crate_path::LanguageParser<'tokens, 'src> + ::std::convert::From<#original_name #ty_generics_orig> + 'tokens,
+                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
             {
                 type Output = Self;
 
@@ -246,6 +301,7 @@ impl GenerateHasRecursiveParser {
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
                     Language: #crate_path::HasRecursiveParser<'tokens, 'src, Language>,
+                    <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
                 {
                     use ::chumsky::prelude::*;
                     #combined.boxed()

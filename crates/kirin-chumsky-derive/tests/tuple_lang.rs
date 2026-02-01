@@ -4,10 +4,9 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::parse_ast;
-use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
+use kirin_chumsky::{parse_ast, HasParser, PrettyPrint};
 
-#[derive(Debug, Clone, PartialEq, Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(type_lattice = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum TupleLang {

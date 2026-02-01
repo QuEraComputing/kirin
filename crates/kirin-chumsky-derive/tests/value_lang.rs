@@ -5,13 +5,18 @@ mod common;
 use chumsky::prelude::*;
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::{parse_ast, BoxedParser, HasParser, TokenInput};
-use kirin_chumsky_derive::{HasRecursiveParser, WithAbstractSyntaxTree};
+use kirin_chumsky::{parse_ast, BoxedParser, HasParser, PrettyPrint, TokenInput};
 use kirin_lexer::Token;
 
 /// A custom compile-time value type that parses any identifier.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Opcode(pub String);
+
+impl std::fmt::Display for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Opcode {
     type Output = Opcode;
@@ -28,7 +33,7 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Opcode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(type_lattice = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum ValueLang {
