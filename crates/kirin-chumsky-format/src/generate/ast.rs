@@ -163,12 +163,19 @@ impl GenerateWithAbstractSyntaxTree {
                     );
                     (pattern, debug)
                 } else {
-                    let pattern = quote! { Self { #(#fields),* } };
+                    let orig_fields = &bindings.original_field_names;
+                    let pat: Vec<_> = orig_fields
+                        .iter()
+                        .zip(fields)
+                        .map(|(f, b)| quote! { #f: #b })
+                        .collect();
+                    let pattern = quote! { Self { #(#pat),* } };
                     let debug =
-                        fields
+                        orig_fields
                             .iter()
-                            .fold(quote! { f.debug_struct(#name) }, |acc, field| {
-                                let field_name = field.to_string();
+                            .zip(fields)
+                            .fold(quote! { f.debug_struct(#name) }, |acc, (orig, field)| {
+                                let field_name = orig.to_string();
                                 quote! { #acc.field(#field_name, &#field) }
                             });
                     (pattern, debug)
@@ -202,14 +209,20 @@ impl GenerateWithAbstractSyntaxTree {
                             );
                             quote! { Self::#name(#(#fields),*) => #debug_fields.finish() }
                         } else {
-                            let debug_fields = fields.iter().fold(
+                            let orig_fields = &bindings.original_field_names;
+                            let pat: Vec<_> = orig_fields
+                                .iter()
+                                .zip(fields)
+                                .map(|(f, b)| quote! { #f: #b })
+                                .collect();
+                            let debug_fields = orig_fields.iter().zip(fields).fold(
                                 quote! { f.debug_struct(#name_str) },
-                                |acc, field| {
-                                    let field_name = field.to_string();
+                                |acc, (orig, field)| {
+                                    let field_name = orig.to_string();
                                     quote! { #acc.field(#field_name, &#field) }
                                 },
                             );
-                            quote! { Self::#name { #(#fields),* } => #debug_fields.finish() }
+                            quote! { Self::#name { #(#pat),* } => #debug_fields.finish() }
                         }
                     })
                     .collect();
@@ -240,9 +253,19 @@ impl GenerateWithAbstractSyntaxTree {
                         quote! { Self(#(#fields.clone()),*) },
                     )
                 } else {
-                    let clones: Vec<_> = fields.iter().map(|f| quote! { #f: #f.clone() }).collect();
+                    let orig_fields = &bindings.original_field_names;
+                    let pat: Vec<_> = orig_fields
+                        .iter()
+                        .zip(fields)
+                        .map(|(f, b)| quote! { #f: #b })
+                        .collect();
+                    let clones: Vec<_> = orig_fields
+                        .iter()
+                        .zip(fields)
+                        .map(|(f, b)| quote! { #f: #b.clone() })
+                        .collect();
                     (
-                        quote! { Self { #(#fields),* } },
+                        quote! { Self { #(#pat),* } },
                         quote! { Self { #(#clones),* } },
                     )
                 };
@@ -272,10 +295,19 @@ impl GenerateWithAbstractSyntaxTree {
                                 Self::#name(#(#fields),*) => Self::#name(#(#fields.clone()),*)
                             }
                         } else {
-                            let clones: Vec<_> =
-                                fields.iter().map(|f| quote! { #f: #f.clone() }).collect();
+                            let orig_fields = &bindings.original_field_names;
+                            let pat: Vec<_> = orig_fields
+                                .iter()
+                                .zip(fields)
+                                .map(|(f, b)| quote! { #f: #b })
+                                .collect();
+                            let clones: Vec<_> = orig_fields
+                                .iter()
+                                .zip(fields)
+                                .map(|(f, b)| quote! { #f: #b.clone() })
+                                .collect();
                             quote! {
-                                Self::#name { #(#fields),* } => Self::#name { #(#clones),* }
+                                Self::#name { #(#pat),* } => Self::#name { #(#clones),* }
                             }
                         }
                     })
@@ -313,7 +345,7 @@ impl GenerateWithAbstractSyntaxTree {
                         quote! { Self(#(#other_fields),*) },
                     )
                 } else {
-                    let orig_fields = data.0.named_field_idents();
+                    let orig_fields = &self_bindings.original_field_names;
                     let self_pat: Vec<_> = orig_fields
                         .iter()
                         .zip(self_fields)
@@ -363,7 +395,7 @@ impl GenerateWithAbstractSyntaxTree {
                                 }
                             }
                         } else {
-                            let orig_fields = variant.named_field_idents();
+                            let orig_fields = &self_bindings.original_field_names;
                             let self_pat: Vec<_> = orig_fields
                                 .iter()
                                 .zip(self_fields)
