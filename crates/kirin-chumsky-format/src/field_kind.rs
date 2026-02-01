@@ -4,8 +4,11 @@
 //! and parser generation.
 
 use kirin_derive_core::ir::fields::Collection;
+use proc_macro2::TokenStream;
+use quote::quote;
 
 use crate::ChumskyLayout;
+use crate::format::FormatOption;
 
 /// The kind of a field in code generation context.
 ///
@@ -37,6 +40,123 @@ impl FieldKind {
             FieldKind::Region => "region",
             FieldKind::Value(_) => "value",
         }
+    }
+
+    /// Returns true if this field kind supports the :name and :type format options.
+    pub fn supports_name_type_options(&self) -> bool {
+        matches!(self, FieldKind::SSAValue | FieldKind::ResultValue)
+    }
+
+    /// Generates the AST type for this field kind.
+    ///
+    /// The `crate_path` should be the path to the kirin_chumsky crate.
+    pub fn ast_type(&self, crate_path: &syn::Path) -> TokenStream {
+        match self {
+            FieldKind::SSAValue => {
+                quote! { #crate_path::SSAValue<'tokens, 'src, Language> }
+            }
+            FieldKind::ResultValue => {
+                quote! { #crate_path::ResultValue<'tokens, 'src, Language> }
+            }
+            FieldKind::Block => {
+                // Block parser returns Spanned<Block>, so we need Spanned wrapper
+                quote! { #crate_path::Spanned<#crate_path::Block<'tokens, 'src, Language>> }
+            }
+            FieldKind::Successor => {
+                quote! { #crate_path::BlockLabel<'src> }
+            }
+            FieldKind::Region => {
+                quote! { #crate_path::Region<'tokens, 'src, Language> }
+            }
+            FieldKind::Value(ty) => {
+                quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
+            }
+        }
+    }
+
+    /// Generates the parser expression for this field kind.
+    ///
+    /// For SSAValue/ResultValue fields, the `opt` parameter controls which parser to use:
+    /// - `Default`: full value parser with optional type annotation
+    /// - `Name`: name-only parser
+    /// - `Type`: type-only parser
+    ///
+    /// The `crate_path` should be the path to the kirin_chumsky crate.
+    pub fn parser_expr(&self, crate_path: &syn::Path, opt: &FormatOption) -> TokenStream {
+        match self {
+            FieldKind::SSAValue => match opt {
+                FormatOption::Name => quote! { #crate_path::nameof_ssa() },
+                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, Language>() },
+                FormatOption::Default => quote! { #crate_path::ssa_value::<_, Language>() },
+            },
+            FieldKind::ResultValue => match opt {
+                FormatOption::Name => quote! { #crate_path::nameof_ssa() },
+                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, Language>() },
+                FormatOption::Default => {
+                    quote! { #crate_path::result_value_with_optional_type::<_, Language>() }
+                }
+            },
+            FieldKind::Block => {
+                quote! { #crate_path::block::<_, Language>(language.clone()) }
+            }
+            FieldKind::Successor => {
+                quote! { #crate_path::block_label() }
+            }
+            FieldKind::Region => {
+                quote! { #crate_path::region::<_, Language>(language.clone()) }
+            }
+            FieldKind::Value(ty) => {
+                quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::parser() }
+            }
+        }
+    }
+
+    /// Returns the AST type name for SSA-like fields (SSAValue or ResultValue).
+    ///
+    /// Returns None for non-SSA field kinds.
+    fn ssa_type_name(&self) -> Option<&'static str> {
+        match self {
+            FieldKind::SSAValue => Some("SSAValue"),
+            FieldKind::ResultValue => Some("ResultValue"),
+            _ => None,
+        }
+    }
+
+    /// Generates constructor code when only the :name format option is provided.
+    ///
+    /// This creates an SSA/Result value with `ty: None`.
+    /// Returns None for non-SSA field kinds.
+    pub fn construct_from_name_only(
+        &self,
+        crate_path: &syn::Path,
+        name_var: &syn::Ident,
+    ) -> Option<TokenStream> {
+        let type_name = syn::Ident::new(self.ssa_type_name()?, proc_macro2::Span::call_site());
+        Some(quote! {
+            #crate_path::#type_name {
+                name: #crate_path::Spanned { value: #name_var.name, span: #name_var.span },
+                ty: None,
+            }
+        })
+    }
+
+    /// Generates constructor code when both :name and :type format options are provided.
+    ///
+    /// This creates an SSA/Result value with both name and type fields populated.
+    /// Returns None for non-SSA field kinds.
+    pub fn construct_from_name_and_type(
+        &self,
+        crate_path: &syn::Path,
+        name_var: &syn::Ident,
+        type_var: &syn::Ident,
+    ) -> Option<TokenStream> {
+        let type_name = syn::Ident::new(self.ssa_type_name()?, proc_macro2::Span::call_site());
+        Some(quote! {
+            #crate_path::#type_name {
+                name: #crate_path::Spanned { value: #name_var.name, span: #name_var.span },
+                ty: Some(#type_var.ty.clone()),
+            }
+        })
     }
 }
 

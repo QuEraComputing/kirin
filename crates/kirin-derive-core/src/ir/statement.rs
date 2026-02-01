@@ -202,4 +202,18 @@ impl<L: Layout> Statement<L> {
             })
             .collect()
     }
+
+    /// Creates field bindings for use in pattern matching and code generation.
+    ///
+    /// For tuple-style structs/variants, generates bindings like `f0`, `f1`, etc.
+    /// For named structs/variants, uses the actual field names.
+    ///
+    /// The `prefix` is used for tuple field names (e.g., "f" produces `f0`, `f1`).
+    pub fn field_bindings(&self, prefix: &str) -> crate::codegen::FieldBindings {
+        if self.is_tuple_style() {
+            crate::codegen::FieldBindings::tuple(prefix, self.field_count())
+        } else {
+            crate::codegen::FieldBindings::named(self.named_field_idents())
+        }
+    }
 }

@@ -1,3 +1,6 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+
 use crate::misc::{is_type, is_type_in};
 
 #[derive(Debug, Clone, Default)]
@@ -22,6 +25,32 @@ impl Collection {
             Some(Collection::Option)
         } else {
             None
+        }
+    }
+
+    /// Wraps a base type TokenStream with the appropriate collection wrapper.
+    ///
+    /// - `Single` returns the base type unchanged
+    /// - `Vec` returns `Vec<base>`
+    /// - `Option` returns `Option<base>`
+    pub fn wrap_type(&self, base: TokenStream) -> TokenStream {
+        match self {
+            Collection::Single => base,
+            Collection::Vec => quote! { Vec<#base> },
+            Collection::Option => quote! { Option<#base> },
+        }
+    }
+
+    /// Wraps a parser TokenStream with the appropriate collection combinator.
+    ///
+    /// - `Single` returns the parser unchanged
+    /// - `Vec` returns `parser.repeated().collect()`
+    /// - `Option` returns `parser.or_not()`
+    pub fn wrap_parser(&self, parser: TokenStream) -> TokenStream {
+        match self {
+            Collection::Single => parser,
+            Collection::Vec => quote! { #parser.repeated().collect() },
+            Collection::Option => quote! { #parser.or_not() },
         }
     }
 }

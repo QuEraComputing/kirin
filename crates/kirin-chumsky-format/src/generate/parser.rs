@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{CollectedField, FieldKind, collect_fields};
+use crate::field_kind::{CollectedField, collect_fields};
 use crate::format::{Format, FormatElement, FormatOption};
 use crate::generics::GenericsBuilder;
 
@@ -308,34 +308,24 @@ impl GenerateHasRecursiveParser {
         for field in collected {
             match field.collection {
                 kirin_derive_core::ir::fields::Collection::Vec => {
-                    let field_name = field
-                        .ident
-                        .as_ref()
-                        .map(|i| i.to_string())
-                        .unwrap_or_else(|| format!("field at index {}", field.index));
                     return Err(syn::Error::new(
                         stmt.name.span(),
                         format!(
                             "field '{}' has type Vec<...> which is not supported in format-derived parsers. \
                              Format strings do not define list syntax (separators, delimiters). \
                              Consider using a single-element field or implementing HasRecursiveParser manually.",
-                            field_name
+                            field
                         ),
                     ));
                 }
                 kirin_derive_core::ir::fields::Collection::Option => {
-                    let field_name = field
-                        .ident
-                        .as_ref()
-                        .map(|i| i.to_string())
-                        .unwrap_or_else(|| format!("field at index {}", field.index));
                     return Err(syn::Error::new(
                         stmt.name.span(),
                         format!(
                             "field '{}' has type Option<...> which is not supported in format-derived parsers. \
                              Format strings do not define optional syntax. \
                              Consider using a required field or implementing HasRecursiveParser manually.",
-                            field_name
+                            field
                         ),
                     ));
                 }
@@ -364,36 +354,24 @@ impl GenerateHasRecursiveParser {
                 })?;
 
                 // Validate that :name and :type options are only used on SSA/Result fields
-                if matches!(opt, FormatOption::Name | FormatOption::Type) {
-                    let is_ssa_like =
-                        matches!(field.kind, FieldKind::SSAValue | FieldKind::ResultValue);
-                    if !is_ssa_like {
-                        let field_name = field
-                            .ident
-                            .as_ref()
-                            .map(|i| i.to_string())
-                            .unwrap_or_else(|| format!("field at index {}", index));
-                        let kind_name = match &field.kind {
-                            FieldKind::Block => "block",
-                            FieldKind::Successor => "successor",
-                            FieldKind::Region => "region",
-                            FieldKind::Value(_) => "value",
-                            FieldKind::SSAValue | FieldKind::ResultValue => unreachable!(),
-                        };
-                        let option_name = match opt {
-                            FormatOption::Name => ":name",
-                            FormatOption::Type => ":type",
-                            FormatOption::Default => unreachable!(),
-                        };
-                        return Err(syn::Error::new(
-                            stmt.name.span(),
-                            format!(
-                                "format option '{}' cannot be used on {} field '{}'. \
-                                 The :name and :type options are only valid for SSAValue and ResultValue fields.",
-                                option_name, kind_name, field_name
-                            ),
-                        ));
-                    }
+                if matches!(opt, FormatOption::Name | FormatOption::Type)
+                    && !field.kind.supports_name_type_options()
+                {
+                    let option_name = match opt {
+                        FormatOption::Name => ":name",
+                        FormatOption::Type => ":type",
+                        FormatOption::Default => unreachable!(),
+                    };
+                    return Err(syn::Error::new(
+                        stmt.name.span(),
+                        format!(
+                            "format option '{}' cannot be used on {} field '{}'. \
+                             The :name and :type options are only valid for SSAValue and ResultValue fields.",
+                            option_name,
+                            field.kind.name(),
+                            field
+                        ),
+                    ));
                 }
 
                 // Check for duplicate default occurrences
@@ -402,18 +380,13 @@ impl GenerateHasRecursiveParser {
                         o.field.index == index && matches!(o.option, FormatOption::Default)
                     });
                     if existing_default {
-                        let field_name = field
-                            .ident
-                            .as_ref()
-                            .map(|i| i.to_string())
-                            .unwrap_or_else(|| format!("field at index {}", index));
                         return Err(syn::Error::new(
                             stmt.name.span(),
                             format!(
                                 "field '{}' appears multiple times with default format option. \
                                  Each field can only have one default occurrence. \
                                  Use {{{}:name}} or {{{}:type}} for additional occurrences.",
-                                field_name, field_name, field_name
+                                field, field, field
                             ),
                         ));
                     }
@@ -422,28 +395,15 @@ impl GenerateHasRecursiveParser {
                 // Generate unique variable name based on field and option
                 let var_name = match opt {
                     FormatOption::Name => {
-                        let base = field
-                            .ident
-                            .as_ref()
-                            .map(|i| i.to_string())
-                            .unwrap_or_else(|| format!("field_{}", index));
-                        syn::Ident::new(&format!("{}_name", base), proc_macro2::Span::call_site())
+                        syn::Ident::new(&format!("{}_name", field), proc_macro2::Span::call_site())
                     }
                     FormatOption::Type => {
-                        let base = field
-                            .ident
-                            .as_ref()
-                            .map(|i| i.to_string())
-                            .unwrap_or_else(|| format!("field_{}", index));
-                        syn::Ident::new(&format!("{}_type", base), proc_macro2::Span::call_site())
+                        syn::Ident::new(&format!("{}_type", field), proc_macro2::Span::call_site())
                     }
                     FormatOption::Default => {
                         // Since we reject duplicate defaults above, this is the only default occurrence
                         field.ident.clone().unwrap_or_else(|| {
-                            syn::Ident::new(
-                                &format!("field_{}", index),
-                                proc_macro2::Span::call_site(),
-                            )
+                            syn::Ident::new(&format!("{}", field), proc_macro2::Span::call_site())
                         })
                     }
                 };
@@ -461,18 +421,13 @@ impl GenerateHasRecursiveParser {
         for field in collected {
             let is_mentioned = occurrences.iter().any(|o| o.field.index == field.index);
             if !is_mentioned {
-                let field_name = field
-                    .ident
-                    .as_ref()
-                    .map(|i| i.to_string())
-                    .unwrap_or_else(|| format!("field at index {}", field.index));
                 return Err(syn::Error::new(
                     stmt.name.span(),
                     format!(
                         "field '{}' is not mentioned in the format string. \
                          All fields must appear in the format string. \
                          Use {{{}}} or {{{}:name}}/{{{}:type}} to include this field.",
-                        field_name, field_name, field_name, field_name
+                        field, field, field, field
                     ),
                 ));
             }
@@ -481,23 +436,18 @@ impl GenerateHasRecursiveParser {
         // Validate that SSAValue/ResultValue fields have at least {field} or {field:name}.
         // These field types require a name to be parsed; only having {field:type} is insufficient.
         for field in collected {
-            if matches!(field.kind, FieldKind::SSAValue | FieldKind::ResultValue) {
+            if field.kind.supports_name_type_options() {
                 let has_name_occurrence = occurrences.iter().any(|o| {
                     o.field.index == field.index
                         && matches!(o.option, FormatOption::Default | FormatOption::Name)
                 });
                 if !has_name_occurrence {
-                    let field_name = field
-                        .ident
-                        .as_ref()
-                        .map(|i| i.to_string())
-                        .unwrap_or_else(|| format!("field at index {}", field.index));
                     return Err(syn::Error::new(
                         stmt.name.span(),
                         format!(
                             "SSA/Result field '{}' must have {{{}}} or {{{}:name}} in the format string. \
                              Using only {{{}:type}} is not sufficient because the name cannot be inferred.",
-                            field_name, field_name, field_name, field_name
+                            field, field, field, field
                         ),
                     ));
                 }
@@ -623,42 +573,8 @@ impl GenerateHasRecursiveParser {
         field: &CollectedField,
         opt: &FormatOption,
     ) -> TokenStream {
-        let base = match &field.kind {
-            FieldKind::SSAValue => match opt {
-                FormatOption::Name => quote! { #crate_path::nameof_ssa() },
-                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, Language>() },
-                FormatOption::Default => quote! { #crate_path::ssa_value::<_, Language>() },
-            },
-            FieldKind::ResultValue => match opt {
-                FormatOption::Name => quote! { #crate_path::nameof_ssa() },
-                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, Language>() },
-                FormatOption::Default => {
-                    quote! { #crate_path::result_value_with_optional_type::<_, Language>() }
-                }
-            },
-            FieldKind::Block => {
-                quote! { #crate_path::block::<_, Language>(language.clone()) }
-            }
-            FieldKind::Successor => {
-                quote! { #crate_path::block_label() }
-            }
-            FieldKind::Region => {
-                quote! { #crate_path::region::<_, Language>(language.clone()) }
-            }
-            FieldKind::Value(ty) => {
-                quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::parser() }
-            }
-        };
-
-        match field.collection {
-            kirin_derive_core::ir::fields::Collection::Single => base,
-            kirin_derive_core::ir::fields::Collection::Vec => {
-                quote! { #base.repeated().collect() }
-            }
-            kirin_derive_core::ir::fields::Collection::Option => {
-                quote! { #base.or_not() }
-            }
-        }
+        let base = field.kind.parser_expr(crate_path, opt);
+        field.collection.wrap_parser(base)
     }
 
     /// Generate AST constructor that combines field occurrences.
@@ -719,10 +635,6 @@ impl GenerateHasRecursiveParser {
                 unreachable!(
                     "field '{}' not in format string - this should have been caught earlier",
                     field
-                        .ident
-                        .as_ref()
-                        .map(|i| i.to_string())
-                        .unwrap_or_else(|| format!("index {}", field.index))
                 )
             }
             Some(occs) if occs.len() == 1 => {
@@ -730,25 +642,18 @@ impl GenerateHasRecursiveParser {
                 let occ = occs[0];
                 let var = &occ.var_name;
 
-                match (&field.kind, &occ.option) {
-                    // ResultValue with only :name - need to create ResultValue with None type
-                    (FieldKind::ResultValue, FormatOption::Name) => {
-                        quote! {
-                            #crate_path::ResultValue {
-                                name: #crate_path::Spanned { value: #var.name, span: #var.span },
-                                ty: None,
-                            }
-                        }
-                    }
-                    // ResultValue with only :type - need to create ResultValue with empty name
-                    // This is unusual but we handle it
-                    (FieldKind::ResultValue, FormatOption::Type) => {
-                        quote! {
-                            #crate_path::ResultValue {
-                                name: #crate_path::Spanned { value: "", span: #var.span },
-                                ty: Some(#var.ty.clone()),
-                            }
-                        }
+                match &occ.option {
+                    // SSA/Result with only :name - need to create value with None type
+                    FormatOption::Name => field
+                        .kind
+                        .construct_from_name_only(crate_path, var)
+                        .unwrap_or_else(|| quote! { #var }),
+                    // :type only should have been caught by validation
+                    FormatOption::Type if field.kind.supports_name_type_options() => {
+                        unreachable!(
+                            "field '{}' has only :type occurrence - this should have been caught by validation",
+                            field
+                        )
                     }
                     // Default case - variable is already the correct type
                     _ => quote! { #var },
@@ -760,29 +665,15 @@ impl GenerateHasRecursiveParser {
                 let name_occ = occs.iter().find(|o| matches!(o.option, FormatOption::Name));
                 let type_occ = occs.iter().find(|o| matches!(o.option, FormatOption::Type));
 
-                match (&field.kind, name_occ, type_occ) {
-                    // ResultValue with both :name and :type
-                    (FieldKind::ResultValue, Some(name), Some(ty)) => {
-                        let name_var = &name.var_name;
-                        let ty_var = &ty.var_name;
-                        quote! {
-                            #crate_path::ResultValue {
-                                name: #crate_path::Spanned { value: #name_var.name, span: #name_var.span },
-                                ty: Some(#ty_var.ty.clone()),
-                            }
-                        }
-                    }
-                    // SSAValue with both :name and :type
-                    (FieldKind::SSAValue, Some(name), Some(ty)) => {
-                        let name_var = &name.var_name;
-                        let ty_var = &ty.var_name;
-                        quote! {
-                            #crate_path::SSAValue {
-                                name: #crate_path::Spanned { value: #name_var.name, span: #name_var.span },
-                                ty: Some(#ty_var.ty.clone()),
-                            }
-                        }
-                    }
+                match (name_occ, type_occ) {
+                    // SSA/Result with both :name and :type
+                    (Some(name), Some(ty)) => field
+                        .kind
+                        .construct_from_name_and_type(crate_path, &name.var_name, &ty.var_name)
+                        .unwrap_or_else(|| {
+                            let var = &occs[0].var_name;
+                            quote! { #var }
+                        }),
                     // Fallback - use the first occurrence
                     _ => {
                         let var = &occs[0].var_name;

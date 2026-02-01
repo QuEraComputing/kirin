@@ -6,7 +6,6 @@ use quote::quote;
 use crate::ChumskyLayout;
 use crate::field_kind::{FieldKind, collect_fields};
 use crate::generics::GenericsBuilder;
-use kirin_derive_core::codegen::{renamed_field_idents, tuple_field_idents};
 
 /// Generator for the `WithAbstractSyntaxTree` trait implementation.
 pub struct GenerateWithAbstractSyntaxTree {
@@ -153,33 +152,31 @@ impl GenerateWithAbstractSyntaxTree {
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
                 let name = ast_name.to_string();
-                let is_tuple = data.0.is_tuple_style();
+                let bindings = data.0.field_bindings("f");
+                let fields = &bindings.field_idents;
 
-                if is_tuple {
-                    let field_names = tuple_field_idents("f", data.0.field_count());
-                    let patterns = quote! { Self(#(#field_names),*) };
-                    let debug_fields = field_names.iter().fold(
+                let (pattern, debug_fields) = if bindings.is_tuple {
+                    let pattern = quote! { Self(#(#fields),*) };
+                    let debug = fields.iter().fold(
                         quote! { f.debug_tuple(#name) },
                         |acc, field| quote! { #acc.field(&#field) },
                     );
-                    quote! {
-                        let #patterns = self;
-                        #debug_fields.finish()
-                    }
+                    (pattern, debug)
                 } else {
-                    let fields = data.0.named_field_idents();
-                    let patterns = quote! { Self { #(#fields),* } };
-                    let debug_fields =
+                    let pattern = quote! { Self { #(#fields),* } };
+                    let debug =
                         fields
                             .iter()
                             .fold(quote! { f.debug_struct(#name) }, |acc, field| {
                                 let field_name = field.to_string();
                                 quote! { #acc.field(#field_name, &#field) }
                             });
-                    quote! {
-                        let #patterns = self;
-                        #debug_fields.finish()
-                    }
+                    (pattern, debug)
+                };
+
+                quote! {
+                    let #pattern = self;
+                    #debug_fields.finish()
                 }
             }
             kirin_derive_core::ir::Data::Enum(data) => {
@@ -189,42 +186,30 @@ impl GenerateWithAbstractSyntaxTree {
                     .map(|variant| {
                         let name = &variant.name;
                         let name_str = name.to_string();
-                        let is_tuple = variant.is_tuple_style();
+                        let bindings = variant.field_bindings("f");
+                        let fields = &bindings.field_idents;
 
-                        if is_tuple {
-                            let field_count = variant.field_count();
-                            if field_count == 0 {
-                                quote! {
-                                    Self::#name => f.write_str(#name_str)
-                                }
+                        if bindings.is_empty() {
+                            if bindings.is_tuple {
+                                quote! { Self::#name => f.write_str(#name_str) }
                             } else {
-                                let field_names = tuple_field_idents("f", field_count);
-                                let debug_fields = field_names.iter().fold(
-                                    quote! { f.debug_tuple(#name_str) },
-                                    |acc, field| quote! { #acc.field(&#field) },
-                                );
-                                quote! {
-                                    Self::#name(#(#field_names),*) => #debug_fields.finish()
-                                }
+                                quote! { Self::#name {} => f.write_str(#name_str) }
                             }
+                        } else if bindings.is_tuple {
+                            let debug_fields = fields.iter().fold(
+                                quote! { f.debug_tuple(#name_str) },
+                                |acc, field| quote! { #acc.field(&#field) },
+                            );
+                            quote! { Self::#name(#(#fields),*) => #debug_fields.finish() }
                         } else {
-                            let fields = variant.named_field_idents();
-                            if fields.is_empty() {
-                                quote! {
-                                    Self::#name {} => f.write_str(#name_str)
-                                }
-                            } else {
-                                let debug_fields = fields.iter().fold(
-                                    quote! { f.debug_struct(#name_str) },
-                                    |acc, field| {
-                                        let field_name = field.to_string();
-                                        quote! { #acc.field(#field_name, &#field) }
-                                    },
-                                );
-                                quote! {
-                                    Self::#name { #(#fields),* } => #debug_fields.finish()
-                                }
-                            }
+                            let debug_fields = fields.iter().fold(
+                                quote! { f.debug_struct(#name_str) },
+                                |acc, field| {
+                                    let field_name = field.to_string();
+                                    quote! { #acc.field(#field_name, &#field) }
+                                },
+                            );
+                            quote! { Self::#name { #(#fields),* } => #debug_fields.finish() }
                         }
                     })
                     .collect();
@@ -246,24 +231,25 @@ impl GenerateWithAbstractSyntaxTree {
     ) -> TokenStream {
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
-                let is_tuple = data.0.is_tuple_style();
+                let bindings = data.0.field_bindings("f");
+                let fields = &bindings.field_idents;
 
-                if is_tuple {
-                    let field_names = tuple_field_idents("f", data.0.field_count());
-                    let patterns = quote! { Self(#(#field_names),*) };
-                    let clones = quote! { Self(#(#field_names.clone()),*) };
-                    quote! {
-                        let #patterns = self;
-                        #clones
-                    }
+                let (pattern, cloned) = if bindings.is_tuple {
+                    (
+                        quote! { Self(#(#fields),*) },
+                        quote! { Self(#(#fields.clone()),*) },
+                    )
                 } else {
-                    let fields = data.0.named_field_idents();
-                    let patterns = quote! { Self { #(#fields),* } };
                     let clones: Vec<_> = fields.iter().map(|f| quote! { #f: #f.clone() }).collect();
-                    quote! {
-                        let #patterns = self;
-                        Self { #(#clones),* }
-                    }
+                    (
+                        quote! { Self { #(#fields),* } },
+                        quote! { Self { #(#clones),* } },
+                    )
+                };
+
+                quote! {
+                    let #pattern = self;
+                    #cloned
                 }
             }
             kirin_derive_core::ir::Data::Enum(data) => {
@@ -272,29 +258,24 @@ impl GenerateWithAbstractSyntaxTree {
                     .iter()
                     .map(|variant| {
                         let name = &variant.name;
-                        let is_tuple = variant.is_tuple_style();
+                        let bindings = variant.field_bindings("f");
+                        let fields = &bindings.field_idents;
 
-                        if is_tuple {
-                            let field_count = variant.field_count();
-                            if field_count == 0 {
+                        if bindings.is_empty() {
+                            if bindings.is_tuple {
                                 quote! { Self::#name => Self::#name }
                             } else {
-                                let field_names = tuple_field_idents("f", field_count);
-                                let clones = quote! { Self::#name(#(#field_names.clone()),*) };
-                                quote! {
-                                    Self::#name(#(#field_names),*) => #clones
-                                }
+                                quote! { Self::#name {} => Self::#name {} }
+                            }
+                        } else if bindings.is_tuple {
+                            quote! {
+                                Self::#name(#(#fields),*) => Self::#name(#(#fields.clone()),*)
                             }
                         } else {
-                            let fields = variant.named_field_idents();
-                            if fields.is_empty() {
-                                quote! { Self::#name {} => Self::#name {} }
-                            } else {
-                                let clones: Vec<_> =
-                                    fields.iter().map(|f| quote! { #f: #f.clone() }).collect();
-                                quote! {
-                                    Self::#name { #(#fields),* } => Self::#name { #(#clones),* }
-                                }
+                            let clones: Vec<_> =
+                                fields.iter().map(|f| quote! { #f: #f.clone() }).collect();
+                            quote! {
+                                Self::#name { #(#fields),* } => Self::#name { #(#clones),* }
                             }
                         }
                     })
@@ -317,42 +298,42 @@ impl GenerateWithAbstractSyntaxTree {
     ) -> TokenStream {
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
-                let is_tuple = data.0.is_tuple_style();
+                let self_bindings = data.0.field_bindings("s");
+                let other_bindings = self_bindings.with_prefix("o");
+                let self_fields = &self_bindings.field_idents;
+                let other_fields = &other_bindings.field_idents;
 
-                if is_tuple {
-                    let field_count = data.0.field_count();
-                    let self_fields = tuple_field_idents("s", field_count);
-                    let other_fields = tuple_field_idents("o", field_count);
-                    let comparisons = self_fields.iter().zip(&other_fields).map(|(s, o)| {
-                        quote! { #s == #o }
-                    });
-                    quote! {
-                        let Self(#(#self_fields),*) = self;
-                        let Self(#(#other_fields),*) = other;
-                        true #(&& #comparisons)*
-                    }
+                let comparisons = self_fields.iter().zip(other_fields).map(|(s, o)| {
+                    quote! { #s == #o }
+                });
+
+                let (self_pattern, other_pattern) = if self_bindings.is_tuple {
+                    (
+                        quote! { Self(#(#self_fields),*) },
+                        quote! { Self(#(#other_fields),*) },
+                    )
                 } else {
-                    let fields = data.0.named_field_idents();
-                    let self_fields = renamed_field_idents("s_", &fields);
-                    let other_fields = renamed_field_idents("o_", &fields);
-                    let self_pattern: Vec<_> = fields
+                    let orig_fields = data.0.named_field_idents();
+                    let self_pat: Vec<_> = orig_fields
                         .iter()
-                        .zip(&self_fields)
+                        .zip(self_fields)
                         .map(|(f, s)| quote! { #f: #s })
                         .collect();
-                    let other_pattern: Vec<_> = fields
+                    let other_pat: Vec<_> = orig_fields
                         .iter()
-                        .zip(&other_fields)
+                        .zip(other_fields)
                         .map(|(f, o)| quote! { #f: #o })
                         .collect();
-                    let comparisons = self_fields.iter().zip(&other_fields).map(|(s, o)| {
-                        quote! { #s == #o }
-                    });
-                    quote! {
-                        let Self { #(#self_pattern),* } = self;
-                        let Self { #(#other_pattern),* } = other;
-                        true #(&& #comparisons)*
-                    }
+                    (
+                        quote! { Self { #(#self_pat),* } },
+                        quote! { Self { #(#other_pat),* } },
+                    )
+                };
+
+                quote! {
+                    let #self_pattern = self;
+                    let #other_pattern = other;
+                    true #(&& #comparisons)*
                 }
             }
             kirin_derive_core::ir::Data::Enum(data) => {
@@ -361,48 +342,44 @@ impl GenerateWithAbstractSyntaxTree {
                     .iter()
                     .map(|variant| {
                         let name = &variant.name;
-                        let is_tuple = variant.is_tuple_style();
+                        let self_bindings = variant.field_bindings("s");
+                        let other_bindings = self_bindings.with_prefix("o");
+                        let self_fields = &self_bindings.field_idents;
+                        let other_fields = &other_bindings.field_idents;
 
-                        if is_tuple {
-                            let field_count = variant.field_count();
-                            if field_count == 0 {
-                                quote! {
-                                    (Self::#name, Self::#name) => true
-                                }
+                        if self_bindings.is_empty() {
+                            if self_bindings.is_tuple {
+                                quote! { (Self::#name, Self::#name) => true }
                             } else {
-                                let self_fields = tuple_field_idents("s", field_count);
-                                let other_fields = tuple_field_idents("o", field_count);
-                                let comparisons = self_fields.iter().zip(&other_fields).map(|(s, o)| {
-                                    quote! { #s == #o }
-                                });
-                                quote! {
-                                    (Self::#name(#(#self_fields),*), Self::#name(#(#other_fields),*)) => {
-                                        true #(&& #comparisons)*
-                                    }
+                                quote! { (Self::#name {}, Self::#name {}) => true }
+                            }
+                        } else if self_bindings.is_tuple {
+                            let comparisons = self_fields.iter().zip(other_fields).map(|(s, o)| {
+                                quote! { #s == #o }
+                            });
+                            quote! {
+                                (Self::#name(#(#self_fields),*), Self::#name(#(#other_fields),*)) => {
+                                    true #(&& #comparisons)*
                                 }
                             }
                         } else {
-                            let fields = variant.named_field_idents();
-                            if fields.is_empty() {
-                                quote! {
-                                    (Self::#name {}, Self::#name {}) => true
-                                }
-                            } else {
-                                let self_fields = renamed_field_idents("s_", &fields);
-                                let other_fields = renamed_field_idents("o_", &fields);
-                                let self_pattern: Vec<_> = fields.iter().zip(&self_fields)
-                                    .map(|(f, s)| quote! { #f: #s })
-                                    .collect();
-                                let other_pattern: Vec<_> = fields.iter().zip(&other_fields)
-                                    .map(|(f, o)| quote! { #f: #o })
-                                    .collect();
-                                let comparisons = self_fields.iter().zip(&other_fields).map(|(s, o)| {
-                                    quote! { #s == #o }
-                                });
-                                quote! {
-                                    (Self::#name { #(#self_pattern),* }, Self::#name { #(#other_pattern),* }) => {
-                                        true #(&& #comparisons)*
-                                    }
+                            let orig_fields = variant.named_field_idents();
+                            let self_pat: Vec<_> = orig_fields
+                                .iter()
+                                .zip(self_fields)
+                                .map(|(f, s)| quote! { #f: #s })
+                                .collect();
+                            let other_pat: Vec<_> = orig_fields
+                                .iter()
+                                .zip(other_fields)
+                                .map(|(f, o)| quote! { #f: #o })
+                                .collect();
+                            let comparisons = self_fields.iter().zip(other_fields).map(|(s, o)| {
+                                quote! { #s == #o }
+                            });
+                            quote! {
+                                (Self::#name { #(#self_pat),* }, Self::#name { #(#other_pat),* }) => {
+                                    true #(&& #comparisons)*
                                 }
                             }
                         }
@@ -490,34 +467,8 @@ impl GenerateWithAbstractSyntaxTree {
         collection: &kirin_derive_core::ir::fields::Collection,
         kind: &FieldKind,
     ) -> TokenStream {
-        let crate_path = &self.crate_path;
-        let base = match kind {
-            FieldKind::SSAValue => {
-                quote! { #crate_path::SSAValue<'tokens, 'src, Language> }
-            }
-            FieldKind::ResultValue => {
-                quote! { #crate_path::ResultValue<'tokens, 'src, Language> }
-            }
-            FieldKind::Block => {
-                // Block parser returns Spanned<Block>, so we need Spanned wrapper
-                quote! { #crate_path::Spanned<#crate_path::Block<'tokens, 'src, Language>> }
-            }
-            FieldKind::Successor => {
-                quote! { #crate_path::BlockLabel<'src> }
-            }
-            FieldKind::Region => {
-                quote! { #crate_path::Region<'tokens, 'src, Language> }
-            }
-            FieldKind::Value(ty) => {
-                quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
-            }
-        };
-
-        match collection {
-            kirin_derive_core::ir::fields::Collection::Single => base,
-            kirin_derive_core::ir::fields::Collection::Vec => quote! { Vec<#base> },
-            kirin_derive_core::ir::fields::Collection::Option => quote! { Option<#base> },
-        }
+        let base = kind.ast_type(&self.crate_path);
+        collection.wrap_type(base)
     }
 
     fn generate_trait_impl(
