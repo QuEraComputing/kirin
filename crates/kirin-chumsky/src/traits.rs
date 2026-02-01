@@ -1,9 +1,10 @@
 //! Core traits for Kirin chumsky parsers
 
+use chumsky::input::Stream;
 use chumsky::prelude::*;
 use chumsky::recursive::{Direct, Recursive};
 use kirin_ir::Dialect;
-use kirin_lexer::Token;
+use kirin_lexer::{Logos, Token};
 use std::fmt::Debug;
 
 /// An alias for token input types used in Kirin Chumsky parsers.
@@ -161,6 +162,77 @@ where
         I: TokenInput<'tokens, 'src>,
     {
         chumsky::recursive::recursive(|language| L::recursive_parser(language)).boxed()
+    }
+}
+
+/// A parse error with location information.
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    /// The error message.
+    pub message: String,
+    /// The span where the error occurred.
+    pub span: SimpleSpan,
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "error at {}..{}: {}",
+            self.span.start, self.span.end, self.message
+        )
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+/// Parses a source string using the given language's parser.
+///
+/// This is a convenience function that wraps the common parsing boilerplate:
+/// tokenization, stream creation, and error handling.
+///
+/// # Example
+///
+/// ```ignore
+/// use kirin_chumsky::parse;
+///
+/// // Define your dialect with HasRecursiveParser and WithAbstractSyntaxTree derives
+/// #[derive(Dialect, HasRecursiveParser, WithAbstractSyntaxTree)]
+/// #[kirin(type_lattice = MyType)]
+/// #[chumsky(crate = kirin_chumsky)]
+/// enum MyLang {
+///     #[chumsky(format = "{res} = add {lhs} {rhs}")]
+///     Add { res: ResultValue, lhs: SSAValue, rhs: SSAValue },
+/// }
+///
+/// // Parse a string directly
+/// let ast = parse::<MyLang>("%x = add %a %b")?;
+/// ```
+pub fn parse<'src, L>(input: &'src str) -> Result<L::Output, Vec<ParseError>>
+where
+    L: HasParser<'src, 'src>,
+{
+    let tokens: Vec<_> = Token::lexer(input)
+        .spanned()
+        .map(|(tok, span)| {
+            let token = tok.unwrap_or(Token::Error);
+            (token, SimpleSpan::from(span))
+        })
+        .collect();
+
+    let eoi = SimpleSpan::from(input.len()..input.len());
+    let stream = Stream::from_iter(tokens).map(eoi, |(t, s)| (t, s));
+    let result = L::parser().parse(stream);
+
+    match result.into_result() {
+        Ok(ast) => Ok(ast),
+        Err(errors) => Err(errors
+            .into_iter()
+            .map(|e| ParseError {
+                message: e.to_string(),
+                span: *e.span(),
+            })
+            .collect()),
     }
 }
 

@@ -26,6 +26,7 @@ pub mod prelude {
     pub use crate::ast::*;
     pub use crate::parsers::*;
     pub use crate::traits::*;
+    pub use crate::{parse, ParseError};
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;
 
