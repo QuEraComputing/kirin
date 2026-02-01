@@ -441,7 +441,15 @@ impl GenerateAST {
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         with_pub: bool,
     ) -> TokenStream {
-        let collected = collect_fields(stmt);
+        let mut collected = collect_fields(stmt);
+        let is_tuple = stmt.is_tuple_style();
+
+        // For tuple fields, sort by original index to match the IR field order.
+        // For named fields, keep the category order (which matches iter_all_fields).
+        if is_tuple {
+            collected.sort_by_key(|f| f.index);
+        }
+
         let mut fields = Vec::new();
 
         for field in &collected {
@@ -458,8 +466,6 @@ impl GenerateAST {
                 fields.push(quote! { #ty });
             }
         }
-
-        let is_tuple = stmt.is_tuple_style();
 
         if is_tuple {
             quote! { #(#fields),* }

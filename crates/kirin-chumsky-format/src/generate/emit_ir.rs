@@ -99,7 +99,7 @@ impl GenerateEmitIR {
             let pattern = quote! { Self(#(#fields),*) };
 
             // Generate emit calls for each field
-            let emit_calls = self.generate_field_emit_calls(&collected, fields);
+            let emit_calls = self.generate_field_emit_calls(&collected, fields, true);
 
             // Generate dialect constructor
             let constructor = self.generate_dialect_constructor(
@@ -121,7 +121,7 @@ impl GenerateEmitIR {
             let pattern = quote! { Self { #(#pat),* } };
 
             // Generate emit calls for each field
-            let emit_calls = self.generate_field_emit_calls(&collected, fields);
+            let emit_calls = self.generate_field_emit_calls(&collected, fields, false);
 
             // Generate dialect constructor
             let constructor = self.generate_dialect_constructor(
@@ -188,7 +188,7 @@ impl GenerateEmitIR {
                         }
                     }
                 } else if bindings.is_tuple {
-                    let emit_calls = self.generate_field_emit_calls(&collected, fields);
+                    let emit_calls = self.generate_field_emit_calls(&collected, fields, true);
                     let constructor = self.generate_dialect_constructor(
                         original_name,
                         Some(name),
@@ -210,7 +210,7 @@ impl GenerateEmitIR {
                         .zip(fields)
                         .map(|(f, b)| quote! { #f: #b })
                         .collect();
-                    let emit_calls = self.generate_field_emit_calls(&collected, fields);
+                    let emit_calls = self.generate_field_emit_calls(&collected, fields, false);
                     let constructor = self.generate_dialect_constructor(
                         original_name,
                         Some(name),
@@ -240,10 +240,21 @@ impl GenerateEmitIR {
         &self,
         collected: &[CollectedField],
         field_vars: &[syn::Ident],
+        is_tuple: bool,
     ) -> TokenStream {
         let crate_path = &self.crate_path;
 
-        let emit_stmts: Vec<_> = collected
+        // For tuple fields, we need to process in index order to match AST struct field order.
+        // For named fields, keep category order since both AST and pattern use names.
+        let ordered_collected: Vec<_> = if is_tuple {
+            let mut sorted: Vec<_> = collected.iter().collect();
+            sorted.sort_by_key(|f| f.index);
+            sorted
+        } else {
+            collected.iter().collect()
+        };
+
+        let emit_stmts: Vec<_> = ordered_collected
             .iter()
             .zip(field_vars.iter())
             .map(|(field, var)| {
@@ -302,9 +313,19 @@ impl GenerateEmitIR {
         field_vars: &[syn::Ident],
         is_tuple: bool,
     ) -> TokenStream {
+        // For tuple fields, we need to process in index order to match AST struct field order.
+        // For named fields, keep category order since both AST and constructor use names.
+        let ordered_collected: Vec<_> = if is_tuple {
+            let mut sorted: Vec<_> = collected.iter().collect();
+            sorted.sort_by_key(|f| f.index);
+            sorted
+        } else {
+            collected.iter().collect()
+        };
+
         // Generate the field values for the constructor
         // We use the same variable names as in generate_field_emit_calls
-        let field_values: Vec<_> = collected
+        let field_values: Vec<_> = ordered_collected
             .iter()
             .zip(field_vars.iter())
             .map(|(field, var)| {

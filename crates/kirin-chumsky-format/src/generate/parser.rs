@@ -665,7 +665,11 @@ impl GenerateHasRecursiveParser {
                 None => quote! { #ast_name { #(#assigns),* } },
             }
         } else {
-            let values = collected
+            // For tuple fields, sort by original index to match AST struct definition order
+            let mut sorted_collected: Vec<_> = collected.iter().collect();
+            sorted_collected.sort_by_key(|f| f.index);
+            
+            let values = sorted_collected
                 .iter()
                 .map(|field| self.build_field_value(field, &field_occurrences, crate_path));
             match variant {

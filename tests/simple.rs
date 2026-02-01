@@ -1,5 +1,8 @@
 use kirin::ir::*;
-use kirin::pretty::*;
+use kirin::parsers::{BoxedParser, HasParser, TokenInput};
+use kirin::parsers::chumsky::prelude::*;
+use kirin::parsers::Token;
+use kirin::pretty::{Document, ArenaDoc, DocAllocator, PrettyPrint, PrettyPrintName, PrettyPrintType};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum SimpleTypeLattice {
@@ -50,6 +53,37 @@ impl FiniteLattice for SimpleTypeLattice {
 
 impl crate::TypeLattice for SimpleTypeLattice {}
 
+impl std::fmt::Display for SimpleTypeLattice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SimpleTypeLattice::Any => write!(f, "any"),
+            SimpleTypeLattice::Int => write!(f, "int"),
+            SimpleTypeLattice::Float => write!(f, "float"),
+            SimpleTypeLattice::DataType => write!(f, "datatype"),
+            SimpleTypeLattice::Bottom => write!(f, "bottom"),
+        }
+    }
+}
+
+impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleTypeLattice {
+    type Output = SimpleTypeLattice;
+
+    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: TokenInput<'tokens, 'src>,
+    {
+        select! {
+            Token::Identifier("any") => SimpleTypeLattice::Any,
+            Token::Identifier("int") => SimpleTypeLattice::Int,
+            Token::Identifier("float") => SimpleTypeLattice::Float,
+            Token::Identifier("datatype") => SimpleTypeLattice::DataType,
+            Token::Identifier("bottom") => SimpleTypeLattice::Bottom,
+        }
+        .labelled("type")
+        .boxed()
+    }
+}
+
 impl Typeof<SimpleTypeLattice> for i64 {
     fn type_of(&self) -> SimpleTypeLattice {
         SimpleTypeLattice::Int
@@ -97,10 +131,60 @@ impl From<f64> for Value {
     }
 }
 
-// TODO: HasParser + PrettyPrint derive for SimpleLanguage is temporarily disabled because:
-// 1. Region fields have complex EmitIR bounds
-// 2. Custom Value type needs additional trait implementations
-// Use manual PrettyPrint implementation below for now.
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::I64(v) => write!(f, "{}", v),
+            Value::F64(v) => write!(f, "{}", v),
+        }
+    }
+}
+
+impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Value {
+    type Output = Value;
+
+    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: TokenInput<'tokens, 'src>,
+    {
+        let int = select! {
+            Token::Int(s) => s.parse::<i64>().unwrap()
+        }.map(Value::I64);
+
+        let float = select! {
+            Token::Float(s) => s.parse::<f64>().unwrap()
+        }.map(Value::F64);
+
+        float.or(int).labelled("value").boxed()
+    }
+}
+
+// PrettyPrint traits for Value (used by PrettyPrint derive)
+
+impl<L: Dialect> PrettyPrint<L> for Value {
+    fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        doc.text(self.to_string())
+    }
+}
+
+impl<L: Dialect> PrettyPrintName<L> for Value {
+    fn pretty_print_name<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        doc.text(self.to_string())
+    }
+}
+
+impl<L: Dialect> PrettyPrintType<L> for Value {
+    fn pretty_print_type<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        // Value doesn't have a separate type - use empty or the type of the value
+        match self {
+            Value::I64(_) => doc.text("int"),
+            Value::F64(_) => doc.text("float"),
+        }
+    }
+}
+
+// Note: Region fields require manual PrettyPrint implementation since the derive
+// doesn't yet support the required EmitIR bounds for Region's nested statements.
 #[derive(Clone, Debug, PartialEq, Dialect)]
 #[kirin(fn, type_lattice = SimpleTypeLattice)]
 pub enum SimpleLanguage {
@@ -121,32 +205,30 @@ pub enum SimpleLanguage {
     ),
 }
 
+// Manual PrettyPrint implementation for SimpleLanguage since we have Region fields
 impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
     fn pretty_print<'a>(&self, doc: &'a Document<'a, SimpleLanguage>) -> ArenaDoc<'a> {
         match self {
             SimpleLanguage::Add(lhs, rhs, _) => {
-                let doc = doc.text(format!("add {}, {}", *lhs, *rhs));
-                doc
+                doc.text(format!("add {}, {}", *lhs, *rhs))
             }
             SimpleLanguage::Constant(value, _) => {
-                let doc = match value {
-                    Value::I64(v) => doc.text(format!("constant {}", v)),
-                    Value::F64(v) => doc.text(format!("constant {}", v)),
-                };
-                doc
+                doc.text(format!("constant {}", value))
             }
             SimpleLanguage::Return(retval) => {
-                let doc = doc.text(format!("return {}", *retval));
-                doc
+                doc.text(format!("return {}", *retval))
             }
             SimpleLanguage::Function(region, _) => {
                 let region_doc = region.pretty_print(doc);
-                let doc = doc.text("function ").append(region_doc);
-                doc
+                doc.text("function ").append(region_doc)
             }
         }
     }
 }
+
+// Note: Parsing tests for SimpleLanguage are skipped because the HasParser derive
+// doesn't support Region fields yet. See kirin-chumsky-derive/tests for parsing tests
+// with dialects that don't use Region fields.
 
 #[test]
 fn test_block() {
@@ -182,20 +264,16 @@ fn test_block() {
     let body = context.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut context, body);
     let f = context.specialize().f(staged_function).body(fdef).new();
-    
 
+    // Pretty print the function
     let mut doc = Document::new(Default::default(), &context);
-    // doc.pager(f).unwrap();
-    let _result = doc.render(f).unwrap();
-    // TODO: Add parser roundtrip test when HasParser is enabled for SimpleLanguage
-
-    // let max_width = doc.config().max_width;
-    // let doc_ = doc.build(f);
-    // let mut buf = String::new();
-    // doc_.render_fmt(max_width, &mut buf)
-    //     .unwrap();
-    // let result = strip_trailing_whitespace(&buf);
-    // println!("{}", result);
+    let result = doc.render(f).unwrap();
+    
+    // Verify the output contains expected elements
+    assert!(result.contains("function"));
+    assert!(result.contains("constant"));
+    assert!(result.contains("add"));
+    assert!(result.contains("return"));
 }
 
 /// Strip trailing whitespace in each line of the input string.
