@@ -187,56 +187,9 @@ impl<L: Dialect> PrettyPrintType<L> for Value {
     }
 }
 
-// Note: Region fields are temporarily not using HasParser/PrettyPrint derive
-// because those require additional bounds that create complex trait resolution.
-// Use manual implementation for dialects with Region fields for now.
-#[derive(Clone, Debug, PartialEq, Dialect)]
-#[kirin(fn, type_lattice = SimpleTypeLattice)]
-pub enum SimpleLanguage {
-    Add(
-        SSAValue,
-        SSAValue,
-        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
-    ),
-    Constant(
-        #[kirin(into)] Value,
-        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
-    ),
-    #[kirin(terminator)]
-    Return(SSAValue),
-    Function(
-        Region,
-        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
-    ),
-}
-
-// Manual PrettyPrint implementation for SimpleLanguage since we have Region fields
-impl kirin::pretty::PrettyPrint<SimpleLanguage> for SimpleLanguage {
-    fn pretty_print<'a>(
-        &self,
-        doc: &'a Document<'a, SimpleLanguage>,
-    ) -> ArenaDoc<'a> {
-        match self {
-            SimpleLanguage::Add(lhs, rhs, _) => {
-                doc.text(format!("add {}, {}", *lhs, *rhs))
-            }
-            SimpleLanguage::Constant(value, _) => {
-                doc.text(format!("constant {}", value))
-            }
-            SimpleLanguage::Return(retval) => {
-                doc.text(format!("return {}", *retval))
-            }
-            SimpleLanguage::Function(region, _) => {
-                let region_doc = region.pretty_print(doc);
-                doc.text("function ").append(region_doc)
-            }
-        }
-    }
-}
-
 // A simpler dialect without Region fields for testing parse/print roundtrip
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = SimpleTypeLattice)]
+#[kirin(type_lattice = SimpleTypeLattice, fn)]
 #[chumsky(crate = kirin::parsers)]
 pub enum SimpleLang {
     #[chumsky(format = "{res:name} = add {lhs}, {rhs} -> {res:type}")]
@@ -267,7 +220,7 @@ pub enum SimpleLang {
 #[test]
 fn test_block() {
 
-    let mut context: Context<SimpleLanguage> = Context::default();
+    let mut context: Context<SimpleLang> = Context::default();
     let staged_function = context
         .staged_function()
         .name("foo")
@@ -275,12 +228,12 @@ fn test_block() {
         .return_type(Int)
         .new();
 
-    let a = SimpleLanguage::op_constant(&mut context, 1.2);
-    let b = SimpleLanguage::op_constant(&mut context, 3.4);
-    let c = SimpleLanguage::op_add(&mut context, a.result, b.result);
+    let a = SimpleLang::op_constant(&mut context, 1.2);
+    let b = SimpleLang::op_constant(&mut context, 3.4);
+    let c = SimpleLang::op_add(&mut context, a.res, b.res);
     let block_arg_x = context.block_argument(0);
-    let d = SimpleLanguage::op_add(&mut context, c.result, block_arg_x);
-    let ret = SimpleLanguage::op_return(&mut context, d.result);
+    let d = SimpleLang::op_add(&mut context, c.res, block_arg_x);
+    let ret = SimpleLang::op_return(&mut context, d.res);
 
     let block_a: Block = context
         .block()
@@ -293,11 +246,11 @@ fn test_block() {
         .terminator(ret)
         .new();
 
-    let ret = SimpleLanguage::op_return(&mut context, block_arg_x);
+    let ret = SimpleLang::op_return(&mut context, block_arg_x);
     let block_b = context.block().argument(Float).terminator(ret).new();
 
     let body = context.region().add_block(block_a).add_block(block_b).new();
-    let fdef = SimpleLanguage::op_function(&mut context, body);
+    let fdef = SimpleLang::op_function(&mut context, body);
     let f = context.specialize().f(staged_function).body(fdef).new();
 
     // Pretty print the function
