@@ -89,7 +89,8 @@ fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
             FieldKind::Wrapper { .. } => continue,
             FieldKind::Value { ty, default, into } => {
                 let name = field.name_ident(ty.span());
-                if let Some(expr) = default.as_ref() {
+                if let Some(default_value) = default.as_ref() {
+                    let expr = default_value.to_expr();
                     assigns.push(quote! { let #name: #ty = #expr; });
                 } else if *into {
                     assigns.push(quote! { let #name: #ty = #name.into(); });
@@ -97,8 +98,7 @@ fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
                     assigns.push(
                         syn::Error::new_spanned(
                             ty,
-                            "use `#[kirin(default = std::marker::PhantomData)]` \
-                            to initialize PhantomData fields",
+                            "use `#[kirin(default)]` to initialize PhantomData fields",
                         )
                         .to_compile_error(),
                     );
@@ -502,10 +502,11 @@ pub(crate) fn from_impl(input: &InputContext, info: &StatementInfo) -> proc_macr
             match &field.kind {
                 FieldKind::Wrapper { .. } => quote! { let #name = value },
                 FieldKind::Value { default, .. } => {
-                    if let Some(expr) = default.as_ref() {
+                    if let Some(default_value) = default.as_ref() {
+                        let expr = default_value.to_expr();
                         quote! { let #name = #expr }
                     } else {
-                        quote! { let #name = Default::default() }
+                        quote! { let #name = ::core::default::Default::default() }
                     }
                 }
                 _ => quote! { let #name = Default::default() },

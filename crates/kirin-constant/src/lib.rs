@@ -9,7 +9,7 @@ pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
     pub value: T,
     #[kirin(type = value.type_of())]
     pub result: ResultValue,
-    #[kirin(default = std::marker::PhantomData)]
+    #[kirin(default)]
     pub marker: std::marker::PhantomData<L>,
 }
 

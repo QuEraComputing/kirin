@@ -10,7 +10,7 @@ pub enum ControlFlow<T: TypeLattice> {
         condition: SSAValue,
         true_target: Successor,
         false_target: Successor,
-        #[kirin(default = std::marker::PhantomData)]
+        #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(format = "ret {0}")]

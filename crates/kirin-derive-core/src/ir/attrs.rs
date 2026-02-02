@@ -52,9 +52,42 @@ pub struct StatementOptions {
 pub struct KirinFieldOptions {
     #[darling(default)]
     pub into: bool,
-    pub default: Option<syn::Expr>,
+    pub default: Option<DefaultValue>,
     #[darling(rename = "type")]
     pub ssa_ty: Option<syn::Expr>,
+}
+
+/// Default value specification for a field.
+///
+/// Supports two forms:
+/// - `#[kirin(default)]` - Uses `Default::default()` as the default value
+/// - `#[kirin(default = expr)]` - Uses the provided expression as the default value
+#[derive(Debug, Clone)]
+pub enum DefaultValue {
+    /// Use `Default::default()` as the default value
+    Default,
+    /// Use a custom expression as the default value
+    Expr(syn::Expr),
+}
+
+impl DefaultValue {
+    /// Returns the expression to use as the default value.
+    pub fn to_expr(&self) -> syn::Expr {
+        match self {
+            DefaultValue::Default => syn::parse_quote!(::core::default::Default::default()),
+            DefaultValue::Expr(expr) => expr.clone(),
+        }
+    }
+}
+
+impl FromMeta for DefaultValue {
+    fn from_word() -> darling::Result<Self> {
+        Ok(DefaultValue::Default)
+    }
+
+    fn from_expr(expr: &syn::Expr) -> darling::Result<Self> {
+        Ok(DefaultValue::Expr(expr.clone()))
+    }
 }
 
 #[derive(Debug, Clone)]

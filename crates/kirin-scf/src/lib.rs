@@ -15,7 +15,7 @@ pub struct If<T: TypeLattice> {
     condition: SSAValue,
     then_body: Block,
     else_body: Block,
-    #[kirin(default = std::marker::PhantomData)]
+    #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
 
@@ -27,6 +27,6 @@ pub struct For<T: TypeLattice> {
     end: SSAValue,
     step: SSAValue,
     body: Block,
-    #[kirin(default = std::marker::PhantomData)]
+    #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }

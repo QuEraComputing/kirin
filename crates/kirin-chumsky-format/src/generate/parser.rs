@@ -488,7 +488,7 @@ impl GenerateHasDialectParser {
                         "field '{}' is not mentioned in the format string. \
                          All fields must appear in the format string unless they have a default value. \
                          Use {{{}}} or {{{}:name}}/{{{}:type}} to include this field, \
-                         or add #[kirin(default = ...)] to provide a default value.",
+                         or add #[kirin(default)] or #[kirin(default = expr)] to provide a default value.",
                         field, field, field, field
                     ),
                 ));

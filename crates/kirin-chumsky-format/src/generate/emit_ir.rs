@@ -486,13 +486,14 @@ impl GenerateEmitIR {
                             quote! { #emitted_var }
                         }
                     }
-                } else if let Some(default_expr) = &field.default {
+                } else if let Some(default_value) = &field.default {
                     // Field has a default - use the default expression
+                    let default_expr = default_value.to_expr();
                     quote! { #default_expr }
                 } else {
                     // This shouldn't happen - validation should have caught it
                     // But as a fallback, use Default::default()
-                    quote! { Default::default() }
+                    quote! { ::core::default::Default::default() }
                 }
             })
             .collect();

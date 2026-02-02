@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::fields::Collection;
+use kirin_derive_core::ir::{fields::Collection, DefaultValue};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -263,8 +263,8 @@ pub struct CollectedField {
     pub collection: Collection,
     /// The kind of this field
     pub kind: FieldKind,
-    /// The default expression if specified via `#[kirin(default = ...)]`
-    pub default: Option<syn::Expr>,
+    /// The default value if specified via `#[kirin(default)]` or `#[kirin(default = ...)]`
+    pub default: Option<DefaultValue>,
 }
 
 impl std::fmt::Display for CollectedField {

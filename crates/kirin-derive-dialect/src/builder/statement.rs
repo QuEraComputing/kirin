@@ -1,4 +1,4 @@
-use kirin_derive_core::ir::fields::Collection;
+use kirin_derive_core::ir::{fields::Collection, DefaultValue};
 use kirin_derive_core::prelude::*;
 use quote::format_ident;
 
@@ -41,7 +41,7 @@ pub(crate) enum FieldKind {
     Value {
         ty: syn::Type,
         into: bool,
-        default: Option<syn::Expr>,
+        default: Option<DefaultValue>,
     },
 }
 

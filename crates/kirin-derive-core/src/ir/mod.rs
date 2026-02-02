@@ -4,7 +4,7 @@ mod input;
 mod layout;
 mod statement;
 
-pub use attrs::BuilderOptions;
+pub use attrs::{BuilderOptions, DefaultValue};
 pub use input::{Data, DataEnum, DataStruct, Input};
 pub use layout::{Layout, StandardLayout};
 pub use statement::Statement;

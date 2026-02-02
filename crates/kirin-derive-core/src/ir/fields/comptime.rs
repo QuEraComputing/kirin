@@ -1,5 +1,8 @@
 use super::index::FieldIndex;
-use crate::ir::{attrs::KirinFieldOptions, layout::Layout};
+use crate::ir::{
+    attrs::{DefaultValue, KirinFieldOptions},
+    layout::Layout,
+};
 use darling::FromField;
 
 #[derive(Debug, Clone)]
@@ -37,6 +40,6 @@ pub struct CompileTimeValue<L: Layout> {
     pub field: FieldIndex,
     pub ty: syn::Type,
     pub into: bool,
-    pub default: Option<syn::Expr>,
+    pub default: Option<DefaultValue>,
     pub extra: L::ExtraFieldAttrs,
 }
