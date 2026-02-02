@@ -1,8 +1,6 @@
 //! Tests for the combined HasParser + PrettyPrint derive macros.
 
-mod common;
-
-use common::SimpleType;
+use kirin_test_utils::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 

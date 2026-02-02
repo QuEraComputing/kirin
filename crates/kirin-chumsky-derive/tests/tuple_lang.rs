@@ -1,8 +1,6 @@
 //! Tests for tuple variants with positional fields.
 
-mod common;
-
-use common::SimpleType;
+use kirin_test_utils::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 

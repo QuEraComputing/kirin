@@ -1,8 +1,6 @@
 //! Tests for ResultValue with :name only (no :type in format).
 
-mod common;
-
-use common::SimpleType;
+use kirin_test_utils::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 

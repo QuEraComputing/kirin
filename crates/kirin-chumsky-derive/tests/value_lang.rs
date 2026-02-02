@@ -1,9 +1,7 @@
 //! Tests for compile-time value fields (non-IR types with HasParser).
 
-mod common;
-
 use chumsky::prelude::*;
-use common::SimpleType;
+use kirin_test_utils::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::{BoxedParser, HasParser, PrettyPrint, TokenInput, parse_ast};
 use kirin_lexer::Token;

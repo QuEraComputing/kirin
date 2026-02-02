@@ -1,8 +1,6 @@
 //! Tests for Successor field parsing.
 
-mod common;
-
-use common::SimpleType;
+use kirin_test_utils::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue, Successor};
 use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 
