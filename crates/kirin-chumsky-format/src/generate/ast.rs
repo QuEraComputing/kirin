@@ -1,10 +1,13 @@
 //! Code generation for AST types corresponding to dialect definitions.
 
+use std::collections::HashSet;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{FieldKind, collect_fields};
+use crate::field_kind::{CollectedField, FieldKind, collect_fields, fields_in_format};
+use crate::format::Format;
 use crate::generics::GenericsBuilder;
 
 /// Generator for AST type definitions.
@@ -14,6 +17,7 @@ use crate::generics::GenericsBuilder;
 /// before it's converted to IR.
 pub struct GenerateAST {
     crate_path: syn::Path,
+    ir_path: syn::Path,
     type_lattice: syn::Path,
 }
 
@@ -26,9 +30,16 @@ impl GenerateAST {
             .clone()
             .or(ir_input.attrs.crate_path.clone())
             .unwrap_or_else(|| syn::parse_quote!(::kirin_chumsky));
+        // IR path comes from #[kirin(crate = ...)] which defaults to ::kirin_ir
+        let ir_path = ir_input
+            .attrs
+            .crate_path
+            .clone()
+            .unwrap_or_else(|| syn::parse_quote!(::kirin_ir));
         let type_lattice = ir_input.attrs.type_lattice.clone();
         Self {
             crate_path,
+            ir_path,
             type_lattice,
         }
     }
@@ -62,7 +73,7 @@ impl GenerateAST {
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
-        GenericsBuilder::new(&self.crate_path).with_language(&ir_input.generics)
+        GenericsBuilder::new(&self.ir_path).with_language(&ir_input.generics)
     }
 
     fn generate_ast_definition(
@@ -81,16 +92,17 @@ impl GenerateAST {
         // AST types only need `Language: Dialect` bound.
         // Field types use the concrete type_lattice directly (not the associated type).
         // Block/Region fields use the concrete AST type name to avoid circular trait bounds.
+        let ir_path = &self.ir_path;
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
-                let fields = self.generate_struct_fields(&data.0, true, ast_name);
+                let fields = self.generate_struct_fields(ir_input, &data.0, true, ast_name);
                 let is_tuple = data.0.is_tuple_style();
 
                 if is_tuple {
                     quote! {
                         pub struct #ast_name #ty_generics
                         where
-                            Language: ::kirin_ir::Dialect,
+                            Language: #ir_path::Dialect,
                         (
                             #fields,
                             #phantom,
@@ -100,7 +112,7 @@ impl GenerateAST {
                     quote! {
                         pub struct #ast_name #ty_generics
                         where
-                            Language: ::kirin_ir::Dialect,
+                            Language: #ir_path::Dialect,
                         {
                             #fields
                             #[doc(hidden)]
@@ -110,11 +122,11 @@ impl GenerateAST {
                 }
             }
             kirin_derive_core::ir::Data::Enum(data) => {
-                let variants = self.generate_enum_variants(data, ast_name);
+                let variants = self.generate_enum_variants(ir_input, data, ast_name);
                 quote! {
                     pub enum #ast_name #ty_generics
                     where
-                        Language: ::kirin_ir::Dialect,
+                        Language: #ir_path::Dialect,
                     {
                         #variants
                         #[doc(hidden)]
@@ -142,10 +154,11 @@ impl GenerateAST {
         // Generate PartialEq impl
         let partialeq_impl = self.generate_partialeq_impl(ir_input, ast_name, ast_generics);
 
+        let ir_path = &self.ir_path;
         quote! {
             impl #impl_generics ::core::fmt::Debug for #ast_name #ty_generics
             where
-                Language: ::kirin_ir::Dialect,
+                Language: #ir_path::Dialect,
             {
                 fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                     #debug_impl
@@ -154,7 +167,7 @@ impl GenerateAST {
 
             impl #impl_generics ::core::clone::Clone for #ast_name #ty_generics
             where
-                Language: ::kirin_ir::Dialect,
+                Language: #ir_path::Dialect,
             {
                 fn clone(&self) -> Self {
                     #clone_impl
@@ -163,7 +176,7 @@ impl GenerateAST {
 
             impl #impl_generics ::core::cmp::PartialEq for #ast_name #ty_generics
             where
-                Language: ::kirin_ir::Dialect,
+                Language: #ir_path::Dialect,
             {
                 fn eq(&self, other: &Self) -> bool {
                     #partialeq_impl
@@ -466,24 +479,79 @@ impl GenerateAST {
         }
     }
 
+    /// Gets the format string for a statement, checking extra_attrs first.
+    fn format_for_statement(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+    ) -> Option<String> {
+        stmt.extra_attrs
+            .format
+            .clone()
+            .or(stmt.attrs.format.clone())
+            .or(ir_input.extra_attrs.format.clone())
+    }
+
+    /// Gets the set of field indices that are in the format string.
+    fn get_fields_in_format(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+    ) -> HashSet<usize> {
+        // If there's no format string, include all fields (wrapper variants, etc.)
+        let Some(format_str) = self.format_for_statement(ir_input, stmt) else {
+            return collect_fields(stmt).iter().map(|f| f.index).collect();
+        };
+
+        // Parse format string and get field indices
+        match Format::parse(&format_str, None) {
+            Ok(format) => fields_in_format(&format, stmt),
+            Err(_) => {
+                // If format parsing fails, include all fields (error will be reported elsewhere)
+                collect_fields(stmt).iter().map(|f| f.index).collect()
+            }
+        }
+    }
+
+    /// Filters collected fields to only include those needed in the AST.
+    ///
+    /// Fields are included if they:
+    /// - Are in the format string (will be parsed), OR
+    /// - Don't have a default value (required)
+    fn filter_fields_for_ast<'a>(
+        &self,
+        collected: &'a [CollectedField],
+        fields_in_format: &HashSet<usize>,
+    ) -> Vec<&'a CollectedField> {
+        collected
+            .iter()
+            .filter(|f| fields_in_format.contains(&f.index) || f.default.is_none())
+            .collect()
+    }
+
     fn generate_struct_fields(
         &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         with_pub: bool,
         ast_name: &syn::Ident,
     ) -> TokenStream {
-        let mut collected = collect_fields(stmt);
+        let collected = collect_fields(stmt);
+        let fields_in_fmt = self.get_fields_in_format(ir_input, stmt);
         let is_tuple = stmt.is_tuple_style();
+
+        // Filter to only fields needed in AST
+        let mut filtered: Vec<_> = self.filter_fields_for_ast(&collected, &fields_in_fmt);
 
         // For tuple fields, sort by original index to match the IR field order.
         // For named fields, keep the category order (which matches iter_all_fields).
         if is_tuple {
-            collected.sort_by_key(|f| f.index);
+            filtered.sort_by_key(|f| f.index);
         }
 
         let mut fields = Vec::new();
 
-        for field in &collected {
+        for field in &filtered {
             let ty = self.field_ast_type(&field.collection, &field.kind, ast_name);
             if let Some(ident) = &field.ident {
                 if with_pub {
@@ -507,6 +575,7 @@ impl GenerateAST {
 
     fn generate_enum_variants(
         &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
         ast_name: &syn::Ident,
     ) -> TokenStream {
@@ -527,7 +596,7 @@ impl GenerateAST {
                 }
 
                 // For enum variants, don't use `pub`
-                let fields = self.generate_struct_fields(variant, false, ast_name);
+                let fields = self.generate_struct_fields(ir_input, variant, false, ast_name);
                 let is_tuple = variant.is_tuple_style();
 
                 if is_tuple {

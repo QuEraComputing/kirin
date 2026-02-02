@@ -1,8 +1,8 @@
-use kirin::ir::*;
-// use kirin::parsers::prelude::*;
+use kirin::prelude::*;
 
+// Note: HasParser is not derived because T and L are generic type parameters
+// that would need HasParser bounds. For generic constants, implement HasParser manually.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
-// #[chumsky(format = "constant {value}")]
 #[kirin(constant, fn = new, type_lattice = L)]
 pub struct Constant<T: CompileTimeValue + Typeof<L>, L: TypeLattice> {
     #[kirin(into)]

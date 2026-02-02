@@ -15,6 +15,7 @@ where
             cond: f_cond,
             then_target: f_then_target,
             else_target: f_else_target,
+            ..
         } = self;
         let f_cond_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f_cond, ctx);
         let f_then_target_ir: ::kirin_ir::Successor =

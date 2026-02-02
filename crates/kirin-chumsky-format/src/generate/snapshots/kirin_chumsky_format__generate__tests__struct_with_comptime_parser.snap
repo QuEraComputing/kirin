@@ -15,21 +15,22 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Co
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         Constant: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Constant>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser: ::kirin_chumsky::BoxedParser<
             'tokens,
             'src,
             I,
             ConstantAST<'tokens, 'src, Constant>,
         > = {
-            use kirin_lexer::Token;
+            use kirin_chumsky::Token;
             ::kirin_chumsky::nameof_ssa()
                 .then_ignore(
-                    ::chumsky::prelude::just(Token::Equal)
-                        .then_ignore(::chumsky::prelude::just(Token::Identifier("constant"))),
+                    ::kirin_chumsky::chumsky::prelude::just(Token::Equal).then_ignore(
+                        ::kirin_chumsky::chumsky::prelude::just(Token::Identifier("constant")),
+                    ),
                 )
                 .then(<Value as ::kirin_chumsky::HasParser<'tokens, 'src>>::parser())
-                .then_ignore(::chumsky::prelude::just(Token::Arrow))
+                .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::Arrow))
                 .then(::kirin_chumsky::typeof_ssa::<_, Constant, SimpleType>())
                 .map(
                     |((res_name, value), res_type)| -> ConstantAST<'tokens, 'src, Constant> {
@@ -60,7 +61,7 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        :: chumsky :: recursive :: recursive (| language | { < Constant as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , Constant , >> :: recursive_parser (language) }) . boxed ()
+        use kirin_chumsky::chumsky::prelude::*;
+        :: kirin_chumsky :: chumsky :: recursive :: recursive (| language | { < Constant as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , Constant , >> :: recursive_parser (language) }) . boxed ()
     }
 }

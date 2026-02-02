@@ -22,16 +22,29 @@ pub struct GeneratePrettyPrint {
 impl GeneratePrettyPrint {
     /// Creates a new generator.
     pub fn new(ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> Self {
-        // Get the prettyless crate path from attributes or use default
-        // We look for a `prettyless` attribute or fall back to `::kirin_prettyless`
-        let prettyless_path = ir_input
-            .attrs
+        // Get the prettyless crate path from extra_attrs first (e.g., #[chumsky(crate = ...)])
+        // or fall back to attrs, then derive the prettyless path
+        let crate_path = ir_input
+            .extra_attrs
             .crate_path
             .as_ref()
+            .or(ir_input.attrs.crate_path.as_ref());
+
+        let prettyless_path = crate_path
             .map(|p| {
-                // If user specified a crate path like `kirin_chumsky`, try to derive prettyless path
-                // For now, just use the default
-                let _ = p;
+                // If user specified a crate path like `kirin::parsers`, derive prettyless as sibling
+                // e.g., `kirin::parsers` -> `kirin::pretty`
+                let mut segments = p.segments.clone();
+                if let Some(last) = segments.last_mut() {
+                    if last.ident == "parsers" {
+                        last.ident = syn::Ident::new("pretty", last.ident.span());
+                        return syn::Path {
+                            leading_colon: p.leading_colon,
+                            segments,
+                        };
+                    }
+                }
+                // Otherwise fall back to default
                 syn::parse_quote!(::kirin_prettyless)
             })
             .unwrap_or_else(|| syn::parse_quote!(::kirin_prettyless));

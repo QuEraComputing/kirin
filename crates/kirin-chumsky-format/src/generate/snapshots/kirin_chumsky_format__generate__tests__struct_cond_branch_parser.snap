@@ -15,8 +15,8 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Co
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         CondBranch: ::kirin_chumsky::HasDialectParser<'tokens, 'src, CondBranch>,
     {
-        use chumsky::prelude::*;
-        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , CondBranchAST < 'tokens , 'src , CondBranch > > = { use :: kirin_lexer :: Token ; :: chumsky :: prelude :: just (Token :: Identifier ("br")) . ignore_then (:: kirin_chumsky :: ssa_value :: < _ , CondBranch , SimpleType > ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin_chumsky :: block_label ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin_chumsky :: block_label ()) . map (| ((cond , then_target) , else_target) | -> CondBranchAST < 'tokens , 'src , CondBranch > { CondBranchAST { cond : cond , then_target : then_target , else_target : else_target , _marker : :: core :: marker :: PhantomData } }) } . boxed () ;
+        use kirin_chumsky::chumsky::prelude::*;
+        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , CondBranchAST < 'tokens , 'src , CondBranch > > = { use :: kirin_chumsky :: Token ; :: kirin_chumsky :: chumsky :: prelude :: just (Token :: Identifier ("br")) . ignore_then (:: kirin_chumsky :: ssa_value :: < _ , CondBranch , SimpleType > ()) . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin_chumsky :: block_label ()) . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin_chumsky :: block_label ()) . map (| ((cond , then_target) , else_target) | -> CondBranchAST < 'tokens , 'src , CondBranch > { CondBranchAST { cond : cond , then_target : then_target , else_target : else_target , _marker : :: core :: marker :: PhantomData } }) } . boxed () ;
         unsafe { ::core::mem::transmute(parser) }
     }
 }
@@ -29,7 +29,7 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        :: chumsky :: recursive :: recursive (| language | { < CondBranch as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , CondBranch , >> :: recursive_parser (language) }) . boxed ()
+        use kirin_chumsky::chumsky::prelude::*;
+        :: kirin_chumsky :: chumsky :: recursive :: recursive (| language | { < CondBranch as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , CondBranch , >> :: recursive_parser (language) }) . boxed ()
     }
 }

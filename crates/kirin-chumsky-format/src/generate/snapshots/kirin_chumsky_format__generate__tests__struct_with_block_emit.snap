@@ -11,7 +11,9 @@ where
 {
     type Output = ::kirin_ir::Statement;
     fn emit(&self, ctx: &mut ::kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
-        let Self { target: f_target } = self;
+        let Self {
+            target: f_target, ..
+        } = self;
         let f_target_ir: ::kirin_ir::Successor = ::kirin_chumsky::EmitIR::emit(f_target, ctx);
         let dialect_variant: Branch = Branch {
             target: f_target_ir.into(),

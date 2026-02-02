@@ -15,13 +15,13 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Em
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         EmptyLang: ::kirin_chumsky::HasDialectParser<'tokens, 'src, EmptyLang>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser: ::kirin_chumsky::BoxedParser<
             'tokens,
             'src,
             I,
             EmptyLangAST<'tokens, 'src, EmptyLang>,
-        > = ::chumsky::prelude::empty()
+        > = ::kirin_chumsky::chumsky::prelude::empty()
             .map(|_: ()| unreachable!())
             .boxed();
         unsafe { ::core::mem::transmute(parser) }
@@ -36,7 +36,7 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        :: chumsky :: recursive :: recursive (| language | { < EmptyLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , EmptyLang , >> :: recursive_parser (language) }) . boxed ()
+        use kirin_chumsky::chumsky::prelude::*;
+        :: kirin_chumsky :: chumsky :: recursive :: recursive (| language | { < EmptyLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , EmptyLang , >> :: recursive_parser (language) }) . boxed ()
     }
 }

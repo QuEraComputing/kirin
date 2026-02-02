@@ -15,8 +15,8 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Tu
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         TupleLang: ::kirin_chumsky::HasDialectParser<'tokens, 'src, TupleLang>,
     {
-        use chumsky::prelude::*;
-        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , TupleLangAST < 'tokens , 'src , TupleLang > > = { use :: kirin_lexer :: Token ; :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin_chumsky :: ssa_value :: < _ , TupleLang , SimpleType > ()) . map (| field_0 | -> TupleLangAST < 'tokens , 'src , TupleLang > { TupleLangAST :: Return (field_0) }) } . or ({ use :: kirin_lexer :: Token ; :: kirin_chumsky :: nameof_ssa () . then_ignore (:: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: chumsky :: prelude :: just (Token :: Identifier ("neg")))) . then (:: kirin_chumsky :: ssa_value :: < _ , TupleLang , SimpleType > ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin_chumsky :: typeof_ssa :: < _ , TupleLang , SimpleType > ()) . map (| ((field_1_name , field_0) , field_1_type) | -> TupleLangAST < 'tokens , 'src , TupleLang > { TupleLangAST :: Neg (field_0 , :: kirin_chumsky :: ResultValue { name : :: kirin_chumsky :: Spanned { value : field_1_name . name , span : field_1_name . span } , ty : Some (field_1_type . ty . clone ()) , }) }) }) . boxed () ;
+        use kirin_chumsky::chumsky::prelude::*;
+        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , TupleLangAST < 'tokens , 'src , TupleLang > > = { use :: kirin_chumsky :: Token ; :: kirin_chumsky :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin_chumsky :: ssa_value :: < _ , TupleLang , SimpleType > ()) . map (| field_0 | -> TupleLangAST < 'tokens , 'src , TupleLang > { TupleLangAST :: Return (field_0) }) } . or ({ use :: kirin_chumsky :: Token ; :: kirin_chumsky :: nameof_ssa () . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Identifier ("neg")))) . then (:: kirin_chumsky :: ssa_value :: < _ , TupleLang , SimpleType > ()) . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin_chumsky :: typeof_ssa :: < _ , TupleLang , SimpleType > ()) . map (| ((field_1_name , field_0) , field_1_type) | -> TupleLangAST < 'tokens , 'src , TupleLang > { TupleLangAST :: Neg (field_0 , :: kirin_chumsky :: ResultValue { name : :: kirin_chumsky :: Spanned { value : field_1_name . name , span : field_1_name . span } , ty : Some (field_1_type . ty . clone ()) , }) }) }) . boxed () ;
         unsafe { ::core::mem::transmute(parser) }
     }
 }
@@ -29,7 +29,7 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        :: chumsky :: recursive :: recursive (| language | { < TupleLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , TupleLang , >> :: recursive_parser (language) }) . boxed ()
+        use kirin_chumsky::chumsky::prelude::*;
+        :: kirin_chumsky :: chumsky :: recursive :: recursive (| language | { < TupleLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , TupleLang , >> :: recursive_parser (language) }) . boxed ()
     }
 }

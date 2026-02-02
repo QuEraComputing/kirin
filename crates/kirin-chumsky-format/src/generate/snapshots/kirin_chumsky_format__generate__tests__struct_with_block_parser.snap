@@ -13,15 +13,15 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Br
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         Branch: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser: ::kirin_chumsky::BoxedParser<
             'tokens,
             'src,
             I,
             BranchAST<'tokens, 'src, Branch>,
         > = {
-            use kirin_lexer::Token;
-            ::chumsky::prelude::just(Token::Identifier("br"))
+            use kirin_chumsky::Token;
+            ::kirin_chumsky::chumsky::prelude::just(Token::Identifier("br"))
                 .ignore_then(::kirin_chumsky::block_label())
                 .map(|target| -> BranchAST<'tokens, 'src, Branch> {
                     BranchAST {
@@ -43,8 +43,8 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        ::chumsky::recursive::recursive(|language| {
+        use kirin_chumsky::chumsky::prelude::*;
+        ::kirin_chumsky::chumsky::recursive::recursive(|language| {
             <Branch as ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch>>::recursive_parser(
                 language,
             )

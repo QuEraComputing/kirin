@@ -15,15 +15,15 @@ impl<'tokens, 'src: 'tokens, T: TypeLattice>
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         GenericReturn<T>: ::kirin_chumsky::HasDialectParser<'tokens, 'src, GenericReturn<T>>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser: ::kirin_chumsky::BoxedParser<
             'tokens,
             'src,
             I,
             GenericReturnAST<'tokens, 'src, GenericReturn<T>>,
         > = {
-            use kirin_lexer::Token;
-            ::chumsky::prelude::just(Token::Identifier("return"))
+            use kirin_chumsky::Token;
+            ::kirin_chumsky::chumsky::prelude::just(Token::Identifier("return"))
                 .ignore_then(::kirin_chumsky::ssa_value::<_, GenericReturn<T>, T>())
                 .map(
                     |field_0| -> GenericReturnAST<'tokens, 'src, GenericReturn<T>> {
@@ -45,8 +45,8 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        ::chumsky::recursive::recursive(|language| {
+        use kirin_chumsky::chumsky::prelude::*;
+        ::kirin_chumsky::chumsky::recursive::recursive(|language| {
             <GenericReturn<T> as ::kirin_chumsky::HasDialectParser<
                 'tokens,
                 'src,

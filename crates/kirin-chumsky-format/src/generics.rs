@@ -7,13 +7,13 @@ use proc_macro2::Span;
 
 /// Builder for AST generics with 'tokens, 'src, and Language parameters.
 pub struct GenericsBuilder<'a> {
-    crate_path: &'a syn::Path,
+    ir_path: &'a syn::Path,
 }
 
 impl<'a> GenericsBuilder<'a> {
     /// Creates a new generics builder.
-    pub fn new(crate_path: &'a syn::Path) -> Self {
-        Self { crate_path }
+    pub fn new(ir_path: &'a syn::Path) -> Self {
+        Self { ir_path }
     }
 
     /// Builds generics with 'tokens, 'src: 'tokens lifetimes only.
@@ -59,7 +59,7 @@ impl<'a> GenericsBuilder<'a> {
     /// AST types only require `Language: Dialect`, not `HasDialectParser`.
     pub fn with_language(&self, base: &syn::Generics) -> syn::Generics {
         let mut generics = self.with_lifetimes(base);
-        let _crate_path = self.crate_path;
+        let ir_path = self.ir_path;
 
         // Add Language type parameter if not present
         // Language only needs the Dialect bound (AST types don't implement HasDialectParser)
@@ -72,10 +72,76 @@ impl<'a> GenericsBuilder<'a> {
             let mut lang_param = syn::TypeParam::from(lang_ident);
             lang_param
                 .bounds
-                .push(syn::parse_quote!(::kirin_ir::Dialect));
+                .push(syn::parse_quote!(#ir_path::Dialect));
             generics.params.push(syn::GenericParam::Type(lang_param));
         }
 
         generics
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quote::quote;
+
+    fn format_generics(generics: &syn::Generics) -> String {
+        let tokens = quote! { #generics };
+        tokens.to_string()
+    }
+
+    #[test]
+    fn test_with_lifetimes_empty() {
+        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let builder = GenericsBuilder::new(&ir_path);
+
+        let base = syn::Generics::default();
+        let result = builder.with_lifetimes(&base);
+
+        insta::assert_snapshot!("with_lifetimes_empty", format_generics(&result));
+    }
+
+    #[test]
+    fn test_with_lifetimes_existing_type_param() {
+        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let builder = GenericsBuilder::new(&ir_path);
+
+        let base: syn::Generics = syn::parse_quote!(<T: Clone>);
+        let result = builder.with_lifetimes(&base);
+
+        insta::assert_snapshot!("with_lifetimes_existing_type", format_generics(&result));
+    }
+
+    #[test]
+    fn test_with_language_empty() {
+        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let builder = GenericsBuilder::new(&ir_path);
+
+        let base = syn::Generics::default();
+        let result = builder.with_language(&base);
+
+        insta::assert_snapshot!("with_language_empty", format_generics(&result));
+    }
+
+    #[test]
+    fn test_with_language_custom_ir_path() {
+        let ir_path: syn::Path = syn::parse_quote!(my_kirin);
+        let builder = GenericsBuilder::new(&ir_path);
+
+        let base = syn::Generics::default();
+        let result = builder.with_language(&base);
+
+        insta::assert_snapshot!("with_language_custom_ir", format_generics(&result));
+    }
+
+    #[test]
+    fn test_with_language_existing_type_param() {
+        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let builder = GenericsBuilder::new(&ir_path);
+
+        let base: syn::Generics = syn::parse_quote!(<T: CompileTimeValue>);
+        let result = builder.with_language(&base);
+
+        insta::assert_snapshot!("with_language_existing_type", format_generics(&result));
     }
 }

@@ -15,7 +15,7 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Co
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         ComposedLang: ::kirin_chumsky::HasDialectParser<'tokens, 'src, ComposedLang>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , ComposedLangAST < 'tokens , 'src , ComposedLang > > = < ArithDialect as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , ComposedLang >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , ComposedLang > { ComposedLangAST :: Arith (inner) }) . or (< ControlDialect as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , ComposedLang >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , ComposedLang > { ComposedLangAST :: Control (inner) })) . boxed () ;
         unsafe { ::core::mem::transmute(parser) }
     }
@@ -29,7 +29,7 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        :: chumsky :: recursive :: recursive (| language | { < ComposedLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , ComposedLang , >> :: recursive_parser (language) }) . boxed ()
+        use kirin_chumsky::chumsky::prelude::*;
+        :: kirin_chumsky :: chumsky :: recursive :: recursive (| language | { < ComposedLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , ComposedLang , >> :: recursive_parser (language) }) . boxed ()
     }
 }

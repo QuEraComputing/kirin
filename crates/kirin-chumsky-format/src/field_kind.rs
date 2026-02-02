@@ -3,12 +3,14 @@
 //! This module provides a unified `FieldKind` type used by both AST generation
 //! and parser generation.
 
+use std::collections::HashSet;
+
 use kirin_derive_core::ir::fields::Collection;
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::format::FormatOption;
+use crate::format::{Format, FormatElement, FormatOption};
 
 /// The kind of a field in code generation context.
 ///
@@ -261,6 +263,8 @@ pub struct CollectedField {
     pub collection: Collection,
     /// The kind of this field
     pub kind: FieldKind,
+    /// The default expression if specified via `#[kirin(default = ...)]`
+    pub default: Option<syn::Expr>,
 }
 
 impl std::fmt::Display for CollectedField {
@@ -288,6 +292,7 @@ pub fn collect_fields(
             ident: arg.field.ident.clone(),
             collection: arg.collection.clone(),
             kind: FieldKind::SSAValue,
+            default: None, // SSAValue fields don't support defaults
         });
     }
 
@@ -297,6 +302,7 @@ pub fn collect_fields(
             ident: res.field.ident.clone(),
             collection: res.collection.clone(),
             kind: FieldKind::ResultValue,
+            default: None, // ResultValue fields don't support defaults
         });
     }
 
@@ -306,6 +312,7 @@ pub fn collect_fields(
             ident: block.field.ident.clone(),
             collection: block.collection.clone(),
             kind: FieldKind::Block,
+            default: None, // Block fields don't support defaults
         });
     }
 
@@ -315,6 +322,7 @@ pub fn collect_fields(
             ident: succ.field.ident.clone(),
             collection: succ.collection.clone(),
             kind: FieldKind::Successor,
+            default: None, // Successor fields don't support defaults
         });
     }
 
@@ -324,6 +332,7 @@ pub fn collect_fields(
             ident: region.field.ident.clone(),
             collection: region.collection.clone(),
             kind: FieldKind::Region,
+            default: None, // Region fields don't support defaults
         });
     }
 
@@ -333,6 +342,7 @@ pub fn collect_fields(
             ident: value.field.ident.clone(),
             collection: Collection::Single,
             kind: FieldKind::Value(value.ty.clone()),
+            default: value.default.clone(), // Compile-time values can have defaults
         });
     }
 
@@ -340,3 +350,31 @@ pub fn collect_fields(
     // which is used by Statement::field_bindings() for code generation.
     fields
 }
+
+/// Returns the set of field indices that are mentioned in the format string.
+///
+/// This is used to determine which fields need to be included in the AST
+/// (fields not in format string but with defaults are excluded).
+pub fn fields_in_format(
+    format: &Format<'_>,
+    stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+) -> HashSet<usize> {
+    let map_by_ident = stmt.field_name_to_index();
+    let mut indices = HashSet::new();
+
+    for elem in format.elements() {
+        if let FormatElement::Field(name, _) = elem {
+            // Try to parse as index first, then look up by name
+            let index = name
+                .parse::<usize>()
+                .ok()
+                .or_else(|| map_by_ident.get(&name.to_string()).copied());
+            if let Some(idx) = index {
+                indices.insert(idx);
+            }
+        }
+    }
+
+    indices
+}
+

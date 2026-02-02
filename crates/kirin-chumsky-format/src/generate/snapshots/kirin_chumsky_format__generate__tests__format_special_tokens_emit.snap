@@ -14,6 +14,7 @@ where
         let Self {
             addr: f_addr,
             res: f_res,
+            ..
         } = self;
         let f_addr_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f_addr, ctx);
         let f_res_ir: ::kirin_ir::ResultValue = ::kirin_chumsky::EmitIR::emit(f_res, ctx);

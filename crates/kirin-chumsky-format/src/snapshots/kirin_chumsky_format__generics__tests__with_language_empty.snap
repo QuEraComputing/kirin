@@ -1,0 +1,5 @@
+---
+source: crates/kirin-chumsky-format/src/generics.rs
+expression: format_generics(&result)
+---
+< 'tokens , 'src : 'tokens , Language : :: kirin_ir :: Dialect >

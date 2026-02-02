@@ -13,18 +13,19 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Ad
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         Add: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Add>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser: ::kirin_chumsky::BoxedParser<'tokens, 'src, I, AddAST<'tokens, 'src, Add>> = {
-            use kirin_lexer::Token;
+            use kirin_chumsky::Token;
             ::kirin_chumsky::nameof_ssa()
                 .then_ignore(
-                    ::chumsky::prelude::just(Token::Equal)
-                        .then_ignore(::chumsky::prelude::just(Token::Identifier("add"))),
+                    ::kirin_chumsky::chumsky::prelude::just(Token::Equal).then_ignore(
+                        ::kirin_chumsky::chumsky::prelude::just(Token::Identifier("add")),
+                    ),
                 )
                 .then(::kirin_chumsky::ssa_value::<_, Add, SimpleType>())
-                .then_ignore(::chumsky::prelude::just(Token::Comma))
+                .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::Comma))
                 .then(::kirin_chumsky::ssa_value::<_, Add, SimpleType>())
-                .then_ignore(::chumsky::prelude::just(Token::Arrow))
+                .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::Arrow))
                 .then(::kirin_chumsky::typeof_ssa::<_, Add, SimpleType>())
                 .map(
                     |(((res_name, lhs), rhs), res_type)| -> AddAST<'tokens, 'src, Add> {
@@ -56,8 +57,8 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        ::chumsky::recursive::recursive(|language| {
+        use kirin_chumsky::chumsky::prelude::*;
+        ::kirin_chumsky::chumsky::recursive::recursive(|language| {
             <Add as ::kirin_chumsky::HasDialectParser<'tokens, 'src, Add>>::recursive_parser(
                 language,
             )

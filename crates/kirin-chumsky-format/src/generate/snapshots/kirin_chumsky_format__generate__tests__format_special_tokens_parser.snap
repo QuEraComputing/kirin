@@ -13,20 +13,22 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Lo
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         Load: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Load>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser: ::kirin_chumsky::BoxedParser<'tokens, 'src, I, LoadAST<'tokens, 'src, Load>> =
             {
-                use kirin_lexer::Token;
+                use kirin_chumsky::Token;
                 ::kirin_chumsky::nameof_ssa()
                     .then_ignore(
-                        ::chumsky::prelude::just(Token::Equal)
-                            .then_ignore(::chumsky::prelude::just(Token::Identifier("load")))
-                            .then_ignore(::chumsky::prelude::just(Token::LBracket)),
+                        ::kirin_chumsky::chumsky::prelude::just(Token::Equal)
+                            .then_ignore(::kirin_chumsky::chumsky::prelude::just(
+                                Token::Identifier("load"),
+                            ))
+                            .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::LBracket)),
                     )
                     .then(::kirin_chumsky::ssa_value::<_, Load, SimpleType>())
                     .then_ignore(
-                        ::chumsky::prelude::just(Token::RBracket)
-                            .then_ignore(::chumsky::prelude::just(Token::Arrow)),
+                        ::kirin_chumsky::chumsky::prelude::just(Token::RBracket)
+                            .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::Arrow)),
                     )
                     .then(::kirin_chumsky::typeof_ssa::<_, Load, SimpleType>())
                     .map(
@@ -58,8 +60,8 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        ::chumsky::recursive::recursive(|language| {
+        use kirin_chumsky::chumsky::prelude::*;
+        ::kirin_chumsky::chumsky::recursive::recursive(|language| {
             <Load as ::kirin_chumsky::HasDialectParser<'tokens, 'src, Load>>::recursive_parser(
                 language,
             )

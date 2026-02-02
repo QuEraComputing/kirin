@@ -24,6 +24,7 @@ struct FieldOccurrence<'a> {
 /// Generator for the `HasDialectParser` trait implementation.
 pub struct GenerateHasDialectParser {
     crate_path: syn::Path,
+    ir_path: syn::Path,
 }
 
 impl GenerateHasDialectParser {
@@ -35,7 +36,13 @@ impl GenerateHasDialectParser {
             .clone()
             .or(ir_input.attrs.crate_path.clone())
             .unwrap_or_else(|| syn::parse_quote!(::kirin_chumsky));
-        Self { crate_path }
+        // IR path comes from #[kirin(crate = ...)] which defaults to ::kirin_ir
+        let ir_path = ir_input
+            .attrs
+            .crate_path
+            .clone()
+            .unwrap_or_else(|| syn::parse_quote!(::kirin_ir));
+        Self { crate_path, ir_path }
     }
 
     /// Generates the `HasDialectParser` implementation.
@@ -116,8 +123,8 @@ impl GenerateHasDialectParser {
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
                 {
-                    use ::chumsky::prelude::*;
-                    ::chumsky::recursive::recursive(|language| {
+                    use #crate_path::chumsky::prelude::*;
+                    #crate_path::chumsky::recursive::recursive(|language| {
                         <#original_name #ty_generics as #crate_path::HasDialectParser<
                             'tokens,
                             'src,
@@ -183,7 +190,7 @@ impl GenerateHasDialectParser {
                     I: #crate_path::TokenInput<'tokens, 'src>,
                     #original_name #ty_generics: #crate_path::HasDialectParser<'tokens, 'src, #original_name #ty_generics>,
                 {
-                    use ::chumsky::prelude::*;
+                    use #crate_path::chumsky::prelude::*;
                     // SAFETY: The transmute converts between two identical types:
                     // - #ast_type (the concrete AST type with explicit lifetimes)
                     // - Self::Output (defined as `type Output = #ast_type` above)
@@ -259,7 +266,7 @@ impl GenerateHasDialectParser {
         }
 
         if variant_parsers.is_empty() {
-            quote! { ::chumsky::prelude::empty().map(|_: ()| unreachable!()) }
+            quote! { #crate_path::chumsky::prelude::empty().map(|_: ()| unreachable!()) }
         } else {
             variant_parsers
                 .into_iter()
@@ -273,14 +280,14 @@ impl GenerateHasDialectParser {
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
-        GenericsBuilder::new(&self.crate_path).with_lifetimes(&ir_input.generics)
+        GenericsBuilder::new(&self.ir_path).with_lifetimes(&ir_input.generics)
     }
 
     fn build_ast_generics(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
     ) -> syn::Generics {
-        GenericsBuilder::new(&self.crate_path).with_language(&ir_input.generics)
+        GenericsBuilder::new(&self.ir_path).with_language(&ir_input.generics)
     }
 
     fn build_statement_parser(
@@ -342,7 +349,7 @@ impl GenerateHasDialectParser {
         // Without this, Rust would infer anonymous lifetimes '_ for the constructor.
         let return_type = quote! { #ast_name<'tokens, 'src, #dialect_type> };
         Ok(quote! {{
-            use ::kirin_lexer::Token;
+            use #crate_path::Token;
             #parser_expr.map(|#pattern| -> #return_type { #constructor })
         }})
     }
@@ -470,17 +477,18 @@ impl GenerateHasDialectParser {
             }
         }
 
-        // Validate that all fields are mentioned in the format string.
-        // This prevents silent fallback to Default::default() for missing fields.
+        // Validate that all fields are mentioned in the format string,
+        // unless they have a default value specified via #[kirin(default = ...)].
         for field in collected {
             let is_mentioned = occurrences.iter().any(|o| o.field.index == field.index);
-            if !is_mentioned {
+            if !is_mentioned && field.default.is_none() {
                 return Err(syn::Error::new(
                     stmt.name.span(),
                     format!(
                         "field '{}' is not mentioned in the format string. \
-                         All fields must appear in the format string. \
-                         Use {{{}}} or {{{}:name}}/{{{}:type}} to include this field.",
+                         All fields must appear in the format string unless they have a default value. \
+                         Use {{{}}} or {{{}:name}}/{{{}:type}} to include this field, \
+                         or add #[kirin(default = ...)] to provide a default value.",
                         field, field, field, field
                     ),
                 ));
@@ -546,7 +554,7 @@ impl GenerateHasDialectParser {
 
         // Build the parser chain
         if parser_parts.is_empty() {
-            return Ok(quote! { ::chumsky::prelude::empty() });
+            return Ok(quote! { #crate_path::chumsky::prelude::empty() });
         }
 
         // Find the first field parser
@@ -606,7 +614,7 @@ impl GenerateHasDialectParser {
             }
         }
 
-        Ok(parser_expr.unwrap_or_else(|| quote! { ::chumsky::prelude::empty() }))
+        Ok(parser_expr.unwrap_or_else(|| quote! { #crate_path::chumsky::prelude::empty() }))
     }
 
     fn build_pattern_v2(&self, var_names: &[syn::Ident]) -> TokenStream {
@@ -660,11 +668,19 @@ impl GenerateHasDialectParser {
                 .push(occ);
         }
 
+        // Filter to only fields that should be in the AST:
+        // - Fields that are in the format string (have occurrences), OR
+        // - Fields that don't have a default value
+        let ast_fields: Vec<_> = collected
+            .iter()
+            .filter(|f| field_occurrences.contains_key(&f.index) || f.default.is_none())
+            .collect();
+
         // Check if we have named fields
-        let has_named = collected.first().and_then(|f| f.ident.as_ref()).is_some();
+        let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
 
         if has_named {
-            let assigns = collected.iter().map(|field| {
+            let assigns = ast_fields.iter().map(|field| {
                 let name = field.ident.as_ref().unwrap();
                 let value = self.build_field_value(field, &field_occurrences, crate_path);
                 quote! { #name: #value }
@@ -676,10 +692,10 @@ impl GenerateHasDialectParser {
             }
         } else {
             // For tuple fields, sort by original index to match AST struct definition order
-            let mut sorted_collected: Vec<_> = collected.iter().collect();
-            sorted_collected.sort_by_key(|f| f.index);
+            let mut sorted_ast_fields: Vec<_> = ast_fields.clone();
+            sorted_ast_fields.sort_by_key(|f| f.index);
 
-            let values = sorted_collected
+            let values = sorted_ast_fields
                 .iter()
                 .map(|field| self.build_field_value(field, &field_occurrences, crate_path));
             match variant {
@@ -792,13 +808,14 @@ impl GenerateHasDialectParser {
     }
 
     fn token_parser(&self, tokens: &[kirin_lexer::Token<'_>]) -> TokenStream {
+        let crate_path = &self.crate_path;
         let mut iter = tokens.iter();
         let Some(first) = iter.next() else {
-            return quote! { ::chumsky::prelude::empty().ignored() };
+            return quote! { #crate_path::chumsky::prelude::empty().ignored() };
         };
-        let mut parser = quote! { ::chumsky::prelude::just(#first) };
+        let mut parser = quote! { #crate_path::chumsky::prelude::just(#first) };
         for tok in iter {
-            parser = quote! { #parser.then_ignore(::chumsky::prelude::just(#tok)) };
+            parser = quote! { #parser.then_ignore(#crate_path::chumsky::prelude::just(#tok)) };
         }
         parser
     }

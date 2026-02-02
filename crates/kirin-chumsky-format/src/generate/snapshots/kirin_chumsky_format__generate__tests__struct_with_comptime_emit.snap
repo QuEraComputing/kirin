@@ -14,6 +14,7 @@ where
         let Self {
             res: f_res,
             value: f_value,
+            ..
         } = self;
         let f_res_ir: ::kirin_ir::ResultValue = ::kirin_chumsky::EmitIR::emit(f_res, ctx);
         let f_value_ir = f_value.clone();

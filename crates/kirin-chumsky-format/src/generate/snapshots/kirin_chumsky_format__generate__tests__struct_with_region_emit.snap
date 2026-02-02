@@ -14,6 +14,7 @@ where
         let Self {
             res: f_res,
             body: f_body,
+            ..
         } = self;
         let f_res_ir: ::kirin_ir::ResultValue = ::kirin_chumsky::EmitIR::emit(f_res, ctx);
         let f_body_ir: ::kirin_ir::Region = ::kirin_chumsky::EmitIR::emit(f_body, ctx);

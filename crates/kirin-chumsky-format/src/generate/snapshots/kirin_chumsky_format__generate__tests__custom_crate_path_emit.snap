@@ -2,17 +2,17 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, Language: ::kirin_ir::Dialect> my_chumsky::EmitIR<Language>
+impl<'tokens, 'src: 'tokens, Language: my_kirin::Dialect> my_chumsky::EmitIR<Language>
     for CustomReturnAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect + From<CustomReturn>,
+    Language: my_kirin::Dialect + From<CustomReturn>,
     <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output:
-        my_chumsky::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
+        my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::TypeLattice>,
 {
-    type Output = ::kirin_ir::Statement;
+    type Output = my_kirin::Statement;
     fn emit(&self, ctx: &mut my_chumsky::EmitContext<'_, Language>) -> Self::Output {
         let Self(f0) = self;
-        let f0_ir: ::kirin_ir::SSAValue = my_chumsky::EmitIR::emit(f0, ctx);
+        let f0_ir: my_kirin::SSAValue = my_chumsky::EmitIR::emit(f0, ctx);
         let dialect_variant: CustomReturn = CustomReturn(f0_ir.into());
         ctx.context.statement().definition(dialect_variant).new()
     }

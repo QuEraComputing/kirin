@@ -15,18 +15,19 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Fu
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
         Function: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Function>,
     {
-        use chumsky::prelude::*;
+        use kirin_chumsky::chumsky::prelude::*;
         let parser: ::kirin_chumsky::BoxedParser<
             'tokens,
             'src,
             I,
             FunctionAST<'tokens, 'src, Function>,
         > = {
-            use kirin_lexer::Token;
+            use kirin_chumsky::Token;
             ::kirin_chumsky::nameof_ssa()
                 .then_ignore(
-                    ::chumsky::prelude::just(Token::Equal)
-                        .then_ignore(::chumsky::prelude::just(Token::Identifier("function"))),
+                    ::kirin_chumsky::chumsky::prelude::just(Token::Equal).then_ignore(
+                        ::kirin_chumsky::chumsky::prelude::just(Token::Identifier("function")),
+                    ),
                 )
                 .then(
                     ::kirin_chumsky::region::<_, Function, SimpleType>(language.clone()).map(
@@ -50,7 +51,7 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Fu
                         },
                     ),
                 )
-                .then_ignore(::chumsky::prelude::just(Token::Arrow))
+                .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::Arrow))
                 .then(::kirin_chumsky::typeof_ssa::<_, Function, SimpleType>())
                 .map(
                     |((res_name, body), res_type)| -> FunctionAST<'tokens, 'src, Function> {
@@ -81,7 +82,7 @@ where
     where
         I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
     {
-        use chumsky::prelude::*;
-        :: chumsky :: recursive :: recursive (| language | { < Function as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , Function , >> :: recursive_parser (language) }) . boxed ()
+        use kirin_chumsky::chumsky::prelude::*;
+        :: kirin_chumsky :: chumsky :: recursive :: recursive (| language | { < Function as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , Function , >> :: recursive_parser (language) }) . boxed ()
     }
 }
