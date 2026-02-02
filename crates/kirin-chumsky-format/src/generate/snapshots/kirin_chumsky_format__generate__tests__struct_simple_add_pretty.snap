@@ -1,0 +1,24 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl ::kirin_prettyless::PrettyPrint<Add> for Add {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin_prettyless::Document<'a, Add>,
+    ) -> ::kirin_prettyless::ArenaDoc<'a> {
+        use kirin_prettyless::DocAllocator;
+        let Add {
+            lhs: f_lhs,
+            rhs: f_rhs,
+            res: f_res,
+        } = self;
+        ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
+            + doc.text(" = add ")
+            + ::kirin_prettyless::PrettyPrint::pretty_print(f_lhs, doc)
+            + doc.text(", ")
+            + ::kirin_prettyless::PrettyPrint::pretty_print(f_rhs, doc)
+            + doc.text(" -> ")
+            + ::kirin_prettyless::PrettyPrintType::pretty_print_type(f_res, doc)
+    }
+}

@@ -1,0 +1,14 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl ::kirin_prettyless::PrettyPrint<Branch> for Branch {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin_prettyless::Document<'a, Branch>,
+    ) -> ::kirin_prettyless::ArenaDoc<'a> {
+        use kirin_prettyless::DocAllocator;
+        let Branch { target: f_target } = self;
+        doc.text("br ") + ::kirin_prettyless::PrettyPrint::pretty_print(f_target, doc)
+    }
+}

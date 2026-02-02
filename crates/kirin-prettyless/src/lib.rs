@@ -327,37 +327,77 @@ impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Statement {
     }
 }
 
-impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Block {
+impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Block
+where
+    L::TypeLattice: std::fmt::Display,
+{
     fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        let block_info = self.expect_info(doc.context);
+
+        // Build block header with arguments: ^name(%arg0: type, %arg1: type)
+        // Look up block name from symbol table, fall back to ^index
+        let block_name = block_info
+            .name
+            .and_then(|name_sym| {
+                doc.context
+                    .symbol_table()
+                    .borrow()
+                    .resolve(name_sym)
+                    .map(|s| format!("^{}", s))
+            })
+            .unwrap_or_else(|| format!("{}", self)); // Block's Display includes the ^
+        let mut header = doc.text(block_name);
+
+        // Add arguments
+        let args = &block_info.arguments;
+        if !args.is_empty() {
+            let mut args_doc = doc.nil();
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    args_doc += doc.text(", ");
+                }
+                let arg_info: &kirin_ir::Item<kirin_ir::SSAInfo<L>> =
+                    arg.expect_info(doc.context);
+                let name = if let Some(name_sym) = arg_info.name() {
+                    doc.context
+                        .symbol_table()
+                        .borrow()
+                        .resolve(name_sym)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}", *arg))
+                } else {
+                    format!("{}", *arg)
+                };
+                args_doc += doc.text(format!("%{}: {}", name, arg_info.ty()));
+            }
+            header += args_doc.enclose("(", ")");
+        }
+
+        // Build block body with statements
+        // Note: Statement results are NOT printed here - they are included in each
+        // statement's format string (e.g., "{res:name} = add {lhs}, {rhs} -> {res:type}")
         let mut inner = doc.nil();
         for (i, stmt) in self.statements(doc.context).enumerate() {
             if i > 0 {
                 inner += doc.line_();
             }
-
-            let mut doc_results = doc.spaces(doc.max_result_width - doc.result_width[stmt]);
-            for (i, result) in stmt.results(doc.context).enumerate() {
-                if i > 0 {
-                    doc_results += doc.text(", ");
-                }
-                doc_results += result.pretty_print(doc);
-            }
-            if !doc_results.is_nil() {
-                inner += doc_results + doc.text(" = ");
-            }
-            inner += stmt.pretty_print(doc);
+            inner += stmt.pretty_print(doc) + doc.text(";");
         }
         if let Some(terminator) = self.terminator(doc.context) {
             if !inner.is_nil() {
                 inner += doc.line_();
             }
-            inner += terminator.pretty_print(doc)
+            inner += terminator.pretty_print(doc) + doc.text(";");
         }
-        doc.text(format!("{}:", self)) + doc.block_indent(inner)
+
+        header + doc.text(" {") + doc.block_indent(inner) + doc.line_() + doc.text("}")
     }
 }
 
-impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Region {
+impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Region
+where
+    L::TypeLattice: std::fmt::Display,
+{
     fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
         let mut inner = doc.nil();
         for block in self.blocks(doc.context) {

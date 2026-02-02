@@ -1,0 +1,18 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl ::kirin_prettyless::PrettyPrint<ComposedLang> for ComposedLang {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin_prettyless::Document<'a, ComposedLang>,
+    ) -> ::kirin_prettyless::ArenaDoc<'a> {
+        use kirin_prettyless::DocAllocator;
+        match self {
+            ComposedLang::Arith(inner) => ::kirin_prettyless::PrettyPrint::pretty_print(inner, doc),
+            ComposedLang::Control(inner) => {
+                ::kirin_prettyless::PrettyPrint::pretty_print(inner, doc)
+            }
+        }
+    }
+}

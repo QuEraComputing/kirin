@@ -47,6 +47,17 @@ impl GenerateAST {
         }
     }
 
+    /// Generates only the AST type definition without trait impls.
+    /// Useful for testing to get cleaner output.
+    pub fn generate_definition_only(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+    ) -> TokenStream {
+        let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
+        let ast_generics = self.build_ast_generics(ir_input);
+        self.generate_ast_definition(ir_input, &ast_name, &ast_generics)
+    }
+
     fn build_ast_generics(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
@@ -62,9 +73,9 @@ impl GenerateAST {
     ) -> TokenStream {
         let (_, ty_generics, _) = ast_generics.split_for_impl();
 
-        // We use PhantomData to make the 'tokens lifetime and Language type parameter used.
-        // Using fn() -> (&'tokens (), Language) makes them covariant and doesn't require Clone/Debug/etc.
-        let phantom = quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), Language)> };
+        // We use PhantomData to make all generic parameters used ('tokens, 'src, Language).
+        // Using fn() -> ... makes them covariant and doesn't require Clone/Debug/etc.
+        let phantom = quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)> };
 
         // AST types only need `Language: Dialect` bound.
         // Field types use the concrete type_lattice directly (not the associated type).

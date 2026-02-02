@@ -1,0 +1,35 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: parser
+---
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, SimpleLang>
+    for SimpleLang
+{
+    type Output = SimpleLangAST<'tokens, 'src, SimpleLang>;
+    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+    #[inline]
+    fn recursive_parser<I>(
+        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
+    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        SimpleLang: ::kirin_chumsky::HasDialectParser<'tokens, 'src, SimpleLang>,
+    {
+        use chumsky::prelude::*;
+        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , SimpleLangAST < 'tokens , 'src , SimpleLang > > = { use :: kirin_lexer :: Token ; :: kirin_chumsky :: nameof_ssa () . then_ignore (:: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: chumsky :: prelude :: just (Token :: Identifier ("add")))) . then (:: kirin_chumsky :: ssa_value :: < _ , SimpleLang , SimpleType > ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin_chumsky :: ssa_value :: < _ , SimpleLang , SimpleType > ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin_chumsky :: typeof_ssa :: < _ , SimpleLang , SimpleType > ()) . map (| (((res_name , lhs) , rhs) , res_type) | -> SimpleLangAST < 'tokens , 'src , SimpleLang > { SimpleLangAST :: Add { lhs : lhs , rhs : rhs , res : :: kirin_chumsky :: ResultValue { name : :: kirin_chumsky :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } } }) } . or ({ use :: kirin_lexer :: Token ; :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin_chumsky :: ssa_value :: < _ , SimpleLang , SimpleType > ()) . map (| arg | -> SimpleLangAST < 'tokens , 'src , SimpleLang > { SimpleLangAST :: Return { arg : arg } }) }) . boxed () ;
+        unsafe { ::core::mem::transmute(parser) }
+    }
+}
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for SimpleLang
+where
+    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+{
+    type Output = SimpleLangAST<'tokens, 'src, SimpleLang>;
+    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+    {
+        use chumsky::prelude::*;
+        :: chumsky :: recursive :: recursive (| language | { < SimpleLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , SimpleLang , >> :: recursive_parser (language) }) . boxed ()
+    }
+}

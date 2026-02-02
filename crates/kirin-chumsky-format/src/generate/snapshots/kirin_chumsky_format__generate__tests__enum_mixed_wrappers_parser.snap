@@ -1,0 +1,35 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: parser
+---
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, MixedLang>
+    for MixedLang
+{
+    type Output = MixedLangAST<'tokens, 'src, MixedLang>;
+    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+    #[inline]
+    fn recursive_parser<I>(
+        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
+    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        MixedLang: ::kirin_chumsky::HasDialectParser<'tokens, 'src, MixedLang>,
+    {
+        use chumsky::prelude::*;
+        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , MixedLangAST < 'tokens , 'src , MixedLang > > = < ArithDialect as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , MixedLang >> :: recursive_parser (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , MixedLang > { MixedLangAST :: Arith (inner) }) . or ({ use :: kirin_lexer :: Token ; :: kirin_chumsky :: nameof_ssa () . then_ignore (:: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: chumsky :: prelude :: just (Token :: Identifier ("custom")))) . then (:: kirin_chumsky :: ssa_value :: < _ , MixedLang , SimpleType > ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin_chumsky :: typeof_ssa :: < _ , MixedLang , SimpleType > ()) . map (| ((res_name , arg) , res_type) | -> MixedLangAST < 'tokens , 'src , MixedLang > { MixedLangAST :: Custom { arg : arg , res : :: kirin_chumsky :: ResultValue { name : :: kirin_chumsky :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } } }) }) . or (< ControlDialect as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , MixedLang >> :: recursive_parser (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , MixedLang > { MixedLangAST :: Control (inner) })) . boxed () ;
+        unsafe { ::core::mem::transmute(parser) }
+    }
+}
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for MixedLang
+where
+    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+{
+    type Output = MixedLangAST<'tokens, 'src, MixedLang>;
+    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+    {
+        use chumsky::prelude::*;
+        :: chumsky :: recursive :: recursive (| language | { < MixedLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , MixedLang , >> :: recursive_parser (language) }) . boxed ()
+    }
+}

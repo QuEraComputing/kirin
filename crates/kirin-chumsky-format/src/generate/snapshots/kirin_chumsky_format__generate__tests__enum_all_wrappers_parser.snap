@@ -1,0 +1,35 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: parser
+---
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, ComposedLang>
+    for ComposedLang
+{
+    type Output = ComposedLangAST<'tokens, 'src, ComposedLang>;
+    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+    #[inline]
+    fn recursive_parser<I>(
+        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
+    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        ComposedLang: ::kirin_chumsky::HasDialectParser<'tokens, 'src, ComposedLang>,
+    {
+        use chumsky::prelude::*;
+        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , ComposedLangAST < 'tokens , 'src , ComposedLang > > = < ArithDialect as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , ComposedLang >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , ComposedLang > { ComposedLangAST :: Arith (inner) }) . or (< ControlDialect as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , ComposedLang >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , ComposedLang > { ComposedLangAST :: Control (inner) })) . boxed () ;
+        unsafe { ::core::mem::transmute(parser) }
+    }
+}
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for ComposedLang
+where
+    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+{
+    type Output = ComposedLangAST<'tokens, 'src, ComposedLang>;
+    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+    {
+        use chumsky::prelude::*;
+        :: chumsky :: recursive :: recursive (| language | { < ComposedLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , ComposedLang , >> :: recursive_parser (language) }) . boxed ()
+    }
+}

@@ -1,0 +1,30 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+pub enum TupleLangAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect,
+{
+    Return(
+        ::kirin_chumsky::SSAValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+    ),
+    Neg(
+        ::kirin_chumsky::SSAValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+        ::kirin_chumsky::ResultValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+    ),
+    #[doc(hidden)]
+    __Marker(
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::convert::Infallible,
+    ),
+}

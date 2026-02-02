@@ -1,0 +1,26 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+pub enum MixedLangAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect,
+{
+    Arith(<ArithDialect as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output),
+    Custom {
+        arg: ::kirin_chumsky::SSAValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+        res: ::kirin_chumsky::ResultValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+    },
+    Control(<ControlDialect as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output),
+    #[doc(hidden)]
+    __Marker(
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::convert::Infallible,
+    ),
+}

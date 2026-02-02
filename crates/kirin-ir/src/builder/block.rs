@@ -5,6 +5,7 @@ use crate::{Context, Dialect};
 pub struct BlockBuilder<'a, L: Dialect> {
     context: &'a mut Context<L>,
     parent: Option<Region>,
+    name: Option<String>,
     arguments: Vec<(L::TypeLattice, Option<String>)>,
     statements: Vec<Statement>,
     terminator: Option<Statement>,
@@ -15,6 +16,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         BlockBuilder {
             context,
             parent: None,
+            name: None,
             arguments: Vec::new(),
             statements: Vec::new(),
             terminator: None,
@@ -24,6 +26,12 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     /// Attach the block to a parent region without pushing it to the region's block list.
     pub fn parent(mut self, parent: Region) -> Self {
         self.parent = Some(parent);
+        self
+    }
+
+    /// Set the name of this block (e.g., "entry", "loop_body").
+    pub fn name<S: Into<String>>(mut self, name: S) -> Self {
+        self.name = Some(name.into());
         self
     }
 
@@ -110,6 +118,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
 
         let block = BlockInfo::builder()
             .maybe_parent(self.parent)
+            .maybe_name(self.name.map(|n| self.context.symbols.borrow_mut().intern(n)))
             .node(LinkedListNode::new(id))
             .arguments(block_args)
             .statements(self.context.link_statements(&self.statements))

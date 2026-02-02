@@ -1,0 +1,26 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl ::kirin_prettyless::PrettyPrint<MixedLang> for MixedLang {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin_prettyless::Document<'a, MixedLang>,
+    ) -> ::kirin_prettyless::ArenaDoc<'a> {
+        use kirin_prettyless::DocAllocator;
+        match self {
+            MixedLang::Arith(inner) => ::kirin_prettyless::PrettyPrint::pretty_print(inner, doc),
+            MixedLang::Custom {
+                arg: f_arg,
+                res: f_res,
+            } => {
+                ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
+                    + doc.text(" = custom ")
+                    + ::kirin_prettyless::PrettyPrint::pretty_print(f_arg, doc)
+                    + doc.text(" -> ")
+                    + ::kirin_prettyless::PrettyPrintType::pretty_print_type(f_res, doc)
+            }
+            MixedLang::Control(inner) => ::kirin_prettyless::PrettyPrint::pretty_print(inner, doc),
+        }
+    }
+}

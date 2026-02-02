@@ -1,0 +1,31 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: emit
+---
+impl<'tokens, 'src: 'tokens, Language: ::kirin_ir::Dialect> ::kirin_chumsky::EmitIR<Language>
+    for CondBranchAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect + From<CondBranch>,
+    <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output:
+        ::kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
+{
+    type Output = ::kirin_ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+        let Self {
+            cond: f_cond,
+            then_target: f_then_target,
+            else_target: f_else_target,
+        } = self;
+        let f_cond_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f_cond, ctx);
+        let f_then_target_ir: ::kirin_ir::Successor =
+            ::kirin_chumsky::EmitIR::emit(f_then_target, ctx);
+        let f_else_target_ir: ::kirin_ir::Successor =
+            ::kirin_chumsky::EmitIR::emit(f_else_target, ctx);
+        let dialect_variant: CondBranch = CondBranch {
+            cond: f_cond_ir.into(),
+            then_target: f_then_target_ir.into(),
+            else_target: f_else_target_ir.into(),
+        };
+        ctx.context.statement().definition(dialect_variant).new()
+    }
+}

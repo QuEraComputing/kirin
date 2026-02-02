@@ -1,0 +1,48 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: parser
+---
+impl<'tokens, 'src: 'tokens> my_chumsky::HasDialectParser<'tokens, 'src, CustomReturn>
+    for CustomReturn
+{
+    type Output = CustomReturnAST<'tokens, 'src, CustomReturn>;
+    type TypeAST = <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output;
+    #[inline]
+    fn recursive_parser<I>(
+        language: my_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
+    ) -> my_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: my_chumsky::TokenInput<'tokens, 'src>,
+        CustomReturn: my_chumsky::HasDialectParser<'tokens, 'src, CustomReturn>,
+    {
+        use chumsky::prelude::*;
+        let parser: my_chumsky::BoxedParser<
+            'tokens,
+            'src,
+            I,
+            CustomReturnAST<'tokens, 'src, CustomReturn>,
+        > = {
+            use kirin_lexer::Token;
+            ::chumsky::prelude::just(Token::Identifier("return"))
+                .ignore_then(my_chumsky::ssa_value::<_, CustomReturn, SimpleType>())
+                .map(|field_0| -> CustomReturnAST<'tokens, 'src, CustomReturn> {
+                    CustomReturnAST(field_0, ::core::marker::PhantomData)
+                })
+        }
+        .boxed();
+        unsafe { ::core::mem::transmute(parser) }
+    }
+}
+impl<'tokens, 'src: 'tokens> my_chumsky::HasParser<'tokens, 'src> for CustomReturn
+where
+    SimpleType: my_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+{
+    type Output = CustomReturnAST<'tokens, 'src, CustomReturn>;
+    fn parser<I>() -> my_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: my_chumsky::TokenInput<'tokens, 'src>,
+    {
+        use chumsky::prelude::*;
+        :: chumsky :: recursive :: recursive (| language | { < CustomReturn as my_chumsky :: HasDialectParser < 'tokens , 'src , CustomReturn , >> :: recursive_parser (language) }) . boxed ()
+    }
+}

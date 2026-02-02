@@ -1,0 +1,14 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+pub enum EmptyLangAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect,
+{
+    #[doc(hidden)]
+    __Marker(
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::convert::Infallible,
+    ),
+}

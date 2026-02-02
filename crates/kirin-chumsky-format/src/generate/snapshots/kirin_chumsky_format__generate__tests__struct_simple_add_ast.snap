@@ -1,0 +1,23 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+pub struct AddAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect,
+{
+    pub lhs: ::kirin_chumsky::SSAValue<
+        'src,
+        <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+    >,
+    pub rhs: ::kirin_chumsky::SSAValue<
+        'src,
+        <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+    >,
+    pub res: ::kirin_chumsky::ResultValue<
+        'src,
+        <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+    >,
+    #[doc(hidden)]
+    _marker: ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+}

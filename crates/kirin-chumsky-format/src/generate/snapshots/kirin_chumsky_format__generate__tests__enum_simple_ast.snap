@@ -1,0 +1,34 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+pub enum SimpleLangAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect,
+{
+    Add {
+        lhs: ::kirin_chumsky::SSAValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+        rhs: ::kirin_chumsky::SSAValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+        res: ::kirin_chumsky::ResultValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+    },
+    Return {
+        arg: ::kirin_chumsky::SSAValue<
+            'src,
+            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        >,
+    },
+    #[doc(hidden)]
+    __Marker(
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::convert::Infallible,
+    ),
+}

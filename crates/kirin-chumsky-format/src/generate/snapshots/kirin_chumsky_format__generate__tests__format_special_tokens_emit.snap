@@ -1,0 +1,26 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: emit
+---
+impl<'tokens, 'src: 'tokens, Language: ::kirin_ir::Dialect> ::kirin_chumsky::EmitIR<Language>
+    for LoadAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect + From<Load>,
+    <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output:
+        ::kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
+{
+    type Output = ::kirin_ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+        let Self {
+            addr: f_addr,
+            res: f_res,
+        } = self;
+        let f_addr_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f_addr, ctx);
+        let f_res_ir: ::kirin_ir::ResultValue = ::kirin_chumsky::EmitIR::emit(f_res, ctx);
+        let dialect_variant: Load = Load {
+            addr: f_addr_ir.into(),
+            res: f_res_ir.into(),
+        };
+        ctx.context.statement().definition(dialect_variant).new()
+    }
+}

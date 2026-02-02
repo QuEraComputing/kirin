@@ -1,0 +1,21 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl ::kirin_prettyless::PrettyPrint<Constant> for Constant {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin_prettyless::Document<'a, Constant>,
+    ) -> ::kirin_prettyless::ArenaDoc<'a> {
+        use kirin_prettyless::DocAllocator;
+        let Constant {
+            res: f_res,
+            value: f_value,
+        } = self;
+        ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
+            + doc.text(" = constant ")
+            + doc.text(format!("{}", f_value))
+            + doc.text(" -> ")
+            + ::kirin_prettyless::PrettyPrintType::pretty_print_type(f_res, doc)
+    }
+}

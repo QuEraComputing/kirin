@@ -1,0 +1,20 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: emit
+---
+impl<'tokens, 'src: 'tokens, Language: ::kirin_ir::Dialect> ::kirin_chumsky::EmitIR<Language>
+    for ComposedLangAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect + From<ComposedLang>,
+    <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output:
+        ::kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
+{
+    type Output = ::kirin_ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+        match self {
+            ComposedLangAST::Arith(inner) => inner.emit(ctx),
+            ComposedLangAST::Control(inner) => inner.emit(ctx),
+            ComposedLangAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}

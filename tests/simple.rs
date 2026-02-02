@@ -303,7 +303,7 @@ fn test_block() {
     // Pretty print the function
     let mut doc = Document::new(Default::default(), &context);
     let result = doc.render(f).unwrap();
-
+    println!("{}", result);
     // Verify the output contains expected elements
     assert!(result.contains("function"));
     assert!(result.contains("constant"));
@@ -461,4 +461,78 @@ pub fn strip_trailing_whitespace(s: &str) -> String {
         res.push('\n');
     }
     res
+}
+
+/// Test roundtrip for a full function with region containing multiple blocks and statements.
+///
+/// Note: This test verifies that parsing and emitting functions with regions works correctly.
+/// The exact output format may differ from input due to Block/Region pretty printing details
+/// (e.g., block names, result alignment), but the core structure is preserved.
+#[test]
+fn test_roundtrip_function() {
+    let mut context: Context<SimpleLang> = Context::default();
+
+    // Parse a function with a region containing a block with multiple statements
+    let input = r#"%f = function {
+    ^entry(%x: float) {
+        %y = add %x, %x -> float;
+        %z = constant 42 -> float;
+        %w = add %y, %z -> float;
+        return %w;
+    }
+}"#;
+
+    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+
+    // Emit to IR
+    let mut emit_ctx = EmitContext::new(&mut context);
+    let statement = ast.emit(&mut emit_ctx);
+
+    // Pretty print using Document::render()
+    let mut doc = Document::new(Config::default(), &context);
+    let output = doc.render(statement).expect("render failed");
+
+    // Verify key structural elements are present
+    assert!(output.contains("%f = function"), "Should have function result name");
+    assert!(output.contains("add"), "Should have add instruction");
+    assert!(output.contains("constant 42"), "Should have constant instruction");
+    assert!(output.contains("return"), "Should have return instruction");
+}
+
+/// Test roundtrip for a function with multiple blocks in the region.
+///
+/// Note: This test verifies that parsing and emitting functions with multiple blocks works.
+/// The exact output format may differ from input due to Block/Region pretty printing details.
+#[test]
+fn test_roundtrip_function_multiple_blocks() {
+    let mut context: Context<SimpleLang> = Context::default();
+
+    // Parse a function with a region containing multiple blocks
+    let input = r#"%f = function {
+    ^entry(%x: float) {
+        %y = add %x, %x -> float;
+        return %y;
+    }
+    ^second(%a: float) {
+        %b = constant 100 -> float;
+        return %b;
+    }
+}"#;
+
+    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+
+    // Emit to IR
+    let mut emit_ctx = EmitContext::new(&mut context);
+    let statement = ast.emit(&mut emit_ctx);
+
+    // Pretty print using Document::render() with 4-space indentation to match input
+    let config = Config {
+        tab_spaces: 4,
+        ..Default::default()
+    };
+    let mut doc = Document::new(config, &context);
+    let output = doc.render(statement).expect("render failed");
+    println!("{}", output);
+    // Note: output has a trailing newline from pretty printer
+    assert_eq!(output.trim_end(), input);
 }

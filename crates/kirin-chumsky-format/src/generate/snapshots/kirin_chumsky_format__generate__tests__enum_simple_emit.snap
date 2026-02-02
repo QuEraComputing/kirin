@@ -1,0 +1,40 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: emit
+---
+impl<'tokens, 'src: 'tokens, Language: ::kirin_ir::Dialect> ::kirin_chumsky::EmitIR<Language>
+    for SimpleLangAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect + From<SimpleLang>,
+    <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output:
+        ::kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
+{
+    type Output = ::kirin_ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+        match self {
+            SimpleLangAST::Add {
+                lhs: f_lhs,
+                rhs: f_rhs,
+                res: f_res,
+            } => {
+                let f_lhs_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f_lhs, ctx);
+                let f_rhs_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f_rhs, ctx);
+                let f_res_ir: ::kirin_ir::ResultValue = ::kirin_chumsky::EmitIR::emit(f_res, ctx);
+                let dialect_variant: SimpleLang = SimpleLang::Add {
+                    lhs: f_lhs_ir.into(),
+                    rhs: f_rhs_ir.into(),
+                    res: f_res_ir.into(),
+                };
+                ctx.context.statement().definition(dialect_variant).new()
+            }
+            SimpleLangAST::Return { arg: f_arg } => {
+                let f_arg_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f_arg, ctx);
+                let dialect_variant: SimpleLang = SimpleLang::Return {
+                    arg: f_arg_ir.into(),
+                };
+                ctx.context.statement().definition(dialect_variant).new()
+            }
+            SimpleLangAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}

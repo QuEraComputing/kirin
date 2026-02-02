@@ -1,0 +1,16 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+pub enum ComposedLangAST<'tokens, 'src, Language>
+where
+    Language: ::kirin_ir::Dialect,
+{
+    Arith(<ArithDialect as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output),
+    Control(<ControlDialect as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output),
+    #[doc(hidden)]
+    __Marker(
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::convert::Infallible,
+    ),
+}

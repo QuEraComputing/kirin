@@ -4,7 +4,7 @@
 //! converted to the IR representation.
 
 use chumsky::span::SimpleSpan;
-use kirin_ir::{Dialect, FiniteLattice, SSAKind};
+use kirin_ir::{Dialect, FiniteLattice, GetInfo, SSAKind};
 
 use crate::traits::{EmitContext, EmitIR};
 
@@ -315,22 +315,36 @@ where
             ctx.register_ssa(name.clone(), ssa);
         }
 
-        // Emit all statements in the block
+        // Emit all statements in the block and check which are terminators
         let statements: Vec<_> = self
             .statements
             .iter()
-            .map(|stmt_ast| stmt_ast.value.emit(ctx))
+            .map(|stmt_ast| {
+                let stmt = stmt_ast.value.emit(ctx);
+                let is_terminator = stmt
+                    .get_info(ctx.context)
+                    .expect("statement should exist")
+                    .definition()
+                    .is_terminator();
+                (stmt, is_terminator)
+            })
             .collect();
 
         // Build the block with arguments and statements
-        let mut builder = ctx.context.block();
+        let block_name = self.header.value.label.name.value.to_string();
+        let mut builder = ctx.context.block().name(block_name);
 
         for (name, ty, _) in arg_info {
             builder = builder.argument_with_name(name, ty);
         }
 
-        for stmt in statements {
-            builder = builder.stmt(stmt);
+        // Add statements, handling terminators specially
+        for (stmt, is_terminator) in statements {
+            if is_terminator {
+                builder = builder.terminator(stmt);
+            } else {
+                builder = builder.stmt(stmt);
+            }
         }
 
         let block = builder.new();

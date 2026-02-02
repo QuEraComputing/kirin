@@ -1,0 +1,24 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl ::kirin_prettyless::PrettyPrint<TupleLang> for TupleLang {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin_prettyless::Document<'a, TupleLang>,
+    ) -> ::kirin_prettyless::ArenaDoc<'a> {
+        use kirin_prettyless::DocAllocator;
+        match self {
+            TupleLang::Return(f0) => {
+                doc.text("return ") + ::kirin_prettyless::PrettyPrint::pretty_print(f0, doc)
+            }
+            TupleLang::Neg(f0, f1) => {
+                ::kirin_prettyless::PrettyPrintName::pretty_print_name(f1, doc)
+                    + doc.text(" = neg ")
+                    + ::kirin_prettyless::PrettyPrint::pretty_print(f0, doc)
+                    + doc.text(" -> ")
+                    + ::kirin_prettyless::PrettyPrintType::pretty_print_type(f1, doc)
+            }
+        }
+    }
+}

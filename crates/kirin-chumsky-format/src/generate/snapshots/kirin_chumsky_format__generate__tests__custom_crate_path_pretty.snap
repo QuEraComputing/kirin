@@ -1,0 +1,14 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl ::kirin_prettyless::PrettyPrint<CustomReturn> for CustomReturn {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin_prettyless::Document<'a, CustomReturn>,
+    ) -> ::kirin_prettyless::ArenaDoc<'a> {
+        use kirin_prettyless::DocAllocator;
+        let CustomReturn(f0) = self;
+        doc.text("return ") + ::kirin_prettyless::PrettyPrint::pretty_print(f0, doc)
+    }
+}

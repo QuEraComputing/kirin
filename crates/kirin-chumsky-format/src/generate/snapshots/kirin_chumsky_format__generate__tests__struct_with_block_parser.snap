@@ -1,0 +1,54 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: parser
+---
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch> for Branch {
+    type Output = BranchAST<'tokens, 'src, Branch>;
+    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+    #[inline]
+    fn recursive_parser<I>(
+        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
+    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        Branch: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch>,
+    {
+        use chumsky::prelude::*;
+        let parser: ::kirin_chumsky::BoxedParser<
+            'tokens,
+            'src,
+            I,
+            BranchAST<'tokens, 'src, Branch>,
+        > = {
+            use kirin_lexer::Token;
+            ::chumsky::prelude::just(Token::Identifier("br"))
+                .ignore_then(::kirin_chumsky::block_label())
+                .map(|target| -> BranchAST<'tokens, 'src, Branch> {
+                    BranchAST {
+                        target: target,
+                        _marker: ::core::marker::PhantomData,
+                    }
+                })
+        }
+        .boxed();
+        unsafe { ::core::mem::transmute(parser) }
+    }
+}
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for Branch
+where
+    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+{
+    type Output = BranchAST<'tokens, 'src, Branch>;
+    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+    {
+        use chumsky::prelude::*;
+        ::chumsky::recursive::recursive(|language| {
+            <Branch as ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch>>::recursive_parser(
+                language,
+            )
+        })
+        .boxed()
+    }
+}

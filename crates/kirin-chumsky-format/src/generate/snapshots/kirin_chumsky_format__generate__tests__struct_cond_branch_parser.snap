@@ -1,0 +1,35 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: parser
+---
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, CondBranch>
+    for CondBranch
+{
+    type Output = CondBranchAST<'tokens, 'src, CondBranch>;
+    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+    #[inline]
+    fn recursive_parser<I>(
+        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
+    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        CondBranch: ::kirin_chumsky::HasDialectParser<'tokens, 'src, CondBranch>,
+    {
+        use chumsky::prelude::*;
+        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , CondBranchAST < 'tokens , 'src , CondBranch > > = { use :: kirin_lexer :: Token ; :: chumsky :: prelude :: just (Token :: Identifier ("br")) . ignore_then (:: kirin_chumsky :: ssa_value :: < _ , CondBranch , SimpleType > ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin_chumsky :: block_label ()) . then_ignore (:: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin_chumsky :: block_label ()) . map (| ((cond , then_target) , else_target) | -> CondBranchAST < 'tokens , 'src , CondBranch > { CondBranchAST { cond : cond , then_target : then_target , else_target : else_target , _marker : :: core :: marker :: PhantomData } }) } . boxed () ;
+        unsafe { ::core::mem::transmute(parser) }
+    }
+}
+impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for CondBranch
+where
+    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+{
+    type Output = CondBranchAST<'tokens, 'src, CondBranch>;
+    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+    {
+        use chumsky::prelude::*;
+        :: chumsky :: recursive :: recursive (| language | { < CondBranch as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , CondBranch , >> :: recursive_parser (language) }) . boxed ()
+    }
+}

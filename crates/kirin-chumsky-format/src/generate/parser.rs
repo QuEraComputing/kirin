@@ -184,11 +184,15 @@ impl GenerateHasDialectParser {
                     #original_name #ty_generics: #crate_path::HasDialectParser<'tokens, 'src, #original_name #ty_generics>,
                 {
                     use ::chumsky::prelude::*;
-                    // The parser body returns BoxedParser<..., #ast_type>.
-                    // Since we define `type Output = #ast_type`, these types are identical.
-                    // However, Rust's type system can't automatically unify associated types
-                    // with concrete types during inference. The transmute is safe because
-                    // both types are identical by construction.
+                    // SAFETY: The transmute converts between two identical types:
+                    // - #ast_type (the concrete AST type with explicit lifetimes)
+                    // - Self::Output (defined as `type Output = #ast_type` above)
+                    //
+                    // This transmute is necessary because Rust's type system treats associated
+                    // types as opaque during type checking. Even though `type Output = #ast_type`
+                    // is defined in this impl block, Rust cannot unify the concrete type with
+                    // `Self::Output` for type inference purposes. The types are identical by
+                    // construction, so this transmute is safe.
                     let parser: #crate_path::BoxedParser<'tokens, 'src, I, #ast_type> = #parser_body.boxed();
                     unsafe { ::core::mem::transmute(parser) }
                 }
@@ -327,7 +331,8 @@ impl GenerateHasDialectParser {
         let constructor =
             self.ast_constructor_v2(ast_name, variant, &collected, &occurrences, crate_path);
 
-        // Use explicit return type with concrete AST type to help Rust connect the closure type to Self::Output
+        // Use explicit return type annotation to pin the lifetimes correctly.
+        // Without this, Rust would infer anonymous lifetimes '_ for the constructor.
         let return_type = quote! { #ast_name<'tokens, 'src, #dialect_type> };
         Ok(quote! {{
             use ::kirin_lexer::Token;
@@ -757,7 +762,7 @@ impl GenerateHasDialectParser {
             None => quote! { #ast_name },
         };
 
-        // Use explicit return type with concrete AST type to help type inference
+        // Use explicit return type annotation to pin the lifetimes correctly
         let return_type = quote! { #ast_name<'tokens, 'src, #dialect_type> };
         Ok(quote! {
             <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, #dialect_type>>::recursive_parser(language.clone())

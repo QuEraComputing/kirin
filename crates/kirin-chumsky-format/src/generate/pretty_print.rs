@@ -301,15 +301,20 @@ impl GeneratePrettyPrint {
     }
 }
 
-/// Build a map from field name (string) to (index, CollectedField)
+/// Build a map from field name/index (string) to (index, CollectedField)
+///
+/// For named fields, both the field name and its index are added as keys.
+/// This allows format strings to use either `{field_name}` or `{0}` syntax.
 fn build_field_map(collected: &[CollectedField]) -> IndexMap<String, (usize, &CollectedField)> {
     let mut map = IndexMap::new();
     for (idx, field) in collected.iter().enumerate() {
-        let name = match &field.ident {
-            Some(ident) => ident.to_string(),
-            None => field.index.to_string(),
-        };
-        map.insert(name, (idx, field));
+        // Always add the index as a key (for {0}, {1}, etc. syntax)
+        map.insert(field.index.to_string(), (idx, field));
+        
+        // Also add the name if it's a named field (for {field_name} syntax)
+        if let Some(ident) = &field.ident {
+            map.insert(ident.to_string(), (idx, field));
+        }
     }
     map
 }

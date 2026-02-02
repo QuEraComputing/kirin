@@ -1,0 +1,5 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+pub struct CustomReturnAST < 'tokens , 'src , Language > where Language : :: kirin_ir :: Dialect , (pub my_chumsky :: SSAValue < 'src , < SimpleType as my_chumsky :: HasParser < 'tokens , 'src >> :: Output > , :: core :: marker :: PhantomData < fn () -> (& 'tokens () , & 'src () , Language) > ,) ;
