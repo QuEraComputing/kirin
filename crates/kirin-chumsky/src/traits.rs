@@ -184,20 +184,21 @@ pub trait EmitIR<L: Dialect> {
     fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output;
 }
 
-/// Marker trait for types that can be used as type AST and emit to themselves.
+/// Marker trait for types that can be directly parsed into themselves.
 ///
-/// This is used to provide identity conversion for type lattice types
-/// without running into coherence issues with blanket implementations.
-pub trait TypeLatticeEmit: Clone {}
+/// This is used to provide identity conversion for types that parse directly
+/// into themselves (like type lattice types and compile-time values) without
+/// running into coherence issues with blanket implementations.
+pub trait DirectlyParsable: Clone {}
 
-/// Blanket implementation of EmitIR for types that implement TypeLatticeEmit.
+/// Blanket implementation of EmitIR for types that implement DirectlyParsable.
 ///
-/// This allows `TypeAST = TypeLattice` to work without explicit conversion,
-/// since the type lattice can emit to itself (identity conversion).
+/// This allows types to emit to themselves (identity conversion),
+/// which is useful for type lattices and compile-time value types.
 impl<T, L> EmitIR<L> for T
 where
     L: Dialect<TypeLattice = T>,
-    T: TypeLatticeEmit,
+    T: DirectlyParsable,
 {
     type Output = T;
 

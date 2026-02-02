@@ -2,4 +2,13 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
-pub struct ReturnAST < 'tokens , 'src , Language > where Language : :: kirin_ir :: Dialect , (pub :: kirin_chumsky :: SSAValue < 'src , < SimpleType as :: kirin_chumsky :: HasParser < 'tokens , 'src >> :: Output > , :: core :: marker :: PhantomData < fn () -> (& 'tokens () , & 'src () , Language) > ,) ;
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReturnAST<'tokens, 'src, Language>(
+    pub  ::kirin::parsers::SSAValue<
+        'src,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+    >,
+    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+)
+where
+    Language: ::kirin::ir::Dialect;

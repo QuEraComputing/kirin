@@ -6,6 +6,7 @@ impl<'tokens, 'src: 'tokens, Language: my_kirin::Dialect> my_chumsky::EmitIR<Lan
     for CustomReturnAST<'tokens, 'src, Language>
 where
     Language: my_kirin::Dialect + From<CustomReturn>,
+    SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output:
         my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::TypeLattice>,
 {

@@ -2,67 +2,81 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Load> for Load {
-    type Output = LoadAST<'tokens, 'src, Load>;
-    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
+    for Load
+where
+    Language: ::kirin::ir::Dialect + 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    type Output = LoadAST<'tokens, 'src, Language>;
+    type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
     fn recursive_parser<I>(
-        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
-    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+        language: ::kirin::parsers::RecursiveParser<
+            'tokens,
+            'src,
+            I,
+            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
+        >,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
-        Load: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Load>,
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
-        use kirin_chumsky::chumsky::prelude::*;
-        let parser: ::kirin_chumsky::BoxedParser<'tokens, 'src, I, LoadAST<'tokens, 'src, Load>> =
-            {
-                use kirin_chumsky::Token;
-                ::kirin_chumsky::nameof_ssa()
-                    .then_ignore(
-                        ::kirin_chumsky::chumsky::prelude::just(Token::Equal)
-                            .then_ignore(::kirin_chumsky::chumsky::prelude::just(
-                                Token::Identifier("load"),
-                            ))
-                            .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::LBracket)),
-                    )
-                    .then(::kirin_chumsky::ssa_value::<_, Load, SimpleType>())
-                    .then_ignore(
-                        ::kirin_chumsky::chumsky::prelude::just(Token::RBracket)
-                            .then_ignore(::kirin_chumsky::chumsky::prelude::just(Token::Arrow)),
-                    )
-                    .then(::kirin_chumsky::typeof_ssa::<_, Load, SimpleType>())
-                    .map(
-                        |((res_name, addr), res_type)| -> LoadAST<'tokens, 'src, Load> {
-                            LoadAST {
-                                addr: addr,
-                                res: ::kirin_chumsky::ResultValue {
-                                    name: ::kirin_chumsky::Spanned {
-                                        value: res_name.name,
-                                        span: res_name.span,
-                                    },
-                                    ty: Some(res_type.ty.clone()),
+        use kirin::parsers::chumsky::prelude::*;
+        let parser: ::kirin::parsers::BoxedParser<
+            'tokens,
+            'src,
+            I,
+            LoadAST<'tokens, 'src, Language>,
+        > = {
+            use kirin::parsers::Token;
+            ::kirin::parsers::nameof_ssa()
+                .then_ignore(
+                    ::kirin::parsers::chumsky::prelude::just(Token::Equal)
+                        .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::Identifier(
+                            "load",
+                        )))
+                        .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::LBracket)),
+                )
+                .then(::kirin::parsers::ssa_value::<_, Language, SimpleType>())
+                .then_ignore(
+                    ::kirin::parsers::chumsky::prelude::just(Token::RBracket)
+                        .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::Arrow)),
+                )
+                .then(::kirin::parsers::typeof_ssa::<_, Language, SimpleType>())
+                .map(
+                    |((res_name, addr), res_type)| -> LoadAST<'tokens, 'src, Language> {
+                        LoadAST {
+                            addr: addr,
+                            res: ::kirin::parsers::ResultValue {
+                                name: ::kirin::parsers::Spanned {
+                                    value: res_name.name,
+                                    span: res_name.span,
                                 },
-                                _marker: ::core::marker::PhantomData,
-                            }
-                        },
-                    )
-            }
-            .boxed();
+                                ty: Some(res_type.ty.clone()),
+                            },
+                            _marker: ::core::marker::PhantomData,
+                        }
+                    },
+                )
+        }
+        .boxed();
         unsafe { ::core::mem::transmute(parser) }
     }
 }
-impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for Load
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for Load
 where
-    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
     type Output = LoadAST<'tokens, 'src, Load>;
-    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
-        use kirin_chumsky::chumsky::prelude::*;
-        ::kirin_chumsky::chumsky::recursive::recursive(|language| {
-            <Load as ::kirin_chumsky::HasDialectParser<'tokens, 'src, Load>>::recursive_parser(
+        use kirin::parsers::chumsky::prelude::*;
+        ::kirin::parsers::chumsky::recursive::recursive(|language| {
+            <Load as ::kirin::parsers::HasDialectParser<'tokens, 'src, Load>>::recursive_parser(
                 language,
             )
         })

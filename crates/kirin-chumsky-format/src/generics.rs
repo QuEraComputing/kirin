@@ -78,6 +78,28 @@ impl<'a> GenericsBuilder<'a> {
 
         generics
     }
+
+    /// Builds generics with 'tokens, 'src: 'tokens lifetimes and Language type parameter without bounds.
+    ///
+    /// This is used for `HasDialectParser` impl where the `Language: Dialect` bound
+    /// is specified in the where clause instead of on the type parameter.
+    pub fn with_language_unbounded(&self, base: &syn::Generics) -> syn::Generics {
+        let mut generics = self.with_lifetimes(base);
+
+        // Add Language type parameter without any bounds
+        // The Dialect bound will be added in the where clause
+        let lang_ident = syn::Ident::new("Language", Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == lang_ident))
+        {
+            let lang_param = syn::TypeParam::from(lang_ident);
+            generics.params.push(syn::GenericParam::Type(lang_param));
+        }
+
+        generics
+    }
 }
 
 #[cfg(test)]
@@ -92,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_with_lifetimes_empty() {
-        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let ir_path: syn::Path = syn::parse_quote!(::kirin::ir);
         let builder = GenericsBuilder::new(&ir_path);
 
         let base = syn::Generics::default();
@@ -103,7 +125,7 @@ mod tests {
 
     #[test]
     fn test_with_lifetimes_existing_type_param() {
-        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let ir_path: syn::Path = syn::parse_quote!(::kirin::ir);
         let builder = GenericsBuilder::new(&ir_path);
 
         let base: syn::Generics = syn::parse_quote!(<T: Clone>);
@@ -114,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_with_language_empty() {
-        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let ir_path: syn::Path = syn::parse_quote!(::kirin::ir);
         let builder = GenericsBuilder::new(&ir_path);
 
         let base = syn::Generics::default();
@@ -136,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_with_language_existing_type_param() {
-        let ir_path: syn::Path = syn::parse_quote!(::kirin_ir);
+        let ir_path: syn::Path = syn::parse_quote!(::kirin::ir);
         let builder = GenericsBuilder::new(&ir_path);
 
         let base: syn::Generics = syn::parse_quote!(<T: CompileTimeValue>);

@@ -2,34 +2,42 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, TupleLang>
+impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
     for TupleLang
+where
+    Language: ::kirin::ir::Dialect + 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = TupleLangAST<'tokens, 'src, TupleLang>;
-    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+    type Output = TupleLangAST<'tokens, 'src, Language>;
+    type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
     fn recursive_parser<I>(
-        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
-    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+        language: ::kirin::parsers::RecursiveParser<
+            'tokens,
+            'src,
+            I,
+            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
+        >,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
-        TupleLang: ::kirin_chumsky::HasDialectParser<'tokens, 'src, TupleLang>,
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
-        use kirin_chumsky::chumsky::prelude::*;
-        let parser : :: kirin_chumsky :: BoxedParser < 'tokens , 'src , I , TupleLangAST < 'tokens , 'src , TupleLang > > = { use :: kirin_chumsky :: Token ; :: kirin_chumsky :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin_chumsky :: ssa_value :: < _ , TupleLang , SimpleType > ()) . map (| field_0 | -> TupleLangAST < 'tokens , 'src , TupleLang > { TupleLangAST :: Return (field_0) }) } . or ({ use :: kirin_chumsky :: Token ; :: kirin_chumsky :: nameof_ssa () . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Identifier ("neg")))) . then (:: kirin_chumsky :: ssa_value :: < _ , TupleLang , SimpleType > ()) . then_ignore (:: kirin_chumsky :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin_chumsky :: typeof_ssa :: < _ , TupleLang , SimpleType > ()) . map (| ((field_1_name , field_0) , field_1_type) | -> TupleLangAST < 'tokens , 'src , TupleLang > { TupleLangAST :: Neg (field_0 , :: kirin_chumsky :: ResultValue { name : :: kirin_chumsky :: Spanned { value : field_1_name . name , span : field_1_name . span } , ty : Some (field_1_type . ty . clone ()) , }) }) }) . boxed () ;
+        use kirin::parsers::chumsky::prelude::*;
+        let parser : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , TupleLangAST < 'tokens , 'src , Language > > = { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin :: parsers :: ssa_value :: < _ , Language , SimpleType > ()) . map (| field_0 | -> TupleLangAST < 'tokens , 'src , Language > { TupleLangAST :: Return (field_0) }) } . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("neg")))) . then (:: kirin :: parsers :: ssa_value :: < _ , Language , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , Language , SimpleType > ()) . map (| ((field_1_name , field_0) , field_1_type) | -> TupleLangAST < 'tokens , 'src , Language > { TupleLangAST :: Neg (field_0 , :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : field_1_name . name , span : field_1_name . span } , ty : Some (field_1_type . ty . clone ()) , }) }) }) . boxed () ;
         unsafe { ::core::mem::transmute(parser) }
     }
 }
-impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for TupleLang
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for TupleLang
 where
-    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
     type Output = TupleLangAST<'tokens, 'src, TupleLang>;
-    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
-        use kirin_chumsky::chumsky::prelude::*;
-        :: kirin_chumsky :: chumsky :: recursive :: recursive (| language | { < TupleLang as :: kirin_chumsky :: HasDialectParser < 'tokens , 'src , TupleLang , >> :: recursive_parser (language) }) . boxed ()
+        use kirin::parsers::chumsky::prelude::*;
+        :: kirin :: parsers :: chumsky :: recursive :: recursive (| language | { < TupleLang as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , TupleLang , >> :: recursive_parser (language) }) . boxed ()
     }
 }

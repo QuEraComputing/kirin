@@ -2,24 +2,25 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[derive(Clone, Debug, PartialEq)]
 pub enum TupleLangAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect,
+    Language: ::kirin::ir::Dialect,
 {
     Return(
-        ::kirin_chumsky::SSAValue<
+        ::kirin::parsers::SSAValue<
             'src,
-            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
     ),
     Neg(
-        ::kirin_chumsky::SSAValue<
+        ::kirin::parsers::SSAValue<
             'src,
-            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
-        ::kirin_chumsky::ResultValue<
+        ::kirin::parsers::ResultValue<
             'src,
-            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
     ),
     #[doc(hidden)]

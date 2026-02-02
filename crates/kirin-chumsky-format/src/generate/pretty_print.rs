@@ -13,6 +13,8 @@ use crate::field_kind::{CollectedField, collect_fields};
 use crate::format::{Format, FormatElement};
 use kirin_lexer::Token;
 
+use super::collect_all_value_types_needing_bounds;
+
 /// Generator for the `PrettyPrint` trait implementation.
 pub struct GeneratePrettyPrint {
     /// Path to the kirin_prettyless crate
@@ -73,11 +75,35 @@ impl GeneratePrettyPrint {
 
         let (impl_generics, _, where_clause) = ir_input.generics.split_for_impl();
 
+        // Add PrettyPrint bounds for Value field types containing type parameters
+        let value_types = collect_all_value_types_needing_bounds(ir_input);
+        let value_type_bounds: Vec<syn::WherePredicate> = value_types
+            .iter()
+            .map(|ty| {
+                syn::parse_quote! { #ty: #prettyless_path::PrettyPrint<#dialect_name #ty_generics> }
+            })
+            .collect();
+
+        let final_where = if value_type_bounds.is_empty() {
+            quote! { #where_clause }
+        } else {
+            match where_clause {
+                Some(wc) => {
+                    let mut combined = wc.clone();
+                    combined.predicates.extend(value_type_bounds);
+                    quote! { #combined }
+                }
+                None => {
+                    quote! { where #(#value_type_bounds),* }
+                }
+            }
+        };
+
         // Build impl with appropriate bounds
         quote! {
             impl #impl_generics #prettyless_path::PrettyPrint<#dialect_name #ty_generics>
                 for #dialect_name #ty_generics
-            #where_clause
+            #final_where
             {
                 fn pretty_print<'a>(
                     &self,

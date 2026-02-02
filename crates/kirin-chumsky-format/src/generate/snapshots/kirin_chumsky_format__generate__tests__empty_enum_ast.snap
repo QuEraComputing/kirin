@@ -2,9 +2,10 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[derive(Clone, Debug, PartialEq)]
 pub enum EmptyLangAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect,
+    Language: ::kirin::ir::Dialect,
 {
     #[doc(hidden)]
     __Marker(

@@ -2,52 +2,58 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens, T: TypeLattice>
-    ::kirin_chumsky::HasDialectParser<'tokens, 'src, GenericReturn<T>> for GenericReturn<T>
+impl<'tokens, 'src: 'tokens, T: TypeLattice, Language>
+    ::kirin::parsers::HasDialectParser<'tokens, 'src, Language> for GenericReturn<T>
+where
+    Language: ::kirin::ir::Dialect + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = GenericReturnAST<'tokens, 'src, GenericReturn<T>>;
-    type TypeAST = <T as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+    type Output = GenericReturnAST<'tokens, 'src, T, Language>;
+    type TypeAST = <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
     fn recursive_parser<I>(
-        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
-    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
-    where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
-        GenericReturn<T>: ::kirin_chumsky::HasDialectParser<'tokens, 'src, GenericReturn<T>>,
-    {
-        use kirin_chumsky::chumsky::prelude::*;
-        let parser: ::kirin_chumsky::BoxedParser<
+        language: ::kirin::parsers::RecursiveParser<
             'tokens,
             'src,
             I,
-            GenericReturnAST<'tokens, 'src, GenericReturn<T>>,
+            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
+        >,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    {
+        use kirin::parsers::chumsky::prelude::*;
+        let parser: ::kirin::parsers::BoxedParser<
+            'tokens,
+            'src,
+            I,
+            GenericReturnAST<'tokens, 'src, T, Language>,
         > = {
-            use kirin_chumsky::Token;
-            ::kirin_chumsky::chumsky::prelude::just(Token::Identifier("return"))
-                .ignore_then(::kirin_chumsky::ssa_value::<_, GenericReturn<T>, T>())
-                .map(
-                    |field_0| -> GenericReturnAST<'tokens, 'src, GenericReturn<T>> {
-                        GenericReturnAST(field_0, ::core::marker::PhantomData)
-                    },
-                )
+            use kirin::parsers::Token;
+            ::kirin::parsers::chumsky::prelude::just(Token::Identifier("return"))
+                .ignore_then(::kirin::parsers::ssa_value::<_, Language, T>())
+                .map(|field_0| -> GenericReturnAST<'tokens, 'src, T, Language> {
+                    GenericReturnAST(field_0, ::core::marker::PhantomData)
+                })
         }
         .boxed();
         unsafe { ::core::mem::transmute(parser) }
     }
 }
-impl<'tokens, 'src: 'tokens, T: TypeLattice> ::kirin_chumsky::HasParser<'tokens, 'src>
+impl<'tokens, 'src: 'tokens, T: TypeLattice> ::kirin::parsers::HasParser<'tokens, 'src>
     for GenericReturn<T>
 where
-    T: ::kirin_chumsky::HasParser<'tokens, 'src, Output = T>,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = GenericReturnAST<'tokens, 'src, GenericReturn<T>>;
-    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    type Output = GenericReturnAST<'tokens, 'src, T, GenericReturn<T>>;
+    fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
-        use kirin_chumsky::chumsky::prelude::*;
-        ::kirin_chumsky::chumsky::recursive::recursive(|language| {
-            <GenericReturn<T> as ::kirin_chumsky::HasDialectParser<
+        use kirin::parsers::chumsky::prelude::*;
+        ::kirin::parsers::chumsky::recursive::recursive(|language| {
+            <GenericReturn<T> as ::kirin::parsers::HasDialectParser<
                 'tokens,
                 'src,
                 GenericReturn<T>,

@@ -6,6 +6,7 @@
 use std::collections::HashSet;
 
 use kirin_derive_core::ir::{fields::Collection, DefaultValue};
+use kirin_derive_core::misc::is_type_in_generic;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -97,14 +98,14 @@ impl FieldKind {
     /// - `Type`: type-only parser
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    /// The `dialect_type` should be the dialect type (e.g., `TestLang`) being parsed.
+    /// The `_dialect_type` is unused but kept for API compatibility.
     /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) for Block/Region field transmutation.
     /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
     pub fn parser_expr(
         &self,
         crate_path: &syn::Path,
         opt: &FormatOption,
-        dialect_type: &TokenStream,
+        _dialect_type: &TokenStream,
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
     ) -> TokenStream {
@@ -112,30 +113,33 @@ impl FieldKind {
             FieldKind::SSAValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
                 FormatOption::Type => {
-                    quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() }
+                    quote! { #crate_path::typeof_ssa::<_, Language, #type_lattice>() }
                 }
                 FormatOption::Default => {
-                    quote! { #crate_path::ssa_value::<_, #dialect_type, #type_lattice>() }
+                    quote! { #crate_path::ssa_value::<_, Language, #type_lattice>() }
                 }
             },
             FieldKind::ResultValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
                 FormatOption::Type => {
-                    quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() }
+                    quote! { #crate_path::typeof_ssa::<_, Language, #type_lattice>() }
                 }
                 FormatOption::Default => {
-                    quote! { #crate_path::result_value_with_optional_type::<_, #dialect_type, #type_lattice>() }
+                    quote! { #crate_path::result_value_with_optional_type::<_, Language, #type_lattice>() }
                 }
             },
             FieldKind::Block => {
-                // The parser returns Block<T, Output> where T = type_lattice.
-                // We only need to transmute the StmtOutput since Output = ASTName.
+                // Block parser uses Language as the language parameter.
+                // Parser returns Block<..., <Language as HasDialectParser>::Output>
+                // AST type is Block<..., AST<..., Language>>
+                // These are the same type when Language: HasDialectParser, so the transmute is safe.
+                let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
-                    #crate_path::block::<_, #dialect_type, #type_lattice>(language.clone())
+                    #crate_path::block::<_, Language, #type_lattice>(language.clone())
                         .map(|b| unsafe {
                             ::core::mem::transmute::<
-                                #crate_path::Spanned<#crate_path::Block<'src, #type_lattice, <#dialect_type as #crate_path::HasDialectParser<'tokens, 'src, #dialect_type>>::Output>>,
-                                #crate_path::Spanned<#crate_path::Block<'src, #type_lattice, #ast_name<'tokens, 'src, #dialect_type>>>
+                                #crate_path::Spanned<#crate_path::Block<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>>,
+                                #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #ast_name<'tokens, 'src, Language>>>
                             >(b)
                         })
                 }
@@ -144,13 +148,17 @@ impl FieldKind {
                 quote! { #crate_path::block_label() }
             }
             FieldKind::Region => {
-                // Same as Block - only transmute StmtOutput
+                // Region parser uses Language as the language parameter.
+                // Parser returns Region<..., <Language as HasDialectParser>::Output>
+                // AST type is Region<..., AST<..., Language>>
+                // These are the same type when Language: HasDialectParser, so the transmute is safe.
+                let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
-                    #crate_path::region::<_, #dialect_type, #type_lattice>(language.clone())
+                    #crate_path::region::<_, Language, #type_lattice>(language.clone())
                         .map(|r| unsafe {
                             ::core::mem::transmute::<
-                                #crate_path::Region<'src, #type_lattice, <#dialect_type as #crate_path::HasDialectParser<'tokens, 'src, #dialect_type>>::Output>,
-                                #crate_path::Region<'src, #type_lattice, #ast_name<'tokens, 'src, #dialect_type>>
+                                #crate_path::Region<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>,
+                                #crate_path::Region<'src, #type_ast, #ast_name<'tokens, 'src, Language>>
                             >(r)
                         })
                 }
@@ -349,6 +357,70 @@ pub fn collect_fields(
     // NOTE: Do NOT sort here! The order must match Statement::iter_all_fields()
     // which is used by Statement::field_bindings() for code generation.
     fields
+}
+
+/// Collects Value field types that contain the given type parameters.
+///
+/// For example, if a struct has `T: Clone` and a field `value: T`,
+/// this will return `vec![T]` (the type that needs HasParser bounds).
+///
+/// This is used to generate appropriate where clauses for generic types.
+/// Only includes fields that don't have a default value, since those are
+/// the only ones that need to be parsed.
+pub fn collect_value_types_with_type_params(
+    collected: &[CollectedField],
+    generics: &syn::Generics,
+) -> Vec<syn::Type> {
+    // Get type parameter names from the generics
+    let type_param_names: Vec<_> = generics
+        .params
+        .iter()
+        .filter_map(|p| {
+            if let syn::GenericParam::Type(tp) = p {
+                Some(tp.ident.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if type_param_names.is_empty() {
+        return Vec::new();
+    }
+
+    let mut types_needing_bounds = Vec::new();
+
+    for field in collected {
+        // Only consider fields without defaults - fields with defaults are not parsed
+        if field.default.is_some() {
+            continue;
+        }
+
+        if let FieldKind::Value(ty) = &field.kind {
+            // Check if any type parameter appears in this field's type
+            for param_name in &type_param_names {
+                // Check if the type IS the parameter directly
+                if kirin_derive_core::misc::is_type(ty, param_name.as_str()) {
+                    types_needing_bounds.push(ty.clone());
+                    break;
+                }
+                // Check if the type parameter appears inside a generic type
+                if is_type_in_generic(ty, param_name.as_str()) {
+                    types_needing_bounds.push(ty.clone());
+                    break;
+                }
+            }
+        }
+    }
+
+    // Deduplicate
+    let mut seen = HashSet::new();
+    types_needing_bounds.retain(|ty| {
+        let key = quote::quote!(#ty).to_string();
+        seen.insert(key)
+    });
+
+    types_needing_bounds
 }
 
 /// Returns the set of field indices that are mentioned in the format string.

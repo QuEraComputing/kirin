@@ -2,28 +2,29 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[derive(Clone, Debug, PartialEq)]
 pub enum SimpleLangAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect,
+    Language: ::kirin::ir::Dialect,
 {
     Add {
-        lhs: ::kirin_chumsky::SSAValue<
+        lhs: ::kirin::parsers::SSAValue<
             'src,
-            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
-        rhs: ::kirin_chumsky::SSAValue<
+        rhs: ::kirin::parsers::SSAValue<
             'src,
-            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
-        res: ::kirin_chumsky::ResultValue<
+        res: ::kirin::parsers::ResultValue<
             'src,
-            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
     },
     Return {
-        arg: ::kirin_chumsky::SSAValue<
+        arg: ::kirin::parsers::SSAValue<
             'src,
-            <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
     },
     #[doc(hidden)]

@@ -57,7 +57,7 @@ pub mod prelude {
     pub use crate::ast;
     pub use crate::parsers::*;
     pub use crate::traits::{
-        BoxedParser, EmitContext, EmitIR, HasParser, ParseError, TokenInput, TypeLatticeEmit, emit, parse, parse_ast,
+        BoxedParser, DirectlyParsable, EmitContext, EmitIR, HasParser, ParseError, TokenInput, emit, parse, parse_ast,
     };
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;

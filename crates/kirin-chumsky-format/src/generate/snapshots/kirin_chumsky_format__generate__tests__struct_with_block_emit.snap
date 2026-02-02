@@ -2,19 +2,22 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, Language: ::kirin_ir::Dialect> ::kirin_chumsky::EmitIR<Language>
+impl<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect> ::kirin::parsers::EmitIR<Language>
     for BranchAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect + From<Branch>,
-    <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output:
-        ::kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
+    Language: ::kirin::ir::Dialect + From<Branch>,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
+        Language,
+        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
+    >,
 {
-    type Output = ::kirin_ir::Statement;
-    fn emit(&self, ctx: &mut ::kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
         let Self {
             target: f_target, ..
         } = self;
-        let f_target_ir: ::kirin_ir::Successor = ::kirin_chumsky::EmitIR::emit(f_target, ctx);
+        let f_target_ir: ::kirin::ir::Successor = ::kirin::parsers::EmitIR::emit(f_target, ctx);
         let dialect_variant: Branch = Branch {
             target: f_target_ir.into(),
         };

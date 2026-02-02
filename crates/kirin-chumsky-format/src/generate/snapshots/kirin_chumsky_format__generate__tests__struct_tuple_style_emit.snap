@@ -2,17 +2,20 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, Language: ::kirin_ir::Dialect> ::kirin_chumsky::EmitIR<Language>
+impl<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect> ::kirin::parsers::EmitIR<Language>
     for ReturnAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect + From<Return>,
-    <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output:
-        ::kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
+    Language: ::kirin::ir::Dialect + From<Return>,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
+        Language,
+        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
+    >,
 {
-    type Output = ::kirin_ir::Statement;
-    fn emit(&self, ctx: &mut ::kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
         let Self(f0) = self;
-        let f0_ir: ::kirin_ir::SSAValue = ::kirin_chumsky::EmitIR::emit(f0, ctx);
+        let f0_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f0, ctx);
         let dialect_variant: Return = Return(f0_ir.into());
         ctx.context.statement().definition(dialect_variant).new()
     }

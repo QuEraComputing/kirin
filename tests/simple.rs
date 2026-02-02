@@ -50,7 +50,7 @@ impl FiniteLattice for SimpleTypeLattice {
 
 impl crate::TypeLattice for SimpleTypeLattice {}
 
-impl TypeLatticeEmit for SimpleTypeLattice {}
+impl DirectlyParsable for SimpleTypeLattice {}
 
 impl std::fmt::Display for SimpleTypeLattice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -2,30 +2,38 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens> my_chumsky::HasDialectParser<'tokens, 'src, CustomReturn>
+impl<'tokens, 'src: 'tokens, Language> my_chumsky::HasDialectParser<'tokens, 'src, Language>
     for CustomReturn
+where
+    Language: my_kirin::Dialect + 'tokens,
+    SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = CustomReturnAST<'tokens, 'src, CustomReturn>;
+    type Output = CustomReturnAST<'tokens, 'src, Language>;
     type TypeAST = <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output;
     #[inline]
     fn recursive_parser<I>(
-        language: my_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
+        language: my_chumsky::RecursiveParser<
+            'tokens,
+            'src,
+            I,
+            <Language as my_chumsky::HasDialectParser<'tokens, 'src, Language>>::Output,
+        >,
     ) -> my_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: my_chumsky::TokenInput<'tokens, 'src>,
-        CustomReturn: my_chumsky::HasDialectParser<'tokens, 'src, CustomReturn>,
+        Language: my_chumsky::HasDialectParser<'tokens, 'src, Language>,
     {
         use my_chumsky::chumsky::prelude::*;
         let parser: my_chumsky::BoxedParser<
             'tokens,
             'src,
             I,
-            CustomReturnAST<'tokens, 'src, CustomReturn>,
+            CustomReturnAST<'tokens, 'src, Language>,
         > = {
             use my_chumsky::Token;
             my_chumsky::chumsky::prelude::just(Token::Identifier("return"))
-                .ignore_then(my_chumsky::ssa_value::<_, CustomReturn, SimpleType>())
-                .map(|field_0| -> CustomReturnAST<'tokens, 'src, CustomReturn> {
+                .ignore_then(my_chumsky::ssa_value::<_, Language, SimpleType>())
+                .map(|field_0| -> CustomReturnAST<'tokens, 'src, Language> {
                     CustomReturnAST(field_0, ::core::marker::PhantomData)
                 })
         }
@@ -35,7 +43,7 @@ impl<'tokens, 'src: 'tokens> my_chumsky::HasDialectParser<'tokens, 'src, CustomR
 }
 impl<'tokens, 'src: 'tokens> my_chumsky::HasParser<'tokens, 'src> for CustomReturn
 where
-    SimpleType: my_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+    SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
 {
     type Output = CustomReturnAST<'tokens, 'src, CustomReturn>;
     fn parser<I>() -> my_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>

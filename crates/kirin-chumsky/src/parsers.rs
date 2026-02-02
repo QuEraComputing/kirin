@@ -80,12 +80,13 @@ where
 /// - `%value: type`
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `SSAValue<'src, <T as HasParser>::Output>`.
 pub fn ssa_value<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, SSAValue<'src, T>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then(just(Token::Colon).ignore_then(T::parser()).or_not())
@@ -98,12 +99,13 @@ where
 /// Matches: `%value: type`
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `SSAValue<'src, <T as HasParser>::Output>`.
 pub fn ssa_value_with_type<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, SSAValue<'src, T>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then_ignore(just(Token::Colon))
@@ -141,12 +143,13 @@ where
 /// for ResultValue fields, allowing users to optionally annotate result types.
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `ResultValue<'src, <T as HasParser>::Output>`.
 pub fn result_value_with_optional_type<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, ResultValue<'src, T>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, ResultValue<'src, <T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then(just(Token::Colon).ignore_then(T::parser()).or_not())
@@ -193,12 +196,13 @@ where
 /// Parses only the type portion (expects type parser output).
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `TypeofSSAValue<<T as HasParser>::Output>`.
 pub fn typeof_ssa<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, TypeofSSAValue<T>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, TypeofSSAValue<<T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     T::parser()
         .map_with(|ty, extra| TypeofSSAValue {
@@ -267,12 +271,13 @@ pub type StmtOutput<'tokens, 'src, L> = <L as HasDialectParser<'tokens, 'src, L>
 /// Matches: `%arg: type`
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `BlockArgument<'src, <T as HasParser>::Output>`.
 pub fn block_argument<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Spanned<BlockArgument<'src, T>>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     ssa_name()
         .then_ignore(just(Token::Colon))
@@ -293,12 +298,13 @@ where
 /// Note: Parentheses are always required, even for empty argument lists.
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `Vec<Spanned<BlockArgument<'src, <T as HasParser>::Output>>>`.
 pub fn block_argument_list<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Vec<Spanned<BlockArgument<'src, T>>>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, Vec<Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     block_argument::<_, L, T>()
         .separated_by(just(Token::Comma))
@@ -314,12 +320,13 @@ where
 /// Note: Parentheses are always required, even for empty argument lists.
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `BlockHeader<'src, <T as HasParser>::Output>`.
 pub fn block_header<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Spanned<BlockHeader<'src, T>>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, Spanned<BlockHeader<'src, <T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     block_label()
         .then(block_argument_list::<_, L, T>())
@@ -335,18 +342,19 @@ where
 /// Requires a parser for the language/dialect statements.
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `Block<'src, <T as HasParser>::Output, ...>`.
 pub fn block<'tokens, 'src: 'tokens, I, L, T>(
     language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
 ) -> impl Parser<
     'tokens,
     I,
-    Spanned<Block<'src, T, StmtOutput<'tokens, 'src, L>>>,
+    Spanned<Block<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>>,
     ParserError<'tokens, 'src>,
 >
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     let header = block_header::<_, L, T>();
     let statements = language
@@ -383,13 +391,14 @@ where
 /// ```
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `Region<'src, <T as HasParser>::Output, ...>`.
 pub fn region<'tokens, 'src: 'tokens, I, L, T>(
     language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
-) -> impl Parser<'tokens, I, Region<'src, T, StmtOutput<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+) -> impl Parser<'tokens, I, Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     block::<_, L, T>(language)
         .then_ignore(just(Token::Semicolon).or_not())
@@ -405,13 +414,14 @@ where
 /// This is a convenience function that boxes the region parser for use in recursive contexts.
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `Region<'src, <T as HasParser>::Output, ...>`.
 pub fn region_boxed<'tokens, 'src: 'tokens, I, L, T>(
     language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
-) -> BoxedParser<'tokens, 'src, I, Region<'src, T, StmtOutput<'tokens, 'src, L>>>
+) -> BoxedParser<'tokens, 'src, I, Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T> + 'tokens,
+    T: HasParser<'tokens, 'src> + 'tokens,
 {
     region::<_, L, T>(language).boxed()
 }
@@ -421,12 +431,14 @@ where
 /// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32`
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `FunctionType<<T as HasParser>::Output>`.
 pub fn function_type<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Spanned<FunctionType<T>>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, Spanned<FunctionType<<T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T> + Clone,
+    T: HasParser<'tokens, 'src>,
+    <T as HasParser<'tokens, 'src>>::Output: Clone,
 {
     let input_types = T::parser()
         .map_with(|ty, e| Spanned {
@@ -474,14 +486,15 @@ where
 /// Parses multiple SSA values separated by a delimiter.
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The parser produces `Vec<SSAValue<'src, <T as HasParser>::Output>>`.
 pub fn ssa_values<'tokens, 'src: 'tokens, I, L, T>(
     n: usize,
     sep: Token<'src>,
-) -> impl Parser<'tokens, I, Vec<SSAValue<'src, T>>, ParserError<'tokens, 'src>>
+) -> impl Parser<'tokens, I, Vec<SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src, Output = T>,
+    T: HasParser<'tokens, 'src>,
 {
     ssa_value::<_, L, T>()
         .separated_by(just(sep))

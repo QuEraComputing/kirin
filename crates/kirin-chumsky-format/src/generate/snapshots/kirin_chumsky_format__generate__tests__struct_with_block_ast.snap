@@ -2,11 +2,12 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[derive(Clone, Debug, PartialEq)]
 pub struct BranchAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect,
+    Language: ::kirin::ir::Dialect,
 {
-    pub target: ::kirin_chumsky::BlockLabel<'src>,
+    pub target: ::kirin::parsers::BlockLabel<'src>,
     #[doc(hidden)]
     _marker: ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
 }

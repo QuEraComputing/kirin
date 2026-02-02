@@ -2,17 +2,18 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[derive(Clone, Debug, PartialEq)]
 pub struct FunctionAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect,
+    Language: ::kirin::ir::Dialect,
 {
-    pub res: ::kirin_chumsky::ResultValue<
+    pub res: ::kirin::parsers::ResultValue<
         'src,
-        <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
     >,
-    pub body: ::kirin_chumsky::Region<
+    pub body: ::kirin::parsers::Region<
         'src,
-        <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         FunctionAST<'tokens, 'src, Language>,
     >,
     #[doc(hidden)]

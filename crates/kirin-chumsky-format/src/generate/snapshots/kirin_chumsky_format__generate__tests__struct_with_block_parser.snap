@@ -2,28 +2,38 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch> for Branch {
-    type Output = BranchAST<'tokens, 'src, Branch>;
-    type TypeAST = <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output;
+impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
+    for Branch
+where
+    Language: ::kirin::ir::Dialect + 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    type Output = BranchAST<'tokens, 'src, Language>;
+    type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
     fn recursive_parser<I>(
-        language: ::kirin_chumsky::RecursiveParser<'tokens, 'src, I, Self::Output>,
-    ) -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
-    where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
-        Branch: ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch>,
-    {
-        use kirin_chumsky::chumsky::prelude::*;
-        let parser: ::kirin_chumsky::BoxedParser<
+        language: ::kirin::parsers::RecursiveParser<
             'tokens,
             'src,
             I,
-            BranchAST<'tokens, 'src, Branch>,
+            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
+        >,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    {
+        use kirin::parsers::chumsky::prelude::*;
+        let parser: ::kirin::parsers::BoxedParser<
+            'tokens,
+            'src,
+            I,
+            BranchAST<'tokens, 'src, Language>,
         > = {
-            use kirin_chumsky::Token;
-            ::kirin_chumsky::chumsky::prelude::just(Token::Identifier("br"))
-                .ignore_then(::kirin_chumsky::block_label())
-                .map(|target| -> BranchAST<'tokens, 'src, Branch> {
+            use kirin::parsers::Token;
+            ::kirin::parsers::chumsky::prelude::just(Token::Identifier("br"))
+                .ignore_then(::kirin::parsers::block_label())
+                .map(|target| -> BranchAST<'tokens, 'src, Language> {
                     BranchAST {
                         target: target,
                         _marker: ::core::marker::PhantomData,
@@ -34,18 +44,18 @@ impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasDialectParser<'tokens, 'src, Br
         unsafe { ::core::mem::transmute(parser) }
     }
 }
-impl<'tokens, 'src: 'tokens> ::kirin_chumsky::HasParser<'tokens, 'src> for Branch
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for Branch
 where
-    SimpleType: ::kirin_chumsky::HasParser<'tokens, 'src, Output = SimpleType>,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
     type Output = BranchAST<'tokens, 'src, Branch>;
-    fn parser<I>() -> ::kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
-        I: ::kirin_chumsky::TokenInput<'tokens, 'src>,
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
-        use kirin_chumsky::chumsky::prelude::*;
-        ::kirin_chumsky::chumsky::recursive::recursive(|language| {
-            <Branch as ::kirin_chumsky::HasDialectParser<'tokens, 'src, Branch>>::recursive_parser(
+        use kirin::parsers::chumsky::prelude::*;
+        ::kirin::parsers::chumsky::recursive::recursive(|language| {
+            <Branch as ::kirin::parsers::HasDialectParser<'tokens, 'src, Branch>>::recursive_parser(
                 language,
             )
         })

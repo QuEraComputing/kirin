@@ -2,12 +2,13 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[derive(Clone, Debug, PartialEq)]
 pub enum ComposedLangAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect,
+    Language: ::kirin::ir::Dialect,
 {
-    Arith(<ArithDialect as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output),
-    Control(<ControlDialect as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output),
+    Arith(<ArithDialect as ::kirin::parsers::HasParser<'tokens, 'src>>::Output),
+    Control(<ControlDialect as ::kirin::parsers::HasParser<'tokens, 'src>>::Output),
     #[doc(hidden)]
     __Marker(
         ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,

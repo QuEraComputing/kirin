@@ -152,7 +152,7 @@ pub enum SimpleLanguage {
 /// This type has more concrete type variants (i32, i64, f32, f64, bool, unit)
 /// compared to `SimpleTypeLattice` which uses abstract categories (Int, Float, etc).
 ///
-/// Enable the `parser` feature to get `HasParser` and `TypeLatticeEmit` implementations.
+/// Enable the `parser` feature to get `HasParser` and `DirectlyParsable` implementations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SimpleType {
     I32,
@@ -214,10 +214,10 @@ impl std::fmt::Display for SimpleType {
 mod parser_impls {
     use super::SimpleType;
     use chumsky::prelude::*;
-    use kirin_chumsky::{BoxedParser, HasParser, TokenInput, TypeLatticeEmit};
+    use kirin_chumsky::{BoxedParser, DirectlyParsable, HasParser, TokenInput};
     use kirin_lexer::Token;
 
-    impl TypeLatticeEmit for SimpleType {}
+    impl DirectlyParsable for SimpleType {}
 
     impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleType {
         type Output = SimpleType;

@@ -2,16 +2,17 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[derive(Clone, Debug, PartialEq)]
 pub struct CondBranchAST<'tokens, 'src, Language>
 where
-    Language: ::kirin_ir::Dialect,
+    Language: ::kirin::ir::Dialect,
 {
-    pub cond: ::kirin_chumsky::SSAValue<
+    pub cond: ::kirin::parsers::SSAValue<
         'src,
-        <SimpleType as ::kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
     >,
-    pub then_target: ::kirin_chumsky::BlockLabel<'src>,
-    pub else_target: ::kirin_chumsky::BlockLabel<'src>,
+    pub then_target: ::kirin::parsers::BlockLabel<'src>,
+    pub else_target: ::kirin::parsers::BlockLabel<'src>,
     #[doc(hidden)]
     _marker: ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
 }

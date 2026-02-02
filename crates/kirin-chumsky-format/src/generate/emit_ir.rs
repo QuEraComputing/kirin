@@ -6,79 +6,28 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{CollectedField, FieldKind, collect_fields, fields_in_format};
-use crate::format::Format;
-use crate::generics::GenericsBuilder;
+use crate::field_kind::{CollectedField, FieldKind, collect_fields};
+
+use super::{GeneratorConfig, collect_all_value_types_needing_bounds, get_fields_in_format};
 
 /// Generator for the `EmitIR` trait implementation.
 pub struct GenerateEmitIR {
-    crate_path: syn::Path,
-    ir_path: syn::Path,
-    type_lattice: syn::Path,
+    config: GeneratorConfig,
 }
 
 impl GenerateEmitIR {
     /// Creates a new generator.
     pub fn new(ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> Self {
-        let crate_path = ir_input
-            .extra_attrs
-            .crate_path
-            .clone()
-            .or(ir_input.attrs.crate_path.clone())
-            .unwrap_or_else(|| syn::parse_quote!(::kirin_chumsky));
-        // IR path comes from #[kirin(crate = ...)] which defaults to ::kirin_ir
-        let ir_path = ir_input
-            .attrs
-            .crate_path
-            .clone()
-            .unwrap_or_else(|| syn::parse_quote!(::kirin_ir));
-        let type_lattice = ir_input.attrs.type_lattice.clone();
         Self {
-            crate_path,
-            ir_path,
-            type_lattice,
-        }
-    }
-
-    /// Gets the format string for a statement, checking extra_attrs first.
-    fn format_for_statement(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
-    ) -> Option<String> {
-        stmt.extra_attrs
-            .format
-            .clone()
-            .or(stmt.attrs.format.clone())
-            .or(ir_input.extra_attrs.format.clone())
-    }
-
-    /// Gets the set of field indices that are in the format string.
-    fn get_fields_in_format(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
-    ) -> HashSet<usize> {
-        // If there's no format string, include all fields (wrapper variants, etc.)
-        let Some(format_str) = self.format_for_statement(ir_input, stmt) else {
-            return collect_fields(stmt).iter().map(|f| f.index).collect();
-        };
-
-        // Parse format string and get field indices
-        match Format::parse(&format_str, None) {
-            Ok(format) => fields_in_format(&format, stmt),
-            Err(_) => {
-                // If format parsing fails, include all fields (error will be reported elsewhere)
-                collect_fields(stmt).iter().map(|f| f.index).collect()
-            }
+            config: GeneratorConfig::new(ir_input),
         }
     }
 
     /// Generates the `EmitIR` implementation.
     pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
-        let ast_generics = self.build_ast_generics(ir_input);
-        let crate_path = &self.crate_path;
+        let ast_generics = self.config.build_ast_generics(ir_input);
+        let crate_path = &self.config.crate_path;
 
         // Generate impl for the AST type
         let emit_impl = self.generate_emit_impl(ir_input, &ast_name, &ast_generics, crate_path);
@@ -86,13 +35,6 @@ impl GenerateEmitIR {
         quote! {
             #emit_impl
         }
-    }
-
-    fn build_ast_generics(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-    ) -> syn::Generics {
-        GenericsBuilder::new(&self.ir_path).with_language(&ir_input.generics)
     }
 
     fn generate_emit_impl(
@@ -108,27 +50,58 @@ impl GenerateEmitIR {
 
         let emit_body = match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(s) => {
-                self.generate_struct_emit(ir_input, &s.0, original_name, None)
+                self.generate_struct_emit(ir_input, &s.0, original_name, &original_ty_generics, None)
             }
             kirin_derive_core::ir::Data::Enum(e) => {
-                self.generate_enum_emit(ir_input, e, original_name, ast_name)
+                self.generate_enum_emit(ir_input, e, original_name, &original_ty_generics, ast_name)
             }
         };
 
-        let type_lattice = &self.type_lattice;
-        let ir_path = &self.ir_path;
+        let type_lattice = &self.config.type_lattice;
+        let ir_path = &self.config.ir_path;
+
+        // Add HasParser + EmitIR bounds for Value field types containing type parameters
+        // For each type T that contains type parameters:
+        // - T: HasParser<'tokens, 'src> + 'tokens (so we can parse it)
+        // - <T as HasParser>::Output: EmitIR<Language, Output = T> (so we can emit it back to T)
+        let value_types = collect_all_value_types_needing_bounds(ir_input);
+        let value_type_bounds: Vec<syn::WherePredicate> = value_types
+            .iter()
+            .flat_map(|ty| {
+                vec![
+                    syn::parse_quote! {
+                        #ty: #crate_path::HasParser<'tokens, 'src> + 'tokens
+                    },
+                    syn::parse_quote! {
+                        <#ty as #crate_path::HasParser<'tokens, 'src>>::Output: #crate_path::EmitIR<Language, Output = #ty>
+                    },
+                ]
+            })
+            .collect();
 
         // IR type parameter for the EmitIR impl
         // We need:
         // - `From<OriginalType>` to convert the AST to IR statements
         // - TypeAST (= <type_lattice as HasParser>::Output) must implement EmitIR to convert
         //   parsed type annotations to TypeLattice
-        // - The TypeLatticeEmit bound on HasParser::Output provides EmitIR when Output = TypeLattice
+        // - type_lattice: HasParser + 'tokens bound
+        // - <type_lattice as HasParser>::Output: EmitIR<Language, Output = TypeLattice>
+        // - For Value field types with type parameters: HasParser + EmitIR bounds
+        let base_bounds = quote! {
+            Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
+            #type_lattice: #crate_path::HasParser<'tokens, 'src> + 'tokens,
+            <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output: #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::TypeLattice>,
+        };
+
+        let where_clause = if value_type_bounds.is_empty() {
+            quote! { where #base_bounds }
+        } else {
+            quote! { where #base_bounds #(#value_type_bounds,)* }
+        };
+
         quote! {
             impl #impl_generics #crate_path::EmitIR<Language> for #ast_name #ty_generics
-            where
-                Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
-                <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output: #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::TypeLattice>,
+            #where_clause
             {
                 type Output = #ir_path::Statement;
 
@@ -144,10 +117,11 @@ impl GenerateEmitIR {
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         original_name: &syn::Ident,
+        original_ty_generics: &syn::TypeGenerics<'_>,
         variant_name: Option<&syn::Ident>,
     ) -> TokenStream {
         let collected = collect_fields(stmt);
-        let fields_in_fmt = self.get_fields_in_format(ir_input, stmt);
+        let fields_in_fmt = get_fields_in_format(ir_input, stmt);
 
         // Filter to only fields that are in the AST (in format or required)
         let ast_fields: Vec<_> = collected
@@ -175,7 +149,7 @@ impl GenerateEmitIR {
 
             // Generate emit calls for AST fields
             let emit_calls =
-                self.generate_field_emit_calls(&sorted_ast_fields, &field_vars, true);
+                self.generate_field_emit_calls(&sorted_ast_fields, &field_vars, &ir_input.generics, true);
 
             // Generate dialect constructor using all fields (AST + defaults)
             let constructor = self.generate_dialect_constructor_with_defaults(
@@ -211,7 +185,7 @@ impl GenerateEmitIR {
             let pattern = quote! { Self { #(#pat,)* .. } };
 
             // Generate emit calls for AST fields
-            let emit_calls = self.generate_field_emit_calls(&ast_fields, &field_vars, false);
+            let emit_calls = self.generate_field_emit_calls(&ast_fields, &field_vars, &ir_input.generics, false);
 
             // Generate dialect constructor using all fields (AST + defaults)
             let constructor = self.generate_dialect_constructor_with_defaults(
@@ -230,7 +204,7 @@ impl GenerateEmitIR {
         quote! {
             let #pattern = self;
             #emit_calls
-            let dialect_variant: #original_name = #constructor;
+            let dialect_variant: #original_name #original_ty_generics = #constructor;
             ctx.context.statement().definition(dialect_variant).new()
         }
     }
@@ -240,6 +214,7 @@ impl GenerateEmitIR {
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
         original_name: &syn::Ident,
+        original_ty_generics: &syn::TypeGenerics<'_>,
         ast_name: &syn::Ident,
     ) -> TokenStream {
         let arms: Vec<_> = data
@@ -259,7 +234,7 @@ impl GenerateEmitIR {
                 }
 
                 let collected = collect_fields(variant);
-                let fields_in_fmt = self.get_fields_in_format(ir_input, variant);
+                let fields_in_fmt = get_fields_in_format(ir_input, variant);
 
                 // Filter to only fields that are in the AST (in format or required)
                 let ast_fields: Vec<_> = collected
@@ -283,14 +258,14 @@ impl GenerateEmitIR {
                     if is_tuple {
                         quote! {
                             #ast_name::#name => {
-                                let dialect_variant: #original_name = #constructor;
+                                let dialect_variant: #original_name #original_ty_generics = #constructor;
                                 ctx.context.statement().definition(dialect_variant).new()
                             }
                         }
                     } else {
                         quote! {
                             #ast_name::#name {} => {
-                                let dialect_variant: #original_name = #constructor;
+                                let dialect_variant: #original_name #original_ty_generics = #constructor;
                                 ctx.context.statement().definition(dialect_variant).new()
                             }
                         }
@@ -307,7 +282,7 @@ impl GenerateEmitIR {
                         .collect();
 
                     let emit_calls =
-                        self.generate_field_emit_calls(&sorted_ast_fields, &field_vars, true);
+                        self.generate_field_emit_calls(&sorted_ast_fields, &field_vars, &ir_input.generics, true);
                     let constructor = self.generate_dialect_constructor_with_defaults(
                         original_name,
                         Some(name),
@@ -320,7 +295,7 @@ impl GenerateEmitIR {
                     quote! {
                         #ast_name::#name(#(#field_vars),*) => {
                             #emit_calls
-                            let dialect_variant: #original_name = #constructor;
+                            let dialect_variant: #original_name #original_ty_generics = #constructor;
                             ctx.context.statement().definition(dialect_variant).new()
                         }
                     }
@@ -341,7 +316,7 @@ impl GenerateEmitIR {
                             quote! { #orig: #b }
                         })
                         .collect();
-                    let emit_calls = self.generate_field_emit_calls(&ast_fields, &field_vars, false);
+                    let emit_calls = self.generate_field_emit_calls(&ast_fields, &field_vars, &ir_input.generics, false);
                     let constructor = self.generate_dialect_constructor_with_defaults(
                         original_name,
                         Some(name),
@@ -354,7 +329,7 @@ impl GenerateEmitIR {
                     quote! {
                         #ast_name::#name { #(#pat),* } => {
                             #emit_calls
-                            let dialect_variant: #original_name = #constructor;
+                            let dialect_variant: #original_name #original_ty_generics = #constructor;
                             ctx.context.statement().definition(dialect_variant).new()
                         }
                     }
@@ -375,10 +350,17 @@ impl GenerateEmitIR {
         &self,
         ast_fields: &[&CollectedField],
         field_vars: &[syn::Ident],
+        generics: &syn::Generics,
         _is_tuple: bool,
     ) -> TokenStream {
-        let crate_path = &self.crate_path;
-        let ir_path = &self.ir_path;
+        let crate_path = &self.config.crate_path;
+        let ir_path = &self.config.ir_path;
+
+        // Get type parameter names for checking if a Value type needs EmitIR::emit
+        let type_param_names: Vec<String> = generics
+            .type_params()
+            .map(|p| p.ident.to_string())
+            .collect();
 
         // ast_fields and field_vars should already be in the correct order
         let emit_stmts: Vec<_> = ast_fields
@@ -416,11 +398,25 @@ impl GenerateEmitIR {
                             let #emitted_var: #ir_path::Region = #crate_path::EmitIR::emit(#var, ctx);
                         }
                     }
-                    FieldKind::Value(_ty) => {
-                        // For compile-time values, we clone them directly
-                        // (they should be the same type in AST and IR)
-                        quote! {
-                            let #emitted_var = #var.clone();
+                    FieldKind::Value(ty) => {
+                        // Check if this Value type contains any type parameters
+                        let needs_emit_ir = type_param_names.iter().any(|param_name| {
+                            kirin_derive_core::misc::is_type(ty, param_name.as_str())
+                                || kirin_derive_core::misc::is_type_in_generic(ty, param_name.as_str())
+                        });
+
+                        if needs_emit_ir {
+                            // For Value types containing type parameters, call EmitIR::emit
+                            // to convert from the AST representation to the IR representation
+                            quote! {
+                                let #emitted_var = #crate_path::EmitIR::emit(#var, ctx);
+                            }
+                        } else {
+                            // For concrete Value types, just clone directly
+                            // (the AST type equals the IR type via HasParser<Output = T>)
+                            quote! {
+                                let #emitted_var = #var.clone();
+                            }
                         }
                     }
                 }

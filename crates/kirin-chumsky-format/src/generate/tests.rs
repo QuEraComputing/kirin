@@ -10,7 +10,6 @@ use kirin_derive_core::ir::Input;
 use kirin_derive_core::test_util::rustfmt_tokens;
 
 /// Helper to generate all outputs for a given input.
-/// AST only generates the type definition (without Clone/Debug/PartialEq impls).
 fn generate_all(input: &syn::DeriveInput) -> (String, String, String, String) {
     let ir_input: Input<ChumskyLayout> = Input::from_derive_input(input).unwrap();
 
@@ -19,8 +18,7 @@ fn generate_all(input: &syn::DeriveInput) -> (String, String, String, String) {
     let parser_gen = GenerateHasDialectParser::new(&ir_input);
     let pretty_gen = GeneratePrettyPrint::new(&ir_input);
 
-    // Use definition_only for cleaner AST snapshots (no Clone/Debug/PartialEq impls)
-    let ast = rustfmt_tokens(&ast_gen.generate_definition_only(&ir_input));
+    let ast = rustfmt_tokens(&ast_gen.generate(&ir_input));
     let emit = rustfmt_tokens(&emit_gen.generate(&ir_input));
     let parser = rustfmt_tokens(&parser_gen.generate(&ir_input));
     let pretty = rustfmt_tokens(&pretty_gen.generate(&ir_input));
