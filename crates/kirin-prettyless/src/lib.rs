@@ -10,6 +10,11 @@ use prettyless::{Arena, DocBuilder};
 pub use prettyless::DocAllocator;
 pub type ArenaDoc<'a> = DocBuilder<'a, Arena<'a>>;
 
+pub mod prelude {
+    pub use crate::{ArenaDoc, DocAllocator, Document, PrettyPrint, PrettyPrintExt, PrettyPrintName, PrettyPrintType};
+    pub use prettyless;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]

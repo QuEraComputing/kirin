@@ -5,5 +5,5 @@ pub use kirin_prettyless as pretty;
 
 pub mod prelude {
     pub use kirin_ir::*;
-    pub use kirin_chumsky::{HasParser, PrettyPrint};
+    pub use kirin_chumsky::prelude::*;
 }

@@ -28,7 +28,7 @@
 //! - `HasParser` enables parsing via `MyDialect::parser()` or `parse::<MyDialect>(...)`
 //! - `PrettyPrint` enables roundtrip-compatible printing
 
-mod ast;
+pub mod ast;
 mod parsers;
 mod traits;
 
@@ -54,13 +54,14 @@ pub use kirin_chumsky_derive::PrettyPrint;
 
 /// Prelude module for convenient imports
 pub mod prelude {
-    pub use crate::ast::*;
+    pub use crate::ast;
     pub use crate::parsers::*;
-    pub use crate::traits::*;
-    pub use crate::{EmitContext, EmitIR, ParseError, emit, parse, parse_ast};
+    pub use crate::traits::{
+        BoxedParser, EmitContext, EmitIR, HasParser, ParseError, TokenInput, TypeLatticeEmit, emit, parse, parse_ast,
+    };
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;
-    pub use kirin_prettyless::PrettyPrint;
+    pub use kirin_prettyless::prelude::*;
 
     #[cfg(feature = "derive")]
     pub use kirin_chumsky_derive::{HasParser, PrettyPrint};

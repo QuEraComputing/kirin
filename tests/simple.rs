@@ -1,8 +1,5 @@
-use kirin::ir::*;
-use kirin::parsers::Token;
-use kirin::parsers::chumsky::prelude::*;
-use kirin::parsers::{BoxedParser, HasParser, PrettyPrint, TokenInput};
-use kirin::pretty::{ArenaDoc, DocAllocator, Document, PrettyPrintExt, PrettyPrintName, PrettyPrintType};
+use kirin::prelude::*;
+
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum SimpleTypeLattice {
@@ -53,7 +50,7 @@ impl FiniteLattice for SimpleTypeLattice {
 
 impl crate::TypeLattice for SimpleTypeLattice {}
 
-impl kirin::parsers::TypeLatticeEmit for SimpleTypeLattice {}
+impl TypeLatticeEmit for SimpleTypeLattice {}
 
 impl std::fmt::Display for SimpleTypeLattice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
