@@ -7,7 +7,7 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Context, Dialect, GetInfo, ResultValue, SSAValue};
-use kirin_chumsky::{parse, parse_ast, EmitContext, EmitIR, HasParser, PrettyPrint};
+use kirin_chumsky::{EmitContext, EmitIR, HasParser, PrettyPrint, parse, parse_ast};
 
 /// A simple dialect for testing EmitIR functionality.
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
@@ -61,7 +61,9 @@ fn test_emit_add_creates_statement() {
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify the statement was created
-    let stmt_info = statement.get_info(&context).expect("statement should exist");
+    let stmt_info = statement
+        .get_info(&context)
+        .expect("statement should exist");
 
     // Verify the statement definition is an Add variant
     match stmt_info.definition() {
@@ -102,7 +104,9 @@ fn test_emit_neg_creates_statement() {
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify
-    let stmt_info = statement.get_info(&context).expect("statement should exist");
+    let stmt_info = statement
+        .get_info(&context)
+        .expect("statement should exist");
     match stmt_info.definition() {
         EmitLang::Neg { res: _, arg } => {
             assert_eq!(*arg, ssa_x);
@@ -133,7 +137,9 @@ fn test_emit_return_creates_statement() {
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify
-    let stmt_info = statement.get_info(&context).expect("statement should exist");
+    let stmt_info = statement
+        .get_info(&context)
+        .expect("statement should exist");
     match stmt_info.definition() {
         EmitLang::Return(arg) => {
             assert_eq!(*arg, ssa_v);
@@ -198,7 +204,10 @@ fn test_emit_result_creates_ssa() {
 
     // After emission, the result SSA "sum" should be registered
     let sum_ssa = emit_ctx.lookup_ssa("sum");
-    assert!(sum_ssa.is_some(), "Result SSA 'sum' should be registered after emission");
+    assert!(
+        sum_ssa.is_some(),
+        "Result SSA 'sum' should be registered after emission"
+    );
 }
 
 #[test]
@@ -244,7 +253,9 @@ fn test_emit_chain_multiple_statements() {
         let stmt3 = ast3.emit(&mut emit_ctx);
 
         // Capture the neg SSA before the borrow ends
-        neg_ssa = emit_ctx.lookup_ssa("neg").expect("neg should be registered");
+        neg_ssa = emit_ctx
+            .lookup_ssa("neg")
+            .expect("neg should be registered");
 
         (stmt1, stmt2, stmt3)
     };
@@ -314,11 +325,7 @@ fn test_combined_parse_workflow() {
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
     // Parse and emit multiple statements
-    let statements = [
-        "%x = add %a, %b",
-        "%y = neg %x",
-        "return %y",
-    ];
+    let statements = ["%x = add %a, %b", "%y = neg %x", "return %y"];
 
     for src in statements {
         let ast = parse_ast::<EmitLang>(src).expect("parse failed");
@@ -379,7 +386,9 @@ fn test_roundtrip_add() {
     let doc = Document::new(config, &context);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
-    arena_doc.render_fmt(80, &mut output).expect("render failed");
+    arena_doc
+        .render_fmt(80, &mut output)
+        .expect("render failed");
 
     // Compare (trim whitespace)
     assert_eq!(output.trim(), input);
@@ -415,7 +424,9 @@ fn test_roundtrip_neg() {
     let doc = Document::new(config, &context);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
-    arena_doc.render_fmt(80, &mut output).expect("render failed");
+    arena_doc
+        .render_fmt(80, &mut output)
+        .expect("render failed");
 
     // Compare
     assert_eq!(output.trim(), input);
@@ -451,7 +462,9 @@ fn test_roundtrip_return() {
     let doc = Document::new(config, &context);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
-    arena_doc.render_fmt(80, &mut output).expect("render failed");
+    arena_doc
+        .render_fmt(80, &mut output)
+        .expect("render failed");
 
     // Compare
     assert_eq!(output.trim(), input);

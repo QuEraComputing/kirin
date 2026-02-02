@@ -13,7 +13,11 @@ serde = { version = "1.0.228", optional = true }
 chumsky = "0.10"
 kirin-lexer = { version = "0.1.0", path = "crates/kirin-lexer" }
 
+[features]
+serde = ["dep:serde"]
+
 [workspace]
+resolver = "2"
 members = [
     "crates/kirin-cf",
     "crates/kirin-constant",
@@ -30,9 +34,32 @@ members = [
     "crates/kirin-chumsky-derive",
 ]
 
-[features]
-serde = ["dep:serde"]
+[workspace.dependencies]
+# Proc-macro ecosystem - standardized versions
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+darling = "0.23"
+manyhow = { version = "0.11", features = ["darling"] }
 
-# [[example]]
-# name = "simple"
-# path = "example/simple.rs"
+# Parser ecosystem
+chumsky = "0.10"
+logos = "0.16"
+
+# Testing
+insta = "1.46"
+
+# Serialization
+serde = "1.0"
+
+# Internal crates
+kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
+kirin-lexer = { version = "0.1.0", path = "crates/kirin-lexer" }
+kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless" }
+kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky" }
+kirin-derive-core = { version = "0.1.0", path = "crates/kirin-derive-core" }
+kirin-derive-dialect = { version = "0.1.0", path = "crates/kirin-derive-dialect" }
+kirin-derive = { version = "0.1.0", path = "crates/kirin-derive" }
+kirin-test-utils = { version = "0.1.0", path = "crates/kirin-test-utils" }
+kirin-chumsky-format = { version = "0.1.0", path = "crates/kirin-chumsky-format" }
+kirin-chumsky-derive = { version = "0.1.0", path = "crates/kirin-chumsky-derive" }

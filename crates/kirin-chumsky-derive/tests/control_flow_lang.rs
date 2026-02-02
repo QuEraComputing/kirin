@@ -4,7 +4,7 @@ mod common;
 
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue, Successor};
-use kirin_chumsky::{parse_ast, HasParser, PrettyPrint};
+use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(type_lattice = SimpleType)]
@@ -35,7 +35,8 @@ fn test_successor_branch() {
 
 #[test]
 fn test_successor_cond_branch() {
-    let ast = parse_ast::<ControlFlowLang>("cond_br %flag then = ^bb1 else = ^bb2").expect("parse failed");
+    let ast = parse_ast::<ControlFlowLang>("cond_br %flag then = ^bb1 else = ^bb2")
+        .expect("parse failed");
     match ast {
         ControlFlowLangAST::CondBranch {
             cond,

@@ -57,7 +57,7 @@ pub mod prelude {
     pub use crate::ast::*;
     pub use crate::parsers::*;
     pub use crate::traits::*;
-    pub use crate::{emit, parse, parse_ast, EmitContext, EmitIR, ParseError};
+    pub use crate::{EmitContext, EmitIR, ParseError, emit, parse, parse_ast};
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;
     pub use kirin_prettyless::PrettyPrint;

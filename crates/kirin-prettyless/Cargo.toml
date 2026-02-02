@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bat = { version = "0.26.1", optional = true }
-bon = "3.8.1"
-kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
-prettyless = "0.3.0"
-serde = { version = "1.0.228", optional = true, features = ["derive"] }
+bat = { version = "0.26", optional = true }
+bon = "3.8"
+kirin-ir.workspace = true
+prettyless = "0.3"
+serde = { workspace = true, optional = true, features = ["derive"] }
 
 [features]
 default = ["serde", "bat"]
@@ -16,5 +16,5 @@ serde = ["dep:serde"]
 bat = ["dep:bat"]
 
 [dev-dependencies]
-insta = "1.44.3"
-kirin-test-utils = { path = "../kirin-test-utils" }
+insta.workspace = true
+kirin-test-utils.workspace = true

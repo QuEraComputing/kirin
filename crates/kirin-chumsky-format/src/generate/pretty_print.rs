@@ -8,9 +8,9 @@ use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::ChumskyLayout;
 use crate::field_kind::{CollectedField, collect_fields};
 use crate::format::{Format, FormatElement};
-use crate::ChumskyLayout;
 use kirin_lexer::Token;
 
 /// Generator for the `PrettyPrint` trait implementation.
@@ -49,9 +49,7 @@ impl GeneratePrettyPrint {
             kirin_derive_core::ir::Data::Struct(s) => {
                 self.generate_struct_print(&s.0, dialect_name, None)
             }
-            kirin_derive_core::ir::Data::Enum(e) => {
-                self.generate_enum_print(e, dialect_name)
-            }
+            kirin_derive_core::ir::Data::Enum(e) => self.generate_enum_print(e, dialect_name),
         };
 
         // Generate a concrete impl `PrettyPrint<Self> for Self` to avoid infinite recursion.
@@ -91,12 +89,11 @@ impl GeneratePrettyPrint {
             .as_ref()
             .expect("Statement must have format string");
 
-        let format = Format::parse(format_str, None)
-            .expect("Format string should be valid");
+        let format = Format::parse(format_str, None).expect("Format string should be valid");
 
         let collected = collect_fields(stmt);
         let field_map = build_field_map(&collected);
-        
+
         // Generate field bindings for pattern matching
         let bindings = stmt.field_bindings("f");
         let fields = &bindings.field_idents;
@@ -107,12 +104,7 @@ impl GeneratePrettyPrint {
                 None => quote! { #dialect_name(#(#fields),*) },
             };
 
-            let print_expr = self.generate_format_print(
-                &format,
-                &field_map,
-                &collected,
-                fields,
-            );
+            let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
 
             (pattern, print_expr)
         } else {
@@ -127,12 +119,7 @@ impl GeneratePrettyPrint {
                 None => quote! { #dialect_name { #(#pat),* } },
             };
 
-            let print_expr = self.generate_format_print(
-                &format,
-                &field_map,
-                &collected,
-                fields,
-            );
+            let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
 
             (pattern, print_expr)
         };
@@ -170,8 +157,8 @@ impl GeneratePrettyPrint {
                     .as_ref()
                     .expect("Variant must have format string");
 
-                let format = Format::parse(format_str, None)
-                    .expect("Format string should be valid");
+                let format =
+                    Format::parse(format_str, None).expect("Format string should be valid");
 
                 let collected = collect_fields(variant);
                 let field_map = build_field_map(&collected);
@@ -179,12 +166,8 @@ impl GeneratePrettyPrint {
                 let fields = &bindings.field_idents;
 
                 if bindings.is_empty() {
-                    let print_expr = self.generate_format_print(
-                        &format,
-                        &field_map,
-                        &collected,
-                        fields,
-                    );
+                    let print_expr =
+                        self.generate_format_print(&format, &field_map, &collected, fields);
                     if bindings.is_tuple {
                         quote! {
                             #dialect_name::#name => {
@@ -199,12 +182,8 @@ impl GeneratePrettyPrint {
                         }
                     }
                 } else if bindings.is_tuple {
-                    let print_expr = self.generate_format_print(
-                        &format,
-                        &field_map,
-                        &collected,
-                        fields,
-                    );
+                    let print_expr =
+                        self.generate_format_print(&format, &field_map, &collected, fields);
                     quote! {
                         #dialect_name::#name(#(#fields),*) => {
                             #print_expr
@@ -217,12 +196,8 @@ impl GeneratePrettyPrint {
                         .zip(fields)
                         .map(|(f, b)| quote! { #f: #b })
                         .collect();
-                    let print_expr = self.generate_format_print(
-                        &format,
-                        &field_map,
-                        &collected,
-                        fields,
-                    );
+                    let print_expr =
+                        self.generate_format_print(&format, &field_map, &collected, fields);
                     quote! {
                         #dialect_name::#name { #(#pat),* } => {
                             #print_expr
@@ -270,18 +245,14 @@ impl GeneratePrettyPrint {
                     if let Some((idx, field)) = field_map.get(&name_str) {
                         let var = &field_vars[*idx];
                         let var_ref = quote! { #var };
-                        
-                        let print_expr = field.kind.print_expr(
-                            prettyless_path,
-                            &var_ref,
-                            opt,
-                        );
-                        
+
+                        let print_expr = field.kind.print_expr(prettyless_path, &var_ref, opt);
+
                         // Add space before field if preceded by another field (no Token between)
                         if !is_first && prev_is_field {
                             parts.push(quote! { doc.text(" ") });
                         }
-                        
+
                         parts.push(print_expr);
                     }
                 }
@@ -310,7 +281,7 @@ fn build_field_map(collected: &[CollectedField]) -> IndexMap<String, (usize, &Co
     for (idx, field) in collected.iter().enumerate() {
         // Always add the index as a key (for {0}, {1}, etc. syntax)
         map.insert(field.index.to_string(), (idx, field));
-        
+
         // Also add the name if it's a named field (for {field_name} syntax)
         if let Some(ident) = &field.ident {
             map.insert(ident.to_string(), (idx, field));
@@ -329,7 +300,7 @@ fn tokens_to_string_with_spacing(
     add_trailing_space: bool,
 ) -> String {
     let mut result = String::new();
-    
+
     // Add leading space if preceded by a field
     if add_leading_space && !tokens.is_empty() {
         // Check if the first token is a punctuation that typically doesn't want leading space
@@ -341,7 +312,7 @@ fn tokens_to_string_with_spacing(
             result.push(' ');
         }
     }
-    
+
     for (i, token) in tokens.iter().enumerate() {
         if i > 0 {
             result.push(' ');
@@ -353,7 +324,7 @@ fn tokens_to_string_with_spacing(
             other => result.push_str(&other.to_string()),
         }
     }
-    
+
     // Add trailing space if followed by a field
     if add_trailing_space && !tokens.is_empty() {
         // Check if the last token is a punctuation that typically doesn't want trailing space
@@ -365,6 +336,6 @@ fn tokens_to_string_with_spacing(
             result.push(' ');
         }
     }
-    
+
     result
 }

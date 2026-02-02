@@ -3,9 +3,9 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::ChumskyLayout;
 use crate::field_kind::{CollectedField, FieldKind, collect_fields};
 use crate::generics::GenericsBuilder;
-use crate::ChumskyLayout;
 
 /// Generator for the `EmitIR` trait implementation.
 pub struct GenerateEmitIR {
@@ -341,10 +341,8 @@ impl GenerateEmitIR {
             .iter()
             .zip(field_vars.iter())
             .map(|(field, var)| {
-                let emitted_var = syn::Ident::new(
-                    &format!("{}_ir", var),
-                    proc_macro2::Span::call_site(),
-                );
+                let emitted_var =
+                    syn::Ident::new(&format!("{}_ir", var), proc_macro2::Span::call_site());
 
                 // For most fields, we convert the emitted IR value to the expected type
                 match &field.kind {

@@ -4,16 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
-kirin-derive-dialect = { version = "0.1.0", path = "../kirin-derive-dialect" }
-paste = "1.0.15"
-proc-macro2 = "1.0.105"
-quote = "1.0.43"
-syn = { version = "2.0.106", features = ["full", "parsing", "extra-traits"] }
+kirin-derive-core.workspace = true
+kirin-derive-dialect.workspace = true
+paste = "1.0"
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
 
 [lib]
 proc-macro = true
 
 [dev-dependencies]
-kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
-kirin-test-utils = { version = "0.1.0", path = "../kirin-test-utils" }
+kirin-ir.workspace = true
+kirin-test-utils.workspace = true

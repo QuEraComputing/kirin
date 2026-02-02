@@ -356,8 +356,7 @@ where
                 if i > 0 {
                     args_doc += doc.text(", ");
                 }
-                let arg_info: &kirin_ir::Item<kirin_ir::SSAInfo<L>> =
-                    arg.expect_info(doc.context);
+                let arg_info: &kirin_ir::Item<kirin_ir::SSAInfo<L>> = arg.expect_info(doc.context);
                 let name = if let Some(name_sym) = arg_info.name() {
                     doc.context
                         .symbol_table()

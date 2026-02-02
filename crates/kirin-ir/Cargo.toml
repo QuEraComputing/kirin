@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bon = "3.8.1"
-eyre = "0.6.12"
-fxhash = "0.2.1"
-kirin-derive = { version = "0.1.0", path = "../kirin-derive", optional = true }
-serde = { version = "1.0.228", optional = true }
+bon = "3.8"
+eyre = "0.6"
+fxhash = "0.2"
+kirin-derive = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 
 [features]
 default = ["derive"]

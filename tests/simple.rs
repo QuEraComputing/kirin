@@ -1,7 +1,7 @@
 use kirin::ir::*;
+use kirin::parsers::Token;
 use kirin::parsers::chumsky::prelude::*;
 use kirin::parsers::{BoxedParser, HasParser, PrettyPrint, TokenInput};
-use kirin::parsers::Token;
 use kirin::pretty::{ArenaDoc, DocAllocator, Document, PrettyPrintName, PrettyPrintType};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -219,7 +219,6 @@ pub enum SimpleLang {
 
 #[test]
 fn test_block() {
-
     let mut context: Context<SimpleLang> = Context::default();
     let staged_function = context
         .staged_function()
@@ -268,13 +267,12 @@ fn test_block() {
 // Roundtrip Tests
 // ============================================================================
 
-use kirin::parsers::{parse_ast, EmitContext, EmitIR};
+use kirin::parsers::{EmitContext, EmitIR, parse_ast};
 use kirin::pretty::Config;
 
 /// Test roundtrip: parse -> emit -> print should produce output matching input.
 #[test]
 fn test_roundtrip_add() {
-
     let mut context: Context<SimpleLang> = Context::default();
 
     // Create operand SSAs with types
@@ -320,7 +318,9 @@ fn test_roundtrip_add() {
     let doc = Document::new(config, &context);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
-    arena_doc.render_fmt(80, &mut output).expect("render failed");
+    arena_doc
+        .render_fmt(80, &mut output)
+        .expect("render failed");
 
     // Compare (trim whitespace)
     assert_eq!(output.trim(), input);
@@ -359,7 +359,9 @@ fn test_roundtrip_constant() {
     let doc = Document::new(config, &context);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
-    arena_doc.render_fmt(80, &mut output).expect("render failed");
+    arena_doc
+        .render_fmt(80, &mut output)
+        .expect("render failed");
 
     // Compare
     assert_eq!(output.trim(), input);
@@ -397,7 +399,9 @@ fn test_roundtrip_return() {
     let doc = Document::new(config, &context);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
-    arena_doc.render_fmt(80, &mut output).expect("render failed");
+    arena_doc
+        .render_fmt(80, &mut output)
+        .expect("render failed");
 
     // Compare
     assert_eq!(output.trim(), input);
@@ -446,9 +450,15 @@ fn test_roundtrip_function() {
     let output = doc.render(statement).expect("render failed");
 
     // Verify key structural elements are present
-    assert!(output.contains("%f = function"), "Should have function result name");
+    assert!(
+        output.contains("%f = function"),
+        "Should have function result name"
+    );
     assert!(output.contains("add"), "Should have add instruction");
-    assert!(output.contains("constant 42"), "Should have constant instruction");
+    assert!(
+        output.contains("constant 42"),
+        "Should have constant instruction"
+    );
     assert!(output.contains("return"), "Should have return instruction");
 }
 

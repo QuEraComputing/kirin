@@ -75,7 +75,8 @@ impl GenerateAST {
 
         // We use PhantomData to make all generic parameters used ('tokens, 'src, Language).
         // Using fn() -> ... makes them covariant and doesn't require Clone/Debug/etc.
-        let phantom = quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)> };
+        let phantom =
+            quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)> };
 
         // AST types only need `Language: Dialect` bound.
         // Field types use the concrete type_lattice directly (not the associated type).
@@ -200,18 +201,17 @@ impl GenerateAST {
                         .collect();
                     // Include _marker field, ignored with ..
                     let pattern = quote! { Self { #(#pat,)* .. } };
-                    let debug =
-                        orig_fields
-                            .iter()
-                            .zip(fields)
-                            .fold(quote! { f.debug_struct(#name) }, |acc, (orig, field)| {
-                                let field_name = orig.to_string();
-                                quote! { #acc.field(#field_name, &#field) }
-                            });
+                    let debug = orig_fields.iter().zip(fields).fold(
+                        quote! { f.debug_struct(#name) },
+                        |acc, (orig, field)| {
+                            let field_name = orig.to_string();
+                            quote! { #acc.field(#field_name, &#field) }
+                        },
+                    );
                     (pattern, debug)
                 };
 
-                    quote! {
+                quote! {
                     let #pattern = self;
                         #debug_fields.finish()
                 }
@@ -234,9 +234,9 @@ impl GenerateAST {
                             }
                         } else if bindings.is_tuple {
                             let debug_fields = fields.iter().fold(
-                                    quote! { f.debug_tuple(#name_str) },
-                                    |acc, field| quote! { #acc.field(&#field) },
-                                );
+                                quote! { f.debug_tuple(#name_str) },
+                                |acc, field| quote! { #acc.field(&#field) },
+                            );
                             quote! { Self::#name(#(#fields),*) => #debug_fields.finish() }
                         } else {
                             let orig_fields = &bindings.original_field_names;
@@ -246,12 +246,12 @@ impl GenerateAST {
                                 .map(|(f, b)| quote! { #f: #b })
                                 .collect();
                             let debug_fields = orig_fields.iter().zip(fields).fold(
-                                    quote! { f.debug_struct(#name_str) },
+                                quote! { f.debug_struct(#name_str) },
                                 |acc, (orig, field)| {
                                     let field_name = orig.to_string();
-                                        quote! { #acc.field(#field_name, &#field) }
-                                    },
-                                );
+                                    quote! { #acc.field(#field_name, &#field) }
+                                },
+                            );
                             quote! { Self::#name { #(#pat),* } => #debug_fields.finish() }
                         }
                     })
@@ -304,7 +304,7 @@ impl GenerateAST {
                     )
                 };
 
-                    quote! {
+                quote! {
                     let #pattern = self;
                     #cloned
                 }
@@ -325,7 +325,7 @@ impl GenerateAST {
                                 quote! { Self::#name {} => Self::#name {} }
                             }
                         } else if bindings.is_tuple {
-                                quote! {
+                            quote! {
                                 Self::#name(#(#fields),*) => Self::#name(#(#fields.clone()),*)
                             }
                         } else {
@@ -340,7 +340,7 @@ impl GenerateAST {
                                 .zip(fields)
                                 .map(|(f, b)| quote! { #f: #b.clone() })
                                 .collect();
-                                quote! {
+                            quote! {
                                 Self::#name { #(#pat),* } => Self::#name { #(#clones),* }
                             }
                         }
@@ -372,8 +372,8 @@ impl GenerateAST {
                 let other_fields = &other_bindings.field_idents;
 
                 let comparisons = self_fields.iter().zip(other_fields).map(|(s, o)| {
-                        quote! { #s == #o }
-                    });
+                    quote! { #s == #o }
+                });
 
                 let (self_pattern, other_pattern) = if self_bindings.is_tuple {
                     // Include _marker PhantomData at the end, ignored with _
@@ -400,7 +400,7 @@ impl GenerateAST {
                     )
                 };
 
-                    quote! {
+                quote! {
                     let #self_pattern = self;
                     let #other_pattern = other;
                         true #(&& #comparisons)*

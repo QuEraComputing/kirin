@@ -88,11 +88,7 @@ where
     T: HasParser<'tokens, 'src, Output = T>,
 {
     ssa_name()
-        .then(
-            just(Token::Colon)
-                .ignore_then(T::parser())
-                .or_not(),
-        )
+        .then(just(Token::Colon).ignore_then(T::parser()).or_not())
         .map(|(name, ty)| SSAValue { name, ty })
         .labelled("SSA value")
 }
@@ -153,11 +149,7 @@ where
     T: HasParser<'tokens, 'src, Output = T>,
 {
     ssa_name()
-        .then(
-            just(Token::Colon)
-                .ignore_then(T::parser())
-                .or_not(),
-        )
+        .then(just(Token::Colon).ignore_then(T::parser()).or_not())
         .map(|(name, ty)| ResultValue { name, ty })
         .labelled("result value")
 }
@@ -344,13 +336,13 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 pub fn block<'tokens, 'src: 'tokens, I, L, T>(
-    language: RecursiveParser<
-        'tokens,
-        'src,
-        I,
-        StmtOutput<'tokens, 'src, L>,
-    >,
-) -> impl Parser<'tokens, I, Spanned<Block<'src, T, StmtOutput<'tokens, 'src, L>>>, ParserError<'tokens, 'src>>
+    language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
+) -> impl Parser<
+    'tokens,
+    I,
+    Spanned<Block<'src, T, StmtOutput<'tokens, 'src, L>>>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -392,12 +384,7 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 pub fn region<'tokens, 'src: 'tokens, I, L, T>(
-    language: RecursiveParser<
-        'tokens,
-        'src,
-        I,
-        StmtOutput<'tokens, 'src, L>,
-    >,
+    language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
 ) -> impl Parser<'tokens, I, Region<'src, T, StmtOutput<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
@@ -419,12 +406,7 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 pub fn region_boxed<'tokens, 'src: 'tokens, I, L, T>(
-    language: RecursiveParser<
-        'tokens,
-        'src,
-        I,
-        StmtOutput<'tokens, 'src, L>,
-    >,
+    language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
 ) -> BoxedParser<'tokens, 'src, I, Region<'src, T, StmtOutput<'tokens, 'src, L>>>
 where
     I: TokenInput<'tokens, 'src>,
@@ -439,12 +421,8 @@ where
 /// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32`
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-pub fn function_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
-    'tokens,
-    I,
-    Spanned<FunctionType<T>>,
-    ParserError<'tokens, 'src>,
->
+pub fn function_type<'tokens, 'src: 'tokens, I, L, T>()
+-> impl Parser<'tokens, I, Spanned<FunctionType<T>>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,

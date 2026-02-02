@@ -226,7 +226,8 @@ impl GenerateHasDialectParser {
         crate_path: &syn::Path,
     ) -> TokenStream {
         let ast_generics = self.build_ast_generics(ir_input);
-        match self.build_statement_parser(ir_input, stmt, ast_name, &ast_generics, None, crate_path) {
+        match self.build_statement_parser(ir_input, stmt, ast_name, &ast_generics, None, crate_path)
+        {
             Ok(body) => body,
             Err(err) => err.to_compile_error(),
         }
@@ -322,8 +323,14 @@ impl GenerateHasDialectParser {
         let type_lattice = &ir_input.attrs.type_lattice;
 
         // Build parser chain properly handling the tuple nesting
-        let parser_expr =
-            self.build_parser_chain_v2(&format, &occurrences, crate_path, &dialect_type, ast_name, type_lattice)?;
+        let parser_expr = self.build_parser_chain_v2(
+            &format,
+            &occurrences,
+            crate_path,
+            &dialect_type,
+            ast_name,
+            type_lattice,
+        )?;
 
         // Generate pattern matching for the parser output
         let var_names: Vec<_> = occurrences.iter().map(|o| o.var_name.clone()).collect();
@@ -629,7 +636,9 @@ impl GenerateHasDialectParser {
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
     ) -> TokenStream {
-        let base = field.kind.parser_expr(crate_path, opt, dialect_type, ast_name, type_lattice);
+        let base = field
+            .kind
+            .parser_expr(crate_path, opt, dialect_type, ast_name, type_lattice);
         field.collection.wrap_parser(base)
     }
 
@@ -669,7 +678,7 @@ impl GenerateHasDialectParser {
             // For tuple fields, sort by original index to match AST struct definition order
             let mut sorted_collected: Vec<_> = collected.iter().collect();
             sorted_collected.sort_by_key(|f| f.index);
-            
+
             let values = sorted_collected
                 .iter()
                 .map(|field| self.build_field_value(field, &field_occurrences, crate_path));

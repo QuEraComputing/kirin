@@ -92,7 +92,11 @@ pub struct ParseError {
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "error at {}..{}: {}", self.span.start, self.span.end, self.message)
+        write!(
+            f,
+            "error at {}..{}: {}",
+            self.span.start, self.span.end, self.message
+        )
     }
 }
 

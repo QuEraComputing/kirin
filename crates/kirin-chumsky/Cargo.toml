@@ -4,20 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = "0.10"
-kirin-ir = { version = "0.1.0", path = "../kirin-ir" }
-kirin-lexer = { version = "0.1.0", path = "../kirin-lexer" }
-kirin-prettyless = { version = "0.1.0", path = "../kirin-prettyless" }
+chumsky.workspace = true
+kirin-ir.workspace = true
+kirin-lexer.workspace = true
+kirin-prettyless.workspace = true
+kirin-chumsky-derive = { workspace = true, optional = true }
 
 [features]
 default = []
 derive = ["kirin-chumsky-derive"]
 
-[dependencies.kirin-chumsky-derive]
-version = "0.1.0"
-path = "../kirin-chumsky-derive"
-optional = true
-
 [dev-dependencies]
-insta = "1.42"
-kirin-derive = { path = "../kirin-derive" }
+insta.workspace = true
+kirin-derive.workspace = true

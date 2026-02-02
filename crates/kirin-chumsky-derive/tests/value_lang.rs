@@ -5,7 +5,7 @@ mod common;
 use chumsky::prelude::*;
 use common::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
-use kirin_chumsky::{parse_ast, BoxedParser, HasParser, PrettyPrint, TokenInput};
+use kirin_chumsky::{BoxedParser, HasParser, PrettyPrint, TokenInput, parse_ast};
 use kirin_lexer::Token;
 
 /// A custom compile-time value type that parses any identifier.

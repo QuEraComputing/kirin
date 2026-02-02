@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = "0.10"
-darling = "0.23"
+chumsky.workspace = true
+darling.workspace = true
 indexmap = "2.7"
-kirin-derive-core = { version = "0.1.0", path = "../kirin-derive-core" }
-kirin-lexer = { version = "0.1.0", path = "../kirin-lexer", features = ["quote"] }
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = { version = "2.0", features = ["full", "extra-traits"] }
+kirin-derive-core.workspace = true
+kirin-lexer = { workspace = true, features = ["quote"] }
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
 
 [dev-dependencies]
-insta = "1.42"
+insta.workspace = true

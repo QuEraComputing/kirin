@@ -109,12 +109,18 @@ impl FieldKind {
         match self {
             FieldKind::SSAValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
-                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() },
-                FormatOption::Default => quote! { #crate_path::ssa_value::<_, #dialect_type, #type_lattice>() },
+                FormatOption::Type => {
+                    quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() }
+                }
+                FormatOption::Default => {
+                    quote! { #crate_path::ssa_value::<_, #dialect_type, #type_lattice>() }
+                }
             },
             FieldKind::ResultValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
-                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() },
+                FormatOption::Type => {
+                    quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() }
+                }
                 FormatOption::Default => {
                     quote! { #crate_path::result_value_with_optional_type::<_, #dialect_type, #type_lattice>() }
                 }
@@ -228,9 +234,7 @@ impl FieldKind {
                     #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
                 },
             },
-            FieldKind::Block
-            | FieldKind::Successor
-            | FieldKind::Region => quote! {
+            FieldKind::Block | FieldKind::Successor | FieldKind::Region => quote! {
                 #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
             },
             FieldKind::Value(_ty) => {

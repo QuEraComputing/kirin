@@ -118,7 +118,10 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
 
         let block = BlockInfo::builder()
             .maybe_parent(self.parent)
-            .maybe_name(self.name.map(|n| self.context.symbols.borrow_mut().intern(n)))
+            .maybe_name(
+                self.name
+                    .map(|n| self.context.symbols.borrow_mut().intern(n)),
+            )
             .node(LinkedListNode::new(id))
             .arguments(block_args)
             .statements(self.context.link_statements(&self.statements))

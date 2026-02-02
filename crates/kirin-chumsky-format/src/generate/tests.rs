@@ -3,36 +3,11 @@
 //! These tests capture the current macro expansion behavior to ensure
 //! consistency and detect unintended changes.
 
-use crate::{ChumskyLayout, GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint};
+use crate::{
+    ChumskyLayout, GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint,
+};
 use kirin_derive_core::ir::Input;
-use proc_macro2::TokenStream;
-
-/// Format tokens with rustfmt for readable snapshots.
-fn rustfmt_tokens(tokens: &TokenStream) -> String {
-    let src = tokens.to_string();
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-
-    if let Ok(mut child) = Command::new("rustfmt")
-        .arg("--emit")
-        .arg("stdout")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-    {
-        if let Some(stdin) = child.stdin.as_mut() {
-            let _ = stdin.write_all(src.as_bytes());
-        }
-        if let Ok(output) = child.wait_with_output() {
-            if output.status.success() {
-                if let Ok(formatted) = String::from_utf8(output.stdout) {
-                    return formatted;
-                }
-            }
-        }
-    }
-    src
-}
+use kirin_derive_core::test_util::rustfmt_tokens;
 
 /// Helper to generate all outputs for a given input.
 /// AST only generates the type definition (without Clone/Debug/PartialEq impls).
