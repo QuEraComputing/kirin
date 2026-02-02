@@ -18,7 +18,7 @@ impl<'a> GenericsBuilder<'a> {
 
     /// Builds generics with 'tokens, 'src: 'tokens lifetimes only.
     ///
-    /// This is used for the original type's `HasRecursiveParser` impl where
+    /// This is used for the original type's `HasDialectParser` impl where
     /// the type is its own Language parameter.
     pub fn with_lifetimes(&self, base: &syn::Generics) -> syn::Generics {
         let mut generics = base.clone();
@@ -56,11 +56,13 @@ impl<'a> GenericsBuilder<'a> {
     /// Builds generics with 'tokens, 'src: 'tokens lifetimes and Language type parameter.
     ///
     /// This is used for AST types and their trait implementations.
+    /// AST types only require `Language: Dialect`, not `HasDialectParser`.
     pub fn with_language(&self, base: &syn::Generics) -> syn::Generics {
         let mut generics = self.with_lifetimes(base);
-        let crate_path = self.crate_path;
+        let _crate_path = self.crate_path;
 
         // Add Language type parameter if not present
+        // Language only needs the Dialect bound (AST types don't implement HasDialectParser)
         let lang_ident = syn::Ident::new("Language", Span::call_site());
         if !generics
             .params
@@ -70,7 +72,7 @@ impl<'a> GenericsBuilder<'a> {
             let mut lang_param = syn::TypeParam::from(lang_ident);
             lang_param
                 .bounds
-                .push(syn::parse_quote!(#crate_path::LanguageParser<'tokens, 'src>));
+                .push(syn::parse_quote!(::kirin_ir::Dialect));
             generics.params.push(syn::GenericParam::Type(lang_param));
         }
 

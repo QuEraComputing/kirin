@@ -2,7 +2,7 @@
 
 use chumsky::prelude::*;
 use kirin::ir::{FiniteLattice, Lattice, TypeLattice};
-use kirin_chumsky::{BoxedParser, HasParser, TokenInput};
+use kirin_chumsky::{BoxedParser, HasParser, TokenInput, TypeLatticeEmit};
 use kirin_lexer::Token;
 
 /// Simple type lattice used across all parser tests.
@@ -49,6 +49,8 @@ impl FiniteLattice for SimpleType {
 }
 
 impl TypeLattice for SimpleType {}
+
+impl TypeLatticeEmit for SimpleType {}
 
 impl std::fmt::Display for SimpleType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

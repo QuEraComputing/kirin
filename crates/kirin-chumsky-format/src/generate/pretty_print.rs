@@ -54,28 +54,23 @@ impl GeneratePrettyPrint {
             }
         };
 
-        // We need to add a Language type parameter for the impl
-        // The existing impl_generics from the type, plus a new Language parameter
-        let impl_generics_with_lang = if ir_input.generics.params.is_empty() {
-            quote! { <Language> }
-        } else {
-            let existing = &ir_input.generics.params;
-            quote! { <Language, #existing> }
-        };
+        // Generate a concrete impl `PrettyPrint<Self> for Self` to avoid infinite recursion.
+        // A generic `impl<Language> PrettyPrint<Language> for Dialect` would cause overflow
+        // when Language = Dialect because Block/Region printing requires Language: PrettyPrint<Language>.
+        // By implementing `PrettyPrint<Dialect> for Dialect`, the recursive bound is satisfied
+        // by the very impl we're defining.
+
+        let (impl_generics, _, where_clause) = ir_input.generics.split_for_impl();
 
         // Build impl with appropriate bounds
-        // Note: we don't require Language: PrettyPrint<Language> because this IS the
-        // implementation for the dialect type. The bound would cause infinite recursion.
         quote! {
-            impl #impl_generics_with_lang #prettyless_path::PrettyPrint<Language>
+            impl #impl_generics #prettyless_path::PrettyPrint<#dialect_name #ty_generics>
                 for #dialect_name #ty_generics
-            where
-                Language: ::kirin_ir::Dialect,
-                Language::TypeLattice: std::fmt::Display,
+            #where_clause
             {
                 fn pretty_print<'a>(
                     &self,
-                    doc: &'a #prettyless_path::Document<'a, Language>,
+                    doc: &'a #prettyless_path::Document<'a, #dialect_name #ty_generics>,
                 ) -> #prettyless_path::ArenaDoc<'a> {
                     use #prettyless_path::DocAllocator;
                     #print_body

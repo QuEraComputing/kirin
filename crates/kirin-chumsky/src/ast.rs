@@ -219,19 +219,30 @@ where
 ///
 /// Note: The result index is set to 0 here. For statements with multiple results,
 /// the generated code should handle setting the correct indices.
+///
+/// The `TypeOutput: EmitIR<IR, Output = IR::TypeLattice>` bound allows proper type
+/// conversion from the parsed type AST to the IR's type lattice via the EmitIR trait.
 impl<'src, TypeOutput, IR> EmitIR<IR> for ResultValue<'src, TypeOutput>
 where
     IR: Dialect,
+    TypeOutput: EmitIR<IR, Output = IR::TypeLattice>,
 {
     type Output = kirin_ir::ResultValue;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
-        // Create a new SSA value with the parsed name
+        // Convert the parsed type to TypeLattice via EmitIR, or use top() if no type annotation
+        let ty: IR::TypeLattice = self
+            .ty
+            .as_ref()
+            .map(|t| t.emit(ctx))
+            .unwrap_or_else(<IR::TypeLattice as FiniteLattice>::top);
+
+        // Create a new SSA value with the parsed name and type
         let ssa = ctx
             .context
             .ssa()
             .name(self.name.value.to_string())
-            .ty(<IR::TypeLattice as FiniteLattice>::top())
+            .ty(ty)
             .kind(SSAKind::BuilderResult(0))
             .new();
 
@@ -264,16 +275,20 @@ where
 ///
 /// This builds an IR block with the parsed label, arguments, and statements.
 /// Block arguments are created with their parsed names and types.
+///
+/// The `TypeOutput: EmitIR<IR, Output = IR::TypeLattice>` bound allows proper type
+/// conversion from the parsed type AST to the IR's type lattice via the EmitIR trait.
 impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for Block<'src, TypeOutput, StmtOutput>
 where
     IR: Dialect,
-    TypeOutput: Into<IR::TypeLattice> + Clone,
+    TypeOutput: EmitIR<IR, Output = IR::TypeLattice>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
     type Output = kirin_ir::Block;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
         // Collect argument info for registration
+        // Convert TypeOutput to TypeLattice using EmitIR
         let arg_info: Vec<_> = self
             .header
             .value
@@ -282,7 +297,7 @@ where
             .enumerate()
             .map(|(idx, arg)| {
                 let name = arg.value.name.value.to_string();
-                let ty: IR::TypeLattice = arg.value.ty.value.clone().into();
+                let ty: IR::TypeLattice = arg.value.ty.value.emit(ctx);
                 (name, ty, idx)
             })
             .collect();
@@ -330,10 +345,13 @@ where
 /// Implementation of EmitIR for Region AST nodes.
 ///
 /// This builds an IR region containing all the parsed blocks.
+///
+/// The `TypeOutput: EmitIR<IR, Output = IR::TypeLattice>` bound allows proper type
+/// conversion for block arguments within the region via the EmitIR trait.
 impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for Region<'src, TypeOutput, StmtOutput>
 where
     IR: Dialect,
-    TypeOutput: Into<IR::TypeLattice> + Clone,
+    TypeOutput: EmitIR<IR, Output = IR::TypeLattice>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
     type Output = kirin_ir::Region;

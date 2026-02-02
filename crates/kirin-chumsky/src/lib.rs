@@ -4,7 +4,7 @@
 //! for parsing dialect definitions.
 //!
 //! This crate provides:
-//! - Core traits: `HasParser`, `HasRecursiveParser`, `EmitIR`
+//! - Core traits: `HasParser`, `HasDialectParser`, `EmitIR`
 //! - Common syntax nodes: `Spanned`, `SSAValue`, `ResultValue`, `Block`, `Region`, etc.
 //! - Parser combinators for common syntaxes
 //! - IR emission via `EmitContext` and `EmitIR` trait

@@ -1,8 +1,8 @@
 use kirin::ir::*;
-use kirin::parsers::{BoxedParser, HasParser, TokenInput};
 use kirin::parsers::chumsky::prelude::*;
+use kirin::parsers::{BoxedParser, HasParser, PrettyPrint, TokenInput};
 use kirin::parsers::Token;
-use kirin::pretty::{Document, ArenaDoc, DocAllocator, PrettyPrint, PrettyPrintName, PrettyPrintType};
+use kirin::pretty::{ArenaDoc, DocAllocator, Document, PrettyPrintName, PrettyPrintType};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum SimpleTypeLattice {
@@ -52,6 +52,8 @@ impl FiniteLattice for SimpleTypeLattice {
 }
 
 impl crate::TypeLattice for SimpleTypeLattice {}
+
+impl kirin::parsers::TypeLatticeEmit for SimpleTypeLattice {}
 
 impl std::fmt::Display for SimpleTypeLattice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -149,11 +151,13 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Value {
     {
         let int = select! {
             Token::Int(s) => s.parse::<i64>().unwrap()
-        }.map(Value::I64);
+        }
+        .map(Value::I64);
 
         let float = select! {
             Token::Float(s) => s.parse::<f64>().unwrap()
-        }.map(Value::F64);
+        }
+        .map(Value::F64);
 
         float.or(int).labelled("value").boxed()
     }
@@ -161,7 +165,7 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Value {
 
 // PrettyPrint traits for Value (used by PrettyPrint derive)
 
-impl<L: Dialect> PrettyPrint<L> for Value {
+impl<L: Dialect> kirin::pretty::PrettyPrint<L> for Value {
     fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
         doc.text(self.to_string())
     }
@@ -183,8 +187,9 @@ impl<L: Dialect> PrettyPrintType<L> for Value {
     }
 }
 
-// Note: Region fields require manual PrettyPrint implementation since the derive
-// doesn't yet support the required EmitIR bounds for Region's nested statements.
+// Note: Region fields are temporarily not using HasParser/PrettyPrint derive
+// because those require additional bounds that create complex trait resolution.
+// Use manual implementation for dialects with Region fields for now.
 #[derive(Clone, Debug, PartialEq, Dialect)]
 #[kirin(fn, type_lattice = SimpleTypeLattice)]
 pub enum SimpleLanguage {
@@ -206,8 +211,11 @@ pub enum SimpleLanguage {
 }
 
 // Manual PrettyPrint implementation for SimpleLanguage since we have Region fields
-impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
-    fn pretty_print<'a>(&self, doc: &'a Document<'a, SimpleLanguage>) -> ArenaDoc<'a> {
+impl kirin::pretty::PrettyPrint<SimpleLanguage> for SimpleLanguage {
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a Document<'a, SimpleLanguage>,
+    ) -> ArenaDoc<'a> {
         match self {
             SimpleLanguage::Add(lhs, rhs, _) => {
                 doc.text(format!("add {}, {}", *lhs, *rhs))
@@ -226,12 +234,39 @@ impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
     }
 }
 
-// Note: Parsing tests for SimpleLanguage are skipped because the HasParser derive
-// doesn't support Region fields yet. See kirin-chumsky-derive/tests for parsing tests
-// with dialects that don't use Region fields.
+// A simpler dialect without Region fields for testing parse/print roundtrip
+#[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
+#[kirin(type_lattice = SimpleTypeLattice)]
+#[chumsky(crate = kirin::parsers)]
+pub enum SimpleLang {
+    #[chumsky(format = "{res:name} = add {lhs}, {rhs} -> {res:type}")]
+    Add {
+        lhs: SSAValue,
+        rhs: SSAValue,
+        #[kirin(type = SimpleTypeLattice::Float)]
+        res: ResultValue,
+    },
+    #[chumsky(format = "{res:name} = constant {value} -> {res:type}")]
+    Constant {
+        #[kirin(into)]
+        value: Value,
+        #[kirin(type = SimpleTypeLattice::Float)]
+        res: ResultValue,
+    },
+    #[kirin(terminator)]
+    #[chumsky(format = "return {arg}")]
+    Return { arg: SSAValue },
+    #[chumsky(format = "{1:name} = function {0}")]
+    Function {
+        region: Region,
+        #[kirin(type = SimpleTypeLattice::Float)]
+        res: ResultValue,
+    },
+}
 
 #[test]
 fn test_block() {
+
     let mut context: Context<SimpleLanguage> = Context::default();
     let staged_function = context
         .staged_function()
@@ -268,12 +303,151 @@ fn test_block() {
     // Pretty print the function
     let mut doc = Document::new(Default::default(), &context);
     let result = doc.render(f).unwrap();
-    
+
     // Verify the output contains expected elements
     assert!(result.contains("function"));
     assert!(result.contains("constant"));
     assert!(result.contains("add"));
     assert!(result.contains("return"));
+}
+
+// ============================================================================
+// Roundtrip Tests
+// ============================================================================
+
+use kirin::parsers::{parse_ast, EmitContext, EmitIR};
+use kirin::pretty::Config;
+
+/// Test roundtrip: parse -> emit -> print should produce output matching input.
+#[test]
+fn test_roundtrip_add() {
+
+    let mut context: Context<SimpleLang> = Context::default();
+
+    // Create operand SSAs with types
+    let ssa_a = context
+        .ssa()
+        .name("a".to_string())
+        .ty(Int)
+        .kind(SSAKind::Test)
+        .new();
+    let ssa_b = context
+        .ssa()
+        .name("b".to_string())
+        .ty(Int)
+        .kind(SSAKind::Test)
+        .new();
+
+    // Parse - type annotation in input
+    let input = "%res = add %a, %b -> float";
+    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+
+    // Emit to get the dialect variant
+    let mut emit_ctx = EmitContext::new(&mut context);
+    emit_ctx.register_ssa("a".to_string(), ssa_a);
+    emit_ctx.register_ssa("b".to_string(), ssa_b);
+
+    let statement = ast.emit(&mut emit_ctx);
+    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let dialect = stmt_info.definition();
+
+    // Verify the result has the correct type by checking the SSA
+    if let SimpleLang::Add { res, .. } = dialect {
+        let res_ssa: kirin_ir::SSAValue = (*res).into();
+        let res_info = res_ssa.get_info(&context).expect("result SSA should exist");
+        assert_eq!(
+            res_info.ty(),
+            &SimpleTypeLattice::Float,
+            "Result type should be Float"
+        );
+    }
+
+    // Pretty print directly using the trait
+    let config = Config::default();
+    let doc = Document::new(config, &context);
+    let arena_doc = dialect.pretty_print(&doc);
+    let mut output = String::new();
+    arena_doc.render_fmt(80, &mut output).expect("render failed");
+
+    // Compare (trim whitespace)
+    assert_eq!(output.trim(), input);
+}
+
+/// Test roundtrip for constant instruction.
+#[test]
+fn test_roundtrip_constant() {
+    use kirin::pretty::PrettyPrint as _;
+
+    let mut context: Context<SimpleLang> = Context::default();
+
+    // Parse - type annotation in input
+    let input = "%x = constant 42 -> float";
+    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+
+    // Emit
+    let mut emit_ctx = EmitContext::new(&mut context);
+    let statement = ast.emit(&mut emit_ctx);
+    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let dialect = stmt_info.definition();
+
+    // Verify the result has the correct type
+    if let SimpleLang::Constant { res, .. } = dialect {
+        let res_ssa: kirin_ir::SSAValue = (*res).into();
+        let res_info = res_ssa.get_info(&context).expect("result SSA should exist");
+        assert_eq!(
+            res_info.ty(),
+            &SimpleTypeLattice::Float,
+            "Result type should be Float"
+        );
+    }
+
+    // Pretty print
+    let config = Config::default();
+    let doc = Document::new(config, &context);
+    let arena_doc = dialect.pretty_print(&doc);
+    let mut output = String::new();
+    arena_doc.render_fmt(80, &mut output).expect("render failed");
+
+    // Compare
+    assert_eq!(output.trim(), input);
+}
+
+/// Test roundtrip for return instruction.
+#[test]
+fn test_roundtrip_return() {
+    use kirin::pretty::PrettyPrint as _;
+
+    let mut context: Context<SimpleLang> = Context::default();
+
+    // Create operand SSA
+    let ssa_v = context
+        .ssa()
+        .name("v".to_string())
+        .ty(Int)
+        .kind(SSAKind::Test)
+        .new();
+
+    // Parse
+    let input = "return %v";
+    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+
+    // Emit
+    let mut emit_ctx = EmitContext::new(&mut context);
+    emit_ctx.register_ssa("v".to_string(), ssa_v);
+
+    let statement = ast.emit(&mut emit_ctx);
+    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let dialect = stmt_info.definition();
+
+    // Pretty print
+    let config = Config::default();
+    let doc = Document::new(config, &context);
+    let arena_doc = dialect.pretty_print(&doc);
+    let mut output = String::new();
+    arena_doc.render_fmt(80, &mut output).expect("render failed");
+
+    // Compare
+    assert_eq!(output.trim(), input);
 }
 
 /// Strip trailing whitespace in each line of the input string.

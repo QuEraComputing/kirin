@@ -1,13 +1,5 @@
 //! Tests for Block and Region field parsing.
-//!
-//! TODO: These tests are currently disabled because the EmitIR generation (part of
-//! HasParser derive) has complex bounds when Block/Region fields are present.
-//! The generated EmitIR impl requires `<Language as HasRecursiveParser>::Output: EmitIR<Language>`
-//! which creates a self-referential constraint. Fix this by adding the bound explicitly
-//! to generated impls for dialects with Block/Region fields.
 
-// Temporarily disabled - uncomment when EmitIR bounds issue is fixed
-/*
 mod common;
 
 use common::SimpleType;
@@ -34,5 +26,36 @@ pub enum BlockRegionLang {
     Ret(SSAValue),
 }
 
-// All tests disabled
-*/
+#[test]
+fn test_parse_loop_with_block() {
+    let input = r#"
+        %r = loop ^entry(%x: i32) {
+            ret %x;
+        }
+    "#;
+
+    let result = parse_ast::<BlockRegionLang>(input);
+    assert!(
+        result.is_ok(),
+        "Failed to parse loop with block: {:?}",
+        result
+    );
+}
+
+#[test]
+fn test_parse_scope_with_region() {
+    let input = r#"
+        %r = scope {
+            ^entry(%x: i32) {
+                ret %x;
+            }
+        }
+    "#;
+
+    let result = parse_ast::<BlockRegionLang>(input);
+    assert!(
+        result.is_ok(),
+        "Failed to parse scope with region: {:?}",
+        result
+    );
+}

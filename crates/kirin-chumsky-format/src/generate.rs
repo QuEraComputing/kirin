@@ -7,5 +7,5 @@ mod pretty_print;
 
 pub use self::ast::GenerateAST;
 pub use self::emit_ir::GenerateEmitIR;
-pub use self::parser::GenerateHasRecursiveParser;
+pub use self::parser::GenerateHasDialectParser;
 pub use self::pretty_print::GeneratePrettyPrint;

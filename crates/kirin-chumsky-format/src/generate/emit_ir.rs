@@ -10,6 +10,7 @@ use crate::ChumskyLayout;
 /// Generator for the `EmitIR` trait implementation.
 pub struct GenerateEmitIR {
     crate_path: syn::Path,
+    type_lattice: syn::Path,
 }
 
 impl GenerateEmitIR {
@@ -21,7 +22,11 @@ impl GenerateEmitIR {
             .clone()
             .or(ir_input.attrs.crate_path.clone())
             .unwrap_or_else(|| syn::parse_quote!(::kirin_chumsky));
-        Self { crate_path }
+        let type_lattice = ir_input.attrs.type_lattice.clone();
+        Self {
+            crate_path,
+            type_lattice,
+        }
     }
 
     /// Generates the `EmitIR` implementation.
@@ -65,14 +70,19 @@ impl GenerateEmitIR {
             }
         };
 
+        let type_lattice = &self.type_lattice;
+
         // IR type parameter for the EmitIR impl
-        // We need `Dialect + From<OriginalType>` to convert the AST to IR statements
-        // We also need `TypeLattice: HasParser` because the AST type requires it
+        // We need:
+        // - `From<OriginalType>` to convert the AST to IR statements
+        // - TypeAST (= <type_lattice as HasParser>::Output) must implement EmitIR to convert
+        //   parsed type annotations to TypeLattice
+        // - The TypeLatticeEmit bound on HasParser::Output provides EmitIR when Output = TypeLattice
         quote! {
             impl #impl_generics #crate_path::EmitIR<Language> for #ast_name #ty_generics
             where
                 Language: ::kirin_ir::Dialect + From<#original_name #original_ty_generics>,
-                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output: #crate_path::EmitIR<Language, Output = <Language as ::kirin_ir::Dialect>::TypeLattice>,
             {
                 type Output = ::kirin_ir::Statement;
 
@@ -229,9 +239,11 @@ impl GenerateEmitIR {
             })
             .collect();
 
+        // Add handler for __Marker variant (uninhabited, so unreachable)
         quote! {
             match self {
                 #(#arms)*
+                #ast_name::__Marker(_, unreachable) => match *unreachable {},
             }
         }
     }

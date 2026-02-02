@@ -14,6 +14,7 @@ use crate::generics::GenericsBuilder;
 /// before it's converted to IR.
 pub struct GenerateAST {
     crate_path: syn::Path,
+    type_lattice: syn::Path,
 }
 
 impl GenerateAST {
@@ -25,7 +26,11 @@ impl GenerateAST {
             .clone()
             .or(ir_input.attrs.crate_path.clone())
             .unwrap_or_else(|| syn::parse_quote!(::kirin_chumsky));
-        Self { crate_path }
+        let type_lattice = ir_input.attrs.type_lattice.clone();
+        Self {
+            crate_path,
+            type_lattice,
+        }
     }
 
     /// Generates the AST type definition with Debug, Clone, and PartialEq impls.
@@ -55,45 +60,53 @@ impl GenerateAST {
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
     ) -> TokenStream {
-        let crate_path = &self.crate_path;
         let (_, ty_generics, _) = ast_generics.split_for_impl();
 
+        // We use PhantomData to make the 'tokens lifetime and Language type parameter used.
+        // Using fn() -> (&'tokens (), Language) makes them covariant and doesn't require Clone/Debug/etc.
+        let phantom = quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), Language)> };
+
+        // AST types only need `Language: Dialect` bound.
+        // Field types use the concrete type_lattice directly (not the associated type).
+        // Block/Region fields use the concrete AST type name to avoid circular trait bounds.
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
-                let fields = self.generate_struct_fields(&data.0, true);
+                let fields = self.generate_struct_fields(&data.0, true, ast_name);
                 let is_tuple = data.0.is_tuple_style();
 
                 if is_tuple {
                     quote! {
                         pub struct #ast_name #ty_generics
                         where
-                            Language: #crate_path::LanguageParser<'tokens, 'src>,
-                            <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                            Language: ::kirin_ir::Dialect,
                         (
-                            #fields
+                            #fields,
+                            #phantom,
                         );
                     }
                 } else {
                     quote! {
                         pub struct #ast_name #ty_generics
                         where
-                            Language: #crate_path::LanguageParser<'tokens, 'src>,
-                            <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                            Language: ::kirin_ir::Dialect,
                         {
                             #fields
+                            #[doc(hidden)]
+                            _marker: #phantom,
                         }
                     }
                 }
             }
             kirin_derive_core::ir::Data::Enum(data) => {
-                let variants = self.generate_enum_variants(data);
+                let variants = self.generate_enum_variants(data, ast_name);
                 quote! {
                     pub enum #ast_name #ty_generics
                     where
-                        Language: #crate_path::LanguageParser<'tokens, 'src>,
-                        <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                        Language: ::kirin_ir::Dialect,
                     {
                         #variants
+                        #[doc(hidden)]
+                        __Marker(#phantom, ::core::convert::Infallible),
                     }
                 }
             }
@@ -106,7 +119,6 @@ impl GenerateAST {
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
     ) -> TokenStream {
-        let crate_path = &self.crate_path;
         let (impl_generics, ty_generics, _) = ast_generics.split_for_impl();
 
         // Generate Debug impl
@@ -121,8 +133,7 @@ impl GenerateAST {
         quote! {
             impl #impl_generics ::core::fmt::Debug for #ast_name #ty_generics
             where
-                Language: #crate_path::LanguageParser<'tokens, 'src>,
-                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                Language: ::kirin_ir::Dialect,
             {
                 fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                     #debug_impl
@@ -131,8 +142,7 @@ impl GenerateAST {
 
             impl #impl_generics ::core::clone::Clone for #ast_name #ty_generics
             where
-                Language: #crate_path::LanguageParser<'tokens, 'src>,
-                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                Language: ::kirin_ir::Dialect,
             {
                 fn clone(&self) -> Self {
                     #clone_impl
@@ -141,8 +151,7 @@ impl GenerateAST {
 
             impl #impl_generics ::core::cmp::PartialEq for #ast_name #ty_generics
             where
-                Language: #crate_path::LanguageParser<'tokens, 'src>,
-                <Language as ::kirin_ir::Dialect>::TypeLattice: #crate_path::HasParser<'tokens, 'src>,
+                Language: ::kirin_ir::Dialect,
             {
                 fn eq(&self, other: &Self) -> bool {
                     #partialeq_impl
@@ -164,7 +173,8 @@ impl GenerateAST {
                 let fields = &bindings.field_idents;
 
                 let (pattern, debug_fields) = if bindings.is_tuple {
-                    let pattern = quote! { Self(#(#fields),*) };
+                    // Include _marker PhantomData at the end, ignored with _
+                    let pattern = quote! { Self(#(#fields,)* _) };
                     let debug = fields.iter().fold(
                         quote! { f.debug_tuple(#name) },
                         |acc, field| quote! { #acc.field(&#field) },
@@ -177,7 +187,8 @@ impl GenerateAST {
                         .zip(fields)
                         .map(|(f, b)| quote! { #f: #b })
                         .collect();
-                    let pattern = quote! { Self { #(#pat),* } };
+                    // Include _marker field, ignored with ..
+                    let pattern = quote! { Self { #(#pat,)* .. } };
                     let debug =
                         orig_fields
                             .iter()
@@ -235,9 +246,11 @@ impl GenerateAST {
                     })
                     .collect();
 
+                // The __Marker variant is uninhabited (contains Infallible), so this is unreachable
                 quote! {
                     match self {
-                        #(#arms),*
+                        #(#arms,)*
+                        Self::__Marker(_, unreachable) => match *unreachable {},
                     }
                 }
             }
@@ -256,9 +269,10 @@ impl GenerateAST {
                 let fields = &bindings.field_idents;
 
                 let (pattern, cloned) = if bindings.is_tuple {
+                    // Include _marker PhantomData at the end
                     (
-                        quote! { Self(#(#fields),*) },
-                        quote! { Self(#(#fields.clone()),*) },
+                        quote! { Self(#(#fields,)* _) },
+                        quote! { Self(#(#fields.clone(),)* ::core::marker::PhantomData) },
                     )
                 } else {
                     let orig_fields = &bindings.original_field_names;
@@ -272,9 +286,10 @@ impl GenerateAST {
                         .zip(fields)
                         .map(|(f, b)| quote! { #f: #b.clone() })
                         .collect();
+                    // Include _marker field
                     (
-                        quote! { Self { #(#pat),* } },
-                        quote! { Self { #(#clones),* } },
+                        quote! { Self { #(#pat,)* .. } },
+                        quote! { Self { #(#clones,)* _marker: ::core::marker::PhantomData } },
                     )
                 };
 
@@ -321,9 +336,11 @@ impl GenerateAST {
                     })
                     .collect();
 
+                // The __Marker variant is uninhabited (contains Infallible), so this is unreachable
                 quote! {
                     match self {
-                        #(#arms),*
+                        #(#arms,)*
+                        Self::__Marker(_, unreachable) => match *unreachable {},
                     }
                 }
             }
@@ -348,9 +365,10 @@ impl GenerateAST {
                     });
 
                 let (self_pattern, other_pattern) = if self_bindings.is_tuple {
+                    // Include _marker PhantomData at the end, ignored with _
                     (
-                        quote! { Self(#(#self_fields),*) },
-                        quote! { Self(#(#other_fields),*) },
+                        quote! { Self(#(#self_fields,)* _) },
+                        quote! { Self(#(#other_fields,)* _) },
                     )
                 } else {
                     let orig_fields = &self_bindings.original_field_names;
@@ -364,9 +382,10 @@ impl GenerateAST {
                         .zip(other_fields)
                         .map(|(f, o)| quote! { #f: #o })
                         .collect();
+                    // Include _marker field, ignored with ..
                     (
-                        quote! { Self { #(#self_pat),* } },
-                        quote! { Self { #(#other_pat),* } },
+                        quote! { Self { #(#self_pat,)* .. } },
+                        quote! { Self { #(#other_pat,)* .. } },
                     )
                 };
 
@@ -440,6 +459,7 @@ impl GenerateAST {
         &self,
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         with_pub: bool,
+        ast_name: &syn::Ident,
     ) -> TokenStream {
         let mut collected = collect_fields(stmt);
         let is_tuple = stmt.is_tuple_style();
@@ -453,7 +473,7 @@ impl GenerateAST {
         let mut fields = Vec::new();
 
         for field in &collected {
-            let ty = self.field_ast_type(&field.collection, &field.kind);
+            let ty = self.field_ast_type(&field.collection, &field.kind, ast_name);
             if let Some(ident) = &field.ident {
                 if with_pub {
                     fields.push(quote! { pub #ident: #ty });
@@ -477,6 +497,7 @@ impl GenerateAST {
     fn generate_enum_variants(
         &self,
         data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
+        ast_name: &syn::Ident,
     ) -> TokenStream {
         let variants: Vec<TokenStream> = data
             .variants
@@ -495,7 +516,7 @@ impl GenerateAST {
                 }
 
                 // For enum variants, don't use `pub`
-                let fields = self.generate_struct_fields(variant, false);
+                let fields = self.generate_struct_fields(variant, false, ast_name);
                 let is_tuple = variant.is_tuple_style();
 
                 if is_tuple {
@@ -513,8 +534,9 @@ impl GenerateAST {
         &self,
         collection: &kirin_derive_core::ir::fields::Collection,
         kind: &FieldKind,
+        ast_name: &syn::Ident,
     ) -> TokenStream {
-        let base = kind.ast_type(&self.crate_path);
+        let base = kind.ast_type(&self.crate_path, ast_name, &self.type_lattice);
         collection.wrap_type(base)
     }
 }

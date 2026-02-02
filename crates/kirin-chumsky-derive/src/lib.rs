@@ -86,7 +86,7 @@ pub fn derive_has_parser(input: TokenStream) -> TokenStream {
         };
 
     let ast_generator = kirin_chumsky_format::GenerateAST::new(&ir_input);
-    let parser_generator = kirin_chumsky_format::GenerateHasRecursiveParser::new(&ir_input);
+    let parser_generator = kirin_chumsky_format::GenerateHasDialectParser::new(&ir_input);
     let emit_generator = kirin_chumsky_format::GenerateEmitIR::new(&ir_input);
 
     let ast_tokens = ast_generator.generate(&ir_input);

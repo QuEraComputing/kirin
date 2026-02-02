@@ -901,8 +901,10 @@ dependencies = [
 name = "kirin"
 version = "0.1.0"
 dependencies = [
+ "chumsky",
  "kirin-chumsky",
  "kirin-ir",
+ "kirin-lexer",
  "kirin-prettyless",
  "serde",
 ]

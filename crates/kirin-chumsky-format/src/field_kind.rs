@@ -50,32 +50,36 @@ impl FieldKind {
     /// Generates the AST type for this field kind.
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    pub fn ast_type(&self, crate_path: &syn::Path) -> TokenStream {
-        // Type alias for the parsed type output
-        let type_output = quote! { <
-            <Language as ::kirin_ir::Dialect>::TypeLattice as #crate_path::HasParser<'tokens, 'src>
-        >::Output };
-        // Type alias for the parsed statement output
-        let stmt_output = quote! { <
-            Language as #crate_path::HasRecursiveParser<'tokens, 'src, Language>
-        >::Output };
+    /// The `ast_name` is the name of the AST type (e.g., `TestLangAST`) used for Block/Region statements.
+    /// The `type_lattice` is the type lattice path (e.g., `SimpleType`) used for type annotations.
+    pub fn ast_type(
+        &self,
+        crate_path: &syn::Path,
+        ast_name: &syn::Ident,
+        type_lattice: &syn::Path,
+    ) -> TokenStream {
+        // Use <type_lattice as HasParser>::Output for type annotations.
+        // This matches the TypeAST definition in HasDialectParser impl.
+        // For Block/Region, use the concrete AST type to avoid circular trait bounds.
+        let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let stmt_output = quote! { #ast_name<'tokens, 'src, Language> };
 
         match self {
             FieldKind::SSAValue => {
-                quote! { #crate_path::SSAValue<'src, #type_output> }
+                quote! { #crate_path::SSAValue<'src, #type_ast> }
             }
             FieldKind::ResultValue => {
-                quote! { #crate_path::ResultValue<'src, #type_output> }
+                quote! { #crate_path::ResultValue<'src, #type_ast> }
             }
             FieldKind::Block => {
                 // Block parser returns Spanned<Block>, so we need Spanned wrapper
-                quote! { #crate_path::Spanned<#crate_path::Block<'src, #type_output, #stmt_output>> }
+                quote! { #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #stmt_output>> }
             }
             FieldKind::Successor => {
                 quote! { #crate_path::BlockLabel<'src> }
             }
             FieldKind::Region => {
-                quote! { #crate_path::Region<'src, #type_output, #stmt_output> }
+                quote! { #crate_path::Region<'src, #type_ast, #stmt_output> }
             }
             FieldKind::Value(ty) => {
                 quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
@@ -91,28 +95,57 @@ impl FieldKind {
     /// - `Type`: type-only parser
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    pub fn parser_expr(&self, crate_path: &syn::Path, opt: &FormatOption) -> TokenStream {
+    /// The `dialect_type` should be the dialect type (e.g., `TestLang`) being parsed.
+    /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) for Block/Region field transmutation.
+    /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
+    pub fn parser_expr(
+        &self,
+        crate_path: &syn::Path,
+        opt: &FormatOption,
+        dialect_type: &TokenStream,
+        ast_name: &syn::Ident,
+        type_lattice: &syn::Path,
+    ) -> TokenStream {
         match self {
             FieldKind::SSAValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
-                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, Language>() },
-                FormatOption::Default => quote! { #crate_path::ssa_value::<_, Language>() },
+                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() },
+                FormatOption::Default => quote! { #crate_path::ssa_value::<_, #dialect_type, #type_lattice>() },
             },
             FieldKind::ResultValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
-                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, Language>() },
+                FormatOption::Type => quote! { #crate_path::typeof_ssa::<_, #dialect_type, #type_lattice>() },
                 FormatOption::Default => {
-                    quote! { #crate_path::result_value_with_optional_type::<_, Language>() }
+                    quote! { #crate_path::result_value_with_optional_type::<_, #dialect_type, #type_lattice>() }
                 }
             },
             FieldKind::Block => {
-                quote! { #crate_path::block::<_, Language>(language.clone()) }
+                // The parser returns Block<T, Output> where T = type_lattice.
+                // We only need to transmute the StmtOutput since Output = ASTName.
+                quote! {
+                    #crate_path::block::<_, #dialect_type, #type_lattice>(language.clone())
+                        .map(|b| unsafe {
+                            ::core::mem::transmute::<
+                                #crate_path::Spanned<#crate_path::Block<'src, #type_lattice, <#dialect_type as #crate_path::HasDialectParser<'tokens, 'src, #dialect_type>>::Output>>,
+                                #crate_path::Spanned<#crate_path::Block<'src, #type_lattice, #ast_name<'tokens, 'src, #dialect_type>>>
+                            >(b)
+                        })
+                }
             }
             FieldKind::Successor => {
                 quote! { #crate_path::block_label() }
             }
             FieldKind::Region => {
-                quote! { #crate_path::region::<_, Language>(language.clone()) }
+                // Same as Block - only transmute StmtOutput
+                quote! {
+                    #crate_path::region::<_, #dialect_type, #type_lattice>(language.clone())
+                        .map(|r| unsafe {
+                            ::core::mem::transmute::<
+                                #crate_path::Region<'src, #type_lattice, <#dialect_type as #crate_path::HasDialectParser<'tokens, 'src, #dialect_type>>::Output>,
+                                #crate_path::Region<'src, #type_lattice, #ast_name<'tokens, 'src, #dialect_type>>
+                            >(r)
+                        })
+                }
             }
             FieldKind::Value(ty) => {
                 quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::parser() }
