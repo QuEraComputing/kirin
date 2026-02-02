@@ -1,4 +1,8 @@
-use std::{borrow::Cow, ops::Deref};
+use std::{
+    borrow::Cow,
+    io::{Write, stdout},
+    ops::Deref,
+};
 
 use kirin_ir::*;
 use prettyless::{Arena, DocBuilder};
@@ -100,7 +104,7 @@ impl<'a, L: Dialect> Document<'a, L> {
         doc
     }
 
-    fn build<N>(&'a mut self, node: N) -> ArenaDoc<'a>
+    fn build<N>(&'a mut self, node: &N) -> ArenaDoc<'a>
     where
         N: ScanResultWidth<L> + PrettyPrint<L>,
     {
@@ -108,7 +112,7 @@ impl<'a, L: Dialect> Document<'a, L> {
         node.pretty_print(self)
     }
 
-    pub fn render<N>(&'a mut self, node: N) -> Result<String, std::fmt::Error>
+    pub fn render<N>(&'a mut self, node: &N) -> Result<String, std::fmt::Error>
     where
         N: ScanResultWidth<L> + PrettyPrint<L>,
     {
@@ -140,8 +144,108 @@ impl<'a, L: Dialect> Deref for Document<'a, L> {
     }
 }
 
+/// Core trait for pretty printing values to a document.
+///
+/// This trait defines how a type should be rendered to a document representation.
+/// For IR nodes that require context (like `Statement`, `Block`, `Region`), use
+/// the convenience methods provided by the `PrettyPrintExt` trait instead.
 pub trait PrettyPrint<L: Dialect> {
     fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>;
+}
+
+/// Extension trait providing convenience methods for pretty printing IR nodes.
+///
+/// This trait is automatically implemented for any type that implements both
+/// `PrettyPrint<L>` and `ScanResultWidth<L>`. All methods require a `&Context<L>`
+/// parameter since IR nodes (like `Statement`, `Block`, `Region`, etc.) need to
+/// look up their data from the context.
+///
+/// # Example
+/// ```ignore
+/// use kirin::pretty::{Config, PrettyPrintExt};
+///
+/// // Render to string with custom config
+/// let output = statement.sprint_with_config(config, &context);
+///
+/// // Render to string with default config
+/// let output = statement.sprint(&context);
+/// ```
+pub trait PrettyPrintExt<L: Dialect>: PrettyPrint<L> + ScanResultWidth<L> {
+    /// Render to string with custom config.
+    fn sprint_with_config(&self, config: Config, context: &Context<L>) -> String;
+
+    /// Render to string with default config.
+    fn sprint(&self, context: &Context<L>) -> String;
+
+    /// Write to writer with custom config.
+    fn write_with_config(&self, writer: &mut impl Write, config: Config, context: &Context<L>);
+
+    /// Write to writer with default config.
+    fn write(&self, writer: &mut impl Write, context: &Context<L>);
+
+    /// Print to stdout with custom config.
+    fn print_with_config(&self, config: Config, context: &Context<L>);
+
+    /// Print to stdout with default config.
+    fn print(&self, context: &Context<L>);
+
+    /// Display with bat pager with custom config.
+    #[cfg(feature = "bat")]
+    fn bat_with_config(&self, config: Config, context: &Context<L>);
+
+    /// Display with bat pager with default config.
+    #[cfg(feature = "bat")]
+    fn bat(&self, context: &Context<L>);
+}
+
+// Blanket implementation: any type that implements PrettyPrint<L> + ScanResultWidth<L>
+// automatically gets the context-aware convenience methods.
+impl<L: Dialect, T: PrettyPrint<L> + ScanResultWidth<L>> PrettyPrintExt<L> for T {
+    fn sprint_with_config(&self, config: Config, context: &Context<L>) -> String {
+        let mut doc = Document::new(config, context);
+        doc.render(self).expect("render failed")
+    }
+
+    fn sprint(&self, context: &Context<L>) -> String {
+        let mut doc = Document::new(Config::default(), context);
+        doc.render(self).expect("render failed")
+    }
+
+    fn write_with_config(&self, writer: &mut impl Write, config: Config, context: &Context<L>) {
+        let mut doc = Document::new(config, context);
+        let output = doc.render(self).expect("render failed");
+        writer.write_all(output.as_bytes()).expect("write failed");
+    }
+
+    fn write(&self, writer: &mut impl Write, context: &Context<L>) {
+        let mut doc = Document::new(Config::default(), context);
+        let output = doc.render(self).expect("render failed");
+        writer.write_all(output.as_bytes()).expect("write failed");
+    }
+
+    fn print_with_config(&self, config: Config, context: &Context<L>) {
+        let mut doc = Document::new(config, context);
+        let output = doc.render(self).expect("render failed");
+        stdout().write_all(output.as_bytes()).expect("write failed");
+    }
+
+    fn print(&self, context: &Context<L>) {
+        let mut doc = Document::new(Config::default(), context);
+        let output = doc.render(self).expect("render failed");
+        stdout().write_all(output.as_bytes()).expect("write failed");
+    }
+
+    #[cfg(feature = "bat")]
+    fn bat_with_config(&self, config: Config, context: &Context<L>) {
+        let mut doc = Document::new(config, context);
+        doc.pager(self).expect("pager failed");
+    }
+
+    #[cfg(feature = "bat")]
+    fn bat(&self, context: &Context<L>) {
+        let mut doc = Document::new(Config::default(), context);
+        doc.pager(self).expect("pager failed");
+    }
 }
 
 pub trait ScanResultWidth<L: Dialect> {
@@ -211,6 +315,25 @@ impl<L: Dialect> ScanResultWidth<L> for StagedFunction {
             let body = specialization.body();
             body.scan_result_width(doc);
         }
+    }
+}
+
+// Leaf IR nodes - no nested statements to scan
+impl<L: Dialect> ScanResultWidth<L> for SSAValue {
+    fn scan_result_width(&self, _doc: &mut Document<'_, L>) {
+        // SSAValue is a leaf node with no nested statements
+    }
+}
+
+impl<L: Dialect> ScanResultWidth<L> for ResultValue {
+    fn scan_result_width(&self, _doc: &mut Document<'_, L>) {
+        // ResultValue is a leaf node with no nested statements
+    }
+}
+
+impl<L: Dialect> ScanResultWidth<L> for Successor {
+    fn scan_result_width(&self, _doc: &mut Document<'_, L>) {
+        // Successor is a leaf node with no nested statements
     }
 }
 

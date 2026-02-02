@@ -63,5 +63,5 @@ fn test_block() {
     let fdef = SimpleLanguage::op_function(&mut context, body);
     let f = context.specialize().f(staged_function).body(fdef).new();
     let mut doc = Document::new(Default::default(), &context);
-    insta::assert_snapshot!(doc.render(f).unwrap());
+    insta::assert_snapshot!(doc.render(&f).unwrap());
 }

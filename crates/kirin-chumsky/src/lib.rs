@@ -63,7 +63,7 @@ pub mod prelude {
     pub use kirin_prettyless::PrettyPrint;
 
     #[cfg(feature = "derive")]
-    pub use kirin_chumsky_derive::{HasParser, PrettyPrint as DerivePrettyPrint};
+    pub use kirin_chumsky_derive::{HasParser, PrettyPrint};
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@ use kirin::ir::*;
 use kirin::parsers::Token;
 use kirin::parsers::chumsky::prelude::*;
 use kirin::parsers::{BoxedParser, HasParser, PrettyPrint, TokenInput};
-use kirin::pretty::{ArenaDoc, DocAllocator, Document, PrettyPrintName, PrettyPrintType};
+use kirin::pretty::{ArenaDoc, DocAllocator, Document, PrettyPrintExt, PrettyPrintName, PrettyPrintType};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum SimpleTypeLattice {
@@ -254,7 +254,7 @@ fn test_block() {
 
     // Pretty print the function
     let mut doc = Document::new(Default::default(), &context);
-    let result = doc.render(f).unwrap();
+    let result = doc.render(&f).unwrap();
     println!("{}", result);
     // Verify the output contains expected elements
     assert!(result.contains("function"));
@@ -447,7 +447,7 @@ fn test_roundtrip_function() {
 
     // Pretty print using Document::render()
     let mut doc = Document::new(Config::default(), &context);
-    let output = doc.render(statement).expect("render failed");
+    let output = doc.render(&statement).expect("render failed");
 
     // Verify key structural elements are present
     assert!(
@@ -493,8 +493,7 @@ fn test_roundtrip_function_multiple_blocks() {
         tab_spaces: 4,
         ..Default::default()
     };
-    let mut doc = Document::new(config, &context);
-    let output = doc.render(statement).expect("render failed");
+    let output = statement.sprint_with_config(config, &context);
     println!("{}", output);
     // Note: output has a trailing newline from pretty printer
     assert_eq!(output.trim_end(), input);

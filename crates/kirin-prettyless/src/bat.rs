@@ -3,7 +3,7 @@ use bat::PrettyPrinter;
 use kirin_ir::*;
 
 impl<'a, L: Dialect> Document<'a, L> {
-    pub fn pager<N>(&'a mut self, node: N) -> Result<(), std::fmt::Error>
+    pub fn pager<N>(&'a mut self, node: &N) -> Result<(), std::fmt::Error>
     where
         N: ScanResultWidth<L> + PrettyPrint<L>,
     {
