@@ -8,7 +8,7 @@ use quote::quote;
 use crate::ChumskyLayout;
 use crate::field_kind::{CollectedField, FieldKind, collect_fields};
 
-use super::{GeneratorConfig, collect_all_value_types_needing_bounds, generate_enum_match, get_fields_in_format};
+use super::{GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields, generate_enum_match, get_fields_in_format};
 
 /// Generator for the `EmitIR` trait implementation.
 pub struct GenerateEmitIR {
@@ -122,49 +122,77 @@ impl GenerateEmitIR {
     ) -> TokenStream {
         let collected = collect_fields(stmt);
         let fields_in_fmt = get_fields_in_format(ir_input, stmt);
+        let ast_fields = filter_ast_fields(&collected, &fields_in_fmt);
 
-        // Filter to only fields that are in the AST (in format or required)
-        let ast_fields: Vec<_> = collected
-            .iter()
-            .filter(|f| fields_in_fmt.contains(&f.index) || f.default.is_none())
-            .collect();
+        let (pattern, emit_calls, constructor) = self.build_emit_components(
+            ir_input,
+            stmt,
+            original_name,
+            variant_name,
+            &collected,
+            &ast_fields,
+            &fields_in_fmt,
+            true, // is_struct (use Self pattern)
+        );
 
-        // Generate field bindings only for AST fields
+        quote! {
+            let #pattern = self;
+            #emit_calls
+            let dialect_variant: #original_name #original_ty_generics = #constructor;
+            ctx.context.statement().definition(dialect_variant).new()
+        }
+    }
+
+    /// Builds the pattern, emit calls, and constructor for a statement.
+    ///
+    /// This is shared between struct and variant emit generation.
+    fn build_emit_components(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+        original_name: &syn::Ident,
+        variant_name: Option<&syn::Ident>,
+        collected: &[CollectedField],
+        ast_fields: &[&CollectedField],
+        fields_in_fmt: &std::collections::HashSet<usize>,
+        is_struct: bool,
+    ) -> (TokenStream, TokenStream, TokenStream) {
         let is_tuple = stmt.is_tuple_style();
 
-        let (pattern, emit_calls, constructor) = if is_tuple {
-            // For tuple fields, we need to handle the pattern carefully
-            // AST only contains fields that are in format or don't have defaults
-            let mut sorted_ast_fields = ast_fields.clone();
+        if is_tuple {
+            let mut sorted_ast_fields: Vec<_> = ast_fields.to_vec();
             sorted_ast_fields.sort_by_key(|f| f.index);
 
             let field_vars: Vec<_> = sorted_ast_fields
                 .iter()
-                .map(|f| {
-                    syn::Ident::new(&format!("f{}", f.index), proc_macro2::Span::call_site())
-                })
+                .map(|f| syn::Ident::new(&format!("f{}", f.index), proc_macro2::Span::call_site()))
                 .collect();
 
-            let pattern = quote! { Self(#(#field_vars),*) };
+            let pattern = if is_struct {
+                quote! { Self(#(#field_vars),*) }
+            } else {
+                quote! { #(#field_vars),* }
+            };
 
-            // Generate emit calls for AST fields
-            let emit_calls =
-                self.generate_field_emit_calls(&sorted_ast_fields, &field_vars, &ir_input.generics, true);
+            let emit_calls = self.generate_field_emit_calls(
+                &sorted_ast_fields,
+                &field_vars,
+                &ir_input.generics,
+                true,
+            );
 
-            // Generate dialect constructor using all fields (AST + defaults)
             let constructor = self.generate_dialect_constructor_with_defaults(
                 original_name,
                 variant_name,
-                &collected,
+                collected,
                 &sorted_ast_fields,
                 &field_vars,
-                &fields_in_fmt,
+                fields_in_fmt,
                 true,
             );
 
             (pattern, emit_calls, constructor)
         } else {
-            // For named fields, bind only AST fields
             let field_vars: Vec<_> = ast_fields
                 .iter()
                 .map(|f| {
@@ -181,31 +209,28 @@ impl GenerateEmitIR {
                     quote! { #orig: #b }
                 })
                 .collect();
-            // Use `..` to ignore the hidden `_marker` field in the AST
-            let pattern = quote! { Self { #(#pat,)* .. } };
 
-            // Generate emit calls for AST fields
-            let emit_calls = self.generate_field_emit_calls(&ast_fields, &field_vars, &ir_input.generics, false);
+            let pattern = if is_struct {
+                // Use `..` to ignore the hidden `_marker` field in the AST
+                quote! { Self { #(#pat,)* .. } }
+            } else {
+                quote! { #(#pat),* }
+            };
 
-            // Generate dialect constructor using all fields (AST + defaults)
+            let emit_calls =
+                self.generate_field_emit_calls(ast_fields, &field_vars, &ir_input.generics, false);
+
             let constructor = self.generate_dialect_constructor_with_defaults(
                 original_name,
                 variant_name,
-                &collected,
-                &ast_fields,
+                collected,
+                ast_fields,
                 &field_vars,
-                &fields_in_fmt,
+                fields_in_fmt,
                 false,
             );
 
             (pattern, emit_calls, constructor)
-        };
-
-        quote! {
-            let #pattern = self;
-            #emit_calls
-            let dialect_variant: #original_name #original_ty_generics = #constructor;
-            ctx.context.statement().definition(dialect_variant).new()
         }
     }
 
@@ -255,99 +280,38 @@ impl GenerateEmitIR {
     ) -> TokenStream {
         let collected = collect_fields(variant);
         let fields_in_fmt = get_fields_in_format(ir_input, variant);
-
-        // Filter to only fields that are in the AST (in format or required)
-        let ast_fields: Vec<_> = collected
-            .iter()
-            .filter(|f| fields_in_fmt.contains(&f.index) || f.default.is_none())
-            .collect();
-
+        let ast_fields = filter_ast_fields(&collected, &fields_in_fmt);
         let is_tuple = variant.is_tuple_style();
 
-        if ast_fields.is_empty() {
-            // All fields have defaults or no fields at all
-            let constructor = self.generate_dialect_constructor_with_defaults(
-                original_name,
-                Some(variant_name),
-                &collected,
-                &[],
-                &[],
-                &fields_in_fmt,
-                is_tuple,
-            );
-            let pattern = if is_tuple {
+        let (pattern, emit_calls, constructor) = self.build_emit_components(
+            ir_input,
+            variant,
+            original_name,
+            Some(variant_name),
+            &collected,
+            &ast_fields,
+            &fields_in_fmt,
+            false, // not a struct, it's a variant
+        );
+
+        // Build the match arm pattern with the AST name
+        let full_pattern = if ast_fields.is_empty() {
+            if is_tuple {
                 quote! { #ast_name::#variant_name }
             } else {
                 quote! { #ast_name::#variant_name {} }
-            };
-            quote! {
-                #pattern => {
-                    let dialect_variant: #original_name #original_ty_generics = #constructor;
-                    ctx.context.statement().definition(dialect_variant).new()
-                }
             }
         } else if is_tuple {
-            let mut sorted_ast_fields = ast_fields.clone();
-            sorted_ast_fields.sort_by_key(|f| f.index);
-
-            let field_vars: Vec<_> = sorted_ast_fields
-                .iter()
-                .map(|f| {
-                    syn::Ident::new(&format!("f{}", f.index), proc_macro2::Span::call_site())
-                })
-                .collect();
-
-            let emit_calls =
-                self.generate_field_emit_calls(&sorted_ast_fields, &field_vars, &ir_input.generics, true);
-            let constructor = self.generate_dialect_constructor_with_defaults(
-                original_name,
-                Some(variant_name),
-                &collected,
-                &sorted_ast_fields,
-                &field_vars,
-                &fields_in_fmt,
-                true,
-            );
-            quote! {
-                #ast_name::#variant_name(#(#field_vars),*) => {
-                    #emit_calls
-                    let dialect_variant: #original_name #original_ty_generics = #constructor;
-                    ctx.context.statement().definition(dialect_variant).new()
-                }
-            }
+            quote! { #ast_name::#variant_name(#pattern) }
         } else {
-            let field_vars: Vec<_> = ast_fields
-                .iter()
-                .map(|f| {
-                    let ident = f.ident.as_ref().unwrap();
-                    syn::Ident::new(&format!("f_{}", ident), proc_macro2::Span::call_site())
-                })
-                .collect();
+            quote! { #ast_name::#variant_name { #pattern } }
+        };
 
-            let pat: Vec<_> = ast_fields
-                .iter()
-                .zip(&field_vars)
-                .map(|(f, b)| {
-                    let orig = f.ident.as_ref().unwrap();
-                    quote! { #orig: #b }
-                })
-                .collect();
-            let emit_calls = self.generate_field_emit_calls(&ast_fields, &field_vars, &ir_input.generics, false);
-            let constructor = self.generate_dialect_constructor_with_defaults(
-                original_name,
-                Some(variant_name),
-                &collected,
-                &ast_fields,
-                &field_vars,
-                &fields_in_fmt,
-                false,
-            );
-            quote! {
-                #ast_name::#variant_name { #(#pat),* } => {
-                    #emit_calls
-                    let dialect_variant: #original_name #original_ty_generics = #constructor;
-                    ctx.context.statement().definition(dialect_variant).new()
-                }
+        quote! {
+            #full_pattern => {
+                #emit_calls
+                let dialect_variant: #original_name #original_ty_generics = #constructor;
+                ctx.context.statement().definition(dialect_variant).new()
             }
         }
     }

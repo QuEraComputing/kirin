@@ -1,14 +1,14 @@
 //! Code generation for AST types corresponding to dialect definitions.
 
-use std::collections::HashSet;
-
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{CollectedField, FieldKind, collect_fields};
+use crate::field_kind::{FieldKind, collect_fields};
 
-use super::{GeneratorConfig, collect_all_value_types_needing_bounds, deduplicate_types, get_fields_in_format};
+use kirin_derive_core::codegen::deduplicate_types;
+
+use super::{GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields, get_fields_in_format};
 
 /// Generator for AST type definitions.
 ///
@@ -150,22 +150,6 @@ impl GenerateAST {
         }
     }
 
-    /// Filters collected fields to only include those needed in the AST.
-    ///
-    /// Fields are included if they:
-    /// - Are in the format string (will be parsed), OR
-    /// - Don't have a default value (required)
-    fn filter_fields_for_ast<'a>(
-        &self,
-        collected: &'a [CollectedField],
-        fields_in_format: &HashSet<usize>,
-    ) -> Vec<&'a CollectedField> {
-        collected
-            .iter()
-            .filter(|f| fields_in_format.contains(&f.index) || f.default.is_none())
-            .collect()
-    }
-
     fn generate_struct_fields(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
@@ -178,7 +162,7 @@ impl GenerateAST {
         let is_tuple = stmt.is_tuple_style();
 
         // Filter to only fields needed in AST
-        let mut filtered: Vec<_> = self.filter_fields_for_ast(&collected, &fields_in_fmt);
+        let mut filtered: Vec<_> = filter_ast_fields(&collected, &fields_in_fmt);
 
         // For tuple fields, sort by original index to match the IR field order.
         // For named fields, keep the category order (which matches iter_all_fields).
@@ -216,30 +200,29 @@ impl GenerateAST {
         data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
         ast_name: &syn::Ident,
     ) -> TokenStream {
-        let variants: Vec<TokenStream> = data
-            .variants
-            .iter()
-            .map(|variant| {
-                let name = &variant.name;
+        use kirin_derive_core::ir::VariantRef;
 
-                // Check if this is a wrapper variant
-                if let Some(wrapper) = &variant.wraps {
+        let variants: Vec<TokenStream> = data
+            .iter_variants()
+            .map(|variant| match variant {
+                VariantRef::Wrapper { name, wrapper, .. } => {
                     let wrapped_ty = &wrapper.ty;
                     let crate_path = &self.config.crate_path;
                     // Use HasParser::Output to get the AST type for wrapped dialects
-                    return quote! {
+                    quote! {
                         #name(<#wrapped_ty as #crate_path::HasParser<'tokens, 'src>>::Output)
-                    };
+                    }
                 }
+                VariantRef::Regular { name, stmt } => {
+                    // For enum variants, don't use `pub`
+                    let fields = self.generate_struct_fields(ir_input, stmt, false, ast_name);
+                    let is_tuple = stmt.is_tuple_style();
 
-                // For enum variants, don't use `pub`
-                let fields = self.generate_struct_fields(ir_input, variant, false, ast_name);
-                let is_tuple = variant.is_tuple_style();
-
-                if is_tuple {
-                    quote! { #name(#fields) }
-                } else {
-                    quote! { #name { #fields } }
+                    if is_tuple {
+                        quote! { #name(#fields) }
+                    } else {
+                        quote! { #name { #fields } }
+                    }
                 }
             })
             .collect();

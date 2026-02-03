@@ -10,6 +10,7 @@ mod tests;
 
 use std::collections::HashSet;
 
+use kirin_derive_core::codegen::GenericsBuilder;
 use kirin_derive_core::ir::VariantRef;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -17,7 +18,6 @@ use quote::quote;
 use crate::ChumskyLayout;
 use crate::field_kind::{ValueTypeScanner, collect_fields, fields_in_format};
 use crate::format::Format;
-use crate::generics::GenericsBuilder;
 
 pub use self::ast::GenerateAST;
 pub use self::emit_ir::GenerateEmitIR;
@@ -109,13 +109,21 @@ pub(crate) fn collect_all_value_types_needing_bounds(
         .unwrap_or_default()
 }
 
-/// Deduplicates a list of types by their token representation.
-pub(crate) fn deduplicate_types(types: &mut Vec<syn::Type>) {
-    let mut seen = std::collections::HashSet::new();
-    types.retain(|ty| {
-        let key = quote!(#ty).to_string();
-        seen.insert(key)
-    });
+/// Filters collected fields to only include those needed in the AST.
+///
+/// Fields are included if they:
+/// - Are in the format string (will be parsed), OR
+/// - Don't have a default value (required)
+///
+/// This is used by both AST generation and EmitIR generation.
+pub(crate) fn filter_ast_fields<'a>(
+    collected: &'a [crate::field_kind::CollectedField],
+    fields_in_format: &HashSet<usize>,
+) -> Vec<&'a crate::field_kind::CollectedField> {
+    collected
+        .iter()
+        .filter(|f| fields_in_format.contains(&f.index) || f.default.is_none())
+        .collect()
 }
 
 // =============================================================================

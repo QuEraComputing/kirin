@@ -8,6 +8,9 @@ pub mod test_util;
 pub mod tokens;
 
 pub mod prelude {
+    pub use crate::codegen::{
+        self, combine_where_clauses, deduplicate_types, FieldBindings, GenericsBuilder,
+    };
     pub use crate::derive::{self, InputBuilder, InputContext};
     pub use crate::emit::{self, Emit};
     pub use crate::ir::{self, Layout, StandardLayout};

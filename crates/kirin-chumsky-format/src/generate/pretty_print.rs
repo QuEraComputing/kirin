@@ -122,6 +122,23 @@ impl GeneratePrettyPrint {
         dialect_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
     ) -> TokenStream {
+        let (pattern, print_expr) = self.build_print_components(stmt, dialect_name, variant_name);
+
+        quote! {
+            let #pattern = self;
+            #print_expr
+        }
+    }
+
+    /// Builds the pattern and print expression for a statement.
+    ///
+    /// This is shared between struct and variant print generation.
+    fn build_print_components(
+        &self,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+        dialect_name: &syn::Ident,
+        variant_name: Option<&syn::Ident>,
+    ) -> (TokenStream, TokenStream) {
         let format_str = stmt
             .extra_attrs
             .format
@@ -132,20 +149,24 @@ impl GeneratePrettyPrint {
 
         let collected = collect_fields(stmt);
         let field_map = build_field_map(&collected);
-
-        // Generate field bindings for pattern matching
         let bindings = stmt.field_bindings("f");
         let fields = &bindings.field_idents;
 
-        let (pattern, print_expr) = if bindings.is_tuple {
-            let pattern = match variant_name {
+        let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
+
+        let pattern = if bindings.is_empty() {
+            // Empty variant - no parens for tuple style, {} for named style
+            match variant_name {
+                Some(v) if bindings.is_tuple => quote! { #dialect_name::#v },
+                Some(v) => quote! { #dialect_name::#v {} },
+                None if bindings.is_tuple => quote! { #dialect_name },
+                None => quote! { #dialect_name {} },
+            }
+        } else if bindings.is_tuple {
+            match variant_name {
                 Some(v) => quote! { #dialect_name::#v(#(#fields),*) },
                 None => quote! { #dialect_name(#(#fields),*) },
-            };
-
-            let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
-
-            (pattern, print_expr)
+            }
         } else {
             let orig_fields = &bindings.original_field_names;
             let pat: Vec<_> = orig_fields
@@ -153,20 +174,13 @@ impl GeneratePrettyPrint {
                 .zip(fields)
                 .map(|(f, b)| quote! { #f: #b })
                 .collect();
-            let pattern = match variant_name {
+            match variant_name {
                 Some(v) => quote! { #dialect_name::#v { #(#pat),* } },
                 None => quote! { #dialect_name { #(#pat),* } },
-            };
-
-            let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
-
-            (pattern, print_expr)
+            }
         };
 
-        quote! {
-            let #pattern = self;
-            #print_expr
-        }
+        (pattern, print_expr)
     }
 
     fn generate_enum_print(
@@ -198,49 +212,12 @@ impl GeneratePrettyPrint {
         dialect_name: &syn::Ident,
         variant_name: &syn::Ident,
     ) -> TokenStream {
-        let format_str = variant
-            .extra_attrs
-            .format
-            .as_ref()
-            .expect("Variant must have format string");
+        let (pattern, print_expr) =
+            self.build_print_components(variant, dialect_name, Some(variant_name));
 
-        let format = Format::parse(format_str, None).expect("Format string should be valid");
-
-        let collected = collect_fields(variant);
-        let field_map = build_field_map(&collected);
-        let bindings = variant.field_bindings("f");
-        let fields = &bindings.field_idents;
-
-        let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
-
-        if bindings.is_empty() {
-            let pattern = if bindings.is_tuple {
-                quote! { #dialect_name::#variant_name }
-            } else {
-                quote! { #dialect_name::#variant_name {} }
-            };
-            quote! {
-                #pattern => {
-                    #print_expr
-                }
-            }
-        } else if bindings.is_tuple {
-            quote! {
-                #dialect_name::#variant_name(#(#fields),*) => {
-                    #print_expr
-                }
-            }
-        } else {
-            let orig_fields = &bindings.original_field_names;
-            let pat: Vec<_> = orig_fields
-                .iter()
-                .zip(fields)
-                .map(|(f, b)| quote! { #f: #b })
-                .collect();
-            quote! {
-                #dialect_name::#variant_name { #(#pat),* } => {
-                    #print_expr
-                }
+        quote! {
+            #pattern => {
+                #print_expr
             }
         }
     }

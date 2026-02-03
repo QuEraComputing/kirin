@@ -100,14 +100,12 @@ impl FieldKind {
     /// - `Type`: type-only parser
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    /// The `_dialect_type` is unused but kept for API compatibility.
     /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) for Block/Region field transmutation.
     /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
     pub fn parser_expr(
         &self,
         crate_path: &syn::Path,
         opt: &FormatOption,
-        _dialect_type: &TokenStream,
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
     ) -> TokenStream {
