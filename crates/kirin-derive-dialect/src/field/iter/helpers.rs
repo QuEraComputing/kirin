@@ -4,11 +4,11 @@ use quote::{format_ident, quote};
 
 pub(crate) struct FieldInputBuilder<'a> {
     pub(crate) ctx: &'a DeriveFieldIter,
-    pub(crate) input: &'a InputContext,
+    pub(crate) input: &'a InputMeta,
 }
 
 impl<'a> FieldInputBuilder<'a> {
-    pub(crate) fn new(ctx: &'a DeriveFieldIter, input: &'a InputContext) -> Self {
+    pub(crate) fn new(ctx: &'a DeriveFieldIter, input: &'a InputMeta) -> Self {
         Self { ctx, input }
     }
 
@@ -40,12 +40,12 @@ impl<'a> FieldInputBuilder<'a> {
     }
 
     pub(crate) fn full_trait_path(&self) -> syn::Path {
-        let core = self.input.builder(&self.ctx.default_crate_path);
+        let core = self.input.path_builder(&self.ctx.default_crate_path);
         core.full_trait_path(&self.ctx.trait_path)
     }
 
     pub(crate) fn full_matching_type(&self) -> syn::Path {
-        let core = self.input.builder(&self.ctx.default_crate_path);
+        let core = self.input.path_builder(&self.ctx.default_crate_path);
         core.full_path(&self.ctx.matching_type)
     }
 

@@ -1,5 +1,5 @@
 use crate::property::statement::StatementInfo;
-use kirin_derive_core::derive::InputContext as CoreInputContext;
+use kirin_derive_core::derive::InputMeta as CoreInputMeta;
 use kirin_derive_core::misc::from_str;
 use kirin_derive_core::prelude::*;
 use std::collections::HashMap;
@@ -41,7 +41,7 @@ pub struct DeriveProperty {
 
 #[derive(Clone, Debug)]
 pub(crate) struct InputContext {
-    pub(crate) core: CoreInputContext,
+    pub(crate) core: CoreInputMeta,
     pub(crate) global_value: bool,
 }
 
@@ -92,7 +92,7 @@ impl DeriveProperty {
     pub(crate) fn full_trait_path(&self, input: &InputContext) -> syn::Path {
         input
             .core
-            .builder(&self.default_crate_path)
+            .path_builder(&self.default_crate_path)
             .full_trait_path(&self.trait_path)
     }
 }

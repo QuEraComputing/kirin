@@ -1,12 +1,12 @@
 use crate::builder::context::DeriveBuilder;
 use crate::builder::helpers::build_fn_name;
 use crate::builder::statement::StatementInfo;
-use kirin_derive_core::derive::InputContext;
+use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::prelude::*;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveBuilder {
     fn scan_input(&mut self, input: &'ir ir::Input<StandardLayout>) -> darling::Result<()> {
-        self.input = Some(InputContext::from_input(input));
+        self.input = Some(InputMeta::from_input(input));
         self.statements.clear();
         scan::scan_input(self, input)
     }

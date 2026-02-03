@@ -132,10 +132,15 @@ impl<L: Layout> FieldInfo<L> {
     }
 
     /// Returns a human-readable name for this field kind.
+    ///
+    /// The names match the `FieldCategory` variants in lowercase:
+    /// - `FieldCategory::Argument` → "argument"
+    /// - `FieldCategory::Result` → "result"
+    /// - etc.
     pub fn kind_name(&self) -> &'static str {
         match self.category() {
-            FieldCategory::Argument => "ssa_value",
-            FieldCategory::Result => "result_value",
+            FieldCategory::Argument => "argument",
+            FieldCategory::Result => "result",
             FieldCategory::Block => "block",
             FieldCategory::Successor => "successor",
             FieldCategory::Region => "region",

@@ -18,11 +18,11 @@ fn field_name_tokens_from_info(field: &ir::fields::FieldInfo<StandardLayout>) ->
 
 pub(crate) struct StatementBuilder<'a> {
     ctx: &'a DeriveFieldIter,
-    input: &'a InputContext,
+    input: &'a InputMeta,
 }
 
 impl<'a> StatementBuilder<'a> {
-    pub(crate) fn new(ctx: &'a DeriveFieldIter, input: &'a InputContext) -> Self {
+    pub(crate) fn new(ctx: &'a DeriveFieldIter, input: &'a InputMeta) -> Self {
         Self { ctx, input }
     }
 
@@ -219,7 +219,7 @@ impl<'a> FieldAccess<'a> {
     fn iter_type(
         &self,
         ctx: &DeriveFieldIter,
-        input: &InputContext,
+        input: &InputMeta,
         matching_item: &proc_macro2::TokenStream,
     ) -> proc_macro2::TokenStream {
         let lifetime = &ctx.trait_lifetime;
@@ -271,7 +271,7 @@ mod tests {
             "arguments",
             "Iter",
         );
-        derive.input = Some(InputContext::from_input(&input));
+        derive.input = Some(InputMeta::from_input(&input));
         let builder = StatementBuilder::new(&derive, derive.input.as_ref().unwrap());
         let pattern = builder.statement_pattern(&data.0);
         assert!(!pattern.is_empty());

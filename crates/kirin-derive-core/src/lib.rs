@@ -12,9 +12,9 @@ pub mod prelude {
         self, ConstructorBuilder, FieldBindings, GenericsBuilder, combine_where_clauses,
         deduplicate_types,
     };
-    pub use crate::derive::{self, InputBuilder, InputContext};
+    pub use crate::derive::{self, InputMeta, PathBuilder};
     pub use crate::emit::{self, Emit};
-    pub use crate::ir::fields::{FieldData, FieldInfo};
+    pub use crate::ir::fields::{FieldCategory, FieldData, FieldInfo};
     pub use crate::ir::{self, Layout, StandardLayout};
     pub use crate::scan::{self, Scan};
     pub use crate::tokens::{
@@ -24,4 +24,8 @@ pub mod prelude {
     };
     pub use darling;
     pub use proc_macro2;
+
+    // Deprecated re-exports for backwards compatibility
+    #[allow(deprecated)]
+    pub use crate::derive::{InputBuilder, InputContext};
 }

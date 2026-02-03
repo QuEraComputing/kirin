@@ -90,7 +90,7 @@ fn field_name_tokens(field: &ir::fields::FieldIndex) -> proc_macro2::TokenStream
 mod tests {
     use super::*;
     use crate::property::context::{DeriveProperty, InputContext, PropertyKind};
-    use kirin_derive_core::derive::InputContext as CoreInputContext;
+    use kirin_derive_core::derive::InputMeta as CoreInputMeta;
 
     #[test]
     fn test_statement_pattern_unnamed() {
@@ -110,7 +110,7 @@ mod tests {
             "bool",
         );
         derive.input = Some(InputContext {
-            core: CoreInputContext::from_input(&input),
+            core: CoreInputMeta::from_input(&input),
             global_value: false,
         });
         let builder = StatementBuilder::new();

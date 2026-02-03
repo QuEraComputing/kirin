@@ -1,5 +1,5 @@
 use crate::builder::statement::StatementInfo;
-use kirin_derive_core::derive::InputContext;
+use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::ir::BuilderOptions;
 use kirin_derive_core::ir::fields::{Collection, FieldCategory};
 use kirin_derive_core::misc::{is_type, to_snake_case};
@@ -29,7 +29,7 @@ pub(crate) fn build_fn_name(
     }
 }
 
-pub(crate) fn build_result_module_name(input: &InputContext) -> syn::Ident {
+pub(crate) fn build_result_module_name(input: &InputMeta) -> syn::Ident {
     format_ident!(
         "{}_build_result",
         to_snake_case(input.name.to_string()),
@@ -37,7 +37,7 @@ pub(crate) fn build_result_module_name(input: &InputContext) -> syn::Ident {
     )
 }
 
-fn build_result_path(input: &InputContext, info: &StatementInfo) -> proc_macro2::TokenStream {
+fn build_result_path(input: &InputMeta, info: &StatementInfo) -> proc_macro2::TokenStream {
     let mod_name = build_result_module_name(input);
     let name = &info.name;
     quote! { #mod_name::#name }
@@ -166,7 +166,7 @@ fn statement_id_name(info: &StatementInfo) -> syn::Ident {
 
 fn build_fn_body(
     info: &StatementInfo,
-    input: &InputContext,
+    input: &InputMeta,
     result_name_map: &std::collections::HashMap<usize, syn::Ident>,
 ) -> proc_macro2::TokenStream {
     let statement_id = statement_id_name(info);
@@ -271,7 +271,7 @@ fn let_name_eq_result_value(
 
 pub(crate) fn build_fn_for_statement(
     info: &StatementInfo,
-    input: &InputContext,
+    input: &InputMeta,
     crate_path: &syn::Path,
     is_enum: bool,
 ) -> darling::Result<proc_macro2::TokenStream> {
@@ -317,7 +317,7 @@ pub(crate) fn build_fn_for_statement(
 }
 
 pub(crate) fn struct_build_fn(
-    input: &InputContext,
+    input: &InputMeta,
     info: &StatementInfo,
     crate_path: &syn::Path,
 ) -> proc_macro2::TokenStream {
@@ -325,7 +325,7 @@ pub(crate) fn struct_build_fn(
 }
 
 pub(crate) fn enum_build_fn<F>(
-    input: &InputContext,
+    input: &InputMeta,
     data: &ir::DataEnum<StandardLayout>,
     mut build_fn: F,
 ) -> darling::Result<proc_macro2::TokenStream>
@@ -371,23 +371,23 @@ pub(crate) fn build_result_impl(
 
     for (field, name) in results.into_iter().zip(names.into_iter()) {
         if matches!(field.collection, Collection::Vec) {
-            fields.push(
-                syn::Error::new_spanned(
-                    field.name_ident(info.name.span()),
-                    "ResultValue field cannot be a Vec, consider implementing the builder manually",
-                )
-                .to_compile_error(),
-            );
-            continue;
+                fields.push(
+                    syn::Error::new_spanned(
+                        field.name_ident(info.name.span()),
+                        "ResultValue field cannot be a Vec, consider implementing the builder manually",
+                    )
+                    .to_compile_error(),
+                );
+                continue;
         } else if matches!(field.collection, Collection::Option) {
-            fields.push(
-                syn::Error::new_spanned(
-                    field.name_ident(info.name.span()),
-                    "ResultValue field cannot be an Option, consider implementing the builder manually",
-                )
-                .to_compile_error(),
-            );
-            continue;
+                fields.push(
+                    syn::Error::new_spanned(
+                        field.name_ident(info.name.span()),
+                        "ResultValue field cannot be an Option, consider implementing the builder manually",
+                    )
+                    .to_compile_error(),
+                );
+                continue;
         }
 
         fields.push(quote! {
@@ -412,7 +412,7 @@ pub(crate) fn build_result_impl(
 }
 
 pub(crate) fn build_result_module(
-    input: &InputContext,
+    input: &InputMeta,
     info: &StatementInfo,
     statement: &ir::Statement<StandardLayout>,
     crate_path: &syn::Path,
@@ -431,7 +431,7 @@ pub(crate) fn build_result_module(
 }
 
 pub(crate) fn build_result_module_enum<F>(
-    input: &InputContext,
+    input: &InputMeta,
     data: &ir::DataEnum<StandardLayout>,
     crate_path: &syn::Path,
     mut build_impl: F,
@@ -453,7 +453,7 @@ where
     })
 }
 
-pub(crate) fn from_impl(input: &InputContext, info: &StatementInfo) -> proc_macro2::TokenStream {
+pub(crate) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2::TokenStream {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let name = &input.name;
     // Get wrapper type from StatementInfo
@@ -530,10 +530,10 @@ pub(crate) fn from_impl(input: &InputContext, info: &StatementInfo) -> proc_macr
                 })
         };
 
-        quote! {
-            impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
-                fn from(value: #wrapper_ty) -> Self {
-                    #(#let_name_eq_input;)*
+    quote! {
+        impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
+            fn from(value: #wrapper_ty) -> Self {
+                #(#let_name_eq_input;)*
                     #constructor
                 }
             }

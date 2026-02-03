@@ -349,7 +349,7 @@ impl<'a> ValueTypeScanner<'a> {
 }
 
 impl<'ir> Scan<'ir, ChumskyLayout> for ValueTypeScanner<'_> {
-    fn scan_comptime_value(
+    fn scan_value(
         &mut self,
         field: &'ir kirin_derive_core::ir::fields::FieldInfo<ChumskyLayout>,
     ) -> darling::Result<()> {

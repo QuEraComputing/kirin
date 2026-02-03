@@ -52,8 +52,8 @@ pub trait Scan<'ir, L: Layout> {
     }
 
     /// Scan a compile-time value field.
-    fn scan_comptime_value(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<()> {
-        scan_comptime_value(self, field)
+    fn scan_value(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<()> {
+        scan_value(self, field)
     }
 }
 
@@ -121,7 +121,7 @@ where
                 FieldCategory::Block => visitor.scan_block(field),
                 FieldCategory::Successor => visitor.scan_successor(field),
                 FieldCategory::Region => visitor.scan_region(field),
-                FieldCategory::Value => visitor.scan_comptime_value(field),
+                FieldCategory::Value => visitor.scan_value(field),
             }
         });
     }
@@ -205,7 +205,7 @@ where
     Ok(())
 }
 
-pub fn scan_comptime_value<'ir, V, L>(
+pub fn scan_value<'ir, V, L>(
     _visitor: &mut V,
     _field: &'ir FieldInfo<L>,
 ) -> darling::Result<()>

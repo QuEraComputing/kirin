@@ -23,7 +23,7 @@ pub struct DeriveFieldIter {
     pub matching_type: syn::Path,
     pub iter_name: syn::Ident,
     pub mutable: bool,
-    pub(crate) input: Option<InputContext>,
+    pub(crate) input: Option<InputMeta>,
     pub(crate) statements: HashMap<String, StatementInfo>,
 }
 
@@ -80,7 +80,7 @@ impl DeriveFieldIter {
         self.emit_input(&input)
     }
 
-    pub(crate) fn input_ctx(&self) -> darling::Result<&InputContext> {
+    pub(crate) fn input_ctx(&self) -> darling::Result<&InputMeta> {
         self.input.as_ref().ok_or_else(|| {
             darling::Error::custom("DeriveFieldIter context missing, call scan_input first")
         })

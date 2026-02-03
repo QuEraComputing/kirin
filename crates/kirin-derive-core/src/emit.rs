@@ -59,8 +59,8 @@ pub trait Emit<'ir, L: Layout> {
     }
 
     /// Emit code for a compile-time value field.
-    fn emit_comptime_value(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
-        emit_comptime_value(self, field)
+    fn emit_value(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_value(self, field)
     }
 }
 
@@ -162,7 +162,7 @@ pub fn emit_region<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     Ok(TokenStream::new())
 }
 
-pub fn emit_comptime_value<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
+pub fn emit_value<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
     _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {

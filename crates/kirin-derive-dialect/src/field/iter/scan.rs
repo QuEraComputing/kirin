@@ -5,7 +5,7 @@ use kirin_derive_core::prelude::*;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveFieldIter {
     fn scan_input(&mut self, input: &'ir ir::Input<StandardLayout>) -> darling::Result<()> {
-        self.input = Some(InputContext::from_input(input));
+        self.input = Some(InputMeta::from_input(input));
         self.statements.clear();
         scan::scan_input(self, input)
     }

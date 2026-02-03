@@ -1,7 +1,11 @@
 use crate::ir::{self, BuilderOptions, StandardLayout};
 
+/// Metadata extracted from the derive input.
+///
+/// This struct contains the key information needed for code generation,
+/// extracted from the original `Input<L>` for convenient access.
 #[derive(Clone, Debug)]
-pub struct InputContext {
+pub struct InputMeta {
     pub name: syn::Ident,
     pub generics: syn::Generics,
     pub crate_path: Option<syn::Path>,
@@ -10,7 +14,7 @@ pub struct InputContext {
     pub is_enum: bool,
 }
 
-impl InputContext {
+impl InputMeta {
     pub fn from_input(input: &ir::Input<StandardLayout>) -> Self {
         Self {
             name: input.name.clone(),
@@ -22,20 +26,31 @@ impl InputContext {
         }
     }
 
-    pub fn builder<'a>(&'a self, default_crate_path: &'a syn::Path) -> InputBuilder<'a> {
-        InputBuilder {
+    /// Creates a path builder for generating fully qualified paths.
+    pub fn path_builder<'a>(&'a self, default_crate_path: &'a syn::Path) -> PathBuilder<'a> {
+        PathBuilder {
             input: self,
             default_crate_path,
         }
     }
+
+    /// Alias for `path_builder` for backwards compatibility.
+    #[deprecated(since = "0.2.0", note = "Use `path_builder` instead")]
+    pub fn builder<'a>(&'a self, default_crate_path: &'a syn::Path) -> PathBuilder<'a> {
+        self.path_builder(default_crate_path)
+    }
 }
 
-pub struct InputBuilder<'a> {
-    input: &'a InputContext,
+/// Builder for generating fully qualified paths.
+///
+/// This helper resolves paths relative to the crate path specified
+/// in the derive attributes, or falls back to a default.
+pub struct PathBuilder<'a> {
+    input: &'a InputMeta,
     default_crate_path: &'a syn::Path,
 }
 
-impl InputBuilder<'_> {
+impl PathBuilder<'_> {
     pub fn full_crate_path(&self) -> syn::Path {
         self.input
             .crate_path
@@ -53,3 +68,10 @@ impl InputBuilder<'_> {
         path
     }
 }
+
+// Type aliases for backwards compatibility
+#[deprecated(since = "0.2.0", note = "Use `InputMeta` instead")]
+pub type InputContext = InputMeta;
+
+#[deprecated(since = "0.2.0", note = "Use `PathBuilder` instead")]
+pub type InputBuilder<'a> = PathBuilder<'a>;

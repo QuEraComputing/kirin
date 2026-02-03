@@ -1,12 +1,12 @@
 use crate::builder::statement::StatementInfo;
-use kirin_derive_core::derive::InputContext;
+use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct DeriveBuilder {
     pub default_crate_path: syn::Path,
-    pub(crate) input: Option<InputContext>,
+    pub(crate) input: Option<InputMeta>,
     pub(crate) statements: HashMap<String, StatementInfo>,
 }
 
@@ -34,7 +34,7 @@ impl DeriveBuilder {
         self.emit_input(&input)
     }
 
-    pub(crate) fn input_ctx(&self) -> darling::Result<&InputContext> {
+    pub(crate) fn input_ctx(&self) -> darling::Result<&InputMeta> {
         self.input.as_ref().ok_or_else(|| {
             darling::Error::custom("DeriveBuilder context missing, call scan_input first")
         })
@@ -53,7 +53,7 @@ impl DeriveBuilder {
         })
     }
 
-    pub(crate) fn full_crate_path(&self, input: &InputContext) -> syn::Path {
-        input.builder(&self.default_crate_path).full_crate_path()
+    pub(crate) fn full_crate_path(&self, input: &InputMeta) -> syn::Path {
+        input.path_builder(&self.default_crate_path).full_crate_path()
     }
 }
