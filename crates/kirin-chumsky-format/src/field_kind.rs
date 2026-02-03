@@ -5,8 +5,10 @@
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::{fields::Collection, DefaultValue};
+use kirin_derive_core::ir::fields::{Collection, FieldCategory, FieldInfo};
+use kirin_derive_core::ir::DefaultValue;
 use kirin_derive_core::misc::is_type_in_generic;
+use kirin_derive_core::scan::Scan;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -275,6 +277,42 @@ pub struct CollectedField {
     pub default: Option<DefaultValue>,
 }
 
+impl CollectedField {
+    /// Creates a `CollectedField` from a `FieldInfo` and value type lookup.
+    ///
+    /// The `value_info` map provides (type, default) for compile-time value fields.
+    fn from_field_info(
+        info: FieldInfo<'_>,
+        value_info: &std::collections::HashMap<usize, (syn::Type, Option<DefaultValue>)>,
+    ) -> Self {
+        let (kind, default) = match info.category {
+            FieldCategory::Argument => (FieldKind::SSAValue, None),
+            FieldCategory::Result => (FieldKind::ResultValue, None),
+            FieldCategory::Block => (FieldKind::Block, None),
+            FieldCategory::Successor => (FieldKind::Successor, None),
+            FieldCategory::Region => (FieldKind::Region, None),
+            FieldCategory::Value => {
+                let (ty, default) = value_info
+                    .get(&info.field.index)
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        // Fallback - should not happen in practice
+                        (syn::parse_quote!(()), None)
+                    });
+                (FieldKind::Value(ty), default)
+            }
+        };
+
+        CollectedField {
+            index: info.field.index,
+            ident: info.field.ident.clone(),
+            collection: info.collection.clone(),
+            kind,
+            default,
+        }
+    }
+}
+
 impl std::fmt::Display for CollectedField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.ident {
@@ -286,141 +324,101 @@ impl std::fmt::Display for CollectedField {
 
 /// Collects all fields from a statement.
 ///
-/// Fields are returned in the same order as `Statement::iter_all_fields()`:
+/// Uses `Statement::iter_all_fields()` to iterate fields in consistent order:
 /// arguments, results, blocks, successors, regions, values.
 /// This ensures consistency with `Statement::field_bindings()`.
 pub fn collect_fields(
     stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
 ) -> Vec<CollectedField> {
-    let mut fields = Vec::new();
-
-    for arg in stmt.arguments.iter() {
-        fields.push(CollectedField {
-            index: arg.field.index,
-            ident: arg.field.ident.clone(),
-            collection: arg.collection.clone(),
-            kind: FieldKind::SSAValue,
-            default: None, // SSAValue fields don't support defaults
-        });
-    }
-
-    for res in stmt.results.iter() {
-        fields.push(CollectedField {
-            index: res.field.index,
-            ident: res.field.ident.clone(),
-            collection: res.collection.clone(),
-            kind: FieldKind::ResultValue,
-            default: None, // ResultValue fields don't support defaults
-        });
-    }
-
-    for block in stmt.blocks.iter() {
-        fields.push(CollectedField {
-            index: block.field.index,
-            ident: block.field.ident.clone(),
-            collection: block.collection.clone(),
-            kind: FieldKind::Block,
-            default: None, // Block fields don't support defaults
-        });
-    }
-
-    for succ in stmt.successors.iter() {
-        fields.push(CollectedField {
-            index: succ.field.index,
-            ident: succ.field.ident.clone(),
-            collection: succ.collection.clone(),
-            kind: FieldKind::Successor,
-            default: None, // Successor fields don't support defaults
-        });
-    }
-
-    for region in stmt.regions.iter() {
-        fields.push(CollectedField {
-            index: region.field.index,
-            ident: region.field.ident.clone(),
-            collection: region.collection.clone(),
-            kind: FieldKind::Region,
-            default: None, // Region fields don't support defaults
-        });
-    }
-
-    for value in stmt.values.iter() {
-        fields.push(CollectedField {
-            index: value.field.index,
-            ident: value.field.ident.clone(),
-            collection: Collection::Single,
-            kind: FieldKind::Value(value.ty.clone()),
-            default: value.default.clone(), // Compile-time values can have defaults
-        });
-    }
-
-    // NOTE: Do NOT sort here! The order must match Statement::iter_all_fields()
-    // which is used by Statement::field_bindings() for code generation.
-    fields
-}
-
-/// Collects Value field types that contain the given type parameters.
-///
-/// For example, if a struct has `T: Clone` and a field `value: T`,
-/// this will return `vec![T]` (the type that needs HasParser bounds).
-///
-/// This is used to generate appropriate where clauses for generic types.
-/// Only includes fields that don't have a default value, since those are
-/// the only ones that need to be parsed.
-pub fn collect_value_types_with_type_params(
-    collected: &[CollectedField],
-    generics: &syn::Generics,
-) -> Vec<syn::Type> {
-    // Get type parameter names from the generics
-    let type_param_names: Vec<_> = generics
-        .params
+    // Build a map from field index to Value type and default for compile-time values
+    let value_info: std::collections::HashMap<usize, (syn::Type, Option<DefaultValue>)> = stmt
+        .values
         .iter()
-        .filter_map(|p| {
-            if let syn::GenericParam::Type(tp) = p {
-                Some(tp.ident.to_string())
-            } else {
-                None
-            }
-        })
+        .map(|v| (v.field.index, (v.ty.clone(), v.default.clone())))
         .collect();
 
-    if type_param_names.is_empty() {
-        return Vec::new();
+    stmt.iter_all_fields()
+        .map(|info| CollectedField::from_field_info(info, &value_info))
+        .collect()
+}
+
+/// Scanner that collects Value field types containing type parameters.
+///
+/// Uses the `Scan` trait from `kirin-derive-core` to traverse the IR.
+pub struct ValueTypeScanner<'a> {
+    /// Type parameter names to check against
+    type_param_names: Vec<String>,
+    /// Collected types that need bounds
+    types: Vec<syn::Type>,
+    /// Set for deduplication
+    seen: HashSet<String>,
+    /// Reference to generics for lifetime
+    _generics: &'a syn::Generics,
+}
+
+impl<'a> ValueTypeScanner<'a> {
+    /// Creates a new scanner for the given generics.
+    pub fn new(generics: &'a syn::Generics) -> Self {
+        let type_param_names = generics
+            .params
+            .iter()
+            .filter_map(|p| {
+                if let syn::GenericParam::Type(tp) = p {
+                    Some(tp.ident.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Self {
+            type_param_names,
+            types: Vec::new(),
+            seen: HashSet::new(),
+            _generics: generics,
+        }
     }
 
-    let mut types_needing_bounds = Vec::new();
+    /// Scans the input and returns collected types.
+    pub fn scan(
+        mut self,
+        input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+    ) -> darling::Result<Vec<syn::Type>> {
+        kirin_derive_core::scan::scan_input(&mut self, input)?;
+        Ok(self.types)
+    }
 
-    for field in collected {
-        // Only consider fields without defaults - fields with defaults are not parsed
-        if field.default.is_some() {
-            continue;
+    /// Checks if a type contains any of our type parameters and adds it if so.
+    fn maybe_add_type(&mut self, ty: &syn::Type, has_default: bool) {
+        // Skip fields with defaults - they're not parsed
+        if has_default {
+            return;
         }
 
-        if let FieldKind::Value(ty) = &field.kind {
-            // Check if any type parameter appears in this field's type
-            for param_name in &type_param_names {
-                // Check if the type IS the parameter directly
-                if kirin_derive_core::misc::is_type(ty, param_name.as_str()) {
-                    types_needing_bounds.push(ty.clone());
-                    break;
+        // Check if any type parameter appears in this type
+        for param_name in &self.type_param_names {
+            if kirin_derive_core::misc::is_type(ty, param_name.as_str())
+                || is_type_in_generic(ty, param_name.as_str())
+            {
+                // Deduplicate
+                let key = quote!(#ty).to_string();
+                if self.seen.insert(key) {
+                    self.types.push(ty.clone());
                 }
-                // Check if the type parameter appears inside a generic type
-                if is_type_in_generic(ty, param_name.as_str()) {
-                    types_needing_bounds.push(ty.clone());
-                    break;
-                }
+                break;
             }
         }
     }
+}
 
-    // Deduplicate
-    let mut seen = HashSet::new();
-    types_needing_bounds.retain(|ty| {
-        let key = quote::quote!(#ty).to_string();
-        seen.insert(key)
-    });
-
-    types_needing_bounds
+impl<'ir> Scan<'ir, ChumskyLayout> for ValueTypeScanner<'_> {
+    fn scan_comptime_value(
+        &mut self,
+        cv: &'ir kirin_derive_core::ir::fields::CompileTimeValue<ChumskyLayout>,
+    ) -> darling::Result<()> {
+        self.maybe_add_type(&cv.ty, cv.default.is_some());
+        Ok(())
+    }
 }
 
 /// Returns the set of field indices that are mentioned in the format string.

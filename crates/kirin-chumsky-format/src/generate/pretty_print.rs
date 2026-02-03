@@ -13,7 +13,7 @@ use crate::field_kind::{CollectedField, collect_fields};
 use crate::format::{Format, FormatElement};
 use kirin_lexer::Token;
 
-use super::collect_all_value_types_needing_bounds;
+use super::{collect_all_value_types_needing_bounds, generate_enum_match};
 
 /// Generator for the `PrettyPrint` trait implementation.
 pub struct GeneratePrettyPrint {
@@ -174,81 +174,73 @@ impl GeneratePrettyPrint {
         data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
         dialect_name: &syn::Ident,
     ) -> TokenStream {
-        let arms: Vec<_> = data
-            .variants
-            .iter()
-            .map(|variant| {
-                let name = &variant.name;
+        let prettyless_path = &self.prettyless_path;
 
-                // Check if this is a wrapper variant
-                if variant.wraps.is_some() {
-                    let prettyless_path = &self.prettyless_path;
-                    return quote! {
-                        #dialect_name::#name(inner) => {
-                            #prettyless_path::PrettyPrint::pretty_print(inner, doc)
-                        }
-                    };
+        generate_enum_match(
+            dialect_name,
+            data,
+            // Wrapper handler
+            |_name, _wrapper| {
+                quote! { #prettyless_path::PrettyPrint::pretty_print(inner, doc) }
+            },
+            // Regular variant handler
+            |name, variant| {
+                self.generate_variant_print(variant, dialect_name, name)
+            },
+            None, // No marker for dialect types
+        )
+    }
+
+    /// Generates pretty print code for a single enum variant.
+    fn generate_variant_print(
+        &self,
+        variant: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+        dialect_name: &syn::Ident,
+        variant_name: &syn::Ident,
+    ) -> TokenStream {
+        let format_str = variant
+            .extra_attrs
+            .format
+            .as_ref()
+            .expect("Variant must have format string");
+
+        let format = Format::parse(format_str, None).expect("Format string should be valid");
+
+        let collected = collect_fields(variant);
+        let field_map = build_field_map(&collected);
+        let bindings = variant.field_bindings("f");
+        let fields = &bindings.field_idents;
+
+        let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
+
+        if bindings.is_empty() {
+            let pattern = if bindings.is_tuple {
+                quote! { #dialect_name::#variant_name }
+            } else {
+                quote! { #dialect_name::#variant_name {} }
+            };
+            quote! {
+                #pattern => {
+                    #print_expr
                 }
-
-                let format_str = variant
-                    .extra_attrs
-                    .format
-                    .as_ref()
-                    .expect("Variant must have format string");
-
-                let format =
-                    Format::parse(format_str, None).expect("Format string should be valid");
-
-                let collected = collect_fields(variant);
-                let field_map = build_field_map(&collected);
-                let bindings = variant.field_bindings("f");
-                let fields = &bindings.field_idents;
-
-                if bindings.is_empty() {
-                    let print_expr =
-                        self.generate_format_print(&format, &field_map, &collected, fields);
-                    if bindings.is_tuple {
-                        quote! {
-                            #dialect_name::#name => {
-                                #print_expr
-                            }
-                        }
-                    } else {
-                        quote! {
-                            #dialect_name::#name {} => {
-                                #print_expr
-                            }
-                        }
-                    }
-                } else if bindings.is_tuple {
-                    let print_expr =
-                        self.generate_format_print(&format, &field_map, &collected, fields);
-                    quote! {
-                        #dialect_name::#name(#(#fields),*) => {
-                            #print_expr
-                        }
-                    }
-                } else {
-                    let orig_fields = &bindings.original_field_names;
-                    let pat: Vec<_> = orig_fields
-                        .iter()
-                        .zip(fields)
-                        .map(|(f, b)| quote! { #f: #b })
-                        .collect();
-                    let print_expr =
-                        self.generate_format_print(&format, &field_map, &collected, fields);
-                    quote! {
-                        #dialect_name::#name { #(#pat),* } => {
-                            #print_expr
-                        }
-                    }
+            }
+        } else if bindings.is_tuple {
+            quote! {
+                #dialect_name::#variant_name(#(#fields),*) => {
+                    #print_expr
                 }
-            })
-            .collect();
-
-        quote! {
-            match self {
-                #(#arms)*
+            }
+        } else {
+            let orig_fields = &bindings.original_field_names;
+            let pat: Vec<_> = orig_fields
+                .iter()
+                .zip(fields)
+                .map(|(f, b)| quote! { #f: #b })
+                .collect();
+            quote! {
+                #dialect_name::#variant_name { #(#pat),* } => {
+                    #print_expr
+                }
             }
         }
     }

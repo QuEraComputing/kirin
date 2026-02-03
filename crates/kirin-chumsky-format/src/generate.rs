@@ -10,10 +10,12 @@ mod tests;
 
 use std::collections::HashSet;
 
+use kirin_derive_core::ir::VariantRef;
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{collect_fields, collect_value_types_with_type_params, fields_in_format};
+use crate::field_kind::{ValueTypeScanner, collect_fields, fields_in_format};
 use crate::format::Format;
 use crate::generics::GenericsBuilder;
 
@@ -97,39 +99,14 @@ pub(crate) fn get_fields_in_format(
 
 /// Collects all Value field types that contain type parameters from all statements.
 ///
+/// Uses the `Scan` visitor pattern from `kirin-derive-core` to traverse the IR.
 /// These types need trait bounds (e.g., `HasParser`, `EmitIR`, `PrettyPrint`) in generated impls.
 pub(crate) fn collect_all_value_types_needing_bounds(
     ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
 ) -> Vec<syn::Type> {
-    let mut all_types = Vec::new();
-
-    match &ir_input.data {
-        kirin_derive_core::ir::Data::Struct(s) => {
-            let collected = collect_fields(&s.0);
-            all_types.extend(collect_value_types_with_type_params(
-                &collected,
-                &ir_input.generics,
-            ));
-        }
-        kirin_derive_core::ir::Data::Enum(e) => {
-            for variant in e.variants.iter() {
-                let collected = collect_fields(variant);
-                all_types.extend(collect_value_types_with_type_params(
-                    &collected,
-                    &ir_input.generics,
-                ));
-            }
-        }
-    }
-
-    // Deduplicate
-    let mut seen = std::collections::HashSet::new();
-    all_types.retain(|ty| {
-        let key = quote!(#ty).to_string();
-        seen.insert(key)
-    });
-
-    all_types
+    ValueTypeScanner::new(&ir_input.generics)
+        .scan(ir_input)
+        .unwrap_or_default()
 }
 
 /// Deduplicates a list of types by their token representation.
@@ -139,4 +116,55 @@ pub(crate) fn deduplicate_types(types: &mut Vec<syn::Type>) {
         let key = quote!(#ty).to_string();
         seen.insert(key)
     });
+}
+
+// =============================================================================
+// Variant Iteration Helpers
+// =============================================================================
+
+/// Generates match arms for an enum, handling both wrapper and regular variants.
+///
+/// Uses `DataEnum::iter_variants()` from `kirin-derive-core` for variant classification.
+///
+/// - `type_name`: The enum type name (used in patterns like `TypeName::Variant`)
+/// - `data`: The enum data containing variants
+/// - `wrapper_handler`: Closure that generates code for wrapper variants
+/// - `regular_handler`: Closure that generates code for regular variants
+/// - `marker_handler`: Optional closure for the `__Marker` variant (for AST enums)
+pub(crate) fn generate_enum_match<F, G>(
+    type_name: &syn::Ident,
+    data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
+    wrapper_handler: F,
+    regular_handler: G,
+    marker_handler: Option<TokenStream>,
+) -> TokenStream
+where
+    F: Fn(&syn::Ident, &kirin_derive_core::ir::fields::Wrapper) -> TokenStream,
+    G: Fn(&syn::Ident, &kirin_derive_core::ir::Statement<ChumskyLayout>) -> TokenStream,
+{
+    let arms: Vec<TokenStream> = data
+        .iter_variants()
+        .map(|variant| match variant {
+            VariantRef::Wrapper { name, wrapper, .. } => {
+                let body = wrapper_handler(name, wrapper);
+                quote! { #type_name::#name(inner) => { #body } }
+            }
+            VariantRef::Regular { name, stmt } => regular_handler(name, stmt),
+        })
+        .collect();
+
+    if let Some(marker) = marker_handler {
+        quote! {
+            match self {
+                #(#arms)*
+                #marker
+            }
+        }
+    } else {
+        quote! {
+            match self {
+                #(#arms)*
+            }
+        }
+    }
 }
