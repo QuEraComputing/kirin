@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-derive-core/src/kirin/builder/mod.rs
-expression: "Builder::default().print(&input)"
+source: crates/kirin-derive-dialect/src/builder/tests.rs
+expression: "case!\n{\n    #[kirin(terminator, fn, type_lattice = T)] pub enum ControlFlow<T:\n    TypeLattice>\n    {\n        #[kirin(format = \"br {target}\")] Branch { target: Successor },\n        #[kirin(format =\n        \"cond_br {condition} then={true_target} else={false_target}\")]\n        ConditionalBranch\n        {\n            condition: SSAValue, true_target: Successor, false_target:\n            Successor, #[kirin(default = std::marker::PhantomData)] marker:\n            std::marker::PhantomData<T>,\n        }, #[kirin(format = \"ret {0}\")] Return(SSAValue),\n    }\n}"
 ---
 impl<T: TypeLattice> ControlFlow<T> {
     pub fn op_branch<Lang>(
@@ -15,7 +15,7 @@ impl<T: TypeLattice> ControlFlow<T> {
         let target: Successor = target.into();
         context
             .statement()
-            .definition(Self::Branch { target })
+            .definition(Self::Branch { target: target })
             .new();
         control_flow_build_result::Branch {
             id: branch_statement_id,
@@ -39,10 +39,10 @@ impl<T: TypeLattice> ControlFlow<T> {
         context
             .statement()
             .definition(Self::ConditionalBranch {
-                condition,
-                true_target,
-                false_target,
-                marker,
+                condition: condition,
+                true_target: true_target,
+                false_target: false_target,
+                marker: marker,
             })
             .new();
         control_flow_build_result::ConditionalBranch {

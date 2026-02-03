@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-chumsky-format/src/generate/tests.rs
+assertion_line: 100
 expression: pretty
 ---
 impl ::kirin_prettyless::PrettyPrint<Constant> for Constant {
@@ -9,8 +10,8 @@ impl ::kirin_prettyless::PrettyPrint<Constant> for Constant {
     ) -> ::kirin_prettyless::ArenaDoc<'a> {
         use kirin_prettyless::DocAllocator;
         let Constant {
-            res: f_res,
             value: f_value,
+            res: f_res,
         } = self;
         ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
             + doc.text(" = constant ")

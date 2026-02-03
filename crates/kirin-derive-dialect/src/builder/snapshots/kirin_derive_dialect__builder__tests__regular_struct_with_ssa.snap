@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-derive-core/src/kirin/builder/mod.rs
-expression: "Builder::default().print(&input)"
+source: crates/kirin-derive-dialect/src/builder/tests.rs
+expression: "case!\n{\n    #[kirin(fn = new, type_lattice = L)] struct TestStruct<T: CompileTimeValue\n    + Typeof<L>, L: TypeLattice>\n    {\n        #[kirin(into)] value: T, #[kirin(type = value.type_of())] result:\n        ResultValue, #[kirin(into)] input_ssa: SSAValue,\n        #[kirin(default = std::marker::PhantomData)] marker:\n        std::marker::PhantomData<L>,\n    }\n}"
 ---
 #[automatically_derived]
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
@@ -26,10 +26,10 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
         context
             .statement()
             .definition(Self {
-                value,
-                result,
-                input_ssa,
-                marker,
+                value: value,
+                result: result,
+                input_ssa: input_ssa,
+                marker: marker,
             })
             .new();
         test_struct_build_result::TestStruct {

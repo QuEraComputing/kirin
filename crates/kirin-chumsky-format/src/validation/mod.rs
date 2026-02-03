@@ -17,7 +17,7 @@ pub use visitor::ValidationVisitor;
 use kirin_derive_core::ir::Statement;
 
 use crate::ChumskyLayout;
-use crate::field_kind::CollectedField;
+use kirin_derive_core::ir::fields::FieldInfo;
 use crate::format::Format;
 
 /// Validates a format string against collected fields.
@@ -27,7 +27,7 @@ use crate::format::Format;
 pub fn validate_format<'ir>(
     stmt: &'ir Statement<ChumskyLayout>,
     format: &Format<'_>,
-    collected: &'ir [CollectedField],
+    collected: &'ir [FieldInfo<ChumskyLayout>],
 ) -> syn::Result<ValidationResult<'ir>> {
     ValidationVisitor::new().validate(stmt, format, collected)
 }

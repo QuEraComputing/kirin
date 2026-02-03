@@ -5,7 +5,10 @@ use std::collections::HashMap;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::field_kind::CollectedField;
+use crate::ChumskyLayout;
+use kirin_derive_core::ir::fields::FieldInfo;
+
+use crate::field_kind::FieldKind;
 use crate::format::{Format, FormatElement, FormatOption};
 use crate::validation::FieldOccurrence;
 
@@ -121,14 +124,13 @@ impl GenerateHasDialectParser {
     fn field_parser(
         &self,
         crate_path: &syn::Path,
-        field: &CollectedField,
+        field: &FieldInfo<ChumskyLayout>,
         opt: &FormatOption,
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
     ) -> TokenStream {
-        let base = field
-            .kind
-            .parser_expr(crate_path, opt, ast_name, type_lattice);
+        let kind = FieldKind::from_field_info(field);
+        let base = kind.parser_expr(crate_path, opt, ast_name, type_lattice);
         field.collection.wrap_parser(base)
     }
 
@@ -137,7 +139,7 @@ impl GenerateHasDialectParser {
         &self,
         ast_name: &syn::Ident,
         variant: Option<&syn::Ident>,
-        collected: &[CollectedField],
+        collected: &[FieldInfo<ChumskyLayout>],
         occurrences: &[FieldOccurrence<'_>],
         crate_path: &syn::Path,
     ) -> TokenStream {
@@ -155,7 +157,7 @@ impl GenerateHasDialectParser {
         // - Fields that don't have a default value
         let ast_fields: Vec<_> = collected
             .iter()
-            .filter(|f| field_occurrences.contains_key(&f.index) || f.default.is_none())
+            .filter(|f| field_occurrences.contains_key(&f.index) || !f.has_default())
             .collect();
 
         // Check if we have named fields
@@ -191,11 +193,12 @@ impl GenerateHasDialectParser {
     /// Build the value expression for a field based on its occurrences.
     fn build_field_value(
         &self,
-        field: &CollectedField,
+        field: &FieldInfo<ChumskyLayout>,
         field_occurrences: &HashMap<usize, Vec<&FieldOccurrence>>,
         crate_path: &syn::Path,
     ) -> TokenStream {
         let occs = field_occurrences.get(&field.index);
+        let kind = FieldKind::from_field_info(field);
 
         match occs {
             None => {
@@ -213,12 +216,11 @@ impl GenerateHasDialectParser {
 
                 match &occ.option {
                     // SSA/Result with only :name - need to create value with None type
-                    FormatOption::Name => field
-                        .kind
+                    FormatOption::Name => kind
                         .construct_from_name_only(crate_path, var)
                         .unwrap_or_else(|| quote! { #var }),
                     // :type only should have been caught by validation
-                    FormatOption::Type if field.kind.supports_name_type_options() => {
+                    FormatOption::Type if kind.supports_name_type_options() => {
                         unreachable!(
                             "field '{}' has only :type occurrence - this should have been caught by validation",
                             field
@@ -236,8 +238,7 @@ impl GenerateHasDialectParser {
 
                 match (name_occ, type_occ) {
                     // SSA/Result with both :name and :type
-                    (Some(name), Some(ty)) => field
-                        .kind
+                    (Some(name), Some(ty)) => kind
                         .construct_from_name_and_type(crate_path, &name.var_name, &ty.var_name)
                         .unwrap_or_else(|| {
                             let var = &occs[0].var_name;

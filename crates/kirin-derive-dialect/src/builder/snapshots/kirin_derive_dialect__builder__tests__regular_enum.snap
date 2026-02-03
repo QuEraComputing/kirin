@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-derive-core/src/kirin/builder/mod.rs
-expression: "Builder::default().print(&input)"
+source: crates/kirin-derive-dialect/src/builder/tests.rs
+expression: "case!\n{\n    #[kirin(fn, type_lattice = SomeLattice)] enum TestEnum\n    {\n        A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, B(#[kirin(into)] u64, #[kirin(type = u64_type)] ResultValue,),\n    }\n}"
 ---
 impl TestEnum {
     pub fn op_a<Lang>(
@@ -21,7 +21,10 @@ impl TestEnum {
             .into();
         context
             .statement()
-            .definition(Self::A { value, result })
+            .definition(Self::A {
+                value: value,
+                result: result,
+            })
             .new();
         test_enum_build_result::A {
             id: a_statement_id,

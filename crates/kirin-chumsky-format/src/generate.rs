@@ -15,6 +15,7 @@ use std::collections::HashSet;
 
 use kirin_derive_core::codegen::GenericsBuilder;
 use kirin_derive_core::ir::VariantRef;
+use kirin_derive_core::ir::fields::FieldInfo;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -120,12 +121,12 @@ pub(crate) fn collect_all_value_types_needing_bounds(
 ///
 /// This is used by both AST generation and EmitIR generation.
 pub(crate) fn filter_ast_fields<'a>(
-    collected: &'a [crate::field_kind::CollectedField],
+    collected: &'a [FieldInfo<ChumskyLayout>],
     fields_in_format: &HashSet<usize>,
-) -> Vec<&'a crate::field_kind::CollectedField> {
+) -> Vec<&'a FieldInfo<ChumskyLayout>> {
     collected
         .iter()
-        .filter(|f| fields_in_format.contains(&f.index) || f.default.is_none())
+        .filter(|f| fields_in_format.contains(&f.index) || !f.has_default())
         .collect()
 }
 

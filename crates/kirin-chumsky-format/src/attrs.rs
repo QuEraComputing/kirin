@@ -27,7 +27,7 @@ pub struct ChumskyStatementAttrs {
 }
 
 /// Attributes applied to individual fields.
-#[derive(Debug, Clone, FromField)]
+#[derive(Debug, Clone, Default, FromField)]
 #[darling(attributes(chumsky))]
 pub struct ChumskyFieldAttrs {
     // Currently no field-level chumsky attributes

@@ -179,7 +179,8 @@ impl GenerateAST {
         let mut fields = Vec::new();
 
         for field in &filtered {
-            let ty = self.field_ast_type(&field.collection, &field.kind, ast_name);
+            let kind = FieldKind::from_field_info(field);
+            let ty = self.field_ast_type(&field.collection, &kind, ast_name);
             if let Some(ident) = &field.ident {
                 if with_pub {
                     fields.push(quote! { pub #ident: #ty });

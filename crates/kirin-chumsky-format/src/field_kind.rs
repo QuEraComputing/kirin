@@ -1,12 +1,10 @@
 //! Field kind enumeration for code generation.
 //!
-//! This module provides a unified `FieldKind` type used by both AST generation
-//! and parser generation.
+//! This module provides a `FieldKind` type with parser-specific methods.
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::DefaultValue;
-use kirin_derive_core::ir::fields::{Collection, FieldCategory, FieldInfo};
+use kirin_derive_core::ir::fields::{FieldCategory, FieldInfo};
 use kirin_derive_core::misc::is_type_in_generic;
 use kirin_derive_core::scan::Scan;
 use proc_macro2::TokenStream;
@@ -35,6 +33,21 @@ pub enum FieldKind {
 }
 
 impl FieldKind {
+    /// Creates a `FieldKind` from a `FieldInfo`.
+    pub fn from_field_info(field: &FieldInfo<ChumskyLayout>) -> Self {
+        match field.category() {
+            FieldCategory::Argument => FieldKind::SSAValue,
+            FieldCategory::Result => FieldKind::ResultValue,
+            FieldCategory::Block => FieldKind::Block,
+            FieldCategory::Successor => FieldKind::Successor,
+            FieldCategory::Region => FieldKind::Region,
+            FieldCategory::Value => {
+                let ty = field.value_type().cloned().unwrap_or_else(|| syn::parse_quote!(()));
+                FieldKind::Value(ty)
+            }
+        }
+    }
+
     /// Returns a human-readable name for this field kind.
     pub fn name(&self) -> &'static str {
         match self {
@@ -259,88 +272,11 @@ impl FieldKind {
     }
 }
 
-/// Collected field information used during code generation.
-///
-/// This combines the field index, identifier, collection type, and kind
-/// into a single structure for processing.
-#[derive(Debug, Clone)]
-pub struct CollectedField {
-    /// The positional index of this field
-    pub index: usize,
-    /// The field identifier (None for tuple fields)
-    pub ident: Option<syn::Ident>,
-    /// The collection type (Single, Vec, Option)
-    pub collection: Collection,
-    /// The kind of this field
-    pub kind: FieldKind,
-    /// The default value if specified via `#[kirin(default)]` or `#[kirin(default = ...)]`
-    pub default: Option<DefaultValue>,
-}
-
-impl CollectedField {
-    /// Creates a `CollectedField` from a `FieldInfo` and value type lookup.
-    ///
-    /// The `value_info` map provides (type, default) for compile-time value fields.
-    fn from_field_info(
-        info: FieldInfo<'_>,
-        value_info: &std::collections::HashMap<usize, (syn::Type, Option<DefaultValue>)>,
-    ) -> Self {
-        let (kind, default) = match info.category {
-            FieldCategory::Argument => (FieldKind::SSAValue, None),
-            FieldCategory::Result => (FieldKind::ResultValue, None),
-            FieldCategory::Block => (FieldKind::Block, None),
-            FieldCategory::Successor => (FieldKind::Successor, None),
-            FieldCategory::Region => (FieldKind::Region, None),
-            FieldCategory::Value => {
-                let (ty, default) =
-                    value_info
-                        .get(&info.field.index)
-                        .cloned()
-                        .unwrap_or_else(|| {
-                            // Fallback - should not happen in practice
-                            (syn::parse_quote!(()), None)
-                        });
-                (FieldKind::Value(ty), default)
-            }
-        };
-
-        CollectedField {
-            index: info.field.index,
-            ident: info.field.ident.clone(),
-            collection: info.collection.clone(),
-            kind,
-            default,
-        }
-    }
-}
-
-impl std::fmt::Display for CollectedField {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.ident {
-            Some(ident) => write!(f, "{}", ident),
-            None => write!(f, "field_{}", self.index),
-        }
-    }
-}
-
-/// Collects all fields from a statement.
-///
-/// Uses `Statement::iter_all_fields()` to iterate fields in consistent order:
-/// arguments, results, blocks, successors, regions, values.
-/// This ensures consistency with `Statement::field_bindings()`.
+/// Collects all fields from a statement using the method on Statement.
 pub fn collect_fields(
     stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
-) -> Vec<CollectedField> {
-    // Build a map from field index to Value type and default for compile-time values
-    let value_info: std::collections::HashMap<usize, (syn::Type, Option<DefaultValue>)> = stmt
-        .values
-        .iter()
-        .map(|v| (v.field.index, (v.ty.clone(), v.default.clone())))
-        .collect();
-
-    stmt.iter_all_fields()
-        .map(|info| CollectedField::from_field_info(info, &value_info))
-        .collect()
+) -> Vec<FieldInfo<ChumskyLayout>> {
+    stmt.collect_fields()
 }
 
 /// Scanner that collects Value field types containing type parameters.

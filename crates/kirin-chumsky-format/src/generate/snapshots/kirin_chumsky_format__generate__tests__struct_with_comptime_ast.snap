@@ -7,11 +7,11 @@ pub struct ConstantAST<'tokens, 'src, Language>
 where
     Language: ::kirin::ir::Dialect,
 {
+    pub value: <Value as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
     pub res: ::kirin::parsers::ResultValue<
         'src,
         <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
     >,
-    pub value: <Value as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
     #[doc(hidden)]
     _marker: ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
 }

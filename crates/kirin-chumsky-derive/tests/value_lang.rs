@@ -2,6 +2,7 @@
 
 use chumsky::prelude::*;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
+use kirin_chumsky::prelude::{ArenaDoc, DocAllocator, Document};
 use kirin_chumsky::{BoxedParser, HasParser, PrettyPrint, TokenInput, parse_ast};
 use kirin_lexer::Token;
 use kirin_test_utils::SimpleType;
@@ -28,6 +29,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Opcode {
         }
         .labelled("opcode")
         .boxed()
+    }
+}
+
+impl<L: kirin::ir::Dialect> PrettyPrint<L> for Opcode {
+    fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        doc.text(self.0.clone())
     }
 }
 

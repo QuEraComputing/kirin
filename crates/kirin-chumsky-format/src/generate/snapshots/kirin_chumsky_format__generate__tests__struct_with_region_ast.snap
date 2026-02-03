@@ -7,14 +7,14 @@ pub struct FunctionAST<'tokens, 'src, Language>
 where
     Language: ::kirin::ir::Dialect,
 {
-    pub res: ::kirin::parsers::ResultValue<
-        'src,
-        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
-    >,
     pub body: ::kirin::parsers::Region<
         'src,
         <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         FunctionAST<'tokens, 'src, Language>,
+    >,
+    pub res: ::kirin::parsers::ResultValue<
+        'src,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
     >,
     #[doc(hidden)]
     _marker: ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,

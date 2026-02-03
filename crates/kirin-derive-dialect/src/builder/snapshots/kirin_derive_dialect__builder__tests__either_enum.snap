@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-derive-core/src/kirin/builder/mod.rs
-expression: "Builder::default().print(&input)"
+source: crates/kirin-derive-dialect/src/builder/tests.rs
+expression: "case!\n{\n    #[kirin(fn, type_lattice = SomeLattice)] enum EitherEnum\n    {\n        #[kirin(fn = op_abc)] A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, #[wraps] B(InnerB),\n    }\n}"
 ---
 impl EitherEnum {
     pub fn op_abc<Lang>(
@@ -21,7 +21,10 @@ impl EitherEnum {
             .into();
         context
             .statement()
-            .definition(Self::A { value, result })
+            .definition(Self::A {
+                value: value,
+                result: result,
+            })
             .new();
         either_enum_build_result::A {
             id: a_statement_id,
@@ -46,7 +49,6 @@ pub mod either_enum_build_result {
 }
 impl From<InnerB> for EitherEnum {
     fn from(value: InnerB) -> Self {
-        let field_0 = value;
-        Self::B(field_0)
+        Self::B(value)
     }
 }

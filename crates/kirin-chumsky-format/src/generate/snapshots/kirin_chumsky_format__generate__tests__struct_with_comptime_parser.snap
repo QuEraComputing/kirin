@@ -43,6 +43,7 @@ where
                 .map(
                     |((res_name, value), res_type)| -> ConstantAST<'tokens, 'src, Language> {
                         ConstantAST {
+                            value: value,
                             res: ::kirin::parsers::ResultValue {
                                 name: ::kirin::parsers::Spanned {
                                     value: res_name.name,
@@ -50,7 +51,6 @@ where
                                 },
                                 ty: Some(res_type.ty.clone()),
                             },
-                            value: value,
                             _marker: ::core::marker::PhantomData,
                         }
                     },

@@ -2,11 +2,14 @@
 
 use std::collections::HashSet;
 
+use kirin_derive_core::ir::fields::FieldCategory;
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{CollectedField, FieldKind, collect_fields};
+use kirin_derive_core::ir::fields::FieldInfo;
+
+use crate::field_kind::{FieldKind, collect_fields};
 
 use super::{
     BoundsBuilder, GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields,
@@ -145,8 +148,8 @@ impl GenerateEmitIR {
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         original_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
-        collected: &[CollectedField],
-        ast_fields: &[&CollectedField],
+        collected: &[FieldInfo<ChumskyLayout>],
+        ast_fields: &[&FieldInfo<ChumskyLayout>],
         fields_in_fmt: &std::collections::HashSet<usize>,
         is_struct: bool,
     ) -> (TokenStream, TokenStream, TokenStream) {
@@ -311,7 +314,7 @@ impl GenerateEmitIR {
 
     fn generate_field_emit_calls(
         &self,
-        ast_fields: &[&CollectedField],
+        ast_fields: &[&FieldInfo<ChumskyLayout>],
         field_vars: &[syn::Ident],
         generics: &syn::Generics,
         _is_tuple: bool,
@@ -335,7 +338,9 @@ impl GenerateEmitIR {
                     proc_macro2::Span::call_site(),
                 );
 
-                match &field.kind {
+                // Use FieldKind to determine the emit behavior
+                let kind = FieldKind::from_field_info(field);
+                match kind {
                     FieldKind::SSAValue => {
                         quote! {
                             let #emitted_var: #ir_path::SSAValue = #crate_path::EmitIR::emit(#var, ctx);
@@ -361,7 +366,7 @@ impl GenerateEmitIR {
                             let #emitted_var: #ir_path::Region = #crate_path::EmitIR::emit(#var, ctx);
                         }
                     }
-                    FieldKind::Value(ty) => {
+                    FieldKind::Value(ref ty) => {
                         // Check if this Value type contains any type parameters
                         let needs_emit_ir = type_param_names.iter().any(|param_name| {
                             kirin_derive_core::misc::is_type(ty, param_name.as_str())
@@ -401,8 +406,8 @@ impl GenerateEmitIR {
         &self,
         original_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
-        all_fields: &[CollectedField],
-        ast_fields: &[&CollectedField],
+        all_fields: &[FieldInfo<ChumskyLayout>],
+        ast_fields: &[&FieldInfo<ChumskyLayout>],
         field_vars: &[syn::Ident],
         _fields_in_fmt: &HashSet<usize>,
         is_tuple: bool,
@@ -433,19 +438,20 @@ impl GenerateEmitIR {
                         syn::Ident::new(&format!("{}_ir", var), proc_macro2::Span::call_site());
 
                     // Field was parsed - use the emitted value
-                    match &field.kind {
-                        FieldKind::SSAValue
-                        | FieldKind::ResultValue
-                        | FieldKind::Block
-                        | FieldKind::Successor
-                        | FieldKind::Region => {
+                    // Use category to determine if we need .into()
+                    match field.category() {
+                        FieldCategory::Argument
+                        | FieldCategory::Result
+                        | FieldCategory::Block
+                        | FieldCategory::Successor
+                        | FieldCategory::Region => {
                             quote! { #emitted_var.into() }
                         }
-                        FieldKind::Value(_) => {
+                        FieldCategory::Value => {
                             quote! { #emitted_var }
                         }
                     }
-                } else if let Some(default_value) = &field.default {
+                } else if let Some(default_value) = field.default_value() {
                     // Field has a default - use the default expression
                     let default_expr = default_value.to_expr();
                     quote! { #default_expr }

@@ -7,7 +7,9 @@ use kirin_derive_core::ir::fields::Collection;
 use kirin_lexer::Token;
 
 use crate::ChumskyLayout;
-use crate::field_kind::CollectedField;
+use kirin_derive_core::ir::fields::FieldInfo;
+
+use crate::field_kind::FieldKind;
 use crate::format::{Format, FormatOption};
 use crate::visitor::FormatVisitor;
 
@@ -53,7 +55,7 @@ impl<'ir> ValidationVisitor<'ir> {
         mut self,
         stmt: &'ir Statement<ChumskyLayout>,
         format: &Format<'_>,
-        collected: &'ir [CollectedField],
+        collected: &'ir [FieldInfo<ChumskyLayout>],
     ) -> syn::Result<ValidationResult<'ir>> {
         // Pre-collect collection errors before visiting
         for field in collected {
@@ -70,7 +72,7 @@ impl<'ir> ValidationVisitor<'ir> {
 
         // Post-validation: check all required fields are present
         for field in collected {
-            if !self.referenced_fields.contains(&field.index) && field.default.is_none() {
+            if !self.referenced_fields.contains(&field.index) && !field.has_default() {
                 self.add_error(format!(
                     "field '{}' is not mentioned in the format string. \
                      All fields must appear in the format string unless they have a default value. \
@@ -81,7 +83,8 @@ impl<'ir> ValidationVisitor<'ir> {
             }
 
             // Validate SSA/Result fields have name occurrence
-            if field.kind.supports_name_type_options()
+            let kind = FieldKind::from_field_info(field);
+            if kind.supports_name_type_options()
                 && self.referenced_fields.contains(&field.index)
                 && !self.name_occurrences.contains(&field.index)
             {
@@ -109,7 +112,7 @@ impl<'ir> ValidationVisitor<'ir> {
     }
 
     /// Generates a unique variable name for a field occurrence.
-    fn generate_var_name(&self, field: &CollectedField, option: &FormatOption) -> syn::Ident {
+    fn generate_var_name(&self, field: &FieldInfo<ChumskyLayout>, option: &FormatOption) -> syn::Ident {
         match option {
             FormatOption::Name => {
                 syn::Ident::new(&format!("{}_name", field), proc_macro2::Span::call_site())
@@ -174,15 +177,16 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
 
     fn visit_field_occurrence(
         &mut self,
-        field: &'ir CollectedField,
+        field: &'ir FieldInfo<ChumskyLayout>,
         option: &FormatOption,
     ) -> syn::Result<()> {
         // Track that this field was referenced
         self.referenced_fields.insert(field.index);
 
         // Validate that :name and :type options are only used on SSA/Result fields
+        let kind = FieldKind::from_field_info(field);
         if matches!(option, FormatOption::Name | FormatOption::Type)
-            && !field.kind.supports_name_type_options()
+            && !kind.supports_name_type_options()
         {
             let option_name = match option {
                 FormatOption::Name => ":name",
@@ -193,7 +197,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 "format option '{}' cannot be used on {} field '{}'. \
                  The :name and :type options are only valid for SSAValue and ResultValue fields.",
                 option_name,
-                field.kind.name(),
+                kind.name(),
                 field
             ));
             return Ok(());
@@ -234,7 +238,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
         Ok(())
     }
 
-    fn visit_default_field(&mut self, _field: &'ir CollectedField) -> syn::Result<()> {
+    fn visit_default_field(&mut self, _field: &'ir FieldInfo<ChumskyLayout>) -> syn::Result<()> {
         // Fields with defaults that aren't in format are fine
         Ok(())
     }

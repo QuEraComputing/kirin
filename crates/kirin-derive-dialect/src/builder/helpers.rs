@@ -1,18 +1,11 @@
-use crate::builder::statement::{FieldInfo, FieldKind, StatementInfo};
+use crate::builder::statement::StatementInfo;
 use kirin_derive_core::derive::InputContext;
 use kirin_derive_core::ir::BuilderOptions;
-use kirin_derive_core::ir::fields::Collection;
+use kirin_derive_core::ir::fields::{Collection, FieldCategory};
 use kirin_derive_core::misc::{is_type, to_snake_case};
 use kirin_derive_core::prelude::*;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
-
-#[derive(Clone, Copy, Debug)]
-enum FieldStyle {
-    Named,
-    Unnamed,
-    Unit,
-}
 
 pub(crate) fn build_fn_name(
     is_enum: bool,
@@ -53,26 +46,26 @@ fn build_result_path(input: &InputContext, info: &StatementInfo) -> proc_macro2:
 fn build_fn_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
     let mut inputs = Vec::new();
     for field in info.fields.iter() {
-        match &field.kind {
-            FieldKind::Result { .. } => continue,
-            FieldKind::Value { ty, default, into } => {
-                if default.is_some() {
+        match field.category() {
+            FieldCategory::Result => continue,
+            FieldCategory::Value => {
+                if field.has_default() {
                     continue;
                 }
+                let ty = field.value_type().expect("Value field must have type");
                 let name = field.name_ident(ty.span());
-                let sig = if *into {
+                let sig = if field.has_into() {
                     quote! { #name: impl Into<#ty> }
                 } else {
                     quote! { #name: #ty }
                 };
                 inputs.push(sig);
             }
-            FieldKind::Wrapper { .. } => continue,
-            FieldKind::Argument { collection }
-            | FieldKind::Block { collection }
-            | FieldKind::Successor { collection }
-            | FieldKind::Region { collection } => {
-                let ty = field_type_for_kind(collection, &field.kind);
+            FieldCategory::Argument
+            | FieldCategory::Block
+            | FieldCategory::Successor
+            | FieldCategory::Region => {
+                let ty = field_type_for_category(&field.collection, field.category());
                 let name = field.name_ident(ty.span());
                 inputs.push(quote! { #name: impl Into<#ty> });
             }
@@ -84,15 +77,15 @@ fn build_fn_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
 fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
     let mut assigns = Vec::new();
     for field in info.fields.iter() {
-        match &field.kind {
-            FieldKind::Result { .. } => continue,
-            FieldKind::Wrapper { .. } => continue,
-            FieldKind::Value { ty, default, into } => {
+        match field.category() {
+            FieldCategory::Result => continue,
+            FieldCategory::Value => {
+                let ty = field.value_type().expect("Value field must have type");
                 let name = field.name_ident(ty.span());
-                if let Some(default_value) = default.as_ref() {
+                if let Some(default_value) = field.default_value() {
                     let expr = default_value.to_expr();
                     assigns.push(quote! { let #name: #ty = #expr; });
-                } else if *into {
+                } else if field.has_into() {
                     assigns.push(quote! { let #name: #ty = #name.into(); });
                 } else if is_type(ty, "PhantomData") {
                     assigns.push(
@@ -106,11 +99,11 @@ fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
                     assigns.push(quote! {});
                 }
             }
-            FieldKind::Argument { collection }
-            | FieldKind::Block { collection }
-            | FieldKind::Successor { collection }
-            | FieldKind::Region { collection } => {
-                let ty = field_type_for_kind(collection, &field.kind);
+            FieldCategory::Argument
+            | FieldCategory::Block
+            | FieldCategory::Successor
+            | FieldCategory::Region => {
+                let ty = field_type_for_category(&field.collection, field.category());
                 let name = field.name_ident(ty.span());
                 assigns.push(quote! { let #name: #ty = #name.into(); });
             }
@@ -119,15 +112,15 @@ fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
     assigns
 }
 
-fn field_type_for_kind(collection: &Collection, kind: &FieldKind) -> syn::Type {
-    let base = match kind {
-        FieldKind::Argument { .. } => "SSAValue",
-        FieldKind::Result { .. } => "ResultValue",
-        FieldKind::Block { .. } => "Block",
-        FieldKind::Successor { .. } => "Successor",
-        FieldKind::Region { .. } => "Region",
-        FieldKind::Wrapper { .. } | FieldKind::Value { .. } => {
-            unreachable!("field_type_for_kind only supports statement reference kinds")
+fn field_type_for_category(collection: &Collection, category: FieldCategory) -> syn::Type {
+    let base = match category {
+        FieldCategory::Argument => "SSAValue",
+        FieldCategory::Result => "ResultValue",
+        FieldCategory::Block => "Block",
+        FieldCategory::Successor => "Successor",
+        FieldCategory::Region => "Region",
+        FieldCategory::Value => {
+            unreachable!("field_type_for_category does not support Value")
         }
     };
     let base_ident: syn::Ident = syn::parse_str(base).unwrap();
@@ -142,7 +135,7 @@ fn result_names(info: &StatementInfo) -> Vec<syn::Ident> {
     let results: Vec<_> = info
         .fields
         .iter()
-        .filter(|f| matches!(f.kind, FieldKind::Result { .. }))
+        .filter(|f| f.category() == FieldCategory::Result)
         .collect();
     if results.len() == 1 {
         let field = results[0];
@@ -166,30 +159,6 @@ fn result_names(info: &StatementInfo) -> Vec<syn::Ident> {
         .collect()
 }
 
-fn initialization_tokens(
-    info: &StatementInfo,
-    field_style: FieldStyle,
-    result_name_map: &std::collections::HashMap<usize, syn::Ident>,
-) -> proc_macro2::TokenStream {
-    let names: Vec<_> = info
-        .fields
-        .iter()
-        .map(|field| {
-            if let Some(name) = result_name_map.get(&field.index) {
-                name.clone()
-            } else {
-                field.name_ident(info.name.span())
-            }
-        })
-        .collect();
-
-    match field_style {
-        FieldStyle::Named => quote! { { #(#names,)* } },
-        FieldStyle::Unnamed => quote! { ( #(#names,)* ) },
-        FieldStyle::Unit => quote! {},
-    }
-}
-
 fn statement_id_name(info: &StatementInfo) -> syn::Ident {
     let name = info.name.to_string().to_lowercase();
     format_ident!("{}_statement_id", name, span = info.name.span())
@@ -198,19 +167,36 @@ fn statement_id_name(info: &StatementInfo) -> syn::Ident {
 fn build_fn_body(
     info: &StatementInfo,
     input: &InputContext,
-    field_style: FieldStyle,
     result_name_map: &std::collections::HashMap<usize, syn::Ident>,
 ) -> proc_macro2::TokenStream {
     let statement_id = statement_id_name(info);
     let let_inputs = build_fn_let_inputs(info);
     let let_results = let_name_eq_result_value(info, result_name_map);
-    let init_head = if input.is_enum {
-        let name = &info.name;
-        quote! { Self::#name }
+
+    // Use ConstructorBuilder to generate the constructor expression
+    let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
+    let constructor = if input.is_enum {
+        ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple)
+            .build_with_self(&info.fields, |field| {
+                if let Some(name) = result_name_map.get(&field.index) {
+                    quote! { #name }
+                } else {
+                    let name = field.name_ident(info.name.span());
+                    quote! { #name }
+                }
+            })
     } else {
-        quote! { Self }
+        ConstructorBuilder::new_struct(&input.name, is_tuple)
+            .build_with_self(&info.fields, |field| {
+                if let Some(name) = result_name_map.get(&field.index) {
+                    quote! { #name }
+                } else {
+                    let name = field.name_ident(info.name.span());
+                    quote! { #name }
+                }
+            })
     };
-    let initialization = initialization_tokens(info, field_style, result_name_map);
+
     let build_result_path = build_result_path(input, info);
     let result_names = result_names(info);
 
@@ -221,7 +207,7 @@ fn build_fn_body(
 
         context
             .statement()
-            .definition(#init_head #initialization)
+            .definition(#constructor)
             .new();
 
         #build_result_path {
@@ -239,9 +225,12 @@ fn let_name_eq_result_value(
     let statement_id = statement_id_name(info);
     let mut result_index = 0usize;
     for field in info.fields.iter() {
-        let FieldKind::Result { collection, ssa_ty } = &field.kind else {
+        if field.category() != FieldCategory::Result {
             continue;
-        };
+        }
+        let collection = &field.collection;
+        let ssa_ty = field.ssa_type().expect("Result field must have ssa_type");
+        
         if matches!(collection, Collection::Vec) {
             results.push(
                 syn::Error::new_spanned(
@@ -280,18 +269,6 @@ fn let_name_eq_result_value(
     quote! { #(#results)* }
 }
 
-fn field_style(fields: &[FieldInfo]) -> FieldStyle {
-    if fields.is_empty() {
-        return FieldStyle::Unit;
-    }
-    let has_named = fields.iter().any(|f| f.ident.is_some());
-    if has_named {
-        FieldStyle::Named
-    } else {
-        FieldStyle::Unnamed
-    }
-}
-
 pub(crate) fn build_fn_for_statement(
     info: &StatementInfo,
     input: &InputContext,
@@ -308,16 +285,15 @@ pub(crate) fn build_fn_for_statement(
     let type_lattice = &input.type_lattice;
     let build_fn_name = &info.build_fn_name;
     let build_result_path = build_result_path(input, info);
-    let style = field_style(&info.fields);
     let result_names = result_names(info);
     let result_name_map = info
         .fields
         .iter()
-        .filter(|f| matches!(f.kind, FieldKind::Result { .. }))
+        .filter(|f| f.category() == FieldCategory::Result)
         .zip(result_names.iter().cloned())
         .map(|(field, name)| (field.index, name))
         .collect::<std::collections::HashMap<_, _>>();
-    let body = build_fn_body(info, input, style, &result_name_map);
+    let body = build_fn_body(info, input, &result_name_map);
     let self_ty = quote! { #name #ty_generics };
 
     let fn_tokens = quote! {
@@ -390,30 +366,28 @@ pub(crate) fn build_result_impl(
     let results = info
         .fields
         .iter()
-        .filter(|f| matches!(f.kind, FieldKind::Result { .. }))
+        .filter(|f| f.category() == FieldCategory::Result)
         .collect::<Vec<_>>();
 
     for (field, name) in results.into_iter().zip(names.into_iter()) {
-        if let FieldKind::Result { collection, .. } = &field.kind {
-            if matches!(collection, Collection::Vec) {
-                fields.push(
-                    syn::Error::new_spanned(
-                        field.name_ident(info.name.span()),
-                        "ResultValue field cannot be a Vec, consider implementing the builder manually",
-                    )
-                    .to_compile_error(),
-                );
-                continue;
-            } else if matches!(collection, Collection::Option) {
-                fields.push(
-                    syn::Error::new_spanned(
-                        field.name_ident(info.name.span()),
-                        "ResultValue field cannot be an Option, consider implementing the builder manually",
-                    )
-                    .to_compile_error(),
-                );
-                continue;
-            }
+        if matches!(field.collection, Collection::Vec) {
+            fields.push(
+                syn::Error::new_spanned(
+                    field.name_ident(info.name.span()),
+                    "ResultValue field cannot be a Vec, consider implementing the builder manually",
+                )
+                .to_compile_error(),
+            );
+            continue;
+        } else if matches!(field.collection, Collection::Option) {
+            fields.push(
+                syn::Error::new_spanned(
+                    field.name_ident(info.name.span()),
+                    "ResultValue field cannot be an Option, consider implementing the builder manually",
+                )
+                .to_compile_error(),
+            );
+            continue;
         }
 
         fields.push(quote! {
@@ -482,53 +456,86 @@ where
 pub(crate) fn from_impl(input: &InputContext, info: &StatementInfo) -> proc_macro2::TokenStream {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let name = &input.name;
+    // Get wrapper type from StatementInfo
     let wrapper_ty = info
-        .fields
-        .iter()
-        .find_map(|field| {
-            if let FieldKind::Wrapper { ty } = &field.kind {
-                Some(ty.clone())
-            } else {
-                None
-            }
-        })
+        .wrapper_type
+        .clone()
         .unwrap_or_else(|| syn::parse_quote!(()));
 
+    // For wrapper variants, we need to generate let statements for each field
+    // The wrapper field gets `value`, other fields get defaults
     let let_name_eq_input: Vec<_> = info
         .fields
         .iter()
         .map(|field| {
-            let name = field.name_ident(info.name.span());
-            match &field.kind {
-                FieldKind::Wrapper { .. } => quote! { let #name = value },
-                FieldKind::Value { default, .. } => {
-                    if let Some(default_value) = default.as_ref() {
+            let field_name = field.name_ident(info.name.span());
+            match field.category() {
+                FieldCategory::Value => {
+                    if let Some(default_value) = field.default_value() {
                         let expr = default_value.to_expr();
-                        quote! { let #name = #expr }
+                        quote! { let #field_name = #expr }
                     } else {
-                        quote! { let #name = ::core::default::Default::default() }
+                        quote! { let #field_name = ::core::default::Default::default() }
                     }
                 }
-                _ => quote! { let #name = Default::default() },
+                _ => quote! { let #field_name = Default::default() },
             }
         })
         .collect();
 
+    // Build the constructor using ConstructorBuilder
+    let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
+    
+    // For wrapper impl, we need to handle differently - just construct with `value`
+    // Since wrapper fields are not in `fields` anymore, we just use the wrapper_type directly
     let init_head = if input.is_enum {
-        let name = &info.name;
-        quote! { Self::#name }
+        let variant_name = &info.name;
+        quote! { Self::#variant_name }
     } else {
         quote! { Self }
     };
-    let style = field_style(&info.fields);
-    let result_name_map = std::collections::HashMap::new();
-    let initialization = initialization_tokens(info, style, &result_name_map);
 
-    quote! {
-        impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
-            fn from(value: #wrapper_ty) -> Self {
-                #(#let_name_eq_input;)*
-                #init_head #initialization
+    // For wrappers, typically there's a single field that takes `value`
+    // Check if fields is empty (pure wrapper) or has additional fields
+    if info.fields.is_empty() {
+        // Pure wrapper - just wrap the value
+        let initialization = if is_tuple || info.fields.is_empty() {
+            quote! { (value) }
+        } else {
+            // This shouldn't happen for pure wrappers
+            quote! { { value } }
+        };
+
+        quote! {
+            impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
+                fn from(value: #wrapper_ty) -> Self {
+                    #init_head #initialization
+                }
+            }
+        }
+    } else {
+        // Wrapper with additional fields - this is a more complex case
+        // Use ConstructorBuilder for the constructor
+        let constructor = if input.is_enum {
+            ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple)
+                .build_with_self(&info.fields, |field| {
+                    let field_name = field.name_ident(info.name.span());
+                    quote! { #field_name }
+                })
+        } else {
+            ConstructorBuilder::new_struct(&input.name, is_tuple)
+                .build_with_self(&info.fields, |field| {
+                    let field_name = field.name_ident(info.name.span());
+                    quote! { #field_name }
+                })
+        };
+
+        quote! {
+            impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
+                fn from(value: #wrapper_ty) -> Self {
+                    #(#let_name_eq_input;)*
+                    #constructor
+                }
             }
         }
     }

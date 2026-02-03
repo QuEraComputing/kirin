@@ -9,7 +9,9 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::{CollectedField, collect_fields};
+use kirin_derive_core::ir::fields::FieldInfo;
+
+use crate::field_kind::{FieldKind, collect_fields};
 use crate::format::{Format, FormatElement};
 use kirin_lexer::Token;
 
@@ -224,8 +226,8 @@ impl GeneratePrettyPrint {
     fn generate_format_print(
         &self,
         format: &Format,
-        field_map: &IndexMap<String, (usize, &CollectedField)>,
-        _collected: &[CollectedField],
+        field_map: &IndexMap<String, (usize, &FieldInfo<ChumskyLayout>)>,
+        _collected: &[FieldInfo<ChumskyLayout>],
         field_vars: &[syn::Ident],
     ) -> TokenStream {
         let prettyless_path = &self.prettyless_path;
@@ -253,7 +255,8 @@ impl GeneratePrettyPrint {
                         let var = &field_vars[*idx];
                         let var_ref = quote! { #var };
 
-                        let print_expr = field.kind.print_expr(prettyless_path, &var_ref, opt);
+                        let kind = FieldKind::from_field_info(field);
+                        let print_expr = kind.print_expr(prettyless_path, &var_ref, opt);
 
                         // Add space before field if preceded by another field (no Token between)
                         if !is_first && prev_is_field {
@@ -279,11 +282,11 @@ impl GeneratePrettyPrint {
     }
 }
 
-/// Build a map from field name/index (string) to (index, CollectedField)
+/// Build a map from field name/index (string) to (index, FieldInfo)
 ///
 /// For named fields, both the field name and its index are added as keys.
 /// This allows format strings to use either `{field_name}` or `{0}` syntax.
-fn build_field_map(collected: &[CollectedField]) -> IndexMap<String, (usize, &CollectedField)> {
+fn build_field_map(collected: &[FieldInfo<ChumskyLayout>]) -> IndexMap<String, (usize, &FieldInfo<ChumskyLayout>)> {
     let mut map = IndexMap::new();
     for (idx, field) in collected.iter().enumerate() {
         // Always add the index as a key (for {0}, {1}, etc. syntax)

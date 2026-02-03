@@ -1,6 +1,7 @@
 //! Validation result types.
 
-use crate::field_kind::CollectedField;
+use crate::ChumskyLayout;
+use kirin_derive_core::ir::fields::FieldInfo;
 use crate::format::FormatOption;
 
 /// Result of validation containing field occurrences.
@@ -14,7 +15,7 @@ pub struct ValidationResult<'a> {
 #[derive(Debug, Clone)]
 pub struct FieldOccurrence<'a> {
     /// The collected field info.
-    pub field: &'a CollectedField,
+    pub field: &'a FieldInfo<ChumskyLayout>,
     /// The format option for this occurrence.
     pub option: FormatOption,
     /// The unique variable name for this occurrence.

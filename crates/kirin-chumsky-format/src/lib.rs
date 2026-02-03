@@ -15,7 +15,7 @@ mod validation;
 mod visitor;
 
 pub use attrs::{ChumskyFieldAttrs, ChumskyGlobalAttrs, ChumskyStatementAttrs};
-pub use field_kind::{CollectedField, FieldKind, collect_fields};
+pub use field_kind::{FieldKind, collect_fields};
 pub use format::{Format, FormatElement, FormatOption};
 pub use generate::{GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint};
 pub use generics::GenericsBuilder;

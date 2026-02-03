@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-derive-core/src/kirin/builder/mod.rs
-expression: "Builder::default().print(&input)"
+source: crates/kirin-derive-dialect/src/builder/tests.rs
+expression: "case!\n{\n    #[kirin(constant, fn = new, type_lattice = L)] pub struct Constant<T:\n    CompileTimeValue + Typeof<L>, L: TypeLattice>\n    {\n        #[kirin(into)] pub value: T, #[kirin(type = value.type_of())] pub\n        result: ResultValue, #[kirin(default = std::marker::PhantomData)] pub\n        marker: std::marker::PhantomData<L>,\n    }\n}"
 ---
 #[automatically_derived]
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
@@ -24,9 +24,9 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
         context
             .statement()
             .definition(Self {
-                value,
-                result,
-                marker,
+                value: value,
+                result: result,
+                marker: marker,
             })
             .new();
         constant_build_result::Constant {

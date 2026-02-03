@@ -15,15 +15,15 @@ where
     type Output = ::kirin::ir::Statement;
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
         let Self {
-            res: f_res,
             value: f_value,
+            res: f_res,
             ..
         } = self;
-        let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
         let f_value_ir = f_value.clone();
+        let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
         let dialect_variant: Constant = Constant {
-            res: f_res_ir.into(),
             value: f_value_ir,
+            res: f_res_ir.into(),
         };
         ctx.context.statement().definition(dialect_variant).new()
     }

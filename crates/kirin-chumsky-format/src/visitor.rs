@@ -9,7 +9,7 @@ use kirin_derive_core::ir::Statement;
 use kirin_lexer::Token;
 
 use crate::ChumskyLayout;
-use crate::field_kind::CollectedField;
+use kirin_derive_core::ir::fields::FieldInfo;
 use crate::format::{Format, FormatElement, FormatOption};
 
 /// Visitor trait for format-driven traversal.
@@ -34,7 +34,7 @@ pub trait FormatVisitor<'ir> {
     /// (e.g., `{x:name}` and `{x:type}`).
     fn visit_field_occurrence(
         &mut self,
-        _field: &'ir CollectedField,
+        _field: &'ir FieldInfo<ChumskyLayout>,
         _option: &FormatOption,
     ) -> syn::Result<()> {
         Ok(())
@@ -51,7 +51,7 @@ pub trait FormatVisitor<'ir> {
     ///
     /// These fields won't be parsed/printed but need to be included
     /// in the AST with their default values.
-    fn visit_default_field(&mut self, _field: &'ir CollectedField) -> syn::Result<()> {
+    fn visit_default_field(&mut self, _field: &'ir FieldInfo<ChumskyLayout>) -> syn::Result<()> {
         Ok(())
     }
 
@@ -85,9 +85,9 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
     visitor: &mut V,
     stmt: &'ir Statement<ChumskyLayout>,
     format: &Format<'_>,
-    collected: &'ir [CollectedField],
+    collected: &'ir [FieldInfo<ChumskyLayout>],
 ) -> syn::Result<()> {
-    // Build a map from field name/index to CollectedField
+    // Build a map from field name/index to FieldInfo
     let field_map = build_field_map(stmt, collected);
 
     // Track which fields are referenced in the format
@@ -114,7 +114,7 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
 
     // Visit fields with defaults that weren't in the format
     for field in collected {
-        if !referenced_fields.contains(&field.index) && field.default.is_some() {
+        if !referenced_fields.contains(&field.index) && field.has_default() {
             visitor.visit_default_field(field)?;
         }
     }
@@ -125,11 +125,11 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
     Ok(())
 }
 
-/// Builds a map from field name (string or index) to CollectedField.
+/// Builds a map from field name (string or index) to FieldInfo.
 fn build_field_map<'a>(
     stmt: &Statement<ChumskyLayout>,
-    collected: &'a [CollectedField],
-) -> HashMap<String, &'a CollectedField> {
+    collected: &'a [FieldInfo<ChumskyLayout>],
+) -> HashMap<String, &'a FieldInfo<ChumskyLayout>> {
     let name_to_index = stmt.field_name_to_index();
     let mut map = HashMap::new();
 
@@ -163,7 +163,7 @@ pub struct VisitorContext<'ir, 'fmt> {
     /// The parsed format string
     pub format: &'fmt Format<'fmt>,
     /// Map from field name/index to field
-    pub field_map: HashMap<String, &'ir CollectedField>,
+    pub field_map: HashMap<String, &'ir FieldInfo<ChumskyLayout>>,
 }
 
 impl<'ir, 'fmt> VisitorContext<'ir, 'fmt> {
@@ -171,7 +171,7 @@ impl<'ir, 'fmt> VisitorContext<'ir, 'fmt> {
     pub fn new(
         stmt: &'ir Statement<ChumskyLayout>,
         format: &'fmt Format<'fmt>,
-        collected: &'ir [CollectedField],
+        collected: &'ir [FieldInfo<ChumskyLayout>],
     ) -> Self {
         Self {
             stmt,
@@ -181,7 +181,7 @@ impl<'ir, 'fmt> VisitorContext<'ir, 'fmt> {
     }
 
     /// Looks up a field by name or index.
-    pub fn get_field(&self, name: &str) -> Option<&'ir CollectedField> {
+    pub fn get_field(&self, name: &str) -> Option<&'ir FieldInfo<ChumskyLayout>> {
         self.field_map.get(name).copied()
     }
 }
@@ -214,7 +214,7 @@ mod tests {
 
         fn visit_field_occurrence(
             &mut self,
-            field: &'ir CollectedField,
+            field: &'ir FieldInfo<ChumskyLayout>,
             option: &FormatOption,
         ) -> syn::Result<()> {
             self.field_occurrences.push((field.index, option.clone()));
@@ -226,7 +226,7 @@ mod tests {
             Ok(())
         }
 
-        fn visit_default_field(&mut self, field: &'ir CollectedField) -> syn::Result<()> {
+        fn visit_default_field(&mut self, field: &'ir FieldInfo<ChumskyLayout>) -> syn::Result<()> {
             self.default_fields.push(field.index);
             Ok(())
         }

@@ -9,10 +9,12 @@ pub mod tokens;
 
 pub mod prelude {
     pub use crate::codegen::{
-        self, FieldBindings, GenericsBuilder, combine_where_clauses, deduplicate_types,
+        self, ConstructorBuilder, FieldBindings, GenericsBuilder, combine_where_clauses,
+        deduplicate_types,
     };
     pub use crate::derive::{self, InputBuilder, InputContext};
     pub use crate::emit::{self, Emit};
+    pub use crate::ir::fields::{FieldData, FieldInfo};
     pub use crate::ir::{self, Layout, StandardLayout};
     pub use crate::scan::{self, Scan};
     pub use crate::tokens::{

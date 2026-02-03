@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-chumsky-format/src/generate/tests.rs
+assertion_line: 81
 expression: pretty
 ---
 impl ::kirin_prettyless::PrettyPrint<Function> for Function {
@@ -9,8 +10,8 @@ impl ::kirin_prettyless::PrettyPrint<Function> for Function {
     ) -> ::kirin_prettyless::ArenaDoc<'a> {
         use kirin_prettyless::DocAllocator;
         let Function {
-            res: f_res,
             body: f_body,
+            res: f_res,
         } = self;
         ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
             + doc.text(" = function ")
