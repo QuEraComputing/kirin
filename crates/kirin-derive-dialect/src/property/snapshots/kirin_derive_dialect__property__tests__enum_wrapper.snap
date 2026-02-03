@@ -1,13 +1,17 @@
 ---
-source: crates/kirin-derive-core/src/kirin/property/mod.rs
-expression: content
+source: crates/kirin-derive-dialect/src/property/tests.rs
+expression: "case!\n{\n    #[kirin(type_lattice = Lattice, constant)] #[wraps] enum MyEnum<T>\n    { VariantA { inner: InnerStructA<T> }, VariantB(InnerStructB), }\n}"
 ---
 #[automatically_derived]
 impl<T> ::kirin::ir::IsConstant for MyEnum<T> {
     fn is_constant(&self) -> bool {
         match self {
-            Self::VariantA { inner } => <InnerStructA<T> as IsConstant>::is_constant(inner),
-            Self::VariantB(field_0) => <InnerStructB as IsConstant>::is_constant(field_0),
+            Self::VariantA { inner } => {
+                <InnerStructA<T> as ::kirin::ir::IsConstant>::is_constant(inner)
+            }
+            Self::VariantB(field_0) => {
+                <InnerStructB as ::kirin::ir::IsConstant>::is_constant(field_0)
+            }
         }
     }
 }

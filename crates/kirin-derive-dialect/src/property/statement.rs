@@ -36,11 +36,7 @@ impl StatementBuilder {
         if let Some(wrapper) = &statement.wraps {
             let wrapper_field = field_name_tokens(&wrapper.field);
             let wrapper_ty = &wrapper.ty;
-            let trait_path = if input.core.is_enum {
-                derive.trait_path.clone()
-            } else {
-                derive.full_trait_path(input)
-            };
+            let trait_path = derive.full_trait_path(input);
             return WrapperCallTokens::builder()
                 .wrapper_ty(wrapper_ty)
                 .trait_path(trait_path)

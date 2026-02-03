@@ -176,6 +176,23 @@ fn test_struct_named_wrapper() {
 }
 
 #[test]
+fn test_struct_wrapper_iter_uses_lifetime() {
+    let generated = case! {
+        #[wraps]
+        #[kirin(fn, type_lattice = T)]
+        struct NamedWrapper<T> {
+            wrapped: InnerStruct<T>,
+        }
+    };
+    assert!(
+        generated.contains("HasArguments<'a>")
+            && generated.contains("HasArgumentsMut<'a>"),
+        "wrapper iter types must include trait lifetime:\n{}",
+        generated
+    );
+}
+
+#[test]
 fn test_struct_unnamed_wrapper() {
     insta::assert_snapshot!(case! {
         #[kirin(type_lattice = T)]

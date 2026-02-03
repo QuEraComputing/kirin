@@ -94,6 +94,23 @@ fn test_enum_wrapper() {
 }
 
 #[test]
+fn test_enum_wrapper_uses_crate_trait_path() {
+    let generated = case! {
+        #[kirin(type_lattice = Lattice, constant)]
+        #[wraps]
+        enum MyEnum<T> {
+            VariantA { inner: InnerStructA<T> },
+            VariantB(InnerStructB),
+        }
+    };
+    assert!(
+        generated.contains("as ::kirin::ir::IsConstant"),
+        "wrapper variant calls must use crate-qualified trait path:\n{}",
+        generated
+    );
+}
+
+#[test]
 fn test_enum_mixed() {
     insta::assert_snapshot!(case! {
         #[kirin(type_lattice = Lattice)]

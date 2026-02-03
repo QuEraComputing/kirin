@@ -95,7 +95,8 @@ impl<'a> StatementBuilder<'a> {
                 .build()
                 .to_token_stream()
         } else {
-            let (_, wrapper_ty_generics, _) = self.input.generics.split_for_impl();
+            let generics_with_lt = input_builder.add_trait_lifetime(&self.input.generics);
+            let (_, wrapper_ty_generics, _) = generics_with_lt.split_for_impl();
             WrapperIterTypeTokens::builder()
                 .wrapper_ty(wrapper_ty)
                 .trait_path(trait_path)
