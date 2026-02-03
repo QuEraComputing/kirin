@@ -232,17 +232,7 @@ impl GenerateHasDialectParser {
                     Language: #crate_path::HasDialectParser<'tokens, 'src, Language>,
                 {
                     use #crate_path::chumsky::prelude::*;
-                    // SAFETY: The transmute converts between two identical types:
-                    // - #ast_type (the concrete AST type with explicit lifetimes)
-                    // - Self::Output (defined as `type Output = #ast_type` above)
-                    //
-                    // This transmute is necessary because Rust's type system treats associated
-                    // types as opaque during type checking. Even though `type Output = #ast_type`
-                    // is defined in this impl block, Rust cannot unify the concrete type with
-                    // `Self::Output` for type inference purposes. The types are identical by
-                    // construction, so this transmute is safe.
-                    let parser: #crate_path::BoxedParser<'tokens, 'src, I, #ast_type> = #parser_body.boxed();
-                    unsafe { ::core::mem::transmute(parser) }
+                    #parser_body.boxed()
                 }
             }
         }
