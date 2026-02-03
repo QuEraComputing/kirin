@@ -11,7 +11,10 @@ pub use prettyless::DocAllocator;
 pub type ArenaDoc<'a> = DocBuilder<'a, Arena<'a>>;
 
 pub mod prelude {
-    pub use crate::{ArenaDoc, DocAllocator, Document, PrettyPrint, PrettyPrintExt, PrettyPrintName, PrettyPrintType};
+    pub use crate::{
+        ArenaDoc, DocAllocator, Document, PrettyPrint, PrettyPrintExt, PrettyPrintName,
+        PrettyPrintType,
+    };
     pub use prettyless;
 }
 

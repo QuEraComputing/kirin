@@ -1,12 +1,15 @@
 //! Code generation for chumsky derive macros.
 
 mod ast;
+mod bounds;
 mod emit_ir;
 mod parser;
 mod pretty_print;
 
 #[cfg(test)]
 mod tests;
+
+pub(crate) use bounds::BoundsBuilder;
 
 use std::collections::HashSet;
 

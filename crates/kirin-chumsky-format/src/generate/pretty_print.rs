@@ -13,7 +13,9 @@ use crate::field_kind::{CollectedField, collect_fields};
 use crate::format::{Format, FormatElement};
 use kirin_lexer::Token;
 
-use super::{collect_all_value_types_needing_bounds, generate_enum_match};
+use super::{
+    BoundsBuilder, GeneratorConfig, collect_all_value_types_needing_bounds, generate_enum_match,
+};
 
 /// Generator for the `PrettyPrint` trait implementation.
 pub struct GeneratePrettyPrint {
@@ -75,14 +77,13 @@ impl GeneratePrettyPrint {
 
         let (impl_generics, _, where_clause) = ir_input.generics.split_for_impl();
 
-        // Add PrettyPrint bounds for Value field types containing type parameters
+        // Use BoundsBuilder to generate PrettyPrint bounds
+        let config = GeneratorConfig::new(ir_input);
+        let bounds = BoundsBuilder::new(&config.crate_path, &config.ir_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
-        let value_type_bounds: Vec<syn::WherePredicate> = value_types
-            .iter()
-            .map(|ty| {
-                syn::parse_quote! { #ty: #prettyless_path::PrettyPrint<#dialect_name #ty_generics> }
-            })
-            .collect();
+        let dialect_type = quote! { #dialect_name #ty_generics };
+        let value_type_bounds =
+            bounds.pretty_print_bounds(&value_types, &dialect_type, prettyless_path);
 
         let final_where = if value_type_bounds.is_empty() {
             quote! { #where_clause }
@@ -198,9 +199,7 @@ impl GeneratePrettyPrint {
                 quote! { #prettyless_path::PrettyPrint::pretty_print(inner, doc) }
             },
             // Regular variant handler
-            |name, variant| {
-                self.generate_variant_print(variant, dialect_name, name)
-            },
+            |name, variant| self.generate_variant_print(variant, dialect_name, name),
             None, // No marker for dialect types
         )
     }

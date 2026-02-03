@@ -246,9 +246,7 @@ impl<'a> GenericsBuilder<'a> {
             .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == lang_ident))
         {
             let mut lang_param = syn::TypeParam::from(lang_ident);
-            lang_param
-                .bounds
-                .push(syn::parse_quote!(#ir_path::Dialect));
+            lang_param.bounds.push(syn::parse_quote!(#ir_path::Dialect));
             generics.params.push(syn::GenericParam::Type(lang_param));
         }
 

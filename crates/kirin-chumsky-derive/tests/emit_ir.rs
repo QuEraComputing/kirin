@@ -3,9 +3,9 @@
 //! These tests verify that parsed AST nodes can be correctly converted to IR nodes
 //! using the EmitIR trait.
 
-use kirin_test_utils::SimpleType;
 use kirin::ir::{Context, Dialect, GetInfo, ResultValue, SSAValue};
 use kirin_chumsky::{EmitContext, EmitIR, HasParser, PrettyPrint, parse, parse_ast};
+use kirin_test_utils::SimpleType;
 
 /// A simple dialect for testing EmitIR functionality.
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]

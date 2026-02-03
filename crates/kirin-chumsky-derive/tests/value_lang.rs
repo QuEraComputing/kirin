@@ -1,10 +1,10 @@
 //! Tests for compile-time value fields (non-IR types with HasParser).
 
 use chumsky::prelude::*;
-use kirin_test_utils::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::{BoxedParser, HasParser, PrettyPrint, TokenInput, parse_ast};
 use kirin_lexer::Token;
+use kirin_test_utils::SimpleType;
 
 /// A custom compile-time value type that parses any identifier.
 #[derive(Debug, Clone, PartialEq)]

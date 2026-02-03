@@ -8,7 +8,10 @@ use quote::quote;
 use crate::ChumskyLayout;
 use crate::field_kind::{CollectedField, FieldKind, collect_fields};
 
-use super::{GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields, generate_enum_match, get_fields_in_format};
+use super::{
+    BoundsBuilder, GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields,
+    generate_enum_match, get_fields_in_format,
+};
 
 /// Generator for the `EmitIR` trait implementation.
 pub struct GenerateEmitIR {
@@ -49,9 +52,13 @@ impl GenerateEmitIR {
         let (_, original_ty_generics, _) = ir_input.generics.split_for_impl();
 
         let emit_body = match &ir_input.data {
-            kirin_derive_core::ir::Data::Struct(s) => {
-                self.generate_struct_emit(ir_input, &s.0, original_name, &original_ty_generics, None)
-            }
+            kirin_derive_core::ir::Data::Struct(s) => self.generate_struct_emit(
+                ir_input,
+                &s.0,
+                original_name,
+                &original_ty_generics,
+                None,
+            ),
             kirin_derive_core::ir::Data::Enum(e) => {
                 self.generate_enum_emit(ir_input, e, original_name, &original_ty_generics, ast_name)
             }
@@ -60,24 +67,10 @@ impl GenerateEmitIR {
         let type_lattice = &self.config.type_lattice;
         let ir_path = &self.config.ir_path;
 
-        // Add HasParser + EmitIR bounds for Value field types containing type parameters
-        // For each type T that contains type parameters:
-        // - T: HasParser<'tokens, 'src> + 'tokens (so we can parse it)
-        // - <T as HasParser>::Output: EmitIR<Language, Output = T> (so we can emit it back to T)
+        // Use BoundsBuilder to generate EmitIR bounds
+        let bounds = BoundsBuilder::new(crate_path, ir_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
-        let value_type_bounds: Vec<syn::WherePredicate> = value_types
-            .iter()
-            .flat_map(|ty| {
-                vec![
-                    syn::parse_quote! {
-                        #ty: #crate_path::HasParser<'tokens, 'src> + 'tokens
-                    },
-                    syn::parse_quote! {
-                        <#ty as #crate_path::HasParser<'tokens, 'src>>::Output: #crate_path::EmitIR<Language, Output = #ty>
-                    },
-                ]
-            })
-            .collect();
+        let value_type_bounds = bounds.emit_ir_bounds(&value_types);
 
         // IR type parameter for the EmitIR impl
         // We need:

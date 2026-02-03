@@ -5,8 +5,8 @@
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::fields::{Collection, FieldCategory, FieldInfo};
 use kirin_derive_core::ir::DefaultValue;
+use kirin_derive_core::ir::fields::{Collection, FieldCategory, FieldInfo};
 use kirin_derive_core::misc::is_type_in_generic;
 use kirin_derive_core::scan::Scan;
 use proc_macro2::TokenStream;
@@ -133,7 +133,8 @@ impl FieldKind {
                 // Parser returns Block<..., <Language as HasDialectParser>::Output>
                 // AST type is Block<..., AST<..., Language>>
                 // These are the same type when Language: HasDialectParser, so the transmute is safe.
-                let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+                let type_ast =
+                    quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
                     #crate_path::block::<_, Language, #type_lattice>(language.clone())
                         .map(|b| unsafe {
@@ -152,7 +153,8 @@ impl FieldKind {
                 // Parser returns Region<..., <Language as HasDialectParser>::Output>
                 // AST type is Region<..., AST<..., Language>>
                 // These are the same type when Language: HasDialectParser, so the transmute is safe.
-                let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+                let type_ast =
+                    quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
                     #crate_path::region::<_, Language, #type_lattice>(language.clone())
                         .map(|r| unsafe {
@@ -290,13 +292,14 @@ impl CollectedField {
             FieldCategory::Successor => (FieldKind::Successor, None),
             FieldCategory::Region => (FieldKind::Region, None),
             FieldCategory::Value => {
-                let (ty, default) = value_info
-                    .get(&info.field.index)
-                    .cloned()
-                    .unwrap_or_else(|| {
-                        // Fallback - should not happen in practice
-                        (syn::parse_quote!(()), None)
-                    });
+                let (ty, default) =
+                    value_info
+                        .get(&info.field.index)
+                        .cloned()
+                        .unwrap_or_else(|| {
+                            // Fallback - should not happen in practice
+                            (syn::parse_quote!(()), None)
+                        });
                 (FieldKind::Value(ty), default)
             }
         };
@@ -445,4 +448,3 @@ pub fn fields_in_format(
 
     indices
 }
-

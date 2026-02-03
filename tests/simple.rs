@@ -1,6 +1,5 @@
 use kirin::prelude::*;
 
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum SimpleTypeLattice {
     Any,

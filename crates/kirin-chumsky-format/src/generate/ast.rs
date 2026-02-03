@@ -8,7 +8,10 @@ use crate::field_kind::{FieldKind, collect_fields};
 
 use kirin_derive_core::codegen::deduplicate_types;
 
-use super::{GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields, get_fields_in_format};
+use super::{
+    GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields,
+    get_fields_in_format,
+};
 
 /// Generator for AST type definitions.
 ///
@@ -58,7 +61,10 @@ impl GenerateAST {
         let type_lattice_ty: syn::Type = syn::parse_quote!(#type_lattice);
         for param_name in &type_param_names {
             if kirin_derive_core::misc::is_type(&type_lattice_ty, param_name.as_str())
-                || kirin_derive_core::misc::is_type_in_generic(&type_lattice_ty, param_name.as_str())
+                || kirin_derive_core::misc::is_type_in_generic(
+                    &type_lattice_ty,
+                    param_name.as_str(),
+                )
             {
                 all_types.push(type_lattice_ty.clone());
                 break;

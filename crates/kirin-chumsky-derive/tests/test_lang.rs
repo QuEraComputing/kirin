@@ -1,8 +1,8 @@
 //! Tests for basic dialect parsing with SSAValue and ResultValue fields.
 
-use kirin_test_utils::SimpleType;
 use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
+use kirin_test_utils::SimpleType;
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(type_lattice = SimpleType)]

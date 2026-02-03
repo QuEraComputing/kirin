@@ -81,8 +81,12 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `SSAValue<'src, <T as HasParser>::Output>`.
-pub fn ssa_value<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
+pub fn ssa_value<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -100,8 +104,12 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `SSAValue<'src, <T as HasParser>::Output>`.
-pub fn ssa_value_with_type<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
+pub fn ssa_value_with_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -144,8 +152,12 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `ResultValue<'src, <T as HasParser>::Output>`.
-pub fn result_value_with_optional_type<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, ResultValue<'src, <T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
+pub fn result_value_with_optional_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    ResultValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -197,8 +209,12 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `TypeofSSAValue<<T as HasParser>::Output>`.
-pub fn typeof_ssa<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, TypeofSSAValue<<T as HasParser<'tokens, 'src>>::Output>, ParserError<'tokens, 'src>>
+pub fn typeof_ssa<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    TypeofSSAValue<<T as HasParser<'tokens, 'src>>::Output>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -272,8 +288,12 @@ pub type StmtOutput<'tokens, 'src, L> = <L as HasDialectParser<'tokens, 'src, L>
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `BlockArgument<'src, <T as HasParser>::Output>`.
-pub fn block_argument<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
+pub fn block_argument<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -299,8 +319,12 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `Vec<Spanned<BlockArgument<'src, <T as HasParser>::Output>>>`.
-pub fn block_argument_list<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Vec<Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>>, ParserError<'tokens, 'src>>
+pub fn block_argument_list<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    Vec<Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -321,8 +345,12 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `BlockHeader<'src, <T as HasParser>::Output>`.
-pub fn block_header<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Spanned<BlockHeader<'src, <T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
+pub fn block_header<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    Spanned<BlockHeader<'src, <T as HasParser<'tokens, 'src>>::Output>>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -394,7 +422,12 @@ where
 /// The parser produces `Region<'src, <T as HasParser>::Output, ...>`.
 pub fn region<'tokens, 'src: 'tokens, I, L, T>(
     language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
-) -> impl Parser<'tokens, I, Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>, ParserError<'tokens, 'src>>
+) -> impl Parser<
+    'tokens,
+    I,
+    Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -417,7 +450,12 @@ where
 /// The parser produces `Region<'src, <T as HasParser>::Output, ...>`.
 pub fn region_boxed<'tokens, 'src: 'tokens, I, L, T>(
     language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
-) -> BoxedParser<'tokens, 'src, I, Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>>
+) -> BoxedParser<
+    'tokens,
+    'src,
+    I,
+    Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -432,8 +470,12 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `FunctionType<<T as HasParser>::Output>`.
-pub fn function_type<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, Spanned<FunctionType<<T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
+pub fn function_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+    'tokens,
+    I,
+    Spanned<FunctionType<<T as HasParser<'tokens, 'src>>::Output>>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
@@ -490,7 +532,12 @@ where
 pub fn ssa_values<'tokens, 'src: 'tokens, I, L, T>(
     n: usize,
     sep: Token<'src>,
-) -> impl Parser<'tokens, I, Vec<SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>>, ParserError<'tokens, 'src>>
+) -> impl Parser<
+    'tokens,
+    I,
+    Vec<SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>>,
+    ParserError<'tokens, 'src>,
+>
 where
     I: TokenInput<'tokens, 'src>,
     L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,

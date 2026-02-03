@@ -11,12 +11,16 @@ mod field_kind;
 mod format;
 mod generate;
 mod generics;
+mod validation;
+mod visitor;
 
 pub use attrs::{ChumskyFieldAttrs, ChumskyGlobalAttrs, ChumskyStatementAttrs};
 pub use field_kind::{CollectedField, FieldKind, collect_fields};
 pub use format::{Format, FormatElement, FormatOption};
 pub use generate::{GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint};
 pub use generics::GenericsBuilder;
+pub use validation::{FieldOccurrence, ValidationResult, ValidationVisitor, validate_format};
+pub use visitor::{FormatVisitor, VisitorContext, visit_format};
 
 use kirin_derive_core::ir::Layout;
 

@@ -1,4 +1,4 @@
-use kirin_derive_core::ir::{fields::Collection, DefaultValue};
+use kirin_derive_core::ir::{DefaultValue, fields::Collection};
 use kirin_derive_core::prelude::*;
 use quote::format_ident;
 
