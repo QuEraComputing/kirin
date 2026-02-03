@@ -24,12 +24,7 @@ where
         Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        let parser: ::kirin::parsers::BoxedParser<
-            'tokens,
-            'src,
-            I,
-            SimpleLangAST<'tokens, 'src, Language>,
-        > = {
+        {
             use kirin::parsers::Token;
             ::kirin::parsers::nameof_ssa()
                 .then_ignore(
@@ -66,8 +61,7 @@ where
                     SimpleLangAST::Return { arg: arg }
                 })
         })
-        .boxed();
-        unsafe { ::core::mem::transmute(parser) }
+        .boxed()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for SimpleLang

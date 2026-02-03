@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-chumsky-format/src/generate/tests.rs
-assertion_line: 80
 expression: parser
 ---
 impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
@@ -25,70 +24,7 @@ where
         Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        let parser: ::kirin::parsers::BoxedParser<
-            'tokens,
-            'src,
-            I,
-            FunctionAST<'tokens, 'src, Language>,
-        > =
-            {
-                use kirin::parsers::Token;
-                ::kirin::parsers::nameof_ssa()
-                    .then_ignore(
-                        ::kirin::parsers::chumsky::prelude::just(Token::Equal).then_ignore(
-                            ::kirin::parsers::chumsky::prelude::just(Token::Identifier("function")),
-                        ),
-                    )
-                    .then(
-                        ::kirin::parsers::region::<_, Language, SimpleType>(language.clone()).map(
-                            |r| unsafe {
-                                ::core::mem::transmute::<
-                                    ::kirin::parsers::Region<
-                                        'src,
-                                        <SimpleType as ::kirin::parsers::HasParser<
-                                            'tokens,
-                                            'src,
-                                        >>::Output,
-                                        <Language as ::kirin::parsers::HasDialectParser<
-                                            'tokens,
-                                            'src,
-                                            Language,
-                                        >>::Output,
-                                    >,
-                                    ::kirin::parsers::Region<
-                                        'src,
-                                        <SimpleType as ::kirin::parsers::HasParser<
-                                            'tokens,
-                                            'src,
-                                        >>::Output,
-                                        FunctionAST<'tokens, 'src, Language>,
-                                    >,
-                                >(r)
-                            },
-                        ),
-                    )
-                    .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::Arrow))
-                    .then(::kirin::parsers::typeof_ssa::<_, Language, SimpleType>())
-                    .map(
-                        |((res_name, body), res_type)| -> FunctionAST<'tokens, 'src, Language> {
-                            FunctionAST {
-                                body: body,
-                                res: ::kirin::parsers::ResultValue {
-                                    name: ::kirin::parsers::Spanned {
-                                        value: res_name.name,
-                                        span: res_name.span,
-                                    },
-                                    ty: Some(res_type.ty.clone()),
-                                },
-                                _marker: ::core::marker::PhantomData::<
-                                    fn() -> (&'tokens (), &'src (), Language),
-                                >,
-                            }
-                        },
-                    )
-            }
-            .boxed();
-        unsafe { ::core::mem::transmute(parser) }
+        { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("function")))) . then (:: kirin :: parsers :: region :: < _ , Language , SimpleType > (language . clone ()) . map (| r | { unsafe { :: core :: mem :: transmute :: < :: kirin :: parsers :: Region < 'src , < SimpleType as :: kirin :: parsers :: HasParser < 'tokens , 'src >> :: Output , < Language as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: Output > , :: kirin :: parsers :: Region < 'src , < SimpleType as :: kirin :: parsers :: HasParser < 'tokens , 'src >> :: Output , FunctionAST < 'tokens , 'src , Language > > > (r) } })) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , Language , SimpleType > ()) . map (| ((res_name , body) , res_type) | -> FunctionAST < 'tokens , 'src , Language > { FunctionAST { body : body , res : :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } , _marker : :: core :: marker :: PhantomData :: < fn () -> (& 'tokens () , & 'src () , Language) > } }) } . boxed ()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for Function

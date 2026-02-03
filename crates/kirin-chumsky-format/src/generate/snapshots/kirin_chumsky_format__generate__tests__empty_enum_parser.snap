@@ -24,15 +24,9 @@ where
         Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        let parser: ::kirin::parsers::BoxedParser<
-            'tokens,
-            'src,
-            I,
-            EmptyLangAST<'tokens, 'src, Language>,
-        > = ::kirin::parsers::chumsky::prelude::empty()
+        ::kirin::parsers::chumsky::prelude::empty()
             .map(|_: ()| unreachable!())
-            .boxed();
-        unsafe { ::core::mem::transmute(parser) }
+            .boxed()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for EmptyLang

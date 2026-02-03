@@ -25,8 +25,7 @@ where
         Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        let parser : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , WrapperWithGenericsAST < 'tokens , 'src , T , Language > > = < GenericInner < T > as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> WrapperWithGenericsAST < 'tokens , 'src , T , Language > { WrapperWithGenericsAST :: Inner (inner) }) . boxed () ;
-        unsafe { ::core::mem::transmute(parser) }
+        < GenericInner < T > as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> WrapperWithGenericsAST < 'tokens , 'src , T , Language > { WrapperWithGenericsAST :: Inner (inner) }) . boxed ()
     }
 }
 impl<'tokens, 'src: 'tokens, T: TypeLattice> ::kirin::parsers::HasParser<'tokens, 'src>

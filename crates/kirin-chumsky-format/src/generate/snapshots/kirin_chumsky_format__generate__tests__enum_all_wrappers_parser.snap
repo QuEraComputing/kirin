@@ -26,8 +26,7 @@ where
         Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        let parser : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , ComposedLangAST < 'tokens , 'src , Language > > = < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , Language > { ComposedLangAST :: Arith (inner) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , Language > { ComposedLangAST :: Control (inner) })) . boxed () ;
-        unsafe { ::core::mem::transmute(parser) }
+        < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , Language > { ComposedLangAST :: Arith (inner) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , Language > { ComposedLangAST :: Control (inner) })) . boxed ()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for ComposedLang
