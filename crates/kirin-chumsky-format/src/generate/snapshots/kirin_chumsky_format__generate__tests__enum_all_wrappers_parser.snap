@@ -7,6 +7,8 @@ impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'token
 where
     Language: ::kirin::ir::Dialect + 'tokens,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
 {
     type Output = ComposedLangAST<'tokens, 'src, Language>;
     type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
@@ -31,6 +33,8 @@ where
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for ComposedLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, ComposedLang>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, ComposedLang>,
 {
     type Output = ComposedLangAST<'tokens, 'src, ComposedLang>;
     fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>

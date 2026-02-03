@@ -1,0 +1,22 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: ast
+---
+#[derive(Clone, Debug, PartialEq)]
+pub enum WrapperWithGenericsAST<
+    'tokens,
+    'src: 'tokens,
+    T: TypeLattice,
+    Language: ::kirin::ir::Dialect,
+> where
+    Language: ::kirin::ir::Dialect + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+{
+    Inner(<GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output),
+    #[doc(hidden)]
+    __Marker(
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::convert::Infallible,
+    ),
+}

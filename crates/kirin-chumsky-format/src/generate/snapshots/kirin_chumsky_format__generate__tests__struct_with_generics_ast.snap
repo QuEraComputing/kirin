@@ -3,7 +3,7 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
-pub struct GenericReturnAST<'tokens, 'src, T, Language>(
+pub struct GenericReturnAST<'tokens, 'src: 'tokens, T: TypeLattice, Language: ::kirin::ir::Dialect>(
     pub ::kirin::parsers::SSAValue<'src, <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output>,
     ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
 )

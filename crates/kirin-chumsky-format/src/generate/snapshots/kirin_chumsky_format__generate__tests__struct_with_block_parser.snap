@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-chumsky-format/src/generate/tests.rs
+assertion_line: 232
 expression: parser
 ---
 impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
@@ -36,7 +37,9 @@ where
                 .map(|target| -> BranchAST<'tokens, 'src, Language> {
                     BranchAST {
                         target: target,
-                        _marker: ::core::marker::PhantomData,
+                        _marker: ::core::marker::PhantomData::<
+                            fn() -> (&'tokens (), &'src (), Language),
+                        >,
                     }
                 })
         }

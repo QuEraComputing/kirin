@@ -70,17 +70,24 @@ impl FieldKind {
     /// The `crate_path` should be the path to the kirin_chumsky crate.
     /// The `ast_name` is the name of the AST type (e.g., `TestLangAST`) used for Block/Region statements.
     /// The `type_lattice` is the type lattice path (e.g., `SimpleType`) used for type annotations.
+    /// The `type_params` are the original type parameters from the dialect (e.g., `[T]` for `If<T>`).
     pub fn ast_type(
         &self,
         crate_path: &syn::Path,
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
+        type_params: &[TokenStream],
     ) -> TokenStream {
         // Use <type_lattice as HasParser>::Output for type annotations.
         // This matches the TypeAST definition in HasDialectParser impl.
         // For Block/Region, use the concrete AST type to avoid circular trait bounds.
         let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
-        let stmt_output = quote! { #ast_name<'tokens, 'src, Language> };
+        // Include original type parameters in the AST type reference
+        let stmt_output = if type_params.is_empty() {
+            quote! { #ast_name<'tokens, 'src, Language> }
+        } else {
+            quote! { #ast_name<'tokens, 'src, #(#type_params,)* Language> }
+        };
 
         match self {
             FieldKind::SSAValue => {
@@ -115,13 +122,22 @@ impl FieldKind {
     /// The `crate_path` should be the path to the kirin_chumsky crate.
     /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) for Block/Region field transmutation.
     /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
+    /// The `type_params` are the original type parameters from the dialect (e.g., `[T]` for `If<T>`).
     pub fn parser_expr(
         &self,
         crate_path: &syn::Path,
         opt: &FormatOption,
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
+        type_params: &[TokenStream],
     ) -> TokenStream {
+        // Include original type parameters in the AST type reference for Block/Region
+        let stmt_output = if type_params.is_empty() {
+            quote! { #ast_name<'tokens, 'src, Language> }
+        } else {
+            quote! { #ast_name<'tokens, 'src, #(#type_params,)* Language> }
+        };
+
         match self {
             FieldKind::SSAValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
@@ -153,7 +169,7 @@ impl FieldKind {
                         .map(|b| unsafe {
                             ::core::mem::transmute::<
                                 #crate_path::Spanned<#crate_path::Block<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>>,
-                                #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #ast_name<'tokens, 'src, Language>>>
+                                #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #stmt_output>>
                             >(b)
                         })
                 }
@@ -173,7 +189,7 @@ impl FieldKind {
                         .map(|r| unsafe {
                             ::core::mem::transmute::<
                                 #crate_path::Region<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>,
-                                #crate_path::Region<'src, #type_ast, #ast_name<'tokens, 'src, Language>>
+                                #crate_path::Region<'src, #type_ast, #stmt_output>
                             >(r)
                         })
                 }
@@ -263,9 +279,9 @@ impl FieldKind {
                 #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
             },
             FieldKind::Value(_ty) => {
-                // For compile-time values, use Display trait
+                // For compile-time values, use PrettyPrint trait
                 quote! {
-                    doc.text(format!("{}", #field_ref))
+                    #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
                 }
             }
         }

@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-chumsky-format/src/generate/tests.rs
+assertion_line: 303
 expression: parser
 ---
 impl<'tokens, 'src: 'tokens, Language> my_chumsky::HasDialectParser<'tokens, 'src, Language>
@@ -34,7 +35,10 @@ where
             my_chumsky::chumsky::prelude::just(Token::Identifier("return"))
                 .ignore_then(my_chumsky::ssa_value::<_, Language, SimpleType>())
                 .map(|field_0| -> CustomReturnAST<'tokens, 'src, Language> {
-                    CustomReturnAST(field_0, ::core::marker::PhantomData)
+                    CustomReturnAST(
+                        field_0,
+                        ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), Language)>,
+                    )
                 })
         }
         .boxed();

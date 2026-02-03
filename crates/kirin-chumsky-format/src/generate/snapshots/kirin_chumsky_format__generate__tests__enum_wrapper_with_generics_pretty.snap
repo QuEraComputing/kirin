@@ -1,0 +1,22 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl<T: TypeLattice> ::kirin::pretty::PrettyPrint<WrapperWithGenerics<T>> for WrapperWithGenerics<T>
+where
+    T: ::core::fmt::Display,
+{
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin::pretty::Document<'a, WrapperWithGenerics<T>>,
+    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        use kirin::pretty::DocAllocator;
+        match self {
+            WrapperWithGenerics::Inner(inner) => {
+                let doc_inner: &'a ::kirin::pretty::Document<'a, GenericInner<T>> =
+                    unsafe { ::core::mem::transmute(doc) };
+                ::kirin::pretty::PrettyPrint::pretty_print(inner, doc_inner)
+            }
+        }
+    }
+}

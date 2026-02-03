@@ -2,13 +2,13 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl ::kirin_prettyless::PrettyPrint<CustomReturn> for CustomReturn {
+impl ::kirin::pretty::PrettyPrint<CustomReturn> for CustomReturn {
     fn pretty_print<'a>(
         &self,
-        doc: &'a ::kirin_prettyless::Document<'a, CustomReturn>,
-    ) -> ::kirin_prettyless::ArenaDoc<'a> {
-        use kirin_prettyless::DocAllocator;
+        doc: &'a ::kirin::pretty::Document<'a, CustomReturn>,
+    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        use kirin::pretty::DocAllocator;
         let CustomReturn(f0) = self;
-        doc.text("return ") + ::kirin_prettyless::PrettyPrint::pretty_print(f0, doc)
+        doc.text("return ") + ::kirin::pretty::PrettyPrint::pretty_print(f0, doc)
     }
 }

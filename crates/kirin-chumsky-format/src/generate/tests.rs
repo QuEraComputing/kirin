@@ -270,6 +270,22 @@ fn test_struct_with_generics() {
     insta::assert_snapshot!("struct_with_generics_pretty", pretty);
 }
 
+#[test]
+fn test_enum_wrapper_with_generics() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type_lattice = T)]
+        #[wraps]
+        enum WrapperWithGenerics<T: TypeLattice> {
+            Inner(GenericInner<T>),
+        }
+    };
+    let (ast, emit, parser, pretty) = generate_all(&input);
+    insta::assert_snapshot!("enum_wrapper_with_generics_ast", ast);
+    insta::assert_snapshot!("enum_wrapper_with_generics_emit", emit);
+    insta::assert_snapshot!("enum_wrapper_with_generics_parser", parser);
+    insta::assert_snapshot!("enum_wrapper_with_generics_pretty", pretty);
+}
+
 // =============================================================================
 // Custom Crate Path Tests
 // =============================================================================

@@ -2,13 +2,13 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl ::kirin_prettyless::PrettyPrint<Branch> for Branch {
+impl ::kirin::pretty::PrettyPrint<Branch> for Branch {
     fn pretty_print<'a>(
         &self,
-        doc: &'a ::kirin_prettyless::Document<'a, Branch>,
-    ) -> ::kirin_prettyless::ArenaDoc<'a> {
-        use kirin_prettyless::DocAllocator;
+        doc: &'a ::kirin::pretty::Document<'a, Branch>,
+    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        use kirin::pretty::DocAllocator;
         let Branch { target: f_target } = self;
-        doc.text("br ") + ::kirin_prettyless::PrettyPrint::pretty_print(f_target, doc)
+        doc.text("br ") + ::kirin::pretty::PrettyPrint::pretty_print(f_target, doc)
     }
 }

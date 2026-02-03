@@ -2,28 +2,28 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl ::kirin_prettyless::PrettyPrint<SimpleLang> for SimpleLang {
+impl ::kirin::pretty::PrettyPrint<SimpleLang> for SimpleLang {
     fn pretty_print<'a>(
         &self,
-        doc: &'a ::kirin_prettyless::Document<'a, SimpleLang>,
-    ) -> ::kirin_prettyless::ArenaDoc<'a> {
-        use kirin_prettyless::DocAllocator;
+        doc: &'a ::kirin::pretty::Document<'a, SimpleLang>,
+    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        use kirin::pretty::DocAllocator;
         match self {
             SimpleLang::Add {
                 lhs: f_lhs,
                 rhs: f_rhs,
                 res: f_res,
             } => {
-                ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
+                ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
                     + doc.text(" = add ")
-                    + ::kirin_prettyless::PrettyPrint::pretty_print(f_lhs, doc)
+                    + ::kirin::pretty::PrettyPrint::pretty_print(f_lhs, doc)
                     + doc.text(", ")
-                    + ::kirin_prettyless::PrettyPrint::pretty_print(f_rhs, doc)
+                    + ::kirin::pretty::PrettyPrint::pretty_print(f_rhs, doc)
                     + doc.text(" -> ")
-                    + ::kirin_prettyless::PrettyPrintType::pretty_print_type(f_res, doc)
+                    + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
             }
             SimpleLang::Return { arg: f_arg } => {
-                doc.text("return ") + ::kirin_prettyless::PrettyPrint::pretty_print(f_arg, doc)
+                doc.text("return ") + ::kirin::pretty::PrettyPrint::pretty_print(f_arg, doc)
             }
         }
     }

@@ -137,9 +137,25 @@ impl GenerateHasDialectParser {
         // Get the type lattice for type annotation parsers
         let type_lattice = &ir_input.attrs.type_lattice;
 
+        // Extract original type parameters as TokenStreams
+        let type_params: Vec<TokenStream> = ir_input
+            .generics
+            .type_params()
+            .map(|p| {
+                let ident = &p.ident;
+                quote! { #ident }
+            })
+            .collect();
+
         // Build parser chain properly handling the tuple nesting
-        let parser_expr =
-            self.build_parser_chain(&format, &occurrences, crate_path, ast_name, type_lattice)?;
+        let parser_expr = self.build_parser_chain(
+            &format,
+            &occurrences,
+            crate_path,
+            ast_name,
+            type_lattice,
+            &type_params,
+        )?;
 
         // Generate pattern matching for the parser output
         let var_names: Vec<_> = occurrences.iter().map(|o| o.var_name.clone()).collect();
@@ -177,6 +193,10 @@ impl GenerateHasDialectParser {
         // Use generic Language since this is inside HasDialectParser::recursive_parser.
         let language = quote! { Language };
         let return_type = self.build_ast_type_reference(ir_input, ast_name, &language);
+
+        // For wrapper types, use HasDialectParser::recursive_parser(language.clone()) to forward
+        // the outer Language through the wrapped type's parser. This ensures blocks inside the
+        // wrapped type use the outer Language for parsing their statements, not the wrapped type.
         Ok(quote! {
             <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::recursive_parser(language.clone())
                 .map(|inner| -> #return_type { #constructor(inner) })

@@ -2,20 +2,20 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl ::kirin_prettyless::PrettyPrint<Load> for Load {
+impl ::kirin::pretty::PrettyPrint<Load> for Load {
     fn pretty_print<'a>(
         &self,
-        doc: &'a ::kirin_prettyless::Document<'a, Load>,
-    ) -> ::kirin_prettyless::ArenaDoc<'a> {
-        use kirin_prettyless::DocAllocator;
+        doc: &'a ::kirin::pretty::Document<'a, Load>,
+    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        use kirin::pretty::DocAllocator;
         let Load {
             addr: f_addr,
             res: f_res,
         } = self;
-        ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
+        ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
             + doc.text(" = load [")
-            + ::kirin_prettyless::PrettyPrint::pretty_print(f_addr, doc)
+            + ::kirin::pretty::PrettyPrint::pretty_print(f_addr, doc)
             + doc.text("] -> ")
-            + ::kirin_prettyless::PrettyPrintType::pretty_print_type(f_res, doc)
+            + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
     }
 }

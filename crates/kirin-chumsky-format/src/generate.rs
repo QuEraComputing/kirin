@@ -113,6 +113,32 @@ pub(crate) fn collect_all_value_types_needing_bounds(
         .unwrap_or_default()
 }
 
+/// Collects all wrapper types from structs and enum variants.
+///
+/// Wrapper types need `HasDialectParser` bounds because we call
+/// `HasDialectParser::recursive_parser(language)` on them to forward the Language parameter.
+/// This is used to add the necessary trait bounds in generated impls.
+pub(crate) fn collect_wrapper_types(
+    ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+) -> Vec<syn::Type> {
+    match &ir_input.data {
+        kirin_derive_core::ir::Data::Struct(data) => {
+            // For wrapper structs, return the wrapped type
+            data.0.wraps.as_ref().map(|w| vec![w.ty.clone()]).unwrap_or_default()
+        }
+        kirin_derive_core::ir::Data::Enum(data) => data
+            .iter_variants()
+            .filter_map(|variant| {
+                if let VariantRef::Wrapper { wrapper, .. } = variant {
+                    Some(wrapper.ty.clone())
+                } else {
+                    None
+                }
+            })
+            .collect(),
+    }
+}
+
 /// Filters collected fields to only include those needed in the AST.
 ///
 /// Fields are included if they:

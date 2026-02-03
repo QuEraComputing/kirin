@@ -3,11 +3,13 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
-pub enum MixedLangAST<'tokens, 'src, Language>
+pub enum MixedLangAST<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect>
 where
-    Language: ::kirin::ir::Dialect,
+    Language: ::kirin::ir::Dialect + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
 {
-    Arith(<ArithDialect as ::kirin::parsers::HasParser<'tokens, 'src>>::Output),
+    Arith(<ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output),
     Custom {
         arg: ::kirin::parsers::SSAValue<
             'src,
@@ -18,7 +20,9 @@ where
             <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
         >,
     },
-    Control(<ControlDialect as ::kirin::parsers::HasParser<'tokens, 'src>>::Output),
+    Control(
+        <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
+    ),
     #[doc(hidden)]
     __Marker(
         ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,

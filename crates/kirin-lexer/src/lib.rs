@@ -76,6 +76,8 @@ pub enum Token<'src> {
     Equal,
     #[token("->")]
     Arrow,
+    #[token("..")]
+    DotDot,
     #[token("...")]
     Ellipsis,
     #[token("::")]
@@ -114,6 +116,7 @@ impl std::fmt::Display for Token<'_> {
             Token::Comma => write!(f, ","),
             Token::Equal => write!(f, "="),
             Token::Arrow => write!(f, "->"),
+            Token::DotDot => write!(f, ".."),
             Token::Ellipsis => write!(f, "..."),
             Token::DoubleColon => write!(f, "::"),
             Token::Semicolon => write!(f, ";"),
@@ -216,6 +219,9 @@ impl quote::ToTokens for Token<'_> {
             }
             Token::Arrow => {
                 tokens.extend(quote::quote! { Token::Arrow });
+            }
+            Token::DotDot => {
+                tokens.extend(quote::quote! { Token::DotDot });
             }
             Token::Ellipsis => {
                 tokens.extend(quote::quote! { Token::Ellipsis });

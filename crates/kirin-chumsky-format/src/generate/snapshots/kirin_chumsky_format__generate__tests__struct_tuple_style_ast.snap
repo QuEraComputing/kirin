@@ -3,7 +3,7 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
-pub struct ReturnAST<'tokens, 'src, Language>(
+pub struct ReturnAST<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect>(
     pub  ::kirin::parsers::SSAValue<
         'src,
         <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,

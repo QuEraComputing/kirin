@@ -1,0 +1,26 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: emit
+---
+impl<'tokens, 'src: 'tokens, T: TypeLattice, Language: ::kirin::ir::Dialect>
+    ::kirin::parsers::EmitIR<Language> for WrapperWithGenericsAST<'tokens, 'src, T, Language>
+where
+    Language: ::kirin::ir::Dialect + From<WrapperWithGenerics<T>>,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
+        Language,
+        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
+    >,
+    Language: ::core::convert::From<GenericInner<T>>,
+    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+{
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
+        match self {
+            WrapperWithGenericsAST::Inner(inner) => inner.emit(ctx),
+            WrapperWithGenericsAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}

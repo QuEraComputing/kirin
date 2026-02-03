@@ -31,7 +31,18 @@ impl GenerateAST {
     }
 
     /// Generates the AST type definition with derive(Clone, Debug, PartialEq).
+    ///
+    /// For wrapper structs, no AST type is generated - the HasParser/HasDialectParser
+    /// impls forward directly to the wrapped type's impls.
     pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
+        // For wrapper structs, don't generate any AST type.
+        // The HasParser/HasDialectParser impls will forward to the wrapped type.
+        if let kirin_derive_core::ir::Data::Struct(data) = &ir_input.data {
+            if data.0.wraps.is_some() {
+                return TokenStream::new();
+            }
+        }
+
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let ast_generics = self.config.build_ast_generics(ir_input);
 
@@ -84,7 +95,11 @@ impl GenerateAST {
         ast_name: &syn::Ident,
         ast_generics: &syn::Generics,
     ) -> TokenStream {
-        let (_, ty_generics, _) = ast_generics.split_for_impl();
+        // Use impl_generics to preserve original type parameter bounds (e.g., T: TypeLattice)
+        // This is important for wrapper types: if If<T> requires T: TypeLattice, and the AST
+        // contains <If<T> as HasParser>::Output, the derive macros (Clone, Debug, PartialEq)
+        // need T: TypeLattice to be in scope for If<T>: HasParser to be satisfied.
+        let (impl_generics, _, _) = ast_generics.split_for_impl();
 
         // We use PhantomData to make all generic parameters used ('tokens, 'src, Language).
         // Using fn() -> ... makes them covariant and doesn't require Clone/Debug/etc.
@@ -105,7 +120,25 @@ impl GenerateAST {
         // Block/Region fields use the concrete AST type name to avoid circular trait bounds.
         // We use #[derive(Clone, Debug, PartialEq)] - the PhantomData<fn() -> T> trick
         // ensures these traits work without requiring bounds on T.
+        //
+        // For enums with wrapper variants, we also need HasDialectParser bounds for wrapped types
+        // and Language: 'tokens (since HasDialectParser::Output may contain Language references).
         let ir_path = &self.config.ir_path;
+        let crate_path = &self.config.crate_path;
+
+        // Check if we have any wrapper variants (need HasDialectParser bounds)
+        let has_wrappers = matches!(&ir_input.data, kirin_derive_core::ir::Data::Enum(data) 
+            if data.variants.iter().any(|v| v.wraps.is_some()));
+
+        let wrapper_bounds: Vec<_> = if has_wrappers {
+            super::collect_wrapper_types(ir_input)
+                .iter()
+                .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src, Language> })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(data) => {
                 let fields = self.generate_struct_fields(ir_input, &data.0, true, ast_name);
@@ -115,7 +148,7 @@ impl GenerateAST {
                     // For tuple structs, the where clause must come after the tuple body
                     quote! {
                         #[derive(Clone, Debug, PartialEq)]
-                        pub struct #ast_name #ty_generics (
+                        pub struct #ast_name #impl_generics (
                             #fields,
                             #phantom,
                         )
@@ -126,7 +159,7 @@ impl GenerateAST {
                 } else {
                     quote! {
                         #[derive(Clone, Debug, PartialEq)]
-                        pub struct #ast_name #ty_generics
+                        pub struct #ast_name #impl_generics
                         where
                             Language: #ir_path::Dialect,
                             #(#has_parser_bounds,)*
@@ -140,12 +173,21 @@ impl GenerateAST {
             }
             kirin_derive_core::ir::Data::Enum(data) => {
                 let variants = self.generate_enum_variants(ir_input, data, ast_name);
+
+                // For enums with wrappers, add Language: 'tokens bound
+                let language_bound = if has_wrappers {
+                    quote! { Language: #ir_path::Dialect + 'tokens, }
+                } else {
+                    quote! { Language: #ir_path::Dialect, }
+                };
+
                 quote! {
                     #[derive(Clone, Debug, PartialEq)]
-                    pub enum #ast_name #ty_generics
+                    pub enum #ast_name #impl_generics
                     where
-                        Language: #ir_path::Dialect,
+                        #language_bound
                         #(#has_parser_bounds,)*
+                        #(#wrapper_bounds,)*
                     {
                         #variants
                         #[doc(hidden)]
@@ -167,6 +209,16 @@ impl GenerateAST {
         let fields_in_fmt = get_fields_in_format(ir_input, stmt);
         let is_tuple = stmt.is_tuple_style();
 
+        // Extract original type parameters as TokenStreams
+        let type_params: Vec<TokenStream> = ir_input
+            .generics
+            .type_params()
+            .map(|p| {
+                let ident = &p.ident;
+                quote! { #ident }
+            })
+            .collect();
+
         // Filter to only fields needed in AST
         let mut filtered: Vec<_> = filter_ast_fields(&collected, &fields_in_fmt);
 
@@ -180,7 +232,7 @@ impl GenerateAST {
 
         for field in &filtered {
             let kind = FieldKind::from_field_info(field);
-            let ty = self.field_ast_type(&field.collection, &kind, ast_name);
+            let ty = self.field_ast_type(&field.collection, &kind, ast_name, &type_params);
             if let Some(ident) = &field.ident {
                 if with_pub {
                     fields.push(quote! { pub #ident: #ty });
@@ -215,9 +267,10 @@ impl GenerateAST {
                 VariantRef::Wrapper { name, wrapper, .. } => {
                     let wrapped_ty = &wrapper.ty;
                     let crate_path = &self.config.crate_path;
-                    // Use HasParser::Output to get the AST type for wrapped dialects
+                    // Use HasDialectParser::Output to get the AST type for wrapped dialects.
+                    // This ensures the Language flows through to nested blocks.
                     quote! {
-                        #name(<#wrapped_ty as #crate_path::HasParser<'tokens, 'src>>::Output)
+                        #name(<#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output)
                     }
                 }
                 VariantRef::Regular { name, stmt } => {
@@ -242,8 +295,14 @@ impl GenerateAST {
         collection: &kirin_derive_core::ir::fields::Collection,
         kind: &FieldKind,
         ast_name: &syn::Ident,
+        type_params: &[TokenStream],
     ) -> TokenStream {
-        let base = kind.ast_type(&self.config.crate_path, ast_name, &self.config.type_lattice);
+        let base = kind.ast_type(
+            &self.config.crate_path,
+            ast_name,
+            &self.config.type_lattice,
+            type_params,
+        );
         collection.wrap_type(base)
     }
 }

@@ -1,15 +1,15 @@
 ---
 source: crates/kirin-chumsky-format/src/generate/tests.rs
-assertion_line: 269
 expression: parser
 ---
 impl<'tokens, 'src: 'tokens, T: TypeLattice, Language>
-    ::kirin::parsers::HasDialectParser<'tokens, 'src, Language> for GenericReturn<T>
+    ::kirin::parsers::HasDialectParser<'tokens, 'src, Language> for WrapperWithGenerics<T>
 where
     Language: ::kirin::ir::Dialect + 'tokens,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
 {
-    type Output = GenericReturnAST<'tokens, 'src, T, Language>;
+    type Output = WrapperWithGenericsAST<'tokens, 'src, T, Language>;
     type TypeAST = <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
     fn recursive_parser<I>(
@@ -25,42 +25,27 @@ where
         Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        let parser: ::kirin::parsers::BoxedParser<
-            'tokens,
-            'src,
-            I,
-            GenericReturnAST<'tokens, 'src, T, Language>,
-        > = {
-            use kirin::parsers::Token;
-            ::kirin::parsers::chumsky::prelude::just(Token::Identifier("return"))
-                .ignore_then(::kirin::parsers::ssa_value::<_, Language, T>())
-                .map(|field_0| -> GenericReturnAST<'tokens, 'src, T, Language> {
-                    GenericReturnAST(
-                        field_0,
-                        ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), Language)>,
-                    )
-                })
-        }
-        .boxed();
+        let parser : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , WrapperWithGenericsAST < 'tokens , 'src , T , Language > > = < GenericInner < T > as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> WrapperWithGenericsAST < 'tokens , 'src , T , Language > { WrapperWithGenericsAST :: Inner (inner) }) . boxed () ;
         unsafe { ::core::mem::transmute(parser) }
     }
 }
 impl<'tokens, 'src: 'tokens, T: TypeLattice> ::kirin::parsers::HasParser<'tokens, 'src>
-    for GenericReturn<T>
+    for WrapperWithGenerics<T>
 where
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src, WrapperWithGenerics<T>>,
 {
-    type Output = GenericReturnAST<'tokens, 'src, T, GenericReturn<T>>;
+    type Output = WrapperWithGenericsAST<'tokens, 'src, T, WrapperWithGenerics<T>>;
     fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
         use kirin::parsers::chumsky::prelude::*;
         ::kirin::parsers::chumsky::recursive::recursive(|language| {
-            <GenericReturn<T> as ::kirin::parsers::HasDialectParser<
+            <WrapperWithGenerics<T> as ::kirin::parsers::HasDialectParser<
                 'tokens,
                 'src,
-                GenericReturn<T>,
+                WrapperWithGenerics<T>,
             >>::recursive_parser(language)
         })
         .boxed()

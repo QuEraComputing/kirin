@@ -11,6 +11,14 @@ where
         Language,
         Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
     >,
+    Language: ::core::convert::From<ArithDialect>,
+    Language: ::core::convert::From<ControlDialect>,
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
 {
     type Output = ::kirin::ir::Statement;
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {

@@ -31,6 +31,7 @@ impl GenerateHasDialectParser {
         crate_path: &syn::Path,
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
+        type_params: &[TokenStream],
     ) -> syn::Result<TokenStream> {
         let mut occurrence_iter = occurrences.iter();
         let mut parser_parts: Vec<ParserPart> = Vec::new();
@@ -50,6 +51,7 @@ impl GenerateHasDialectParser {
                         &occurrence.option,
                         ast_name,
                         type_lattice,
+                        type_params,
                     )));
                 }
             }
@@ -128,9 +130,10 @@ impl GenerateHasDialectParser {
         opt: &FormatOption,
         ast_name: &syn::Ident,
         type_lattice: &syn::Path,
+        type_params: &[TokenStream],
     ) -> TokenStream {
         let kind = FieldKind::from_field_info(field);
-        let base = kind.parser_expr(crate_path, opt, ast_name, type_lattice);
+        let base = kind.parser_expr(crate_path, opt, ast_name, type_lattice, type_params);
         field.collection.wrap_parser(base)
     }
 
@@ -163,6 +166,10 @@ impl GenerateHasDialectParser {
         // Check if we have named fields
         let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
 
+        // PhantomData needs to match the AST type definition exactly
+        let phantom_data =
+            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), Language)> };
+
         if has_named {
             let assigns = ast_fields.iter().map(|field| {
                 let name = field.ident.as_ref().unwrap();
@@ -172,7 +179,7 @@ impl GenerateHasDialectParser {
             match variant {
                 Some(v) => quote! { #ast_name::#v { #(#assigns),* } },
                 // For named structs (not enum variants), add the _marker field
-                None => quote! { #ast_name { #(#assigns,)* _marker: ::core::marker::PhantomData } },
+                None => quote! { #ast_name { #(#assigns,)* _marker: #phantom_data } },
             }
         } else {
             // For tuple fields, sort by original index to match AST struct definition order
@@ -185,7 +192,7 @@ impl GenerateHasDialectParser {
             match variant {
                 Some(v) => quote! { #ast_name::#v ( #(#values),* ) },
                 // For tuple structs (not enum variants), add PhantomData at the end
-                None => quote! { #ast_name ( #(#values,)* ::core::marker::PhantomData ) },
+                None => quote! { #ast_name ( #(#values,)* #phantom_data ) },
             }
         }
     }

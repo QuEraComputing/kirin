@@ -1,22 +1,21 @@
 ---
 source: crates/kirin-chumsky-format/src/generate/tests.rs
-assertion_line: 81
 expression: pretty
 ---
-impl ::kirin_prettyless::PrettyPrint<Function> for Function {
+impl ::kirin::pretty::PrettyPrint<Function> for Function {
     fn pretty_print<'a>(
         &self,
-        doc: &'a ::kirin_prettyless::Document<'a, Function>,
-    ) -> ::kirin_prettyless::ArenaDoc<'a> {
-        use kirin_prettyless::DocAllocator;
+        doc: &'a ::kirin::pretty::Document<'a, Function>,
+    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        use kirin::pretty::DocAllocator;
         let Function {
             body: f_body,
             res: f_res,
         } = self;
-        ::kirin_prettyless::PrettyPrintName::pretty_print_name(f_res, doc)
+        ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
             + doc.text(" = function ")
-            + ::kirin_prettyless::PrettyPrint::pretty_print(f_body, doc)
+            + ::kirin::pretty::PrettyPrint::pretty_print(f_body, doc)
             + doc.text(" -> ")
-            + ::kirin_prettyless::PrettyPrintType::pretty_print_type(f_res, doc)
+            + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
     }
 }

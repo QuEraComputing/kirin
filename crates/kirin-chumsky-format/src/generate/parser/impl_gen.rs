@@ -8,7 +8,7 @@ use crate::generics::GenericsBuilder;
 
 use kirin_derive_core::codegen::combine_where_clauses;
 
-use super::super::{BoundsBuilder, collect_all_value_types_needing_bounds};
+use super::super::{BoundsBuilder, collect_all_value_types_needing_bounds, collect_wrapper_types};
 use super::GenerateHasDialectParser;
 
 impl GenerateHasDialectParser {
@@ -20,6 +20,13 @@ impl GenerateHasDialectParser {
         ast_name: &syn::Ident,
         crate_path: &syn::Path,
     ) -> TokenStream {
+        // For wrapper structs, forward to the wrapped type's HasParser impl
+        if let kirin_derive_core::ir::Data::Struct(data) = &ir_input.data {
+            if let Some(wrapper) = &data.0.wraps {
+                return self.generate_wrapper_struct_has_parser_impl(ir_input, wrapper, crate_path);
+            }
+        }
+
         let original_name = &ir_input.name;
         let type_lattice = &ir_input.attrs.type_lattice;
 
@@ -37,16 +44,23 @@ impl GenerateHasDialectParser {
         let type_lattice_bound = bounds.type_lattice_has_parser_bound(type_lattice);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
+        // Wrapper types need HasDialectParser bounds to forward the Language parameter
+        // For HasParser impl, the Language is the dialect type itself
+        let dialect_type = quote! { #original_name #ty_generics };
+        let wrapper_types = collect_wrapper_types(ir_input);
+        let wrapper_type_bounds = bounds.has_dialect_parser_bounds(&wrapper_types, &dialect_type);
 
         let where_clause = match combined_where {
             Some(mut wc) => {
                 wc.predicates.push(type_lattice_bound);
                 wc.predicates.extend(value_type_bounds);
+                wc.predicates.extend(wrapper_type_bounds);
                 quote! { #wc }
             }
             None => {
                 let all_bounds = std::iter::once(type_lattice_bound)
                     .chain(value_type_bounds)
+                    .chain(wrapper_type_bounds)
                     .collect::<Vec<_>>();
                 quote! { where #(#all_bounds),* }
             }
@@ -79,6 +93,56 @@ impl GenerateHasDialectParser {
         }
     }
 
+    /// Generates the `HasParser` impl for wrapper structs.
+    ///
+    /// For wrapper structs, we forward completely to the wrapped type's impl:
+    /// - `Output = <Wrapped as HasParser>::Output`
+    /// - `parser() = <Wrapped as HasParser>::parser()`
+    fn generate_wrapper_struct_has_parser_impl(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        wrapper: &kirin_derive_core::ir::fields::Wrapper,
+        crate_path: &syn::Path,
+    ) -> TokenStream {
+        let original_name = &ir_input.name;
+        let wrapped_ty = &wrapper.ty;
+
+        // Build impl generics
+        let impl_generics = self.build_original_type_impl_generics(ir_input);
+        let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
+        let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+        let combined_where = combine_where_clauses(where_clause, impl_where_clause);
+
+        // The wrapped type needs HasParser bound
+        let wrapped_bound: syn::WherePredicate =
+            syn::parse_quote! { #wrapped_ty: #crate_path::HasParser<'tokens, 'src> };
+
+        let where_clause = match combined_where {
+            Some(mut wc) => {
+                wc.predicates.push(wrapped_bound);
+                quote! { #wc }
+            }
+            None => {
+                quote! { where #wrapped_bound }
+            }
+        };
+
+        quote! {
+            impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
+            #where_clause
+            {
+                type Output = <#wrapped_ty as #crate_path::HasParser<'tokens, 'src>>::Output;
+
+                fn parser<I>() -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output>
+                where
+                    I: #crate_path::TokenInput<'tokens, 'src>,
+                {
+                    <#wrapped_ty as #crate_path::HasParser<'tokens, 'src>>::parser()
+                }
+            }
+        }
+    }
+
     /// Generates the `HasDialectParser` impl for the dialect type.
     ///
     /// Only the dialect type implements `HasDialectParser`. The AST type is just the Output.
@@ -90,6 +154,13 @@ impl GenerateHasDialectParser {
         ast_name: &syn::Ident,
         crate_path: &syn::Path,
     ) -> TokenStream {
+        // For wrapper structs, forward to the wrapped type's HasDialectParser impl
+        if let kirin_derive_core::ir::Data::Struct(data) = &ir_input.data {
+            if let Some(wrapper) = &data.0.wraps {
+                return self.generate_wrapper_struct_dialect_parser_impl(ir_input, wrapper, crate_path);
+            }
+        }
+
         let original_name = &ir_input.name;
         let type_lattice = &ir_input.attrs.type_lattice;
         let ir_path = &self.config.ir_path;
@@ -111,6 +182,11 @@ impl GenerateHasDialectParser {
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
         let type_lattice_bound = bounds.type_lattice_has_parser_bound(type_lattice);
         let language_dialect_bound = bounds.language_dialect_bound();
+        // Wrapper types need HasDialectParser bounds to forward the Language parameter
+        // For HasDialectParser impl, the Language is the generic `Language` type parameter
+        let language_type = quote! { Language };
+        let wrapper_types = collect_wrapper_types(ir_input);
+        let wrapper_type_bounds = bounds.has_dialect_parser_bounds(&wrapper_types, &language_type);
 
         let final_where = {
             let mut wc = match combined_where {
@@ -123,6 +199,7 @@ impl GenerateHasDialectParser {
             wc.predicates.push(language_dialect_bound);
             wc.predicates.push(type_lattice_bound);
             wc.predicates.extend(value_type_bounds);
+            wc.predicates.extend(wrapper_type_bounds);
             wc
         };
 
@@ -213,6 +290,74 @@ impl GenerateHasDialectParser {
             quote! { #ast_name<'tokens, 'src, #language_type> }
         } else {
             quote! { #ast_name<'tokens, 'src, #(#type_params,)* #language_type> }
+        }
+    }
+
+    /// Generates the `HasDialectParser` impl for wrapper structs.
+    ///
+    /// For wrapper structs, we forward completely to the wrapped type's impl:
+    /// - `Output = <Wrapped as HasDialectParser<..., Language>>::Output`
+    /// - `TypeAST = <Wrapped as HasDialectParser<..., Language>>::TypeAST`
+    /// - `recursive_parser(language) = <Wrapped as HasDialectParser<..., Language>>::recursive_parser(language)`
+    fn generate_wrapper_struct_dialect_parser_impl(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        wrapper: &kirin_derive_core::ir::fields::Wrapper,
+        crate_path: &syn::Path,
+    ) -> TokenStream {
+        let original_name = &ir_input.name;
+        let wrapped_ty = &wrapper.ty;
+        let ir_path = &self.config.ir_path;
+
+        // Build impl generics with Language parameter
+        let impl_generics =
+            GenericsBuilder::new(&self.config.ir_path).with_language_unbounded(&ir_input.generics);
+        let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
+        let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+        let combined_where = combine_where_clauses(where_clause, impl_where_clause);
+
+        // Build bounds: Language: Dialect + 'tokens, Wrapped: HasDialectParser<..., Language>
+        let language_bound: syn::WherePredicate =
+            syn::parse_quote! { Language: #ir_path::Dialect + 'tokens };
+        let wrapped_bound: syn::WherePredicate =
+            syn::parse_quote! { #wrapped_ty: #crate_path::HasDialectParser<'tokens, 'src, Language> };
+
+        let final_where = {
+            let mut wc = match combined_where {
+                Some(wc) => wc,
+                None => syn::WhereClause {
+                    where_token: syn::token::Where::default(),
+                    predicates: syn::punctuated::Punctuated::new(),
+                },
+            };
+            wc.predicates.push(language_bound);
+            wc.predicates.push(wrapped_bound);
+            wc
+        };
+
+        // The Language's output type (for the recursive parser argument)
+        let language_output =
+            quote! { <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output };
+
+        quote! {
+            impl #impl_generics #crate_path::HasDialectParser<'tokens, 'src, Language>
+                for #original_name #ty_generics
+            #final_where
+            {
+                type Output = <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output;
+                type TypeAST = <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::TypeAST;
+
+                #[inline]
+                fn recursive_parser<I>(
+                    language: #crate_path::RecursiveParser<'tokens, 'src, I, #language_output>,
+                ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output>
+                where
+                    I: #crate_path::TokenInput<'tokens, 'src>,
+                    Language: #crate_path::HasDialectParser<'tokens, 'src, Language>,
+                {
+                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::recursive_parser(language)
+                }
+            }
         }
     }
 }

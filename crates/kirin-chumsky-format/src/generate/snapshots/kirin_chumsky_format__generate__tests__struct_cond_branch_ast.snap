@@ -3,7 +3,7 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
-pub struct CondBranchAST<'tokens, 'src, Language>
+pub struct CondBranchAST<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect>
 where
     Language: ::kirin::ir::Dialect,
 {

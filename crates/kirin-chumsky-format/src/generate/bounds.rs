@@ -36,6 +36,28 @@ impl<'a> BoundsBuilder<'a> {
             .collect()
     }
 
+    /// Generates `HasDialectParser<'tokens, 'src, L>` bounds for wrapper types.
+    ///
+    /// This is used for wrapper types where we forward the Language parameter through
+    /// to nested blocks.
+    ///
+    /// The `language_type` parameter specifies what type to use as the Language:
+    /// - For `HasDialectParser` impl: use `quote! { Language }`
+    /// - For `HasParser` impl: use the concrete dialect type (e.g., `quote! { MyDialect #ty_generics }`)
+    ///
+    /// Used by: parser impl_gen
+    pub fn has_dialect_parser_bounds(
+        &self,
+        types: &[syn::Type],
+        language_type: &TokenStream,
+    ) -> Vec<syn::WherePredicate> {
+        let crate_path = self.crate_path;
+        types
+            .iter()
+            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src, #language_type> })
+            .collect()
+    }
+
     /// Generates the TypeLattice bound: `TypeLattice: HasParser<'tokens, 'src> + 'tokens`.
     pub fn type_lattice_has_parser_bound(&self, type_lattice: &syn::Path) -> syn::WherePredicate {
         let crate_path = self.crate_path;
