@@ -42,7 +42,10 @@ impl FieldKind {
             FieldCategory::Successor => FieldKind::Successor,
             FieldCategory::Region => FieldKind::Region,
             FieldCategory::Value => {
-                let ty = field.value_type().cloned().unwrap_or_else(|| syn::parse_quote!(()));
+                let ty = field
+                    .value_type()
+                    .cloned()
+                    .unwrap_or_else(|| syn::parse_quote!(()));
                 FieldKind::Value(ty)
             }
         }
@@ -158,19 +161,34 @@ impl FieldKind {
                 }
             },
             FieldKind::Block => {
-                // Block parser uses Language as the language parameter.
-                // Parser returns Block<..., <Language as HasDialectParser>::Output>
-                // AST type is Block<..., AST<..., Language>>
-                // These are the same type when Language: HasDialectParser, so the transmute is safe.
                 let type_ast =
                     quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
                     #crate_path::block::<_, Language, #type_lattice>(language.clone())
-                        .map(|b| unsafe {
-                            ::core::mem::transmute::<
-                                #crate_path::Spanned<#crate_path::Block<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>>,
-                                #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #stmt_output>>
-                            >(b)
+                        .map(|b| {
+                            // SAFETY: This transmute converts between two types that are identical
+                            // by construction:
+                            // - Source: Spanned<Block<'src, TypeAST, <Language as HasDialectParser>::Output>>
+                            // - Target: Spanned<Block<'src, TypeAST, ASTName<..., Language>>>
+                            //
+                            // The HasDialectParser impl for Language defines:
+                            //   type Output = ASTName<'tokens, 'src, Language>;
+                            //
+                            // Therefore <Language as HasDialectParser>::Output == ASTName<..., Language>,
+                            // making the types identical. The transmute is necessary because Rust's
+                            // type system cannot unify associated types with concrete types in all
+                            // contexts, even when they are definitionally equal.
+                            //
+                            // Size and alignment are identical because:
+                            // - Both types are Spanned<Block<...>> with the same TypeAST
+                            // - The StmtOutput type parameter is the same underlying type
+                            // - Block<..., S> has the same layout regardless of how S is expressed
+                            unsafe {
+                                ::core::mem::transmute::<
+                                    #crate_path::Spanned<#crate_path::Block<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>>,
+                                    #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #stmt_output>>
+                                >(b)
+                            }
                         })
                 }
             }
@@ -178,19 +196,34 @@ impl FieldKind {
                 quote! { #crate_path::block_label() }
             }
             FieldKind::Region => {
-                // Region parser uses Language as the language parameter.
-                // Parser returns Region<..., <Language as HasDialectParser>::Output>
-                // AST type is Region<..., AST<..., Language>>
-                // These are the same type when Language: HasDialectParser, so the transmute is safe.
                 let type_ast =
                     quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
                     #crate_path::region::<_, Language, #type_lattice>(language.clone())
-                        .map(|r| unsafe {
-                            ::core::mem::transmute::<
-                                #crate_path::Region<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>,
-                                #crate_path::Region<'src, #type_ast, #stmt_output>
-                            >(r)
+                        .map(|r| {
+                            // SAFETY: This transmute converts between two types that are identical
+                            // by construction:
+                            // - Source: Region<'src, TypeAST, <Language as HasDialectParser>::Output>
+                            // - Target: Region<'src, TypeAST, ASTName<..., Language>>
+                            //
+                            // The HasDialectParser impl for Language defines:
+                            //   type Output = ASTName<'tokens, 'src, Language>;
+                            //
+                            // Therefore <Language as HasDialectParser>::Output == ASTName<..., Language>,
+                            // making the types identical. The transmute is necessary because Rust's
+                            // type system cannot unify associated types with concrete types in all
+                            // contexts, even when they are definitionally equal.
+                            //
+                            // Size and alignment are identical because:
+                            // - Both types are Region<...> with the same TypeAST
+                            // - The StmtOutput type parameter is the same underlying type
+                            // - Region<..., S> has the same layout regardless of how S is expressed
+                            unsafe {
+                                ::core::mem::transmute::<
+                                    #crate_path::Region<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>,
+                                    #crate_path::Region<'src, #type_ast, #stmt_output>
+                                >(r)
+                            }
                         })
                 }
             }
