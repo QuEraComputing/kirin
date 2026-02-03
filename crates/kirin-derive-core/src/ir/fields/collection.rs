@@ -3,7 +3,7 @@ use quote::quote;
 
 use crate::misc::{is_type, is_type_in};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Collection {
     #[default]
     Single,

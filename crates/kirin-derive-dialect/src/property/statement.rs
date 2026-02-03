@@ -64,23 +64,8 @@ impl StatementBuilder {
         if let Some(wrapper) = &statement.wraps {
             fields.push(wrapper.field.clone());
         }
-        for arg in statement.arguments.iter() {
-            fields.push(arg.field.clone());
-        }
-        for res in statement.results.iter() {
-            fields.push(res.field.clone());
-        }
-        for block in statement.blocks.iter() {
-            fields.push(block.field.clone());
-        }
-        for succ in statement.successors.iter() {
-            fields.push(succ.field.clone());
-        }
-        for region in statement.regions.iter() {
-            fields.push(region.field.clone());
-        }
-        for value in statement.values.iter() {
-            fields.push(value.field.clone());
+        for f in statement.iter_all_fields() {
+            fields.push(ir::fields::FieldIndex::new(f.ident.clone(), f.index));
         }
         fields.sort_by_key(|field| field.index);
         fields

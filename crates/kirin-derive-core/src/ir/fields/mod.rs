@@ -1,60 +1,13 @@
 mod collection;
-mod comptime;
 mod index;
-mod value;
 mod wrapper;
 
 pub use collection::Collection;
-pub use comptime::{CompileTimeValue, CompileTimeValues};
 pub use index::FieldIndex;
-pub use value::{Argument, Arguments, Result, Results, Value};
 pub use wrapper::Wrapper;
 
 use crate::ir::{DefaultValue, Layout};
 use proc_macro2::Span;
-
-/// Macro to define a simple IR field collection type.
-///
-/// This generates:
-/// - A container struct (e.g., `Blocks`) with `data: Vec<T>`
-/// - An item struct (e.g., `Block`) with `field: FieldIndex` and `collection: Collection`
-/// - `add()` method that checks for the type name in field type
-/// - `iter()` method to iterate over items
-macro_rules! define_field_collection {
-    ($container:ident, $item:ident, $type_name:literal) => {
-        #[derive(Debug, Clone, Default)]
-        pub struct $container {
-            data: Vec<$item>,
-        }
-
-        #[derive(Debug, Clone)]
-        pub struct $item {
-            pub field: FieldIndex,
-            pub collection: Collection,
-        }
-
-        impl $container {
-            pub fn add(&mut self, index: usize, f: &syn::Field) -> darling::Result<bool> {
-                let Some(coll) = Collection::from_type(&f.ty, $type_name) else {
-                    return Ok(false);
-                };
-                self.data.push($item {
-                    field: FieldIndex::new(f.ident.clone(), index),
-                    collection: coll,
-                });
-                Ok(true)
-            }
-
-            pub fn iter(&self) -> impl Iterator<Item = &$item> {
-                self.data.iter()
-            }
-        }
-    };
-}
-
-define_field_collection!(Blocks, Block, "Block");
-define_field_collection!(Regions, Region, "Region");
-define_field_collection!(Successors, Successor, "Successor");
 
 /// The category of an IR field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -79,7 +32,7 @@ pub enum FieldCategory {
 /// - `Argument` and `Result`: SSA type expression
 /// - `Value`: type, default, into flag, and layout-specific extra data
 /// - `Block`, `Successor`, `Region`: no additional data
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum FieldData<L: Layout> {
     /// SSAValue argument field
     Argument {
@@ -110,12 +63,39 @@ pub enum FieldData<L: Layout> {
     },
 }
 
+impl<L: Layout> Clone for FieldData<L> {
+    fn clone(&self) -> Self {
+        match self {
+            FieldData::Argument { ssa_type } => FieldData::Argument {
+                ssa_type: ssa_type.clone(),
+            },
+            FieldData::Result { ssa_type } => FieldData::Result {
+                ssa_type: ssa_type.clone(),
+            },
+            FieldData::Block => FieldData::Block,
+            FieldData::Successor => FieldData::Successor,
+            FieldData::Region => FieldData::Region,
+            FieldData::Value {
+                ty,
+                default,
+                into,
+                extra,
+            } => FieldData::Value {
+                ty: ty.clone(),
+                default: default.clone(),
+                into: *into,
+                extra: extra.clone(),
+            },
+        }
+    }
+}
+
 /// Unified field information for iteration and storage.
 ///
 /// This struct provides a common representation for all field types,
 /// used for both iteration over statement fields and storage in
 /// data structures like `StatementInfo`.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FieldInfo<L: Layout> {
     /// The positional index of this field in the struct/variant.
     pub index: usize,
@@ -125,6 +105,17 @@ pub struct FieldInfo<L: Layout> {
     pub collection: Collection,
     /// Category-specific data.
     pub data: FieldData<L>,
+}
+
+impl<L: Layout> Clone for FieldInfo<L> {
+    fn clone(&self) -> Self {
+        FieldInfo {
+            index: self.index,
+            ident: self.ident.clone(),
+            collection: self.collection.clone(),
+            data: self.data.clone(),
+        }
+    }
 }
 
 impl<L: Layout> FieldInfo<L> {

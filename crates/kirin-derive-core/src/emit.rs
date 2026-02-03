@@ -1,4 +1,4 @@
-use crate::ir::{Data, Layout};
+use crate::ir::{fields::FieldInfo, Data, Layout};
 use proc_macro2::TokenStream;
 
 pub trait Emit<'ir, L: Layout> {
@@ -21,48 +21,6 @@ pub trait Emit<'ir, L: Layout> {
         emit_statement(self, statement)
     }
 
-    fn emit_arguments(
-        &mut self,
-        arguments: &'ir crate::ir::fields::Arguments,
-    ) -> darling::Result<TokenStream> {
-        emit_arguments(self, arguments)
-    }
-
-    fn emit_results(
-        &mut self,
-        results: &'ir crate::ir::fields::Results,
-    ) -> darling::Result<TokenStream> {
-        emit_results(self, results)
-    }
-
-    fn emit_successors(
-        &mut self,
-        successors: &'ir crate::ir::fields::Successors,
-    ) -> darling::Result<TokenStream> {
-        emit_successors(self, successors)
-    }
-
-    fn emit_blocks(
-        &mut self,
-        blocks: &'ir crate::ir::fields::Blocks,
-    ) -> darling::Result<TokenStream> {
-        emit_blocks(self, blocks)
-    }
-
-    fn emit_regions(
-        &mut self,
-        regions: &'ir crate::ir::fields::Regions,
-    ) -> darling::Result<TokenStream> {
-        emit_regions(self, regions)
-    }
-
-    fn emit_comptime_values(
-        &mut self,
-        comptime_values: &'ir crate::ir::fields::CompileTimeValues<L>,
-    ) -> darling::Result<TokenStream> {
-        emit_comptime_values(self, comptime_values)
-    }
-
     fn emit_wrapper(
         &mut self,
         wrapper: &'ir crate::ir::fields::Wrapper,
@@ -70,29 +28,39 @@ pub trait Emit<'ir, L: Layout> {
         emit_wrapper(self, wrapper)
     }
 
-    fn emit_result(
-        &mut self,
-        result: &'ir crate::ir::fields::Result,
-    ) -> darling::Result<TokenStream> {
-        emit_result(self, result)
+    /// Emit code for a field.
+    fn emit_field(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_field(self, field)
     }
 
-    fn emit_argument(
-        &mut self,
-        argument: &'ir crate::ir::fields::Argument,
-    ) -> darling::Result<TokenStream> {
-        emit_argument(self, argument)
+    /// Emit code for an argument field (SSAValue).
+    fn emit_argument(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_argument(self, field)
     }
 
-    fn emit_value(&mut self, value: &'ir crate::ir::fields::Value) -> darling::Result<TokenStream> {
-        emit_value(self, value)
+    /// Emit code for a result field (ResultValue).
+    fn emit_result(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_result(self, field)
     }
 
-    fn emit_successor(
-        &mut self,
-        successor: &'ir crate::ir::fields::Successor,
-    ) -> darling::Result<TokenStream> {
-        emit_successor(self, successor)
+    /// Emit code for a block field.
+    fn emit_block(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_block(self, field)
+    }
+
+    /// Emit code for a successor field.
+    fn emit_successor(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_successor(self, field)
+    }
+
+    /// Emit code for a region field.
+    fn emit_region(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_region(self, field)
+    }
+
+    /// Emit code for a compile-time value field.
+    fn emit_comptime_value(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_comptime_value(self, field)
     }
 }
 
@@ -138,54 +106,6 @@ pub fn emit_statement<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     Ok(TokenStream::new())
 }
 
-pub fn emit_arguments<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
-    _emitter: &mut E,
-    _arguments: &'ir crate::ir::fields::Arguments,
-) -> darling::Result<TokenStream> {
-    // Default implementation produces no tokens.
-    Ok(TokenStream::new())
-}
-
-pub fn emit_results<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
-    _emitter: &mut E,
-    _results: &'ir crate::ir::fields::Results,
-) -> darling::Result<TokenStream> {
-    // Default implementation produces no tokens.
-    Ok(TokenStream::new())
-}
-
-pub fn emit_successors<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
-    _emitter: &mut E,
-    _successors: &'ir crate::ir::fields::Successors,
-) -> darling::Result<TokenStream> {
-    // Default implementation produces no tokens.
-    Ok(TokenStream::new())
-}
-
-pub fn emit_blocks<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
-    _emitter: &mut E,
-    _blocks: &'ir crate::ir::fields::Blocks,
-) -> darling::Result<TokenStream> {
-    // Default implementation produces no tokens.
-    Ok(TokenStream::new())
-}
-
-pub fn emit_regions<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
-    _emitter: &mut E,
-    _regions: &'ir crate::ir::fields::Regions,
-) -> darling::Result<TokenStream> {
-    // Default implementation produces no tokens.
-    Ok(TokenStream::new())
-}
-
-pub fn emit_comptime_values<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
-    _emitter: &mut E,
-    _comptime_values: &'ir crate::ir::fields::CompileTimeValues<L>,
-) -> darling::Result<TokenStream> {
-    // Default implementation produces no tokens.
-    Ok(TokenStream::new())
-}
-
 pub fn emit_wrapper<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
     _wrapper: &'ir crate::ir::fields::Wrapper,
@@ -194,9 +114,9 @@ pub fn emit_wrapper<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     Ok(TokenStream::new())
 }
 
-pub fn emit_result<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
+pub fn emit_field<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
-    _result: &'ir crate::ir::fields::Result,
+    _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {
     // Default implementation produces no tokens.
     Ok(TokenStream::new())
@@ -204,23 +124,15 @@ pub fn emit_result<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
 
 pub fn emit_argument<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
-    _argument: &'ir crate::ir::fields::Argument,
+    _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {
     // Default implementation produces no tokens.
     Ok(TokenStream::new())
 }
 
-pub fn emit_value<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
+pub fn emit_result<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
-    _value: &'ir crate::ir::fields::Value,
-) -> darling::Result<TokenStream> {
-    // Default implementation produces no tokens.
-    Ok(TokenStream::new())
-}
-
-pub fn emit_successor<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
-    _emitter: &mut E,
-    _successor: &'ir crate::ir::fields::Successor,
+    _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {
     // Default implementation produces no tokens.
     Ok(TokenStream::new())
@@ -228,15 +140,15 @@ pub fn emit_successor<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
 
 pub fn emit_block<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
-    _block: &'ir crate::ir::fields::Block,
+    _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {
     // Default implementation produces no tokens.
     Ok(TokenStream::new())
 }
 
-pub fn emit_comptime_value<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
+pub fn emit_successor<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
-    _comptime_value: &'ir crate::ir::fields::CompileTimeValue<L>,
+    _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {
     // Default implementation produces no tokens.
     Ok(TokenStream::new())
@@ -244,7 +156,15 @@ pub fn emit_comptime_value<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
 
 pub fn emit_region<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
-    _region: &'ir crate::ir::fields::Region,
+    _field: &'ir FieldInfo<L>,
+) -> darling::Result<TokenStream> {
+    // Default implementation produces no tokens.
+    Ok(TokenStream::new())
+}
+
+pub fn emit_comptime_value<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
+    _emitter: &mut E,
+    _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {
     // Default implementation produces no tokens.
     Ok(TokenStream::new())

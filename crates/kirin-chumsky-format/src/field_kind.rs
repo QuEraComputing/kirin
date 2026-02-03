@@ -351,9 +351,11 @@ impl<'a> ValueTypeScanner<'a> {
 impl<'ir> Scan<'ir, ChumskyLayout> for ValueTypeScanner<'_> {
     fn scan_comptime_value(
         &mut self,
-        cv: &'ir kirin_derive_core::ir::fields::CompileTimeValue<ChumskyLayout>,
+        field: &'ir kirin_derive_core::ir::fields::FieldInfo<ChumskyLayout>,
     ) -> darling::Result<()> {
-        self.maybe_add_type(&cv.ty, cv.default.is_some());
+        if let Some(ty) = field.value_type() {
+            self.maybe_add_type(ty, field.has_default());
+        }
         Ok(())
     }
 }

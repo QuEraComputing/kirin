@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-derive-core/src/ir/mod.rs
+assertion_line: 56
 expression: ast
 ---
 Input {
@@ -56,304 +57,262 @@ Input {
                     pure: false,
                     terminator: false,
                 },
-                arguments: Arguments {
-                    data: [
-                        Argument(
-                            Value {
-                                field: FieldIndex {
-                                    ident: Some(
-                                        Ident(
-                                            field1,
-                                        ),
-                                    ),
-                                    index: 0,
-                                },
-                                ty: Expr::Path {
-                                    attrs: [],
-                                    qself: None,
-                                    path: Path {
-                                        leading_colon: None,
-                                        segments: [
-                                            PathSegment {
-                                                ident: Ident(
-                                                    CustomType,
-                                                ),
-                                                arguments: PathArguments::None,
-                                            },
-                                        ],
-                                    },
-                                },
-                                collection: Single,
-                            },
+                fields: [
+                    FieldInfo {
+                        index: 0,
+                        ident: Some(
+                            Ident(
+                                field1,
+                            ),
                         ),
-                        Argument(
-                            Value {
-                                field: FieldIndex {
-                                    ident: Some(
-                                        Ident(
-                                            field2,
-                                        ),
-                                    ),
-                                    index: 1,
+                        collection: Single,
+                        data: Argument {
+                            ssa_type: Expr::Path {
+                                attrs: [],
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                CustomType,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
                                 },
-                                ty: Expr::Path {
-                                    attrs: [],
-                                    qself: None,
-                                    path: Path {
-                                        leading_colon: None,
-                                        segments: [
-                                            PathSegment {
-                                                ident: Ident(
-                                                    CustomType,
-                                                ),
-                                                arguments: PathArguments::None,
-                                            },
-                                        ],
-                                    },
-                                },
-                                collection: Vec,
                             },
+                        },
+                    },
+                    FieldInfo {
+                        index: 1,
+                        ident: Some(
+                            Ident(
+                                field2,
+                            ),
                         ),
-                        Argument(
-                            Value {
-                                field: FieldIndex {
-                                    ident: Some(
-                                        Ident(
-                                            field3,
-                                        ),
-                                    ),
-                                    index: 2,
+                        collection: Vec,
+                        data: Argument {
+                            ssa_type: Expr::Path {
+                                attrs: [],
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                CustomType,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
                                 },
-                                ty: Expr::Path {
-                                    attrs: [],
-                                    qself: None,
-                                    path: Path {
-                                        leading_colon: None,
-                                        segments: [
-                                            PathSegment {
-                                                ident: Ident(
-                                                    CustomType,
-                                                ),
-                                                arguments: PathArguments::None,
-                                            },
-                                        ],
-                                    },
-                                },
-                                collection: Option,
                             },
+                        },
+                    },
+                    FieldInfo {
+                        index: 2,
+                        ident: Some(
+                            Ident(
+                                field3,
+                            ),
                         ),
-                    ],
-                },
-                results: Results {
-                    data: [
-                        Result(
-                            Value {
-                                field: FieldIndex {
-                                    ident: Some(
-                                        Ident(
-                                            field4,
-                                        ),
-                                    ),
-                                    index: 3,
+                        collection: Option,
+                        data: Argument {
+                            ssa_type: Expr::Path {
+                                attrs: [],
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                CustomType,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
                                 },
-                                ty: Expr::Path {
-                                    attrs: [],
-                                    qself: None,
-                                    path: Path {
-                                        leading_colon: None,
-                                        segments: [
-                                            PathSegment {
-                                                ident: Ident(
-                                                    ResultType,
-                                                ),
-                                                arguments: PathArguments::None,
-                                            },
-                                        ],
-                                    },
-                                },
-                                collection: Single,
                             },
+                        },
+                    },
+                    FieldInfo {
+                        index: 3,
+                        ident: Some(
+                            Ident(
+                                field4,
+                            ),
                         ),
-                        Result(
-                            Value {
-                                field: FieldIndex {
-                                    ident: Some(
-                                        Ident(
-                                            field5,
-                                        ),
-                                    ),
-                                    index: 4,
+                        collection: Single,
+                        data: Result {
+                            ssa_type: Expr::Path {
+                                attrs: [],
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                ResultType,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
                                 },
-                                ty: Expr::Path {
-                                    attrs: [],
-                                    qself: None,
-                                    path: Path {
-                                        leading_colon: None,
-                                        segments: [
-                                            PathSegment {
-                                                ident: Ident(
-                                                    ResultType,
-                                                ),
-                                                arguments: PathArguments::None,
-                                            },
-                                        ],
-                                    },
-                                },
-                                collection: Vec,
                             },
+                        },
+                    },
+                    FieldInfo {
+                        index: 4,
+                        ident: Some(
+                            Ident(
+                                field5,
+                            ),
                         ),
-                        Result(
-                            Value {
-                                field: FieldIndex {
-                                    ident: Some(
-                                        Ident(
-                                            field6,
-                                        ),
-                                    ),
-                                    index: 5,
+                        collection: Vec,
+                        data: Result {
+                            ssa_type: Expr::Path {
+                                attrs: [],
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                ResultType,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
                                 },
-                                ty: Expr::Path {
-                                    attrs: [],
-                                    qself: None,
-                                    path: Path {
-                                        leading_colon: None,
-                                        segments: [
-                                            PathSegment {
-                                                ident: Ident(
-                                                    ResultType,
-                                                ),
-                                                arguments: PathArguments::None,
-                                            },
-                                        ],
-                                    },
-                                },
-                                collection: Option,
                             },
+                        },
+                    },
+                    FieldInfo {
+                        index: 5,
+                        ident: Some(
+                            Ident(
+                                field6,
+                            ),
                         ),
-                    ],
-                },
-                blocks: Blocks {
-                    data: [
-                        Block {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field8,
-                                    ),
-                                ),
-                                index: 6,
+                        collection: Option,
+                        data: Result {
+                            ssa_type: Expr::Path {
+                                attrs: [],
+                                qself: None,
+                                path: Path {
+                                    leading_colon: None,
+                                    segments: [
+                                        PathSegment {
+                                            ident: Ident(
+                                                ResultType,
+                                            ),
+                                            arguments: PathArguments::None,
+                                        },
+                                    ],
+                                },
                             },
-                            collection: Single,
                         },
-                        Block {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field9,
-                                    ),
-                                ),
-                                index: 7,
-                            },
-                            collection: Vec,
-                        },
-                        Block {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field10,
-                                    ),
-                                ),
-                                index: 8,
-                            },
-                            collection: Option,
-                        },
-                    ],
-                },
-                successors: Successors {
-                    data: [
-                        Successor {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field11,
-                                    ),
-                                ),
-                                index: 9,
-                            },
-                            collection: Single,
-                        },
-                        Successor {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field12,
-                                    ),
-                                ),
-                                index: 10,
-                            },
-                            collection: Vec,
-                        },
-                        Successor {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field13,
-                                    ),
-                                ),
-                                index: 11,
-                            },
-                            collection: Option,
-                        },
-                    ],
-                },
-                regions: Regions {
-                    data: [
-                        Region {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field14,
-                                    ),
-                                ),
-                                index: 12,
-                            },
-                            collection: Single,
-                        },
-                        Region {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field15,
-                                    ),
-                                ),
-                                index: 13,
-                            },
-                            collection: Vec,
-                        },
-                        Region {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field16,
-                                    ),
-                                ),
-                                index: 14,
-                            },
-                            collection: Option,
-                        },
-                    ],
-                },
-                values: CompileTimeValues {
-                    data: [
-                        CompileTimeValue {
-                            field: FieldIndex {
-                                ident: Some(
-                                    Ident(
-                                        field7,
-                                    ),
-                                ),
-                                index: 15,
-                            },
+                    },
+                    FieldInfo {
+                        index: 6,
+                        ident: Some(
+                            Ident(
+                                field8,
+                            ),
+                        ),
+                        collection: Single,
+                        data: Block,
+                    },
+                    FieldInfo {
+                        index: 7,
+                        ident: Some(
+                            Ident(
+                                field9,
+                            ),
+                        ),
+                        collection: Vec,
+                        data: Block,
+                    },
+                    FieldInfo {
+                        index: 8,
+                        ident: Some(
+                            Ident(
+                                field10,
+                            ),
+                        ),
+                        collection: Option,
+                        data: Block,
+                    },
+                    FieldInfo {
+                        index: 9,
+                        ident: Some(
+                            Ident(
+                                field11,
+                            ),
+                        ),
+                        collection: Single,
+                        data: Successor,
+                    },
+                    FieldInfo {
+                        index: 10,
+                        ident: Some(
+                            Ident(
+                                field12,
+                            ),
+                        ),
+                        collection: Vec,
+                        data: Successor,
+                    },
+                    FieldInfo {
+                        index: 11,
+                        ident: Some(
+                            Ident(
+                                field13,
+                            ),
+                        ),
+                        collection: Option,
+                        data: Successor,
+                    },
+                    FieldInfo {
+                        index: 12,
+                        ident: Some(
+                            Ident(
+                                field14,
+                            ),
+                        ),
+                        collection: Single,
+                        data: Region,
+                    },
+                    FieldInfo {
+                        index: 13,
+                        ident: Some(
+                            Ident(
+                                field15,
+                            ),
+                        ),
+                        collection: Vec,
+                        data: Region,
+                    },
+                    FieldInfo {
+                        index: 14,
+                        ident: Some(
+                            Ident(
+                                field16,
+                            ),
+                        ),
+                        collection: Option,
+                        data: Region,
+                    },
+                    FieldInfo {
+                        index: 15,
+                        ident: Some(
+                            Ident(
+                                field7,
+                            ),
+                        ),
+                        collection: Single,
+                        data: Value {
                             ty: Type::Path {
                                 qself: None,
                                 path: Path {
@@ -368,12 +327,12 @@ Input {
                                     ],
                                 },
                             },
-                            into: false,
                             default: None,
+                            into: false,
                             extra: (),
                         },
-                    ],
-                },
+                    },
+                ],
                 wraps: None,
                 extra: (),
                 extra_attrs: (),

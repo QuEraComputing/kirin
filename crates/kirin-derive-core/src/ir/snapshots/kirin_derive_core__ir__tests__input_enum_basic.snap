@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-derive-core/src/ir/mod.rs
+assertion_line: 75
 expression: ast
 ---
 Input {
@@ -57,53 +58,34 @@ Input {
                         pure: false,
                         terminator: false,
                     },
-                    arguments: Arguments {
-                        data: [
-                            Argument(
-                                Value {
-                                    field: FieldIndex {
-                                        ident: Some(
-                                            Ident(
-                                                field1,
-                                            ),
-                                        ),
-                                        index: 0,
-                                    },
-                                    ty: Expr::Path {
-                                        attrs: [],
-                                        qself: None,
-                                        path: Path {
-                                            leading_colon: None,
-                                            segments: [
-                                                PathSegment {
-                                                    ident: Ident(
-                                                        CustomType,
-                                                    ),
-                                                    arguments: PathArguments::None,
-                                                },
-                                            ],
-                                        },
-                                    },
-                                    collection: Single,
-                                },
+                    fields: [
+                        FieldInfo {
+                            index: 0,
+                            ident: Some(
+                                Ident(
+                                    field1,
+                                ),
                             ),
-                        ],
-                    },
-                    results: Results {
-                        data: [],
-                    },
-                    blocks: Blocks {
-                        data: [],
-                    },
-                    successors: Successors {
-                        data: [],
-                    },
-                    regions: Regions {
-                        data: [],
-                    },
-                    values: CompileTimeValues {
-                        data: [],
-                    },
+                            collection: Single,
+                            data: Argument {
+                                ssa_type: Expr::Path {
+                                    attrs: [],
+                                    qself: None,
+                                    path: Path {
+                                        leading_colon: None,
+                                        segments: [
+                                            PathSegment {
+                                                ident: Ident(
+                                                    CustomType,
+                                                ),
+                                                arguments: PathArguments::None,
+                                            },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                    ],
                     wraps: None,
                     extra: (),
                     extra_attrs: (),
@@ -119,53 +101,34 @@ Input {
                         pure: false,
                         terminator: false,
                     },
-                    arguments: Arguments {
-                        data: [],
-                    },
-                    results: Results {
-                        data: [
-                            Result(
-                                Value {
-                                    field: FieldIndex {
-                                        ident: Some(
-                                            Ident(
-                                                field2,
-                                            ),
-                                        ),
-                                        index: 0,
-                                    },
-                                    ty: Expr::Path {
-                                        attrs: [],
-                                        qself: None,
-                                        path: Path {
-                                            leading_colon: None,
-                                            segments: [
-                                                PathSegment {
-                                                    ident: Ident(
-                                                        ResultType,
-                                                    ),
-                                                    arguments: PathArguments::None,
-                                                },
-                                            ],
-                                        },
-                                    },
-                                    collection: Single,
-                                },
+                    fields: [
+                        FieldInfo {
+                            index: 0,
+                            ident: Some(
+                                Ident(
+                                    field2,
+                                ),
                             ),
-                        ],
-                    },
-                    blocks: Blocks {
-                        data: [],
-                    },
-                    successors: Successors {
-                        data: [],
-                    },
-                    regions: Regions {
-                        data: [],
-                    },
-                    values: CompileTimeValues {
-                        data: [],
-                    },
+                            collection: Single,
+                            data: Result {
+                                ssa_type: Expr::Path {
+                                    attrs: [],
+                                    qself: None,
+                                    path: Path {
+                                        leading_colon: None,
+                                        segments: [
+                                            PathSegment {
+                                                ident: Ident(
+                                                    ResultType,
+                                                ),
+                                                arguments: PathArguments::None,
+                                            },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                    ],
                     wraps: None,
                     extra: (),
                     extra_attrs: (),

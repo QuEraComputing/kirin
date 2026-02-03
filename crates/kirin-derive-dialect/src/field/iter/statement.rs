@@ -2,7 +2,19 @@ use crate::field::iter::context::{DeriveFieldIter, FieldIterKind};
 use crate::field::iter::helpers::{FieldInputBuilder, field_name_tokens};
 use kirin_derive_core::prelude::*;
 use kirin_derive_core::tokens::{FieldPatternTokens, WrapperCallTokens, WrapperIterTypeTokens};
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
+
+/// Generate field name tokens from FieldInfo (for pattern matching in generated code).
+fn field_name_tokens_from_info(field: &ir::fields::FieldInfo<StandardLayout>) -> proc_macro2::TokenStream {
+    match &field.ident {
+        Some(ident) => quote! { #ident },
+        None => {
+            // For tuple fields, generate `field_0`, `field_1`, etc.
+            let name = format_ident!("field_{}", field.index);
+            quote! { #name }
+        }
+    }
+}
 
 pub(crate) struct StatementBuilder<'a> {
     ctx: &'a DeriveFieldIter,
@@ -100,29 +112,24 @@ impl<'a> StatementBuilder<'a> {
     ) -> Vec<FieldAccess<'b>> {
         match self.ctx.field_kind {
             FieldIterKind::Arguments => statement
-                .arguments
-                .iter()
-                .map(|arg| FieldAccess::new(&arg.field, arg.collection.clone()))
+                .arguments()
+                .map(|f| FieldAccess::from_field_info(f))
                 .collect(),
             FieldIterKind::Results => statement
-                .results
-                .iter()
-                .map(|res| FieldAccess::new(&res.field, res.collection.clone()))
+                .results()
+                .map(|f| FieldAccess::from_field_info(f))
                 .collect(),
             FieldIterKind::Blocks => statement
-                .blocks
-                .iter()
-                .map(|block| FieldAccess::new(&block.field, block.collection.clone()))
+                .blocks()
+                .map(|f| FieldAccess::from_field_info(f))
                 .collect(),
             FieldIterKind::Successors => statement
-                .successors
-                .iter()
-                .map(|succ| FieldAccess::new(&succ.field, succ.collection.clone()))
+                .successors()
+                .map(|f| FieldAccess::from_field_info(f))
                 .collect(),
             FieldIterKind::Regions => statement
-                .regions
-                .iter()
-                .map(|region| FieldAccess::new(&region.field, region.collection.clone()))
+                .regions()
+                .map(|f| FieldAccess::from_field_info(f))
                 .collect(),
         }
     }
@@ -132,23 +139,8 @@ impl<'a> StatementBuilder<'a> {
         if let Some(wrapper) = &statement.wraps {
             fields.push(wrapper.field.clone());
         }
-        for arg in statement.arguments.iter() {
-            fields.push(arg.field.clone());
-        }
-        for res in statement.results.iter() {
-            fields.push(res.field.clone());
-        }
-        for block in statement.blocks.iter() {
-            fields.push(block.field.clone());
-        }
-        for succ in statement.successors.iter() {
-            fields.push(succ.field.clone());
-        }
-        for region in statement.regions.iter() {
-            fields.push(region.field.clone());
-        }
-        for value in statement.values.iter() {
-            fields.push(value.field.clone());
+        for f in statement.iter_all_fields() {
+            fields.push(ir::fields::FieldIndex::new(f.ident.clone(), f.index));
         }
         fields.sort_by_key(|field| field.index);
         fields
@@ -190,15 +182,16 @@ impl<'a> StatementBuilder<'a> {
 struct FieldAccess<'a> {
     name: proc_macro2::TokenStream,
     collection: ir::fields::Collection,
-    _field: &'a ir::fields::FieldIndex,
+    _phantom: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a> FieldAccess<'a> {
-    fn new(field: &'a ir::fields::FieldIndex, collection: ir::fields::Collection) -> Self {
+    fn from_field_info(field: &'a ir::fields::FieldInfo<StandardLayout>) -> Self {
+        let name = field_name_tokens_from_info(field);
         Self {
-            name: field_name_tokens(field),
-            collection,
-            _field: field,
+            name,
+            collection: field.collection.clone(),
+            _phantom: std::marker::PhantomData,
         }
     }
 

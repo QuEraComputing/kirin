@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-derive-core/src/ir/mod.rs
+assertion_line: 89
 expression: ast
 ---
 Input {
@@ -57,24 +58,7 @@ Input {
                         pure: false,
                         terminator: false,
                     },
-                    arguments: Arguments {
-                        data: [],
-                    },
-                    results: Results {
-                        data: [],
-                    },
-                    blocks: Blocks {
-                        data: [],
-                    },
-                    successors: Successors {
-                        data: [],
-                    },
-                    regions: Regions {
-                        data: [],
-                    },
-                    values: CompileTimeValues {
-                        data: [],
-                    },
+                    fields: [],
                     wraps: Some(
                         Wrapper {
                             field: FieldIndex {
@@ -111,24 +95,7 @@ Input {
                         pure: false,
                         terminator: false,
                     },
-                    arguments: Arguments {
-                        data: [],
-                    },
-                    results: Results {
-                        data: [],
-                    },
-                    blocks: Blocks {
-                        data: [],
-                    },
-                    successors: Successors {
-                        data: [],
-                    },
-                    regions: Regions {
-                        data: [],
-                    },
-                    values: CompileTimeValues {
-                        data: [],
-                    },
+                    fields: [],
                     wraps: Some(
                         Wrapper {
                             field: FieldIndex {

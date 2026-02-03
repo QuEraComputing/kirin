@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 
-use super::{attrs::StatementOptions, fields::*, layout::Layout};
-use darling::{FromDeriveInput, FromVariant};
+use super::{
+    attrs::{KirinFieldOptions, StatementOptions},
+    fields::*,
+    layout::Layout,
+};
+use darling::{FromDeriveInput, FromField, FromVariant};
 
 #[derive(Debug, Clone)]
 pub struct Statement<L: Layout> {
     pub name: syn::Ident,
     pub attrs: StatementOptions,
-    pub arguments: Arguments,
-    pub results: Results,
-    pub blocks: Blocks,
-    pub successors: Successors,
-    pub regions: Regions,
-    /// compile-time values of the statement
-    pub values: CompileTimeValues<L>,
+    /// All fields in declaration order.
+    pub fields: Vec<FieldInfo<L>>,
     pub wraps: Option<Wrapper>,
     pub extra: L::StatementExtra,
     pub extra_attrs: L::ExtraStatementAttrs,
@@ -29,12 +28,7 @@ impl<L: Layout> Statement<L> {
         Self {
             name,
             attrs,
-            arguments: Default::default(),
-            results: Default::default(),
-            blocks: Default::default(),
-            successors: Default::default(),
-            regions: Default::default(),
-            values: Default::default(),
+            fields: Vec::new(),
             wraps: None,
             extra,
             extra_attrs,
@@ -73,6 +67,8 @@ impl<L: Layout> Statement<L> {
 
     fn update_fields(mut self, wraps: bool, fields: &syn::Fields) -> darling::Result<Self> {
         let mut errors = darling::Error::accumulator();
+
+        // Handle wrapper variants
         if wraps
             || fields
                 .iter()
@@ -85,11 +81,10 @@ impl<L: Layout> Statement<L> {
                     errors.handle_in(|| {
                         if f.attrs.iter().any(|attr| attr.path().is_ident("wraps")) {
                             self.wraps = Some(Wrapper::new(i, f));
-                            Ok(())
                         } else {
-                            self.values.add(i, f)?;
-                            Ok(())
+                            self.fields.push(Self::parse_field(i, f)?);
                         }
+                        Ok(())
                     });
                 }
             }
@@ -104,111 +99,175 @@ impl<L: Layout> Statement<L> {
             return Ok(self);
         }
 
+        // Parse all fields
         for (i, f) in fields.iter().enumerate() {
             errors.handle_in(|| {
-                if self.arguments.add(i, f)?
-                    || self.results.add(i, f)?
-                    || self.blocks.add(i, f)?
-                    || self.successors.add(i, f)?
-                    || self.regions.add(i, f)?
-                    || self.values.add(i, f)?
-                {
-                    return Ok(true);
-                }
-                Ok(true)
+                self.fields.push(Self::parse_field(i, f)?);
+                Ok(())
             });
         }
         errors.finish()?;
         Ok(self)
     }
 
-    /// Iterates over all fields in this statement, returning owned field information.
-    ///
-    /// Fields are yielded in the order: arguments, results, blocks, successors, regions, values.
-    /// This is useful when you need to process all fields uniformly.
-    pub fn iter_all_fields(&self) -> impl Iterator<Item = FieldInfo<L>> + '_ {
-        let args = self.arguments.iter().map(|a| FieldInfo {
-            index: a.field.index,
-            ident: a.field.ident.clone(),
-            collection: a.collection.clone(),
-            data: FieldData::Argument {
-                ssa_type: a.ty.clone(),
-            },
-        });
-        let results = self.results.iter().map(|r| FieldInfo {
-            index: r.field.index,
-            ident: r.field.ident.clone(),
-            collection: r.collection.clone(),
-            data: FieldData::Result {
-                ssa_type: r.ty.clone(),
-            },
-        });
-        let blocks = self.blocks.iter().map(|b| FieldInfo {
-            index: b.field.index,
-            ident: b.field.ident.clone(),
-            collection: b.collection.clone(),
-            data: FieldData::Block,
-        });
-        let successors = self.successors.iter().map(|s| FieldInfo {
-            index: s.field.index,
-            ident: s.field.ident.clone(),
-            collection: s.collection.clone(),
-            data: FieldData::Successor,
-        });
-        let regions = self.regions.iter().map(|r| FieldInfo {
-            index: r.field.index,
-            ident: r.field.ident.clone(),
-            collection: r.collection.clone(),
-            data: FieldData::Region,
-        });
-        let values = self.values.iter().map(|v| FieldInfo {
-            index: v.field.index,
-            ident: v.field.ident.clone(),
+    /// Parse a single field into FieldInfo.
+    fn parse_field(index: usize, f: &syn::Field) -> darling::Result<FieldInfo<L>> {
+        let kirin_opts = KirinFieldOptions::from_field(f)?;
+        let extra = L::ExtraFieldAttrs::from_field(f)?;
+        let ident = f.ident.clone();
+        let ty = &f.ty;
+
+        // Check for SSAValue (Argument)
+        if let Some(collection) = Collection::from_type(ty, "SSAValue") {
+            let ssa_type = kirin_opts
+                .ssa_ty
+                .unwrap_or_else(|| syn::parse_quote! { Default::default() });
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::Argument { ssa_type },
+            });
+        }
+
+        // Check for ResultValue (Result)
+        if let Some(collection) = Collection::from_type(ty, "ResultValue") {
+            let ssa_type = kirin_opts
+                .ssa_ty
+                .unwrap_or_else(|| syn::parse_quote! { Default::default() });
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::Result { ssa_type },
+            });
+        }
+
+        // Check for Block
+        if let Some(collection) = Collection::from_type(ty, "Block") {
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::Block,
+            });
+        }
+
+        // Check for Successor
+        if let Some(collection) = Collection::from_type(ty, "Successor") {
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::Successor,
+            });
+        }
+
+        // Check for Region
+        if let Some(collection) = Collection::from_type(ty, "Region") {
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::Region,
+            });
+        }
+
+        // Otherwise it's a compile-time Value
+        Ok(FieldInfo {
+            index,
+            ident,
             collection: Collection::Single,
             data: FieldData::Value {
-                ty: v.ty.clone(),
-                default: v.default.clone(),
-                into: v.into,
-                extra: v.extra.clone(),
+                ty: ty.clone(),
+                default: kirin_opts.default,
+                into: kirin_opts.into,
+                extra,
             },
-        });
-
-        args.chain(results)
-            .chain(blocks)
-            .chain(successors)
-            .chain(regions)
-            .chain(values)
+        })
     }
 
-    /// Returns the total count of fields across all categories.
+    // =========================================================================
+    // Field Iteration Methods
+    // =========================================================================
+
+    /// Iterates over all fields in declaration order.
+    pub fn iter_all_fields(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields.iter()
+    }
+
+    /// Iterates over argument fields (SSAValue).
+    pub fn arguments(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Argument)
+    }
+
+    /// Iterates over result fields (ResultValue).
+    pub fn results(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Result)
+    }
+
+    /// Iterates over block fields.
+    pub fn blocks(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Block)
+    }
+
+    /// Iterates over successor fields.
+    pub fn successors(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Successor)
+    }
+
+    /// Iterates over region fields.
+    pub fn regions(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Region)
+    }
+
+    /// Iterates over compile-time value fields.
+    pub fn values(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Value)
+    }
+
+    // =========================================================================
+    // Field Query Methods
+    // =========================================================================
+
+    /// Returns the total count of fields.
     pub fn field_count(&self) -> usize {
-        self.arguments.iter().count()
-            + self.results.iter().count()
-            + self.blocks.iter().count()
-            + self.successors.iter().count()
-            + self.regions.iter().count()
-            + self.values.iter().count()
+        self.fields.len()
     }
 
-    /// Collects all named field identifiers in declaration order (sorted by index).
+    /// Collects all named field identifiers in declaration order.
     ///
     /// Returns identifiers only for fields that have names (not tuple fields).
     pub fn named_field_idents(&self) -> Vec<syn::Ident> {
-        let mut fields: Vec<_> = self.iter_all_fields().collect();
-        fields.sort_by_key(|f| f.index);
-        fields.into_iter().filter_map(|f| f.ident).collect()
+        self.fields
+            .iter()
+            .filter_map(|f| f.ident.clone())
+            .collect()
     }
 
     /// Returns true if all fields are unnamed (tuple-style).
     pub fn is_tuple_style(&self) -> bool {
-        self.iter_all_fields().all(|f| f.ident.is_none())
+        self.fields.iter().all(|f| f.ident.is_none())
     }
 
     /// Builds a map from field name to field index.
     ///
     /// Only includes fields that have names.
     pub fn field_name_to_index(&self) -> HashMap<String, usize> {
-        self.iter_all_fields()
+        self.fields
+            .iter()
             .filter_map(|f| f.ident.as_ref().map(|id| (id.to_string(), f.index)))
             .collect()
     }
@@ -227,13 +286,353 @@ impl<L: Layout> Statement<L> {
         }
     }
 
-    /// Collects all fields into a Vec, sorted by declaration order (index).
-    ///
-    /// This is a convenience method equivalent to `iter_all_fields().collect()`
-    /// followed by sorting.
+    /// Returns a clone of all fields (already in declaration order).
     pub fn collect_fields(&self) -> Vec<FieldInfo<L>> {
-        let mut fields: Vec<_> = self.iter_all_fields().collect();
-        fields.sort_by_key(|f| f.index);
-        fields
+        self.fields.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::StandardLayout;
+    use quote::ToTokens;
+
+    /// Helper to parse a struct and return the Statement
+    fn parse_statement(input: proc_macro2::TokenStream) -> Statement<StandardLayout> {
+        let input: syn::DeriveInput = syn::parse2(input).expect("Failed to parse input");
+        Statement::from_derive_input(&input).expect("Failed to create Statement")
+    }
+
+    /// Helper to parse a variant from an enum
+    fn parse_variant(input: proc_macro2::TokenStream) -> Statement<StandardLayout> {
+        let input: syn::DeriveInput = syn::parse2(input).expect("Failed to parse input");
+        let syn::Data::Enum(data) = &input.data else {
+            panic!("Expected enum");
+        };
+        Statement::from_variant(false, &data.variants[0]).expect("Failed to create Statement")
+    }
+
+    #[test]
+    fn test_field_count() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                arg: SSAValue,
+                #[kirin(type = "T")]
+                res: ResultValue,
+                block: Block,
+                succ: Successor,
+                region: Region,
+                value: String,
+            }
+        });
+
+        assert_eq!(stmt.field_count(), 6);
+    }
+
+    #[test]
+    fn test_field_count_empty() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct EmptyStmt {}
+        });
+
+        assert_eq!(stmt.field_count(), 0);
+    }
+
+    #[test]
+    fn test_iter_all_fields_categories() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                arg: SSAValue,
+                #[kirin(type = "T")]
+                res: ResultValue,
+                block: Block,
+                succ: Successor,
+                region: Region,
+                value: String,
+            }
+        });
+
+        let fields: Vec<_> = stmt.iter_all_fields().collect();
+        assert_eq!(fields.len(), 6);
+
+        // Fields are now in declaration order
+        assert_eq!(fields[0].category(), FieldCategory::Argument);
+        assert_eq!(fields[1].category(), FieldCategory::Result);
+        assert_eq!(fields[2].category(), FieldCategory::Block);
+        assert_eq!(fields[3].category(), FieldCategory::Successor);
+        assert_eq!(fields[4].category(), FieldCategory::Region);
+        assert_eq!(fields[5].category(), FieldCategory::Value);
+    }
+
+    #[test]
+    fn test_category_iterators() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                arg1: SSAValue,
+                #[kirin(type = "T")]
+                res1: ResultValue,
+                #[kirin(type = "T")]
+                arg2: SSAValue,
+                value: String,
+            }
+        });
+
+        assert_eq!(stmt.arguments().count(), 2);
+        assert_eq!(stmt.results().count(), 1);
+        assert_eq!(stmt.values().count(), 1);
+        assert_eq!(stmt.blocks().count(), 0);
+    }
+
+    #[test]
+    fn test_collect_fields_declaration_order() {
+        // Fields declared in non-category order
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                res: ResultValue,      // index 0, Result
+                value: String,         // index 1, Value
+                #[kirin(type = "T")]
+                arg: SSAValue,         // index 2, Argument
+                block: Block,          // index 3, Block
+            }
+        });
+
+        let fields = stmt.collect_fields();
+        assert_eq!(fields.len(), 4);
+
+        // collect_fields should return in declaration order (by index)
+        assert_eq!(fields[0].index, 0);
+        assert_eq!(fields[0].ident.as_ref().unwrap().to_string(), "res");
+        assert_eq!(fields[1].index, 1);
+        assert_eq!(fields[1].ident.as_ref().unwrap().to_string(), "value");
+        assert_eq!(fields[2].index, 2);
+        assert_eq!(fields[2].ident.as_ref().unwrap().to_string(), "arg");
+        assert_eq!(fields[3].index, 3);
+        assert_eq!(fields[3].ident.as_ref().unwrap().to_string(), "block");
+    }
+
+    #[test]
+    fn test_named_field_idents_declaration_order() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                res: ResultValue,      // index 0
+                value: String,         // index 1
+                #[kirin(type = "T")]
+                arg: SSAValue,         // index 2
+            }
+        });
+
+        let idents = stmt.named_field_idents();
+        assert_eq!(idents.len(), 3);
+
+        // Should be in declaration order
+        assert_eq!(idents[0].to_string(), "res");
+        assert_eq!(idents[1].to_string(), "value");
+        assert_eq!(idents[2].to_string(), "arg");
+    }
+
+    #[test]
+    fn test_is_tuple_style_named() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct NamedStmt {
+                #[kirin(type = "T")]
+                arg: SSAValue,
+            }
+        });
+
+        assert!(!stmt.is_tuple_style());
+    }
+
+    #[test]
+    fn test_is_tuple_style_tuple() {
+        let stmt = parse_variant(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            enum MyEnum {
+                TupleVariant(#[kirin(type = "T")] SSAValue, String),
+            }
+        });
+
+        assert!(stmt.is_tuple_style());
+    }
+
+    #[test]
+    fn test_field_name_to_index() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                first: SSAValue,       // index 0
+                second: String,        // index 1
+                #[kirin(type = "T")]
+                third: ResultValue,    // index 2
+            }
+        });
+
+        let map = stmt.field_name_to_index();
+        assert_eq!(map.len(), 3);
+        assert_eq!(map.get("first"), Some(&0));
+        assert_eq!(map.get("second"), Some(&1));
+        assert_eq!(map.get("third"), Some(&2));
+    }
+
+    #[test]
+    fn test_wrapper_detection() {
+        let stmt = parse_variant(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            enum MyEnum {
+                #[wraps]
+                WrapperVariant(InnerType),
+            }
+        });
+
+        assert!(stmt.wraps.is_some());
+        let wrapper = stmt.wraps.as_ref().unwrap();
+        assert_eq!(wrapper.field.index, 0);
+    }
+
+    #[test]
+    fn test_wrapper_with_extra_fields() {
+        let stmt = parse_variant(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            enum MyEnum {
+                MultiField(#[wraps] InnerType, String),
+            }
+        });
+
+        assert!(stmt.wraps.is_some());
+        // Extra field should be in values
+        assert_eq!(stmt.values().count(), 1);
+    }
+
+    #[test]
+    fn test_field_data_argument() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "CustomType")]
+                arg: SSAValue,
+            }
+        });
+
+        let fields: Vec<_> = stmt.iter_all_fields().collect();
+        assert_eq!(fields.len(), 1);
+
+        match &fields[0].data {
+            FieldData::Argument { ssa_type } => {
+                // ssa_type should be the parsed expression
+                assert!(ssa_type.to_token_stream().to_string().contains("CustomType"));
+            }
+            _ => panic!("Expected Argument"),
+        }
+    }
+
+    #[test]
+    fn test_field_data_value_with_default() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(default)]
+                value: String,
+            }
+        });
+
+        let fields: Vec<_> = stmt.iter_all_fields().collect();
+        assert_eq!(fields.len(), 1);
+
+        match &fields[0].data {
+            FieldData::Value { default, .. } => {
+                assert!(default.is_some());
+            }
+            _ => panic!("Expected Value"),
+        }
+    }
+
+    #[test]
+    fn test_field_data_value_with_into() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(into)]
+                value: String,
+            }
+        });
+
+        let fields: Vec<_> = stmt.iter_all_fields().collect();
+        assert_eq!(fields.len(), 1);
+
+        match &fields[0].data {
+            FieldData::Value { into, .. } => {
+                assert!(*into);
+            }
+            _ => panic!("Expected Value"),
+        }
+    }
+
+    #[test]
+    fn test_collection_types() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                single: SSAValue,
+                #[kirin(type = "T")]
+                vec_args: Vec<SSAValue>,
+                #[kirin(type = "T")]
+                opt_arg: Option<SSAValue>,
+            }
+        });
+
+        let fields = stmt.collect_fields();
+        assert_eq!(fields.len(), 3);
+
+        assert_eq!(fields[0].collection, Collection::Single);
+        assert_eq!(fields[1].collection, Collection::Vec);
+        assert_eq!(fields[2].collection, Collection::Option);
+    }
+
+    #[test]
+    fn test_field_bindings_named() {
+        let stmt = parse_statement(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            struct MyStmt {
+                #[kirin(type = "T")]
+                first: SSAValue,
+                second: String,
+            }
+        });
+
+        let bindings = stmt.field_bindings("f");
+        assert!(!bindings.is_tuple);
+        assert_eq!(bindings.field_count, 2);
+        assert_eq!(bindings.field_idents.len(), 2);
+        assert_eq!(bindings.original_field_names.len(), 2);
+    }
+
+    #[test]
+    fn test_field_bindings_tuple() {
+        let stmt = parse_variant(quote::quote! {
+            #[kirin(type_lattice = MyLattice)]
+            enum MyEnum {
+                Tuple(#[kirin(type = "T")] SSAValue, String),
+            }
+        });
+
+        let bindings = stmt.field_bindings("f");
+        assert!(bindings.is_tuple);
+        assert_eq!(bindings.field_count, 2);
+        assert_eq!(bindings.field_idents.len(), 2);
+    }
+}
+
