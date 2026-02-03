@@ -72,12 +72,12 @@ fn test_any_identifier_underscore() {
 fn test_symbol_parser() {
     let result = test_parse!("@main", symbol());
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().value, "main");
+    assert_eq!(result.unwrap().name, "main");
 }
 
 #[test]
 fn test_symbol_no_match() {
-    let result: Result<Spanned<&str>, _> = test_parse!("main", symbol());
+    let result: Result<SymbolName<'_>, _> = test_parse!("main", symbol());
     assert!(result.is_err());
 }
 
@@ -85,7 +85,7 @@ fn test_symbol_no_match() {
 fn test_symbol_with_underscore() {
     let result = test_parse!("@my_function", symbol());
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().value, "my_function");
+    assert_eq!(result.unwrap().name, "my_function");
 }
 
 // === SSA Name Tests ===

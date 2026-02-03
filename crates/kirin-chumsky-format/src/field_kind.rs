@@ -138,7 +138,7 @@ impl FieldKind {
                     quote! { #crate_path::typeof_ssa::<_, Language, #type_lattice>() }
                 }
                 FormatOption::Default => {
-                    quote! { #crate_path::result_value_with_optional_type::<_, Language, #type_lattice>() }
+                    quote! { #crate_path::result_value::<_, Language, #type_lattice>() }
                 }
             },
             FieldKind::Block => {

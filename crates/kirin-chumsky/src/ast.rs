@@ -100,6 +100,18 @@ pub struct NameofSSAValue<'src> {
     pub span: SimpleSpan,
 }
 
+/// A symbol name (prefixed with `@` in source).
+///
+/// Represents syntax like: `@main`, `@my_function`
+/// Used for function names, global symbols, etc.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SymbolName<'src> {
+    /// The name of the symbol (without the `@` prefix).
+    pub name: &'src str,
+    /// The span of the symbol in the source.
+    pub span: SimpleSpan,
+}
+
 /// A block label.
 ///
 /// Represents syntax like: `^bb0`

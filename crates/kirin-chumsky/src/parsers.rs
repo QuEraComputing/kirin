@@ -44,15 +44,15 @@ where
 /// # Example
 ///
 /// ```ignore
-/// let sym = symbol(); // matches "@foo", returns "foo"
+/// let sym = symbol(); // matches "@foo", returns SymbolName { name: "foo", span: ... }
 /// ```
 pub fn symbol<'tokens, 'src: 'tokens, I>()
--> impl Parser<'tokens, I, Spanned<&'src str>, ParserError<'tokens, 'src>>
+-> impl Parser<'tokens, I, SymbolName<'src>, ParserError<'tokens, 'src>>
 where
     I: TokenInput<'tokens, 'src>,
 {
-    select! { Token::Symbol(sym) = e => Spanned {
-        value: sym,
+    select! { Token::Symbol(sym) = e => SymbolName {
+        name: sym,
         span: e.span(),
     }}
     .labelled("symbol")
@@ -98,49 +98,6 @@ where
         .labelled("SSA value")
 }
 
-/// Parses an SSA value with required type annotation.
-///
-/// Matches: `%value: type`
-///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-/// The parser produces `SSAValue<'src, <T as HasParser>::Output>`.
-pub fn ssa_value_with_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
-    'tokens,
-    I,
-    SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
-    ParserError<'tokens, 'src>,
->
-where
-    I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src>,
-{
-    ssa_name()
-        .then_ignore(just(Token::Colon))
-        .then(T::parser())
-        .map(|(name, ty)| SSAValue { name, ty: Some(ty) })
-        .labelled("SSA value with type")
-}
-
-/// Parses a result value (left-hand side of assignment) without type annotation.
-///
-/// Matches: `%result`
-///
-/// For parsing result values with optional type annotations, use
-/// [`result_value_with_optional_type`].
-///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-pub fn result_value<'tokens, 'src: 'tokens, I, L, T>()
--> impl Parser<'tokens, I, ResultValue<'src, T>, ParserError<'tokens, 'src>>
-where
-    I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect,
-{
-    ssa_name()
-        .map(|name| ResultValue { name, ty: None })
-        .labelled("result value")
-}
-
 /// Parses a result value with optional type annotation.
 ///
 /// Matches:
@@ -152,7 +109,7 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
 /// The parser produces `ResultValue<'src, <T as HasParser>::Output>`.
-pub fn result_value_with_optional_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn result_value<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
     'tokens,
     I,
     ResultValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
@@ -167,27 +124,6 @@ where
         .then(just(Token::Colon).ignore_then(T::parser()).or_not())
         .map(|(name, ty)| ResultValue { name, ty })
         .labelled("result value")
-}
-
-/// Parses multiple result values followed by `=`.
-///
-/// Matches: `%r1, %r2, %r3 =`
-///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-pub fn result_values<'tokens, 'src: 'tokens, I, L, T>(
-    n: usize,
-) -> impl Parser<'tokens, I, Vec<ResultValue<'src, T>>, ParserError<'tokens, 'src>>
-where
-    I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect,
-{
-    ssa_name()
-        .map(|name| ResultValue { name, ty: None })
-        .separated_by(just(Token::Comma))
-        .exactly(n)
-        .collect()
-        .then_ignore(just(Token::Equal))
-        .labelled(format!("{} result values", n))
 }
 
 /// Parses only the name portion of an SSA value.
@@ -442,28 +378,6 @@ where
         .labelled("region")
 }
 
-/// Parses a region containing multiple blocks, returning a boxed parser.
-///
-/// This is a convenience function that boxes the region parser for use in recursive contexts.
-///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-/// The parser produces `Region<'src, <T as HasParser>::Output, ...>`.
-pub fn region_boxed<'tokens, 'src: 'tokens, I, L, T>(
-    language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
-) -> BoxedParser<
-    'tokens,
-    'src,
-    I,
-    Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>,
->
-where
-    I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src> + 'tokens,
-{
-    region::<_, L, T>(language).boxed()
-}
-
 /// Parses a function type signature.
 ///
 /// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32`
@@ -523,29 +437,4 @@ where
             },
             span: e.span(),
         })
-}
-
-/// Parses multiple SSA values separated by a delimiter.
-///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-/// The parser produces `Vec<SSAValue<'src, <T as HasParser>::Output>>`.
-pub fn ssa_values<'tokens, 'src: 'tokens, I, L, T>(
-    n: usize,
-    sep: Token<'src>,
-) -> impl Parser<
-    'tokens,
-    I,
-    Vec<SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>>,
-    ParserError<'tokens, 'src>,
->
-where
-    I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
-    T: HasParser<'tokens, 'src>,
-{
-    ssa_value::<_, L, T>()
-        .separated_by(just(sep))
-        .exactly(n)
-        .collect()
-        .labelled(format!("{} operands", n))
 }
