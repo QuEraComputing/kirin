@@ -72,6 +72,8 @@ where
     LanguageOutput: Clone + PartialEq + 'tokens,
     ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
     ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+    LanguageOutput: ::core::fmt::Debug,
 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self {

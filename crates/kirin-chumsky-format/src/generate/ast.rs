@@ -838,6 +838,7 @@ impl GenerateAST {
     ) -> TokenStream {
         use kirin_derive_core::ir::VariantRef;
         let crate_path = &self.config.crate_path;
+        let type_lattice = &self.config.type_lattice;
 
         let (impl_generics, ty_generics, _) = ast_generics.split_for_impl();
 
@@ -849,6 +850,13 @@ impl GenerateAST {
             .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
             .collect();
 
+        // Collect value types that need Debug bounds (types containing type parameters)
+        let value_types_needing_bounds = self.collect_value_types_needing_bounds(ir_input);
+        let value_debug_bounds: Vec<_> = value_types_needing_bounds
+            .iter()
+            .map(|ty| quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug })
+            .collect();
+
         // Build base where clause without trait-specific bounds
         let where_clause = quote! {
             where
@@ -857,7 +865,20 @@ impl GenerateAST {
                 #(#has_dialect_parser_base_bounds,)*
         };
 
-        // Collect all variant names and their types for pattern matching
+        // Debug where clause adds Debug bounds on the actual field types
+        let debug_where_clause = quote! {
+            where
+                #base_bounds
+                #(#has_parser_bounds,)*
+                #(#has_dialect_parser_base_bounds,)*
+                <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+                LanguageOutput: ::core::fmt::Debug,
+                #(#value_debug_bounds,)*
+        };
+
+        // Collect all variant names and their types for pattern matching.
+        // For regular variants, we filter to only include fields that are in the AST
+        // (i.e., fields in format string or fields without defaults).
         let variant_arms_clone: Vec<TokenStream> = data
             .iter_variants()
             .map(|variant| match variant {
@@ -867,8 +888,13 @@ impl GenerateAST {
                     }
                 }
                 VariantRef::Regular { name, stmt } => {
+                    // Get filtered AST fields (excludes default fields not in format)
+                    let collected = super::collect_fields(stmt);
+                    let fields_in_fmt = super::get_fields_in_format(ir_input, stmt);
+                    let filtered = super::filter_ast_fields(&collected, &fields_in_fmt);
+
                     if stmt.is_tuple_style() {
-                        let fields: Vec<_> = (0..stmt.fields.len())
+                        let fields: Vec<_> = (0..filtered.len())
                             .map(|i| syn::Ident::new(&format!("f{}", i), proc_macro2::Span::call_site()))
                             .collect();
                         let patterns: Vec<_> = fields.iter().map(|f| quote! { #f }).collect();
@@ -877,7 +903,7 @@ impl GenerateAST {
                             #ast_name::#name(#(#patterns,)*) => #ast_name::#name(#(#clones,)*)
                         }
                     } else {
-                        let field_names: Vec<_> = stmt.fields.iter()
+                        let field_names: Vec<_> = filtered.iter()
                             .filter_map(|f| f.ident.as_ref())
                             .collect();
                         let clones: Vec<_> = field_names.iter().map(|f| quote! { #f: #f.clone() }).collect();
@@ -902,9 +928,14 @@ impl GenerateAST {
                     }
                 }
                 VariantRef::Regular { name, stmt } => {
+                    // Get filtered AST fields (excludes default fields not in format)
+                    let collected = super::collect_fields(stmt);
+                    let fields_in_fmt = super::get_fields_in_format(ir_input, stmt);
+                    let filtered = super::filter_ast_fields(&collected, &fields_in_fmt);
+
                     let name_str = name.to_string();
                     if stmt.is_tuple_style() {
-                        let fields: Vec<_> = (0..stmt.fields.len())
+                        let fields: Vec<_> = (0..filtered.len())
                             .map(|i| syn::Ident::new(&format!("f{}", i), proc_macro2::Span::call_site()))
                             .collect();
                         let patterns: Vec<_> = fields.iter().map(|f| quote! { #f }).collect();
@@ -913,7 +944,7 @@ impl GenerateAST {
                             #ast_name::#name(#(#patterns,)*) => f.debug_tuple(#name_str)#(#field_calls)*.finish()
                         }
                     } else {
-                        let field_names: Vec<_> = stmt.fields.iter()
+                        let field_names: Vec<_> = filtered.iter()
                             .filter_map(|f| f.ident.as_ref())
                             .collect();
                         let field_calls: Vec<_> = field_names.iter().map(|f| {
@@ -937,11 +968,16 @@ impl GenerateAST {
                     }
                 }
                 VariantRef::Regular { name, stmt } => {
+                    // Get filtered AST fields (excludes default fields not in format)
+                    let collected = super::collect_fields(stmt);
+                    let fields_in_fmt = super::get_fields_in_format(ir_input, stmt);
+                    let filtered = super::filter_ast_fields(&collected, &fields_in_fmt);
+
                     if stmt.is_tuple_style() {
-                        let fields_a: Vec<_> = (0..stmt.fields.len())
+                        let fields_a: Vec<_> = (0..filtered.len())
                             .map(|i| syn::Ident::new(&format!("a{}", i), proc_macro2::Span::call_site()))
                             .collect();
-                        let fields_b: Vec<_> = (0..stmt.fields.len())
+                        let fields_b: Vec<_> = (0..filtered.len())
                             .map(|i| syn::Ident::new(&format!("b{}", i), proc_macro2::Span::call_site()))
                             .collect();
                         let comparisons: Vec<_> = fields_a.iter().zip(fields_b.iter())
@@ -956,7 +992,7 @@ impl GenerateAST {
                             (#ast_name::#name(#(#fields_a,)*), #ast_name::#name(#(#fields_b,)*)) => #comparison
                         }
                     } else {
-                        let field_names: Vec<_> = stmt.fields.iter()
+                        let field_names: Vec<_> = filtered.iter()
                             .filter_map(|f| f.ident.as_ref())
                             .collect();
                         let fields_a: Vec<_> = field_names.iter()
@@ -1012,7 +1048,7 @@ impl GenerateAST {
             }
 
             impl #impl_generics ::core::fmt::Debug for #ast_name #ty_generics
-            #where_clause
+            #debug_where_clause
             {
                 fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                     match self {

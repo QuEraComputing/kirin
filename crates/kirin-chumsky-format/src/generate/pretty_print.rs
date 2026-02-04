@@ -85,9 +85,9 @@ impl GeneratePrettyPrint {
         // Generate the pretty print body based on struct/enum
         let print_body = match &ir_input.data {
             kirin_derive_core::ir::Data::Struct(s) => {
-                self.generate_struct_print(&s.0, dialect_name, None)
+                self.generate_struct_print(ir_input, &s.0, dialect_name, None)
             }
-            kirin_derive_core::ir::Data::Enum(e) => self.generate_enum_print(e, dialect_name),
+            kirin_derive_core::ir::Data::Enum(e) => self.generate_enum_print(ir_input, e, dialect_name),
         };
 
         let (impl_generics, _, _) = ir_input.generics.split_for_impl();
@@ -167,11 +167,12 @@ impl GeneratePrettyPrint {
 
     fn generate_struct_print(
         &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         dialect_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
     ) -> TokenStream {
-        let (pattern, print_expr) = self.build_print_components(stmt, dialect_name, variant_name);
+        let (pattern, print_expr) = self.build_print_components(ir_input, stmt, dialect_name, variant_name);
 
         quote! {
             let #pattern = self;
@@ -184,17 +185,16 @@ impl GeneratePrettyPrint {
     /// This is shared between struct and variant print generation.
     fn build_print_components(
         &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         dialect_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
     ) -> (TokenStream, TokenStream) {
-        let format_str = stmt
-            .extra_attrs
-            .format
-            .as_ref()
+        // Use the shared helper that checks both #[chumsky(format = ...)] and #[kirin(format = ...)]
+        let format_str = super::format_for_statement(ir_input, stmt)
             .expect("Statement must have format string");
 
-        let format = Format::parse(format_str, None).expect("Format string should be valid");
+        let format = Format::parse(&format_str, None).expect("Format string should be valid");
 
         let collected = collect_fields(stmt);
         let field_map = build_field_map(&collected);
@@ -237,6 +237,7 @@ impl GeneratePrettyPrint {
     /// Wrapper variants delegate to the wrapped type's PrettyPrint implementation.
     fn generate_enum_print(
         &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
         dialect_name: &syn::Ident,
     ) -> TokenStream {
@@ -252,7 +253,7 @@ impl GeneratePrettyPrint {
                 }
             },
             // Regular variant handler
-            |name, variant| self.generate_variant_print(variant, dialect_name, name),
+            |name, variant| self.generate_variant_print(ir_input, variant, dialect_name, name),
             None, // No marker for dialect types
         )
     }
@@ -260,12 +261,13 @@ impl GeneratePrettyPrint {
     /// Generates pretty print code for a single enum variant.
     fn generate_variant_print(
         &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         variant: &kirin_derive_core::ir::Statement<ChumskyLayout>,
         dialect_name: &syn::Ident,
         variant_name: &syn::Ident,
     ) -> TokenStream {
         let (pattern, print_expr) =
-            self.build_print_components(variant, dialect_name, Some(variant_name));
+            self.build_print_components(ir_input, variant, dialect_name, Some(variant_name));
 
         quote! {
             #pattern => {
