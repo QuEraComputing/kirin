@@ -1,11 +1,11 @@
-use kirin::ir::*;
+use kirin::prelude::*;
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Dialect)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[kirin(terminator, fn, type_lattice = T)]
 pub enum ControlFlow<T: TypeLattice> {
-    #[kirin(format = "br {target}")]
+    #[chumsky(format = "br {target}")]
     Branch { target: Successor },
-    #[kirin(format = "cond_br {condition} then={true_target} else={false_target}")]
+    #[chumsky(format = "cond_br {condition} then={true_target} else={false_target}")]
     ConditionalBranch {
         condition: SSAValue,
         true_target: Successor,
