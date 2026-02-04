@@ -31,7 +31,7 @@ members = [
     "crates/kirin-derive-dialect",
     "crates/kirin-chumsky",
     "crates/kirin-chumsky-format",
-    "crates/kirin-chumsky-derive",
+    "crates/kirin-chumsky-derive", "crates/kirin-function",
 ]
 
 [workspace.dependencies]
@@ -63,3 +63,4 @@ kirin-derive = { version = "0.1.0", path = "crates/kirin-derive" }
 kirin-test-utils = { version = "0.1.0", path = "crates/kirin-test-utils" }
 kirin-chumsky-format = { version = "0.1.0", path = "crates/kirin-chumsky-format" }
 kirin-chumsky-derive = { version = "0.1.0", path = "crates/kirin-chumsky-derive" }
+kirin = { version = "0.1.0", path = "." }

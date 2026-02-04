@@ -5,6 +5,7 @@
 
 use chumsky::span::SimpleSpan;
 use kirin_ir::{Dialect, FiniteLattice, GetInfo, SSAKind};
+use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
 use crate::traits::{EmitContext, EmitIR};
 
@@ -280,6 +281,35 @@ where
             .lookup_block(self.name.value)
             .unwrap_or_else(|| panic!("Undefined block: ^{}", self.name.value));
         block.into()
+    }
+}
+
+/// Implementation of EmitIR for SymbolName AST nodes.
+///
+/// This interns the symbol name and returns a Symbol.
+impl<'src, IR> EmitIR<IR> for SymbolName<'src>
+where
+    IR: Dialect,
+{
+    type Output = kirin_ir::Symbol;
+
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
+        ctx.context
+            .symbol_table()
+            .borrow_mut()
+            .intern(self.name.to_string())
+    }
+}
+
+/// Implementation of PrettyPrint for SymbolName AST nodes.
+///
+/// Prints symbols with the `@` prefix: `@main`, `@foo`, etc.
+impl<'src> PrettyPrint for SymbolName<'src> {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
+        doc.text(format!("@{}", self.name))
     }
 }
 

@@ -173,6 +173,16 @@ impl<L: Layout> Statement<L> {
             });
         }
 
+        // Check for Symbol
+        if let Some(collection) = Collection::from_type(ty, "Symbol") {
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::Symbol,
+            });
+        }
+
         // Otherwise it's a compile-time Value
         Ok(FieldInfo {
             index,

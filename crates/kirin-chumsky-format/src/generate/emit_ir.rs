@@ -660,6 +660,11 @@ impl GenerateEmitIR {
                             let #emitted_var: #ir_path::Region = #crate_path::EmitIR::emit(#var, ctx);
                         }
                     }
+                    FieldKind::Symbol => {
+                        quote! {
+                            let #emitted_var: #ir_path::Symbol = #crate_path::EmitIR::emit(#var, ctx);
+                        }
+                    }
                     FieldKind::Value(ref ty) => {
                         // Check if this Value type contains any type parameters
                         let needs_emit_ir = type_param_names.iter().any(|param_name| {
@@ -738,7 +743,8 @@ impl GenerateEmitIR {
                         | FieldCategory::Result
                         | FieldCategory::Block
                         | FieldCategory::Successor
-                        | FieldCategory::Region => {
+                        | FieldCategory::Region
+                        | FieldCategory::Symbol => {
                             quote! { #emitted_var.into() }
                         }
                         FieldCategory::Value => {

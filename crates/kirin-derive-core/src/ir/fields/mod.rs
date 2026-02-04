@@ -22,6 +22,8 @@ pub enum FieldCategory {
     Successor,
     /// Region field (nested scope)
     Region,
+    /// Symbol field (global symbol reference)
+    Symbol,
     /// Compile-time value field
     Value,
 }
@@ -31,7 +33,7 @@ pub enum FieldCategory {
 /// This enum stores the data that varies by field category:
 /// - `Argument` and `Result`: SSA type expression
 /// - `Value`: type, default, into flag, and layout-specific extra data
-/// - `Block`, `Successor`, `Region`: no additional data
+/// - `Block`, `Successor`, `Region`, `Symbol`: no additional data
 #[derive(Debug)]
 pub enum FieldData<L: Layout> {
     /// SSAValue argument field
@@ -50,6 +52,8 @@ pub enum FieldData<L: Layout> {
     Successor,
     /// Region field (nested scope)
     Region,
+    /// Symbol field (global symbol reference, e.g., function name)
+    Symbol,
     /// Compile-time value field
     Value {
         /// The type of the compile-time value
@@ -75,6 +79,7 @@ impl<L: Layout> Clone for FieldData<L> {
             FieldData::Block => FieldData::Block,
             FieldData::Successor => FieldData::Successor,
             FieldData::Region => FieldData::Region,
+            FieldData::Symbol => FieldData::Symbol,
             FieldData::Value {
                 ty,
                 default,
@@ -127,6 +132,7 @@ impl<L: Layout> FieldInfo<L> {
             FieldData::Block => FieldCategory::Block,
             FieldData::Successor => FieldCategory::Successor,
             FieldData::Region => FieldCategory::Region,
+            FieldData::Symbol => FieldCategory::Symbol,
             FieldData::Value { .. } => FieldCategory::Value,
         }
     }
@@ -144,6 +150,7 @@ impl<L: Layout> FieldInfo<L> {
             FieldCategory::Block => "block",
             FieldCategory::Successor => "successor",
             FieldCategory::Region => "region",
+            FieldCategory::Symbol => "symbol",
             FieldCategory::Value => "value",
         }
     }

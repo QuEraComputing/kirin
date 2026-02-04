@@ -51,6 +51,11 @@ pub trait Scan<'ir, L: Layout> {
         scan_region(self, field)
     }
 
+    /// Scan a symbol field.
+    fn scan_symbol(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<()> {
+        scan_symbol(self, field)
+    }
+
     /// Scan a compile-time value field.
     fn scan_value(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<()> {
         scan_value(self, field)
@@ -121,6 +126,7 @@ where
                 FieldCategory::Block => visitor.scan_block(field),
                 FieldCategory::Successor => visitor.scan_successor(field),
                 FieldCategory::Region => visitor.scan_region(field),
+                FieldCategory::Symbol => visitor.scan_symbol(field),
                 FieldCategory::Value => visitor.scan_value(field),
             }
         });
@@ -195,6 +201,17 @@ where
 }
 
 pub fn scan_region<'ir, V, L>(
+    _visitor: &mut V,
+    _field: &'ir FieldInfo<L>,
+) -> darling::Result<()>
+where
+    V: Scan<'ir, L> + ?Sized,
+    L: Layout,
+{
+    Ok(())
+}
+
+pub fn scan_symbol<'ir, V, L>(
     _visitor: &mut V,
     _field: &'ir FieldInfo<L>,
 ) -> darling::Result<()>

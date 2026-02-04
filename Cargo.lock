@@ -1009,6 +1009,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-function"
+version = "0.1.0"
+dependencies = [
+ "kirin",
+]
+
+[[package]]
 name = "kirin-ir"
 version = "0.1.0"
 dependencies = [

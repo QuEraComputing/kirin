@@ -506,6 +506,21 @@ impl PrettyPrint for Successor {
     }
 }
 
+impl PrettyPrint for Symbol {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
+        // Look up the symbol name from the context's symbol table
+        if let Some(name) = doc.context.symbol_table().borrow().resolve(*self) {
+            doc.text(format!("@{}", name))
+        } else {
+            // Fallback: print as raw ID if not found
+            doc.text(format!("@<{}>", usize::from(*self)))
+        }
+    }
+}
+
 /// Trait for types that can print their name (e.g., SSA values).
 pub trait PrettyPrintName {
     /// Pretty print just the name part (e.g., `%x` for an SSA value).

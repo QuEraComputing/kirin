@@ -58,6 +58,11 @@ pub trait Emit<'ir, L: Layout> {
         emit_region(self, field)
     }
 
+    /// Emit code for a symbol field.
+    fn emit_symbol(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
+        emit_symbol(self, field)
+    }
+
     /// Emit code for a compile-time value field.
     fn emit_value(&mut self, field: &'ir FieldInfo<L>) -> darling::Result<TokenStream> {
         emit_value(self, field)
@@ -155,6 +160,14 @@ pub fn emit_successor<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
 }
 
 pub fn emit_region<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
+    _emitter: &mut E,
+    _field: &'ir FieldInfo<L>,
+) -> darling::Result<TokenStream> {
+    // Default implementation produces no tokens.
+    Ok(TokenStream::new())
+}
+
+pub fn emit_symbol<'ir, L: Layout, E: Emit<'ir, L> + ?Sized>(
     _emitter: &mut E,
     _field: &'ir FieldInfo<L>,
 ) -> darling::Result<TokenStream> {

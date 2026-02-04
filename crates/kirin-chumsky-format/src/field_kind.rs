@@ -28,6 +28,8 @@ pub enum FieldKind {
     Successor,
     /// Region field (nested scope)
     Region,
+    /// Symbol field (global symbol reference)
+    Symbol,
     /// Compile-time value field with its type
     Value(syn::Type),
 }
@@ -41,6 +43,7 @@ impl FieldKind {
             FieldCategory::Block => FieldKind::Block,
             FieldCategory::Successor => FieldKind::Successor,
             FieldCategory::Region => FieldKind::Region,
+            FieldCategory::Symbol => FieldKind::Symbol,
             FieldCategory::Value => {
                 let ty = field
                     .value_type()
@@ -59,6 +62,7 @@ impl FieldKind {
             FieldKind::Block => "block",
             FieldKind::Successor => "successor",
             FieldKind::Region => "region",
+            FieldKind::Symbol => "symbol",
             FieldKind::Value(_) => "value",
         }
     }
@@ -105,6 +109,9 @@ impl FieldKind {
             }
             FieldKind::Region => {
                 quote! { #crate_path::Region<'src, #type_output, LanguageOutput> }
+            }
+            FieldKind::Symbol => {
+                quote! { #crate_path::SymbolName<'src> }
             }
             FieldKind::Value(ty) => {
                 quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
@@ -170,6 +177,9 @@ impl FieldKind {
                 quote! {
                     #crate_path::region::<_, #type_lattice, _>(language.clone())
                 }
+            }
+            FieldKind::Symbol => {
+                quote! { #crate_path::symbol() }
             }
             FieldKind::Value(ty) => {
                 quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::parser() }
@@ -260,6 +270,9 @@ impl FieldKind {
             },
             FieldKind::Region => quote! {
                 doc.print_region(#field_ref)
+            },
+            FieldKind::Symbol => quote! {
+                #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
             },
             FieldKind::Value(_ty) => {
                 // For compile-time values, use PrettyPrint trait
