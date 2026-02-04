@@ -93,21 +93,4 @@ impl<'a> BoundsBuilder<'a> {
             })
             .collect()
     }
-
-    /// Generates `PrettyPrint` bounds for the given types.
-    ///
-    /// For each type T, generates: `T: PrettyPrint<DialectType>`
-    ///
-    /// Used by: pretty_print
-    pub fn pretty_print_bounds(
-        &self,
-        types: &[syn::Type],
-        dialect_type: &TokenStream,
-        prettyless_path: &syn::Path,
-    ) -> Vec<syn::WherePredicate> {
-        types
-            .iter()
-            .map(|ty| syn::parse_quote! { #ty: #prettyless_path::PrettyPrint<#dialect_type> })
-            .collect()
-    }
 }

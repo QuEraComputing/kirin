@@ -117,7 +117,9 @@ impl GenerateAST {
 
         // AST types need `Language: Dialect` bound plus HasParser bounds for value types.
         // Field types use the concrete type_lattice directly (not the associated type).
-        // Block/Region fields use the concrete AST type name to avoid circular trait bounds.
+        // Block/Region fields use the concrete AST type name to avoid circular trait bounds
+        // (the AST needs Clone/Debug/PartialEq, which would require Language: HasDialectParser,
+        // but that's what we're implementing, creating a cycle).
         // We use #[derive(Clone, Debug, PartialEq)] - the PhantomData<fn() -> T> trick
         // ensures these traits work without requiring bounds on T.
         //

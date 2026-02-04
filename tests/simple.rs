@@ -161,20 +161,26 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Value {
 
 // PrettyPrint traits for Value (used by PrettyPrint derive)
 
-impl<L: Dialect> kirin::pretty::PrettyPrint<L> for Value {
-    fn pretty_print<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+impl kirin::pretty::PrettyPrint for Value {
+    fn pretty_print<'a, L: Dialect + kirin::pretty::PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
         doc.text(self.to_string())
     }
 }
 
-impl<L: Dialect> PrettyPrintName<L> for Value {
-    fn pretty_print_name<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+impl PrettyPrintName for Value {
+    fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
         doc.text(self.to_string())
     }
 }
 
-impl<L: Dialect> PrettyPrintType<L> for Value {
-    fn pretty_print_type<'a>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+impl PrettyPrintType for Value {
+    fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
         // Value doesn't have a separate type - use empty or the type of the value
         match self {
             Value::I64(_) => doc.text("int"),
@@ -248,15 +254,18 @@ fn test_block() {
     let fdef = SimpleLang::op_function(&mut context, body);
     let f = context.specialize().f(staged_function).body(fdef).new();
 
-    // Pretty print the function
-    let mut doc = Document::new(Default::default(), &context);
-    let result = doc.render(&f).unwrap();
-    println!("{}", result);
+    // Pretty print the function using the Document method
+    let doc = Document::new(Default::default(), &context);
+    let arena_doc = doc.print_specialized_function(&f);
+    let max_width = doc.config().max_width;
+    let mut buf = String::new();
+    arena_doc.render_fmt(max_width, &mut buf).unwrap();
+    println!("{}", buf);
     // Verify the output contains expected elements
-    assert!(result.contains("function"));
-    assert!(result.contains("constant"));
-    assert!(result.contains("add"));
-    assert!(result.contains("return"));
+    assert!(buf.contains("function"));
+    assert!(buf.contains("constant"));
+    assert!(buf.contains("add"));
+    assert!(buf.contains("return"));
 }
 
 // ============================================================================
@@ -441,21 +450,24 @@ fn test_roundtrip_function() {
     let mut emit_ctx = EmitContext::new(&mut context);
     let statement = ast.emit(&mut emit_ctx);
 
-    // Pretty print using Document::render()
-    let mut doc = Document::new(Config::default(), &context);
-    let output = doc.render(&statement).expect("render failed");
+    // Pretty print using Document method
+    let doc = Document::new(Config::default(), &context);
+    let arena_doc = doc.print_statement(&statement);
+    let max_width = doc.config().max_width;
+    let mut buf = String::new();
+    arena_doc.render_fmt(max_width, &mut buf).expect("render failed");
 
     // Verify key structural elements are present
     assert!(
-        output.contains("%f = function"),
+        buf.contains("%f = function"),
         "Should have function result name"
     );
-    assert!(output.contains("add"), "Should have add instruction");
+    assert!(buf.contains("add"), "Should have add instruction");
     assert!(
-        output.contains("constant 42"),
+        buf.contains("constant 42"),
         "Should have constant instruction"
     );
-    assert!(output.contains("return"), "Should have return instruction");
+    assert!(buf.contains("return"), "Should have return instruction");
 }
 
 /// Test roundtrip for a function with multiple blocks in the region.
@@ -484,12 +496,16 @@ fn test_roundtrip_function_multiple_blocks() {
     let mut emit_ctx = EmitContext::new(&mut context);
     let statement = ast.emit(&mut emit_ctx);
 
-    // Pretty print using Document::render() with 4-space indentation to match input
+    // Pretty print using Document method with 4-space indentation to match input
     let config = Config {
         tab_spaces: 4,
         ..Default::default()
     };
-    let output = statement.sprint_with_config(config, &context);
+    let doc = Document::new(config, &context);
+    let arena_doc = doc.print_statement(&statement);
+    let max_width = doc.config().max_width;
+    let mut output = String::new();
+    arena_doc.render_fmt(max_width, &mut output).expect("render failed");
     println!("{}", output);
     // Note: output has a trailing newline from pretty printer
     assert_eq!(output.trim_end(), input);

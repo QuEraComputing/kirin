@@ -2,10 +2,13 @@ use crate::{Document, PrettyPrint, ScanResultWidth};
 use bat::PrettyPrinter;
 use kirin_ir::*;
 
-impl<'a, L: Dialect> Document<'a, L> {
+impl<'a, L: Dialect + PrettyPrint> Document<'a, L>
+where
+    L::TypeLattice: std::fmt::Display,
+{
     pub fn pager<N>(&'a mut self, node: &N) -> Result<(), std::fmt::Error>
     where
-        N: ScanResultWidth<L> + PrettyPrint<L>,
+        N: ScanResultWidth<L> + PrettyPrint,
     {
         let rendered = self.render(node)?;
         PrettyPrinter::new()

@@ -15,9 +15,7 @@ use crate::field_kind::{FieldKind, collect_fields};
 use crate::format::{Format, FormatElement};
 use kirin_lexer::Token;
 
-use super::{
-    BoundsBuilder, GeneratorConfig, collect_all_value_types_needing_bounds, generate_enum_match,
-};
+use super::{GeneratorConfig, generate_enum_match};
 
 /// Generator for the `PrettyPrint` trait implementation.
 pub struct GeneratePrettyPrint {
@@ -57,40 +55,11 @@ impl GeneratePrettyPrint {
         Self { prettyless_path }
     }
 
-    /// Checks if type_lattice contains type parameters and returns a Display bound if so.
-    ///
-    /// This is needed because Block/Region pretty printing in kirin-prettyless requires
-    /// the TypeLattice to implement Display for formatting type annotations.
-    fn type_lattice_display_bound(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-    ) -> Option<syn::WherePredicate> {
-        let config = GeneratorConfig::new(ir_input);
-        let type_lattice = &config.type_lattice;
-
-        // Collect type parameter names
-        let type_param_names: Vec<String> = ir_input
-            .generics
-            .type_params()
-            .map(|p| p.ident.to_string())
-            .collect();
-
-        // Check if type_lattice contains any type parameter
-        let type_lattice_ty: syn::Type = syn::parse_quote!(#type_lattice);
-        for param_name in &type_param_names {
-            if kirin_derive_core::misc::is_type(&type_lattice_ty, param_name.as_str())
-                || kirin_derive_core::misc::is_type_in_generic(&type_lattice_ty, param_name.as_str())
-            {
-                return Some(syn::parse_quote! {
-                    #type_lattice: ::core::fmt::Display
-                });
-            }
-        }
-
-        None
-    }
-
     /// Generates the `PrettyPrint` implementation.
+    ///
+    /// Generates `impl PrettyPrint for Self` with a method generic over `L: Dialect`.
+    /// This avoids the trait resolution overflow that occurred with the old
+    /// `impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Block` pattern.
     pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
         // For wrapper structs, forward to the wrapped type's PrettyPrint
         if let kirin_derive_core::ir::Data::Struct(data) = &ir_input.data {
@@ -99,9 +68,19 @@ impl GeneratePrettyPrint {
             }
         }
 
+        self.generate_pretty_print(ir_input)
+    }
+
+    /// Generates `impl PrettyPrint for Self`.
+    fn generate_pretty_print(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+    ) -> TokenStream {
         let dialect_name = &ir_input.name;
-        let (_, ty_generics, _) = ir_input.generics.split_for_impl();
+        let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
         let prettyless_path = &self.prettyless_path;
+        let config = GeneratorConfig::new(ir_input);
+        let ir_path = &config.ir_path;
 
         // Generate the pretty print body based on struct/enum
         let print_body = match &ir_input.data {
@@ -111,59 +90,22 @@ impl GeneratePrettyPrint {
             kirin_derive_core::ir::Data::Enum(e) => self.generate_enum_print(e, dialect_name),
         };
 
-        // Generate a concrete impl `PrettyPrint<Self> for Self` to avoid infinite recursion.
-        // A generic `impl<Language> PrettyPrint<Language> for Dialect` would cause overflow
-        // when Language = Dialect because Block/Region printing requires Language: PrettyPrint<Language>.
-        // By implementing `PrettyPrint<Dialect> for Dialect`, the recursive bound is satisfied
-        // by the very impl we're defining.
+        let (impl_generics, _, _) = ir_input.generics.split_for_impl();
 
-        let (impl_generics, _, where_clause) = ir_input.generics.split_for_impl();
-
-        // Use BoundsBuilder to generate PrettyPrint bounds
-        let config = GeneratorConfig::new(ir_input);
-        let bounds = BoundsBuilder::new(&config.crate_path, &config.ir_path);
-        let value_types = collect_all_value_types_needing_bounds(ir_input);
-        let dialect_type = quote! { #dialect_name #ty_generics };
-        let value_type_bounds =
-            bounds.pretty_print_bounds(&value_types, &dialect_type, prettyless_path);
-
-        // Check if type_lattice contains type parameters and add Display bound
-        // This is needed because Block/Region pretty printing in kirin-prettyless requires TypeLattice: Display
-        let type_lattice_bound = self.type_lattice_display_bound(ir_input);
-
-        let final_where = {
-            let mut all_bounds: Vec<syn::WherePredicate> = Vec::new();
-            all_bounds.extend(value_type_bounds);
-            if let Some(bound) = type_lattice_bound {
-                all_bounds.push(bound);
-            }
-
-            if all_bounds.is_empty() {
-                quote! { #where_clause }
-            } else {
-                match where_clause {
-                    Some(wc) => {
-                        let mut combined = wc.clone();
-                        combined.predicates.extend(all_bounds);
-                        quote! { #combined }
-                    }
-                    None => {
-                        quote! { where #(#all_bounds),* }
-                    }
-                }
-            }
-        };
-
-        // Build impl with appropriate bounds
+        // The trait method has fixed bounds: L: Dialect + PrettyPrint, L::TypeLattice: Display
+        // All implementations must match these bounds
         quote! {
-            impl #impl_generics #prettyless_path::PrettyPrint<#dialect_name #ty_generics>
+            impl #impl_generics #prettyless_path::PrettyPrint
                 for #dialect_name #ty_generics
-            #final_where
+            #where_clause
             {
-                fn pretty_print<'a>(
+                fn pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
                     &self,
-                    doc: &'a #prettyless_path::Document<'a, #dialect_name #ty_generics>,
-                ) -> #prettyless_path::ArenaDoc<'a> {
+                    doc: &'a #prettyless_path::Document<'a, __L>,
+                ) -> #prettyless_path::ArenaDoc<'a>
+                where
+                    __L::TypeLattice: ::core::fmt::Display,
+                {
                     use #prettyless_path::DocAllocator;
                     #print_body
                 }
@@ -182,12 +124,15 @@ impl GeneratePrettyPrint {
         let dialect_name = &ir_input.name;
         let wrapped_ty = &wrapper.ty;
         let prettyless_path = &self.prettyless_path;
+        let config = GeneratorConfig::new(ir_input);
+        let ir_path = &config.ir_path;
 
-        let (impl_generics, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+        let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+        let (impl_generics, _, _) = ir_input.generics.split_for_impl();
 
-        // The wrapped type needs PrettyPrint<WrapperType> bound
+        // The wrapped type needs PrettyPrint bound
         let wrapped_bound: syn::WherePredicate =
-            syn::parse_quote! { #wrapped_ty: #prettyless_path::PrettyPrint<#dialect_name #ty_generics> };
+            syn::parse_quote! { #wrapped_ty: #prettyless_path::PrettyPrint };
 
         let final_where = match where_clause {
             Some(wc) => {
@@ -201,14 +146,17 @@ impl GeneratePrettyPrint {
         };
 
         quote! {
-            impl #impl_generics #prettyless_path::PrettyPrint<#dialect_name #ty_generics>
+            impl #impl_generics #prettyless_path::PrettyPrint
                 for #dialect_name #ty_generics
             #final_where
             {
-                fn pretty_print<'a>(
+                fn pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
                     &self,
-                    doc: &'a #prettyless_path::Document<'a, #dialect_name #ty_generics>,
-                ) -> #prettyless_path::ArenaDoc<'a> {
+                    doc: &'a #prettyless_path::Document<'a, __L>,
+                ) -> #prettyless_path::ArenaDoc<'a>
+                where
+                    __L::TypeLattice: ::core::fmt::Display,
+                {
                     // Delegate to the wrapped type's PrettyPrint
                     let inner = &self.0;
                     #prettyless_path::PrettyPrint::pretty_print(inner, doc)
@@ -284,6 +232,9 @@ impl GeneratePrettyPrint {
         (pattern, print_expr)
     }
 
+    /// Generates enum print code.
+    ///
+    /// Wrapper variants delegate to the wrapped type's PrettyPrint implementation.
     fn generate_enum_print(
         &self,
         data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
@@ -294,18 +245,10 @@ impl GeneratePrettyPrint {
         generate_enum_match(
             dialect_name,
             data,
-            // Wrapper handler
-            // The wrapped type implements `PrettyPrint<Self>`, not `PrettyPrint<OuterDialect>`.
-            // We need to transmute the Document to have the correct Language type parameter.
-            // This is safe because Document's Language type is only used for trait resolution,
-            // not for actual data storage.
-            |_name, wrapper| {
-                let wrapped_ty = &wrapper.ty;
+            // Wrapper handler - delegate to wrapped type
+            |_name, _wrapper| {
                 quote! {
-                    let doc_inner: &'a #prettyless_path::Document<'a, #wrapped_ty> = unsafe {
-                        ::core::mem::transmute(doc)
-                    };
-                    #prettyless_path::PrettyPrint::pretty_print(inner, doc_inner)
+                    #prettyless_path::PrettyPrint::pretty_print(inner, doc)
                 }
             },
             // Regular variant handler

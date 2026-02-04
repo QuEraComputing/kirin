@@ -2,18 +2,17 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl ::kirin::pretty::PrettyPrint<MixedLang> for MixedLang {
-    fn pretty_print<'a>(
+impl ::kirin::pretty::PrettyPrint for MixedLang {
+    fn pretty_print<'a, __L: ::kirin::ir::Dialect + ::kirin::pretty::PrettyPrint>(
         &self,
-        doc: &'a ::kirin::pretty::Document<'a, MixedLang>,
-    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        doc: &'a ::kirin::pretty::Document<'a, __L>,
+    ) -> ::kirin::pretty::ArenaDoc<'a>
+    where
+        __L::TypeLattice: ::core::fmt::Display,
+    {
         use kirin::pretty::DocAllocator;
         match self {
-            MixedLang::Arith(inner) => {
-                let doc_inner: &'a ::kirin::pretty::Document<'a, ArithDialect> =
-                    unsafe { ::core::mem::transmute(doc) };
-                ::kirin::pretty::PrettyPrint::pretty_print(inner, doc_inner)
-            }
+            MixedLang::Arith(inner) => ::kirin::pretty::PrettyPrint::pretty_print(inner, doc),
             MixedLang::Custom {
                 arg: f_arg,
                 res: f_res,
@@ -24,11 +23,7 @@ impl ::kirin::pretty::PrettyPrint<MixedLang> for MixedLang {
                     + doc.text(" -> ")
                     + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
             }
-            MixedLang::Control(inner) => {
-                let doc_inner: &'a ::kirin::pretty::Document<'a, ControlDialect> =
-                    unsafe { ::core::mem::transmute(doc) };
-                ::kirin::pretty::PrettyPrint::pretty_print(inner, doc_inner)
-            }
+            MixedLang::Control(inner) => ::kirin::pretty::PrettyPrint::pretty_print(inner, doc),
         }
     }
 }

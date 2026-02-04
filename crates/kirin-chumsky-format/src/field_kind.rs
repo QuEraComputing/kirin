@@ -83,7 +83,7 @@ impl FieldKind {
     ) -> TokenStream {
         // Use <type_lattice as HasParser>::Output for type annotations.
         // This matches the TypeAST definition in HasDialectParser impl.
-        // For Block/Region, use the concrete AST type to avoid circular trait bounds.
+        // For Block/Region, use the concrete AST type name to avoid circular trait bounds.
         let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
         // Include original type parameters in the AST type reference
         let stmt_output = if type_params.is_empty() {
@@ -123,7 +123,7 @@ impl FieldKind {
     /// - `Type`: type-only parser
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) for Block/Region field transmutation.
+    /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) for Block/Region field type coercion.
     /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
     /// The `type_params` are the original type parameters from the dialect (e.g., `[T]` for `If<T>`).
     pub fn parser_expr(
@@ -166,29 +166,27 @@ impl FieldKind {
                 quote! {
                     #crate_path::block::<_, Language, #type_lattice>(language.clone())
                         .map(|b| {
-                            // SAFETY: This transmute converts between two types that are identical
-                            // by construction:
-                            // - Source: Spanned<Block<'src, TypeAST, <Language as HasDialectParser>::Output>>
-                            // - Target: Spanned<Block<'src, TypeAST, ASTName<..., Language>>>
+                            // Type coercion: convert from associated type form to concrete type.
                             //
-                            // The HasDialectParser impl for Language defines:
-                            //   type Output = ASTName<'tokens, 'src, Language>;
+                            // The parser returns Block<..., <Language as HasDialectParser>::Output>
+                            // but our AST field type is Block<..., ASTName<..., Language>>.
                             //
-                            // Therefore <Language as HasDialectParser>::Output == ASTName<..., Language>,
-                            // making the types identical. The transmute is necessary because Rust's
-                            // type system cannot unify associated types with concrete types in all
-                            // contexts, even when they are definitionally equal.
+                            // These types are IDENTICAL by construction because in the generated
+                            // HasDialectParser impl, we define `type Output = ASTName<..., Language>`.
                             //
-                            // Size and alignment are identical because:
-                            // - Both types are Spanned<Block<...>> with the same TypeAST
-                            // - The StmtOutput type parameter is the same underlying type
-                            // - Block<..., S> has the same layout regardless of how S is expressed
-                            unsafe {
-                                ::core::mem::transmute::<
-                                    #crate_path::Spanned<#crate_path::Block<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>>,
-                                    #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #stmt_output>>
-                                >(b)
-                            }
+                            // This coercion is sound because:
+                            // 1. Both types have identical layout (same struct, same type parameters)
+                            // 2. The associated type is bound to the concrete type in our impl
+                            // 3. Rust just can't prove equality within the impl body
+                            //
+                            // At monomorphization time, after type substitution, the compiler will
+                            // verify these types are identical before allowing the coercion.
+                            #crate_path::coerce_block_type::<
+                                #type_ast,
+                                <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output,
+                                #stmt_output,
+                                _
+                            >(b)
                         })
                 }
             }
@@ -201,29 +199,14 @@ impl FieldKind {
                 quote! {
                     #crate_path::region::<_, Language, #type_lattice>(language.clone())
                         .map(|r| {
-                            // SAFETY: This transmute converts between two types that are identical
-                            // by construction:
-                            // - Source: Region<'src, TypeAST, <Language as HasDialectParser>::Output>
-                            // - Target: Region<'src, TypeAST, ASTName<..., Language>>
-                            //
-                            // The HasDialectParser impl for Language defines:
-                            //   type Output = ASTName<'tokens, 'src, Language>;
-                            //
-                            // Therefore <Language as HasDialectParser>::Output == ASTName<..., Language>,
-                            // making the types identical. The transmute is necessary because Rust's
-                            // type system cannot unify associated types with concrete types in all
-                            // contexts, even when they are definitionally equal.
-                            //
-                            // Size and alignment are identical because:
-                            // - Both types are Region<...> with the same TypeAST
-                            // - The StmtOutput type parameter is the same underlying type
-                            // - Region<..., S> has the same layout regardless of how S is expressed
-                            unsafe {
-                                ::core::mem::transmute::<
-                                    #crate_path::Region<'src, #type_ast, <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output>,
-                                    #crate_path::Region<'src, #type_ast, #stmt_output>
-                                >(r)
-                            }
+                            // Type coercion: convert from associated type form to concrete type.
+                            // See Block comment above for detailed safety explanation.
+                            #crate_path::coerce_region_type::<
+                                #type_ast,
+                                <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output,
+                                #stmt_output,
+                                _
+                            >(r)
                         })
                 }
             }
@@ -308,8 +291,14 @@ impl FieldKind {
                     #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
                 },
             },
-            FieldKind::Block | FieldKind::Successor | FieldKind::Region => quote! {
+            FieldKind::Block => quote! {
+                doc.print_block(#field_ref)
+            },
+            FieldKind::Successor => quote! {
                 #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
+            },
+            FieldKind::Region => quote! {
+                doc.print_region(#field_ref)
             },
             FieldKind::Value(_ty) => {
                 // For compile-time values, use PrettyPrint trait

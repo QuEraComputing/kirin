@@ -1,0 +1,42 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: parser
+---
+impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
+    for MyWrapper
+where
+    Language: ::kirin::ir::Dialect + 'tokens,
+    OtherDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+{
+    type Output =
+        <OtherDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output;
+    type TypeAST =
+        <OtherDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::TypeAST;
+    #[inline]
+    fn recursive_parser<I>(
+        language: ::kirin::parsers::RecursiveParser<
+            'tokens,
+            'src,
+            I,
+            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
+        >,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    {
+        < OtherDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language)
+    }
+}
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for MyWrapper
+where
+    OtherDialect: ::kirin::parsers::HasParser<'tokens, 'src>,
+{
+    type Output = <OtherDialect as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
+    fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+    {
+        <OtherDialect as ::kirin::parsers::HasParser<'tokens, 'src>>::parser()
+    }
+}

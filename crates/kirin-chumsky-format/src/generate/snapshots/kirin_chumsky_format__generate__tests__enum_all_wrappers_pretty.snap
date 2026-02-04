@@ -2,23 +2,18 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl ::kirin::pretty::PrettyPrint<ComposedLang> for ComposedLang {
-    fn pretty_print<'a>(
+impl ::kirin::pretty::PrettyPrint for ComposedLang {
+    fn pretty_print<'a, __L: ::kirin::ir::Dialect + ::kirin::pretty::PrettyPrint>(
         &self,
-        doc: &'a ::kirin::pretty::Document<'a, ComposedLang>,
-    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        doc: &'a ::kirin::pretty::Document<'a, __L>,
+    ) -> ::kirin::pretty::ArenaDoc<'a>
+    where
+        __L::TypeLattice: ::core::fmt::Display,
+    {
         use kirin::pretty::DocAllocator;
         match self {
-            ComposedLang::Arith(inner) => {
-                let doc_inner: &'a ::kirin::pretty::Document<'a, ArithDialect> =
-                    unsafe { ::core::mem::transmute(doc) };
-                ::kirin::pretty::PrettyPrint::pretty_print(inner, doc_inner)
-            }
-            ComposedLang::Control(inner) => {
-                let doc_inner: &'a ::kirin::pretty::Document<'a, ControlDialect> =
-                    unsafe { ::core::mem::transmute(doc) };
-                ::kirin::pretty::PrettyPrint::pretty_print(inner, doc_inner)
-            }
+            ComposedLang::Arith(inner) => ::kirin::pretty::PrettyPrint::pretty_print(inner, doc),
+            ComposedLang::Control(inner) => ::kirin::pretty::PrettyPrint::pretty_print(inner, doc),
         }
     }
 }

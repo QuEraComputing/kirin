@@ -415,3 +415,109 @@ where
         self.value.emit(ctx)
     }
 }
+
+// === Type coercion helpers for generated parser code ===
+//
+// These functions enable type-safe coercion between associated type form and
+// concrete type form for Block and Region types. This is needed because:
+//
+// 1. The parser returns `Block<..., <Language as HasDialectParser>::Output>`
+// 2. The AST field type is `Block<..., ConcreteAST<..., Language>>`
+// 3. The HasDialectParser impl defines `type Output = ConcreteAST<..., Language>`
+//
+// While these types are identical after type substitution, Rust's type system
+// cannot prove this equality within the impl body where the association is defined.
+// These helper functions use transmute to perform the coercion, which is sound
+// because the types are guaranteed to be identical at monomorphization time.
+
+/// Coerces a `Spanned<Block>` from associated type form to concrete type form.
+///
+/// # Safety Invariant
+///
+/// This function is only safe to call when `From` and `To` are the same type,
+/// just expressed differently (e.g., associated type vs concrete type).
+/// This is guaranteed by the macro-generated code that calls this function.
+///
+/// The caller must ensure that `From` equals `To` via the HasDialectParser impl,
+/// i.e., `<Language as HasDialectParser<'tokens, 'src, Language>>::Output == To`.
+#[inline(always)]
+pub fn coerce_block_type<TypeAST, From, To, B>(block: B) -> Spanned<Block<'static, TypeAST, To>>
+where
+    B: CoerceSpannedBlock<TypeAST, From, To>,
+{
+    block.coerce()
+}
+
+/// Coerces a `Region` from associated type form to concrete type form.
+///
+/// # Safety Invariant
+///
+/// This function is only safe to call when `From` and `To` are the same type,
+/// just expressed differently (e.g., associated type vs concrete type).
+/// This is guaranteed by the macro-generated code that calls this function.
+///
+/// The caller must ensure that `From` equals `To` via the HasDialectParser impl,
+/// i.e., `<Language as HasDialectParser<'tokens, 'src, Language>>::Output == To`.
+#[inline(always)]
+pub fn coerce_region_type<TypeAST, From, To, R>(region: R) -> Region<'static, TypeAST, To>
+where
+    R: CoerceRegion<TypeAST, From, To>,
+{
+    region.coerce()
+}
+
+/// Helper trait for coercing Spanned<Block> types.
+/// This trait-based approach avoids late-bound lifetime issues.
+pub trait CoerceSpannedBlock<TypeAST, From, To> {
+    fn coerce(self) -> Spanned<Block<'static, TypeAST, To>>;
+}
+
+impl<'src, TypeAST, From, To> CoerceSpannedBlock<TypeAST, From, To>
+    for Spanned<Block<'src, TypeAST, From>>
+{
+    #[inline(always)]
+    fn coerce(self) -> Spanned<Block<'static, TypeAST, To>> {
+        // SAFETY: This transmute is sound because:
+        // 1. `From` and `To` are the same type by construction (associated type = concrete type)
+        // 2. Block<..., From> and Block<..., To> have identical layout when From == To
+        // 3. Spanned is a transparent wrapper that doesn't affect layout
+        // 4. The compiler will verify type equality at monomorphization time
+        // 5. The lifetime change from 'src to 'static is safe because we're just changing
+        //    the phantom lifetime annotation - the actual data layout is unchanged.
+        //
+        // This coercion is necessary because Rust cannot prove that an associated type
+        // equals its definition within the impl body where the definition appears.
+        // At monomorphization, after type substitution, the types will be identical.
+        unsafe {
+            std::mem::transmute::<
+                Spanned<Block<'src, TypeAST, From>>,
+                Spanned<Block<'static, TypeAST, To>>,
+            >(self)
+        }
+    }
+}
+
+/// Helper trait for coercing Region types.
+/// This trait-based approach avoids late-bound lifetime issues.
+pub trait CoerceRegion<TypeAST, From, To> {
+    fn coerce(self) -> Region<'static, TypeAST, To>;
+}
+
+impl<'src, TypeAST, From, To> CoerceRegion<TypeAST, From, To> for Region<'src, TypeAST, From> {
+    #[inline(always)]
+    fn coerce(self) -> Region<'static, TypeAST, To> {
+        // SAFETY: This transmute is sound because:
+        // 1. `From` and `To` are the same type by construction (associated type = concrete type)
+        // 2. Region<..., From> and Region<..., To> have identical layout when From == To
+        // 3. The compiler will verify type equality at monomorphization time
+        // 4. The lifetime change from 'src to 'static is safe because we're just changing
+        //    the phantom lifetime annotation - the actual data layout is unchanged.
+        //
+        // This coercion is necessary because Rust cannot prove that an associated type
+        // equals its definition within the impl body where the definition appears.
+        // At monomorphization, after type substitution, the types will be identical.
+        unsafe {
+            std::mem::transmute::<Region<'src, TypeAST, From>, Region<'static, TypeAST, To>>(self)
+        }
+    }
+}

@@ -2,20 +2,18 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl<T: TypeLattice> ::kirin::pretty::PrettyPrint<WrapperWithGenerics<T>> for WrapperWithGenerics<T>
-where
-    T: ::core::fmt::Display,
-{
-    fn pretty_print<'a>(
+impl<T: TypeLattice> ::kirin::pretty::PrettyPrint for WrapperWithGenerics<T> {
+    fn pretty_print<'a, __L: ::kirin::ir::Dialect + ::kirin::pretty::PrettyPrint>(
         &self,
-        doc: &'a ::kirin::pretty::Document<'a, WrapperWithGenerics<T>>,
-    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        doc: &'a ::kirin::pretty::Document<'a, __L>,
+    ) -> ::kirin::pretty::ArenaDoc<'a>
+    where
+        __L::TypeLattice: ::core::fmt::Display,
+    {
         use kirin::pretty::DocAllocator;
         match self {
             WrapperWithGenerics::Inner(inner) => {
-                let doc_inner: &'a ::kirin::pretty::Document<'a, GenericInner<T>> =
-                    unsafe { ::core::mem::transmute(doc) };
-                ::kirin::pretty::PrettyPrint::pretty_print(inner, doc_inner)
+                ::kirin::pretty::PrettyPrint::pretty_print(inner, doc)
             }
         }
     }

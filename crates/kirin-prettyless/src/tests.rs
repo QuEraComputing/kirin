@@ -1,8 +1,11 @@
 use super::*;
 use kirin_test_utils::*;
 
-impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
-    fn pretty_print<'a>(&self, doc: &'a Document<'a, SimpleLanguage>) -> ArenaDoc<'a> {
+impl PrettyPrint for SimpleLanguage {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
         match self {
             SimpleLanguage::Add(lhs, rhs, _) => {
                 let doc = doc.text(format!("add {}, {}", *lhs, *rhs));
@@ -20,9 +23,8 @@ impl PrettyPrint<SimpleLanguage> for SimpleLanguage {
                 doc
             }
             SimpleLanguage::Function(region, _) => {
-                let region_doc = region.pretty_print(doc);
-                let doc = doc.text("function ").append(region_doc);
-                doc
+                // Now that we have L: PrettyPrint bound, we can print the region content
+                doc.text("function ") + doc.print_region(region)
             }
         }
     }
@@ -62,6 +64,12 @@ fn test_block() {
     let body = context.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut context, body);
     let f = context.specialize().f(staged_function).body(fdef).new();
-    let mut doc = Document::new(Default::default(), &context);
-    insta::assert_snapshot!(doc.render(&f).unwrap());
+    
+    // Use the new Document method API for printing IR nodes
+    let doc = Document::new(Default::default(), &context);
+    let arena_doc = doc.print_specialized_function(&f);
+    let max_width = doc.config().max_width;
+    let mut buf = String::new();
+    arena_doc.render_fmt(max_width, &mut buf).unwrap();
+    insta::assert_snapshot!(buf);
 }

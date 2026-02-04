@@ -2,11 +2,14 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
-impl ::kirin::pretty::PrettyPrint<Function> for Function {
-    fn pretty_print<'a>(
+impl ::kirin::pretty::PrettyPrint for Function {
+    fn pretty_print<'a, __L: ::kirin::ir::Dialect + ::kirin::pretty::PrettyPrint>(
         &self,
-        doc: &'a ::kirin::pretty::Document<'a, Function>,
-    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        doc: &'a ::kirin::pretty::Document<'a, __L>,
+    ) -> ::kirin::pretty::ArenaDoc<'a>
+    where
+        __L::TypeLattice: ::core::fmt::Display,
+    {
         use kirin::pretty::DocAllocator;
         let Function {
             body: f_body,
@@ -14,7 +17,7 @@ impl ::kirin::pretty::PrettyPrint<Function> for Function {
         } = self;
         ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
             + doc.text(" = function ")
-            + ::kirin::pretty::PrettyPrint::pretty_print(f_body, doc)
+            + doc.print_region(f_body)
             + doc.text(" -> ")
             + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
     }

@@ -1,0 +1,16 @@
+---
+source: crates/kirin-chumsky-format/src/generate/tests.rs
+expression: pretty
+---
+impl<Language: ::kirin::ir::Dialect> ::kirin::pretty::PrettyPrint<Language> for MyWrapper
+where
+    OtherDialect: ::kirin::pretty::PrettyPrint<Language>,
+{
+    fn pretty_print<'a>(
+        &self,
+        doc: &'a ::kirin::pretty::Document<'a, Language>,
+    ) -> ::kirin::pretty::ArenaDoc<'a> {
+        let inner = &self.0;
+        ::kirin::pretty::PrettyPrint::pretty_print(inner, doc)
+    }
+}
