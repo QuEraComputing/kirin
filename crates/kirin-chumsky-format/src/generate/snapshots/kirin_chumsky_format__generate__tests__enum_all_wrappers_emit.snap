@@ -13,12 +13,12 @@ where
     >,
     Language: ::core::convert::From<ArithDialect>,
     Language: ::core::convert::From<ControlDialect>,
-    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output:
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>:
         ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
-    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output:
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>:
         ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
-    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
-    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
     type Output = ::kirin::ir::Statement;
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {

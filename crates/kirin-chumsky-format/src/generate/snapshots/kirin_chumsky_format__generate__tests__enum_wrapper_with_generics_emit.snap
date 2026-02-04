@@ -12,9 +12,9 @@ where
         Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
     >,
     Language: ::core::convert::From<GenericInner<T>>,
-    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output:
+    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>:
         ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
-    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
     type Output = ::kirin::ir::Statement;
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {

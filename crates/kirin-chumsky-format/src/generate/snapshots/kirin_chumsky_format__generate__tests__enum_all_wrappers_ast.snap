@@ -6,12 +6,12 @@ expression: ast
 pub enum ComposedLangAST<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect>
 where
     Language: ::kirin::ir::Dialect + 'tokens,
-    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
-    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    Arith(<ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output),
+    Arith(<ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>),
     Control(
-        <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
+        <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>,
     ),
     #[doc(hidden)]
     __Marker(

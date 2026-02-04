@@ -85,7 +85,7 @@ impl GenerateEmitIR {
 
         // For wrapper enum variants, we need:
         // - Language: From<WrappedDialect> for each wrapped type (so inner.emit(ctx) works)
-        // - <WrappedDialect as HasDialectParser<..., Language>>::Output: EmitIR<Language>
+        // - <WrappedDialect as HasDialectParser<...>>::Output<Language>: EmitIR<Language>
         let wrapper_types = super::collect_wrapper_types(ir_input);
         let wrapper_from_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
@@ -94,15 +94,16 @@ impl GenerateEmitIR {
         let wrapper_emit_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
             .map(|ty| {
+                // Use GAT syntax: Output<Language> instead of trait param Language
                 syn::parse_quote! {
-                    <#ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output:
+                    <#ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<Language>:
                         #crate_path::EmitIR<Language, Output = #ir_path::Statement>
                 }
             })
             .collect();
         let wrapper_dialect_parser_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
-            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src, Language> })
+            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
             .collect();
 
         // IR type parameter for the EmitIR impl

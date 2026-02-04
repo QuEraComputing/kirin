@@ -165,8 +165,8 @@ impl GenerateHasDialectParser {
 
         // Use explicit return type annotation to pin the lifetimes correctly.
         // Without this, Rust would infer anonymous lifetimes '_ for the constructor.
-        // Use generic Language since this is inside HasDialectParser::recursive_parser.
-        let language = quote! { Language };
+        // Use __Language since this is inside HasDialectParser::recursive_parser<I, __Language>.
+        let language = quote! { __Language };
         let return_type = self.build_ast_type_reference(ir_input, ast_name, &language);
         Ok(quote! {{
             use #crate_path::Token;
@@ -190,15 +190,15 @@ impl GenerateHasDialectParser {
         };
 
         // Use explicit return type annotation to pin the lifetimes correctly
-        // Use generic Language since this is inside HasDialectParser::recursive_parser.
-        let language = quote! { Language };
+        // Use __Language since this is inside HasDialectParser::recursive_parser<I, __Language, __LanguageOutput>.
+        let language = quote! { __Language };
         let return_type = self.build_ast_type_reference(ir_input, ast_name, &language);
 
-        // For wrapper types, use HasDialectParser::recursive_parser(language.clone()) to forward
+        // For wrapper types, use HasDialectParser::recursive_parser::<I, __Language, __LanguageOutput>(language.clone()) to forward
         // the outer Language through the wrapped type's parser. This ensures blocks inside the
         // wrapped type use the outer Language for parsing their statements, not the wrapped type.
         Ok(quote! {
-            <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::recursive_parser(language.clone())
+            <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::recursive_parser::<I, __Language, __LanguageOutput>(language.clone())
                 .map(|inner| -> #return_type { #constructor(inner) })
         })
     }

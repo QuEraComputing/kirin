@@ -46,41 +46,49 @@ pub trait HasParser<'tokens, 'src: 'tokens> {
 
 /// Trait for dialect types that can be parsed with chumsky.
 ///
-/// This trait provides recursive parsing capabilities for dialects.
-/// The `Language` parameter is the top-level language being parsed,
-/// which may be a composition of multiple dialects.
+/// This trait provides recursive parsing capabilities for dialects using
+/// Generic Associated Types (GAT) to avoid self-referential trait bounds.
 ///
-/// When a dialect is used standalone, `Language = Self`.
-/// When embedded in another dialect, `Language` is the outer dialect.
+/// The `Output<L>` GAT is parameterized by the top-level language dialect type `L`.
+/// This design allows dialect composition without recursive trait bounds like
+/// `Language: HasDialectParser<Language>` which can cause trait resolution overflow.
 ///
-/// Note: This trait is implemented both by the original dialect type
-/// (e.g., `SimpleLang`) and by the generated AST type (e.g., `SimpleLangAST`).
-/// The AST type doesn't implement `Dialect`, so we don't require `Self: Dialect`.
-pub trait HasDialectParser<'tokens, 'src: 'tokens, Language: Dialect>: Sized {
+/// When a dialect is used standalone, `L = Self`.
+/// When embedded in another dialect, `L` is the outer dialect type.
+///
+/// Note: This trait is implemented by the original dialect type (e.g., `SimpleLang`).
+/// The AST type is `Self::Output<L>` where `L` is the composing language.
+pub trait HasDialectParser<'tokens, 'src: 'tokens>: Sized {
     /// The AST type produced by parsing this dialect.
-    type Output: Clone + Debug + PartialEq;
+    ///
+    /// The `L` parameter is the top-level language dialect type being parsed.
+    /// For standalone use, `L = Self`. For composed languages, `L` is the outer dialect.
+    type Output<L>: Clone + Debug + PartialEq
+    where
+        L: Dialect + 'tokens;
 
     /// The AST representation for type annotations.
     ///
     /// This avoids the double projection through `TypeLattice + HasParser::Output`.
-    /// Typically equals `Language::TypeLattice` (types parse to themselves).
+    /// Typically equals the type lattice's parsed output type.
     type TypeAST: Clone + Debug + PartialEq;
 
     /// Returns a recursive parser for this dialect.
     ///
     /// The `language` parameter is a recursive parser handle that can be used
     /// to parse nested language constructs (like statements within blocks).
-    fn recursive_parser<I>(
-        language: RecursiveParser<
-            'tokens,
-            'src,
-            I,
-            <Language as HasDialectParser<'tokens, 'src, Language>>::Output,
-        >,
-    ) -> BoxedParser<'tokens, 'src, I, Self::Output>
+    /// The `LanguageOutput` type is the outer language's AST type, which may differ
+    /// from `Self::Output<L>` when this dialect is wrapped in an enum.
+    ///
+    /// The `L` type parameter is the top-level language being parsed. This is
+    /// passed at the method level to avoid self-referential trait bounds.
+    fn recursive_parser<I, L, LanguageOutput>(
+        language: RecursiveParser<'tokens, 'src, I, LanguageOutput>,
+    ) -> BoxedParser<'tokens, 'src, I, Self::Output<L>>
     where
         I: TokenInput<'tokens, 'src>,
-        Language: HasDialectParser<'tokens, 'src, Language>;
+        L: Dialect + 'tokens,
+        LanguageOutput: Clone + 'tokens;
 }
 
 /// A parse error with location information.

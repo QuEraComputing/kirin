@@ -3,8 +3,6 @@
 //! This module provides `BoundsBuilder` which consolidates the duplicated
 //! where clause bound generation logic across generators.
 
-use proc_macro2::TokenStream;
-
 /// Builder for generating where clause bounds.
 ///
 /// This consolidates the common pattern of generating trait bounds
@@ -12,17 +10,12 @@ use proc_macro2::TokenStream;
 pub struct BoundsBuilder<'a> {
     /// Path to the kirin-chumsky crate
     crate_path: &'a syn::Path,
-    /// Path to the kirin IR crate
-    ir_path: &'a syn::Path,
 }
 
 impl<'a> BoundsBuilder<'a> {
     /// Creates a new bounds builder.
-    pub fn new(crate_path: &'a syn::Path, ir_path: &'a syn::Path) -> Self {
-        Self {
-            crate_path,
-            ir_path,
-        }
+    pub fn new(crate_path: &'a syn::Path, _ir_path: &'a syn::Path) -> Self {
+        Self { crate_path }
     }
 
     /// Generates `HasParser<'tokens, 'src> + 'tokens` bounds for the given types.
@@ -36,25 +29,17 @@ impl<'a> BoundsBuilder<'a> {
             .collect()
     }
 
-    /// Generates `HasDialectParser<'tokens, 'src, L>` bounds for wrapper types.
+    /// Generates `HasDialectParser<'tokens, 'src>` bounds for wrapper types.
     ///
-    /// This is used for wrapper types where we forward the Language parameter through
-    /// to nested blocks.
+    /// With GAT, the trait no longer has a Language type parameter.
+    /// The Language is passed as a method type parameter instead.
     ///
-    /// The `language_type` parameter specifies what type to use as the Language:
-    /// - For `HasDialectParser` impl: use `quote! { Language }`
-    /// - For `HasParser` impl: use the concrete dialect type (e.g., `quote! { MyDialect #ty_generics }`)
-    ///
-    /// Used by: parser impl_gen
-    pub fn has_dialect_parser_bounds(
-        &self,
-        types: &[syn::Type],
-        language_type: &TokenStream,
-    ) -> Vec<syn::WherePredicate> {
+    /// Used by: parser impl_gen, ast generation
+    pub fn has_dialect_parser_bounds(&self, types: &[syn::Type]) -> Vec<syn::WherePredicate> {
         let crate_path = self.crate_path;
         types
             .iter()
-            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src, #language_type> })
+            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
             .collect()
     }
 
@@ -62,12 +47,6 @@ impl<'a> BoundsBuilder<'a> {
     pub fn type_lattice_has_parser_bound(&self, type_lattice: &syn::Path) -> syn::WherePredicate {
         let crate_path = self.crate_path;
         syn::parse_quote! { #type_lattice: #crate_path::HasParser<'tokens, 'src> + 'tokens }
-    }
-
-    /// Generates the Language: Dialect + 'tokens bound.
-    pub fn language_dialect_bound(&self) -> syn::WherePredicate {
-        let ir_path = self.ir_path;
-        syn::parse_quote! { Language: #ir_path::Dialect + 'tokens }
     }
 
     /// Generates `EmitIR` bounds for the given types.

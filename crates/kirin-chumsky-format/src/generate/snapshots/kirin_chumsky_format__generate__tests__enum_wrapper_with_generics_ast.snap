@@ -11,9 +11,9 @@ pub enum WrapperWithGenericsAST<
 > where
     Language: ::kirin::ir::Dialect + 'tokens,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    Inner(<GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output),
+    Inner(<GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>),
     #[doc(hidden)]
     __Marker(
         ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,

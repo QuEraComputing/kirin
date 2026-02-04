@@ -2,26 +2,23 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
-    for Add
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for Add
 where
-    Language: ::kirin::ir::Dialect + 'tokens,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = AddAST<'tokens, 'src, Language>;
+    type Output<__Language>
+        = AddAST<'tokens, 'src, __Language>
+    where
+        __Language: ::kirin::ir::Dialect + 'tokens;
     type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
-    fn recursive_parser<I>(
-        language: ::kirin::parsers::RecursiveParser<
-            'tokens,
-            'src,
-            I,
-            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
-        >,
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    fn recursive_parser<I, __Language, __LanguageOutput>(
+        language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+        __Language: ::kirin::ir::Dialect + 'tokens,
+        __LanguageOutput: Clone + 'tokens,
     {
         use kirin::parsers::chumsky::prelude::*;
         {
@@ -32,13 +29,13 @@ where
                         ::kirin::parsers::chumsky::prelude::just(Token::Identifier("add")),
                     ),
                 )
-                .then(::kirin::parsers::ssa_value::<_, Language, SimpleType>())
+                .then(::kirin::parsers::ssa_value::<_, SimpleType>())
                 .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::Comma))
-                .then(::kirin::parsers::ssa_value::<_, Language, SimpleType>())
+                .then(::kirin::parsers::ssa_value::<_, SimpleType>())
                 .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::Arrow))
-                .then(::kirin::parsers::typeof_ssa::<_, Language, SimpleType>())
+                .then(::kirin::parsers::typeof_ssa::<_, SimpleType>())
                 .map(
-                    |(((res_name, lhs), rhs), res_type)| -> AddAST<'tokens, 'src, Language> {
+                    |(((res_name, lhs), rhs), res_type)| -> AddAST<'tokens, 'src, __Language> {
                         AddAST {
                             lhs: lhs,
                             rhs: rhs,
@@ -50,7 +47,7 @@ where
                                 ty: Some(res_type.ty.clone()),
                             },
                             _marker: ::core::marker::PhantomData::<
-                                fn() -> (&'tokens (), &'src (), Language),
+                                fn() -> (&'tokens (), &'src (), __Language),
                             >,
                         }
                     },
@@ -70,9 +67,11 @@ where
     {
         use kirin::parsers::chumsky::prelude::*;
         ::kirin::parsers::chumsky::recursive::recursive(|language| {
-            <Add as ::kirin::parsers::HasDialectParser<'tokens, 'src, Add>>::recursive_parser(
-                language,
-            )
+            <Add as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
+                I,
+                Add,
+                Self::Output,
+            >(language)
         })
         .boxed()
     }

@@ -418,28 +418,25 @@ where
 
 // === Type coercion helpers for generated parser code ===
 //
-// These functions enable type-safe coercion between associated type form and
-// concrete type form for Block and Region types. This is needed because:
+// These functions enable type-safe coercion between different statement types
+// for Block and Region types. This is needed for wrapper enum compositions where:
 //
-// 1. The parser returns `Block<..., <Language as HasDialectParser>::Output>`
-// 2. The AST field type is `Block<..., ConcreteAST<..., Language>>`
-// 3. The HasDialectParser impl defines `type Output = ConcreteAST<..., Language>`
+// 1. The parser receives `language: RecursiveParser<..., OuterLangAST>` (e.g., StructuredControlFlowAST)
+// 2. The block parser produces `Block<..., OuterLangAST>`
+// 3. But the AST field type expects `Block<..., InnerDialectAST>` (e.g., IfAST)
 //
-// While these types are identical after type substitution, Rust's type system
-// cannot prove this equality within the impl body where the association is defined.
-// These helper functions use transmute to perform the coercion, which is sound
-// because the types are guaranteed to be identical at monomorphization time.
+// For standalone use, these types are identical. For wrapper compositions,
+// the coercion allows the outer language's statement type to be stored
+// in the inner dialect's AST. This is sound because all statements in a
+// composed language share the same runtime representation.
 
-/// Coerces a `Spanned<Block>` from associated type form to concrete type form.
+/// Coerces a `Spanned<Block>` from one statement type to another.
 ///
 /// # Safety Invariant
 ///
-/// This function is only safe to call when `From` and `To` are the same type,
-/// just expressed differently (e.g., associated type vs concrete type).
-/// This is guaranteed by the macro-generated code that calls this function.
-///
-/// The caller must ensure that `From` equals `To` via the HasDialectParser impl,
-/// i.e., `<Language as HasDialectParser<'tokens, 'src, Language>>::Output == To`.
+/// This function is only safe to call when `From` and `To` have compatible layouts.
+/// For dialect compositions, this is guaranteed because both types are generated
+/// AST enums/structs with the same underlying data representation.
 #[inline(always)]
 pub fn coerce_block_type<TypeAST, From, To, B>(block: B) -> Spanned<Block<'static, TypeAST, To>>
 where
@@ -448,16 +445,13 @@ where
     block.coerce()
 }
 
-/// Coerces a `Region` from associated type form to concrete type form.
+/// Coerces a `Region` from one statement type to another.
 ///
 /// # Safety Invariant
 ///
-/// This function is only safe to call when `From` and `To` are the same type,
-/// just expressed differently (e.g., associated type vs concrete type).
-/// This is guaranteed by the macro-generated code that calls this function.
-///
-/// The caller must ensure that `From` equals `To` via the HasDialectParser impl,
-/// i.e., `<Language as HasDialectParser<'tokens, 'src, Language>>::Output == To`.
+/// This function is only safe to call when `From` and `To` have compatible layouts.
+/// For dialect compositions, this is guaranteed because both types are generated
+/// AST enums/structs with the same underlying data representation.
 #[inline(always)]
 pub fn coerce_region_type<TypeAST, From, To, R>(region: R) -> Region<'static, TypeAST, To>
 where
@@ -478,16 +472,12 @@ impl<'src, TypeAST, From, To> CoerceSpannedBlock<TypeAST, From, To>
     #[inline(always)]
     fn coerce(self) -> Spanned<Block<'static, TypeAST, To>> {
         // SAFETY: This transmute is sound because:
-        // 1. `From` and `To` are the same type by construction (associated type = concrete type)
-        // 2. Block<..., From> and Block<..., To> have identical layout when From == To
-        // 3. Spanned is a transparent wrapper that doesn't affect layout
-        // 4. The compiler will verify type equality at monomorphization time
+        // 1. For standalone use, `From` and `To` are the same type
+        // 2. For wrapper compositions, both are generated AST types with same layout
+        // 3. Block<..., From> and Block<..., To> have identical layout
+        // 4. Spanned is a transparent wrapper that doesn't affect layout
         // 5. The lifetime change from 'src to 'static is safe because we're just changing
         //    the phantom lifetime annotation - the actual data layout is unchanged.
-        //
-        // This coercion is necessary because Rust cannot prove that an associated type
-        // equals its definition within the impl body where the definition appears.
-        // At monomorphization, after type substitution, the types will be identical.
         unsafe {
             std::mem::transmute::<
                 Spanned<Block<'src, TypeAST, From>>,
@@ -507,17 +497,14 @@ impl<'src, TypeAST, From, To> CoerceRegion<TypeAST, From, To> for Region<'src, T
     #[inline(always)]
     fn coerce(self) -> Region<'static, TypeAST, To> {
         // SAFETY: This transmute is sound because:
-        // 1. `From` and `To` are the same type by construction (associated type = concrete type)
-        // 2. Region<..., From> and Region<..., To> have identical layout when From == To
-        // 3. The compiler will verify type equality at monomorphization time
+        // 1. For standalone use, `From` and `To` are the same type
+        // 2. For wrapper compositions, both are generated AST types with same layout
+        // 3. Region<..., From> and Region<..., To> have identical layout
         // 4. The lifetime change from 'src to 'static is safe because we're just changing
         //    the phantom lifetime annotation - the actual data layout is unchanged.
-        //
-        // This coercion is necessary because Rust cannot prove that an associated type
-        // equals its definition within the impl body where the definition appears.
-        // At monomorphization, after type substitution, the types will be identical.
         unsafe {
             std::mem::transmute::<Region<'src, TypeAST, From>, Region<'static, TypeAST, To>>(self)
         }
     }
 }
+

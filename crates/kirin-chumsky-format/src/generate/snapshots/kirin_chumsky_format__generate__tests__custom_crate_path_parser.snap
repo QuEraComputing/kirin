@@ -2,36 +2,33 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens, Language> my_chumsky::HasDialectParser<'tokens, 'src, Language>
-    for CustomReturn
+impl<'tokens, 'src: 'tokens> my_chumsky::HasDialectParser<'tokens, 'src> for CustomReturn
 where
-    Language: my_kirin::Dialect + 'tokens,
     SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = CustomReturnAST<'tokens, 'src, Language>;
+    type Output<__Language>
+        = CustomReturnAST<'tokens, 'src, __Language>
+    where
+        __Language: my_kirin::Dialect + 'tokens;
     type TypeAST = <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output;
     #[inline]
-    fn recursive_parser<I>(
-        language: my_chumsky::RecursiveParser<
-            'tokens,
-            'src,
-            I,
-            <Language as my_chumsky::HasDialectParser<'tokens, 'src, Language>>::Output,
-        >,
-    ) -> my_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    fn recursive_parser<I, __Language, __LanguageOutput>(
+        language: my_chumsky::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+    ) -> my_chumsky::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
     where
         I: my_chumsky::TokenInput<'tokens, 'src>,
-        Language: my_chumsky::HasDialectParser<'tokens, 'src, Language>,
+        __Language: my_kirin::Dialect + 'tokens,
+        __LanguageOutput: Clone + 'tokens,
     {
         use my_chumsky::chumsky::prelude::*;
         {
             use my_chumsky::Token;
             my_chumsky::chumsky::prelude::just(Token::Identifier("return"))
-                .ignore_then(my_chumsky::ssa_value::<_, Language, SimpleType>())
-                .map(|field_0| -> CustomReturnAST<'tokens, 'src, Language> {
+                .ignore_then(my_chumsky::ssa_value::<_, SimpleType>())
+                .map(|field_0| -> CustomReturnAST<'tokens, 'src, __Language> {
                     CustomReturnAST(
                         field_0,
-                        ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), Language)>,
+                        ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), __Language)>,
                     )
                 })
         }
@@ -48,6 +45,13 @@ where
         I: my_chumsky::TokenInput<'tokens, 'src>,
     {
         use my_chumsky::chumsky::prelude::*;
-        my_chumsky :: chumsky :: recursive :: recursive (| language | { < CustomReturn as my_chumsky :: HasDialectParser < 'tokens , 'src , CustomReturn , >> :: recursive_parser (language) }) . boxed ()
+        my_chumsky::chumsky::recursive::recursive(|language| {
+            <CustomReturn as my_chumsky::HasDialectParser<'tokens, 'src>>::recursive_parser::<
+                I,
+                CustomReturn,
+                Self::Output,
+            >(language)
+        })
+        .boxed()
     }
 }

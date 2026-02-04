@@ -3,7 +3,6 @@
 use crate::ast::*;
 use crate::traits::*;
 use chumsky::prelude::*;
-use kirin_ir::Dialect;
 use kirin_lexer::Token;
 
 /// Parses a specific identifier keyword.
@@ -79,9 +78,9 @@ where
 /// - `%value`
 /// - `%value: type`
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `SSAValue<'src, <T as HasParser>::Output>`.
-pub fn ssa_value<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn ssa_value<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
     'tokens,
     I,
     SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
@@ -89,7 +88,6 @@ pub fn ssa_value<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
 {
     ssa_name()
@@ -107,9 +105,9 @@ where
 /// This is the parser used by format strings with `{result}` (Default option)
 /// for ResultValue fields, allowing users to optionally annotate result types.
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `ResultValue<'src, <T as HasParser>::Output>`.
-pub fn result_value<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn result_value<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
     'tokens,
     I,
     ResultValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
@@ -117,7 +115,6 @@ pub fn result_value<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
 {
     ssa_name()
@@ -143,9 +140,9 @@ where
 
 /// Parses only the type portion (expects type parser output).
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `TypeofSSAValue<<T as HasParser>::Output>`.
-pub fn typeof_ssa<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn typeof_ssa<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
     'tokens,
     I,
     TypeofSSAValue<<T as HasParser<'tokens, 'src>>::Output>,
@@ -153,7 +150,6 @@ pub fn typeof_ssa<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
 {
     T::parser()
@@ -210,21 +206,24 @@ where
     .labelled("block label")
 }
 
-/// Type alias for the parsed type AST of a language.
+/// Type alias for the parsed type AST of a dialect.
 ///
 /// This is the AST representation of type annotations in the language.
-pub type TypeAST<'tokens, 'src, L> = <L as HasDialectParser<'tokens, 'src, L>>::TypeAST;
+pub type TypeAST<'tokens, 'src, D> = <D as HasDialectParser<'tokens, 'src>>::TypeAST;
 
-/// Type alias for the parsed statement output of a language.
-pub type StmtOutput<'tokens, 'src, L> = <L as HasDialectParser<'tokens, 'src, L>>::Output;
+/// Type alias for the parsed statement output of a dialect with a specific language.
+///
+/// The `D` parameter is the dialect being parsed.
+/// The `L` parameter is the top-level language (for composing dialects).
+pub type StmtOutput<'tokens, 'src, D, L> = <D as HasDialectParser<'tokens, 'src>>::Output<L>;
 
 /// Parses a block argument.
 ///
 /// Matches: `%arg: type`
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `BlockArgument<'src, <T as HasParser>::Output>`.
-pub fn block_argument<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn block_argument<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
     'tokens,
     I,
     Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>,
@@ -232,7 +231,6 @@ pub fn block_argument<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
 {
     ssa_name()
@@ -253,9 +251,9 @@ where
 /// Matches: `(%arg0: i32, %arg1: f64)` or `()` for empty argument lists.
 /// Note: Parentheses are always required, even for empty argument lists.
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `Vec<Spanned<BlockArgument<'src, <T as HasParser>::Output>>>`.
-pub fn block_argument_list<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn block_argument_list<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
     'tokens,
     I,
     Vec<Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>>,
@@ -263,10 +261,9 @@ pub fn block_argument_list<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
 {
-    block_argument::<_, L, T>()
+    block_argument::<_, T>()
         .separated_by(just(Token::Comma))
         .allow_trailing()
         .collect::<Vec<_>>()
@@ -279,9 +276,9 @@ where
 /// Matches: `^bb0(%arg0: i32, %arg1: f64)` or `^bb0()` for blocks with no arguments.
 /// Note: Parentheses are always required, even for empty argument lists.
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `BlockHeader<'src, <T as HasParser>::Output>`.
-pub fn block_header<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn block_header<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
     'tokens,
     I,
     Spanned<BlockHeader<'src, <T as HasParser<'tokens, 'src>>::Output>>,
@@ -289,11 +286,10 @@ pub fn block_header<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
 {
     block_label()
-        .then(block_argument_list::<_, L, T>())
+        .then(block_argument_list::<_, T>())
         .map_with(|(label, arguments), e| Spanned {
             value: BlockHeader { label, arguments },
             span: e.span(),
@@ -305,22 +301,23 @@ where
 ///
 /// Requires a parser for the language/dialect statements.
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-/// The parser produces `Block<'src, <T as HasParser>::Output, ...>`.
-pub fn block<'tokens, 'src: 'tokens, I, L, T>(
-    language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
+/// The type parameter `S` is the statement AST type produced by the language parser.
+/// The parser produces `Block<'src, <T as HasParser>::Output, S>`.
+pub fn block<'tokens, 'src: 'tokens, I, T, S>(
+    language: RecursiveParser<'tokens, 'src, I, S>,
 ) -> impl Parser<
     'tokens,
     I,
-    Spanned<Block<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>>,
+    Spanned<Block<'src, <T as HasParser<'tokens, 'src>>::Output, S>>,
     ParserError<'tokens, 'src>,
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
+    S: Clone,
 {
-    let header = block_header::<_, L, T>();
+    let header = block_header::<_, T>();
     let statements = language
         .clone()
         .map_with(|stmt, e| Spanned {
@@ -354,22 +351,23 @@ where
 /// }
 /// ```
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
-/// The parser produces `Region<'src, <T as HasParser>::Output, ...>`.
-pub fn region<'tokens, 'src: 'tokens, I, L, T>(
-    language: RecursiveParser<'tokens, 'src, I, StmtOutput<'tokens, 'src, L>>,
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
+/// The type parameter `S` is the statement AST type produced by the language parser.
+/// The parser produces `Region<'src, <T as HasParser>::Output, S>`.
+pub fn region<'tokens, 'src: 'tokens, I, T, S>(
+    language: RecursiveParser<'tokens, 'src, I, S>,
 ) -> impl Parser<
     'tokens,
     I,
-    Region<'src, <T as HasParser<'tokens, 'src>>::Output, StmtOutput<'tokens, 'src, L>>,
+    Region<'src, <T as HasParser<'tokens, 'src>>::Output, S>,
     ParserError<'tokens, 'src>,
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
+    S: Clone,
 {
-    block::<_, L, T>(language)
+    block::<_, T, S>(language)
         .then_ignore(just(Token::Semicolon).or_not())
         .repeated()
         .collect::<Vec<_>>()
@@ -382,9 +380,9 @@ where
 ///
 /// Matches: `(i32, f64) -> bool` or `(i32) -> (bool, i32)` or `-> i32`
 ///
-/// The type parameter `T` specifies the type annotation type (typically `L::TypeLattice`).
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `FunctionType<<T as HasParser>::Output>`.
-pub fn function_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
+pub fn function_type<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
     'tokens,
     I,
     Spanned<FunctionType<<T as HasParser<'tokens, 'src>>::Output>>,
@@ -392,7 +390,6 @@ pub fn function_type<'tokens, 'src: 'tokens, I, L, T>() -> impl Parser<
 >
 where
     I: TokenInput<'tokens, 'src>,
-    L: HasDialectParser<'tokens, 'src, L> + Dialect + 'tokens,
     T: HasParser<'tokens, 'src>,
     <T as HasParser<'tokens, 'src>>::Output: Clone,
 {

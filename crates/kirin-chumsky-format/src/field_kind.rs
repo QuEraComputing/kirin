@@ -123,68 +123,54 @@ impl FieldKind {
     /// - `Type`: type-only parser
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) for Block/Region field type coercion.
+    /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) - currently unused with GAT.
     /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
     /// The `type_params` are the original type parameters from the dialect (e.g., `[T]` for `If<T>`).
     pub fn parser_expr(
         &self,
         crate_path: &syn::Path,
         opt: &FormatOption,
-        ast_name: &syn::Ident,
+        _ast_name: &syn::Ident,
         type_lattice: &syn::Path,
-        type_params: &[TokenStream],
+        _type_params: &[TokenStream],
     ) -> TokenStream {
-        // Include original type parameters in the AST type reference for Block/Region
-        let stmt_output = if type_params.is_empty() {
-            quote! { #ast_name<'tokens, 'src, Language> }
-        } else {
-            quote! { #ast_name<'tokens, 'src, #(#type_params,)* Language> }
-        };
+        // With GAT, Block/Region parsers directly return Self::Output<L>, no coercion needed.
+        // The `language` parameter is typed as RecursiveParser<..., Self::Output<L>>,
+        // so block/region parsers produce Block<..., Self::Output<L>> which matches the AST field type.
 
         match self {
             FieldKind::SSAValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
                 FormatOption::Type => {
-                    quote! { #crate_path::typeof_ssa::<_, Language, #type_lattice>() }
+                    quote! { #crate_path::typeof_ssa::<_, #type_lattice>() }
                 }
                 FormatOption::Default => {
-                    quote! { #crate_path::ssa_value::<_, Language, #type_lattice>() }
+                    quote! { #crate_path::ssa_value::<_, #type_lattice>() }
                 }
             },
             FieldKind::ResultValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
                 FormatOption::Type => {
-                    quote! { #crate_path::typeof_ssa::<_, Language, #type_lattice>() }
+                    quote! { #crate_path::typeof_ssa::<_, #type_lattice>() }
                 }
                 FormatOption::Default => {
-                    quote! { #crate_path::result_value::<_, Language, #type_lattice>() }
+                    quote! { #crate_path::result_value::<_, #type_lattice>() }
                 }
             },
             FieldKind::Block => {
+                // Parse block with the outer language's statement type (__LanguageOutput),
+                // then coerce to Self::Output<__Language> for the AST field.
+                // This coercion is needed for wrapper compositions where the outer language's
+                // statement type differs from the inner dialect's AST type.
                 let type_ast =
                     quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
-                    #crate_path::block::<_, Language, #type_lattice>(language.clone())
+                    #crate_path::block::<_, #type_lattice, _>(language.clone())
                         .map(|b| {
-                            // Type coercion: convert from associated type form to concrete type.
-                            //
-                            // The parser returns Block<..., <Language as HasDialectParser>::Output>
-                            // but our AST field type is Block<..., ASTName<..., Language>>.
-                            //
-                            // These types are IDENTICAL by construction because in the generated
-                            // HasDialectParser impl, we define `type Output = ASTName<..., Language>`.
-                            //
-                            // This coercion is sound because:
-                            // 1. Both types have identical layout (same struct, same type parameters)
-                            // 2. The associated type is bound to the concrete type in our impl
-                            // 3. Rust just can't prove equality within the impl body
-                            //
-                            // At monomorphization time, after type substitution, the compiler will
-                            // verify these types are identical before allowing the coercion.
                             #crate_path::coerce_block_type::<
                                 #type_ast,
-                                <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output,
-                                #stmt_output,
+                                __LanguageOutput,
+                                Self::Output<__Language>,
                                 _
                             >(b)
                         })
@@ -194,17 +180,17 @@ impl FieldKind {
                 quote! { #crate_path::block_label() }
             }
             FieldKind::Region => {
+                // Parse region with the outer language's statement type (__LanguageOutput),
+                // then coerce to Self::Output<__Language> for the AST field.
                 let type_ast =
                     quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
                 quote! {
-                    #crate_path::region::<_, Language, #type_lattice>(language.clone())
+                    #crate_path::region::<_, #type_lattice, _>(language.clone())
                         .map(|r| {
-                            // Type coercion: convert from associated type form to concrete type.
-                            // See Block comment above for detailed safety explanation.
                             #crate_path::coerce_region_type::<
                                 #type_ast,
-                                <Language as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output,
-                                #stmt_output,
+                                __LanguageOutput,
+                                Self::Output<__Language>,
                                 _
                             >(r)
                         })

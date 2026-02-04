@@ -135,7 +135,7 @@ impl GenerateAST {
         let wrapper_bounds: Vec<_> = if has_wrappers {
             super::collect_wrapper_types(ir_input)
                 .iter()
-                .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src, Language> })
+                .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
                 .collect()
         } else {
             Vec::new()
@@ -269,10 +269,10 @@ impl GenerateAST {
                 VariantRef::Wrapper { name, wrapper, .. } => {
                     let wrapped_ty = &wrapper.ty;
                     let crate_path = &self.config.crate_path;
-                    // Use HasDialectParser::Output to get the AST type for wrapped dialects.
+                    // Use HasDialectParser::Output<Language> GAT to get the AST type for wrapped dialects.
                     // This ensures the Language flows through to nested blocks.
                     quote! {
-                        #name(<#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src, Language>>::Output)
+                        #name(<#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<Language>)
                     }
                 }
                 VariantRef::Regular { name, stmt } => {

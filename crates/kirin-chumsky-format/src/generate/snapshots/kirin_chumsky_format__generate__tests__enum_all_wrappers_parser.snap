@@ -2,38 +2,35 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
-    for ComposedLang
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for ComposedLang
 where
-    Language: ::kirin::ir::Dialect + 'tokens,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
-    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    type Output = ComposedLangAST<'tokens, 'src, Language>;
+    type Output<__Language>
+        = ComposedLangAST<'tokens, 'src, __Language>
+    where
+        __Language: ::kirin::ir::Dialect + 'tokens;
     type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
-    fn recursive_parser<I>(
-        language: ::kirin::parsers::RecursiveParser<
-            'tokens,
-            'src,
-            I,
-            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
-        >,
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    fn recursive_parser<I, __Language, __LanguageOutput>(
+        language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+        __Language: ::kirin::ir::Dialect + 'tokens,
+        __LanguageOutput: Clone + 'tokens,
     {
         use kirin::parsers::chumsky::prelude::*;
-        < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , Language > { ComposedLangAST :: Arith (inner) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , Language >> :: recursive_parser (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , Language > { ComposedLangAST :: Control (inner) })) . boxed ()
+        < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __Language , __LanguageOutput > (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , __Language > { ComposedLangAST :: Arith (inner) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __Language , __LanguageOutput > (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , __Language > { ComposedLangAST :: Control (inner) })) . boxed ()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for ComposedLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, ComposedLang>,
-    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src, ComposedLang>,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
     type Output = ComposedLangAST<'tokens, 'src, ComposedLang>;
     fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
@@ -41,6 +38,13 @@ where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        :: kirin :: parsers :: chumsky :: recursive :: recursive (| language | { < ComposedLang as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , ComposedLang , >> :: recursive_parser (language) }) . boxed ()
+        ::kirin::parsers::chumsky::recursive::recursive(|language| {
+            <ComposedLang as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
+                I,
+                ComposedLang,
+                Self::Output,
+            >(language)
+        })
+        .boxed()
     }
 }

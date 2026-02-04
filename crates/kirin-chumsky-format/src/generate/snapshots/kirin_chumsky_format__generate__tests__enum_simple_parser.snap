@@ -2,66 +2,26 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
-impl<'tokens, 'src: 'tokens, Language> ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>
-    for SimpleLang
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for SimpleLang
 where
-    Language: ::kirin::ir::Dialect + 'tokens,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = SimpleLangAST<'tokens, 'src, Language>;
+    type Output<__Language>
+        = SimpleLangAST<'tokens, 'src, __Language>
+    where
+        __Language: ::kirin::ir::Dialect + 'tokens;
     type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
     #[inline]
-    fn recursive_parser<I>(
-        language: ::kirin::parsers::RecursiveParser<
-            'tokens,
-            'src,
-            I,
-            <Language as ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>>::Output,
-        >,
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    fn recursive_parser<I, __Language, __LanguageOutput>(
+        language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        Language: ::kirin::parsers::HasDialectParser<'tokens, 'src, Language>,
+        __Language: ::kirin::ir::Dialect + 'tokens,
+        __LanguageOutput: Clone + 'tokens,
     {
         use kirin::parsers::chumsky::prelude::*;
-        {
-            use kirin::parsers::Token;
-            ::kirin::parsers::nameof_ssa()
-                .then_ignore(
-                    ::kirin::parsers::chumsky::prelude::just(Token::Equal).then_ignore(
-                        ::kirin::parsers::chumsky::prelude::just(Token::Identifier("add")),
-                    ),
-                )
-                .then(::kirin::parsers::ssa_value::<_, Language, SimpleType>())
-                .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::Comma))
-                .then(::kirin::parsers::ssa_value::<_, Language, SimpleType>())
-                .then_ignore(::kirin::parsers::chumsky::prelude::just(Token::Arrow))
-                .then(::kirin::parsers::typeof_ssa::<_, Language, SimpleType>())
-                .map(
-                    |(((res_name, lhs), rhs), res_type)| -> SimpleLangAST<'tokens, 'src, Language> {
-                        SimpleLangAST::Add {
-                            lhs: lhs,
-                            rhs: rhs,
-                            res: ::kirin::parsers::ResultValue {
-                                name: ::kirin::parsers::Spanned {
-                                    value: res_name.name,
-                                    span: res_name.span,
-                                },
-                                ty: Some(res_type.ty.clone()),
-                            },
-                        }
-                    },
-                )
-        }
-        .or({
-            use kirin::parsers::Token;
-            ::kirin::parsers::chumsky::prelude::just(Token::Identifier("return"))
-                .ignore_then(::kirin::parsers::ssa_value::<_, Language, SimpleType>())
-                .map(|arg| -> SimpleLangAST<'tokens, 'src, Language> {
-                    SimpleLangAST::Return { arg: arg }
-                })
-        })
-        .boxed()
+        { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("add")))) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| (((res_name , lhs) , rhs) , res_type) | -> SimpleLangAST < 'tokens , 'src , __Language > { SimpleLangAST :: Add { lhs : lhs , rhs : rhs , res : :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } } }) } . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . map (| arg | -> SimpleLangAST < 'tokens , 'src , __Language > { SimpleLangAST :: Return { arg : arg } }) }) . boxed ()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for SimpleLang
@@ -74,6 +34,13 @@ where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        :: kirin :: parsers :: chumsky :: recursive :: recursive (| language | { < SimpleLang as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , SimpleLang , >> :: recursive_parser (language) }) . boxed ()
+        ::kirin::parsers::chumsky::recursive::recursive(|language| {
+            <SimpleLang as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
+                I,
+                SimpleLang,
+                Self::Output,
+            >(language)
+        })
+        .boxed()
     }
 }

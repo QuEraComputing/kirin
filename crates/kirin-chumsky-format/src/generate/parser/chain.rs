@@ -167,8 +167,9 @@ impl GenerateHasDialectParser {
         let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
 
         // PhantomData needs to match the AST type definition exactly
+        // Use __Language since this is inside HasDialectParser::recursive_parser<I, __Language>
         let phantom_data =
-            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), Language)> };
+            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), __Language)> };
 
         if has_named {
             let assigns = ast_fields.iter().map(|field| {
