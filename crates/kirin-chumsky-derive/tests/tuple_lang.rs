@@ -22,8 +22,8 @@ pub enum TupleLang {
 #[test]
 fn test_tuple_two_positional() {
     let ast = parse_ast::<TupleLang>("swap %a %b").expect("parse failed");
-    match ast {
-        TupleLangAST::Swap(first, second) => {
+    match ast.0 {
+        TupleLangAST::Swap(first, second, ..) => {
             assert_eq!(first.name.value, "a");
             assert_eq!(second.name.value, "b");
         }
@@ -34,12 +34,13 @@ fn test_tuple_two_positional() {
 #[test]
 fn test_named_fields_four_fields() {
     let ast = parse_ast::<TupleLang>("%out = sel %cond %left %right -> i32").expect("parse failed");
-    match ast {
+    match ast.0 {
         TupleLangAST::Select {
             res,
             cond,
             left,
             right,
+            ..
         } => {
             assert_eq!(res.name.value, "out");
             assert_eq!(res.ty, Some(SimpleType::I32));

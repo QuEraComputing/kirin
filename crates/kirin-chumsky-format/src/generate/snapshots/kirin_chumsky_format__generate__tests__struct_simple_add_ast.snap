@@ -3,9 +3,10 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
-pub struct AddAST<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect>
+pub struct AddAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
 where
-    Language: ::kirin::ir::Dialect,
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
 {
     pub lhs: ::kirin::parsers::SSAValue<
         'src,
@@ -20,5 +21,30 @@ where
         <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
     >,
     #[doc(hidden)]
-    _marker: ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+    _marker:
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
+}
+#[doc = r" Self-referential wrapper for standalone use."]
+#[doc = r""]
+#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
+#[doc = r" AST type suitable for use with `HasParser`."]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AddASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
+    pub AddAST<'tokens, 'src, TypeOutput, AddASTSelf<'tokens, 'src, TypeOutput>>,
+    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,
+)
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens;
+impl<'tokens, 'src, TypeOutput> AddASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+{
+    #[doc = r" Creates a new ASTSelf wrapper."]
+    pub fn new(
+        inner: AddAST<'tokens, 'src, TypeOutput, AddASTSelf<'tokens, 'src, TypeOutput>>,
+    ) -> Self {
+        Self(inner, ::core::marker::PhantomData)
+    }
 }

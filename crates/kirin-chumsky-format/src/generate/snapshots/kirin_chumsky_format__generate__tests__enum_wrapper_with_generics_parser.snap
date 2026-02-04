@@ -8,28 +8,28 @@ where
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    type Output<__Language>
-        = WrapperWithGenericsAST<'tokens, 'src, T, __Language>
+    type Output<__TypeOutput, __LanguageOutput>
+        = WrapperWithGenericsAST<'tokens, 'src, T, __TypeOutput, __LanguageOutput>
     where
-        __Language: ::kirin::ir::Dialect + 'tokens;
-    type TypeAST = <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens;
     #[inline]
-    fn recursive_parser<I, __Language, __LanguageOutput>(
+    fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
         language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        __Language: ::kirin::ir::Dialect + 'tokens,
-        __LanguageOutput: Clone + 'tokens,
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens,
     {
         use kirin::parsers::chumsky::prelude::*;
         <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
             I,
-            __Language,
+            __TypeOutput,
             __LanguageOutput,
         >(language.clone())
         .map(
-            |inner| -> WrapperWithGenericsAST<'tokens, 'src, T, __Language> {
+            |inner| -> WrapperWithGenericsAST<'tokens, 'src, T, __TypeOutput, __LanguageOutput> {
                 WrapperWithGenericsAST::Inner(inner)
             },
         )
@@ -42,12 +42,17 @@ where
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    type Output = WrapperWithGenericsAST<'tokens, 'src, T, WrapperWithGenerics<T>>;
+    type Output = WrapperWithGenericsASTSelf<
+        'tokens,
+        'src,
+        T,
+        <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+    >;
     fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
     {
         use kirin::parsers::chumsky::prelude::*;
-        :: kirin :: parsers :: chumsky :: recursive :: recursive (| language | { < WrapperWithGenerics < T > as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , >> :: recursive_parser :: < I , WrapperWithGenerics < T > , Self :: Output > (language) }) . boxed ()
+        :: kirin :: parsers :: chumsky :: recursive :: recursive (| language | { < WrapperWithGenerics < T > as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src , >> :: recursive_parser :: < I , < T as :: kirin :: parsers :: HasParser < 'tokens , 'src >> :: Output , Self :: Output > (language) . map (| inner | WrapperWithGenericsASTSelf :: new (inner)) }) . boxed ()
     }
 }

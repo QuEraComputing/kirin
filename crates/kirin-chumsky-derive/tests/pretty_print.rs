@@ -36,7 +36,7 @@ fn test_pretty_print_derive_compiles() {
 fn test_ast_type_exists() {
     // The HasParser derive generates TestLangAST
     // We just verify the type exists - actual parsing is tested elsewhere
-    fn _verify_type_exists() -> Option<TestLangAST<'static, 'static, TestLang>> {
+    fn _verify_type_exists() -> Option<TestLangAST<'static, 'static, SimpleType, TestLangASTSelf<'static, 'static, SimpleType>>> {
         None
     }
 }

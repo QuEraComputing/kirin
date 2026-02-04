@@ -13,7 +13,6 @@ pub(crate) use bounds::BoundsBuilder;
 
 use std::collections::HashSet;
 
-use kirin_derive_core::codegen::GenericsBuilder;
 use kirin_derive_core::ir::VariantRef;
 use kirin_derive_core::ir::fields::FieldInfo;
 use proc_macro2::TokenStream;
@@ -61,14 +60,6 @@ impl GeneratorConfig {
             ir_path,
             type_lattice,
         }
-    }
-
-    /// Builds AST generics with Language parameter.
-    pub fn build_ast_generics(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-    ) -> syn::Generics {
-        GenericsBuilder::new(&self.ir_path).with_language(&ir_input.generics)
     }
 }
 

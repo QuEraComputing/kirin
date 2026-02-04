@@ -40,14 +40,124 @@ impl GenerateEmitIR {
         }
 
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
-        let ast_generics = self.config.build_ast_generics(ir_input);
+        let ast_self_name = syn::Ident::new(&format!("{}ASTSelf", ir_input.name), ir_input.name.span());
+        let ast_generics = self.build_ast_generics_for_emit_ir(ir_input);
         let crate_path = &self.config.crate_path;
 
         // Generate impl for the AST type
         let emit_impl = self.generate_emit_impl(ir_input, &ast_name, &ast_generics, crate_path);
 
+        // Generate impl for the ASTSelf wrapper - delegates to inner type
+        let ast_self_emit_impl = self.generate_ast_self_emit_impl(ir_input, &ast_name, &ast_self_name, crate_path);
+
         quote! {
             #emit_impl
+            #ast_self_emit_impl
+        }
+    }
+
+    /// Builds AST generics for EmitIR impl.
+    ///
+    /// Returns generics like `<'tokens, 'src, [original type params], TypeOutput, LanguageOutput>`.
+    fn build_ast_generics_for_emit_ir(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+    ) -> syn::Generics {
+        use proc_macro2::Span;
+
+        let mut generics = ir_input.generics.clone();
+
+        // Add 'tokens lifetime at the beginning if not present
+        let tokens_lt = syn::Lifetime::new("'tokens", Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
+        {
+            generics.params.insert(
+                0,
+                syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
+            );
+        }
+
+        // Add 'src: 'tokens lifetime after 'tokens if not present
+        let src_lt = syn::Lifetime::new("'src", Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
+        {
+            let mut src_param = syn::LifetimeParam::new(src_lt);
+            src_param.bounds.push(tokens_lt);
+            generics
+                .params
+                .insert(1, syn::GenericParam::Lifetime(src_param));
+        }
+
+        // Add TypeOutput type parameter
+        let type_output_ident = syn::Ident::new("TypeOutput", Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == type_output_ident))
+        {
+            let type_output_param = syn::TypeParam::from(type_output_ident);
+            generics
+                .params
+                .push(syn::GenericParam::Type(type_output_param));
+        }
+
+        // Add LanguageOutput type parameter
+        let lang_output_ident = syn::Ident::new("LanguageOutput", Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == lang_output_ident))
+        {
+            let lang_output_param = syn::TypeParam::from(lang_output_ident);
+            generics
+                .params
+                .push(syn::GenericParam::Type(lang_output_param));
+        }
+
+        // Add Language type parameter for EmitIR<Language>
+        // This is a separate type parameter from LanguageOutput
+        let language_ident = syn::Ident::new("Language", Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == language_ident))
+        {
+            let language_param = syn::TypeParam::from(language_ident);
+            generics
+                .params
+                .push(syn::GenericParam::Type(language_param));
+        }
+
+        generics
+    }
+
+    /// Builds just the type generics for the AST type (without Language).
+    ///
+    /// Returns a TokenStream like `<'tokens, 'src, [original type params], TypeOutput, LanguageOutput>`.
+    fn build_ast_ty_generics(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+    ) -> TokenStream {
+        // Extract original type parameters
+        let type_params: Vec<TokenStream> = ir_input
+            .generics
+            .type_params()
+            .map(|p| {
+                let ident = &p.ident;
+                quote! { #ident }
+            })
+            .collect();
+
+        if type_params.is_empty() {
+            quote! { <'tokens, 'src, TypeOutput, LanguageOutput> }
+        } else {
+            quote! { <'tokens, 'src, #(#type_params,)* TypeOutput, LanguageOutput> }
         }
     }
 
@@ -59,7 +169,13 @@ impl GenerateEmitIR {
         crate_path: &syn::Path,
     ) -> TokenStream {
         let original_name = &ir_input.name;
-        let (impl_generics, ty_generics, _) = ast_generics.split_for_impl();
+        // ast_generics includes Language, but the AST type doesn't have Language
+        // So we use ast_generics for impl_generics, but build ty_generics without Language
+        let (impl_generics, _, _) = ast_generics.split_for_impl();
+
+        // Build ty_generics without the Language parameter
+        let ty_generics = self.build_ast_ty_generics(ir_input);
+
         let (_, original_ty_generics, _) = ir_input.generics.split_for_impl();
 
         let emit_body = match &ir_input.data {
@@ -85,18 +201,22 @@ impl GenerateEmitIR {
 
         // For wrapper enum variants, we need:
         // - Language: From<WrappedDialect> for each wrapped type (so inner.emit(ctx) works)
-        // - <WrappedDialect as HasDialectParser<...>>::Output<Language>: EmitIR<Language>
+        // - The wrapped type's AST (with TypeOutput and LanguageOutput) must implement EmitIR
         let wrapper_types = super::collect_wrapper_types(ir_input);
         let wrapper_from_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
             .map(|ty| syn::parse_quote! { Language: ::core::convert::From<#ty> })
             .collect();
+        // With new design, wrapper variants use the direct AST type name
+        // (e.g., WrappedDialectAST<..., TypeOutput, LanguageOutput>)
+        // which is already in our AST's variant, so it will naturally implement EmitIR
+        // if we have the proper bounds.
         let wrapper_emit_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
             .map(|ty| {
-                // Use GAT syntax: Output<Language> instead of trait param Language
+                // Use new syntax: Output<TypeOutput, LanguageOutput>
                 syn::parse_quote! {
-                    <#ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<Language>:
+                    <#ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<TypeOutput, LanguageOutput>:
                         #crate_path::EmitIR<Language, Output = #ir_path::Statement>
                 }
             })
@@ -109,16 +229,21 @@ impl GenerateEmitIR {
         // IR type parameter for the EmitIR impl
         // We need:
         // - `From<OriginalType>` to convert the AST to IR statements
-        // - TypeAST (= <type_lattice as HasParser>::Output) must implement EmitIR to convert
-        //   parsed type annotations to TypeLattice
+        // - <type_lattice as HasParser>::Output must implement EmitIR to convert parsed type annotations
+        //   to TypeLattice (this is the actual type in the AST fields)
         // - type_lattice: HasParser + 'tokens bound
-        // - <type_lattice as HasParser>::Output: EmitIR<Language, Output = TypeLattice>
+        // - TypeOutput: Clone + PartialEq (from AST bounds, used in PhantomData)
+        // - LanguageOutput: Clone + PartialEq + 'tokens + EmitIR<Language> (for Block/Region recursion)
         // - For Value field types with type parameters: HasParser + EmitIR bounds
         // - For wrapper variants: Language: From<WrappedType> and inner AST: EmitIR<Language>
         let base_bounds = quote! {
             Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
+            TypeOutput: Clone + PartialEq,
+            LanguageOutput: Clone + PartialEq + 'tokens,
+            LanguageOutput: #crate_path::EmitIR<Language, Output = #ir_path::Statement>,
             #type_lattice: #crate_path::HasParser<'tokens, 'src> + 'tokens,
-            <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output: #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::TypeLattice>,
+            <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output:
+                #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::TypeLattice>,
         };
 
         let mut all_bounds = vec![base_bounds];
@@ -143,6 +268,133 @@ impl GenerateEmitIR {
 
                 fn emit(&self, ctx: &mut #crate_path::EmitContext<'_, Language>) -> Self::Output {
                     #emit_body
+                }
+            }
+        }
+    }
+
+    /// Generates an EmitIR impl for the ASTSelf wrapper that delegates to the inner type.
+    fn generate_ast_self_emit_impl(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        ast_name: &syn::Ident,
+        ast_self_name: &syn::Ident,
+        crate_path: &syn::Path,
+    ) -> TokenStream {
+        let original_name = &ir_input.name;
+        let ir_path = &self.config.ir_path;
+        let type_lattice = &self.config.type_lattice;
+        let (_, original_ty_generics, _) = ir_input.generics.split_for_impl();
+
+        // Extract original type parameters
+        let type_params: Vec<TokenStream> = ir_input
+            .generics
+            .type_params()
+            .map(|p| {
+                let ident = &p.ident;
+                quote! { #ident }
+            })
+            .collect();
+
+        // Build generics for the ASTSelf impl: <'tokens, 'src, [original type params], TypeOutput, Language>
+        let impl_generics = if type_params.is_empty() {
+            quote! { <'tokens, 'src, TypeOutput, Language> }
+        } else {
+            // Get original type parameters with their bounds for impl
+            let type_param_bounds: Vec<_> = ir_input
+                .generics
+                .type_params()
+                .map(|p| {
+                    let ident = &p.ident;
+                    let bounds = &p.bounds;
+                    if bounds.is_empty() {
+                        quote! { #ident }
+                    } else {
+                        quote! { #ident: #bounds }
+                    }
+                })
+                .collect();
+            quote! { <'tokens, 'src, #(#type_param_bounds,)* TypeOutput, Language> }
+        };
+
+        // Build type generics for ASTSelf: <'tokens, 'src, [params], TypeOutput>
+        let ast_self_ty_generics = if type_params.is_empty() {
+            quote! { <'tokens, 'src, TypeOutput> }
+        } else {
+            quote! { <'tokens, 'src, #(#type_params,)* TypeOutput> }
+        };
+
+        // Note: We do NOT use inner_ast_type in bounds to avoid recursive trait resolution.
+        // The bound `inner_ast_type: EmitIR<Language>` would cause overflow.
+        let _inner_ast_type = if type_params.is_empty() {
+            quote! { #ast_name<'tokens, 'src, TypeOutput, #ast_self_name<'tokens, 'src, TypeOutput>> }
+        } else {
+            quote! { #ast_name<'tokens, 'src, #(#type_params,)* TypeOutput, #ast_self_name<'tokens, 'src, #(#type_params,)* TypeOutput>> }
+        };
+
+        // Use BoundsBuilder to generate EmitIR bounds
+        let bounds = BoundsBuilder::new(crate_path, ir_path);
+        let value_types = collect_all_value_types_needing_bounds(ir_input);
+        let value_type_bounds = bounds.emit_ir_bounds(&value_types);
+
+        // Collect wrapper types for their bounds
+        let wrapper_types = super::collect_wrapper_types(ir_input);
+        let wrapper_from_bounds: Vec<syn::WherePredicate> = wrapper_types
+            .iter()
+            .map(|ty| syn::parse_quote! { Language: ::core::convert::From<#ty> })
+            .collect();
+        let wrapper_dialect_parser_bounds: Vec<syn::WherePredicate> = wrapper_types
+            .iter()
+            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
+            .collect();
+        // For wrapper enums, we need the inner ASTs to implement EmitIR.
+        // The LanguageOutput for these is Self (the ASTSelf type), creating a coinductive requirement.
+        // We use the ASTSelf type directly to allow Rust's trait solver to find the coinductive solution.
+        let wrapper_emit_bounds: Vec<syn::WherePredicate> = wrapper_types
+            .iter()
+            .map(|ty| {
+                syn::parse_quote! {
+                    <#ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<TypeOutput, #ast_self_name #ast_self_ty_generics>:
+                        #crate_path::EmitIR<Language, Output = #ir_path::Statement>
+                }
+            })
+            .collect();
+
+        // Note: We do NOT add a bound requiring `inner_ast_type: EmitIR<Language>` because
+        // that would create a recursive bound (ASTSelf contains AST which contains ASTSelf...).
+        // Instead, we rely on the wrapper_emit_bounds which use coinduction.
+        let base_bounds = quote! {
+            Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
+            TypeOutput: Clone + PartialEq,
+            'src: 'tokens,
+            #type_lattice: #crate_path::HasParser<'tokens, 'src> + 'tokens,
+            <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output:
+                #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::TypeLattice>,
+        };
+
+        let mut all_bounds = vec![base_bounds];
+        if !value_type_bounds.is_empty() {
+            let bounds_tokens = value_type_bounds.iter().map(|b| quote! { #b, });
+            all_bounds.push(quote! { #(#bounds_tokens)* });
+        }
+        if !wrapper_from_bounds.is_empty() {
+            let from_tokens = wrapper_from_bounds.iter().map(|b| quote! { #b, });
+            let emit_tokens = wrapper_emit_bounds.iter().map(|b| quote! { #b, });
+            let dialect_parser_tokens = wrapper_dialect_parser_bounds.iter().map(|b| quote! { #b, });
+            all_bounds.push(quote! { #(#from_tokens)* #(#emit_tokens)* #(#dialect_parser_tokens)* });
+        }
+
+        let where_clause = quote! { where #(#all_bounds)* };
+
+        quote! {
+            impl #impl_generics #crate_path::EmitIR<Language> for #ast_self_name #ast_self_ty_generics
+            #where_clause
+            {
+                type Output = #ir_path::Statement;
+
+                fn emit(&self, ctx: &mut #crate_path::EmitContext<'_, Language>) -> Self::Output {
+                    // Delegate to the inner AST type - use fully qualified syntax
+                    #crate_path::EmitIR::emit(&self.0, ctx)
                 }
             }
         }
@@ -282,12 +534,14 @@ impl GenerateEmitIR {
             #ast_name::__Marker(_, unreachable) => match *unreachable {}
         };
 
+        let crate_path = &self.config.crate_path;
+        let crate_path_for_match = crate_path.clone();
         generate_enum_match(
             ast_name,
             data,
-            // Wrapper handler
-            |_name, _wrapper| {
-                quote! { inner.emit(ctx) }
+            // Wrapper handler - use fully qualified syntax to ensure EmitIR is in scope
+            move |_name, _wrapper| {
+                quote! { #crate_path_for_match::EmitIR::emit(inner, ctx) }
             },
             // Regular variant handler
             |name, variant| {

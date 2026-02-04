@@ -2,10 +2,13 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect> ::kirin::parsers::EmitIR<Language>
-    for AddAST<'tokens, 'src, Language>
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput, Language>
+    ::kirin::parsers::EmitIR<Language> for AddAST<'tokens, 'src, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<Add>,
+    TypeOutput: Clone + PartialEq,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
         Language,
@@ -29,5 +32,22 @@ where
             res: f_res_ir.into(),
         };
         ctx.context.statement().definition(dialect_variant).new()
+    }
+}
+impl<'tokens, 'src, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
+    for AddASTSelf<'tokens, 'src, TypeOutput>
+where
+    Language: ::kirin::ir::Dialect + From<Add>,
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
+        Language,
+        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
+    >,
+{
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
+        ::kirin::parsers::EmitIR::emit(&self.0, ctx)
     }
 }

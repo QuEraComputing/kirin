@@ -71,43 +71,40 @@ impl FieldKind {
     /// Generates the AST type for this field kind.
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    /// The `ast_name` is the name of the AST type (e.g., `TestLangAST`) used for Block/Region statements.
-    /// The `type_lattice` is the type lattice path (e.g., `SimpleType`) used for type annotations.
-    /// The `type_params` are the original type parameters from the dialect (e.g., `[T]` for `If<T>`).
+    /// The `_ast_name` is unused but kept for API compatibility.
+    /// The `type_lattice` is used to construct the concrete type for SSA/Result fields.
+    /// The `_type_params` are unused but kept for API compatibility.
+    ///
+    /// Field types use `<TypeLattice as HasParser>::Output` to match what the parser produces.
+    /// The `TypeOutput` parameter in the AST struct is tracked via PhantomData.
+    /// Block/Region fields use `LanguageOutput` directly for recursive nesting.
     pub fn ast_type(
         &self,
         crate_path: &syn::Path,
-        ast_name: &syn::Ident,
+        _ast_name: &syn::Ident,
         type_lattice: &syn::Path,
-        type_params: &[TokenStream],
+        _type_params: &[TokenStream],
     ) -> TokenStream {
-        // Use <type_lattice as HasParser>::Output for type annotations.
-        // This matches the TypeAST definition in HasDialectParser impl.
-        // For Block/Region, use the concrete AST type name to avoid circular trait bounds.
-        let type_ast = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
-        // Include original type parameters in the AST type reference
-        let stmt_output = if type_params.is_empty() {
-            quote! { #ast_name<'tokens, 'src, Language> }
-        } else {
-            quote! { #ast_name<'tokens, 'src, #(#type_params,)* Language> }
-        };
-
+        // Use the concrete type that parsers produce for SSA/Result/Value fields.
+        // For Block/Region, use LanguageOutput directly.
+        let type_output = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
         match self {
             FieldKind::SSAValue => {
-                quote! { #crate_path::SSAValue<'src, #type_ast> }
+                quote! { #crate_path::SSAValue<'src, #type_output> }
             }
             FieldKind::ResultValue => {
-                quote! { #crate_path::ResultValue<'src, #type_ast> }
+                quote! { #crate_path::ResultValue<'src, #type_output> }
             }
             FieldKind::Block => {
                 // Block parser returns Spanned<Block>, so we need Spanned wrapper
-                quote! { #crate_path::Spanned<#crate_path::Block<'src, #type_ast, #stmt_output>> }
+                // Use type_output for TypeOutput and LanguageOutput for statements
+                quote! { #crate_path::Spanned<#crate_path::Block<'src, #type_output, LanguageOutput>> }
             }
             FieldKind::Successor => {
                 quote! { #crate_path::BlockLabel<'src> }
             }
             FieldKind::Region => {
-                quote! { #crate_path::Region<'src, #type_ast, #stmt_output> }
+                quote! { #crate_path::Region<'src, #type_output, LanguageOutput> }
             }
             FieldKind::Value(ty) => {
                 quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
@@ -123,9 +120,9 @@ impl FieldKind {
     /// - `Type`: type-only parser
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
-    /// The `ast_name` should be the AST type name (e.g., `TestLangAST`) - currently unused with GAT.
+    /// The `_ast_name` is unused but kept for API compatibility.
     /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
-    /// The `type_params` are the original type parameters from the dialect (e.g., `[T]` for `If<T>`).
+    /// The `_type_params` are unused but kept for API compatibility.
     pub fn parser_expr(
         &self,
         crate_path: &syn::Path,
@@ -134,9 +131,9 @@ impl FieldKind {
         type_lattice: &syn::Path,
         _type_params: &[TokenStream],
     ) -> TokenStream {
-        // With GAT, Block/Region parsers directly return Self::Output<L>, no coercion needed.
-        // The `language` parameter is typed as RecursiveParser<..., Self::Output<L>>,
-        // so block/region parsers produce Block<..., Self::Output<L>> which matches the AST field type.
+        // With the new design, Block/Region parsers use __LanguageOutput directly.
+        // The `language` parameter is typed as RecursiveParser<..., __LanguageOutput>,
+        // and AST fields use LanguageOutput as a type parameter.
 
         match self {
             FieldKind::SSAValue => match opt {
@@ -158,42 +155,20 @@ impl FieldKind {
                 }
             },
             FieldKind::Block => {
-                // Parse block with the outer language's statement type (__LanguageOutput),
-                // then coerce to Self::Output<__Language> for the AST field.
-                // This coercion is needed for wrapper compositions where the outer language's
-                // statement type differs from the inner dialect's AST type.
-                let type_ast =
-                    quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+                // Parse block directly with __LanguageOutput - no coercion needed.
+                // The AST type uses LanguageOutput as a type parameter.
                 quote! {
                     #crate_path::block::<_, #type_lattice, _>(language.clone())
-                        .map(|b| {
-                            #crate_path::coerce_block_type::<
-                                #type_ast,
-                                __LanguageOutput,
-                                Self::Output<__Language>,
-                                _
-                            >(b)
-                        })
                 }
             }
             FieldKind::Successor => {
                 quote! { #crate_path::block_label() }
             }
             FieldKind::Region => {
-                // Parse region with the outer language's statement type (__LanguageOutput),
-                // then coerce to Self::Output<__Language> for the AST field.
-                let type_ast =
-                    quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+                // Parse region directly with __LanguageOutput - no coercion needed.
+                // The AST type uses LanguageOutput as a type parameter.
                 quote! {
                     #crate_path::region::<_, #type_lattice, _>(language.clone())
-                        .map(|r| {
-                            #crate_path::coerce_region_type::<
-                                #type_ast,
-                                __LanguageOutput,
-                                Self::Output<__Language>,
-                                _
-                            >(r)
-                        })
                 }
             }
             FieldKind::Value(ty) => {

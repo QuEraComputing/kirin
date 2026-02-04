@@ -145,6 +145,7 @@ impl GenerateHasDialectParser {
         collected: &[FieldInfo<ChumskyLayout>],
         occurrences: &[FieldOccurrence<'_>],
         crate_path: &syn::Path,
+        type_params: &[TokenStream],
     ) -> TokenStream {
         // Group occurrences by field index
         let mut field_occurrences: HashMap<usize, Vec<&FieldOccurrence>> = HashMap::new();
@@ -167,9 +168,12 @@ impl GenerateHasDialectParser {
         let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
 
         // PhantomData needs to match the AST type definition exactly
-        // Use __Language since this is inside HasDialectParser::recursive_parser<I, __Language>
-        let phantom_data =
-            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), __Language)> };
+        // Include original type params (&'tokens (), &'src (), [type_params], __TypeOutput, __LanguageOutput)
+        let phantom_data = if type_params.is_empty() {
+            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), __TypeOutput, __LanguageOutput)> }
+        } else {
+            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), #(#type_params,)* __TypeOutput, __LanguageOutput)> }
+        };
 
         if has_named {
             let assigns = ast_fields.iter().map(|field| {

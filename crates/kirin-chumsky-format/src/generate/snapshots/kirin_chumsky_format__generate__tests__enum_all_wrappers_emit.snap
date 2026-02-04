@@ -2,10 +2,14 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect> ::kirin::parsers::EmitIR<Language>
-    for ComposedLangAST<'tokens, 'src, Language>
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput, Language>
+    ::kirin::parsers::EmitIR<Language>
+    for ComposedLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<ComposedLang>,
+    TypeOutput: Clone + PartialEq,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
         Language,
@@ -13,19 +17,52 @@ where
     >,
     Language: ::core::convert::From<ArithDialect>,
     Language: ::core::convert::From<ControlDialect>,
-    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>:
-        ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
-    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>:
-        ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
     ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
     type Output = ::kirin::ir::Statement;
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
         match self {
-            ComposedLangAST::Arith(inner) => inner.emit(ctx),
-            ComposedLangAST::Control(inner) => inner.emit(ctx),
+            ComposedLangAST::Arith(inner) => ::kirin::parsers::EmitIR::emit(inner, ctx),
+            ComposedLangAST::Control(inner) => ::kirin::parsers::EmitIR::emit(inner, ctx),
             ComposedLangAST::__Marker(_, unreachable) => match *unreachable {},
         }
+    }
+}
+impl<'tokens, 'src, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
+    for ComposedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    Language: ::kirin::ir::Dialect + From<ComposedLang>,
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
+        Language,
+        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
+    >,
+    Language: ::core::convert::From<ArithDialect>,
+    Language: ::core::convert::From<ControlDialect>,
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        ComposedLangASTSelf<'tokens, 'src, TypeOutput>,
+    >: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        ComposedLangASTSelf<'tokens, 'src, TypeOutput>,
+    >: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
+        ::kirin::parsers::EmitIR::emit(&self.0, ctx)
     }
 }

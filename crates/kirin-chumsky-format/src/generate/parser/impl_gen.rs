@@ -15,8 +15,7 @@ impl GenerateHasDialectParser {
     /// Generates the `HasParser` impl for the original type.
     /// This provides the `parser()` method that sets up recursive parsing.
     ///
-    /// With GAT, `HasParser::Output` is `<Self as HasDialectParser>::Output<Self>`,
-    /// using Self (the dialect type) as the Language parameter to the GAT.
+    /// With the new design, `HasParser::Output` is the ASTSelf wrapper type.
     pub(super) fn generate_has_parser_impl(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
@@ -47,7 +46,7 @@ impl GenerateHasDialectParser {
         let type_lattice_bound = bounds.type_lattice_has_parser_bound(type_lattice);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
-        // Wrapper types need HasDialectParser bounds (no Language parameter with GAT)
+        // Wrapper types need HasDialectParser bounds
         let wrapper_types = collect_wrapper_types(ir_input);
         let wrapper_type_bounds = bounds.has_dialect_parser_bounds(&wrapper_types);
 
@@ -67,15 +66,16 @@ impl GenerateHasDialectParser {
             }
         };
 
-        // The AST type for this dialect uses GAT: Output<Self>
-        let dialect_type = quote! { #original_name #ty_generics };
-        let ast_type = self.build_ast_type_reference(ir_input, ast_name, &dialect_type);
+        // The ASTSelf wrapper type for standalone use
+        let ast_self_name = syn::Ident::new(&format!("{}Self", ast_name), ast_name.span());
+        let ast_self_type = self.build_ast_self_type_reference(ir_input, &ast_self_name, type_lattice);
+        let type_output = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
 
         quote! {
             impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
             #where_clause
             {
-                type Output = #ast_type;
+                type Output = #ast_self_type;
 
                 fn parser<I>() -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output>
                 where
@@ -83,11 +83,12 @@ impl GenerateHasDialectParser {
                 {
                     use #crate_path::chumsky::prelude::*;
                     #crate_path::chumsky::recursive::recursive(|language| {
-                        // For standalone use, LanguageOutput = Self::Output<Self>
+                        // For standalone use, LanguageOutput = Self::Output (the ASTSelf type)
                         <#original_name #ty_generics as #crate_path::HasDialectParser<
                             'tokens,
                             'src,
-                        >>::recursive_parser::<I, #dialect_type, Self::Output>(language)
+                        >>::recursive_parser::<I, #type_output, Self::Output>(language)
+                            .map(|inner| #ast_self_name::new(inner))
                     }).boxed()
                 }
             }
@@ -146,11 +147,11 @@ impl GenerateHasDialectParser {
 
     /// Generates the `HasDialectParser` impl for the dialect type.
     ///
-    /// With GAT, the trait has no `Language` type parameter. Instead:
-    /// - `type Output<L>` is a GAT parameterized by the language type
-    /// - `recursive_parser<I, L>` takes `L: Dialect` as a method type parameter
+    /// With the new design:
+    /// - `type Output<TypeOutput, LanguageOutput>` has two type parameters
+    /// - `recursive_parser<I, TypeOutput, LanguageOutput>` takes both as method type parameters
     ///
-    /// This allows dialects to be composed without recursive trait bounds.
+    /// This allows dialects to be composed without GAT projection issues.
     pub(super) fn generate_dialect_parser_impl(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
@@ -166,9 +167,8 @@ impl GenerateHasDialectParser {
 
         let original_name = &ir_input.name;
         let type_lattice = &ir_input.attrs.type_lattice;
-        let ir_path = &self.config.ir_path;
 
-        // Build impl generics with just lifetimes and original type parameters (no Language)
+        // Build impl generics with just lifetimes and original type parameters
         let impl_generics = self.build_original_type_impl_generics(ir_input);
         let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
 
@@ -178,11 +178,11 @@ impl GenerateHasDialectParser {
         let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         // Use BoundsBuilder to generate bounds
-        let bounds = BoundsBuilder::new(crate_path, ir_path);
+        let bounds = BoundsBuilder::new(crate_path, &self.config.ir_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
         let type_lattice_bound = bounds.type_lattice_has_parser_bound(type_lattice);
-        // Wrapper types need HasDialectParser bounds (no Language parameter with GAT)
+        // Wrapper types need HasDialectParser bounds
         let wrapper_types = collect_wrapper_types(ir_input);
         let wrapper_type_bounds = bounds.has_dialect_parser_bounds(&wrapper_types);
 
@@ -203,29 +203,28 @@ impl GenerateHasDialectParser {
         // Generate parser body based on struct/enum
         let parser_body = self.generate_dialect_parser_body(ir_input, ast_name, crate_path);
 
-        // The AST type for this dialect uses GAT with __Language parameter
-        // Use __Language to avoid conflicts with user-defined type parameters
-        let ast_type = self.build_ast_type_reference(ir_input, ast_name, &quote! { __Language });
+        // The AST type with TypeOutput and LanguageOutput parameters
+        let ast_type = self.build_ast_type_with_type_params(ir_input, ast_name);
 
         quote! {
             impl #impl_generics #crate_path::HasDialectParser<'tokens, 'src>
                 for #original_name #ty_generics
             #final_where
             {
-                // GAT: Output is parameterized by __Language (top-level language dialect type)
-                // Use __Language to avoid conflicts with user-defined type parameters
-                type Output<__Language> = #ast_type where __Language: #ir_path::Dialect + 'tokens;
-                // TypeAST is the output of parsing the type lattice via HasParser
-                type TypeAST = <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output;
+                // Output is parameterized by TypeOutput and LanguageOutput
+                type Output<__TypeOutput, __LanguageOutput> = #ast_type
+                where
+                    __TypeOutput: Clone + PartialEq + 'tokens,
+                    __LanguageOutput: Clone + PartialEq + 'tokens;
 
                 #[inline]
-                fn recursive_parser<I, __Language, __LanguageOutput>(
+                fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
                     language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-                ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
+                ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
-                    __Language: #ir_path::Dialect + 'tokens,
-                    __LanguageOutput: Clone + 'tokens,
+                    __TypeOutput: Clone + PartialEq + 'tokens,
+                    __LanguageOutput: Clone + PartialEq + 'tokens,
                 {
                     use #crate_path::chumsky::prelude::*;
                     #parser_body.boxed()
@@ -242,19 +241,13 @@ impl GenerateHasDialectParser {
         GenericsBuilder::new(&self.config.ir_path).with_lifetimes(&ir_input.generics)
     }
 
-    /// Builds the fully-qualified AST type reference with a specific Language type.
+    /// Builds the AST type reference with __TypeOutput and __LanguageOutput parameters.
     ///
-    /// AST types have generics: `<'tokens, 'src, [original type params], Language>`
-    /// This returns: `ASTName<'tokens, 'src, T, L, ..., LanguageType>`
-    ///
-    /// Common usages:
-    /// - For `HasParser::Output`: pass the dialect type (e.g., `DialectName<T>`)
-    /// - For `HasDialectParser::Output`: pass `quote! { Language }`
-    pub(super) fn build_ast_type_reference(
+    /// Returns: `ASTName<'tokens, 'src, [original type params], __TypeOutput, __LanguageOutput>`
+    fn build_ast_type_with_type_params(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
-        language_type: &TokenStream,
     ) -> TokenStream {
         // Extract just the type parameters from the original generics (not lifetimes)
         let type_params: Vec<_> = ir_input
@@ -271,20 +264,88 @@ impl GenerateHasDialectParser {
             })
             .collect();
 
-        // AST generics are <'tokens, 'src, [original type params], Language>
+        // AST generics are <'tokens, 'src, [original type params], __TypeOutput, __LanguageOutput>
         if type_params.is_empty() {
-            quote! { #ast_name<'tokens, 'src, #language_type> }
+            quote! { #ast_name<'tokens, 'src, __TypeOutput, __LanguageOutput> }
         } else {
-            quote! { #ast_name<'tokens, 'src, #(#type_params,)* #language_type> }
+            quote! { #ast_name<'tokens, 'src, #(#type_params,)* __TypeOutput, __LanguageOutput> }
+        }
+    }
+
+    /// Builds the ASTSelf type reference for HasParser::Output.
+    ///
+    /// Returns: `ASTNameSelf<'tokens, 'src, [original type params], TypeLatticeOutput>`
+    fn build_ast_self_type_reference(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        ast_self_name: &syn::Ident,
+        type_lattice: &syn::Path,
+    ) -> TokenStream {
+        let crate_path = &self.config.crate_path;
+
+        // Extract just the type parameters from the original generics (not lifetimes)
+        let type_params: Vec<_> = ir_input
+            .generics
+            .params
+            .iter()
+            .filter_map(|p| {
+                if let syn::GenericParam::Type(tp) = p {
+                    let ident = &tp.ident;
+                    Some(quote! { #ident })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let type_output = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+
+        // ASTSelf generics are <'tokens, 'src, [original type params], TypeOutput>
+        if type_params.is_empty() {
+            quote! { #ast_self_name<'tokens, 'src, #type_output> }
+        } else {
+            quote! { #ast_self_name<'tokens, 'src, #(#type_params,)* #type_output> }
+        }
+    }
+
+    /// Builds the fully-qualified AST type reference with specific TypeOutput and LanguageOutput.
+    ///
+    /// This is used in parser bodies for return type annotations.
+    pub(super) fn build_ast_type_reference(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        ast_name: &syn::Ident,
+        type_output: &TokenStream,
+        language_output: &TokenStream,
+    ) -> TokenStream {
+        // Extract just the type parameters from the original generics (not lifetimes)
+        let type_params: Vec<_> = ir_input
+            .generics
+            .params
+            .iter()
+            .filter_map(|p| {
+                if let syn::GenericParam::Type(tp) = p {
+                    let ident = &tp.ident;
+                    Some(quote! { #ident })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // AST generics are <'tokens, 'src, [original type params], TypeOutput, LanguageOutput>
+        if type_params.is_empty() {
+            quote! { #ast_name<'tokens, 'src, #type_output, #language_output> }
+        } else {
+            quote! { #ast_name<'tokens, 'src, #(#type_params,)* #type_output, #language_output> }
         }
     }
 
     /// Generates the `HasDialectParser` impl for wrapper structs.
     ///
-    /// With GAT, we forward to the wrapped type's impl using the GAT syntax:
-    /// - `Output<L> = <Wrapped as HasDialectParser>::Output<L>`
-    /// - `TypeAST = <Wrapped as HasDialectParser>::TypeAST`
-    /// - `recursive_parser<I, L>(language) = Wrapped::recursive_parser::<I, L>(language)`
+    /// We forward to the wrapped type's impl:
+    /// - `Output<TypeOutput, LanguageOutput> = <Wrapped as HasDialectParser>::Output<TypeOutput, LanguageOutput>`
+    /// - `recursive_parser` forwards to wrapped type
     fn generate_wrapper_struct_dialect_parser_impl(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
@@ -293,9 +354,8 @@ impl GenerateHasDialectParser {
     ) -> TokenStream {
         let original_name = &ir_input.name;
         let wrapped_ty = &wrapper.ty;
-        let ir_path = &self.config.ir_path;
 
-        // Build impl generics with just lifetimes (no Language parameter with GAT)
+        // Build impl generics with just lifetimes
         let impl_generics = self.build_original_type_impl_generics(ir_input);
         let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
@@ -322,22 +382,23 @@ impl GenerateHasDialectParser {
                 for #original_name #ty_generics
             #final_where
             {
-                // GAT: Forward to wrapped type's Output GAT
-                // Use __Language to avoid conflicts with user-defined type parameters
-                type Output<__Language> = <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<__Language>
-                    where __Language: #ir_path::Dialect + 'tokens;
-                type TypeAST = <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::TypeAST;
+                // Forward to wrapped type's Output
+                type Output<__TypeOutput, __LanguageOutput> =
+                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<__TypeOutput, __LanguageOutput>
+                where
+                    __TypeOutput: Clone + PartialEq + 'tokens,
+                    __LanguageOutput: Clone + PartialEq + 'tokens;
 
                 #[inline]
-                fn recursive_parser<I, __Language, __LanguageOutput>(
+                fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
                     language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-                ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
+                ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
-                    __Language: #ir_path::Dialect + 'tokens,
-                    __LanguageOutput: Clone + 'tokens,
+                    __TypeOutput: Clone + PartialEq + 'tokens,
+                    __LanguageOutput: Clone + PartialEq + 'tokens,
                 {
-                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::recursive_parser::<I, __Language, __LanguageOutput>(language)
+                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::recursive_parser::<I, __TypeOutput, __LanguageOutput>(language)
                 }
             }
         }

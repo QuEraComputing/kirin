@@ -2,10 +2,14 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, T: TypeLattice, Language: ::kirin::ir::Dialect>
-    ::kirin::parsers::EmitIR<Language> for GenericReturnAST<'tokens, 'src, T, Language>
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput, Language>
+    ::kirin::parsers::EmitIR<Language>
+    for GenericReturnAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<GenericReturn<T>>,
+    TypeOutput: Clone + PartialEq,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
         Language,
@@ -18,5 +22,22 @@ where
         let f0_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f0, ctx);
         let dialect_variant: GenericReturn<T> = GenericReturn(f0_ir.into());
         ctx.context.statement().definition(dialect_variant).new()
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
+    for GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    Language: ::kirin::ir::Dialect + From<GenericReturn<T>>,
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
+        Language,
+        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
+    >,
+{
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
+        ::kirin::parsers::EmitIR::emit(&self.0, ctx)
     }
 }

@@ -2,10 +2,13 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, Language: my_kirin::Dialect> my_chumsky::EmitIR<Language>
-    for CustomReturnAST<'tokens, 'src, Language>
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput, Language> my_chumsky::EmitIR<Language>
+    for CustomReturnAST<'tokens, 'src, TypeOutput, LanguageOutput>
 where
     Language: my_kirin::Dialect + From<CustomReturn>,
+    TypeOutput: Clone + PartialEq,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: my_chumsky::EmitIR<Language, Output = my_kirin::Statement>,
     SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output:
         my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::TypeLattice>,
@@ -16,5 +19,20 @@ where
         let f0_ir: my_kirin::SSAValue = my_chumsky::EmitIR::emit(f0, ctx);
         let dialect_variant: CustomReturn = CustomReturn(f0_ir.into());
         ctx.context.statement().definition(dialect_variant).new()
+    }
+}
+impl<'tokens, 'src, TypeOutput, Language> my_chumsky::EmitIR<Language>
+    for CustomReturnASTSelf<'tokens, 'src, TypeOutput>
+where
+    Language: my_kirin::Dialect + From<CustomReturn>,
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
+    <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output:
+        my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::TypeLattice>,
+{
+    type Output = my_kirin::Statement;
+    fn emit(&self, ctx: &mut my_chumsky::EmitContext<'_, Language>) -> Self::Output {
+        my_chumsky::EmitIR::emit(&self.0, ctx)
     }
 }

@@ -2,21 +2,155 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
-#[derive(Clone, Debug, PartialEq)]
-pub enum WrapperWithGenericsAST<
-    'tokens,
-    'src: 'tokens,
-    T: TypeLattice,
-    Language: ::kirin::ir::Dialect,
-> where
-    Language: ::kirin::ir::Dialect + 'tokens,
+pub enum WrapperWithGenericsAST<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    Inner(<GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>),
+    Inner(
+        <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+            TypeOutput,
+            LanguageOutput,
+        >,
+    ),
     #[doc(hidden)]
     __Marker(
-        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), T, TypeOutput, LanguageOutput)>,
         ::core::convert::Infallible,
     ),
+}
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput> Clone
+    for WrapperWithGenericsAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            WrapperWithGenericsAST::Inner(inner) => WrapperWithGenericsAST::Inner(inner.clone()),
+            WrapperWithGenericsAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput> ::core::fmt::Debug
+    for WrapperWithGenericsAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        match self {
+            WrapperWithGenericsAST::Inner(_) => f.debug_tuple("Inner").field(&"..").finish(),
+            WrapperWithGenericsAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput> PartialEq
+    for WrapperWithGenericsAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (WrapperWithGenericsAST::Inner(a), WrapperWithGenericsAST::Inner(b)) => a == b,
+            (WrapperWithGenericsAST::__Marker(_, unreachable), _) => match *unreachable {},
+            (_, WrapperWithGenericsAST::__Marker(_, unreachable)) => match *unreachable {},
+            _ => false,
+        }
+    }
+}
+#[doc = r" Self-referential wrapper for standalone use."]
+#[doc = r""]
+#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
+#[doc = r" AST type suitable for use with `HasParser`."]
+pub struct WrapperWithGenericsASTSelf<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput>(
+    pub  WrapperWithGenericsAST<
+        'tokens,
+        'src,
+        T,
+        TypeOutput,
+        WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>,
+    >,
+    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), T, TypeOutput)>,
+)
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>;
+impl<'tokens, 'src, T: TypeLattice, TypeOutput> Clone
+    for WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), ::core::marker::PhantomData)
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput> ::core::fmt::Debug
+    for WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_tuple("WrapperWithGenericsASTSelf")
+            .field(&"..")
+            .finish()
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput> PartialEq
+    for WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput>
+    WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    #[doc = r" Creates a new ASTSelf wrapper."]
+    pub fn new(
+        inner: WrapperWithGenericsAST<
+            'tokens,
+            'src,
+            T,
+            TypeOutput,
+            WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>,
+        >,
+    ) -> Self {
+        Self(inner, ::core::marker::PhantomData)
+    }
 }

@@ -6,19 +6,19 @@ impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> f
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output<__Language>
-        = EmptyLangAST<'tokens, 'src, __Language>
+    type Output<__TypeOutput, __LanguageOutput>
+        = EmptyLangAST<'tokens, 'src, __TypeOutput, __LanguageOutput>
     where
-        __Language: ::kirin::ir::Dialect + 'tokens;
-    type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens;
     #[inline]
-    fn recursive_parser<I, __Language, __LanguageOutput>(
+    fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
         language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        __Language: ::kirin::ir::Dialect + 'tokens,
-        __LanguageOutput: Clone + 'tokens,
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens,
     {
         use kirin::parsers::chumsky::prelude::*;
         ::kirin::parsers::chumsky::prelude::empty()
@@ -30,7 +30,11 @@ impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for Empt
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = EmptyLangAST<'tokens, 'src, EmptyLang>;
+    type Output = EmptyLangASTSelf<
+        'tokens,
+        'src,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+    >;
     fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
@@ -39,9 +43,10 @@ where
         ::kirin::parsers::chumsky::recursive::recursive(|language| {
             <EmptyLang as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
                 I,
-                EmptyLang,
+                <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
                 Self::Output,
             >(language)
+            .map(|inner| EmptyLangASTSelf::new(inner))
         })
         .boxed()
     }

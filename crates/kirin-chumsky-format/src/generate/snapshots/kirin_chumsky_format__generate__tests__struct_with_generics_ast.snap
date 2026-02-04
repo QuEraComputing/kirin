@@ -2,11 +2,121 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
-#[derive(Clone, Debug, PartialEq)]
-pub struct GenericReturnAST<'tokens, 'src: 'tokens, T: TypeLattice, Language: ::kirin::ir::Dialect>(
+pub struct GenericReturnAST<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput>(
     pub ::kirin::parsers::SSAValue<'src, <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output>,
-    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), T, TypeOutput, LanguageOutput)>,
 )
 where
-    Language: ::kirin::ir::Dialect,
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens;
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput> Clone
+    for GenericReturnAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    fn clone(&self) -> Self {
+        let Self(f0, _marker) = self;
+        Self(f0.clone(), ::core::marker::PhantomData)
+    }
+}
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput> ::core::fmt::Debug
+    for GenericReturnAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+    LanguageOutput: ::core::fmt::Debug,
+    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        let Self(f0, _) = self;
+        f.debug_tuple("GenericReturnAST").field(f0).finish()
+    }
+}
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput> PartialEq
+    for GenericReturnAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let Self(a0, _) = self;
+        let Self(b0, _) = other;
+        a0 == b0
+    }
+}
+#[doc = r" Self-referential wrapper for standalone use."]
+#[doc = r""]
+#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
+#[doc = r" AST type suitable for use with `HasParser`."]
+pub struct GenericReturnASTSelf<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput>(
+    pub  GenericReturnAST<
+        'tokens,
+        'src,
+        T,
+        TypeOutput,
+        GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>,
+    >,
+    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), T, TypeOutput)>,
+)
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens;
+impl<'tokens, 'src, T: TypeLattice, TypeOutput> Clone
+    for GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), ::core::marker::PhantomData)
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput> ::core::fmt::Debug
+    for GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_tuple("GenericReturnASTSelf").field(&"..").finish()
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput> PartialEq
+    for GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput> GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    #[doc = r" Creates a new ASTSelf wrapper."]
+    pub fn new(
+        inner: GenericReturnAST<
+            'tokens,
+            'src,
+            T,
+            TypeOutput,
+            GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>,
+        >,
+    ) -> Self {
+        Self(inner, ::core::marker::PhantomData)
+    }
+}

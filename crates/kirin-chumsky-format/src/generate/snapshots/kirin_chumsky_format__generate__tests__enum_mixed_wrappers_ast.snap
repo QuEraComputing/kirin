@@ -2,14 +2,19 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
-#[derive(Clone, Debug, PartialEq)]
-pub enum MixedLangAST<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect>
+pub enum MixedLangAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
 where
-    Language: ::kirin::ir::Dialect + 'tokens,
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
     ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
     ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    Arith(<ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>),
+    Arith(
+        <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+            TypeOutput,
+            LanguageOutput,
+        >,
+    ),
     Custom {
         arg: ::kirin::parsers::SSAValue<
             'src,
@@ -21,11 +26,159 @@ where
         >,
     },
     Control(
-        <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>,
+        <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+            TypeOutput,
+            LanguageOutput,
+        >,
     ),
     #[doc(hidden)]
     __Marker(
-        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
         ::core::convert::Infallible,
     ),
+}
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> Clone
+    for MixedLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: Clone,
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            MixedLangAST::Arith(inner) => MixedLangAST::Arith(inner.clone()),
+            MixedLangAST::Custom { arg, res } => MixedLangAST::Custom {
+                arg: arg.clone(),
+                res: res.clone(),
+            },
+            MixedLangAST::Control(inner) => MixedLangAST::Control(inner.clone()),
+            MixedLangAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> ::core::fmt::Debug
+    for MixedLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        match self {
+            MixedLangAST::Arith(_) => f.debug_tuple("Arith").field(&"..").finish(),
+            MixedLangAST::Custom { arg, res } => f
+                .debug_struct("Custom")
+                .field("arg", arg)
+                .field("res", res)
+                .finish(),
+            MixedLangAST::Control(_) => f.debug_tuple("Control").field(&"..").finish(),
+            MixedLangAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> PartialEq
+    for MixedLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: PartialEq,
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (MixedLangAST::Arith(a), MixedLangAST::Arith(b)) => a == b,
+            (
+                MixedLangAST::Custom {
+                    arg: arg_a,
+                    res: res_a,
+                },
+                MixedLangAST::Custom {
+                    arg: arg_b,
+                    res: res_b,
+                },
+            ) => arg_a == arg_b && res_a == res_b,
+            (MixedLangAST::Control(a), MixedLangAST::Control(b)) => a == b,
+            (MixedLangAST::__Marker(_, unreachable), _) => match *unreachable {},
+            (_, MixedLangAST::__Marker(_, unreachable)) => match *unreachable {},
+            _ => false,
+        }
+    }
+}
+#[doc = r" Self-referential wrapper for standalone use."]
+#[doc = r""]
+#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
+#[doc = r" AST type suitable for use with `HasParser`."]
+pub struct MixedLangASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
+    pub MixedLangAST<'tokens, 'src, TypeOutput, MixedLangASTSelf<'tokens, 'src, TypeOutput>>,
+    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,
+)
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>;
+impl<'tokens, 'src, TypeOutput> Clone for MixedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), ::core::marker::PhantomData)
+    }
+}
+impl<'tokens, 'src, TypeOutput> ::core::fmt::Debug for MixedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_tuple("MixedLangASTSelf").field(&"..").finish()
+    }
+}
+impl<'tokens, 'src, TypeOutput> PartialEq for MixedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<'tokens, 'src, TypeOutput> MixedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    #[doc = r" Creates a new ASTSelf wrapper."]
+    pub fn new(
+        inner: MixedLangAST<'tokens, 'src, TypeOutput, MixedLangASTSelf<'tokens, 'src, TypeOutput>>,
+    ) -> Self {
+        Self(inner, ::core::marker::PhantomData)
+    }
 }

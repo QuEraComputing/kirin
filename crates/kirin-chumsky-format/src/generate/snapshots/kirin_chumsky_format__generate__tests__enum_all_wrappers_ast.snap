@@ -2,20 +2,160 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
-#[derive(Clone, Debug, PartialEq)]
-pub enum ComposedLangAST<'tokens, 'src: 'tokens, Language: ::kirin::ir::Dialect>
+pub enum ComposedLangAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
 where
-    Language: ::kirin::ir::Dialect + 'tokens,
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
     ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
     ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    Arith(<ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>),
+    Arith(
+        <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+            TypeOutput,
+            LanguageOutput,
+        >,
+    ),
     Control(
-        <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>,
+        <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+            TypeOutput,
+            LanguageOutput,
+        >,
     ),
     #[doc(hidden)]
     __Marker(
-        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), Language)>,
+        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
         ::core::convert::Infallible,
     ),
+}
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> Clone
+    for ComposedLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: Clone,
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            ComposedLangAST::Arith(inner) => ComposedLangAST::Arith(inner.clone()),
+            ComposedLangAST::Control(inner) => ComposedLangAST::Control(inner.clone()),
+            ComposedLangAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> ::core::fmt::Debug
+    for ComposedLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        match self {
+            ComposedLangAST::Arith(_) => f.debug_tuple("Arith").field(&"..").finish(),
+            ComposedLangAST::Control(_) => f.debug_tuple("Control").field(&"..").finish(),
+            ComposedLangAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> PartialEq
+    for ComposedLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: PartialEq,
+    <ControlDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ComposedLangAST::Arith(a), ComposedLangAST::Arith(b)) => a == b,
+            (ComposedLangAST::Control(a), ComposedLangAST::Control(b)) => a == b,
+            (ComposedLangAST::__Marker(_, unreachable), _) => match *unreachable {},
+            (_, ComposedLangAST::__Marker(_, unreachable)) => match *unreachable {},
+            _ => false,
+        }
+    }
+}
+#[doc = r" Self-referential wrapper for standalone use."]
+#[doc = r""]
+#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
+#[doc = r" AST type suitable for use with `HasParser`."]
+pub struct ComposedLangASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
+    pub ComposedLangAST<'tokens, 'src, TypeOutput, ComposedLangASTSelf<'tokens, 'src, TypeOutput>>,
+    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,
+)
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>;
+impl<'tokens, 'src, TypeOutput> Clone for ComposedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), ::core::marker::PhantomData)
+    }
+}
+impl<'tokens, 'src, TypeOutput> ::core::fmt::Debug
+    for ComposedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_tuple("ComposedLangASTSelf").field(&"..").finish()
+    }
+}
+impl<'tokens, 'src, TypeOutput> PartialEq for ComposedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<'tokens, 'src, TypeOutput> ComposedLangASTSelf<'tokens, 'src, TypeOutput>
+where
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    #[doc = r" Creates a new ASTSelf wrapper."]
+    pub fn new(
+        inner: ComposedLangAST<
+            'tokens,
+            'src,
+            TypeOutput,
+            ComposedLangASTSelf<'tokens, 'src, TypeOutput>,
+        >,
+    ) -> Self {
+        Self(inner, ::core::marker::PhantomData)
+    }
 }

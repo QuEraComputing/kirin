@@ -2,25 +2,54 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
-impl<'tokens, 'src: 'tokens, T: TypeLattice, Language: ::kirin::ir::Dialect>
-    ::kirin::parsers::EmitIR<Language> for WrapperWithGenericsAST<'tokens, 'src, T, Language>
+impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput, Language>
+    ::kirin::parsers::EmitIR<Language>
+    for WrapperWithGenericsAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<WrapperWithGenerics<T>>,
+    TypeOutput: Clone + PartialEq,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
         Language,
         Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
     >,
     Language: ::core::convert::From<GenericInner<T>>,
-    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<Language>:
-        ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        LanguageOutput,
+    >: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
     type Output = ::kirin::ir::Statement;
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
         match self {
-            WrapperWithGenericsAST::Inner(inner) => inner.emit(ctx),
+            WrapperWithGenericsAST::Inner(inner) => ::kirin::parsers::EmitIR::emit(inner, ctx),
             WrapperWithGenericsAST::__Marker(_, unreachable) => match *unreachable {},
         }
+    }
+}
+impl<'tokens, 'src, T: TypeLattice, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
+    for WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
+where
+    Language: ::kirin::ir::Dialect + From<WrapperWithGenerics<T>>,
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
+        Language,
+        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
+    >,
+    Language: ::core::convert::From<GenericInner<T>>,
+    <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
+        TypeOutput,
+        WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>,
+    >: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
+    GenericInner<T>: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+{
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
+        ::kirin::parsers::EmitIR::emit(&self.0, ctx)
     }
 }

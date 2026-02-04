@@ -6,29 +6,33 @@ impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> f
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output<__Language>
-        = TupleLangAST<'tokens, 'src, __Language>
+    type Output<__TypeOutput, __LanguageOutput>
+        = TupleLangAST<'tokens, 'src, __TypeOutput, __LanguageOutput>
     where
-        __Language: ::kirin::ir::Dialect + 'tokens;
-    type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens;
     #[inline]
-    fn recursive_parser<I, __Language, __LanguageOutput>(
+    fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
         language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        __Language: ::kirin::ir::Dialect + 'tokens,
-        __LanguageOutput: Clone + 'tokens,
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens,
     {
         use kirin::parsers::chumsky::prelude::*;
-        { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . map (| field_0 | -> TupleLangAST < 'tokens , 'src , __Language > { TupleLangAST :: Return (field_0) }) } . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("neg")))) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| ((field_1_name , field_0) , field_1_type) | -> TupleLangAST < 'tokens , 'src , __Language > { TupleLangAST :: Neg (field_0 , :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : field_1_name . name , span : field_1_name . span } , ty : Some (field_1_type . ty . clone ()) , }) }) }) . boxed ()
+        { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . map (| field_0 | -> TupleLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { TupleLangAST :: Return (field_0) }) } . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("neg")))) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| ((field_1_name , field_0) , field_1_type) | -> TupleLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { TupleLangAST :: Neg (field_0 , :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : field_1_name . name , span : field_1_name . span } , ty : Some (field_1_type . ty . clone ()) , }) }) }) . boxed ()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for TupleLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
 {
-    type Output = TupleLangAST<'tokens, 'src, TupleLang>;
+    type Output = TupleLangASTSelf<
+        'tokens,
+        'src,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+    >;
     fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
@@ -37,9 +41,10 @@ where
         ::kirin::parsers::chumsky::recursive::recursive(|language| {
             <TupleLang as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
                 I,
-                TupleLang,
+                <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
                 Self::Output,
             >(language)
+            .map(|inner| TupleLangASTSelf::new(inner))
         })
         .boxed()
     }

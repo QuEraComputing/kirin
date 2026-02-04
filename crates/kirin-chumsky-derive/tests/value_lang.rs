@@ -56,8 +56,8 @@ pub enum ValueLang {
 #[test]
 fn test_compile_time_value() {
     let ast = parse_ast::<ValueLang>("%r = apply custom_op %x -> i32").expect("parse failed");
-    match ast {
-        ValueLangAST::Apply { res, op, arg } => {
+    match ast.0 {
+        ValueLangAST::Apply { res, op, arg, .. } => {
             assert_eq!(res.name.value, "r");
             assert_eq!(res.ty, Some(SimpleType::I32));
             assert_eq!(op, Opcode("custom_op".to_string()));
@@ -69,8 +69,8 @@ fn test_compile_time_value() {
 #[test]
 fn test_compile_time_value_different() {
     let ast = parse_ast::<ValueLang>("%r = apply another %x -> f32").expect("parse failed");
-    match ast {
-        ValueLangAST::Apply { res, op, arg } => {
+    match ast.0 {
+        ValueLangAST::Apply { res, op, arg, .. } => {
             assert_eq!(res.name.value, "r");
             assert_eq!(res.ty, Some(SimpleType::F32));
             assert_eq!(op, Opcode("another".to_string()));

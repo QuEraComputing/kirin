@@ -17,8 +17,8 @@ pub enum CombinedLang {
 #[test]
 fn test_combined_derive_inc() {
     let ast = parse_ast::<CombinedLang>("%r = inc %x -> i32").expect("parse failed");
-    match ast {
-        CombinedLangAST::Inc { res, arg } => {
+    match ast.0 {
+        CombinedLangAST::Inc { res, arg, .. } => {
             assert_eq!(res.name.value, "r");
             assert_eq!(res.ty, Some(SimpleType::I32));
             assert_eq!(arg.name.value, "x");
@@ -30,8 +30,8 @@ fn test_combined_derive_inc() {
 #[test]
 fn test_combined_derive_dec() {
     let ast = parse_ast::<CombinedLang>("%y = dec %z -> f64").expect("parse failed");
-    match ast {
-        CombinedLangAST::Dec { res, arg } => {
+    match ast.0 {
+        CombinedLangAST::Dec { res, arg, .. } => {
             assert_eq!(res.name.value, "y");
             assert_eq!(res.ty, Some(SimpleType::F64));
             assert_eq!(arg.name.value, "z");
@@ -43,8 +43,8 @@ fn test_combined_derive_dec() {
 #[test]
 fn test_multiple_variants_same_dialect() {
     let ast1 = parse_ast::<CombinedLang>("%r = inc %x -> i32").expect("parse failed");
-    assert!(matches!(ast1, CombinedLangAST::Inc { .. }));
+    assert!(matches!(ast1.0, CombinedLangAST::Inc { .. }));
 
     let ast2 = parse_ast::<CombinedLang>("%y = dec %z -> f64").expect("parse failed");
-    assert!(matches!(ast2, CombinedLangAST::Dec { .. }));
+    assert!(matches!(ast2.0, CombinedLangAST::Dec { .. }));
 }

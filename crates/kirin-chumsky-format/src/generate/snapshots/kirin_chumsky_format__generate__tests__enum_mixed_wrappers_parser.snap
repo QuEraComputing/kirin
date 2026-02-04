@@ -8,22 +8,22 @@ where
     ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
     ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    type Output<__Language>
-        = MixedLangAST<'tokens, 'src, __Language>
+    type Output<__TypeOutput, __LanguageOutput>
+        = MixedLangAST<'tokens, 'src, __TypeOutput, __LanguageOutput>
     where
-        __Language: ::kirin::ir::Dialect + 'tokens;
-    type TypeAST = <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output;
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens;
     #[inline]
-    fn recursive_parser<I, __Language, __LanguageOutput>(
+    fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
         language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__Language>>
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        __Language: ::kirin::ir::Dialect + 'tokens,
-        __LanguageOutput: Clone + 'tokens,
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens,
     {
         use kirin::parsers::chumsky::prelude::*;
-        < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __Language , __LanguageOutput > (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , __Language > { MixedLangAST :: Arith (inner) }) . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("custom")))) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| ((res_name , arg) , res_type) | -> MixedLangAST < 'tokens , 'src , __Language > { MixedLangAST :: Custom { arg : arg , res : :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } } }) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __Language , __LanguageOutput > (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , __Language > { MixedLangAST :: Control (inner) })) . boxed ()
+        < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __TypeOutput , __LanguageOutput > (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { MixedLangAST :: Arith (inner) }) . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("custom")))) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| ((res_name , arg) , res_type) | -> MixedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { MixedLangAST :: Custom { arg : arg , res : :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } } }) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __TypeOutput , __LanguageOutput > (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { MixedLangAST :: Control (inner) })) . boxed ()
     }
 }
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for MixedLang
@@ -32,7 +32,11 @@ where
     ArithDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
     ControlDialect: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
 {
-    type Output = MixedLangAST<'tokens, 'src, MixedLang>;
+    type Output = MixedLangASTSelf<
+        'tokens,
+        'src,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+    >;
     fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: ::kirin::parsers::TokenInput<'tokens, 'src>,
@@ -41,9 +45,10 @@ where
         ::kirin::parsers::chumsky::recursive::recursive(|language| {
             <MixedLang as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
                 I,
-                MixedLang,
+                <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
                 Self::Output,
             >(language)
+            .map(|inner| MixedLangASTSelf::new(inner))
         })
         .boxed()
     }

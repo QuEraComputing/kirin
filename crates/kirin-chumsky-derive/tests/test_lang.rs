@@ -27,8 +27,8 @@ pub enum TestLang {
 #[test]
 fn test_parse_add() {
     let ast = parse_ast::<TestLang>("%result = add %a %b -> i32").expect("parse failed");
-    match ast {
-        TestLangAST::Add { res, lhs, rhs } => {
+    match ast.0 {
+        TestLangAST::Add { res, lhs, rhs, .. } => {
             assert_eq!(res.name.value, "result");
             assert_eq!(res.ty, Some(SimpleType::I32));
             assert_eq!(lhs.name.value, "a");
@@ -41,8 +41,8 @@ fn test_parse_add() {
 #[test]
 fn test_parse_mul() {
     let ast = parse_ast::<TestLang>("%x = mul %y: i32, %z -> i64").expect("parse failed");
-    match ast {
-        TestLangAST::Mul { res, lhs, rhs } => {
+    match ast.0 {
+        TestLangAST::Mul { res, lhs, rhs, .. } => {
             assert_eq!(res.name.value, "x");
             assert_eq!(res.ty, Some(SimpleType::I64));
             assert_eq!(lhs.name.value, "y");
@@ -56,8 +56,8 @@ fn test_parse_mul() {
 #[test]
 fn test_parse_return() {
     let ast = parse_ast::<TestLang>("return %value").expect("parse failed");
-    match ast {
-        TestLangAST::Return(ssa) => {
+    match ast.0 {
+        TestLangAST::Return(ssa, ..) => {
             assert_eq!(ssa.name.value, "value");
         }
         _ => panic!("Expected Return variant"),
@@ -72,8 +72,8 @@ fn test_parse_fails_on_invalid_input() {
 #[test]
 fn test_parse_ssa_default_with_type() {
     let ast = parse_ast::<TestLang>("return %x: i32").expect("parse failed");
-    match ast {
-        TestLangAST::Return(ssa) => {
+    match ast.0 {
+        TestLangAST::Return(ssa, ..) => {
             assert_eq!(ssa.name.value, "x");
             assert_eq!(ssa.ty, Some(SimpleType::I32));
         }
@@ -84,8 +84,8 @@ fn test_parse_ssa_default_with_type() {
 #[test]
 fn test_parse_ssa_default_without_type() {
     let ast = parse_ast::<TestLang>("return %x").expect("parse failed");
-    match ast {
-        TestLangAST::Return(ssa) => {
+    match ast.0 {
+        TestLangAST::Return(ssa, ..) => {
             assert_eq!(ssa.name.value, "x");
             assert!(ssa.ty.is_none());
         }

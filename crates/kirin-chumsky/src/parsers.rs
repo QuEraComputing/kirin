@@ -206,16 +206,13 @@ where
     .labelled("block label")
 }
 
-/// Type alias for the parsed type AST of a dialect.
-///
-/// This is the AST representation of type annotations in the language.
-pub type TypeAST<'tokens, 'src, D> = <D as HasDialectParser<'tokens, 'src>>::TypeAST;
-
-/// Type alias for the parsed statement output of a dialect with a specific language.
+/// Type alias for the parsed statement output of a dialect.
 ///
 /// The `D` parameter is the dialect being parsed.
-/// The `L` parameter is the top-level language (for composing dialects).
-pub type StmtOutput<'tokens, 'src, D, L> = <D as HasDialectParser<'tokens, 'src>>::Output<L>;
+/// The `TypeOutput` parameter is the parsed type representation.
+/// The `LanguageOutput` parameter is the AST type for nested statements.
+pub type StmtOutput<'tokens, 'src, D, TypeOutput, LanguageOutput> =
+    <D as HasDialectParser<'tokens, 'src>>::Output<TypeOutput, LanguageOutput>;
 
 /// Parses a block argument.
 ///
