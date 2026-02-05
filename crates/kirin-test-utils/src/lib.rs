@@ -210,12 +210,54 @@ impl std::fmt::Display for SimpleType {
     }
 }
 
+// ============================================================================
+// UnitType - A minimal type lattice for testing
+// ============================================================================
+
+/// A minimal type lattice with a single value, useful for testing dialects
+/// that don't need type annotations.
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Default)]
+pub struct UnitType;
+
+impl std::fmt::Display for UnitType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "()")
+    }
+}
+
+impl Lattice for UnitType {
+    fn join(&self, _: &Self) -> Self {
+        UnitType
+    }
+
+    fn meet(&self, _: &Self) -> Self {
+        UnitType
+    }
+
+    fn is_subseteq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl FiniteLattice for UnitType {
+    fn top() -> Self {
+        UnitType
+    }
+
+    fn bottom() -> Self {
+        UnitType
+    }
+}
+
+impl TypeLattice for UnitType {}
+
 #[cfg(feature = "parser")]
 mod parser_impls {
-    use super::SimpleType;
+    use super::{SimpleType, UnitType};
     use chumsky::prelude::*;
     use kirin_chumsky::{BoxedParser, DirectlyParsable, HasParser, TokenInput};
     use kirin_lexer::Token;
+    use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
     impl DirectlyParsable for SimpleType {}
 
@@ -236,6 +278,35 @@ mod parser_impls {
             }
             .labelled("type")
             .boxed()
+        }
+    }
+
+    impl DirectlyParsable for UnitType {}
+
+    impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for UnitType {
+        type Output = UnitType;
+
+        fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+        where
+            I: TokenInput<'tokens, 'src>,
+        {
+            // Parse "()" as UnitType
+            just(Token::LParen)
+                .ignore_then(just(Token::RParen))
+                .to(UnitType)
+                .boxed()
+        }
+    }
+
+    impl PrettyPrint for UnitType {
+        fn pretty_print<'a, L: kirin_ir::Dialect + PrettyPrint>(
+            &self,
+            doc: &'a Document<'a, L>,
+        ) -> ArenaDoc<'a>
+        where
+            L::TypeLattice: std::fmt::Display,
+        {
+            doc.text("()")
         }
     }
 }

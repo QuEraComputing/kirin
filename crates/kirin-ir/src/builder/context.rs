@@ -138,6 +138,10 @@ impl<L: Dialect> Context<L> {
         id
     }
 
+    // TODO: remove params_type and return_type, we should always read the signature from statement
+    //       then check if the signature is a subset of the staged function signature, we need a HasSignature trait
+    //       for `L` which will be implemented by the dialect to provide information about the signature of
+    //       statements it contains.
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,

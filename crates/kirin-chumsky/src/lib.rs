@@ -29,6 +29,7 @@
 //! - `PrettyPrint` enables roundtrip-compatible printing
 
 pub mod ast;
+mod builtins;
 mod parsers;
 mod traits;
 

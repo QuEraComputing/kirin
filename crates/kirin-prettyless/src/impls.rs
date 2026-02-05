@@ -123,3 +123,77 @@ impl PrettyPrint for StagedFunction {
         doc.print_staged_function(self)
     }
 }
+
+// ============================================================================
+// PrettyPrint implementations for builtin types
+// ============================================================================
+
+// Macro to reduce boilerplate for integer types
+macro_rules! impl_pretty_print_int {
+    ($($ty:ty),*) => {
+        $(
+            impl PrettyPrint for $ty {
+                fn pretty_print<'a, L: Dialect + PrettyPrint>(
+                    &self,
+                    doc: &'a Document<'a, L>,
+                ) -> ArenaDoc<'a>
+                where
+                    L::TypeLattice: std::fmt::Display,
+                {
+                    doc.text(self.to_string())
+                }
+            }
+        )*
+    };
+}
+
+// Implement for all integer types
+impl_pretty_print_int!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
+
+// Floating point types need special handling to ensure decimal point
+impl PrettyPrint for f32 {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
+        // Ensure we always print as a float (with decimal point)
+        if self.fract() == 0.0 {
+            doc.text(format!("{:.1}", self))
+        } else {
+            doc.text(self.to_string())
+        }
+    }
+}
+
+impl PrettyPrint for f64 {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
+        // Ensure we always print as a float (with decimal point)
+        if self.fract() == 0.0 {
+            doc.text(format!("{:.1}", self))
+        } else {
+            doc.text(self.to_string())
+        }
+    }
+}
+
+impl PrettyPrint for bool {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
+        doc.text(if *self { "true" } else { "false" })
+    }
+}
+
+impl PrettyPrint for String {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::TypeLattice: std::fmt::Display,
+    {
+        // Print as quoted string
+        doc.text(format!("\"{}\"", self))
+    }
+}

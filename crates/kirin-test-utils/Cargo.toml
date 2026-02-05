@@ -10,7 +10,8 @@ kirin-ir.workspace = true
 chumsky = { workspace = true, optional = true }
 kirin-chumsky = { workspace = true, optional = true }
 kirin-lexer = { workspace = true, optional = true }
+kirin-prettyless = { workspace = true, optional = true }
 
 [features]
 default = []
-parser = ["chumsky", "kirin-chumsky", "kirin-lexer"]
+parser = ["chumsky", "kirin-chumsky", "kirin-lexer", "kirin-prettyless"]

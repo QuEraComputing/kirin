@@ -7,6 +7,7 @@ impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput, Languag
     for WrapperWithGenericsAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<WrapperWithGenerics<T>>,
+    Language: ::kirin::ir::Dialect<TypeLattice = T>,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 'tokens,
     LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
@@ -34,6 +35,7 @@ impl<'tokens, 'src, T: TypeLattice, TypeOutput, Language> ::kirin::parsers::Emit
     for WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
 where
     Language: ::kirin::ir::Dialect + From<WrapperWithGenerics<T>>,
+    Language: ::kirin::ir::Dialect<TypeLattice = T>,
     TypeOutput: Clone + PartialEq,
     'src: 'tokens,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,

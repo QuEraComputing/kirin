@@ -45,6 +45,7 @@ manyhow = { version = "0.11", features = ["darling"] }
 # Parser ecosystem
 chumsky = "0.10"
 logos = "0.16"
+num-traits = "0.2"
 
 # Testing
 insta = "1.46"

@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 kirin = { version = "0.1.0", path = "../.." }
+kirin-test-utils = { workspace = true, features = ["parser"] }
