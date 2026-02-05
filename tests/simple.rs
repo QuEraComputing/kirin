@@ -162,7 +162,10 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Value {
 // PrettyPrint traits for Value (used by PrettyPrint derive)
 
 impl kirin::pretty::PrettyPrint for Value {
-    fn pretty_print<'a, L: Dialect + kirin::pretty::PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn pretty_print<'a, L: Dialect + kirin::pretty::PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
     where
         L::TypeLattice: std::fmt::Display,
     {
@@ -455,7 +458,9 @@ fn test_roundtrip_function() {
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;
     let mut buf = String::new();
-    arena_doc.render_fmt(max_width, &mut buf).expect("render failed");
+    arena_doc
+        .render_fmt(max_width, &mut buf)
+        .expect("render failed");
 
     // Verify key structural elements are present
     assert!(
@@ -505,7 +510,9 @@ fn test_roundtrip_function_multiple_blocks() {
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;
     let mut output = String::new();
-    arena_doc.render_fmt(max_width, &mut output).expect("render failed");
+    arena_doc
+        .render_fmt(max_width, &mut output)
+        .expect("render failed");
     println!("{}", output);
     // Note: output has a trailing newline from pretty printer
     assert_eq!(output.trim_end(), input);

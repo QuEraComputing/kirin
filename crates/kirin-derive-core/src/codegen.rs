@@ -266,7 +266,7 @@ impl<'a> GenericsBuilder<'a> {
 // Constructor Builder
 // =============================================================================
 
-use crate::ir::{fields::FieldInfo, Layout};
+use crate::ir::{Layout, fields::FieldInfo};
 
 /// Builder for generating struct/enum variant constructor expressions.
 ///

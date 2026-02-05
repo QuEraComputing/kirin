@@ -179,25 +179,29 @@ fn build_fn_body(
     // Use ConstructorBuilder to generate the constructor expression
     let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
     let constructor = if input.is_enum {
-        ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple)
-            .build_with_self(&info.fields, |field| {
+        ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple).build_with_self(
+            &info.fields,
+            |field| {
                 if let Some(name) = result_name_map.get(&field.index) {
                     quote! { #name }
                 } else {
                     let name = field.name_ident(info.name.span());
                     quote! { #name }
                 }
-            })
+            },
+        )
     } else {
-        ConstructorBuilder::new_struct(&input.name, is_tuple)
-            .build_with_self(&info.fields, |field| {
+        ConstructorBuilder::new_struct(&input.name, is_tuple).build_with_self(
+            &info.fields,
+            |field| {
                 if let Some(name) = result_name_map.get(&field.index) {
                     quote! { #name }
                 } else {
                     let name = field.name_ident(info.name.span());
                     quote! { #name }
                 }
-            })
+            },
+        )
     };
 
     let build_result_path = build_result_path(input, info);
@@ -233,7 +237,7 @@ fn let_name_eq_result_value(
         }
         let collection = &field.collection;
         let ssa_ty = field.ssa_type().expect("Result field must have ssa_type");
-        
+
         if matches!(collection, Collection::Vec) {
             results.push(
                 syn::Error::new_spanned(
@@ -374,23 +378,23 @@ pub(crate) fn build_result_impl(
 
     for (field, name) in results.into_iter().zip(names.into_iter()) {
         if matches!(field.collection, Collection::Vec) {
-                fields.push(
-                    syn::Error::new_spanned(
-                        field.name_ident(info.name.span()),
-                        "ResultValue field cannot be a Vec, consider implementing the builder manually",
-                    )
-                    .to_compile_error(),
-                );
-                continue;
+            fields.push(
+                syn::Error::new_spanned(
+                    field.name_ident(info.name.span()),
+                    "ResultValue field cannot be a Vec, consider implementing the builder manually",
+                )
+                .to_compile_error(),
+            );
+            continue;
         } else if matches!(field.collection, Collection::Option) {
-                fields.push(
+            fields.push(
                     syn::Error::new_spanned(
                         field.name_ident(info.name.span()),
                         "ResultValue field cannot be an Option, consider implementing the builder manually",
                     )
                     .to_compile_error(),
                 );
-                continue;
+            continue;
         }
 
         fields.push(quote! {
@@ -488,7 +492,7 @@ pub(crate) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
 
     // Build the constructor using ConstructorBuilder
     let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
-    
+
     // For wrapper impl, we need to handle differently - just construct with `value`
     // Since wrapper fields are not in `fields` anymore, we just use the wrapper_type directly
     let init_head = if input.is_enum {
@@ -520,20 +524,24 @@ pub(crate) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
         // Wrapper with additional fields - this is a more complex case
         // Use ConstructorBuilder for the constructor
         let constructor = if input.is_enum {
-            ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple)
-                .build_with_self(&info.fields, |field| {
+            ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple).build_with_self(
+                &info.fields,
+                |field| {
                     let field_name = field.name_ident(info.name.span());
                     quote! { #field_name }
-                })
+                },
+            )
         } else {
-            ConstructorBuilder::new_struct(&input.name, is_tuple)
-                .build_with_self(&info.fields, |field| {
+            ConstructorBuilder::new_struct(&input.name, is_tuple).build_with_self(
+                &info.fields,
+                |field| {
                     let field_name = field.name_ident(info.name.span());
                     quote! { #field_name }
-                })
+                },
+            )
         };
 
-    quote! {
+        quote! {
         impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
             fn from(value: #wrapper_ty) -> Self {
                 #(#let_name_eq_input;)*

@@ -40,7 +40,8 @@ impl GenerateEmitIR {
         }
 
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
-        let ast_self_name = syn::Ident::new(&format!("{}ASTSelf", ir_input.name), ir_input.name.span());
+        let ast_self_name =
+            syn::Ident::new(&format!("{}ASTSelf", ir_input.name), ir_input.name.span());
         let ast_generics = self.build_ast_generics_for_emit_ir(ir_input);
         let crate_path = &self.config.crate_path;
 
@@ -48,7 +49,8 @@ impl GenerateEmitIR {
         let emit_impl = self.generate_emit_impl(ir_input, &ast_name, &ast_generics, crate_path);
 
         // Generate impl for the ASTSelf wrapper - delegates to inner type
-        let ast_self_emit_impl = self.generate_ast_self_emit_impl(ir_input, &ast_name, &ast_self_name, crate_path);
+        let ast_self_emit_impl =
+            self.generate_ast_self_emit_impl(ir_input, &ast_name, &ast_self_name, crate_path);
 
         quote! {
             #emit_impl
@@ -254,8 +256,10 @@ impl GenerateEmitIR {
         if !wrapper_from_bounds.is_empty() {
             let from_tokens = wrapper_from_bounds.iter().map(|b| quote! { #b, });
             let emit_tokens = wrapper_emit_bounds.iter().map(|b| quote! { #b, });
-            let dialect_parser_tokens = wrapper_dialect_parser_bounds.iter().map(|b| quote! { #b, });
-            all_bounds.push(quote! { #(#from_tokens)* #(#emit_tokens)* #(#dialect_parser_tokens)* });
+            let dialect_parser_tokens =
+                wrapper_dialect_parser_bounds.iter().map(|b| quote! { #b, });
+            all_bounds
+                .push(quote! { #(#from_tokens)* #(#emit_tokens)* #(#dialect_parser_tokens)* });
         }
 
         let where_clause = quote! { where #(#all_bounds)* };
@@ -380,8 +384,10 @@ impl GenerateEmitIR {
         if !wrapper_from_bounds.is_empty() {
             let from_tokens = wrapper_from_bounds.iter().map(|b| quote! { #b, });
             let emit_tokens = wrapper_emit_bounds.iter().map(|b| quote! { #b, });
-            let dialect_parser_tokens = wrapper_dialect_parser_bounds.iter().map(|b| quote! { #b, });
-            all_bounds.push(quote! { #(#from_tokens)* #(#emit_tokens)* #(#dialect_parser_tokens)* });
+            let dialect_parser_tokens =
+                wrapper_dialect_parser_bounds.iter().map(|b| quote! { #b, });
+            all_bounds
+                .push(quote! { #(#from_tokens)* #(#emit_tokens)* #(#dialect_parser_tokens)* });
         }
 
         let where_clause = quote! { where #(#all_bounds)* };

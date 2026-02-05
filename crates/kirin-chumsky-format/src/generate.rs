@@ -115,7 +115,11 @@ pub(crate) fn collect_wrapper_types(
     match &ir_input.data {
         kirin_derive_core::ir::Data::Struct(data) => {
             // For wrapper structs, return the wrapped type
-            data.0.wraps.as_ref().map(|w| vec![w.ty.clone()]).unwrap_or_default()
+            data.0
+                .wraps
+                .as_ref()
+                .map(|w| vec![w.ty.clone()])
+                .unwrap_or_default()
         }
         kirin_derive_core::ir::Data::Enum(data) => data
             .iter_variants()

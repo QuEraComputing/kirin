@@ -91,7 +91,8 @@ impl FieldKind {
     ) -> TokenStream {
         // Use the concrete type that parsers produce for SSA/Result/Value fields.
         // For Block/Region, use LanguageOutput directly.
-        let type_output = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let type_output =
+            quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
         match self {
             FieldKind::SSAValue => {
                 quote! { #crate_path::SSAValue<'src, #type_output> }

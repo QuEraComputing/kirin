@@ -17,8 +17,8 @@ pub use visitor::ValidationVisitor;
 use kirin_derive_core::ir::Statement;
 
 use crate::ChumskyLayout;
-use kirin_derive_core::ir::fields::FieldInfo;
 use crate::format::Format;
+use kirin_derive_core::ir::fields::FieldInfo;
 
 /// Validates a format string against collected fields.
 ///

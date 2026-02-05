@@ -301,7 +301,7 @@ impl GenerateAST {
 
                 if needs_manual_impls {
                     // For enums with wrapper variants or original type params,
-                    // we can't use #[derive] because the standard derive macros 
+                    // we can't use #[derive] because the standard derive macros
                     // don't handle GAT projections or phantom type params well.
                     // Instead, we manually implement Clone, Debug, PartialEq with proper bounds.
                     let manual_impls = self.generate_manual_trait_impls_for_wrapper_enum(
@@ -404,15 +404,23 @@ impl GenerateAST {
             let field_indices: Vec<_> = (0..field_count)
                 .map(|i| syn::Ident::new(&format!("f{}", i), proc_macro2::Span::call_site()))
                 .collect();
-            let clone_fields: Vec<_> = field_indices.iter().map(|f| quote! { #f.clone() }).collect();
-            let debug_fields: Vec<_> = field_indices.iter().map(|f| quote! { .field(#f) }).collect();
+            let clone_fields: Vec<_> = field_indices
+                .iter()
+                .map(|f| quote! { #f.clone() })
+                .collect();
+            let debug_fields: Vec<_> = field_indices
+                .iter()
+                .map(|f| quote! { .field(#f) })
+                .collect();
             let eq_a: Vec<_> = (0..field_count)
                 .map(|i| syn::Ident::new(&format!("a{}", i), proc_macro2::Span::call_site()))
                 .collect();
             let eq_b: Vec<_> = (0..field_count)
                 .map(|i| syn::Ident::new(&format!("b{}", i), proc_macro2::Span::call_site()))
                 .collect();
-            let eq_comparisons: Vec<_> = eq_a.iter().zip(eq_b.iter())
+            let eq_comparisons: Vec<_> = eq_a
+                .iter()
+                .zip(eq_b.iter())
                 .map(|(a, b)| quote! { #a == #b })
                 .collect();
             let eq_comparison = if eq_comparisons.is_empty() {
@@ -454,19 +462,20 @@ impl GenerateAST {
             }
         } else {
             // Named struct
-            let field_names: Vec<_> = filtered.iter()
-                .filter_map(|f| f.ident.as_ref())
-                .collect();
-            let clone_fields: Vec<_> = field_names.iter()
+            let field_names: Vec<_> = filtered.iter().filter_map(|f| f.ident.as_ref()).collect();
+            let clone_fields: Vec<_> = field_names
+                .iter()
                 .map(|f| quote! { #f: self.#f.clone() })
                 .collect();
-            let debug_fields: Vec<_> = field_names.iter()
+            let debug_fields: Vec<_> = field_names
+                .iter()
                 .map(|f| {
                     let name_str = f.to_string();
                     quote! { .field(#name_str, &self.#f) }
                 })
                 .collect();
-            let eq_comparisons: Vec<_> = field_names.iter()
+            let eq_comparisons: Vec<_> = field_names
+                .iter()
                 .map(|f| quote! { self.#f == other.#f })
                 .collect();
             let eq_comparison = if eq_comparisons.is_empty() {
@@ -517,8 +526,7 @@ impl GenerateAST {
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
     ) -> TokenStream {
-        let ast_self_name =
-            syn::Ident::new(&format!("{}Self", ast_name), ir_input.name.span());
+        let ast_self_name = syn::Ident::new(&format!("{}Self", ast_name), ir_input.name.span());
         let crate_path = &self.config.crate_path;
 
         // Extract original type parameters
@@ -630,7 +638,7 @@ impl GenerateAST {
         if needs_manual_impls {
             // For types with wrapper variants or original type params,
             // we need manual trait impls to avoid incorrect bounds.
-            // 
+            //
             // For wrapper enums, the inner AST type has wrapper variants that use GAT projections.
             // For types with original params (like T: TypeLattice), #[derive] would add T: Clone
             // even though T is only in PhantomData.
@@ -640,7 +648,7 @@ impl GenerateAST {
             // - inner AST: Debug (with LanguageOutput = ASTSelf) would require ASTSelf: Debug
             // This creates an infinite cycle. Using a placeholder breaks the cycle.
             let ast_self_name_str = ast_self_name.to_string();
-            
+
             quote! {
                 /// Self-referential wrapper for standalone use.
                 ///

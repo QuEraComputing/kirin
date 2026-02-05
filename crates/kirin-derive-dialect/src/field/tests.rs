@@ -185,8 +185,7 @@ fn test_struct_wrapper_iter_uses_lifetime() {
         }
     };
     assert!(
-        generated.contains("HasArguments<'a>")
-            && generated.contains("HasArgumentsMut<'a>"),
+        generated.contains("HasArguments<'a>") && generated.contains("HasArgumentsMut<'a>"),
         "wrapper iter types must include trait lifetime:\n{}",
         generated
     );

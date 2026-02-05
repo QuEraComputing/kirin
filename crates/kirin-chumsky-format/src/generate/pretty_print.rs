@@ -87,7 +87,9 @@ impl GeneratePrettyPrint {
             kirin_derive_core::ir::Data::Struct(s) => {
                 self.generate_struct_print(ir_input, &s.0, dialect_name, None)
             }
-            kirin_derive_core::ir::Data::Enum(e) => self.generate_enum_print(ir_input, e, dialect_name),
+            kirin_derive_core::ir::Data::Enum(e) => {
+                self.generate_enum_print(ir_input, e, dialect_name)
+            }
         };
 
         let (impl_generics, _, _) = ir_input.generics.split_for_impl();
@@ -172,7 +174,8 @@ impl GeneratePrettyPrint {
         dialect_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
     ) -> TokenStream {
-        let (pattern, print_expr) = self.build_print_components(ir_input, stmt, dialect_name, variant_name);
+        let (pattern, print_expr) =
+            self.build_print_components(ir_input, stmt, dialect_name, variant_name);
 
         quote! {
             let #pattern = self;
@@ -191,8 +194,8 @@ impl GeneratePrettyPrint {
         variant_name: Option<&syn::Ident>,
     ) -> (TokenStream, TokenStream) {
         // Use the shared helper that checks both #[chumsky(format = ...)] and #[kirin(format = ...)]
-        let format_str = super::format_for_statement(ir_input, stmt)
-            .expect("Statement must have format string");
+        let format_str =
+            super::format_for_statement(ir_input, stmt).expect("Statement must have format string");
 
         let format = Format::parse(&format_str, None).expect("Format string should be valid");
 
@@ -339,7 +342,9 @@ impl GeneratePrettyPrint {
 ///
 /// For named fields, both the field name and its index are added as keys.
 /// This allows format strings to use either `{field_name}` or `{0}` syntax.
-fn build_field_map(collected: &[FieldInfo<ChumskyLayout>]) -> IndexMap<String, (usize, &FieldInfo<ChumskyLayout>)> {
+fn build_field_map(
+    collected: &[FieldInfo<ChumskyLayout>],
+) -> IndexMap<String, (usize, &FieldInfo<ChumskyLayout>)> {
     let mut map = IndexMap::new();
     for (idx, field) in collected.iter().enumerate() {
         // Always add the index as a key (for {0}, {1}, etc. syntax)

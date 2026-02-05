@@ -5,7 +5,9 @@ use kirin_derive_core::tokens::{FieldPatternTokens, WrapperCallTokens, WrapperIt
 use quote::{ToTokens, format_ident, quote};
 
 /// Generate field name tokens from FieldInfo (for pattern matching in generated code).
-fn field_name_tokens_from_info(field: &ir::fields::FieldInfo<StandardLayout>) -> proc_macro2::TokenStream {
+fn field_name_tokens_from_info(
+    field: &ir::fields::FieldInfo<StandardLayout>,
+) -> proc_macro2::TokenStream {
     match &field.ident {
         Some(ident) => quote! { #ident },
         None => {

@@ -9,8 +9,8 @@ use kirin_derive_core::ir::Statement;
 use kirin_lexer::Token;
 
 use crate::ChumskyLayout;
-use kirin_derive_core::ir::fields::FieldInfo;
 use crate::format::{Format, FormatElement, FormatOption};
+use kirin_derive_core::ir::fields::FieldInfo;
 
 /// Visitor trait for format-driven traversal.
 ///

@@ -1,4 +1,4 @@
-use crate::ir::{fields::FieldInfo, Data, Layout};
+use crate::ir::{Data, Layout, fields::FieldInfo};
 use proc_macro2::TokenStream;
 
 pub trait Emit<'ir, L: Layout> {

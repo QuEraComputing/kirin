@@ -1,8 +1,8 @@
 //! Validation result types.
 
 use crate::ChumskyLayout;
-use kirin_derive_core::ir::fields::FieldInfo;
 use crate::format::FormatOption;
+use kirin_derive_core::ir::fields::FieldInfo;
 
 /// Result of validation containing field occurrences.
 #[derive(Debug)]

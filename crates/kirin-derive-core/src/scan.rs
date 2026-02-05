@@ -1,4 +1,4 @@
-use crate::ir::{fields::FieldInfo, Layout};
+use crate::ir::{Layout, fields::FieldInfo};
 
 pub trait Scan<'ir, L: Layout> {
     fn scan_input(&mut self, input: &'ir crate::ir::Input<L>) -> darling::Result<()> {
@@ -145,10 +145,7 @@ where
     Ok(())
 }
 
-pub fn scan_field<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_field<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -156,10 +153,7 @@ where
     Ok(())
 }
 
-pub fn scan_argument<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_argument<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -167,10 +161,7 @@ where
     Ok(())
 }
 
-pub fn scan_result<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_result<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -178,10 +169,7 @@ where
     Ok(())
 }
 
-pub fn scan_block<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_block<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -189,10 +177,7 @@ where
     Ok(())
 }
 
-pub fn scan_successor<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_successor<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -200,10 +185,7 @@ where
     Ok(())
 }
 
-pub fn scan_region<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_region<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -211,10 +193,7 @@ where
     Ok(())
 }
 
-pub fn scan_symbol<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_symbol<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -222,10 +201,7 @@ where
     Ok(())
 }
 
-pub fn scan_value<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_value<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,

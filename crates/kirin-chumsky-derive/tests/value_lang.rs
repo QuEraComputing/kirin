@@ -33,7 +33,10 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Opcode {
 }
 
 impl PrettyPrint for Opcode {
-    fn pretty_print<'a, L: kirin::ir::Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn pretty_print<'a, L: kirin::ir::Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
     where
         L::TypeLattice: std::fmt::Display,
     {

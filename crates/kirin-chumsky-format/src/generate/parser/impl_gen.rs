@@ -68,8 +68,10 @@ impl GenerateHasDialectParser {
 
         // The ASTSelf wrapper type for standalone use
         let ast_self_name = syn::Ident::new(&format!("{}Self", ast_name), ast_name.span());
-        let ast_self_type = self.build_ast_self_type_reference(ir_input, &ast_self_name, type_lattice);
-        let type_output = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let ast_self_type =
+            self.build_ast_self_type_reference(ir_input, &ast_self_name, type_lattice);
+        let type_output =
+            quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
 
         quote! {
             impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
@@ -161,7 +163,8 @@ impl GenerateHasDialectParser {
         // For wrapper structs, forward to the wrapped type's HasDialectParser impl
         if let kirin_derive_core::ir::Data::Struct(data) = &ir_input.data {
             if let Some(wrapper) = &data.0.wraps {
-                return self.generate_wrapper_struct_dialect_parser_impl(ir_input, wrapper, crate_path);
+                return self
+                    .generate_wrapper_struct_dialect_parser_impl(ir_input, wrapper, crate_path);
             }
         }
 
@@ -298,7 +301,8 @@ impl GenerateHasDialectParser {
             })
             .collect();
 
-        let type_output = quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let type_output =
+            quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
 
         // ASTSelf generics are <'tokens, 'src, [original type params], TypeOutput>
         if type_params.is_empty() {

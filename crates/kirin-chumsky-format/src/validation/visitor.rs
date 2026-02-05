@@ -112,7 +112,11 @@ impl<'ir> ValidationVisitor<'ir> {
     }
 
     /// Generates a unique variable name for a field occurrence.
-    fn generate_var_name(&self, field: &FieldInfo<ChumskyLayout>, option: &FormatOption) -> syn::Ident {
+    fn generate_var_name(
+        &self,
+        field: &FieldInfo<ChumskyLayout>,
+        option: &FormatOption,
+    ) -> syn::Ident {
         match option {
             FormatOption::Name => {
                 syn::Ident::new(&format!("{}_name", field), proc_macro2::Span::call_site())

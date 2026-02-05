@@ -261,10 +261,7 @@ impl<L: Layout> Statement<L> {
     ///
     /// Returns identifiers only for fields that have names (not tuple fields).
     pub fn named_field_idents(&self) -> Vec<syn::Ident> {
-        self.fields
-            .iter()
-            .filter_map(|f| f.ident.clone())
-            .collect()
+        self.fields.iter().filter_map(|f| f.ident.clone()).collect()
     }
 
     /// Returns true if all fields are unnamed (tuple-style).
@@ -542,7 +539,12 @@ mod tests {
         match &fields[0].data {
             FieldData::Argument { ssa_type } => {
                 // ssa_type should be the parsed expression
-                assert!(ssa_type.to_token_stream().to_string().contains("CustomType"));
+                assert!(
+                    ssa_type
+                        .to_token_stream()
+                        .to_string()
+                        .contains("CustomType")
+                );
             }
             _ => panic!("Expected Argument"),
         }
@@ -645,4 +647,3 @@ mod tests {
         assert_eq!(bindings.field_idents.len(), 2);
     }
 }
-

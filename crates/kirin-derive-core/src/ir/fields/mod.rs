@@ -164,7 +164,13 @@ impl<L: Layout> FieldInfo<L> {
 
     /// Returns true if this field has a default value.
     pub fn has_default(&self) -> bool {
-        matches!(&self.data, FieldData::Value { default: Some(_), .. })
+        matches!(
+            &self.data,
+            FieldData::Value {
+                default: Some(_),
+                ..
+            }
+        )
     }
 
     /// Returns the default value for Value fields, if any.
