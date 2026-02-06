@@ -1,5 +1,5 @@
 use super::block::BlockBuilder;
-use super::error::{SpecializeError, StagedFunctionError};
+use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
 use super::region::RegionBuilder;
 
 use crate::arena::GetInfo;
@@ -117,11 +117,19 @@ impl<L: Dialect> Context<L> {
 
     /// Create a new staged function.
     ///
-    /// Returns `Err(StagedFunctionError)` if a non-invalidated staged function
-    /// with the same (name, signature) already exists in the arena. The error
-    /// preserves all construction arguments so the caller can pass it to
-    /// [`Context::redefine_staged_function`] to intentionally overwrite the
-    /// existing staged function.
+    /// Returns `Err(StagedFunctionError)` when staged-function name policy would
+    /// be violated:
+    ///
+    /// - `DuplicateSignature`: same name + same signature already exists.
+    /// - `SignatureMismatchUnderSingleInterface`: same name + different signature
+    ///   exists while [`StagedNamePolicy::SingleInterface`] is active.
+    ///
+    /// The error preserves all construction arguments so the caller can pass
+    /// it to [`Context::redefine_staged_function`] to intentionally overwrite
+    /// the existing staged function.
+    ///
+    /// Anonymous staged functions (name = `None`) are never considered
+    /// conflicting since they have no identity to collide on.
     #[builder(finish_fn = new)]
     pub fn staged_function(
         &mut self,
@@ -133,25 +141,53 @@ impl<L: Dialect> Context<L> {
         let interned_name = name.map(|n| self.symbols.borrow_mut().intern(n));
         let sig = signature.unwrap_or_default();
 
-        // Check for existing non-invalidated staged functions with the same (name, signature)
-        let conflicting: Vec<StagedFunction> = self
-            .staged_functions
-            .iter()
-            .filter(|item| {
-                let info: &StagedFunctionInfo<L> = item;
-                !info.invalidated && info.name == interned_name && info.signature == sig
-            })
-            .map(|item| item.id)
-            .collect();
+        // Check policy conflicts for named staged functions.
+        if interned_name.is_some() {
+            let same_name: Vec<_> = self
+                .staged_functions
+                .iter()
+                .filter(|item| {
+                    let info: &StagedFunctionInfo<L> = item;
+                    !info.invalidated && info.name == interned_name
+                })
+                .map(|item| item.id)
+                .collect();
 
-        if !conflicting.is_empty() {
-            return Err(StagedFunctionError {
-                name: interned_name,
-                signature: sig,
-                conflicting,
-                specializations: specializations.unwrap_or_default(),
-                backedges: backedges.unwrap_or_default(),
-            });
+            let duplicate_signature: Vec<_> = same_name
+                .iter()
+                .copied()
+                .filter(|id| id.expect_info(self).signature() == &sig)
+                .collect();
+
+            if !duplicate_signature.is_empty() {
+                return Err(StagedFunctionError {
+                    conflict_kind: StagedFunctionConflictKind::DuplicateSignature,
+                    name: interned_name,
+                    signature: sig,
+                    conflicting: duplicate_signature,
+                    specializations: specializations.unwrap_or_default(),
+                    backedges: backedges.unwrap_or_default(),
+                });
+            }
+
+            if self.staged_name_policy == StagedNamePolicy::SingleInterface {
+                let signature_mismatch: Vec<_> = same_name
+                    .into_iter()
+                    .filter(|id| id.expect_info(self).signature() != &sig)
+                    .collect();
+
+                if !signature_mismatch.is_empty() {
+                    return Err(StagedFunctionError {
+                        conflict_kind:
+                            StagedFunctionConflictKind::SignatureMismatchUnderSingleInterface,
+                        name: interned_name,
+                        signature: sig,
+                        conflicting: signature_mismatch,
+                        specializations: specializations.unwrap_or_default(),
+                        backedges: backedges.unwrap_or_default(),
+                    });
+                }
+            }
         }
 
         let id = self.staged_functions.next_id();
@@ -304,5 +340,204 @@ impl<L: Dialect> Context<L> {
         };
         self.staged_functions.alloc(staged_function);
         id
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        Block, Context, Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut,
+        HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
+        IsConstant, IsPure, IsTerminator, Region, ResultValue, SSAValue,
+        StagedFunctionConflictKind, StagedNamePolicy, Successor,
+    };
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+    enum TestType {
+        #[default]
+        Any,
+        I32,
+        I64,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct TestDialect;
+
+    impl<'a> HasArguments<'a> for TestDialect {
+        type Iter = std::iter::Empty<&'a SSAValue>;
+
+        fn arguments(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasArgumentsMut<'a> for TestDialect {
+        type IterMut = std::iter::Empty<&'a mut SSAValue>;
+
+        fn arguments_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasResults<'a> for TestDialect {
+        type Iter = std::iter::Empty<&'a ResultValue>;
+
+        fn results(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasResultsMut<'a> for TestDialect {
+        type IterMut = std::iter::Empty<&'a mut ResultValue>;
+
+        fn results_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasBlocks<'a> for TestDialect {
+        type Iter = std::iter::Empty<&'a Block>;
+
+        fn blocks(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasBlocksMut<'a> for TestDialect {
+        type IterMut = std::iter::Empty<&'a mut Block>;
+
+        fn blocks_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasSuccessors<'a> for TestDialect {
+        type Iter = std::iter::Empty<&'a Successor>;
+
+        fn successors(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasSuccessorsMut<'a> for TestDialect {
+        type IterMut = std::iter::Empty<&'a mut Successor>;
+
+        fn successors_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasRegions<'a> for TestDialect {
+        type Iter = std::iter::Empty<&'a Region>;
+
+        fn regions(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasRegionsMut<'a> for TestDialect {
+        type IterMut = std::iter::Empty<&'a mut Region>;
+
+        fn regions_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl IsTerminator for TestDialect {
+        fn is_terminator(&self) -> bool {
+            false
+        }
+    }
+
+    impl IsConstant for TestDialect {
+        fn is_constant(&self) -> bool {
+            false
+        }
+    }
+
+    impl IsPure for TestDialect {
+        fn is_pure(&self) -> bool {
+            true
+        }
+    }
+
+    impl Dialect for TestDialect {
+        type Type = TestType;
+    }
+
+    fn sig(ty: TestType) -> Signature<TestType> {
+        Signature {
+            params: vec![ty.clone()],
+            ret: ty,
+            constraints: (),
+        }
+    }
+
+    #[test]
+    fn staged_name_policy_defaults_to_single_interface() {
+        let mut ctx: Context<TestDialect> = Context::default();
+        assert_eq!(ctx.staged_name_policy(), StagedNamePolicy::SingleInterface);
+
+        ctx.staged_function()
+            .name("foo")
+            .signature(sig(TestType::I32))
+            .new()
+            .expect("first staged function should be created");
+
+        let err = ctx
+            .staged_function()
+            .name("foo")
+            .signature(sig(TestType::I64))
+            .new()
+            .expect_err("same name + different signature should fail by default");
+
+        assert_eq!(
+            err.conflict_kind,
+            StagedFunctionConflictKind::SignatureMismatchUnderSingleInterface
+        );
+    }
+
+    #[test]
+    fn staged_name_policy_multiple_dispatch_allows_different_signatures() {
+        let mut ctx: Context<TestDialect> = Context::default();
+        ctx.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
+
+        ctx.staged_function()
+            .name("foo")
+            .signature(sig(TestType::I32))
+            .new()
+            .expect("first staged function should be created");
+
+        ctx.staged_function()
+            .name("foo")
+            .signature(sig(TestType::I64))
+            .new()
+            .expect("same name + different signature should be allowed under MultipleDispatch");
+    }
+
+    #[test]
+    fn duplicate_signature_is_rejected_even_with_multiple_dispatch() {
+        let mut ctx: Context<TestDialect> = Context::default();
+        ctx.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
+
+        let i32_sig = sig(TestType::I32);
+        ctx.staged_function()
+            .name("foo")
+            .signature(i32_sig.clone())
+            .new()
+            .expect("first staged function should be created");
+
+        let err = ctx
+            .staged_function()
+            .name("foo")
+            .signature(i32_sig)
+            .new()
+            .expect_err("duplicate (name, signature) should still fail");
+
+        assert_eq!(
+            err.conflict_kind,
+            StagedFunctionConflictKind::DuplicateSignature
+        );
     }
 }

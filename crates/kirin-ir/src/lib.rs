@@ -13,7 +13,7 @@ mod signature;
 pub mod query;
 
 pub use arena::{Arena, DenseHint, GetInfo, Id, Identifier, Item, SparseHint};
-pub use builder::error::{SpecializeError, StagedFunctionError};
+pub use builder::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
 pub use comptime::{CompileTimeValue, Typeof};
 pub use context::Context;
 pub use detach::Detach;
@@ -26,8 +26,8 @@ pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{
     Block, BlockArgument, BlockInfo, CompileStage, DeletedSSAValue, Function, FunctionInfo,
     LinkedList, LinkedListNode, Region, ResultValue, SSAInfo, SSAKind, SSAValue,
-    SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo, Statement,
-    StatementInfo, Successor, Symbol, TestSSAValue,
+    SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo,
+    StagedNamePolicy, Statement, StatementInfo, Successor, Symbol, TestSSAValue,
 };
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,

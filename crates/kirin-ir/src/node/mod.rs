@@ -9,7 +9,7 @@ pub mod symbol;
 pub use block::{Block, BlockInfo, Successor};
 pub use function::{
     CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
-    StagedFunction, StagedFunctionInfo,
+    StagedFunction, StagedFunctionInfo, StagedNamePolicy,
 };
 pub use linked_list::{LinkedList, LinkedListNode};
 pub use region::{Region, RegionInfo};

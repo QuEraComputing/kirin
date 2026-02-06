@@ -8,6 +8,7 @@ use crate::{Dialect, InternTable, node::*};
 #[derive(Debug)]
 pub struct Context<L: Dialect> {
     pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
+    pub(crate) staged_name_policy: StagedNamePolicy,
     pub(crate) regions: Arena<Region, RegionInfo<L>>,
     pub(crate) blocks: Arena<Block, BlockInfo<L>>,
     pub(crate) statements: Arena<Statement, StatementInfo<L>>,
@@ -22,6 +23,7 @@ where
     fn default() -> Self {
         Self {
             staged_functions: Arena::default(),
+            staged_name_policy: StagedNamePolicy::default(),
             regions: Arena::default(),
             blocks: Arena::default(),
             statements: Arena::default(),
@@ -40,6 +42,7 @@ where
     fn clone(&self) -> Self {
         Self {
             staged_functions: self.staged_functions.clone(),
+            staged_name_policy: self.staged_name_policy,
             regions: self.regions.clone(),
             blocks: self.blocks.clone(),
             statements: self.statements.clone(),
@@ -75,6 +78,18 @@ impl<L: Dialect> Context<L> {
     /// Read-only access. Use `get_info_mut` on `StagedFunction` for mutable access.
     pub fn staged_function_arena(&self) -> &Arena<StagedFunction, StagedFunctionInfo<L>> {
         &self.staged_functions
+    }
+
+    /// Get the policy controlling staged-function name/signature compatibility.
+    pub fn staged_name_policy(&self) -> StagedNamePolicy {
+        self.staged_name_policy
+    }
+
+    /// Set the policy controlling staged-function name/signature compatibility.
+    ///
+    /// Defaults to [`StagedNamePolicy::SingleInterface`].
+    pub fn set_staged_name_policy(&mut self, policy: StagedNamePolicy) {
+        self.staged_name_policy = policy;
     }
 
     /// Get a reference to the regions arena.

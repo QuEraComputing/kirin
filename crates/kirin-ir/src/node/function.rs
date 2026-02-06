@@ -34,6 +34,20 @@ identifier! {
     struct StagedFunction
 }
 
+/// Policy controlling whether multiple staged signatures can share the same function name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub enum StagedNamePolicy {
+    /// Require a single semantic interface per function name.
+    ///
+    /// A new staged function with an existing name must have the same signature.
+    #[default]
+    SingleInterface,
+    /// Allow multiple staged signatures under the same function name.
+    ///
+    /// Dispatch across signature variants is handled by signature semantics.
+    MultipleDispatch,
+}
+
 /// A specialized version of a function, identified by its function ID and specialization ID.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct SpecializedFunction(pub(crate) StagedFunction, pub(crate) usize);
