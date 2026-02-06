@@ -138,10 +138,22 @@ impl<L: Dialect> Context<L> {
         id
     }
 
-    // TODO: remove params_type and return_type, we should always read the signature from statement
-    //       then check if the signature is a subset of the staged function signature, we need a HasSignature trait
-    //       for `L` which will be implemented by the dialect to provide information about the signature of
-    //       statements it contains.
+    /// Create a specialized function from a staged function.
+    ///
+    /// # Design: Signature ownership
+    ///
+    /// Signatures are explicitly provided here rather than derived from the body
+    /// statement. This is intentional:
+    ///
+    /// - **StagedFunction** owns the user-declared signature from the frontend.
+    /// - **SpecializedFunction** owns the compiler-derived signature (a subset of
+    ///   staged). If not provided, it defaults to the staged function's signature.
+    /// - **Body statement** is a structural container (Region + dialect-specific
+    ///   context) and does not encode signature information. A Region's block
+    ///   arguments have dialect-specific semantics and do not universally
+    ///   correspond to function parameters.
+    /// - **Extern functions** are represented as StagedFunctions with no
+    ///   specializations (empty `specializations` vec).
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,
@@ -151,8 +163,6 @@ impl<L: Dialect> Context<L> {
         #[builder(into)] body: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> SpecializedFunction {
-        // the only way to create a staged function is through the context
-        // and unless the whole context is dropped, the staged function should exist
         let staged_function_info = f.expect_info_mut(self);
         let id = SpecializedFunction(f, staged_function_info.specializations.len());
 
