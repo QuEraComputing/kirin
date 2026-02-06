@@ -5,7 +5,7 @@ use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 use kirin_test_utils::SimpleType;
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = SimpleType)]
+#[kirin(type = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum TupleLang {
     #[chumsky(format = "swap {0} {1}")]

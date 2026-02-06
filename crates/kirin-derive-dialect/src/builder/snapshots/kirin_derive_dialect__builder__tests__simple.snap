@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-derive-core/src/kirin/builder/mod.rs
-expression: "Builder::default().print(&input)"
+source: crates/kirin-derive-dialect/src/builder/tests.rs
+expression: "case!\n{\n    #[kirin(fn, type = SimpleIRType, crate = kirin_ir)] pub enum\n    SimpleLanguage\n    {\n        Add(SSAValue, SSAValue, #[kirin(type = SimpleIRType::Float)]\n        ResultValue,),\n        Constant(#[kirin(into)] Value, #[kirin(type = SimpleIRType::Float)]\n        ResultValue,), #[kirin(terminator)] Return(SSAValue),\n        Function(Region, #[kirin(type = SimpleIRType::Float)] ResultValue,),\n    }\n}"
 ---
 impl SimpleLanguage {
     pub fn op_add<Lang>(
@@ -10,7 +10,7 @@ impl SimpleLanguage {
     ) -> simple_language_build_result::Add
     where
         Lang: kirin_ir::Dialect + From<SimpleLanguage>,
-        Lang::TypeLattice: From<SimpleTypeLattice>,
+        Lang::Type: From<SimpleIRType>,
     {
         let add_statement_id = context.statement_arena().next_id();
         let field_0: SSAValue = field_0.into();
@@ -18,7 +18,7 @@ impl SimpleLanguage {
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(add_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(SimpleTypeLattice::Float))
+            .ty(Lang::Type::from(SimpleIRType::Float))
             .new()
             .into();
         context
@@ -36,14 +36,14 @@ impl SimpleLanguage {
     ) -> simple_language_build_result::Constant
     where
         Lang: kirin_ir::Dialect + From<SimpleLanguage>,
-        Lang::TypeLattice: From<SimpleTypeLattice>,
+        Lang::Type: From<SimpleIRType>,
     {
         let constant_statement_id = context.statement_arena().next_id();
         let field_0: Value = field_0.into();
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(constant_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(SimpleTypeLattice::Float))
+            .ty(Lang::Type::from(SimpleIRType::Float))
             .new()
             .into();
         context
@@ -61,7 +61,7 @@ impl SimpleLanguage {
     ) -> simple_language_build_result::Return
     where
         Lang: kirin_ir::Dialect + From<SimpleLanguage>,
-        Lang::TypeLattice: From<SimpleTypeLattice>,
+        Lang::Type: From<SimpleIRType>,
     {
         let return_statement_id = context.statement_arena().next_id();
         let field_0: SSAValue = field_0.into();
@@ -76,14 +76,14 @@ impl SimpleLanguage {
     ) -> simple_language_build_result::Function
     where
         Lang: kirin_ir::Dialect + From<SimpleLanguage>,
-        Lang::TypeLattice: From<SimpleTypeLattice>,
+        Lang::Type: From<SimpleIRType>,
     {
         let function_statement_id = context.statement_arena().next_id();
         let field_0: Region = field_0.into();
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(function_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(SimpleTypeLattice::Float))
+            .ty(Lang::Type::from(SimpleIRType::Float))
             .new()
             .into();
         context

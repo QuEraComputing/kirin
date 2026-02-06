@@ -9,7 +9,7 @@ use kirin_test_utils::SimpleType;
 
 /// A simple dialect for testing EmitIR functionality.
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = SimpleType)]
+#[kirin(type = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum EmitLang {
     /// Simple add instruction: `%res = add %lhs, %rhs`

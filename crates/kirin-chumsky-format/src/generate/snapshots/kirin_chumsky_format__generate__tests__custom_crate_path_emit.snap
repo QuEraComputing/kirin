@@ -11,7 +11,7 @@ where
     LanguageOutput: my_chumsky::EmitIR<Language, Output = my_kirin::Statement>,
     SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output:
-        my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::TypeLattice>,
+        my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::Type>,
 {
     type Output = my_kirin::Statement;
     fn emit(&self, ctx: &mut my_chumsky::EmitContext<'_, Language>) -> Self::Output {
@@ -29,7 +29,7 @@ where
     'src: 'tokens,
     SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output:
-        my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::TypeLattice>,
+        my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::Type>,
 {
     type Output = my_kirin::Statement;
     fn emit(&self, ctx: &mut my_chumsky::EmitContext<'_, Language>) -> Self::Output {

@@ -11,7 +11,7 @@ use crate::{ArenaDoc, Document, PrettyPrint, PrettyPrintName, PrettyPrintType};
 impl PrettyPrint for ResultValue {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.context());
         if let Some(name) = info.name() {
@@ -26,7 +26,7 @@ impl PrettyPrint for ResultValue {
 impl PrettyPrint for SSAValue {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.context());
         if let Some(name) = info.name() {
@@ -41,7 +41,7 @@ impl PrettyPrint for SSAValue {
 impl PrettyPrint for Successor {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         doc.text(self.to_string())
     }
@@ -50,7 +50,7 @@ impl PrettyPrint for Successor {
 impl PrettyPrint for Symbol {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         // Look up the symbol name from the context's symbol table
         if let Some(name) = doc.context().symbol_table().borrow().resolve(*self) {
@@ -89,7 +89,7 @@ impl PrettyPrintName for ResultValue {
 impl PrettyPrintType for SSAValue {
     fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.context());
         doc.text(format!("{}", info.ty()))
@@ -99,7 +99,7 @@ impl PrettyPrintType for SSAValue {
 impl PrettyPrintType for ResultValue {
     fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         let info: &Item<SSAInfo<L>> = self.expect_info(doc.context());
         doc.text(format!("{}", info.ty()))
@@ -109,7 +109,7 @@ impl PrettyPrintType for ResultValue {
 impl PrettyPrint for SpecializedFunction {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         doc.print_specialized_function(self)
     }
@@ -118,7 +118,7 @@ impl PrettyPrint for SpecializedFunction {
 impl PrettyPrint for StagedFunction {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         doc.print_staged_function(self)
     }
@@ -138,7 +138,7 @@ macro_rules! impl_pretty_print_int {
                     doc: &'a Document<'a, L>,
                 ) -> ArenaDoc<'a>
                 where
-                    L::TypeLattice: std::fmt::Display,
+                    L::Type: std::fmt::Display,
                 {
                     doc.text(self.to_string())
                 }
@@ -154,7 +154,7 @@ impl_pretty_print_int!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 impl PrettyPrint for f32 {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         // Ensure we always print as a float (with decimal point)
         if self.fract() == 0.0 {
@@ -168,7 +168,7 @@ impl PrettyPrint for f32 {
 impl PrettyPrint for f64 {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         // Ensure we always print as a float (with decimal point)
         if self.fract() == 0.0 {
@@ -182,7 +182,7 @@ impl PrettyPrint for f64 {
 impl PrettyPrint for bool {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         doc.text(if *self { "true" } else { "false" })
     }
@@ -191,7 +191,7 @@ impl PrettyPrint for bool {
 impl PrettyPrint for String {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         // Print as quoted string
         doc.text(format!("\"{}\"", self))

@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-derive-core/src/kirin/builder/mod.rs
-expression: "Builder::default().print(&input)"
+source: crates/kirin-derive-dialect/src/builder/tests.rs
+expression: "case!\n{\n    #[kirin(constant, fn = op_constant, type = L)] struct Constant<T:\n    CompileTimeValue + Typeof<L>, L:\n    TypeLattice>(#[kirin(into)] T, #[kirin(type = value.type_of())]\n    ResultValue, #[kirin(default = std::marker::PhantomData)]\n    std::marker::PhantomData<L>,);\n}"
 ---
 #[automatically_derived]
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
@@ -10,7 +10,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
     ) -> constant_build_result::Constant
     where
         Lang: ::kirin::ir::Dialect + From<Constant<T, L>>,
-        Lang::TypeLattice: From<L>,
+        Lang::Type: From<L>,
     {
         let constant_statement_id = context.statement_arena().next_id();
         let field_0: T = field_0.into();
@@ -18,7 +18,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> Constant<T, L> {
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(constant_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(value.type_of()))
+            .ty(Lang::Type::from(value.type_of()))
             .new()
             .into();
         context

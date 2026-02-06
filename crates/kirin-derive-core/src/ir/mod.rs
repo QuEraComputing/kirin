@@ -16,7 +16,7 @@ mod tests {
     #[test]
     fn test_input_struct_basic() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(crate = "my_crate", type_lattice = MyLattice)]
+            #[kirin(crate = "my_crate", type = MyLattice)]
             struct MyAST {
                 #[kirin(type = "CustomType")]
                 field1: SSAValue,
@@ -59,7 +59,7 @@ mod tests {
     #[test]
     fn test_input_enum_basic() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(crate = "my_crate", type_lattice = MyLattice)]
+            #[kirin(crate = "my_crate", type = MyLattice)]
             enum MyEnumAST {
                 VariantA {
                     #[kirin(type = "CustomType")]
@@ -79,7 +79,7 @@ mod tests {
     fn test_input_enum_global_wrapper() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[wraps]
-            #[kirin(crate = "my_crate", type_lattice = MyLattice)]
+            #[kirin(crate = "my_crate", type = MyLattice)]
             enum MyEnumAST {
                 VariantA(AnotherA),
                 VariantB(AnotherB),
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn test_input_enum_variant_wrapper() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(crate = "my_crate", type_lattice = MyLattice)]
+            #[kirin(crate = "my_crate", type = MyLattice)]
             enum MyEnumAST {
                 #[wraps]
                 VariantA(AnotherA),
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn test_input_enum_variant_field_wrapper() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(crate = "my_crate", type_lattice = MyLattice)]
+            #[kirin(crate = "my_crate", type = MyLattice)]
             enum MyEnumAST {
                 VariantA(#[wraps] AnotherA, String),
                 VariantB {

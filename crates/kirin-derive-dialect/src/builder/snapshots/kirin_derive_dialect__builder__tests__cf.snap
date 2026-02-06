@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/builder/tests.rs
-expression: "case!\n{\n    #[kirin(terminator, fn, type_lattice = T)] pub enum ControlFlow<T:\n    TypeLattice>\n    {\n        #[kirin(format = \"br {target}\")] Branch { target: Successor },\n        #[kirin(format =\n        \"cond_br {condition} then={true_target} else={false_target}\")]\n        ConditionalBranch\n        {\n            condition: SSAValue, true_target: Successor, false_target:\n            Successor, #[kirin(default = std::marker::PhantomData)] marker:\n            std::marker::PhantomData<T>,\n        }, #[kirin(format = \"ret {0}\")] Return(SSAValue),\n    }\n}"
+expression: "case!\n{\n    #[kirin(terminator, fn, type = T)] pub enum ControlFlow<T: TypeLattice>\n    {\n        #[kirin(format = \"br {target}\")] Branch { target: Successor },\n        #[kirin(format =\n        \"cond_br {condition} then={true_target} else={false_target}\")]\n        ConditionalBranch\n        {\n            condition: SSAValue, true_target: Successor, false_target:\n            Successor, #[kirin(default = std::marker::PhantomData)] marker:\n            std::marker::PhantomData<T>,\n        }, #[kirin(format = \"ret {0}\")] Return(SSAValue),\n    }\n}"
 ---
 impl<T: TypeLattice> ControlFlow<T> {
     pub fn op_branch<Lang>(
@@ -9,7 +9,7 @@ impl<T: TypeLattice> ControlFlow<T> {
     ) -> control_flow_build_result::Branch
     where
         Lang: ::kirin::ir::Dialect + From<ControlFlow<T>>,
-        Lang::TypeLattice: From<T>,
+        Lang::Type: From<T>,
     {
         let branch_statement_id = context.statement_arena().next_id();
         let target: Successor = target.into();
@@ -29,7 +29,7 @@ impl<T: TypeLattice> ControlFlow<T> {
     ) -> control_flow_build_result::ConditionalBranch
     where
         Lang: ::kirin::ir::Dialect + From<ControlFlow<T>>,
-        Lang::TypeLattice: From<T>,
+        Lang::Type: From<T>,
     {
         let conditionalbranch_statement_id = context.statement_arena().next_id();
         let condition: SSAValue = condition.into();
@@ -55,7 +55,7 @@ impl<T: TypeLattice> ControlFlow<T> {
     ) -> control_flow_build_result::Return
     where
         Lang: ::kirin::ir::Dialect + From<ControlFlow<T>>,
-        Lang::TypeLattice: From<T>,
+        Lang::Type: From<T>,
     {
         let return_statement_id = context.statement_arena().next_id();
         let field_0: SSAValue = field_0.into();

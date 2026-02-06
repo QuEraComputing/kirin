@@ -5,7 +5,7 @@ use kirin_ir::*;
 use kirin_test_utils::*;
 
 #[derive(Dialect, Clone, Debug, PartialEq)]
-#[kirin(fn, type_lattice = SimpleTypeLattice, crate = kirin_ir)]
+#[kirin(fn, type = SimpleIRType, crate = kirin_ir)]
 struct StructOp {
     arg1: SSAValue,
     arg2: SSAValue,

@@ -9,7 +9,7 @@ pub struct InputMeta {
     pub name: syn::Ident,
     pub generics: syn::Generics,
     pub crate_path: Option<syn::Path>,
-    pub type_lattice: syn::Path,
+    pub ir_type: syn::Path,
     pub builder: Option<BuilderOptions>,
     pub is_enum: bool,
 }
@@ -20,7 +20,7 @@ impl InputMeta {
             name: input.name.clone(),
             generics: input.generics.clone(),
             crate_path: input.attrs.crate_path.clone(),
-            type_lattice: input.attrs.type_lattice.clone(),
+            ir_type: input.attrs.ir_type.clone(),
             builder: input.attrs.builder.clone(),
             is_enum: matches!(input.data, ir::Data::Enum(_)),
         }

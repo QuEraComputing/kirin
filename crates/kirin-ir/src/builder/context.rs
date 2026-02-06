@@ -1,9 +1,10 @@
 use super::block::BlockBuilder;
+use super::error::{SpecializeError, StagedFunctionError};
 use super::region::RegionBuilder;
 
 use crate::arena::GetInfo;
-use crate::lattice::{FiniteLattice, Lattice};
 use crate::node::*;
+use crate::signature::Signature;
 use crate::{Context, Dialect};
 
 impl<L: Dialect> Context<L> {
@@ -75,7 +76,7 @@ impl<L: Dialect> Context<L> {
     pub fn ssa(
         &mut self,
         #[builder(into)] name: Option<String>,
-        ty: L::TypeLattice,
+        ty: L::Type,
         kind: SSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
@@ -95,7 +96,7 @@ impl<L: Dialect> Context<L> {
         let ssa = SSAInfo::new(
             id.into(),
             None,
-            L::TypeLattice::top(),
+            L::Type::default(),
             SSAKind::BuilderBlockArgument(index),
         );
         self.ssas.alloc(ssa);
@@ -114,31 +115,64 @@ impl<L: Dialect> Context<L> {
         id
     }
 
+    /// Create a new staged function.
+    ///
+    /// Returns `Err(StagedFunctionError)` if a non-invalidated staged function
+    /// with the same (name, signature) already exists in the arena. The error
+    /// preserves all construction arguments so the caller can pass it to
+    /// [`Context::redefine_staged_function`] to intentionally overwrite the
+    /// existing staged function.
     #[builder(finish_fn = new)]
     pub fn staged_function(
         &mut self,
         #[builder(into)] name: Option<String>,
-        params_type: Option<&[L::TypeLattice]>,
-        return_type: Option<L::TypeLattice>,
+        signature: Option<Signature<L::Type>>,
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
-    ) -> StagedFunction {
+    ) -> Result<StagedFunction, StagedFunctionError<L>> {
+        let interned_name = name.map(|n| self.symbols.borrow_mut().intern(n));
+        let sig = signature.unwrap_or_default();
+
+        // Check for existing non-invalidated staged functions with the same (name, signature)
+        let conflicting: Vec<StagedFunction> = self
+            .staged_functions
+            .iter()
+            .filter(|item| {
+                let info: &StagedFunctionInfo<L> = item;
+                !info.invalidated && info.name == interned_name && info.signature == sig
+            })
+            .map(|item| item.id)
+            .collect();
+
+        if !conflicting.is_empty() {
+            return Err(StagedFunctionError {
+                name: interned_name,
+                signature: sig,
+                conflicting,
+                specializations: specializations.unwrap_or_default(),
+                backedges: backedges.unwrap_or_default(),
+            });
+        }
+
         let id = self.staged_functions.next_id();
         let staged_function = StagedFunctionInfo {
             id,
-            name: name.map(|n| self.symbols.borrow_mut().intern(n)),
-            signature: params_type
-                .map(|pts| Signature(pts.to_vec()))
-                .unwrap_or(Signature(Vec::new())),
-            return_type: return_type.unwrap_or(L::TypeLattice::top()),
+            name: interned_name,
+            signature: sig,
             specializations: specializations.unwrap_or_default(),
             backedges: backedges.unwrap_or_default(),
+            invalidated: false,
         };
         self.staged_functions.alloc(staged_function);
-        id
+        Ok(id)
     }
 
     /// Create a specialized function from a staged function.
+    ///
+    /// Returns `Err(SpecializeError)` if a non-invalidated specialization with
+    /// the same signature already exists. The error preserves all construction
+    /// arguments so the caller can pass it to [`Context::redefine_specialization`]
+    /// to intentionally overwrite the existing specialization.
     ///
     /// # Design: Signature ownership
     ///
@@ -154,40 +188,121 @@ impl<L: Dialect> Context<L> {
     ///   correspond to function parameters.
     /// - **Extern functions** are represented as StagedFunctions with no
     ///   specializations (empty `specializations` vec).
+    ///
+    /// Signature validation (e.g., checking that the specialized signature is a
+    /// subset of the staged signature) is the caller's responsibility via
+    /// [`SignatureSemantics::applicable`].
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,
         f: StagedFunction,
-        params_type: Option<&[L::TypeLattice]>,
-        return_type: Option<L::TypeLattice>,
+        signature: Option<Signature<L::Type>>,
         #[builder(into)] body: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
-    ) -> SpecializedFunction {
+    ) -> Result<SpecializedFunction, SpecializeError<L>> {
         let staged_function_info = f.expect_info_mut(self);
-        let id = SpecializedFunction(f, staged_function_info.specializations.len());
 
-        let signature = Signature(
-            params_type
-                .map(|pts| pts.to_vec())
-                .unwrap_or(staged_function_info.signature.0.clone()),
-        );
+        let signature = signature.unwrap_or(staged_function_info.signature.clone());
 
-        if !signature.is_subseteq(&staged_function_info.signature) {
-            panic!(
-                "Specialized function signature is not a subset of the staged function signature"
-            );
+        // Check for existing non-invalidated specializations with the same signature
+        let conflicting: Vec<SpecializedFunction> = staged_function_info
+            .specializations
+            .iter()
+            .filter(|s| !s.is_invalidated() && s.signature() == &signature)
+            .map(|s| s.id())
+            .collect();
+
+        if !conflicting.is_empty() {
+            return Err(SpecializeError {
+                staged_function: f,
+                signature,
+                conflicting,
+                body,
+                backedges,
+            });
         }
+
+        let id = SpecializedFunction(f, staged_function_info.specializations.len());
 
         let specialized_function = SpecializedFunctionInfo::builder()
             .id(id)
             .signature(signature)
-            .return_type(return_type.unwrap_or(staged_function_info.return_type.clone()))
             .body(body)
             .maybe_backedges(backedges)
             .new();
         staged_function_info
             .specializations
             .push(specialized_function);
+        Ok(id)
+    }
+}
+
+/// Methods for intentionally redefining (overwriting) existing functions.
+///
+/// These consume the error returned by [`Context::specialize`] or
+/// [`Context::staged_function`] when a duplicate is detected, invalidate the
+/// conflicting entries, and register the new definition.
+impl<L: Dialect> Context<L> {
+    /// Redefine a specialization by consuming a [`SpecializeError`].
+    ///
+    /// Invalidates all conflicting specializations identified in the error
+    /// and registers the new specialization. Returns the new
+    /// [`SpecializedFunction`] ID.
+    ///
+    /// Callers should inspect the [`SpecializeError::conflicting`] backedges
+    /// to determine what needs recompilation.
+    pub fn redefine_specialization(&mut self, error: SpecializeError<L>) -> SpecializedFunction {
+        let staged_function_info = error.staged_function.expect_info_mut(self);
+
+        // Invalidate all conflicting specializations
+        for conflict in &error.conflicting {
+            let (_, idx) = conflict.id();
+            staged_function_info.specializations[idx].invalidate();
+        }
+
+        // Push the new specialization
+        let id = SpecializedFunction(
+            error.staged_function,
+            staged_function_info.specializations.len(),
+        );
+        let specialized_function = SpecializedFunctionInfo::builder()
+            .id(id)
+            .signature(error.signature)
+            .body(error.body)
+            .maybe_backedges(error.backedges)
+            .new();
+        staged_function_info
+            .specializations
+            .push(specialized_function);
+        id
+    }
+
+    /// Redefine a staged function by consuming a [`StagedFunctionError`].
+    ///
+    /// Invalidates all conflicting staged functions identified in the error
+    /// and registers the new staged function. Returns the new
+    /// [`StagedFunction`] ID.
+    ///
+    /// Callers should inspect the backedges of the conflicting staged
+    /// functions to determine what needs recompilation.
+    pub fn redefine_staged_function(&mut self, error: StagedFunctionError<L>) -> StagedFunction {
+        // Invalidate all conflicting staged functions
+        for &conflict in &error.conflicting {
+            let info = conflict.expect_info_mut(self);
+            info.invalidate();
+        }
+
+        // Allocate the new staged function
+        let id = self.staged_functions.next_id();
+        let staged_function = StagedFunctionInfo {
+            id,
+            name: error.name,
+            signature: error.signature,
+            specializations: error.specializations,
+            backedges: error.backedges,
+            invalidated: false,
+        };
+        self.staged_functions.alloc(staged_function);
         id
     }
 }

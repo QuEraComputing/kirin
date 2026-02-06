@@ -30,7 +30,7 @@ impl GenerateHasDialectParser {
         }
 
         let original_name = &ir_input.name;
-        let type_lattice = &ir_input.attrs.type_lattice;
+        let ir_type = &ir_input.attrs.ir_type;
 
         // Build impl generics that include both the lifetimes and the original type parameters
         let impl_generics = self.build_original_type_impl_generics(ir_input);
@@ -38,12 +38,12 @@ impl GenerateHasDialectParser {
 
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
 
-        // Combine where clauses and add TypeLattice: HasParser bound
+        // Combine where clauses and add IR type: HasParser bound
         let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         // Use BoundsBuilder to generate bounds
         let bounds = BoundsBuilder::new(crate_path, &self.config.ir_path);
-        let type_lattice_bound = bounds.type_lattice_has_parser_bound(type_lattice);
+        let ir_type_bound = bounds.ir_type_has_parser_bound(ir_type);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
         // Wrapper types need HasDialectParser bounds
@@ -52,13 +52,13 @@ impl GenerateHasDialectParser {
 
         let where_clause = match combined_where {
             Some(mut wc) => {
-                wc.predicates.push(type_lattice_bound);
+                wc.predicates.push(ir_type_bound);
                 wc.predicates.extend(value_type_bounds);
                 wc.predicates.extend(wrapper_type_bounds);
                 quote! { #wc }
             }
             None => {
-                let all_bounds = std::iter::once(type_lattice_bound)
+                let all_bounds = std::iter::once(ir_type_bound)
                     .chain(value_type_bounds)
                     .chain(wrapper_type_bounds)
                     .collect::<Vec<_>>();
@@ -68,10 +68,8 @@ impl GenerateHasDialectParser {
 
         // The ASTSelf wrapper type for standalone use
         let ast_self_name = syn::Ident::new(&format!("{}Self", ast_name), ast_name.span());
-        let ast_self_type =
-            self.build_ast_self_type_reference(ir_input, &ast_self_name, type_lattice);
-        let type_output =
-            quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let ast_self_type = self.build_ast_self_type_reference(ir_input, &ast_self_name, ir_type);
+        let type_output = quote! { <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output };
 
         quote! {
             impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
@@ -169,7 +167,7 @@ impl GenerateHasDialectParser {
         }
 
         let original_name = &ir_input.name;
-        let type_lattice = &ir_input.attrs.type_lattice;
+        let ir_type = &ir_input.attrs.ir_type;
 
         // Build impl generics with just lifetimes and original type parameters
         let impl_generics = self.build_original_type_impl_generics(ir_input);
@@ -184,7 +182,7 @@ impl GenerateHasDialectParser {
         let bounds = BoundsBuilder::new(crate_path, &self.config.ir_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
-        let type_lattice_bound = bounds.type_lattice_has_parser_bound(type_lattice);
+        let ir_type_bound = bounds.ir_type_has_parser_bound(ir_type);
         // Wrapper types need HasDialectParser bounds
         let wrapper_types = collect_wrapper_types(ir_input);
         let wrapper_type_bounds = bounds.has_dialect_parser_bounds(&wrapper_types);
@@ -197,7 +195,7 @@ impl GenerateHasDialectParser {
                     predicates: syn::punctuated::Punctuated::new(),
                 },
             };
-            wc.predicates.push(type_lattice_bound);
+            wc.predicates.push(ir_type_bound);
             wc.predicates.extend(value_type_bounds);
             wc.predicates.extend(wrapper_type_bounds);
             wc
@@ -277,12 +275,12 @@ impl GenerateHasDialectParser {
 
     /// Builds the ASTSelf type reference for HasParser::Output.
     ///
-    /// Returns: `ASTNameSelf<'tokens, 'src, [original type params], TypeLatticeOutput>`
+    /// Returns: `ASTNameSelf<'tokens, 'src, [original type params], IrTypeOutput>`
     fn build_ast_self_type_reference(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_self_name: &syn::Ident,
-        type_lattice: &syn::Path,
+        ir_type: &syn::Path,
     ) -> TokenStream {
         let crate_path = &self.config.crate_path;
 
@@ -301,8 +299,7 @@ impl GenerateHasDialectParser {
             })
             .collect();
 
-        let type_output =
-            quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let type_output = quote! { <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output };
 
         // ASTSelf generics are <'tokens, 'src, [original type params], TypeOutput>
         if type_params.is_empty() {

@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn test_statement_pattern_named() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = L)]
+            #[kirin(type = L)]
             struct Example {
                 a: SSAValue,
                 b: SSAValue,

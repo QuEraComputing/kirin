@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::arena::{GetInfo, Id, Item};
 use crate::language::Dialect;
-use crate::{Lattice, Statement, identifier};
+use crate::signature::{Signature, SignatureCmp, SignatureSemantics};
+use crate::{Statement, identifier};
 
 use super::symbol::Symbol;
 
@@ -88,8 +89,7 @@ impl FunctionInfo {
 pub struct StagedFunctionInfo<L: Dialect> {
     pub(crate) id: StagedFunction,
     pub(crate) name: Option<Symbol>,
-    pub(crate) signature: Signature<L>,
-    pub(crate) return_type: L::TypeLattice,
+    pub(crate) signature: Signature<L::Type>,
     pub(crate) specializations: Vec<SpecializedFunctionInfo<L>>,
     /// Functions that call this staged function (used for inter-procedural analyses).
     /// note that the call statement must refer to the `StagedFunction` ID,
@@ -97,23 +97,41 @@ pub struct StagedFunctionInfo<L: Dialect> {
     /// `backedges` field of `SpecializedFunctionInfo`.
     /// thus the `backedges` field of `SpecializedFunctionInfo` is always a superset of this field.
     pub(crate) backedges: Vec<StagedFunction>,
+    /// Whether this staged function has been invalidated by a redefinition.
+    /// Invalidated staged functions are retained for backedge tracking but
+    /// should not be considered for new dispatch or compilation.
+    pub(crate) invalidated: bool,
 }
 
 impl<L: Dialect> StagedFunctionInfo<L> {
+    pub fn id(&self) -> StagedFunction {
+        self.id
+    }
+
     pub fn name(&self) -> Option<&Symbol> {
         self.name.as_ref()
     }
 
-    pub fn signature(&self) -> &Signature<L> {
+    pub fn signature(&self) -> &Signature<L::Type> {
         &self.signature
     }
 
-    pub fn return_type(&self) -> &L::TypeLattice {
-        &self.return_type
+    pub fn return_type(&self) -> &L::Type {
+        &self.signature.ret
     }
 
     pub fn backedges(&self) -> &Vec<StagedFunction> {
         &self.backedges
+    }
+
+    /// Returns whether this staged function has been invalidated by a redefinition.
+    pub fn is_invalidated(&self) -> bool {
+        self.invalidated
+    }
+
+    /// Mark this staged function as invalidated.
+    pub fn invalidate(&mut self) {
+        self.invalidated = true;
     }
 
     /// Get the specializations of this staged function.
@@ -130,36 +148,58 @@ impl<L: Dialect> StagedFunctionInfo<L> {
         self.specializations.push(spec);
     }
 
-    pub fn all_matching(&self, signature: &Signature<L>) -> Vec<&SpecializedFunctionInfo<L>> {
-        let specialized = self
+    /// Find all specializations applicable to the given call signature,
+    /// reduced to the most specific candidates using the provided semantics.
+    ///
+    /// Invalidated specializations are excluded from matching.
+    pub fn all_matching<S: SignatureSemantics<L::Type>>(
+        &self,
+        call: &Signature<L::Type>,
+    ) -> Vec<(&SpecializedFunctionInfo<L>, S::Env)> {
+        // Collect all applicable, non-invalidated specializations with their environments
+        let applicable: Vec<_> = self
             .specializations
             .iter()
-            .filter(|spec| {
-                spec.signature().partial_cmp(signature) == Some(std::cmp::Ordering::Less)
-            })
-            .collect::<Vec<_>>();
-        // reduce the specialized functions to the most specific ones
-        specialized
-            .clone()
+            .filter(|spec| !spec.is_invalidated())
+            .filter_map(|spec| S::applicable(call, spec.signature()).map(|env| (spec, env)))
+            .collect();
+
+        // Reduce to the most specific candidates: keep only those where
+        // no other applicable candidate is strictly more specific.
+        applicable
             .into_iter()
-            .filter(|spec| {
-                let sig = spec.signature();
-                !specialized.iter().any(|other| {
-                    other.signature().partial_cmp(&sig) == Some(std::cmp::Ordering::Less)
-                })
+            .filter(|(spec, env)| {
+                !self
+                    .specializations
+                    .iter()
+                    .filter(|other| !other.is_invalidated())
+                    .any(|other| {
+                        if std::ptr::eq(*spec, other) {
+                            return false;
+                        }
+                        if let Some(other_env) = S::applicable(call, other.signature()) {
+                            S::cmp_candidate(other.signature(), &other_env, spec.signature(), env)
+                                == SignatureCmp::More
+                        } else {
+                            false
+                        }
+                    })
             })
-            .collect::<Vec<_>>()
+            .collect()
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct SpecializedFunctionInfo<L: Dialect> {
     id: SpecializedFunction,
-    signature: Signature<L>,
-    return_type: L::TypeLattice,
+    signature: Signature<L::Type>,
     body: Statement,
     /// Functions that call this function (used for inter-procedural analyses).
     backedges: Vec<SpecializedFunction>,
+    /// Whether this specialization has been invalidated by a redefinition.
+    /// Invalidated specializations are retained for backedge tracking but
+    /// should not be matched during dispatch.
+    invalidated: bool,
 }
 
 #[bon::bon]
@@ -169,9 +209,7 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         /// The unique identifier for this specialized function.
         id: SpecializedFunction,
         /// The signature of this specialized function.
-        signature: Signature<L>,
-        /// The return type of this specialized function.
-        return_type: L::TypeLattice,
+        signature: Signature<L::Type>,
         /// The body of this specialized function.
         body: Statement,
         /// The functions that call this specialized function.
@@ -180,41 +218,10 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         Self {
             id,
             signature,
-            return_type,
             body,
             backedges: backedges.unwrap_or_default(),
+            invalidated: false,
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Signature<L: Dialect>(pub Vec<L::TypeLattice>);
-
-impl<L: Dialect> PartialEq for Signature<L> {
-    fn eq(&self, other: &Self) -> bool {
-        if self.0.len() != other.0.len() {
-            return false;
-        }
-        for (a, b) in self.0.iter().zip(other.0.iter()) {
-            if a != b {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-impl<L: Dialect> PartialOrd for Signature<L> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self.0.len() != other.0.len() {
-            return None;
-        }
-        for (a, b) in self.0.iter().zip(other.0.iter()) {
-            if !a.is_subseteq(b) {
-                return None;
-            }
-        }
-        Some(std::cmp::Ordering::Less)
     }
 }
 
@@ -237,6 +244,10 @@ impl<L: Dialect> From<SpecializedFunctionInfo<L>> for SpecializedFunction {
 }
 
 impl<L: Dialect> SpecializedFunctionInfo<L> {
+    pub fn id(&self) -> SpecializedFunction {
+        self.id
+    }
+
     pub fn body(&self) -> &Statement {
         &self.body
     }
@@ -245,56 +256,26 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         &mut self.body
     }
 
-    pub fn return_type(&self) -> &L::TypeLattice {
-        &self.return_type
+    pub fn return_type(&self) -> &L::Type {
+        &self.signature.ret
     }
 
-    pub fn signature(&self) -> &Signature<L> {
+    pub fn signature(&self) -> &Signature<L::Type> {
         &self.signature
     }
 
     pub fn backedges(&self) -> &Vec<SpecializedFunction> {
         &self.backedges
     }
-}
 
-impl<L: Dialect> Lattice for Signature<L> {
-    fn join(&self, other: &Self) -> Self {
-        if self.0.len() != other.0.len() {
-            panic!("Cannot join signatures of different lengths");
-        }
-        let types = self
-            .0
-            .iter()
-            .zip(other.0.iter())
-            .map(|(a, b)| a.join(b))
-            .collect();
-        Signature(types)
+    /// Returns whether this specialization has been invalidated by a redefinition.
+    pub fn is_invalidated(&self) -> bool {
+        self.invalidated
     }
 
-    fn meet(&self, other: &Self) -> Self {
-        if self.0.len() != other.0.len() {
-            panic!("Cannot meet signatures of different lengths");
-        }
-        let types = self
-            .0
-            .iter()
-            .zip(other.0.iter())
-            .map(|(a, b)| a.meet(b))
-            .collect();
-        Signature(types)
-    }
-
-    fn is_subseteq(&self, other: &Self) -> bool {
-        if self.0.len() != other.0.len() {
-            return false;
-        }
-        for (a, b) in self.0.iter().zip(other.0.iter()) {
-            if !a.is_subseteq(b) {
-                return false;
-            }
-        }
-        true
+    /// Mark this specialization as invalidated.
+    pub fn invalidate(&mut self) {
+        self.invalidated = true;
     }
 }
 

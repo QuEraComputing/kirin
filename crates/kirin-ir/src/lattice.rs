@@ -11,4 +11,4 @@ pub trait FiniteLattice: Lattice {
     fn top() -> Self;
 }
 
-pub trait TypeLattice: FiniteLattice + CompileTimeValue {}
+pub trait TypeLattice: FiniteLattice + CompileTimeValue + Default {}

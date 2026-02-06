@@ -7,7 +7,7 @@ pub use kirin_test_utils::UnitType;
 /// Name, signature, and return type live on StagedFunction/SpecializedFunction,
 /// not on the body statement. See `Context::specialize()` for design rationale.
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type_lattice = UnitType)]
+#[kirin(fn, type = UnitType)]
 #[chumsky(format = "{body}")]
 pub struct SimpleFunction {
     body: Region,

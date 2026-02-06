@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/builder/tests.rs
-expression: "case!\n{\n    #[kirin(fn, type_lattice = SomeLattice)] enum TestEnum\n    {\n        A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, B(#[kirin(into)] u64, #[kirin(type = u64_type)] ResultValue,),\n    }\n}"
+expression: "case!\n{\n    #[kirin(fn, type = SomeType)] enum TestEnum\n    {\n        A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, B(#[kirin(into)] u64, #[kirin(type = u64_type)] ResultValue,),\n    }\n}"
 ---
 impl TestEnum {
     pub fn op_a<Lang>(
@@ -9,14 +9,14 @@ impl TestEnum {
     ) -> test_enum_build_result::A
     where
         Lang: ::kirin::ir::Dialect + From<TestEnum>,
-        Lang::TypeLattice: From<SomeLattice>,
+        Lang::Type: From<SomeType>,
     {
         let a_statement_id = context.statement_arena().next_id();
         let value: u32 = value.into();
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(a_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(u32_type))
+            .ty(Lang::Type::from(u32_type))
             .new()
             .into();
         context
@@ -37,14 +37,14 @@ impl TestEnum {
     ) -> test_enum_build_result::B
     where
         Lang: ::kirin::ir::Dialect + From<TestEnum>,
-        Lang::TypeLattice: From<SomeLattice>,
+        Lang::Type: From<SomeType>,
     {
         let b_statement_id = context.statement_arena().next_id();
         let field_0: u64 = field_0.into();
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(b_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(u64_type))
+            .ty(Lang::Type::from(u64_type))
             .new()
             .into();
         context

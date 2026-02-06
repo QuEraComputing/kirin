@@ -50,7 +50,7 @@ macro_rules! case {
 #[test]
 fn test_struct_regular() {
     insta::assert_snapshot!(case! {
-        #[kirin(constant, type_lattice = Lattice)]
+        #[kirin(constant, type = TestType)]
         struct MyStruct {
             a: i32,
             b: i32,
@@ -61,7 +61,7 @@ fn test_struct_regular() {
 #[test]
 fn test_struct_wrapper() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = Lattice)]
+        #[kirin(type = TestType)]
         struct Wrapper<T> {
             #[wraps]
             inner: InnerStruct<T>,
@@ -72,7 +72,7 @@ fn test_struct_wrapper() {
 #[test]
 fn test_enum_regular() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = Lattice)]
+        #[kirin(type = TestType)]
         enum MyEnum<T> {
             VariantA { a: i32, b: T },
             #[kirin(constant)]
@@ -84,7 +84,7 @@ fn test_enum_regular() {
 #[test]
 fn test_enum_wrapper() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = Lattice, constant)]
+        #[kirin(type = TestType, constant)]
         #[wraps]
         enum MyEnum<T> {
             VariantA { inner: InnerStructA<T> },
@@ -96,7 +96,7 @@ fn test_enum_wrapper() {
 #[test]
 fn test_enum_wrapper_uses_crate_trait_path() {
     let generated = case! {
-        #[kirin(type_lattice = Lattice, constant)]
+        #[kirin(type = TestType, constant)]
         #[wraps]
         enum MyEnum<T> {
             VariantA { inner: InnerStructA<T> },
@@ -113,7 +113,7 @@ fn test_enum_wrapper_uses_crate_trait_path() {
 #[test]
 fn test_enum_mixed() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = Lattice)]
+        #[kirin(type = TestType)]
         enum MyEnum<T> {
             VariantA { #[wraps] inner: InnerStructA<T> },
             #[wraps]

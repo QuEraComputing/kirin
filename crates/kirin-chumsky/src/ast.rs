@@ -4,7 +4,7 @@
 //! converted to the IR representation.
 
 use chumsky::span::SimpleSpan;
-use kirin_ir::{Dialect, FiniteLattice, GetInfo, SSAKind};
+use kirin_ir::{Dialect, GetInfo, SSAKind};
 use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
 use crate::traits::{EmitContext, EmitIR};
@@ -52,7 +52,7 @@ impl<T> Spanned<T> {
 /// - `%value: type` (with type)
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SSAValue<'src, TypeOutput> {
     /// The name of the SSA value (without the `%` prefix).
@@ -66,7 +66,7 @@ pub struct SSAValue<'src, TypeOutput> {
 /// Represents syntax like: `%result` in `%result = add %a, %b`
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResultValue<'src, TypeOutput> {
     /// The name of the result value (without the `%` prefix).
@@ -81,7 +81,7 @@ pub struct ResultValue<'src, TypeOutput> {
 /// for example in `add %a, %b -> bool` where `bool` is the result type.
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeofSSAValue<TypeOutput> {
     /// The type value.
@@ -127,7 +127,7 @@ pub struct BlockLabel<'src> {
 /// Represents syntax like: `%arg: i32`
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockArgument<'src, TypeOutput> {
     /// The name of the argument (without the `%` prefix).
@@ -141,7 +141,7 @@ pub struct BlockArgument<'src, TypeOutput> {
 /// Represents syntax like: `^bb0(%arg0: i32, %arg1: f64)`
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::TypeLattice as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockHeader<'src, TypeOutput> {
     /// The block label.
@@ -233,22 +233,18 @@ where
 /// Note: The result index is set to 0 here. For statements with multiple results,
 /// the generated code should handle setting the correct indices.
 ///
-/// The `TypeOutput: EmitIR<IR, Output = IR::TypeLattice>` bound allows proper type
+/// The `TypeOutput: EmitIR<IR, Output = IR::Type>` bound allows proper type
 /// conversion from the parsed type AST to the IR's type lattice via the EmitIR trait.
 impl<'src, TypeOutput, IR> EmitIR<IR> for ResultValue<'src, TypeOutput>
 where
     IR: Dialect,
-    TypeOutput: EmitIR<IR, Output = IR::TypeLattice>,
+    TypeOutput: EmitIR<IR, Output = IR::Type>,
 {
     type Output = kirin_ir::ResultValue;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
-        // Convert the parsed type to TypeLattice via EmitIR, or use top() if no type annotation
-        let ty: IR::TypeLattice = self
-            .ty
-            .as_ref()
-            .map(|t| t.emit(ctx))
-            .unwrap_or_else(<IR::TypeLattice as FiniteLattice>::top);
+        // Convert the parsed type to Dialect::Type via EmitIR, or use default if no type annotation
+        let ty: IR::Type = self.ty.as_ref().map(|t| t.emit(ctx)).unwrap_or_default();
 
         // Create a new SSA value with the parsed name and type
         let ssa = ctx
@@ -307,7 +303,7 @@ where
 impl<'src> PrettyPrint for SymbolName<'src> {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         doc.text(format!("@{}", self.name))
     }
@@ -318,19 +314,19 @@ impl<'src> PrettyPrint for SymbolName<'src> {
 /// This builds an IR block with the parsed label, arguments, and statements.
 /// Block arguments are created with their parsed names and types.
 ///
-/// The `TypeOutput: EmitIR<IR, Output = IR::TypeLattice>` bound allows proper type
+/// The `TypeOutput: EmitIR<IR, Output = IR::Type>` bound allows proper type
 /// conversion from the parsed type AST to the IR's type lattice via the EmitIR trait.
 impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for Block<'src, TypeOutput, StmtOutput>
 where
     IR: Dialect,
-    TypeOutput: EmitIR<IR, Output = IR::TypeLattice>,
+    TypeOutput: EmitIR<IR, Output = IR::Type>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
     type Output = kirin_ir::Block;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
         // Collect argument info for registration
-        // Convert TypeOutput to TypeLattice using EmitIR
+        // Convert TypeOutput to Dialect::Type using EmitIR
         let arg_info: Vec<_> = self
             .header
             .value
@@ -339,7 +335,7 @@ where
             .enumerate()
             .map(|(idx, arg)| {
                 let name = arg.value.name.value.to_string();
-                let ty: IR::TypeLattice = arg.value.ty.value.emit(ctx);
+                let ty: IR::Type = arg.value.ty.value.emit(ctx);
                 (name, ty, idx)
             })
             .collect();
@@ -402,12 +398,12 @@ where
 ///
 /// This builds an IR region containing all the parsed blocks.
 ///
-/// The `TypeOutput: EmitIR<IR, Output = IR::TypeLattice>` bound allows proper type
+/// The `TypeOutput: EmitIR<IR, Output = IR::Type>` bound allows proper type
 /// conversion for block arguments within the region via the EmitIR trait.
 impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for Region<'src, TypeOutput, StmtOutput>
 where
     IR: Dialect,
-    TypeOutput: EmitIR<IR, Output = IR::TypeLattice>,
+    TypeOutput: EmitIR<IR, Output = IR::Type>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
     type Output = kirin_ir::Region;

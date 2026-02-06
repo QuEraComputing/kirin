@@ -5,7 +5,7 @@ use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 use kirin_test_utils::SimpleType;
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = SimpleType)]
+#[kirin(type = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum TestLang {
     #[chumsky(format = "{res:name} = add {lhs} {rhs} -> {res:type}")]

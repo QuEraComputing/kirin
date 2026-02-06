@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-core/src/ir/mod.rs
-assertion_line: 106
 expression: ast
 ---
 Input {
@@ -27,7 +26,7 @@ Input {
                 ],
             },
         ),
-        type_lattice: Path {
+        ir_type: Path {
             leading_colon: None,
             segments: [
                 PathSegment {

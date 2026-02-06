@@ -1,7 +1,7 @@
 use kirin::prelude::*;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum SimpleTypeLattice {
+pub enum SimpleIRType {
     Any,
     Int,
     Float,
@@ -9,9 +9,9 @@ pub enum SimpleTypeLattice {
     Bottom,
 }
 
-pub use SimpleTypeLattice::*;
+pub use SimpleIRType::*;
 
-impl Lattice for SimpleTypeLattice {
+impl Lattice for SimpleIRType {
     fn is_subseteq(&self, other: &Self) -> bool {
         matches!((self, other), (a, b) if a == b)
     }
@@ -22,7 +22,7 @@ impl Lattice for SimpleTypeLattice {
         } else if other.is_subseteq(self) {
             self.clone()
         } else {
-            SimpleTypeLattice::Any
+            SimpleIRType::Any
         }
     }
 
@@ -32,59 +32,65 @@ impl Lattice for SimpleTypeLattice {
         } else if other.is_subseteq(self) {
             other.clone()
         } else {
-            SimpleTypeLattice::Bottom
+            SimpleIRType::Bottom
         }
     }
 }
 
-impl FiniteLattice for SimpleTypeLattice {
+impl FiniteLattice for SimpleIRType {
     fn bottom() -> Self {
-        SimpleTypeLattice::Bottom
+        SimpleIRType::Bottom
     }
 
     fn top() -> Self {
-        SimpleTypeLattice::Any
+        SimpleIRType::Any
     }
 }
 
-impl crate::TypeLattice for SimpleTypeLattice {}
+impl Default for SimpleIRType {
+    fn default() -> Self {
+        SimpleIRType::Any
+    }
+}
 
-impl DirectlyParsable for SimpleTypeLattice {}
+impl crate::TypeLattice for SimpleIRType {}
 
-impl std::fmt::Display for SimpleTypeLattice {
+impl DirectlyParsable for SimpleIRType {}
+
+impl std::fmt::Display for SimpleIRType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SimpleTypeLattice::Any => write!(f, "any"),
-            SimpleTypeLattice::Int => write!(f, "int"),
-            SimpleTypeLattice::Float => write!(f, "float"),
-            SimpleTypeLattice::DataType => write!(f, "datatype"),
-            SimpleTypeLattice::Bottom => write!(f, "bottom"),
+            SimpleIRType::Any => write!(f, "any"),
+            SimpleIRType::Int => write!(f, "int"),
+            SimpleIRType::Float => write!(f, "float"),
+            SimpleIRType::DataType => write!(f, "datatype"),
+            SimpleIRType::Bottom => write!(f, "bottom"),
         }
     }
 }
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleTypeLattice {
-    type Output = SimpleTypeLattice;
+impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleIRType {
+    type Output = SimpleIRType;
 
     fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
     where
         I: TokenInput<'tokens, 'src>,
     {
         select! {
-            Token::Identifier("any") => SimpleTypeLattice::Any,
-            Token::Identifier("int") => SimpleTypeLattice::Int,
-            Token::Identifier("float") => SimpleTypeLattice::Float,
-            Token::Identifier("datatype") => SimpleTypeLattice::DataType,
-            Token::Identifier("bottom") => SimpleTypeLattice::Bottom,
+            Token::Identifier("any") => SimpleIRType::Any,
+            Token::Identifier("int") => SimpleIRType::Int,
+            Token::Identifier("float") => SimpleIRType::Float,
+            Token::Identifier("datatype") => SimpleIRType::DataType,
+            Token::Identifier("bottom") => SimpleIRType::Bottom,
         }
         .labelled("type")
         .boxed()
     }
 }
 
-impl Typeof<SimpleTypeLattice> for i64 {
-    fn type_of(&self) -> SimpleTypeLattice {
-        SimpleTypeLattice::Int
+impl Typeof<SimpleIRType> for i64 {
+    fn type_of(&self) -> SimpleIRType {
+        SimpleIRType::Int
     }
 }
 
@@ -108,11 +114,11 @@ impl std::hash::Hash for Value {
     }
 }
 
-impl Typeof<SimpleTypeLattice> for Value {
-    fn type_of(&self) -> SimpleTypeLattice {
+impl Typeof<SimpleIRType> for Value {
+    fn type_of(&self) -> SimpleIRType {
         match self {
-            Value::I64(_) => SimpleTypeLattice::Int,
-            Value::F64(_) => SimpleTypeLattice::Float,
+            Value::I64(_) => SimpleIRType::Int,
+            Value::F64(_) => SimpleIRType::Float,
         }
     }
 }
@@ -167,7 +173,7 @@ impl kirin::pretty::PrettyPrint for Value {
         doc: &'a Document<'a, L>,
     ) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         doc.text(self.to_string())
     }
@@ -182,7 +188,7 @@ impl PrettyPrintName for Value {
 impl PrettyPrintType for Value {
     fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         // Value doesn't have a separate type - use empty or the type of the value
         match self {
@@ -194,21 +200,21 @@ impl PrettyPrintType for Value {
 
 // A simpler dialect without Region fields for testing parse/print roundtrip
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = SimpleTypeLattice, fn)]
+#[kirin(type = SimpleIRType, fn)]
 #[chumsky(crate = kirin::parsers)]
 pub enum SimpleLang {
     #[chumsky(format = "{res:name} = add {lhs}, {rhs} -> {res:type}")]
     Add {
         lhs: SSAValue,
         rhs: SSAValue,
-        #[kirin(type = SimpleTypeLattice::Float)]
+        #[kirin(type = SimpleIRType::Float)]
         res: ResultValue,
     },
     #[chumsky(format = "{res:name} = constant {value} -> {res:type}")]
     Constant {
         #[kirin(into)]
         value: Value,
-        #[kirin(type = SimpleTypeLattice::Float)]
+        #[kirin(type = SimpleIRType::Float)]
         res: ResultValue,
     },
     #[kirin(terminator)]
@@ -217,7 +223,7 @@ pub enum SimpleLang {
     #[chumsky(format = "{1:name} = function {0}")]
     Function {
         region: Region,
-        #[kirin(type = SimpleTypeLattice::Float)]
+        #[kirin(type = SimpleIRType::Float)]
         res: ResultValue,
     },
 }
@@ -228,9 +234,13 @@ fn test_block() {
     let staged_function = context
         .staged_function()
         .name("foo")
-        .params_type(&[Int])
-        .return_type(Int)
-        .new();
+        .signature(kirin_ir::Signature {
+            params: vec![Int],
+            ret: Int,
+            constraints: (),
+        })
+        .new()
+        .unwrap();
 
     let a = SimpleLang::op_constant(&mut context, 1.2);
     let b = SimpleLang::op_constant(&mut context, 3.4);
@@ -255,7 +265,12 @@ fn test_block() {
 
     let body = context.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLang::op_function(&mut context, body);
-    let f = context.specialize().f(staged_function).body(fdef).new();
+    let f = context
+        .specialize()
+        .f(staged_function)
+        .body(fdef)
+        .new()
+        .unwrap();
 
     // Pretty print the function using the Document method
     let doc = Document::new(Default::default(), &context);
@@ -316,7 +331,7 @@ fn test_roundtrip_add() {
         let res_info = res_ssa.get_info(&context).expect("result SSA should exist");
         assert_eq!(
             res_info.ty(),
-            &SimpleTypeLattice::Float,
+            &SimpleIRType::Float,
             "Result type should be Float"
         );
     }
@@ -357,7 +372,7 @@ fn test_roundtrip_constant() {
         let res_info = res_ssa.get_info(&context).expect("result SSA should exist");
         assert_eq!(
             res_info.ty(),
-            &SimpleTypeLattice::Float,
+            &SimpleIRType::Float,
             "Result type should be Float"
         );
     }

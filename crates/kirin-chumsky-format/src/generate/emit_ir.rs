@@ -193,7 +193,7 @@ impl GenerateEmitIR {
             }
         };
 
-        let type_lattice = &self.config.type_lattice;
+        let ir_type = &self.config.ir_type;
         let ir_path = &self.config.ir_path;
 
         // Use BoundsBuilder to generate EmitIR bounds
@@ -231,34 +231,34 @@ impl GenerateEmitIR {
         // IR type parameter for the EmitIR impl
         // We need:
         // - `From<OriginalType>` to convert the AST to IR statements
-        // - <type_lattice as HasParser>::Output must implement EmitIR to convert parsed type annotations
-        //   to TypeLattice (this is the actual type in the AST fields)
-        // - type_lattice: HasParser + 'tokens bound
+        // - <ir_type as HasParser>::Output must implement EmitIR to convert parsed type annotations
+        //   to Dialect::Type (this is the actual type in the AST fields)
+        // - ir_type: HasParser + 'tokens bound
         // - TypeOutput: Clone + PartialEq (from AST bounds, used in PhantomData)
         // - LanguageOutput: Clone + PartialEq + 'tokens + EmitIR<Language> (for Block/Region recursion)
         // - For Value field types with type parameters: HasParser + EmitIR bounds
         // - For wrapper variants: Language: From<WrappedType> and inner AST: EmitIR<Language>
         //
-        // If type_lattice is a type parameter (e.g., `T`), we also need to add an explicit
-        // `Language: Dialect<TypeLattice = T>` bound. This ensures consistency between:
-        // - `<T as HasParser>::Output: EmitIR<Language, Output = Language::TypeLattice>`
+        // If ir_type is a type parameter (e.g., `T`), we also need to add an explicit
+        // `Language: Dialect<Type = T>` bound. This ensures consistency between:
+        // - `<T as HasParser>::Output: EmitIR<Language, Output = Language::Type>`
         // - `<T as HasParser>::Output: EmitIR<Language, Output = T>` (from value type bounds)
-        // Without this, the compiler can't prove that `Language::TypeLattice == T`.
-        let type_lattice_is_param = is_type_lattice_a_type_param(type_lattice, &ir_input.generics);
-        let dialect_type_lattice_bound = if type_lattice_is_param {
-            quote! { Language: #ir_path::Dialect<TypeLattice = #type_lattice>, }
+        // Without this, the compiler can't prove that `Language::Type == T`.
+        let ir_type_is_param = is_ir_type_a_type_param(ir_type, &ir_input.generics);
+        let dialect_type_bound = if ir_type_is_param {
+            quote! { Language: #ir_path::Dialect<Type = #ir_type>, }
         } else {
             quote! {}
         };
         let base_bounds = quote! {
             Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
-            #dialect_type_lattice_bound
+            #dialect_type_bound
             TypeOutput: Clone + PartialEq,
             LanguageOutput: Clone + PartialEq + 'tokens,
             LanguageOutput: #crate_path::EmitIR<Language, Output = #ir_path::Statement>,
-            #type_lattice: #crate_path::HasParser<'tokens, 'src> + 'tokens,
-            <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output:
-                #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::TypeLattice>,
+            #ir_type: #crate_path::HasParser<'tokens, 'src> + 'tokens,
+            <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output:
+                #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::Type>,
         };
 
         let mut all_bounds = vec![base_bounds];
@@ -300,7 +300,7 @@ impl GenerateEmitIR {
     ) -> TokenStream {
         let original_name = &ir_input.name;
         let ir_path = &self.config.ir_path;
-        let type_lattice = &self.config.type_lattice;
+        let ir_type = &self.config.ir_type;
         let (_, original_ty_generics, _) = ir_input.generics.split_for_impl();
 
         // Extract original type parameters
@@ -381,22 +381,22 @@ impl GenerateEmitIR {
         // that would create a recursive bound (ASTSelf contains AST which contains ASTSelf...).
         // Instead, we rely on the wrapper_emit_bounds which use coinduction.
         //
-        // If type_lattice is a type parameter, add explicit Language::TypeLattice bound
+        // If ir_type is a type parameter, add explicit Language::Type bound
         // (same reasoning as in generate_emit_impl).
-        let type_lattice_is_param = is_type_lattice_a_type_param(type_lattice, &ir_input.generics);
-        let dialect_type_lattice_bound = if type_lattice_is_param {
-            quote! { Language: #ir_path::Dialect<TypeLattice = #type_lattice>, }
+        let ir_type_is_param = is_ir_type_a_type_param(ir_type, &ir_input.generics);
+        let dialect_type_bound = if ir_type_is_param {
+            quote! { Language: #ir_path::Dialect<Type = #ir_type>, }
         } else {
             quote! {}
         };
         let base_bounds = quote! {
             Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
-            #dialect_type_lattice_bound
+            #dialect_type_bound
             TypeOutput: Clone + PartialEq,
             'src: 'tokens,
-            #type_lattice: #crate_path::HasParser<'tokens, 'src> + 'tokens,
-            <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output:
-                #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::TypeLattice>,
+            #ir_type: #crate_path::HasParser<'tokens, 'src> + 'tokens,
+            <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output:
+                #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::Type>,
         };
 
         let mut all_bounds = vec![base_bounds];
@@ -815,20 +815,18 @@ impl GenerateEmitIR {
     }
 }
 
-/// Checks if the `type_lattice` path is a type parameter of the struct.
+/// Checks if the `ir_type` path is a type parameter of the struct.
 ///
-/// Returns true if `type_lattice` is a single-segment path that matches
+/// Returns true if `ir_type` is a single-segment path that matches
 /// one of the generic type parameters (e.g., `T` when the struct is `Foo<T>`).
-fn is_type_lattice_a_type_param(type_lattice: &syn::Path, generics: &syn::Generics) -> bool {
+fn is_ir_type_a_type_param(ir_type: &syn::Path, generics: &syn::Generics) -> bool {
     // Type parameter must be a single segment path (e.g., `T`, not `foo::T`)
-    if type_lattice.segments.len() != 1 {
+    if ir_type.segments.len() != 1 {
         return false;
     }
 
-    let type_lattice_name = &type_lattice.segments[0].ident;
+    let ir_type_name = &ir_type.segments[0].ident;
 
     // Check if this matches any of the struct's type parameters
-    generics
-        .type_params()
-        .any(|tp| &tp.ident == type_lattice_name)
+    generics.type_params().any(|tp| &tp.ident == ir_type_name)
 }

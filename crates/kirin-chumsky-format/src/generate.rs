@@ -36,8 +36,8 @@ pub(crate) struct GeneratorConfig {
     pub crate_path: syn::Path,
     /// Path to the kirin IR crate (e.g., `::kirin::ir`)
     pub ir_path: syn::Path,
-    /// The type lattice path (e.g., `SimpleType`)
-    pub type_lattice: syn::Path,
+    /// The IR type path (e.g., `SimpleType`)
+    pub ir_type: syn::Path,
 }
 
 impl GeneratorConfig {
@@ -54,11 +54,11 @@ impl GeneratorConfig {
             .crate_path
             .clone()
             .unwrap_or_else(|| syn::parse_quote!(::kirin::ir));
-        let type_lattice = ir_input.attrs.type_lattice.clone();
+        let ir_type = ir_input.attrs.ir_type.clone();
         Self {
             crate_path,
             ir_path,
-            type_lattice,
+            ir_type,
         }
     }
 }

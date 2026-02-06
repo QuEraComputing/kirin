@@ -62,7 +62,7 @@ macro_rules! case {
 #[test]
 fn test_enum_either() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = SomeLattice)]
+        #[kirin(type = SomeType)]
         enum TestEnum<T> {
             VariantA { #[wraps] wrapped: InnerStructA<T> },
             #[wraps]
@@ -77,7 +77,7 @@ fn test_enum_either() {
 fn test_enum_global_wrapper() {
     insta::assert_snapshot!(case! {
         #[wraps]
-        #[kirin(type_lattice = AnotherLattice)]
+        #[kirin(type = AnotherType)]
         enum TestEnum<T> {
             VariantA { wrapped: InnerStructA<T> },
             VariantB(InnerStructB),
@@ -88,7 +88,7 @@ fn test_enum_global_wrapper() {
 #[test]
 fn test_enum_regular() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = RegularLattice)]
+        #[kirin(type = RegularType)]
         enum TestEnum<T> {
             VariantA { a: SSAValue, b: T, c: SSAValue },
             VariantB(SSAValue, f64, SSAValue),
@@ -99,7 +99,7 @@ fn test_enum_regular() {
 #[test]
 fn test_enum_arith() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = ArithLattice)]
+        #[kirin(type = ArithType)]
         pub enum ArithInstruction<T> {
             Add(SSAValue, Vec<SSAValue>, ResultValue, T),
             Sub(SSAValue, Vec<SSAValue>, ResultValue, T),
@@ -112,7 +112,7 @@ fn test_enum_arith() {
 #[test]
 fn test_enum_named() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = CFlowLattice)]
+        #[kirin(type = CFlowType)]
         pub enum ControlFlowInstruction {
             Branch {
                 target: Block,
@@ -131,7 +131,7 @@ fn test_enum_named() {
 fn test_enum_wraps() {
     insta::assert_snapshot!(case! {
         #[wraps]
-        #[kirin(fn, type_lattice = T)]
+        #[kirin(fn, type = T)]
         pub enum StructuredControlFlow<T: TypeLattice> {
             If(If<T>),
             For(For<T>),
@@ -142,7 +142,7 @@ fn test_enum_wraps() {
 #[test]
 fn test_struct_regular() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = T)]
+        #[kirin(type = T)]
         struct TestStruct<T> {
             a: SSAValue,
             b: f64,
@@ -154,7 +154,7 @@ fn test_struct_regular() {
 #[test]
 fn test_struct_vec() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = T)]
+        #[kirin(type = T)]
         struct TestStruct<T> {
             a: SSAValue,
             b: SSAValue,
@@ -168,7 +168,7 @@ fn test_struct_vec() {
 fn test_struct_named_wrapper() {
     insta::assert_snapshot!(case! {
         #[wraps]
-        #[kirin(fn, type_lattice = T)]
+        #[kirin(fn, type = T)]
         struct NamedWrapper<T> {
             wrapped: InnerStruct<T>,
         }
@@ -179,7 +179,7 @@ fn test_struct_named_wrapper() {
 fn test_struct_wrapper_iter_uses_lifetime() {
     let generated = case! {
         #[wraps]
-        #[kirin(fn, type_lattice = T)]
+        #[kirin(fn, type = T)]
         struct NamedWrapper<T> {
             wrapped: InnerStruct<T>,
         }
@@ -194,7 +194,7 @@ fn test_struct_wrapper_iter_uses_lifetime() {
 #[test]
 fn test_struct_unnamed_wrapper() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = T)]
+        #[kirin(type = T)]
         struct TestStruct<T>(SSAValue, #[wraps] T, SSAValue, String, f64);
     })
 }
@@ -202,7 +202,7 @@ fn test_struct_unnamed_wrapper() {
 #[test]
 fn test_struct_unnamed_regular() {
     insta::assert_snapshot!(case! {
-        #[kirin(type_lattice = T)]
+        #[kirin(type = T)]
         struct TestStruct<T>(SSAValue, T, SSAValue, String, f64);
     })
 }
@@ -210,22 +210,22 @@ fn test_struct_unnamed_regular() {
 #[test]
 fn test_simple() {
     insta::assert_snapshot!(case! {
-        #[kirin(fn, type_lattice = SimpleTypeLattice, crate = kirin_ir)]
+        #[kirin(fn, type = SimpleIRType, crate = kirin_ir)]
         pub enum SimpleLanguage {
             Add(
                 SSAValue,
                 SSAValue,
-                #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+                #[kirin(type = SimpleIRType::Float)] ResultValue,
             ),
             Constant(
                 #[kirin(into)] Value,
-                #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+                #[kirin(type = SimpleIRType::Float)] ResultValue,
             ),
             #[kirin(terminator)]
             Return(SSAValue),
             Function(
                 Region,
-                #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+                #[kirin(type = SimpleIRType::Float)] ResultValue,
             ),
         }
     });

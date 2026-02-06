@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn test_field_count() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 arg: SSAValue,
@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn test_field_count_empty() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct EmptyStmt {}
         });
 
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn test_iter_all_fields_categories() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 arg: SSAValue,
@@ -380,7 +380,7 @@ mod tests {
     #[test]
     fn test_category_iterators() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 arg1: SSAValue,
@@ -402,7 +402,7 @@ mod tests {
     fn test_collect_fields_declaration_order() {
         // Fields declared in non-category order
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 res: ResultValue,      // index 0, Result
@@ -430,7 +430,7 @@ mod tests {
     #[test]
     fn test_named_field_idents_declaration_order() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 res: ResultValue,      // index 0
@@ -452,7 +452,7 @@ mod tests {
     #[test]
     fn test_is_tuple_style_named() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct NamedStmt {
                 #[kirin(type = "T")]
                 arg: SSAValue,
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn test_is_tuple_style_tuple() {
         let stmt = parse_variant(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             enum MyEnum {
                 TupleVariant(#[kirin(type = "T")] SSAValue, String),
             }
@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn test_field_name_to_index() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 first: SSAValue,       // index 0
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn test_wrapper_detection() {
         let stmt = parse_variant(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             enum MyEnum {
                 #[wraps]
                 WrapperVariant(InnerType),
@@ -512,7 +512,7 @@ mod tests {
     #[test]
     fn test_wrapper_with_extra_fields() {
         let stmt = parse_variant(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             enum MyEnum {
                 MultiField(#[wraps] InnerType, String),
             }
@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn test_field_data_argument() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "CustomType")]
                 arg: SSAValue,
@@ -553,7 +553,7 @@ mod tests {
     #[test]
     fn test_field_data_value_with_default() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(default)]
                 value: String,
@@ -574,7 +574,7 @@ mod tests {
     #[test]
     fn test_field_data_value_with_into() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(into)]
                 value: String,
@@ -595,7 +595,7 @@ mod tests {
     #[test]
     fn test_collection_types() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 single: SSAValue,
@@ -617,7 +617,7 @@ mod tests {
     #[test]
     fn test_field_bindings_named() {
         let stmt = parse_statement(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             struct MyStmt {
                 #[kirin(type = "T")]
                 first: SSAValue,
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn test_field_bindings_tuple() {
         let stmt = parse_variant(quote::quote! {
-            #[kirin(type_lattice = MyLattice)]
+            #[kirin(type = MyLattice)]
             enum MyEnum {
                 Tuple(#[kirin(type = "T")] SSAValue, String),
             }

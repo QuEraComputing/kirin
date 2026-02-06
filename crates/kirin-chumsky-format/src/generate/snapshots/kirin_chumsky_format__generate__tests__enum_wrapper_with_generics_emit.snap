@@ -7,15 +7,13 @@ impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput, Languag
     for WrapperWithGenericsAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<WrapperWithGenerics<T>>,
-    Language: ::kirin::ir::Dialect<TypeLattice = T>,
+    Language: ::kirin::ir::Dialect<Type = T>,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 'tokens,
     LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
-        Language,
-        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
-    >,
+    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
     Language: ::core::convert::From<GenericInner<T>>,
     <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
         TypeOutput,
@@ -35,14 +33,12 @@ impl<'tokens, 'src, T: TypeLattice, TypeOutput, Language> ::kirin::parsers::Emit
     for WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
 where
     Language: ::kirin::ir::Dialect + From<WrapperWithGenerics<T>>,
-    Language: ::kirin::ir::Dialect<TypeLattice = T>,
+    Language: ::kirin::ir::Dialect<Type = T>,
     TypeOutput: Clone + PartialEq,
     'src: 'tokens,
     T: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
-        Language,
-        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
-    >,
+    <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
     Language: ::core::convert::From<GenericInner<T>>,
     <GenericInner<T> as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
         TypeOutput,

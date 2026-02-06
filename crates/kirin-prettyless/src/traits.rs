@@ -13,9 +13,9 @@ use crate::{ArenaDoc, Config, Document, ScanResultWidth};
 /// The method is generic over the dialect type `L`, allowing the same implementation
 /// to work with any `Document<L>`.
 ///
-/// The bounds on `L` (`PrettyPrint` and `TypeLattice: Display`) are required because:
+/// The bounds on `L` (`PrettyPrint` and `Type: Display`) are required because:
 /// - `L: PrettyPrint` is needed to print nested Block/Region structures
-/// - `TypeLattice: Display` is needed to print type annotations (`:type` format)
+/// - `Type: Display` is needed to print type annotations (`:type` format)
 ///
 /// For IR nodes that require context (like `Statement`, `Block`, `Region`), use
 /// the convenience methods provided on `Document` instead.
@@ -29,7 +29,7 @@ use crate::{ArenaDoc, Config, Document, ScanResultWidth};
 ///         doc: &'a Document<'a, L>,
 ///     ) -> ArenaDoc<'a>
 ///     where
-///         L::TypeLattice: std::fmt::Display,
+///         L::Type: std::fmt::Display,
 ///     {
 ///         doc.text(format!("MyType({})", self.value))
 ///     }
@@ -38,7 +38,7 @@ use crate::{ArenaDoc, Config, Document, ScanResultWidth};
 pub trait PrettyPrint {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display;
+        L::Type: std::fmt::Display;
 }
 
 /// Extension trait providing convenience methods for pretty printing IR nodes.
@@ -61,7 +61,7 @@ pub trait PrettyPrint {
 /// ```
 pub trait PrettyPrintExt<L: Dialect + PrettyPrint>: PrettyPrint + ScanResultWidth<L>
 where
-    L::TypeLattice: std::fmt::Display,
+    L::Type: std::fmt::Display,
 {
     /// Render to string with custom config.
     fn sprint_with_config(&self, config: Config, context: &Context<L>) -> String;
@@ -94,7 +94,7 @@ where
 // automatically gets the context-aware convenience methods.
 impl<L: Dialect + PrettyPrint, T: PrettyPrint + ScanResultWidth<L>> PrettyPrintExt<L> for T
 where
-    L::TypeLattice: std::fmt::Display,
+    L::Type: std::fmt::Display,
 {
     fn sprint_with_config(&self, config: Config, context: &Context<L>) -> String {
         let mut doc = Document::new(config, context);
@@ -160,7 +160,7 @@ pub trait PrettyPrintType {
         doc: &'a Document<'a, L>,
     ) -> DocBuilder<'a, prettyless::Arena<'a>>
     where
-        L::TypeLattice: std::fmt::Display;
+        L::Type: std::fmt::Display;
 }
 
 // Blanket impls for references - allows calling on &T when the impl is on T
@@ -179,7 +179,7 @@ impl<T: PrettyPrintType> PrettyPrintType for &T {
         doc: &'a Document<'a, L>,
     ) -> DocBuilder<'a, prettyless::Arena<'a>>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         (*self).pretty_print_type(doc)
     }
@@ -188,7 +188,7 @@ impl<T: PrettyPrintType> PrettyPrintType for &T {
 impl<T: PrettyPrint> PrettyPrint for &T {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         (*self).pretty_print(doc)
     }

@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn test_statement_pattern_unnamed() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = L)]
+            #[kirin(type = L)]
             struct Example(SSAValue, ResultValue);
         };
         let input = ir::Input::<StandardLayout>::from_derive_input(&input).unwrap();

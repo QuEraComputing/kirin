@@ -76,7 +76,7 @@ impl FieldKind {
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
     /// The `_ast_name` is unused but kept for API compatibility.
-    /// The `type_lattice` is used to construct the concrete type for SSA/Result fields.
+    /// The `ir_type` is used to construct the concrete type for SSA/Result fields.
     /// The `_type_params` are unused but kept for API compatibility.
     ///
     /// Field types use `<TypeLattice as HasParser>::Output` to match what the parser produces.
@@ -86,13 +86,12 @@ impl FieldKind {
         &self,
         crate_path: &syn::Path,
         _ast_name: &syn::Ident,
-        type_lattice: &syn::Path,
+        ir_type: &syn::Path,
         _type_params: &[TokenStream],
     ) -> TokenStream {
         // Use the concrete type that parsers produce for SSA/Result/Value fields.
         // For Block/Region, use LanguageOutput directly.
-        let type_output =
-            quote! { <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let type_output = quote! { <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output };
         match self {
             FieldKind::SSAValue => {
                 quote! { #crate_path::SSAValue<'src, #type_output> }
@@ -129,14 +128,14 @@ impl FieldKind {
     ///
     /// The `crate_path` should be the path to the kirin_chumsky crate.
     /// The `_ast_name` is unused but kept for API compatibility.
-    /// The `type_lattice` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
+    /// The `ir_type` should be the concrete type lattice (e.g., `SimpleType`) used for type annotations.
     /// The `_type_params` are unused but kept for API compatibility.
     pub fn parser_expr(
         &self,
         crate_path: &syn::Path,
         opt: &FormatOption,
         _ast_name: &syn::Ident,
-        type_lattice: &syn::Path,
+        ir_type: &syn::Path,
         _type_params: &[TokenStream],
     ) -> TokenStream {
         // With the new design, Block/Region parsers use __LanguageOutput directly.
@@ -147,26 +146,26 @@ impl FieldKind {
             FieldKind::SSAValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
                 FormatOption::Type => {
-                    quote! { #crate_path::typeof_ssa::<_, #type_lattice>() }
+                    quote! { #crate_path::typeof_ssa::<_, #ir_type>() }
                 }
                 FormatOption::Default => {
-                    quote! { #crate_path::ssa_value::<_, #type_lattice>() }
+                    quote! { #crate_path::ssa_value::<_, #ir_type>() }
                 }
             },
             FieldKind::ResultValue => match opt {
                 FormatOption::Name => quote! { #crate_path::nameof_ssa() },
                 FormatOption::Type => {
-                    quote! { #crate_path::typeof_ssa::<_, #type_lattice>() }
+                    quote! { #crate_path::typeof_ssa::<_, #ir_type>() }
                 }
                 FormatOption::Default => {
-                    quote! { #crate_path::result_value::<_, #type_lattice>() }
+                    quote! { #crate_path::result_value::<_, #ir_type>() }
                 }
             },
             FieldKind::Block => {
                 // Parse block directly with __LanguageOutput - no coercion needed.
                 // The AST type uses LanguageOutput as a type parameter.
                 quote! {
-                    #crate_path::block::<_, #type_lattice, _>(language.clone())
+                    #crate_path::block::<_, #ir_type, _>(language.clone())
                 }
             }
             FieldKind::Successor => {
@@ -176,7 +175,7 @@ impl FieldKind {
                 // Parse region directly with __LanguageOutput - no coercion needed.
                 // The AST type uses LanguageOutput as a type parameter.
                 quote! {
-                    #crate_path::region::<_, #type_lattice, _>(language.clone())
+                    #crate_path::region::<_, #ir_type, _>(language.clone())
                 }
             }
             FieldKind::Symbol => {

@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/builder/tests.rs
-expression: "case!\n{\n    #[kirin(fn, type_lattice = SomeLattice)] enum EitherEnum\n    {\n        #[kirin(fn = op_abc)] A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, #[wraps] B(InnerB),\n    }\n}"
+expression: "case!\n{\n    #[kirin(fn, type = SomeType)] enum EitherEnum\n    {\n        #[kirin(fn = op_abc)] A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, #[wraps] B(InnerB),\n    }\n}"
 ---
 impl EitherEnum {
     pub fn op_abc<Lang>(
@@ -9,14 +9,14 @@ impl EitherEnum {
     ) -> either_enum_build_result::A
     where
         Lang: ::kirin::ir::Dialect + From<EitherEnum>,
-        Lang::TypeLattice: From<SomeLattice>,
+        Lang::Type: From<SomeType>,
     {
         let a_statement_id = context.statement_arena().next_id();
         let value: u32 = value.into();
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(a_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(u32_type))
+            .ty(Lang::Type::from(u32_type))
             .new()
             .into();
         context

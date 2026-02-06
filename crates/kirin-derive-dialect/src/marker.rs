@@ -7,13 +7,13 @@ use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 
 pub fn derive_marker<L: Layout>(input: &ir::Input<L>, trait_path: &syn::Path) -> TokenStream {
-    let type_lattice = &input.attrs.type_lattice;
+    let ir_type = &input.attrs.ir_type;
     TraitAssocTypeImplTokens::builder()
         .generics(&input.generics)
         .trait_path(trait_path)
         .type_name(&input.name)
-        .assoc_type_ident(syn::Ident::new("TypeLattice", Span::call_site()))
-        .assoc_type(type_lattice)
+        .assoc_type_ident(syn::Ident::new("Type", Span::call_site()))
+        .assoc_type(ir_type)
         .build()
         .to_token_stream()
 }
@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn test_marker_struct() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = T, crate = ::my::path)]
+            #[kirin(type = T, crate = ::my::path)]
             pub struct MyStruct;
         };
         let ir = ir::Input::<StandardLayout>::from_derive_input(&input).unwrap();
@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn test_marker_enum() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = T, crate = ::my::path)]
+            #[kirin(type = T, crate = ::my::path)]
             pub enum MyEnum {
                 A,
                 B,

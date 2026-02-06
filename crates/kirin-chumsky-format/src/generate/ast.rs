@@ -63,7 +63,7 @@ impl GenerateAST {
     ///
     /// This includes:
     /// - Value field types that contain type parameters
-    /// - type_lattice if it contains type parameters
+    /// - ir_type if it contains type parameters
     fn collect_value_types_needing_bounds(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
@@ -77,17 +77,14 @@ impl GenerateAST {
             .map(|p| p.ident.to_string())
             .collect();
 
-        // Check if type_lattice contains any type parameter
-        let type_lattice = &self.config.type_lattice;
-        let type_lattice_ty: syn::Type = syn::parse_quote!(#type_lattice);
+        // Check if ir_type contains any type parameter
+        let ir_type = &self.config.ir_type;
+        let ir_type_ty: syn::Type = syn::parse_quote!(#ir_type);
         for param_name in &type_param_names {
-            if kirin_derive_core::misc::is_type(&type_lattice_ty, param_name.as_str())
-                || kirin_derive_core::misc::is_type_in_generic(
-                    &type_lattice_ty,
-                    param_name.as_str(),
-                )
+            if kirin_derive_core::misc::is_type(&ir_type_ty, param_name.as_str())
+                || kirin_derive_core::misc::is_type_in_generic(&ir_type_ty, param_name.as_str())
             {
-                all_types.push(type_lattice_ty.clone());
+                all_types.push(ir_type_ty.clone());
                 break;
             }
         }
@@ -363,7 +360,7 @@ impl GenerateAST {
     ) -> TokenStream {
         let (impl_generics, ty_generics, _) = ast_generics.split_for_impl();
         let crate_path = &self.config.crate_path;
-        let type_lattice = &self.config.type_lattice;
+        let ir_type = &self.config.ir_type;
 
         // Collect value types that need Debug bounds (types containing type parameters)
         let value_types_needing_bounds = self.collect_value_types_needing_bounds(ir_input);
@@ -380,7 +377,7 @@ impl GenerateAST {
         };
 
         // Debug where clause adds Debug bounds on the actual field types:
-        // - AST fields use <type_lattice as HasParser>::Output for type annotations
+        // - AST fields use <ir_type as HasParser>::Output for type annotations
         // - Value fields use <ValueType as HasParser>::Output
         // - Block/Region fields use LanguageOutput for statements
         // So we need Debug on all these types.
@@ -388,7 +385,7 @@ impl GenerateAST {
             where
                 #base_bounds
                 #(#has_parser_bounds,)*
-                <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+                <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
                 LanguageOutput: ::core::fmt::Debug,
                 #(#value_debug_bounds,)*
         };
@@ -823,7 +820,7 @@ impl GenerateAST {
         let base = kind.ast_type(
             &self.config.crate_path,
             ast_name,
-            &self.config.type_lattice,
+            &self.config.ir_type,
             type_params,
         );
         collection.wrap_type(base)
@@ -846,7 +843,7 @@ impl GenerateAST {
     ) -> TokenStream {
         use kirin_derive_core::ir::VariantRef;
         let crate_path = &self.config.crate_path;
-        let type_lattice = &self.config.type_lattice;
+        let ir_type = &self.config.ir_type;
 
         let (impl_generics, ty_generics, _) = ast_generics.split_for_impl();
 
@@ -879,7 +876,7 @@ impl GenerateAST {
                 #base_bounds
                 #(#has_parser_bounds,)*
                 #(#has_dialect_parser_base_bounds,)*
-                <#type_lattice as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+                <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
                 LanguageOutput: ::core::fmt::Debug,
                 #(#value_debug_bounds,)*
         };

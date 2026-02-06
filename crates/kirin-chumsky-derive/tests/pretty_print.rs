@@ -9,7 +9,7 @@ use kirin_test_utils::SimpleType;
 
 // A simple dialect for testing pretty print derive
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = SimpleType)]
+#[kirin(type = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum TestLang {
     #[chumsky(format = "{res:name} = add {lhs}, {rhs} -> {res:type}")]

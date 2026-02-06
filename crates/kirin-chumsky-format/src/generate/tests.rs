@@ -33,7 +33,7 @@ fn generate_all(input: &syn::DeriveInput) -> (String, String, String, String) {
 #[test]
 fn test_struct_simple_add() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[chumsky(format = "{res:name} = add {lhs}, {rhs} -> {res:type}")]
         struct Add {
             lhs: SSAValue,
@@ -52,7 +52,7 @@ fn test_struct_simple_add() {
 #[test]
 fn test_struct_tuple_style() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[chumsky(format = "return {0}")]
         struct Return(SSAValue);
     };
@@ -66,7 +66,7 @@ fn test_struct_tuple_style() {
 #[test]
 fn test_struct_with_region() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[chumsky(format = "{res:name} = function {body} -> {res:type}")]
         struct Function {
             body: Region,
@@ -84,7 +84,7 @@ fn test_struct_with_region() {
 #[test]
 fn test_struct_with_comptime_value() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[chumsky(format = "{res:name} = constant {value} -> {res:type}")]
         struct Constant {
             #[kirin(into)]
@@ -107,7 +107,7 @@ fn test_struct_with_comptime_value() {
 #[test]
 fn test_enum_simple() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         enum SimpleLang {
             #[chumsky(format = "{res:name} = add {lhs}, {rhs} -> {res:type}")]
             Add {
@@ -133,7 +133,7 @@ fn test_enum_simple() {
 #[test]
 fn test_enum_tuple_variants() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         enum TupleLang {
             #[chumsky(format = "return {0}")]
             #[kirin(terminator)]
@@ -160,7 +160,7 @@ fn test_enum_tuple_variants() {
 #[ignore = "Bug: wrapper structs generate empty tuple fields, see ast.rs"]
 fn test_struct_wrapper() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[wraps]
         struct MyWrapper(OtherDialect);
     };
@@ -174,7 +174,7 @@ fn test_struct_wrapper() {
 #[test]
 fn test_enum_all_wrappers() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[wraps]
         enum ComposedLang {
             Arith(ArithDialect),
@@ -191,7 +191,7 @@ fn test_enum_all_wrappers() {
 #[test]
 fn test_enum_mixed_wrappers() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         enum MixedLang {
             #[wraps]
             Arith(ArithDialect),
@@ -219,7 +219,7 @@ fn test_enum_mixed_wrappers() {
 #[test]
 fn test_struct_with_block() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[chumsky(format = "br {target}")]
         #[kirin(terminator)]
         struct Branch {
@@ -236,7 +236,7 @@ fn test_struct_with_block() {
 #[test]
 fn test_struct_conditional_branch() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[chumsky(format = "br {cond}, {then_target}, {else_target}")]
         #[kirin(terminator)]
         struct CondBranch {
@@ -259,7 +259,7 @@ fn test_struct_conditional_branch() {
 #[test]
 fn test_struct_with_generics() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = T)]
+        #[kirin(type = T)]
         #[chumsky(format = "return {0}")]
         struct GenericReturn<T: TypeLattice>(SSAValue);
     };
@@ -273,7 +273,7 @@ fn test_struct_with_generics() {
 #[test]
 fn test_enum_wrapper_with_generics() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = T)]
+        #[kirin(type = T)]
         #[wraps]
         enum WrapperWithGenerics<T: TypeLattice> {
             Inner(GenericInner<T>),
@@ -293,7 +293,7 @@ fn test_enum_wrapper_with_generics() {
 #[test]
 fn test_custom_crate_path() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType, crate = "my_kirin")]
+        #[kirin(type = SimpleType, crate = "my_kirin")]
         #[chumsky(crate = "my_chumsky", format = "return {0}")]
         struct CustomReturn(SSAValue);
     };
@@ -311,7 +311,7 @@ fn test_custom_crate_path() {
 #[test]
 fn test_empty_enum() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         enum EmptyLang {}
     };
     let (ast, emit, parser, pretty) = generate_all(&input);
@@ -324,7 +324,7 @@ fn test_empty_enum() {
 #[test]
 fn test_format_with_special_tokens() {
     let input: syn::DeriveInput = syn::parse_quote! {
-        #[kirin(type_lattice = SimpleType)]
+        #[kirin(type = SimpleType)]
         #[chumsky(format = "{res:name} = load [{addr}] -> {res:type}")]
         struct Load {
             addr: SSAValue,

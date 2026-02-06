@@ -1,4 +1,4 @@
-use crate::lattice::TypeLattice;
+use crate::comptime::CompileTimeValue;
 
 // TODO: use Cow<'a, str> for name to avoid allocations in some cases
 
@@ -83,5 +83,5 @@ pub trait Dialect:
     + PartialEq
     + std::fmt::Debug
 {
-    type TypeLattice: TypeLattice;
+    type Type: CompileTimeValue + Default;
 }

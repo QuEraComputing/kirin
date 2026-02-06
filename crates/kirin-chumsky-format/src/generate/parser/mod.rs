@@ -134,8 +134,8 @@ impl GenerateHasDialectParser {
         let validation_result = validate_format(stmt, &format, &collected)?;
         let occurrences = validation_result.occurrences;
 
-        // Get the type lattice for type annotation parsers
-        let type_lattice = &ir_input.attrs.type_lattice;
+        // Get the IR type for type annotation parsers
+        let ir_type = &ir_input.attrs.ir_type;
 
         // Extract original type parameters as TokenStreams
         let type_params: Vec<TokenStream> = ir_input
@@ -153,7 +153,7 @@ impl GenerateHasDialectParser {
             &occurrences,
             crate_path,
             ast_name,
-            type_lattice,
+            ir_type,
             &type_params,
         )?;
 

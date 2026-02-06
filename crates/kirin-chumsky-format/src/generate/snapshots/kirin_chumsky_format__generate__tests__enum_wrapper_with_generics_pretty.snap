@@ -8,7 +8,7 @@ impl<T: TypeLattice> ::kirin::pretty::PrettyPrint for WrapperWithGenerics<T> {
         doc: &'a ::kirin::pretty::Document<'a, __L>,
     ) -> ::kirin::pretty::ArenaDoc<'a>
     where
-        __L::TypeLattice: ::core::fmt::Display,
+        __L::Type: ::core::fmt::Display,
     {
         use kirin::pretty::DocAllocator;
         match self {

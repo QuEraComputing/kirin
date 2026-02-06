@@ -1,7 +1,7 @@
 use kirin_ir::*;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum SimpleTypeLattice {
+pub enum SimpleIRType {
     Any,
     Int,
     Float,
@@ -9,9 +9,9 @@ pub enum SimpleTypeLattice {
     Bottom,
 }
 
-pub use SimpleTypeLattice::*;
+pub use SimpleIRType::*;
 
-impl Lattice for SimpleTypeLattice {
+impl Lattice for SimpleIRType {
     fn is_subseteq(&self, other: &Self) -> bool {
         matches!((self, other), (a, b) if a == b)
     }
@@ -22,7 +22,7 @@ impl Lattice for SimpleTypeLattice {
         } else if other.is_subseteq(self) {
             self.clone()
         } else {
-            SimpleTypeLattice::Any
+            SimpleIRType::Any
         }
     }
 
@@ -32,44 +32,44 @@ impl Lattice for SimpleTypeLattice {
         } else if other.is_subseteq(self) {
             other.clone()
         } else {
-            SimpleTypeLattice::Bottom
+            SimpleIRType::Bottom
         }
     }
 }
 
-impl FiniteLattice for SimpleTypeLattice {
+impl FiniteLattice for SimpleIRType {
     fn bottom() -> Self {
-        SimpleTypeLattice::Bottom
+        SimpleIRType::Bottom
     }
 
     fn top() -> Self {
-        SimpleTypeLattice::Any
+        SimpleIRType::Any
     }
 }
 
-impl Default for SimpleTypeLattice {
+impl Default for SimpleIRType {
     fn default() -> Self {
         Self::bottom()
     }
 }
 
-impl std::fmt::Display for SimpleTypeLattice {
+impl std::fmt::Display for SimpleIRType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SimpleTypeLattice::Any => write!(f, "any"),
-            SimpleTypeLattice::Int => write!(f, "int"),
-            SimpleTypeLattice::Float => write!(f, "float"),
-            SimpleTypeLattice::DataType => write!(f, "datatype"),
-            SimpleTypeLattice::Bottom => write!(f, "bottom"),
+            SimpleIRType::Any => write!(f, "any"),
+            SimpleIRType::Int => write!(f, "int"),
+            SimpleIRType::Float => write!(f, "float"),
+            SimpleIRType::DataType => write!(f, "datatype"),
+            SimpleIRType::Bottom => write!(f, "bottom"),
         }
     }
 }
 
-impl crate::TypeLattice for SimpleTypeLattice {}
+impl crate::TypeLattice for SimpleIRType {}
 
-impl Typeof<SimpleTypeLattice> for i64 {
-    fn type_of(&self) -> SimpleTypeLattice {
-        SimpleTypeLattice::Int
+impl Typeof<SimpleIRType> for i64 {
+    fn type_of(&self) -> SimpleIRType {
+        SimpleIRType::Int
     }
 }
 
@@ -93,11 +93,11 @@ impl std::hash::Hash for Value {
     }
 }
 
-impl Typeof<SimpleTypeLattice> for Value {
-    fn type_of(&self) -> SimpleTypeLattice {
+impl Typeof<SimpleIRType> for Value {
+    fn type_of(&self) -> SimpleIRType {
         match self {
-            Value::I64(_) => SimpleTypeLattice::Int,
-            Value::F64(_) => SimpleTypeLattice::Float,
+            Value::I64(_) => SimpleIRType::Int,
+            Value::F64(_) => SimpleIRType::Float,
         }
     }
 }
@@ -124,23 +124,20 @@ impl std::fmt::Display for Value {
 }
 
 #[derive(Clone, Debug, PartialEq, Dialect)]
-#[kirin(fn, type_lattice = SimpleTypeLattice, crate = kirin_ir)]
+#[kirin(fn, type = SimpleIRType, crate = kirin_ir)]
 pub enum SimpleLanguage {
     Add(
         SSAValue,
         SSAValue,
-        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+        #[kirin(type = SimpleIRType::Float)] ResultValue,
     ),
     Constant(
         #[kirin(into)] Value,
-        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
+        #[kirin(type = SimpleIRType::Float)] ResultValue,
     ),
     #[kirin(terminator)]
     Return(SSAValue),
-    Function(
-        Region,
-        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,
-    ),
+    Function(Region, #[kirin(type = SimpleIRType::Float)] ResultValue),
 }
 
 // ============================================================================
@@ -150,7 +147,7 @@ pub enum SimpleLanguage {
 /// Simple type lattice used for parser integration tests.
 ///
 /// This type has more concrete type variants (i32, i64, f32, f64, bool, unit)
-/// compared to `SimpleTypeLattice` which uses abstract categories (Int, Float, etc).
+/// compared to `SimpleIRType` which uses abstract categories (Int, Float, etc).
 ///
 /// Enable the `parser` feature to get `HasParser` and `DirectlyParsable` implementations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -196,6 +193,12 @@ impl FiniteLattice for SimpleType {
 }
 
 impl TypeLattice for SimpleType {}
+
+impl Default for SimpleType {
+    fn default() -> Self {
+        SimpleType::Unit
+    }
+}
 
 impl std::fmt::Display for SimpleType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -304,7 +307,7 @@ mod parser_impls {
             doc: &'a Document<'a, L>,
         ) -> ArenaDoc<'a>
         where
-            L::TypeLattice: std::fmt::Display,
+            L::Type: std::fmt::Display,
         {
             doc.text("()")
         }

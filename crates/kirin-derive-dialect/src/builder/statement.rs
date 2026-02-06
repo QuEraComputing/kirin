@@ -19,7 +19,7 @@ mod tests {
     #[test]
     fn test_collect_fields_sorted() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = L)]
+            #[kirin(type = L)]
             struct Example {
                 b: ResultValue,
                 a: SSAValue,

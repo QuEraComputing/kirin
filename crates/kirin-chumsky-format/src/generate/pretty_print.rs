@@ -94,7 +94,7 @@ impl GeneratePrettyPrint {
 
         let (impl_generics, _, _) = ir_input.generics.split_for_impl();
 
-        // The trait method has fixed bounds: L: Dialect + PrettyPrint, L::TypeLattice: Display
+        // The trait method has fixed bounds: L: Dialect + PrettyPrint, L::Type: Display
         // All implementations must match these bounds
         quote! {
             impl #impl_generics #prettyless_path::PrettyPrint
@@ -106,7 +106,7 @@ impl GeneratePrettyPrint {
                     doc: &'a #prettyless_path::Document<'a, __L>,
                 ) -> #prettyless_path::ArenaDoc<'a>
                 where
-                    __L::TypeLattice: ::core::fmt::Display,
+                    __L::Type: ::core::fmt::Display,
                 {
                     use #prettyless_path::DocAllocator;
                     #print_body
@@ -157,7 +157,7 @@ impl GeneratePrettyPrint {
                     doc: &'a #prettyless_path::Document<'a, __L>,
                 ) -> #prettyless_path::ArenaDoc<'a>
                 where
-                    __L::TypeLattice: ::core::fmt::Display,
+                    __L::Type: ::core::fmt::Display,
                 {
                     // Delegate to the wrapped type's PrettyPrint
                     let inner = &self.0;

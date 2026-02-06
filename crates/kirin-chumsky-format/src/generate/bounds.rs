@@ -43,10 +43,10 @@ impl<'a> BoundsBuilder<'a> {
             .collect()
     }
 
-    /// Generates the TypeLattice bound: `TypeLattice: HasParser<'tokens, 'src> + 'tokens`.
-    pub fn type_lattice_has_parser_bound(&self, type_lattice: &syn::Path) -> syn::WherePredicate {
+    /// Generates the IR type bound: `IrType: HasParser<'tokens, 'src> + 'tokens`.
+    pub fn ir_type_has_parser_bound(&self, ir_type: &syn::Path) -> syn::WherePredicate {
         let crate_path = self.crate_path;
-        syn::parse_quote! { #type_lattice: #crate_path::HasParser<'tokens, 'src> + 'tokens }
+        syn::parse_quote! { #ir_type: #crate_path::HasParser<'tokens, 'src> + 'tokens }
     }
 
     /// Generates `EmitIR` bounds for the given types.

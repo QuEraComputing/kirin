@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/builder/tests.rs
-expression: "case!\n{\n    #[kirin(fn, type_lattice = L)] struct MultiResult<T: CompileTimeValue +\n    Typeof<L>, L: TypeLattice>\n    {\n        #[kirin(into)] value: T, #[kirin(type = value.type_of())] result1:\n        ResultValue, #[kirin(type = value.type_of())] result2: ResultValue,\n        #[kirin(default = std::marker::PhantomData)] marker:\n        std::marker::PhantomData<L>,\n    }\n}"
+expression: "case!\n{\n    #[kirin(fn, type = L)] struct MultiResult<T: CompileTimeValue + Typeof<L>,\n    L: TypeLattice>\n    {\n        #[kirin(into)] value: T, #[kirin(type = value.type_of())] result1:\n        ResultValue, #[kirin(type = value.type_of())] result2: ResultValue,\n        #[kirin(default = std::marker::PhantomData)] marker:\n        std::marker::PhantomData<L>,\n    }\n}"
 ---
 #[automatically_derived]
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
@@ -10,7 +10,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
     ) -> multi_result_build_result::MultiResult
     where
         Lang: ::kirin::ir::Dialect + From<MultiResult<T, L>>,
-        Lang::TypeLattice: From<L>,
+        Lang::Type: From<L>,
     {
         let multiresult_statement_id = context.statement_arena().next_id();
         let value: T = value.into();
@@ -18,13 +18,13 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
         let result1: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(multiresult_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(value.type_of()))
+            .ty(Lang::Type::from(value.type_of()))
             .new()
             .into();
         let result2: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(multiresult_statement_id, 1usize))
-            .ty(Lang::TypeLattice::from(value.type_of()))
+            .ty(Lang::Type::from(value.type_of()))
             .new()
             .into();
         context

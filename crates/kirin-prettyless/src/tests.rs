@@ -10,7 +10,7 @@ use crate::{ArenaDoc, Config, Document, PrettyPrint};
 impl PrettyPrint for SimpleLanguage {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         match self {
             SimpleLanguage::Add(lhs, rhs, _) => doc.text(format!("add {}, {}", *lhs, *rhs)),
@@ -33,9 +33,13 @@ fn create_test_function() -> (
     let staged_function = context
         .staged_function()
         .name("test_func")
-        .params_type(&[Int])
-        .return_type(Int)
-        .new();
+        .signature(kirin_ir::Signature {
+            params: vec![Int],
+            ret: Int,
+            constraints: (),
+        })
+        .new()
+        .unwrap();
 
     let a = SimpleLanguage::op_constant(&mut context, 1.2);
     let b = SimpleLanguage::op_constant(&mut context, 3.4);
@@ -60,7 +64,12 @@ fn create_test_function() -> (
 
     let body = context.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut context, body);
-    let f = context.specialize().f(staged_function).body(fdef).new();
+    let f = context
+        .specialize()
+        .f(staged_function)
+        .body(fdef)
+        .new()
+        .unwrap();
 
     (context, f)
 }
@@ -163,7 +172,7 @@ fn test_document_indent() {
 #[test]
 fn test_constant_pretty_print() {
     let mut context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let _ = context.staged_function().name("test").new();
+    let _ = context.staged_function().name("test").new().unwrap();
 
     let const_op = SimpleLanguage::op_constant(&mut context, 42i64);
     let doc = Document::new(Default::default(), &context);
@@ -176,7 +185,7 @@ fn test_constant_pretty_print() {
 #[test]
 fn test_add_pretty_print() {
     let mut context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let _ = context.staged_function().name("test").new();
+    let _ = context.staged_function().name("test").new().unwrap();
 
     let a = SimpleLanguage::op_constant(&mut context, 1i64);
     let b = SimpleLanguage::op_constant(&mut context, 2i64);

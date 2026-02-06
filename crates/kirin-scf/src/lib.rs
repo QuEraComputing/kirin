@@ -3,16 +3,16 @@ use kirin::parsers::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
-#[kirin(fn, type_lattice = T)]
-pub enum StructuredControlFlow<T: TypeLattice> {
+#[kirin(fn, type = T)]
+pub enum StructuredControlFlow<T: CompileTimeValue + Default> {
     If(If<T>),
     For(For<T>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "if {condition} then {then_body} else {else_body}")]
-#[kirin(fn, type_lattice = T)]
-pub struct If<T: TypeLattice> {
+#[kirin(fn, type = T)]
+pub struct If<T: CompileTimeValue + Default> {
     condition: SSAValue,
     then_body: Block,
     else_body: Block,
@@ -22,8 +22,8 @@ pub struct If<T: TypeLattice> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "for {induction_var} in {start}..{end} step {step} do {body}")]
-#[kirin(fn, type_lattice = T)]
-pub struct For<T: TypeLattice> {
+#[kirin(fn, type = T)]
+pub struct For<T: CompileTimeValue + Default> {
     induction_var: SSAValue,
     start: SSAValue,
     end: SSAValue,

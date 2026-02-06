@@ -7,7 +7,7 @@ use kirin_test_utils::*;
 // Note: 'fn' attribute is omitted to disable builder generation,
 // avoiding 'ResultValue field cannot be a Vec' error.
 #[derive(Dialect, Clone, Debug, PartialEq)]
-#[kirin(type_lattice = SimpleTypeLattice, crate = kirin_ir)]
+#[kirin(type = SimpleIRType, crate = kirin_ir)]
 struct VecOp {
     args: Vec<SSAValue>,
     res: Vec<ResultValue>,

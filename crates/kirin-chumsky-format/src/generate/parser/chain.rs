@@ -30,7 +30,7 @@ impl GenerateHasDialectParser {
         occurrences: &[FieldOccurrence<'_>],
         crate_path: &syn::Path,
         ast_name: &syn::Ident,
-        type_lattice: &syn::Path,
+        ir_type: &syn::Path,
         type_params: &[TokenStream],
     ) -> syn::Result<TokenStream> {
         let mut occurrence_iter = occurrences.iter();
@@ -50,7 +50,7 @@ impl GenerateHasDialectParser {
                         occurrence.field,
                         &occurrence.option,
                         ast_name,
-                        type_lattice,
+                        ir_type,
                         type_params,
                     )));
                 }
@@ -129,11 +129,11 @@ impl GenerateHasDialectParser {
         field: &FieldInfo<ChumskyLayout>,
         opt: &FormatOption,
         ast_name: &syn::Ident,
-        type_lattice: &syn::Path,
+        ir_type: &syn::Path,
         type_params: &[TokenStream],
     ) -> TokenStream {
         let kind = FieldKind::from_field_info(field);
-        let base = kind.parser_expr(crate_path, opt, ast_name, type_lattice, type_params);
+        let base = kind.parser_expr(crate_path, opt, ast_name, ir_type, type_params);
         field.collection.wrap_parser(base)
     }
 

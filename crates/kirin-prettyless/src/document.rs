@@ -98,7 +98,7 @@ impl<'a, L: Dialect> Document<'a, L> {
     where
         N: ScanResultWidth<L> + PrettyPrint,
         L: PrettyPrint,
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         node.scan_result_width(self);
         node.pretty_print(self)
@@ -109,7 +109,7 @@ impl<'a, L: Dialect> Document<'a, L> {
     where
         N: ScanResultWidth<L> + PrettyPrint,
         L: PrettyPrint,
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         let max_width = self.config.max_width;
         let arena_doc = self.build(node);
@@ -122,7 +122,7 @@ impl<'a, L: Dialect> Document<'a, L> {
 // Methods for printing IR nodes that need L: PrettyPrint bound
 impl<'a, L: Dialect + PrettyPrint> Document<'a, L>
 where
-    L::TypeLattice: std::fmt::Display,
+    L::Type: std::fmt::Display,
 {
     /// Pretty print a statement by printing its definition.
     pub fn print_statement(&'a self, stmt: &Statement) -> ArenaDoc<'a> {
@@ -209,15 +209,22 @@ where
     }
 
     /// Pretty print a staged function.
+    ///
+    /// Invalidated specializations are excluded from the count.
     pub fn print_staged_function(&'a self, func: &StagedFunction) -> ArenaDoc<'a> {
         let info = func.expect_info(self.context);
         let name = info
             .name()
             .and_then(|n| self.context.symbol_table().borrow().resolve(*n).cloned());
+        let active_specializations = info
+            .specializations()
+            .iter()
+            .filter(|s| !s.is_invalidated())
+            .count();
         self.text(name.unwrap_or_else(|| "<unnamed function>".into()))
             + self.text(format!(
                 "staged function with {} specializations",
-                info.specializations().len()
+                active_specializations
             ))
     }
 }

@@ -268,7 +268,7 @@ fn let_name_eq_result_value(
             let #name: ResultValue = context
                 .ssa()
                 .kind(SSAKind::Result(#statement_id, #index))
-                .ty(Lang::TypeLattice::from(#ssa_ty))
+                .ty(Lang::Type::from(#ssa_ty))
                 .new()
                 .into();
         });
@@ -289,7 +289,7 @@ pub(crate) fn build_fn_for_statement(
     let inputs = build_fn_inputs(info);
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let name = &input.name;
-    let type_lattice = &input.type_lattice;
+    let ir_type = &input.ir_type;
     let build_fn_name = &info.build_fn_name;
     let build_result_path = build_result_path(input, info);
     let result_names = result_names(info);
@@ -307,7 +307,7 @@ pub(crate) fn build_fn_for_statement(
         pub fn #build_fn_name<Lang>(context: &mut #crate_path::Context<Lang>, #(#inputs),*) -> #build_result_path
         where
             Lang: #crate_path::Dialect + From<#self_ty>,
-            Lang::TypeLattice: From<#type_lattice>
+            Lang::Type: From<#ir_type>
         #body
     };
 

@@ -4,7 +4,7 @@ use kirin_ir::*;
 
 impl<'a, L: Dialect + PrettyPrint> Document<'a, L>
 where
-    L::TypeLattice: std::fmt::Display,
+    L::Type: std::fmt::Display,
 {
     pub fn pager<N>(&'a mut self, node: &N) -> Result<(), std::fmt::Error>
     where

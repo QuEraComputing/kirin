@@ -5,7 +5,8 @@ use darling::{Error, FromDeriveInput, FromField, FromMeta, FromVariant};
 pub struct KirinStructOptions {
     #[darling(rename = "crate")]
     pub crate_path: Option<syn::Path>,
-    pub type_lattice: syn::Path,
+    #[darling(rename = "type")]
+    pub ir_type: syn::Path,
     pub format: Option<String>,
     #[darling(rename = "fn")]
     pub builder: Option<BuilderOptions>,
@@ -22,7 +23,8 @@ pub struct KirinStructOptions {
 pub struct KirinEnumOptions {
     #[darling(rename = "crate")]
     pub crate_path: Option<syn::Path>,
-    pub type_lattice: syn::Path,
+    #[darling(rename = "type")]
+    pub ir_type: syn::Path,
     #[darling(rename = "fn")]
     pub builder: Option<BuilderOptions>,
     #[darling(default)]
@@ -127,7 +129,7 @@ impl FromMeta for BuilderOptions {
 #[derive(Debug, Clone)]
 pub struct GlobalOptions {
     pub crate_path: Option<syn::Path>,
-    pub type_lattice: syn::Path,
+    pub ir_type: syn::Path,
     pub builder: Option<BuilderOptions>,
     pub constant: bool,
     pub pure: bool,
@@ -163,7 +165,7 @@ impl From<KirinStructOptions> for GlobalOptions {
     fn from(opts: KirinStructOptions) -> Self {
         GlobalOptions {
             crate_path: opts.crate_path,
-            type_lattice: opts.type_lattice,
+            ir_type: opts.ir_type,
             builder: opts.builder,
             constant: opts.constant,
             pure: opts.pure,
@@ -188,7 +190,7 @@ impl From<KirinEnumOptions> for GlobalOptions {
     fn from(value: KirinEnumOptions) -> Self {
         GlobalOptions {
             crate_path: value.crate_path,
-            type_lattice: value.type_lattice,
+            ir_type: value.ir_type,
             builder: value.builder,
             constant: value.constant,
             pure: value.pure,

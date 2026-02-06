@@ -38,14 +38,14 @@ impl PrettyPrint for Opcode {
         doc: &'a Document<'a, L>,
     ) -> ArenaDoc<'a>
     where
-        L::TypeLattice: std::fmt::Display,
+        L::Type: std::fmt::Display,
     {
         doc.text(self.0.clone())
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = SimpleType)]
+#[kirin(type = SimpleType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum ValueLang {
     #[chumsky(format = "{res:name} = apply {op} {arg} -> {res:type}")]

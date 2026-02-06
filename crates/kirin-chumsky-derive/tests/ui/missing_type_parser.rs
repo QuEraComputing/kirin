@@ -42,7 +42,7 @@ impl std::fmt::Display for NoParserType {
 
 // This should fail to compile because NoParserType doesn't implement HasParser
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type_lattice = NoParserType)]
+#[kirin(type = NoParserType)]
 #[chumsky(crate = kirin_chumsky)]
 pub enum BadLang {
     #[chumsky(format = "{res:name} = add {lhs} {rhs}")]

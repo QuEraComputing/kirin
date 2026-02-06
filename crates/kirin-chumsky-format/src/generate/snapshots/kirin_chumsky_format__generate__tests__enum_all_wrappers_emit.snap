@@ -11,10 +11,8 @@ where
     LanguageOutput: Clone + PartialEq + 'tokens,
     LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
-        Language,
-        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
-    >,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
     Language: ::core::convert::From<ArithDialect>,
     Language: ::core::convert::From<ControlDialect>,
     <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
@@ -44,10 +42,8 @@ where
     TypeOutput: Clone + PartialEq,
     'src: 'tokens,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::kirin::parsers::EmitIR<
-        Language,
-        Output = <Language as ::kirin::ir::Dialect>::TypeLattice,
-    >,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
     Language: ::core::convert::From<ArithDialect>,
     Language: ::core::convert::From<ControlDialect>,
     <ArithDialect as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<

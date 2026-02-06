@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_visitor_basic_traversal() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = SimpleType)]
+            #[kirin(type = SimpleType)]
             #[chumsky(format = "{res} = add {lhs}, {rhs}")]
             struct Add {
                 lhs: SSAValue,
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn test_visitor_with_format_options() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = SimpleType)]
+            #[kirin(type = SimpleType)]
             #[chumsky(format = "{res:name} = neg {arg} -> {res:type}")]
             struct Neg {
                 arg: SSAValue,
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_visitor_context() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type_lattice = SimpleType)]
+            #[kirin(type = SimpleType)]
             #[chumsky(format = "{a} + {b}")]
             struct Add {
                 a: SSAValue,

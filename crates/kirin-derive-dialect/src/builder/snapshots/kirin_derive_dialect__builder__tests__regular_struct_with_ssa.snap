@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/builder/tests.rs
-expression: "case!\n{\n    #[kirin(fn = new, type_lattice = L)] struct TestStruct<T: CompileTimeValue\n    + Typeof<L>, L: TypeLattice>\n    {\n        #[kirin(into)] value: T, #[kirin(type = value.type_of())] result:\n        ResultValue, #[kirin(into)] input_ssa: SSAValue,\n        #[kirin(default = std::marker::PhantomData)] marker:\n        std::marker::PhantomData<L>,\n    }\n}"
+expression: "case!\n{\n    #[kirin(fn = new, type = L)] struct TestStruct<T: CompileTimeValue +\n    Typeof<L>, L: TypeLattice>\n    {\n        #[kirin(into)] value: T, #[kirin(type = value.type_of())] result:\n        ResultValue, #[kirin(into)] input_ssa: SSAValue,\n        #[kirin(default = std::marker::PhantomData)] marker:\n        std::marker::PhantomData<L>,\n    }\n}"
 ---
 #[automatically_derived]
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
@@ -11,7 +11,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
     ) -> test_struct_build_result::TestStruct
     where
         Lang: ::kirin::ir::Dialect + From<TestStruct<T, L>>,
-        Lang::TypeLattice: From<L>,
+        Lang::Type: From<L>,
     {
         let teststruct_statement_id = context.statement_arena().next_id();
         let value: T = value.into();
@@ -20,7 +20,7 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
         let result: ResultValue = context
             .ssa()
             .kind(SSAKind::Result(teststruct_statement_id, 0usize))
-            .ty(Lang::TypeLattice::from(value.type_of()))
+            .ty(Lang::Type::from(value.type_of()))
             .new()
             .into();
         context
