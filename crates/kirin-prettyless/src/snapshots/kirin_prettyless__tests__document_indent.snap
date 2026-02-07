@@ -1,0 +1,7 @@
+---
+source: crates/kirin-prettyless/src/tests.rs
+assertion_line: 167
+expression: buf
+---
+hello
+    world

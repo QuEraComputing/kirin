@@ -1,7 +1,7 @@
 use crate::language::Dialect;
 use crate::node::function::{SpecializedFunction, SpecializedFunctionInfo, StagedFunction};
 use crate::node::stmt::Statement;
-use crate::node::symbol::Symbol;
+use crate::node::symbol::GlobalSymbol;
 use crate::signature::Signature;
 
 /// Why staged function creation conflicted with existing definitions.
@@ -60,8 +60,8 @@ impl<L: Dialect> std::error::Error for SpecializeError<L> {}
 pub struct StagedFunctionError<L: Dialect> {
     /// Why this staged-function creation conflicted.
     pub conflict_kind: StagedFunctionConflictKind,
-    /// The conflicting interned name.
-    pub name: Option<Symbol>,
+    /// The conflicting global symbol name.
+    pub name: Option<GlobalSymbol>,
     /// The signature of the new staged function being created.
     pub signature: Signature<L::Type>,
     /// Existing non-invalidated staged functions with the same name.

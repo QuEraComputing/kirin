@@ -230,10 +230,13 @@ pub enum SimpleLang {
 
 #[test]
 fn test_block() {
+    let mut gs: kirin_ir::InternTable<String, kirin_ir::GlobalSymbol> =
+        kirin_ir::InternTable::default();
+    let foo = gs.intern("foo".to_string());
     let mut context: Context<SimpleLang> = Context::default();
     let staged_function = context
         .staged_function()
-        .name("foo")
+        .name(foo)
         .signature(kirin_ir::Signature {
             params: vec![Int],
             ret: Int,

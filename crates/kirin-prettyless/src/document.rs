@@ -3,8 +3,8 @@
 use std::{borrow::Cow, ops::Deref};
 
 use kirin_ir::{
-    Block, Context, DenseHint, Dialect, GetInfo, Item, Region, SSAInfo, SpecializedFunction,
-    StagedFunction, Statement,
+    Block, Context, DenseHint, Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, Region,
+    SSAInfo, Signature, SpecializedFunction, StagedFunction, Statement,
 };
 use prettyless::{Arena, DocAllocator};
 
@@ -18,21 +18,52 @@ pub struct Document<'a, L: Dialect> {
     config: Config,
     arena: Arena<'a>,
     context: &'a Context<L>,
+    global_symbols: Option<&'a InternTable<String, GlobalSymbol>>,
     result_width: DenseHint<Statement, usize>,
     max_result_width: usize,
 }
 
 impl<'a, L: Dialect> Document<'a, L> {
     /// Create a new document builder with the given configuration and context.
+    ///
+    /// Global symbol resolution for function names is not available.
+    /// Use [`Document::with_global_symbols`] if you need to resolve
+    /// [`GlobalSymbol`] names.
     pub fn new(config: Config, context: &'a Context<L>) -> Self {
         let arena = Arena::new();
         Self {
             config,
             arena,
             context,
+            global_symbols: None,
             result_width: context.statement_arena().hint().dense(),
             max_result_width: 0,
         }
+    }
+
+    /// Create a new document builder with global symbol table support.
+    ///
+    /// The `global_symbols` table is used to resolve [`GlobalSymbol`] names
+    /// (e.g., function names) that were interned via [`Pipeline::intern`](kirin_ir::Pipeline::intern).
+    pub fn with_global_symbols(
+        config: Config,
+        context: &'a Context<L>,
+        global_symbols: &'a InternTable<String, GlobalSymbol>,
+    ) -> Self {
+        let arena = Arena::new();
+        Self {
+            config,
+            arena,
+            context,
+            global_symbols: Some(global_symbols),
+            result_width: context.statement_arena().hint().dense(),
+            max_result_width: 0,
+        }
+    }
+
+    /// Returns a reference to the global symbol table, if available.
+    pub fn global_symbols(&self) -> Option<&'a InternTable<String, GlobalSymbol>> {
+        self.global_symbols
     }
 
     /// Indent a document by the configured tab spaces.
@@ -164,9 +195,9 @@ where
                         .borrow()
                         .resolve(name_sym)
                         .cloned()
-                        .unwrap_or_else(|| format!("{}", *arg))
+                        .unwrap_or_else(|| format!("{}", Id::from(*arg).raw()))
                 } else {
-                    format!("{}", *arg)
+                    format!("{}", Id::from(*arg).raw())
                 };
                 args_doc += self.text(format!("%{}: {}", name, arg_info.ty()));
             }
@@ -201,31 +232,110 @@ where
         self.block_indent(inner).enclose("{", "}")
     }
 
-    /// Pretty print a specialized function.
+    /// Pretty print a specialized function with its full header.
+    ///
+    /// Renders as:
+    /// ```text
+    /// fn @name(Type0, Type1) -> RetType {
+    ///   <body>
+    /// }
+    /// ```
+    ///
+    /// The stage prefix is derived from the context's own identity (name or
+    /// stage ID), so pipeline-level rendering requires no external prefix.
+    ///
+    /// The function name is obtained from the parent [`StagedFunction`] and
+    /// resolved via the global symbol table if available.
     pub fn print_specialized_function(&'a self, func: &SpecializedFunction) -> ArenaDoc<'a> {
-        let info = func.expect_info(self.context);
-        let body = info.body();
-        self.print_statement(body)
+        let (staged_fn, idx) = func.id();
+        let staged_info = staged_fn.expect_info(self.context);
+        let spec = &staged_info.specializations()[idx];
+        let header = self.print_function_header(staged_info.name(), spec.signature());
+        header + self.text(" ") + self.print_statement(spec.body())
     }
 
-    /// Pretty print a staged function.
+    /// Pretty print a staged function with all its non-invalidated specializations.
     ///
-    /// Invalidated specializations are excluded from the count.
+    /// Each specialization is rendered with the full header:
+    /// ```text
+    /// stage @A fn @name(Type0, Type1) -> RetType {
+    ///   <body>
+    /// }
+    /// ```
+    ///
+    /// The stage prefix is derived from the context's identity automatically.
+    /// Function names are resolved via the global symbol table if available.
+    /// Invalidated specializations are excluded.
     pub fn print_staged_function(&'a self, func: &StagedFunction) -> ArenaDoc<'a> {
         let info = func.expect_info(self.context);
-        let name = info
-            .name()
-            .and_then(|n| self.context.symbol_table().borrow().resolve(*n).cloned());
-        let active_specializations = info
+        let active: Vec<_> = info
             .specializations()
             .iter()
             .filter(|s| !s.is_invalidated())
-            .count();
-        self.text(name.unwrap_or_else(|| "<unnamed function>".into()))
-            + self.text(format!(
-                "staged function with {} specializations",
-                active_specializations
-            ))
+            .collect();
+
+        if active.is_empty() {
+            // Extern / declaration-only staged function: just print the signature header
+            return self.print_function_header(info.name(), info.signature());
+        }
+
+        let mut doc = self.nil();
+        for (i, spec) in active.iter().enumerate() {
+            if i > 0 {
+                doc += self.line_() + self.line_();
+            }
+            // Build header from the specialization's own signature
+            doc += self.print_function_header(info.name(), spec.signature());
+            // Render the body statement (dialect provides its own formatting)
+            doc += self.text(" ") + self.print_statement(spec.body());
+        }
+        doc
+    }
+
+    /// Print a function header line: `fn @name(T0, T1) -> Ret`
+    ///
+    /// The stage prefix is derived from the context's identity:
+    /// - If the context has a name, prints `stage @<name> fn @...`
+    /// - If the context has only a stage ID, prints `stage <id> fn @...`
+    /// - Otherwise, prints `fn @...` (standalone, no pipeline)
+    ///
+    /// Uses the given signature for parameter types and return type.
+    pub fn print_function_header(
+        &'a self,
+        name: Option<GlobalSymbol>,
+        sig: &Signature<L::Type>,
+    ) -> ArenaDoc<'a> {
+        let name_str = name
+            .and_then(|sym| self.global_symbols.and_then(|gs| gs.resolve(sym).cloned()))
+            .unwrap_or_else(|| "<unnamed>".into());
+
+        // Derive stage prefix from the context's own identity
+        let prefix = self
+            .context
+            .name()
+            .and_then(|sym| self.global_symbols.and_then(|gs| gs.resolve(sym).cloned()))
+            .map(|n| format!("stage @{}", n))
+            .or_else(|| {
+                self.context
+                    .stage_id()
+                    .map(|id| format!("stage {}", Id::from(id).raw()))
+            });
+
+        let mut header = match prefix {
+            Some(p) => self.text(p) + self.text(" fn @"),
+            None => self.text("fn @"),
+        };
+        header += self.text(name_str) + self.text("(");
+
+        // Parameters
+        for (i, param) in sig.params.iter().enumerate() {
+            if i > 0 {
+                header += self.text(", ");
+            }
+            header += self.text(format!("{}", param));
+        }
+        header += self.text(") -> ") + self.text(format!("{}", sig.ret));
+        header
     }
 }
 

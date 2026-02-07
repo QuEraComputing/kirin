@@ -1,23 +1,23 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use crate::arena::{GetInfo, Id, Item};
 use crate::language::Dialect;
 use crate::signature::{Signature, SignatureCmp, SignatureSemantics};
 use crate::{Statement, identifier};
 
-use super::symbol::Symbol;
+use super::symbol::GlobalSymbol;
 
 identifier! {
     /// A unique identifier for a compilation stage.
     ///
     /// Compilation stages represent different phases in the compilation pipeline,
     /// such as parsing, optimization, code generation, etc.
-    struct CompileStage
+    struct CompileStageId
 }
 
-impl CompileStage {
+impl CompileStageId {
     pub fn new(stage: Id) -> Self {
-        CompileStage(stage)
+        CompileStageId(stage)
     }
 }
 
@@ -62,7 +62,7 @@ impl SpecializedFunction {
 #[derive(Clone, Debug)]
 pub struct FunctionInfo {
     id: Function,
-    name: Option<Symbol>,
+    name: Option<GlobalSymbol>,
     /// compiled versions of the function at different stages.
     ///
     /// note that compile stages may not be sequential,
@@ -74,27 +74,27 @@ pub struct FunctionInfo {
     /// The execution will always look for the matching stage of the target execution environment
     /// e.g an interpreter will look for the staged function at the interpreter stage.
     /// but LLVM backend will look for the staged function at the LLVM IR generation stage.
-    staged_functions: HashMap<CompileStage, StagedFunction>,
+    staged_functions: IndexMap<CompileStageId, StagedFunction>,
 }
 
 impl FunctionInfo {
-    pub fn new(id: Function, name: Option<Symbol>) -> Self {
+    pub fn new(id: Function, name: Option<GlobalSymbol>) -> Self {
         Self {
             id,
             name,
-            staged_functions: HashMap::new(),
+            staged_functions: IndexMap::new(),
         }
     }
 
-    pub fn name(&self) -> Option<&Symbol> {
-        self.name.as_ref()
+    pub fn name(&self) -> Option<GlobalSymbol> {
+        self.name
     }
 
-    pub fn staged_functions(&self) -> &HashMap<CompileStage, StagedFunction> {
+    pub fn staged_functions(&self) -> &IndexMap<CompileStageId, StagedFunction> {
         &self.staged_functions
     }
 
-    pub fn add_staged_function(&mut self, stage: CompileStage, func: StagedFunction) {
+    pub fn add_staged_function(&mut self, stage: CompileStageId, func: StagedFunction) {
         self.staged_functions.insert(stage, func);
     }
 }
@@ -102,7 +102,7 @@ impl FunctionInfo {
 #[derive(Clone, Debug)]
 pub struct StagedFunctionInfo<L: Dialect> {
     pub(crate) id: StagedFunction,
-    pub(crate) name: Option<Symbol>,
+    pub(crate) name: Option<GlobalSymbol>,
     pub(crate) signature: Signature<L::Type>,
     pub(crate) specializations: Vec<SpecializedFunctionInfo<L>>,
     /// Functions that call this staged function (used for inter-procedural analyses).
@@ -122,8 +122,8 @@ impl<L: Dialect> StagedFunctionInfo<L> {
         self.id
     }
 
-    pub fn name(&self) -> Option<&Symbol> {
-        self.name.as_ref()
+    pub fn name(&self) -> Option<GlobalSymbol> {
+        self.name
     }
 
     pub fn signature(&self) -> &Signature<L::Type> {

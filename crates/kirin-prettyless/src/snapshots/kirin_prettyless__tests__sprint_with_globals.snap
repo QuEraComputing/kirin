@@ -1,0 +1,11 @@
+---
+source: crates/kirin-prettyless/src/tests.rs
+assertion_line: 296
+expression: output
+---
+fn @my_function(int) -> int {
+  ^0 {
+    constant 42;
+    return %0;
+  }
+}

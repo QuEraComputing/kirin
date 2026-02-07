@@ -2,7 +2,7 @@
 
 use std::io::{Write, stdout};
 
-use kirin_ir::{Context, Dialect};
+use kirin_ir::{Context, Dialect, GlobalSymbol, InternTable};
 use prettyless::DocBuilder;
 
 use crate::{ArenaDoc, Config, Document, ScanResultWidth};
@@ -81,6 +81,28 @@ where
     /// Print to stdout with default config.
     fn print(&self, context: &Context<L>);
 
+    /// Render to string with default config and global symbol resolution.
+    fn sprint_with_globals(
+        &self,
+        context: &Context<L>,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    ) -> String;
+
+    /// Render to string with custom config and global symbol resolution.
+    fn sprint_with_globals_config(
+        &self,
+        config: Config,
+        context: &Context<L>,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    ) -> String;
+
+    /// Print to stdout with default config and global symbol resolution.
+    fn print_with_globals(
+        &self,
+        context: &Context<L>,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    );
+
     /// Display with bat pager with custom config.
     #[cfg(feature = "bat")]
     fn bat_with_config(&self, config: Config, context: &Context<L>);
@@ -126,6 +148,35 @@ where
 
     fn print(&self, context: &Context<L>) {
         let mut doc = Document::new(Config::default(), context);
+        let output = doc.render(self).expect("render failed");
+        stdout().write_all(output.as_bytes()).expect("write failed");
+    }
+
+    fn sprint_with_globals(
+        &self,
+        context: &Context<L>,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    ) -> String {
+        let mut doc = Document::with_global_symbols(Config::default(), context, global_symbols);
+        doc.render(self).expect("render failed")
+    }
+
+    fn sprint_with_globals_config(
+        &self,
+        config: Config,
+        context: &Context<L>,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    ) -> String {
+        let mut doc = Document::with_global_symbols(config, context, global_symbols);
+        doc.render(self).expect("render failed")
+    }
+
+    fn print_with_globals(
+        &self,
+        context: &Context<L>,
+        global_symbols: &InternTable<String, GlobalSymbol>,
+    ) {
+        let mut doc = Document::with_global_symbols(Config::default(), context, global_symbols);
         let output = doc.render(self).expect("render failed");
         stdout().write_all(output.as_bytes()).expect("write failed");
     }

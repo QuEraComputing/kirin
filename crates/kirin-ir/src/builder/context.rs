@@ -3,6 +3,7 @@ use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionEr
 use super::region::RegionBuilder;
 
 use crate::arena::GetInfo;
+use crate::node::symbol::GlobalSymbol;
 use crate::node::*;
 use crate::signature::Signature;
 use crate::{Context, Dialect};
@@ -117,6 +118,10 @@ impl<L: Dialect> Context<L> {
 
     /// Create a new staged function.
     ///
+    /// The `name` parameter accepts a [`GlobalSymbol`] pre-interned via
+    /// [`Pipeline::intern`](crate::Pipeline::intern). This ensures function
+    /// names are consistent across compilation stages.
+    ///
     /// Returns `Err(StagedFunctionError)` when staged-function name policy would
     /// be violated:
     ///
@@ -133,22 +138,21 @@ impl<L: Dialect> Context<L> {
     #[builder(finish_fn = new)]
     pub fn staged_function(
         &mut self,
-        #[builder(into)] name: Option<String>,
+        name: Option<GlobalSymbol>,
         signature: Option<Signature<L::Type>>,
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
     ) -> Result<StagedFunction, StagedFunctionError<L>> {
-        let interned_name = name.map(|n| self.symbols.borrow_mut().intern(n));
         let sig = signature.unwrap_or_default();
 
         // Check policy conflicts for named staged functions.
-        if interned_name.is_some() {
+        if name.is_some() {
             let same_name: Vec<_> = self
                 .staged_functions
                 .iter()
                 .filter(|item| {
                     let info: &StagedFunctionInfo<L> = item;
-                    !info.invalidated && info.name == interned_name
+                    !info.invalidated && info.name == name
                 })
                 .map(|item| item.id)
                 .collect();
@@ -162,7 +166,7 @@ impl<L: Dialect> Context<L> {
             if !duplicate_signature.is_empty() {
                 return Err(StagedFunctionError {
                     conflict_kind: StagedFunctionConflictKind::DuplicateSignature,
-                    name: interned_name,
+                    name,
                     signature: sig,
                     conflicting: duplicate_signature,
                     specializations: specializations.unwrap_or_default(),
@@ -180,7 +184,7 @@ impl<L: Dialect> Context<L> {
                     return Err(StagedFunctionError {
                         conflict_kind:
                             StagedFunctionConflictKind::SignatureMismatchUnderSingleInterface,
-                        name: interned_name,
+                        name,
                         signature: sig,
                         conflicting: signature_mismatch,
                         specializations: specializations.unwrap_or_default(),
@@ -193,7 +197,7 @@ impl<L: Dialect> Context<L> {
         let id = self.staged_functions.next_id();
         let staged_function = StagedFunctionInfo {
             id,
-            name: interned_name,
+            name,
             signature: sig,
             specializations: specializations.unwrap_or_default(),
             backedges: backedges.unwrap_or_default(),
@@ -347,10 +351,10 @@ impl<L: Dialect> Context<L> {
 mod tests {
     use super::*;
     use crate::{
-        Block, Context, Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut,
-        HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
-        IsConstant, IsPure, IsTerminator, Region, ResultValue, SSAValue,
-        StagedFunctionConflictKind, StagedNamePolicy, Successor,
+        Block, Context, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks,
+        HasBlocksMut, HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors,
+        HasSuccessorsMut, InternTable, IsConstant, IsPure, IsTerminator, Region, ResultValue,
+        SSAValue, StagedFunctionConflictKind, StagedNamePolicy, Successor,
     };
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -476,18 +480,20 @@ mod tests {
 
     #[test]
     fn staged_name_policy_defaults_to_single_interface() {
+        let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
+        let foo = gs.intern("foo".to_string());
         let mut ctx: Context<TestDialect> = Context::default();
         assert_eq!(ctx.staged_name_policy(), StagedNamePolicy::SingleInterface);
 
         ctx.staged_function()
-            .name("foo")
+            .name(foo)
             .signature(sig(TestType::I32))
             .new()
             .expect("first staged function should be created");
 
         let err = ctx
             .staged_function()
-            .name("foo")
+            .name(foo)
             .signature(sig(TestType::I64))
             .new()
             .expect_err("same name + different signature should fail by default");
@@ -500,17 +506,19 @@ mod tests {
 
     #[test]
     fn staged_name_policy_multiple_dispatch_allows_different_signatures() {
+        let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
+        let foo = gs.intern("foo".to_string());
         let mut ctx: Context<TestDialect> = Context::default();
         ctx.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
 
         ctx.staged_function()
-            .name("foo")
+            .name(foo)
             .signature(sig(TestType::I32))
             .new()
             .expect("first staged function should be created");
 
         ctx.staged_function()
-            .name("foo")
+            .name(foo)
             .signature(sig(TestType::I64))
             .new()
             .expect("same name + different signature should be allowed under MultipleDispatch");
@@ -518,19 +526,21 @@ mod tests {
 
     #[test]
     fn duplicate_signature_is_rejected_even_with_multiple_dispatch() {
+        let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
+        let foo = gs.intern("foo".to_string());
         let mut ctx: Context<TestDialect> = Context::default();
         ctx.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
 
         let i32_sig = sig(TestType::I32);
         ctx.staged_function()
-            .name("foo")
+            .name(foo)
             .signature(i32_sig.clone())
             .new()
             .expect("first staged function should be created");
 
         let err = ctx
             .staged_function()
-            .name("foo")
+            .name(foo)
             .signature(i32_sig)
             .new()
             .expect_err("duplicate (name, signature) should still fail");

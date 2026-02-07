@@ -1,0 +1,20 @@
+---
+source: crates/kirin-prettyless/src/tests.rs
+assertion_line: 364
+expression: output
+---
+stage @A fn @foo(int) -> int {
+  ^0 {
+    constant 42;
+    return %0;
+  }
+}
+
+stage @B fn @foo(int) -> int {
+  ^0 {
+    constant 10;
+    constant 20;
+    add %0, %1;
+    return %2;
+  }
+}

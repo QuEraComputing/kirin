@@ -1,7 +1,7 @@
 //! Result width scanning for proper alignment in pretty printing.
 
 use kirin_ir::{
-    Block, Dialect, GetInfo, Region, ResultValue, SSAValue, SpecializedFunction,
+    Block, Dialect, GetInfo, GlobalSymbol, Region, ResultValue, SSAValue, SpecializedFunction,
     SpecializedFunctionInfo, StagedFunction, Statement, Successor,
 };
 
@@ -97,5 +97,11 @@ impl<L: Dialect> ScanResultWidth<L> for ResultValue {
 impl<L: Dialect> ScanResultWidth<L> for Successor {
     fn scan_result_width(&self, _doc: &mut Document<'_, L>) {
         // Successor is a leaf node with no nested statements
+    }
+}
+
+impl<L: Dialect> ScanResultWidth<L> for GlobalSymbol {
+    fn scan_result_width(&self, _doc: &mut Document<'_, L>) {
+        // GlobalSymbol is a leaf node with no nested statements
     }
 }

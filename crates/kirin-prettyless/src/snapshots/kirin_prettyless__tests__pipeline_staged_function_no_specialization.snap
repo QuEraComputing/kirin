@@ -1,0 +1,6 @@
+---
+source: crates/kirin-prettyless/src/tests.rs
+assertion_line: 427
+expression: output
+---
+stage @host fn @extern_fn(int) -> float

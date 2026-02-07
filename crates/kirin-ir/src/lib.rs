@@ -7,6 +7,7 @@ mod intern;
 mod language;
 mod lattice;
 mod node;
+mod pipeline;
 mod signature;
 
 /// Queries from the IRContext.
@@ -24,11 +25,12 @@ pub use language::{
 };
 pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{
-    Block, BlockArgument, BlockInfo, CompileStage, DeletedSSAValue, Function, FunctionInfo,
-    LinkedList, LinkedListNode, Region, ResultValue, SSAInfo, SSAKind, SSAValue,
+    Block, BlockArgument, BlockInfo, CompileStageId, DeletedSSAValue, Function, FunctionInfo,
+    GlobalSymbol, LinkedList, LinkedListNode, Region, ResultValue, SSAInfo, SSAKind, SSAValue,
     SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo,
     StagedNamePolicy, Statement, StatementInfo, Successor, Symbol, TestSSAValue,
 };
+pub use pipeline::{CompileStage, Pipeline, StageIdentity};
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };

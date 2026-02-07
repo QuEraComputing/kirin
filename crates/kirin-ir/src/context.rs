@@ -2,11 +2,19 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use crate::arena::Arena;
+use crate::node::function::CompileStageId;
 use crate::node::region::RegionInfo;
 use crate::{Dialect, InternTable, node::*};
 
 #[derive(Debug)]
 pub struct Context<L: Dialect> {
+    /// Optional human-readable name for this compilation stage.
+    ///
+    /// When set, printing infrastructure can use this instead of a numeric
+    /// index (e.g., `stage @llvm_ir` instead of `stage 0`). The symbol is
+    /// interned in the pipeline's global symbol table.
+    pub(crate) name: Option<GlobalSymbol>,
+    pub(crate) stage_id: Option<CompileStageId>,
     pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
     pub(crate) staged_name_policy: StagedNamePolicy,
     pub(crate) regions: Arena<Region, RegionInfo<L>>,
@@ -22,6 +30,8 @@ where
 {
     fn default() -> Self {
         Self {
+            name: None,
+            stage_id: None,
             staged_functions: Arena::default(),
             staged_name_policy: StagedNamePolicy::default(),
             regions: Arena::default(),
@@ -41,6 +51,8 @@ where
 {
     fn clone(&self) -> Self {
         Self {
+            name: self.name,
+            stage_id: self.stage_id,
             staged_functions: self.staged_functions.clone(),
             staged_name_policy: self.staged_name_policy,
             regions: self.regions.clone(),
@@ -53,6 +65,26 @@ where
 }
 
 impl<L: Dialect> Context<L> {
+    /// Get the optional stage name for this context.
+    pub fn name(&self) -> Option<GlobalSymbol> {
+        self.name
+    }
+
+    /// Set the stage name for this context.
+    pub fn set_name(&mut self, name: Option<GlobalSymbol>) {
+        self.name = name;
+    }
+
+    /// Get the compile-stage ID assigned by the pipeline, if any.
+    pub fn stage_id(&self) -> Option<CompileStageId> {
+        self.stage_id
+    }
+
+    /// Set the compile-stage ID for this context.
+    pub fn set_stage_id(&mut self, id: Option<CompileStageId>) {
+        self.stage_id = id;
+    }
+
     /// Get a reference to the statements arena.
     ///
     /// Read-only access. Use `get_info_mut` on `Statement` for mutable access.

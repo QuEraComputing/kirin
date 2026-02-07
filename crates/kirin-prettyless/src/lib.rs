@@ -32,12 +32,14 @@
 mod config;
 mod document;
 mod impls;
+mod pipeline;
 mod scan;
 mod traits;
 
 // Re-export main types
 pub use config::Config;
 pub use document::Document;
+pub use pipeline::{FunctionPrintExt, PipelineDocument, RenderStage};
 pub use scan::ScanResultWidth;
 pub use traits::{PrettyPrint, PrettyPrintExt, PrettyPrintName, PrettyPrintType};
 
@@ -48,8 +50,8 @@ pub type ArenaDoc<'a> = prettyless::DocBuilder<'a, Arena<'a>>;
 /// Prelude module for common imports.
 pub mod prelude {
     pub use crate::{
-        ArenaDoc, Config, DocAllocator, Document, PrettyPrint, PrettyPrintExt, PrettyPrintName,
-        PrettyPrintType,
+        ArenaDoc, Config, DocAllocator, Document, FunctionPrintExt, PipelineDocument, PrettyPrint,
+        PrettyPrintExt, PrettyPrintName, PrettyPrintType, RenderStage,
     };
     pub use prettyless;
 }

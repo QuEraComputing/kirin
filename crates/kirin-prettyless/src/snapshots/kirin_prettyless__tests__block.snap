@@ -1,16 +1,16 @@
 ---
 source: crates/kirin-prettyless/src/tests.rs
-expression: doc.render(f).unwrap()
+expression: buf
 ---
-function {
-  ^0(%%5: int, %y: float) {
+fn @test_func(int) -> int {
+  ^0(%5: int, %y: float) {
     constant 1.2;
     constant 3.4;
     add %0, %1;
     add %2, %5;
     return %4;
   }
-  ^1(%%7: float) {
+  ^1(%7: float) {
     return %3;
   }
 }

@@ -1,0 +1,11 @@
+---
+source: crates/kirin-prettyless/src/tests.rs
+assertion_line: 399
+expression: output
+---
+stage 0 fn @bar(int, float) -> int {
+  ^0 {
+    constant 7;
+    return %0;
+  }
+}

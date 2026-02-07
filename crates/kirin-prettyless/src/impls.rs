@@ -1,8 +1,8 @@
 //! PrettyPrint implementations for IR types.
 
 use kirin_ir::{
-    Dialect, GetInfo, Item, ResultValue, SSAInfo, SSAValue, SpecializedFunction, StagedFunction,
-    Successor, Symbol,
+    Dialect, GetInfo, GlobalSymbol, Item, ResultValue, SSAInfo, SSAValue, SpecializedFunction,
+    StagedFunction, Successor, Symbol,
 };
 use prettyless::DocAllocator;
 
@@ -59,6 +59,20 @@ impl PrettyPrint for Symbol {
             // Fallback: print as raw ID if not found
             doc.text(format!("@<{}>", usize::from(*self)))
         }
+    }
+}
+
+impl PrettyPrint for GlobalSymbol {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        if let Some(gs) = doc.global_symbols() {
+            if let Some(name) = gs.resolve(*self) {
+                return doc.text(format!("@{}", name));
+            }
+        }
+        doc.text(format!("@<global:{}>", usize::from(*self)))
     }
 }
 

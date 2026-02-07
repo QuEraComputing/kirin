@@ -8,7 +8,7 @@ pub mod symbol;
 
 pub use block::{Block, BlockInfo, Successor};
 pub use function::{
-    CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
+    CompileStageId, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
     StagedFunction, StagedFunctionInfo, StagedNamePolicy,
 };
 pub use linked_list::{LinkedList, LinkedListNode};
@@ -17,4 +17,4 @@ pub use ssa::{
     BlockArgument, DeletedSSAValue, ResultValue, SSAInfo, SSAKind, SSAValue, TestSSAValue,
 };
 pub use stmt::{Statement, StatementInfo};
-pub use symbol::Symbol;
+pub use symbol::{GlobalSymbol, Symbol};
