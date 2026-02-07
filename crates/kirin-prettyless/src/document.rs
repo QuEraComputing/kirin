@@ -173,7 +173,6 @@ where
             .and_then(|name_sym| {
                 self.stage
                     .symbol_table()
-                    .borrow()
                     .resolve(name_sym)
                     .map(|s| format!("^{}", s))
             })
@@ -192,7 +191,6 @@ where
                 let name = if let Some(name_sym) = arg_info.name() {
                     self.stage
                         .symbol_table()
-                        .borrow()
                         .resolve(name_sym)
                         .cloned()
                         .unwrap_or_else(|| format!("{}", Id::from(*arg).raw()))

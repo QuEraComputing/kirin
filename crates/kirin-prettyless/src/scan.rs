@@ -23,7 +23,7 @@ impl<L: Dialect> ScanResultWidth<L> for Statement {
             let info = result.expect_info(doc.stage());
             let mut result_len = result.to_string().len();
             if let Some(name) = info.name() {
-                if let Some(resolved_name) = doc.stage().symbol_table().borrow().resolve(name) {
+                if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
                     result_len = resolved_name.len();
                 }
             }

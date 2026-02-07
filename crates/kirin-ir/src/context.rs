@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::sync::Arc;
-
 use crate::arena::Arena;
 use crate::node::function::CompileStage;
 use crate::node::region::RegionInfo;
@@ -21,7 +18,7 @@ pub struct StageInfo<L: Dialect> {
     pub(crate) blocks: Arena<Block, BlockInfo<L>>,
     pub(crate) statements: Arena<Statement, StatementInfo<L>>,
     pub(crate) ssas: Arena<SSAValue, SSAInfo<L>>,
-    pub(crate) symbols: Arc<RefCell<InternTable<String, Symbol>>>,
+    pub(crate) symbols: InternTable<String, Symbol>,
 }
 
 impl<L> Default for StageInfo<L>
@@ -38,7 +35,7 @@ where
             blocks: Arena::default(),
             statements: Arena::default(),
             ssas: Arena::default(),
-            symbols: Arc::new(RefCell::new(InternTable::default())),
+            symbols: InternTable::default(),
         }
     }
 }
@@ -100,9 +97,13 @@ impl<L: Dialect> StageInfo<L> {
     }
 
     /// Get a reference to the symbols intern table.
-    /// Read-only access. Use `borrow_mut` on the returned `RefCell` for mutable access.
-    pub fn symbol_table(&self) -> Arc<RefCell<InternTable<String, Symbol>>> {
-        self.symbols.clone()
+    pub fn symbol_table(&self) -> &InternTable<String, Symbol> {
+        &self.symbols
+    }
+
+    /// Get a mutable reference to the symbols intern table.
+    pub fn symbol_table_mut(&mut self) -> &mut InternTable<String, Symbol> {
+        &mut self.symbols
     }
 
     /// Get a reference to the staged functions arena.

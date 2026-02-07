@@ -131,10 +131,7 @@ impl Block {
         }
     }
 
-    pub fn terminator<'a, L: Dialect>(
-        &self,
-        stage: &'a crate::StageInfo<L>,
-    ) -> Option<Statement> {
+    pub fn terminator<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> Option<Statement> {
         let info = self.expect_info(stage);
         info.terminator
     }

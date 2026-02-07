@@ -290,10 +290,7 @@ where
     type Output = kirin_ir::Symbol;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
-        ctx.stage
-            .symbol_table()
-            .borrow_mut()
-            .intern(self.name.to_string())
+        ctx.stage.symbol_table_mut().intern(self.name.to_string())
     }
 }
 

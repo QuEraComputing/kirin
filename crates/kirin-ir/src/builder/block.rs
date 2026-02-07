@@ -88,7 +88,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                 let arg: BlockArgument = self.stage.ssas.next_id().into();
                 let ssa = SSAInfo::new(
                     arg.into(),
-                    name.map(|n| self.stage.symbols.borrow_mut().intern(n)),
+                    name.map(|n| self.stage.symbols.intern(n)),
                     ty,
                     SSAKind::BlockArgument(id, index),
                 );
@@ -114,10 +114,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
 
         let block = BlockInfo::builder()
             .maybe_parent(self.parent)
-            .maybe_name(
-                self.name
-                    .map(|n| self.stage.symbols.borrow_mut().intern(n)),
-            )
+            .maybe_name(self.name.map(|n| self.stage.symbols.intern(n)))
             .node(LinkedListNode::new(id))
             .arguments(block_args)
             .statements(self.stage.link_statements(&self.statements))

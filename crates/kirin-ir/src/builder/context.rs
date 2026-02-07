@@ -81,12 +81,7 @@ impl<L: Dialect> StageInfo<L> {
         kind: SSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
-        let ssa = SSAInfo::new(
-            id.into(),
-            name.map(|n| self.symbols.borrow_mut().intern(n)),
-            ty,
-            kind,
-        );
+        let ssa = SSAInfo::new(id.into(), name.map(|n| self.symbols.intern(n)), ty, kind);
         self.ssas.alloc(ssa);
         id
     }
@@ -483,9 +478,13 @@ mod tests {
         let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
         let foo = gs.intern("foo".to_string());
         let mut stage: StageInfo<TestDialect> = StageInfo::default();
-        assert_eq!(stage.staged_name_policy(), StagedNamePolicy::SingleInterface);
+        assert_eq!(
+            stage.staged_name_policy(),
+            StagedNamePolicy::SingleInterface
+        );
 
-        stage.staged_function()
+        stage
+            .staged_function()
             .name(foo)
             .signature(sig(TestType::I32))
             .new()
@@ -511,13 +510,15 @@ mod tests {
         let mut stage: StageInfo<TestDialect> = StageInfo::default();
         stage.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
 
-        stage.staged_function()
+        stage
+            .staged_function()
             .name(foo)
             .signature(sig(TestType::I32))
             .new()
             .expect("first staged function should be created");
 
-        stage.staged_function()
+        stage
+            .staged_function()
             .name(foo)
             .signature(sig(TestType::I64))
             .new()
@@ -532,7 +533,8 @@ mod tests {
         stage.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
 
         let i32_sig = sig(TestType::I32);
-        stage.staged_function()
+        stage
+            .staged_function()
             .name(foo)
             .signature(i32_sig.clone())
             .new()

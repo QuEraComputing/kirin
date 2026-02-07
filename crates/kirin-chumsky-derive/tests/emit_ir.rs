@@ -59,9 +59,7 @@ fn test_emit_add_creates_statement() {
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify the statement was created
-    let stmt_info = statement
-        .get_info(&stage)
-        .expect("statement should exist");
+    let stmt_info = statement.get_info(&stage).expect("statement should exist");
 
     // Verify the statement definition is an Add variant
     match stmt_info.definition() {
@@ -102,9 +100,7 @@ fn test_emit_neg_creates_statement() {
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify
-    let stmt_info = statement
-        .get_info(&stage)
-        .expect("statement should exist");
+    let stmt_info = statement.get_info(&stage).expect("statement should exist");
     match stmt_info.definition() {
         EmitLang::Neg { res: _, arg } => {
             assert_eq!(*arg, ssa_x);
@@ -135,9 +131,7 @@ fn test_emit_return_creates_statement() {
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify
-    let stmt_info = statement
-        .get_info(&stage)
-        .expect("statement should exist");
+    let stmt_info = statement.get_info(&stage).expect("statement should exist");
     match stmt_info.definition() {
         EmitLang::Return(arg) => {
             assert_eq!(*arg, ssa_v);
