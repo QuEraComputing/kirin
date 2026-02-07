@@ -22,7 +22,7 @@ where
         let dialect_variant: Branch = Branch {
             target: f_target_ir.into(),
         };
-        ctx.context.statement().definition(dialect_variant).new()
+        ctx.stage.statement().definition(dialect_variant).new()
     }
 }
 impl<'tokens, 'src, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>

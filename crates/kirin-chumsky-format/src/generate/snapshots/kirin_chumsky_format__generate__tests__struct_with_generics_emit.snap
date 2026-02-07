@@ -20,7 +20,7 @@ where
         let Self(f0) = self;
         let f0_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f0, ctx);
         let dialect_variant: GenericReturn<T> = GenericReturn(f0_ir.into());
-        ctx.context.statement().definition(dialect_variant).new()
+        ctx.stage.statement().definition(dialect_variant).new()
     }
 }
 impl<'tokens, 'src, T: TypeLattice, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>

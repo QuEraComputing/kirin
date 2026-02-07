@@ -233,8 +233,8 @@ fn test_block() {
     let mut gs: kirin_ir::InternTable<String, kirin_ir::GlobalSymbol> =
         kirin_ir::InternTable::default();
     let foo = gs.intern("foo".to_string());
-    let mut context: Context<SimpleLang> = Context::default();
-    let staged_function = context
+    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
+    let staged_function = stage
         .staged_function()
         .name(foo)
         .signature(kirin_ir::Signature {
@@ -245,14 +245,14 @@ fn test_block() {
         .new()
         .unwrap();
 
-    let a = SimpleLang::op_constant(&mut context, 1.2);
-    let b = SimpleLang::op_constant(&mut context, 3.4);
-    let c = SimpleLang::op_add(&mut context, a.res, b.res);
-    let block_arg_x = context.block_argument(0);
-    let d = SimpleLang::op_add(&mut context, c.res, block_arg_x);
-    let ret = SimpleLang::op_return(&mut context, d.res);
+    let a = SimpleLang::op_constant(&mut stage, 1.2);
+    let b = SimpleLang::op_constant(&mut stage, 3.4);
+    let c = SimpleLang::op_add(&mut stage, a.res, b.res);
+    let block_arg_x = stage.block_argument(0);
+    let d = SimpleLang::op_add(&mut stage, c.res, block_arg_x);
+    let ret = SimpleLang::op_return(&mut stage, d.res);
 
-    let block_a: Block = context
+    let block_a: Block = stage
         .block()
         .argument(Int)
         .argument_with_name("y", Float)
@@ -263,12 +263,12 @@ fn test_block() {
         .terminator(ret)
         .new();
 
-    let ret = SimpleLang::op_return(&mut context, block_arg_x);
-    let block_b = context.block().argument(Float).terminator(ret).new();
+    let ret = SimpleLang::op_return(&mut stage, block_arg_x);
+    let block_b = stage.block().argument(Float).terminator(ret).new();
 
-    let body = context.region().add_block(block_a).add_block(block_b).new();
-    let fdef = SimpleLang::op_function(&mut context, body);
-    let f = context
+    let body = stage.region().add_block(block_a).add_block(block_b).new();
+    let fdef = SimpleLang::op_function(&mut stage, body);
+    let f = stage
         .specialize()
         .f(staged_function)
         .body(fdef)
@@ -276,7 +276,7 @@ fn test_block() {
         .unwrap();
 
     // Pretty print the function using the Document method
-    let doc = Document::new(Default::default(), &context);
+    let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_specialized_function(&f);
     let max_width = doc.config().max_width;
     let mut buf = String::new();
@@ -299,16 +299,16 @@ use kirin::pretty::Config;
 /// Test roundtrip: parse -> emit -> print should produce output matching input.
 #[test]
 fn test_roundtrip_add() {
-    let mut context: Context<SimpleLang> = Context::default();
+    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
 
     // Create operand SSAs with types
-    let ssa_a = context
+    let ssa_a = stage
         .ssa()
         .name("a".to_string())
         .ty(Int)
         .kind(SSAKind::Test)
         .new();
-    let ssa_b = context
+    let ssa_b = stage
         .ssa()
         .name("b".to_string())
         .ty(Int)
@@ -320,18 +320,18 @@ fn test_roundtrip_add() {
     let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
 
     // Emit to get the dialect variant
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("a".to_string(), ssa_a);
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
     let statement = ast.emit(&mut emit_ctx);
-    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
     // Verify the result has the correct type by checking the SSA
     if let SimpleLang::Add { res, .. } = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
-        let res_info = res_ssa.get_info(&context).expect("result SSA should exist");
+        let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
         assert_eq!(
             res_info.ty(),
             &SimpleIRType::Float,
@@ -341,7 +341,7 @@ fn test_roundtrip_add() {
 
     // Pretty print directly using the trait
     let config = Config::default();
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
     arena_doc
@@ -357,22 +357,22 @@ fn test_roundtrip_add() {
 fn test_roundtrip_constant() {
     use kirin::pretty::PrettyPrint as _;
 
-    let mut context: Context<SimpleLang> = Context::default();
+    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
 
     // Parse - type annotation in input
     let input = "%x = constant 42 -> float";
     let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
 
     // Emit
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx);
-    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
     // Verify the result has the correct type
     if let SimpleLang::Constant { res, .. } = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
-        let res_info = res_ssa.get_info(&context).expect("result SSA should exist");
+        let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
         assert_eq!(
             res_info.ty(),
             &SimpleIRType::Float,
@@ -382,7 +382,7 @@ fn test_roundtrip_constant() {
 
     // Pretty print
     let config = Config::default();
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
     arena_doc
@@ -398,10 +398,10 @@ fn test_roundtrip_constant() {
 fn test_roundtrip_return() {
     use kirin::pretty::PrettyPrint as _;
 
-    let mut context: Context<SimpleLang> = Context::default();
+    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
 
     // Create operand SSA
-    let ssa_v = context
+    let ssa_v = stage
         .ssa()
         .name("v".to_string())
         .ty(Int)
@@ -413,16 +413,16 @@ fn test_roundtrip_return() {
     let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
 
     // Emit
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("v".to_string(), ssa_v);
 
     let statement = ast.emit(&mut emit_ctx);
-    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
     // Pretty print
     let config = Config::default();
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
     arena_doc
@@ -453,7 +453,7 @@ pub fn strip_trailing_whitespace(s: &str) -> String {
 /// (e.g., block names, result alignment), but the core structure is preserved.
 #[test]
 fn test_roundtrip_function() {
-    let mut context: Context<SimpleLang> = Context::default();
+    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
 
     // Parse a function with a region containing a block with multiple statements
     let input = r#"%f = function {
@@ -468,11 +468,11 @@ fn test_roundtrip_function() {
     let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
 
     // Emit to IR
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx);
 
     // Pretty print using Document method
-    let doc = Document::new(Config::default(), &context);
+    let doc = Document::new(Config::default(), &stage);
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;
     let mut buf = String::new();
@@ -499,7 +499,7 @@ fn test_roundtrip_function() {
 /// The exact output format may differ from input due to Block/Region pretty printing details.
 #[test]
 fn test_roundtrip_function_multiple_blocks() {
-    let mut context: Context<SimpleLang> = Context::default();
+    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
 
     // Parse a function with a region containing multiple blocks
     let input = r#"%f = function {
@@ -516,7 +516,7 @@ fn test_roundtrip_function_multiple_blocks() {
     let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
 
     // Emit to IR
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx);
 
     // Pretty print using Document method with 4-space indentation to match input
@@ -524,7 +524,7 @@ fn test_roundtrip_function_multiple_blocks() {
         tab_spaces: 4,
         ..Default::default()
     };
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;
     let mut output = String::new();

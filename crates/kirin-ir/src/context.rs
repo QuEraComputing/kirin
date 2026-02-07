@@ -2,19 +2,19 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use crate::arena::Arena;
-use crate::node::function::CompileStageId;
+use crate::node::function::CompileStage;
 use crate::node::region::RegionInfo;
 use crate::{Dialect, InternTable, node::*};
 
 #[derive(Debug)]
-pub struct Context<L: Dialect> {
+pub struct StageInfo<L: Dialect> {
     /// Optional human-readable name for this compilation stage.
     ///
     /// When set, printing infrastructure can use this instead of a numeric
     /// index (e.g., `stage @llvm_ir` instead of `stage 0`). The symbol is
     /// interned in the pipeline's global symbol table.
     pub(crate) name: Option<GlobalSymbol>,
-    pub(crate) stage_id: Option<CompileStageId>,
+    pub(crate) stage_id: Option<CompileStage>,
     pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
     pub(crate) staged_name_policy: StagedNamePolicy,
     pub(crate) regions: Arena<Region, RegionInfo<L>>,
@@ -24,7 +24,7 @@ pub struct Context<L: Dialect> {
     pub(crate) symbols: Arc<RefCell<InternTable<String, Symbol>>>,
 }
 
-impl<L> Default for Context<L>
+impl<L> Default for StageInfo<L>
 where
     L: Dialect,
 {
@@ -43,7 +43,7 @@ where
     }
 }
 
-impl<L> Clone for Context<L>
+impl<L> Clone for StageInfo<L>
 where
     L: Dialect,
     StatementInfo<L>: Clone,
@@ -64,7 +64,7 @@ where
     }
 }
 
-impl<L: Dialect> Context<L> {
+impl<L: Dialect> StageInfo<L> {
     /// Get the optional stage name for this context.
     pub fn name(&self) -> Option<GlobalSymbol> {
         self.name
@@ -76,12 +76,12 @@ impl<L: Dialect> Context<L> {
     }
 
     /// Get the compile-stage ID assigned by the pipeline, if any.
-    pub fn stage_id(&self) -> Option<CompileStageId> {
+    pub fn stage_id(&self) -> Option<CompileStage> {
         self.stage_id
     }
 
     /// Set the compile-stage ID for this context.
-    pub fn set_stage_id(&mut self, id: Option<CompileStageId>) {
+    pub fn set_stage_id(&mut self, id: Option<CompileStage>) {
         self.stage_id = id;
     }
 

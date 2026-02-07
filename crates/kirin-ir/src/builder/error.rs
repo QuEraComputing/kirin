@@ -13,11 +13,11 @@ pub enum StagedFunctionConflictKind {
     SignatureMismatchUnderSingleInterface,
 }
 
-/// Error returned when [`Context::specialize`] detects an existing non-invalidated
+/// Error returned when [`StageInfo::specialize`] detects an existing non-invalidated
 /// specialization with the same signature.
 ///
 /// The caller can either propagate this error or consume it via
-/// [`Context::redefine_specialization`] to intentionally invalidate the old
+/// [`StageInfo::redefine_specialization`] to intentionally invalidate the old
 /// specialization and register the new one.
 #[derive(Debug)]
 pub struct SpecializeError<L: Dialect> {
@@ -45,7 +45,7 @@ impl<L: Dialect> std::fmt::Display for SpecializeError<L> {
 
 impl<L: Dialect> std::error::Error for SpecializeError<L> {}
 
-/// Error returned when [`Context::staged_function`] detects an existing
+/// Error returned when [`StageInfo::staged_function`] detects an existing
 /// non-invalidated staged function with the same name.
 ///
 /// This catches both exact duplicates (same name + same signature) and
@@ -54,7 +54,7 @@ impl<L: Dialect> std::error::Error for SpecializeError<L> {}
 /// distinguish the cases.
 ///
 /// The caller can either propagate this error or consume it via
-/// [`Context::redefine_staged_function`] to intentionally invalidate the old
+/// [`StageInfo::redefine_staged_function`] to intentionally invalidate the old
 /// staged function and register the new one.
 #[derive(Debug)]
 pub struct StagedFunctionError<L: Dialect> {

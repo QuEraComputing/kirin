@@ -29,7 +29,7 @@ where
             rhs: f_rhs_ir.into(),
             res: f_res_ir.into(),
         };
-        ctx.context.statement().definition(dialect_variant).new()
+        ctx.stage.statement().definition(dialect_variant).new()
     }
 }
 impl<'tokens, 'src, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>

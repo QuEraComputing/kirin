@@ -208,11 +208,11 @@ fn build_fn_body(
     let result_names = result_names(info);
 
     quote! {{
-        let #statement_id = context.statement_arena().next_id();
+        let #statement_id = stage.statement_arena().next_id();
         #(#let_inputs)*
         #let_results
 
-        context
+        stage
             .statement()
             .definition(#constructor)
             .new();
@@ -265,7 +265,7 @@ fn let_name_eq_result_value(
         let index = result_index;
         result_index += 1;
         results.push(quote! {
-            let #name: ResultValue = context
+            let #name: ResultValue = stage
                 .ssa()
                 .kind(SSAKind::Result(#statement_id, #index))
                 .ty(Lang::Type::from(#ssa_ty))
@@ -304,7 +304,7 @@ pub(crate) fn build_fn_for_statement(
     let self_ty = quote! { #name #ty_generics };
 
     let fn_tokens = quote! {
-        pub fn #build_fn_name<Lang>(context: &mut #crate_path::Context<Lang>, #(#inputs),*) -> #build_result_path
+        pub fn #build_fn_name<Lang>(stage: &mut #crate_path::StageInfo<Lang>, #(#inputs),*) -> #build_result_path
         where
             Lang: #crate_path::Dialect + From<#self_ty>,
             Lang::Type: From<#ir_type>

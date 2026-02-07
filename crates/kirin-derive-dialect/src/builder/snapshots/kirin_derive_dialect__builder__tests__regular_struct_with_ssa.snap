@@ -5,7 +5,7 @@ expression: "case!\n{\n    #[kirin(fn = new, type = L)] struct TestStruct<T: Com
 #[automatically_derived]
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
     pub fn new<Lang>(
-        context: &mut ::kirin::ir::Context<Lang>,
+        stage: &mut ::kirin::ir::StageInfo<Lang>,
         value: impl Into<T>,
         input_ssa: impl Into<SSAValue>,
     ) -> test_struct_build_result::TestStruct
@@ -13,17 +13,17 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
         Lang: ::kirin::ir::Dialect + From<TestStruct<T, L>>,
         Lang::Type: From<L>,
     {
-        let teststruct_statement_id = context.statement_arena().next_id();
+        let teststruct_statement_id = stage.statement_arena().next_id();
         let value: T = value.into();
         let input_ssa: SSAValue = input_ssa.into();
         let marker: std::marker::PhantomData<L> = std::marker::PhantomData;
-        let result: ResultValue = context
+        let result: ResultValue = stage
             .ssa()
             .kind(SSAKind::Result(teststruct_statement_id, 0usize))
             .ty(Lang::Type::from(value.type_of()))
             .new()
             .into();
-        context
+        stage
             .statement()
             .definition(Self {
                 value: value,

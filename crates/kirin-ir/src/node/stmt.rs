@@ -38,64 +38,64 @@ impl Statement {
 impl Statement {
     pub fn results<'a, L: Dialect>(
         &self,
-        context: &'a crate::Context<L>,
+        stage: &'a crate::StageInfo<L>,
     ) -> <L as crate::HasResults<'a>>::Iter {
-        self.expect_info(context).definition.results()
+        self.expect_info(stage).definition.results()
     }
 
     pub fn arguments<'a, L: Dialect>(
         &self,
-        context: &'a crate::Context<L>,
+        stage: &'a crate::StageInfo<L>,
     ) -> <L as crate::HasArguments<'a>>::Iter {
-        self.expect_info(context).definition.arguments()
+        self.expect_info(stage).definition.arguments()
     }
 
     pub fn regions<'a, L: Dialect>(
         &self,
-        context: &'a crate::Context<L>,
+        stage: &'a crate::StageInfo<L>,
     ) -> <L as crate::HasRegions<'a>>::Iter {
-        self.expect_info(context).definition.regions()
+        self.expect_info(stage).definition.regions()
     }
 
     pub fn blocks<'a, L: Dialect>(
         &self,
-        context: &'a crate::Context<L>,
+        stage: &'a crate::StageInfo<L>,
     ) -> <L as crate::HasBlocks<'a>>::Iter {
-        self.expect_info(context).definition.blocks()
+        self.expect_info(stage).definition.blocks()
     }
 
     pub fn successors<'a, L: Dialect>(
         &self,
-        context: &'a crate::Context<L>,
+        stage: &'a crate::StageInfo<L>,
     ) -> <L as crate::HasSuccessors<'a>>::Iter {
-        self.expect_info(context).definition.successors()
+        self.expect_info(stage).definition.successors()
     }
 
-    pub fn parent<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<Block> {
-        &self.expect_info(context).parent
+    pub fn parent<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> &'a Option<Block> {
+        &self.expect_info(stage).parent
     }
 
-    pub fn next<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<Statement> {
-        &self.expect_info(context).node.next
+    pub fn next<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> &'a Option<Statement> {
+        &self.expect_info(stage).node.next
     }
 
-    pub fn prev<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a Option<Statement> {
-        &self.expect_info(context).node.prev
+    pub fn prev<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> &'a Option<Statement> {
+        &self.expect_info(stage).node.prev
     }
 
-    pub fn definition<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> &'a L {
-        &self.expect_info(context).definition
+    pub fn definition<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> &'a L {
+        &self.expect_info(stage).definition
     }
 }
 
 impl<L: Dialect> GetInfo<L> for Statement {
     type Info = Item<StatementInfo<L>>;
 
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
-        context.statements.get(*self)
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
+        stage.statements.get(*self)
     }
 
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
-        context.statements.get_mut(*self)
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
+        stage.statements.get_mut(*self)
     }
 }

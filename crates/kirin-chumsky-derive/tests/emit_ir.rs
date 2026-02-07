@@ -3,7 +3,7 @@
 //! These tests verify that parsed AST nodes can be correctly converted to IR nodes
 //! using the EmitIR trait.
 
-use kirin::ir::{Context, Dialect, GetInfo, ResultValue, SSAValue};
+use kirin::ir::{Dialect, GetInfo, ResultValue, SSAValue, StageInfo};
 use kirin_chumsky::{EmitContext, EmitIR, HasParser, PrettyPrint, parse, parse_ast};
 use kirin_test_utils::SimpleType;
 
@@ -30,17 +30,17 @@ pub enum EmitLang {
 #[test]
 fn test_emit_add_creates_statement() {
     // Create a fresh context
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // First, we need to set up the operand SSAs that the Add instruction will reference
     // Create SSAs for %a and %b before emitting the add instruction
-    let ssa_a = context
+    let ssa_a = stage
         .ssa()
         .name("a".to_string())
         .ty(SimpleType::I32)
         .kind(kirin_ir::SSAKind::Test)
         .new();
-    let ssa_b = context
+    let ssa_b = stage
         .ssa()
         .name("b".to_string())
         .ty(SimpleType::I32)
@@ -51,7 +51,7 @@ fn test_emit_add_creates_statement() {
     let ast = parse_ast::<EmitLang>("%result = add %a, %b").expect("parse failed");
 
     // Create emit context and register the operand SSAs
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("a".to_string(), ssa_a);
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
@@ -60,7 +60,7 @@ fn test_emit_add_creates_statement() {
 
     // Verify the statement was created
     let stmt_info = statement
-        .get_info(&context)
+        .get_info(&stage)
         .expect("statement should exist");
 
     // Verify the statement definition is an Add variant
@@ -72,7 +72,7 @@ fn test_emit_add_creates_statement() {
 
             // Verify the result SSA has the correct name
             let res_ssa: SSAValue = (*res).into();
-            let res_info = res_ssa.get_info(&context).expect("result SSA should exist");
+            let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
             // The name should be "result" from the parsed input
             assert!(res_info.name().is_some());
         }
@@ -82,10 +82,10 @@ fn test_emit_add_creates_statement() {
 
 #[test]
 fn test_emit_neg_creates_statement() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create the operand SSA
-    let ssa_x = context
+    let ssa_x = stage
         .ssa()
         .name("x".to_string())
         .ty(SimpleType::I32)
@@ -96,14 +96,14 @@ fn test_emit_neg_creates_statement() {
     let ast = parse_ast::<EmitLang>("%y = neg %x").expect("parse failed");
 
     // Emit with registered SSA
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("x".to_string(), ssa_x);
 
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify
     let stmt_info = statement
-        .get_info(&context)
+        .get_info(&stage)
         .expect("statement should exist");
     match stmt_info.definition() {
         EmitLang::Neg { res: _, arg } => {
@@ -115,10 +115,10 @@ fn test_emit_neg_creates_statement() {
 
 #[test]
 fn test_emit_return_creates_statement() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create the operand SSA
-    let ssa_v = context
+    let ssa_v = stage
         .ssa()
         .name("v".to_string())
         .ty(SimpleType::I32)
@@ -129,14 +129,14 @@ fn test_emit_return_creates_statement() {
     let ast = parse_ast::<EmitLang>("return %v").expect("parse failed");
 
     // Emit with registered SSA
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("v".to_string(), ssa_v);
 
     let statement = ast.emit(&mut emit_ctx);
 
     // Verify
     let stmt_info = statement
-        .get_info(&context)
+        .get_info(&stage)
         .expect("statement should exist");
     match stmt_info.definition() {
         EmitLang::Return(arg) => {
@@ -148,10 +148,10 @@ fn test_emit_return_creates_statement() {
 
 #[test]
 fn test_emit_convenience_function() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create the operand SSA
-    let ssa_val = context
+    let ssa_val = stage
         .ssa()
         .name("val".to_string())
         .ty(SimpleType::I32)
@@ -167,23 +167,23 @@ fn test_emit_convenience_function() {
     // In practice, you'd use EmitContext directly for complex scenarios
 
     // For this test, let's just verify emit() works when SSAs are registered
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("val".to_string(), ssa_val);
     let _statement = ast.emit(&mut emit_ctx);
 }
 
 #[test]
 fn test_emit_result_creates_ssa() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSAs
-    let ssa_a = context
+    let ssa_a = stage
         .ssa()
         .name("a".to_string())
         .ty(SimpleType::I32)
         .kind(kirin_ir::SSAKind::Test)
         .new();
-    let ssa_b = context
+    let ssa_b = stage
         .ssa()
         .name("b".to_string())
         .ty(SimpleType::I32)
@@ -194,7 +194,7 @@ fn test_emit_result_creates_ssa() {
     let ast = parse_ast::<EmitLang>("%sum = add %a, %b").expect("parse failed");
 
     // Emit
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("a".to_string(), ssa_a);
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
@@ -210,16 +210,16 @@ fn test_emit_result_creates_ssa() {
 
 #[test]
 fn test_emit_chain_multiple_statements() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create initial SSAs
-    let ssa_x = context
+    let ssa_x = stage
         .ssa()
         .name("x".to_string())
         .ty(SimpleType::I32)
         .kind(kirin_ir::SSAKind::Test)
         .new();
-    let ssa_y = context
+    let ssa_y = stage
         .ssa()
         .name("y".to_string())
         .ty(SimpleType::I32)
@@ -236,7 +236,7 @@ fn test_emit_chain_multiple_statements() {
 
     // Emit all statements in a block so the mutable borrow ends
     let (stmt1, stmt2, stmt3) = {
-        let mut emit_ctx = EmitContext::new(&mut context);
+        let mut emit_ctx = EmitContext::new(&mut stage);
         emit_ctx.register_ssa("x".to_string(), ssa_x);
         emit_ctx.register_ssa("y".to_string(), ssa_y);
 
@@ -259,12 +259,12 @@ fn test_emit_chain_multiple_statements() {
     };
 
     // Verify all statements were created
-    assert!(stmt1.get_info(&context).is_some());
-    assert!(stmt2.get_info(&context).is_some());
-    assert!(stmt3.get_info(&context).is_some());
+    assert!(stmt1.get_info(&stage).is_some());
+    assert!(stmt2.get_info(&stage).is_some());
+    assert!(stmt3.get_info(&stage).is_some());
 
     // Verify the chain is correct by checking the Return uses the negated value
-    let stmt3_info = stmt3.get_info(&context).unwrap();
+    let stmt3_info = stmt3.get_info(&stage).unwrap();
     if let EmitLang::Return(ret_arg) = stmt3_info.definition() {
         // The return argument should be the SSA registered as "neg"
         assert_eq!(*ret_arg, neg_ssa);
@@ -276,14 +276,14 @@ fn test_emit_chain_multiple_statements() {
 /// Test the combined `parse` function that does parsing + emission in one step.
 ///
 /// The combined `parse` function is designed for parsing complete programs
-/// or statements where all referenced SSAs are defined within the same context.
+/// or statements where all referenced SSAs are defined within the same stage.
 /// For this test, we verify the function signature and basic usage work.
 #[test]
 fn test_combined_parse_function() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Test that the parse function works for syntax errors (returns Err)
-    let result = parse::<EmitLang>("invalid syntax", &mut context);
+    let result = parse::<EmitLang>("invalid syntax", &mut stage);
     assert!(result.is_err(), "Invalid syntax should return an error");
 
     // For statements that reference external SSAs (like %a, %b), we need
@@ -297,20 +297,20 @@ fn test_combined_parse_function() {
 /// SSAs from earlier statements are referenced in later ones.
 #[test]
 fn test_combined_parse_workflow() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // For multi-statement programs, use parse_ast + EmitContext
     // to maintain SSA mappings across statements.
 
     // Create initial SSAs (these would typically come from function arguments
     // or other sources in a real compiler)
-    let ssa_a = context
+    let ssa_a = stage
         .ssa()
         .name("a".to_string())
         .ty(SimpleType::I32)
         .kind(kirin_ir::SSAKind::Test)
         .new();
-    let ssa_b = context
+    let ssa_b = stage
         .ssa()
         .name("b".to_string())
         .ty(SimpleType::I32)
@@ -318,7 +318,7 @@ fn test_combined_parse_workflow() {
         .new();
 
     // Create emit context and register the initial SSAs
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("a".to_string(), ssa_a);
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
@@ -335,8 +335,8 @@ fn test_combined_parse_workflow() {
     let y_ssa = emit_ctx.lookup_ssa("y").expect("y should exist");
 
     // Both SSAs should have been created
-    assert!(x_ssa.get_info(emit_ctx.context).is_some());
-    assert!(y_ssa.get_info(emit_ctx.context).is_some());
+    assert!(x_ssa.get_info(emit_ctx.stage).is_some());
+    assert!(y_ssa.get_info(emit_ctx.stage).is_some());
 }
 
 // ============================================================================
@@ -350,16 +350,16 @@ use kirin_prettyless::{Config, Document};
 /// This verifies that the parser and pretty printer are symmetric.
 #[test]
 fn test_roundtrip_add() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSAs
-    let ssa_a = context
+    let ssa_a = stage
         .ssa()
         .name("a".to_string())
         .ty(SimpleType::I32)
         .kind(kirin_ir::SSAKind::Test)
         .new();
-    let ssa_b = context
+    let ssa_b = stage
         .ssa()
         .name("b".to_string())
         .ty(SimpleType::I32)
@@ -371,17 +371,17 @@ fn test_roundtrip_add() {
     let ast = parse_ast::<EmitLang>(input).expect("parse failed");
 
     // Emit to get the dialect variant
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("a".to_string(), ssa_a);
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
     let statement = ast.emit(&mut emit_ctx);
-    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
     // Pretty print directly using the trait
     let config = Config::default();
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
     arena_doc
@@ -395,10 +395,10 @@ fn test_roundtrip_add() {
 /// Test roundtrip for neg instruction.
 #[test]
 fn test_roundtrip_neg() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSA
-    let ssa_x = context
+    let ssa_x = stage
         .ssa()
         .name("x".to_string())
         .ty(SimpleType::I32)
@@ -410,16 +410,16 @@ fn test_roundtrip_neg() {
     let ast = parse_ast::<EmitLang>(input).expect("parse failed");
 
     // Emit
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("x".to_string(), ssa_x);
 
     let statement = ast.emit(&mut emit_ctx);
-    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
     // Pretty print directly using the trait
     let config = Config::default();
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
     arena_doc
@@ -433,10 +433,10 @@ fn test_roundtrip_neg() {
 /// Test roundtrip for return instruction (tuple variant).
 #[test]
 fn test_roundtrip_return() {
-    let mut context: Context<EmitLang> = Context::default();
+    let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSA
-    let ssa_v = context
+    let ssa_v = stage
         .ssa()
         .name("v".to_string())
         .ty(SimpleType::I32)
@@ -448,16 +448,16 @@ fn test_roundtrip_return() {
     let ast = parse_ast::<EmitLang>(input).expect("parse failed");
 
     // Emit
-    let mut emit_ctx = EmitContext::new(&mut context);
+    let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("v".to_string(), ssa_v);
 
     let statement = ast.emit(&mut emit_ctx);
-    let stmt_info = statement.get_info(&context).expect("stmt should exist");
+    let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
     // Pretty print directly using the trait
     let config = Config::default();
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
     let arena_doc = dialect.pretty_print(&doc);
     let mut output = String::new();
     arena_doc

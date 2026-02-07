@@ -13,9 +13,9 @@ impl PrettyPrint for ResultValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info = self.expect_info(doc.context());
+        let info = self.expect_info(doc.stage());
         if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.context().symbol_table().borrow().resolve(name) {
+            if let Some(resolved_name) = doc.stage().symbol_table().borrow().resolve(name) {
                 return doc.text(format!("%{}", resolved_name));
             }
         }
@@ -28,9 +28,9 @@ impl PrettyPrint for SSAValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info = self.expect_info(doc.context());
+        let info = self.expect_info(doc.stage());
         if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.context().symbol_table().borrow().resolve(name) {
+            if let Some(resolved_name) = doc.stage().symbol_table().borrow().resolve(name) {
                 return doc.text(format!("%{}", resolved_name));
             }
         }
@@ -53,7 +53,7 @@ impl PrettyPrint for Symbol {
         L::Type: std::fmt::Display,
     {
         // Look up the symbol name from the context's symbol table
-        if let Some(name) = doc.context().symbol_table().borrow().resolve(*self) {
+        if let Some(name) = doc.stage().symbol_table().borrow().resolve(*self) {
             doc.text(format!("@{}", name))
         } else {
             // Fallback: print as raw ID if not found
@@ -78,9 +78,9 @@ impl PrettyPrint for GlobalSymbol {
 
 impl PrettyPrintName for SSAValue {
     fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
-        let info = self.expect_info(doc.context());
+        let info = self.expect_info(doc.stage());
         if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.context().symbol_table().borrow().resolve(name) {
+            if let Some(resolved_name) = doc.stage().symbol_table().borrow().resolve(name) {
                 return doc.text(format!("%{}", resolved_name));
             }
         }
@@ -90,9 +90,9 @@ impl PrettyPrintName for SSAValue {
 
 impl PrettyPrintName for ResultValue {
     fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
-        let info: &Item<SSAInfo<L>> = self.expect_info(doc.context());
+        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
         if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.context().symbol_table().borrow().resolve(name) {
+            if let Some(resolved_name) = doc.stage().symbol_table().borrow().resolve(name) {
                 return doc.text(format!("%{}", resolved_name));
             }
         }
@@ -105,7 +105,7 @@ impl PrettyPrintType for SSAValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info = self.expect_info(doc.context());
+        let info = self.expect_info(doc.stage());
         doc.text(format!("{}", info.ty()))
     }
 }
@@ -115,7 +115,7 @@ impl PrettyPrintType for ResultValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info: &Item<SSAInfo<L>> = self.expect_info(doc.context());
+        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
         doc.text(format!("{}", info.ty()))
     }
 }

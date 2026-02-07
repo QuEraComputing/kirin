@@ -3,7 +3,7 @@ use crate::intern::InternKey;
 /// A stage-local interned symbol.
 ///
 /// Used for SSA value names, block names, and other identifiers that are
-/// local to a single compilation stage's [`Context`](crate::Context).
+/// local to a single compilation stage's [`StageInfo`](crate::StageInfo).
 /// Interned via `Context.symbols`.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Symbol(usize);

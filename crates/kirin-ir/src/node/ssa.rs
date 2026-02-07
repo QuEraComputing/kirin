@@ -184,12 +184,12 @@ where
 {
     type Info = crate::arena::Item<SSAInfo<L>>;
 
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
-        context.ssas.get(*self)
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
+        stage.ssas.get(*self)
     }
 
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
-        context.ssas.get_mut(*self)
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
+        stage.ssas.get_mut(*self)
     }
 }
 

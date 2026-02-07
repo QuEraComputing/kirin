@@ -39,7 +39,7 @@ where
                     arg: f_arg_ir.into(),
                     res: f_res_ir.into(),
                 };
-                ctx.context.statement().definition(dialect_variant).new()
+                ctx.stage.statement().definition(dialect_variant).new()
             }
             MixedLangAST::Control(inner) => ::kirin::parsers::EmitIR::emit(inner, ctx),
             MixedLangAST::__Marker(_, unreachable) => match *unreachable {},

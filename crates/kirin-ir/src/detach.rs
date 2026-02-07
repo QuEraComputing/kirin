@@ -1,18 +1,18 @@
 use crate::arena::GetInfo;
 use crate::node::{Block, Statement};
 use crate::query::{LinkedListElem, LinkedListInfo, ParentInfo};
-use crate::{Context, Dialect};
+use crate::{Dialect, StageInfo};
 
 pub trait Detach {
     /// Detach the IR node from its parent.
-    fn detach<L: Dialect>(&self, ctx: &mut Context<L>) -> eyre::Result<()>;
+    fn detach<L: Dialect>(&self, stage: &mut StageInfo<L>) -> eyre::Result<()>;
 }
 
 macro_rules! impl_detach {
     ($ty:ty) => {
         impl Detach for $ty {
-            fn detach<L: Dialect>(&self, ctx: &mut Context<L>) -> eyre::Result<()> {
-                let (prev, next, parent) = if let Some(info) = self.get_info_mut(ctx) {
+            fn detach<L: Dialect>(&self, stage: &mut StageInfo<L>) -> eyre::Result<()> {
+                let (prev, next, parent) = if let Some(info) = self.get_info_mut(stage) {
                     let prev = info.get_prev_mut().take();
                     let next = info.get_next_mut().take();
                     let parent = info.get_parent_mut().take();
@@ -22,18 +22,18 @@ macro_rules! impl_detach {
                 };
 
                 prev.and_then(|prev| {
-                    let prev_info = prev.expect_info_mut(ctx);
+                    let prev_info = prev.expect_info_mut(stage);
                     prev_info.node.next = next;
                     Some(())
                 });
                 next.and_then(|next| {
-                    let next_info = next.expect_info_mut(ctx);
+                    let next_info = next.expect_info_mut(stage);
                     *next_info.get_prev_mut() = prev;
                     Some(())
                 });
 
                 if let Some(parent) = parent {
-                    let parent_info = parent.expect_info_mut(ctx);
+                    let parent_info = parent.expect_info_mut(stage);
                     // if prev is None, set head of parent block to next
                     if let None = prev {
                         debug_assert!(

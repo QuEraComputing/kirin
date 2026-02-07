@@ -4,22 +4,22 @@ expression: "case!\n{\n    #[kirin(fn, type = SomeType)] enum EitherEnum\n    {\
 ---
 impl EitherEnum {
     pub fn op_abc<Lang>(
-        context: &mut ::kirin::ir::Context<Lang>,
+        stage: &mut ::kirin::ir::StageInfo<Lang>,
         value: impl Into<u32>,
     ) -> either_enum_build_result::A
     where
         Lang: ::kirin::ir::Dialect + From<EitherEnum>,
         Lang::Type: From<SomeType>,
     {
-        let a_statement_id = context.statement_arena().next_id();
+        let a_statement_id = stage.statement_arena().next_id();
         let value: u32 = value.into();
-        let result: ResultValue = context
+        let result: ResultValue = stage
             .ssa()
             .kind(SSAKind::Result(a_statement_id, 0usize))
             .ty(Lang::Type::from(u32_type))
             .new()
             .into();
-        context
+        stage
             .statement()
             .definition(Self::A {
                 value: value,

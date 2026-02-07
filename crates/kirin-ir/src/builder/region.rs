@@ -1,15 +1,15 @@
 use crate::{Block, Dialect, Region, Statement, node::RegionInfo};
 
 pub struct RegionBuilder<'a, L: Dialect> {
-    pub(super) context: &'a mut crate::Context<L>,
+    pub(super) stage: &'a mut crate::StageInfo<L>,
     pub(super) parent: Option<Statement>,
     pub(super) blocks: Vec<Block>,
 }
 
 impl<'a, L: Dialect> RegionBuilder<'a, L> {
-    pub fn from_context(context: &'a mut crate::Context<L>) -> Self {
+    pub fn from_stage(stage: &'a mut crate::StageInfo<L>) -> Self {
         Self {
-            context,
+            stage,
             parent: None,
             blocks: Vec::new(),
         }
@@ -30,13 +30,13 @@ impl<'a, L: Dialect> RegionBuilder<'a, L> {
     }
 
     pub fn new(self) -> Region {
-        let id = self.context.regions.next_id();
+        let id = self.stage.regions.next_id();
         let info = RegionInfo::builder()
             .id(id)
-            .blocks(self.context.link_blocks(&self.blocks))
+            .blocks(self.stage.link_blocks(&self.blocks))
             .maybe_parent(self.parent)
             .new();
-        self.context.regions.alloc(info);
+        self.stage.regions.alloc(info);
         id
     }
 }

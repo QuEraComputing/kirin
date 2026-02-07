@@ -456,7 +456,7 @@ impl GenerateEmitIR {
             let #pattern = self;
             #emit_calls
             let dialect_variant: #original_name #original_ty_generics = #constructor;
-            ctx.context.statement().definition(dialect_variant).new()
+            ctx.stage.statement().definition(dialect_variant).new()
         }
     }
 
@@ -630,7 +630,7 @@ impl GenerateEmitIR {
             #full_pattern => {
                 #emit_calls
                 let dialect_variant: #original_name #original_ty_generics = #constructor;
-                ctx.context.statement().definition(dialect_variant).new()
+                ctx.stage.statement().definition(dialect_variant).new()
             }
         }
     }

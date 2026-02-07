@@ -18,7 +18,7 @@ where
         let Self(f0) = self;
         let f0_ir: my_kirin::SSAValue = my_chumsky::EmitIR::emit(f0, ctx);
         let dialect_variant: CustomReturn = CustomReturn(f0_ir.into());
-        ctx.context.statement().definition(dialect_variant).new()
+        ctx.stage.statement().definition(dialect_variant).new()
     }
 }
 impl<'tokens, 'src, TypeOutput, Language> my_chumsky::EmitIR<Language>

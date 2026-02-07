@@ -228,7 +228,7 @@ Add `EmitIR` impls for these AST nodes:
 - `StagedFunctionAst -> StagedFunction`
 - `SpecializedFunctionAst -> SpecializedFunction`
 
-Emission uses existing `Context::{staged_function, specialize}` APIs and policy checks.
+Emission uses existing `StageInfo::{staged_function, specialize}` APIs and policy checks.
 
 ## Pretty Printing Interface Proposal
 

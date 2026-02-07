@@ -16,7 +16,7 @@ pub mod query;
 pub use arena::{Arena, DenseHint, GetInfo, Id, Identifier, Item, SparseHint};
 pub use builder::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
 pub use comptime::{CompileTimeValue, Typeof};
-pub use context::Context;
+pub use context::StageInfo;
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
@@ -25,12 +25,12 @@ pub use language::{
 };
 pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{
-    Block, BlockArgument, BlockInfo, CompileStageId, DeletedSSAValue, Function, FunctionInfo,
+    Block, BlockArgument, BlockInfo, CompileStage, DeletedSSAValue, Function, FunctionInfo,
     GlobalSymbol, LinkedList, LinkedListNode, Region, ResultValue, SSAInfo, SSAKind, SSAValue,
     SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo,
     StagedNamePolicy, Statement, StatementInfo, Successor, Symbol, TestSSAValue,
 };
-pub use pipeline::{CompileStage, Pipeline, StageIdentity};
+pub use pipeline::{HasStageInfo, Pipeline, StageIdentity};
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };

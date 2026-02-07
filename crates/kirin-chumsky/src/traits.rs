@@ -3,7 +3,7 @@
 use chumsky::input::Stream;
 use chumsky::prelude::*;
 use chumsky::recursive::{Direct, Recursive};
-use kirin_ir::{Context, Dialect};
+use kirin_ir::{Dialect, StageInfo};
 use kirin_lexer::{Logos, Token};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -131,28 +131,28 @@ where
 /// Parses a source string and emits IR using the given language's parser.
 pub fn parse<'src, L>(
     input: &'src str,
-    context: &mut Context<L>,
+    stage: &mut StageInfo<L>,
 ) -> Result<<L::Output as EmitIR<L>>::Output, Vec<ParseError>>
 where
     L: Dialect + HasParser<'src, 'src>,
     L::Output: EmitIR<L>,
 {
     let ast = parse_ast::<L>(input)?;
-    let mut emit_ctx = EmitContext::new(context);
+    let mut emit_ctx = EmitContext::new(stage);
     Ok(ast.emit(&mut emit_ctx))
 }
 
 /// Context for emitting IR from parsed AST, tracking name mappings.
 pub struct EmitContext<'a, L: Dialect> {
-    pub context: &'a mut Context<L>,
+    pub stage: &'a mut StageInfo<L>,
     ssa_names: HashMap<String, kirin_ir::SSAValue>,
     block_names: HashMap<String, kirin_ir::Block>,
 }
 
 impl<'a, L: Dialect> EmitContext<'a, L> {
-    pub fn new(context: &'a mut Context<L>) -> Self {
+    pub fn new(stage: &'a mut StageInfo<L>) -> Self {
         Self {
-            context,
+            stage,
             ssa_names: HashMap::new(),
             block_names: HashMap::new(),
         }
@@ -205,11 +205,11 @@ where
 }
 
 /// Emits an AST node as IR using a fresh emit context.
-pub fn emit<L, T>(ast: &T, context: &mut Context<L>) -> T::Output
+pub fn emit<L, T>(ast: &T, stage: &mut StageInfo<L>) -> T::Output
 where
     L: Dialect,
     T: EmitIR<L>,
 {
-    let mut emit_ctx = EmitContext::new(context);
+    let mut emit_ctx = EmitContext::new(stage);
     ast.emit(&mut emit_ctx)
 }

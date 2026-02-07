@@ -31,7 +31,7 @@ where
             then_target: f_then_target_ir.into(),
             else_target: f_else_target_ir.into(),
         };
-        ctx.context.statement().definition(dialect_variant).new()
+        ctx.stage.statement().definition(dialect_variant).new()
     }
 }
 impl<'tokens, 'src, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>

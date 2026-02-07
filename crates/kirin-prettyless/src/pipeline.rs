@@ -6,7 +6,7 @@
 
 use std::io::{Write, stdout};
 
-use kirin_ir::{Context, Dialect, Function, GlobalSymbol, InternTable, Pipeline, StagedFunction};
+use kirin_ir::{Dialect, Function, GlobalSymbol, InternTable, Pipeline, StageInfo, StagedFunction};
 
 use crate::{Config, Document, PrettyPrint, ScanResultWidth};
 
@@ -18,7 +18,7 @@ use crate::{Config, Document, PrettyPrint, ScanResultWidth};
 /// The stage prefix (e.g., `stage @A`) is derived from the context's own
 /// identity (name and/or stage ID), so callers don't need to supply it.
 ///
-/// A generic blanket implementation is provided for [`Context<L>`] where
+/// A generic blanket implementation is provided for [`StageInfo<L>`] where
 /// `L: Dialect + PrettyPrint`. User stage enums delegate to this via simple
 /// match arms:
 ///
@@ -51,9 +51,9 @@ pub trait RenderStage {
     ) -> Result<Option<String>, std::fmt::Error>;
 }
 
-/// Generic blanket implementation: any `Context<L>` where `L` supports pretty
+/// Generic blanket implementation: any `StageInfo<L>` where `L` supports pretty
 /// printing automatically gets `RenderStage`.
-impl<L> RenderStage for Context<L>
+impl<L> RenderStage for StageInfo<L>
 where
     L: Dialect + PrettyPrint,
     L::Type: std::fmt::Display,

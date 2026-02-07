@@ -1,63 +1,63 @@
 use crate::arena::{Arena, Id, Item};
 use crate::builder::error::StagedFunctionError;
-use crate::context::Context;
+use crate::context::StageInfo;
 use crate::intern::InternTable;
 use crate::language::Dialect;
 use crate::node::function::{
-    CompileStageId, Function, FunctionInfo, SpecializedFunctionInfo, StagedFunction,
+    CompileStage, Function, FunctionInfo, SpecializedFunctionInfo, StagedFunction,
 };
 use crate::node::symbol::GlobalSymbol;
 use crate::signature::Signature;
 
-/// Trait for types that contain a [`Context`] for a specific dialect.
+/// Trait for types that contain a [`StageInfo`] for a specific dialect.
 ///
 /// Parameterized by dialect type `L` so that enums with multiple stage variants
 /// can implement it multiple times -- once per dialect:
 ///
 /// ```ignore
 /// enum Stage {
-///     A(Context<LangA>),
-///     B(Context<LangB>),
+///     A(StageInfo<LangA>),
+///     B(StageInfo<LangB>),
 /// }
 ///
-/// impl CompileStage<LangA> for Stage {
-///     fn try_context(&self) -> Option<&Context<LangA>> {
+/// impl HasStageInfo<LangA> for Stage {
+///     fn try_stage_info(&self) -> Option<&StageInfo<LangA>> {
 ///         match self { Stage::A(ctx) => Some(ctx), _ => None }
 ///     }
-///     fn try_context_mut(&mut self) -> Option<&mut Context<LangA>> {
+///     fn try_stage_info_mut(&mut self) -> Option<&mut StageInfo<LangA>> {
 ///         match self { Stage::A(ctx) => Some(ctx), _ => None }
 ///     }
 /// }
 /// ```
 ///
-/// Composable via bounds: `S: CompileStage<LangA> + CompileStage<LangB>`.
-pub trait CompileStage<L: Dialect> {
-    /// Try to get a reference to the context for dialect `L`.
+/// Composable via bounds: `S: HasStageInfo<LangA> + HasStageInfo<LangB>`.
+pub trait HasStageInfo<L: Dialect> {
+    /// Try to get a reference to the stage info for dialect `L`.
     ///
-    /// Returns `None` if this stage does not contain a context for dialect `L`
+    /// Returns `None` if this stage does not contain stage info for dialect `L`
     /// (e.g., an enum variant for a different dialect).
-    fn try_context(&self) -> Option<&Context<L>>;
+    fn try_stage_info(&self) -> Option<&StageInfo<L>>;
 
-    /// Try to get a mutable reference to the context for dialect `L`.
+    /// Try to get a mutable reference to the stage info for dialect `L`.
     ///
-    /// Returns `None` if this stage does not contain a context for dialect `L`.
-    fn try_context_mut(&mut self) -> Option<&mut Context<L>>;
+    /// Returns `None` if this stage does not contain stage info for dialect `L`.
+    fn try_stage_info_mut(&mut self) -> Option<&mut StageInfo<L>>;
 }
 
-// Base case: Context<L> trivially is a compile stage for L.
-impl<L: Dialect> CompileStage<L> for Context<L> {
-    fn try_context(&self) -> Option<&Context<L>> {
+// Base case: StageInfo<L> trivially provides stage info for L.
+impl<L: Dialect> HasStageInfo<L> for StageInfo<L> {
+    fn try_stage_info(&self) -> Option<&StageInfo<L>> {
         Some(self)
     }
 
-    fn try_context_mut(&mut self) -> Option<&mut Context<L>> {
+    fn try_stage_info_mut(&mut self) -> Option<&mut StageInfo<L>> {
         Some(self)
     }
 }
 
 /// Non-generic trait for stage identity (name and compile-stage ID).
 ///
-/// Automatically implemented for [`Context<L>`]. Allows [`Pipeline::add_stage`]
+/// Automatically implemented for [`StageInfo<L>`]. Allows [`Pipeline::add_stage`]
 /// to set both a readable name and the numeric stage ID on the stage.
 ///
 /// For enum stages, implement this trait by delegating to the
@@ -68,12 +68,12 @@ pub trait StageIdentity {
     /// Set the stage name.
     fn set_stage_name(&mut self, name: Option<GlobalSymbol>);
     /// Get the compile-stage ID, if set.
-    fn stage_id(&self) -> Option<CompileStageId>;
+    fn stage_id(&self) -> Option<CompileStage>;
     /// Set the compile-stage ID.
-    fn set_stage_id(&mut self, id: Option<CompileStageId>);
+    fn set_stage_id(&mut self, id: Option<CompileStage>);
 }
 
-impl<L: Dialect> StageIdentity for Context<L> {
+impl<L: Dialect> StageIdentity for StageInfo<L> {
     fn stage_name(&self) -> Option<GlobalSymbol> {
         self.name
     }
@@ -82,11 +82,11 @@ impl<L: Dialect> StageIdentity for Context<L> {
         self.name = name;
     }
 
-    fn stage_id(&self) -> Option<CompileStageId> {
+    fn stage_id(&self) -> Option<CompileStage> {
         self.stage_id
     }
 
-    fn set_stage_id(&mut self, id: Option<CompileStageId>) {
+    fn set_stage_id(&mut self, id: Option<CompileStage>) {
         self.stage_id = id;
     }
 }
@@ -95,7 +95,7 @@ impl<L: Dialect> StageIdentity for Context<L> {
 ///
 /// The global symbol table (`global_symbols`) provides cross-stage interning
 /// for identifiers like function names. Stage-local symbols (SSA names, blocks)
-/// remain in each stage's [`Context`].
+/// remain in each stage's [`StageInfo`].
 pub struct Pipeline<S> {
     stages: Vec<S>,
     functions: Arena<Function, FunctionInfo>,
@@ -117,23 +117,23 @@ impl<S> Pipeline<S> {
         }
     }
 
-    /// Add a stage to the pipeline, returning its [`CompileStageId`].
+    /// Add a stage to the pipeline, returning its [`CompileStage`].
     ///
     /// *Non-builder variant.* Prefer the builder form (see [`Pipeline::add_stage`]
     /// in the `#[bon::bon]` block) when you want to set a stage name.
-    pub fn add_stage_raw(&mut self, stage: S) -> CompileStageId {
-        let id = CompileStageId::new(Id(self.stages.len()));
+    pub fn add_stage_raw(&mut self, stage: S) -> CompileStage {
+        let id = CompileStage::new(Id(self.stages.len()));
         self.stages.push(stage);
         id
     }
 
-    /// Get a reference to a stage by its [`CompileStageId`].
-    pub fn stage(&self, id: CompileStageId) -> Option<&S> {
+    /// Get a reference to a stage by its [`CompileStage`].
+    pub fn stage(&self, id: CompileStage) -> Option<&S> {
         self.stages.get(Id::from(id).raw())
     }
 
-    /// Get a mutable reference to a stage by its [`CompileStageId`].
-    pub fn stage_mut(&mut self, id: CompileStageId) -> Option<&mut S> {
+    /// Get a mutable reference to a stage by its [`CompileStage`].
+    pub fn stage_mut(&mut self, id: CompileStage) -> Option<&mut S> {
         self.stages.get_mut(Id::from(id).raw())
     }
 
@@ -192,7 +192,7 @@ impl<S> Pipeline<S> {
     /// # Panics
     ///
     /// Panics if `func` refers to an unknown [`Function`].
-    pub fn link(&mut self, func: Function, stage: CompileStageId, sf: StagedFunction) {
+    pub fn link(&mut self, func: Function, stage: CompileStage, sf: StagedFunction) {
         self.functions
             .get_mut(func)
             .expect("unknown Function")
@@ -202,7 +202,7 @@ impl<S> Pipeline<S> {
 
 #[bon::bon]
 impl<S> Pipeline<S> {
-    /// Add a stage to the pipeline, returning its [`CompileStageId`].
+    /// Add a stage to the pipeline, returning its [`CompileStage`].
     ///
     /// If a `name` is provided, it is interned into the global symbol table
     /// and set on the stage via [`StageIdentity::set_stage_name`]. This lets the
@@ -216,15 +216,11 @@ impl<S> Pipeline<S> {
     /// let id = pipeline.add_stage().stage(ctx).name("llvm_ir").new();   // named
     /// ```
     #[builder(finish_fn = new)]
-    pub fn add_stage(
-        &mut self,
-        mut stage: S,
-        #[builder(into)] name: Option<String>,
-    ) -> CompileStageId
+    pub fn add_stage(&mut self, mut stage: S, #[builder(into)] name: Option<String>) -> CompileStage
     where
         S: StageIdentity,
     {
-        let id = CompileStageId::new(Id(self.stages.len()));
+        let id = CompileStage::new(Id(self.stages.len()));
         stage.set_stage_id(Some(id));
         if let Some(n) = name {
             let sym = self.global_symbols.intern(n);
@@ -279,26 +275,26 @@ impl<S> Pipeline<S> {
     pub fn staged_function<L: Dialect>(
         &mut self,
         func: Function,
-        stage: CompileStageId,
+        stage: CompileStage,
         signature: Option<Signature<L::Type>>,
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
     ) -> Result<StagedFunction, StagedFunctionError<L>>
     where
-        S: CompileStage<L>,
+        S: HasStageInfo<L>,
     {
         // Read name from FunctionInfo (GlobalSymbol is Copy, borrow ends immediately).
         let name = self.functions.get(func).expect("unknown Function").name();
 
-        // Borrow the stage mutably to access its Context.
-        let ctx = self
+        // Borrow the stage mutably to access its StageInfo.
+        let stage_info = self
             .stages
             .get_mut(Id::from(stage).raw())
-            .and_then(|s| CompileStage::<L>::try_context_mut(s))
-            .expect("invalid stage or stage does not contain a Context for this dialect");
+            .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
+            .expect("invalid stage or stage does not contain a StageInfo for this dialect");
 
-        // Delegate to Context::staged_function builder.
-        let sf = ctx
+        // Delegate to StageInfo::staged_function builder.
+        let sf = stage_info
             .staged_function()
             .maybe_name(name)
             .maybe_signature(signature)

@@ -29,14 +29,14 @@ where
                     rhs: f_rhs_ir.into(),
                     res: f_res_ir.into(),
                 };
-                ctx.context.statement().definition(dialect_variant).new()
+                ctx.stage.statement().definition(dialect_variant).new()
             }
             SimpleLangAST::Return { arg: f_arg } => {
                 let f_arg_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_arg, ctx);
                 let dialect_variant: SimpleLang = SimpleLang::Return {
                     arg: f_arg_ir.into(),
                 };
-                ctx.context.statement().definition(dialect_variant).new()
+                ctx.stage.statement().definition(dialect_variant).new()
             }
             SimpleLangAST::__Marker(_, unreachable) => match *unreachable {},
         }

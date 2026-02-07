@@ -3,8 +3,8 @@
 use std::{borrow::Cow, ops::Deref};
 
 use kirin_ir::{
-    Block, Context, DenseHint, Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, Region,
-    SSAInfo, Signature, SpecializedFunction, StagedFunction, Statement,
+    Block, DenseHint, Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, Region, SSAInfo,
+    Signature, SpecializedFunction, StageInfo, StagedFunction, Statement,
 };
 use prettyless::{Arena, DocAllocator};
 
@@ -17,7 +17,7 @@ use crate::{ArenaDoc, Config, PrettyPrint, ScanResultWidth};
 pub struct Document<'a, L: Dialect> {
     config: Config,
     arena: Arena<'a>,
-    context: &'a Context<L>,
+    stage: &'a StageInfo<L>,
     global_symbols: Option<&'a InternTable<String, GlobalSymbol>>,
     result_width: DenseHint<Statement, usize>,
     max_result_width: usize,
@@ -29,14 +29,14 @@ impl<'a, L: Dialect> Document<'a, L> {
     /// Global symbol resolution for function names is not available.
     /// Use [`Document::with_global_symbols`] if you need to resolve
     /// [`GlobalSymbol`] names.
-    pub fn new(config: Config, context: &'a Context<L>) -> Self {
+    pub fn new(config: Config, stage: &'a StageInfo<L>) -> Self {
         let arena = Arena::new();
         Self {
             config,
             arena,
-            context,
+            stage,
             global_symbols: None,
-            result_width: context.statement_arena().hint().dense(),
+            result_width: stage.statement_arena().hint().dense(),
             max_result_width: 0,
         }
     }
@@ -47,16 +47,16 @@ impl<'a, L: Dialect> Document<'a, L> {
     /// (e.g., function names) that were interned via [`Pipeline::intern`](kirin_ir::Pipeline::intern).
     pub fn with_global_symbols(
         config: Config,
-        context: &'a Context<L>,
+        stage: &'a StageInfo<L>,
         global_symbols: &'a InternTable<String, GlobalSymbol>,
     ) -> Self {
         let arena = Arena::new();
         Self {
             config,
             arena,
-            context,
+            stage,
             global_symbols: Some(global_symbols),
-            result_width: context.statement_arena().hint().dense(),
+            result_width: stage.statement_arena().hint().dense(),
             max_result_width: 0,
         }
     }
@@ -82,8 +82,8 @@ impl<'a, L: Dialect> Document<'a, L> {
     }
 
     /// Returns a reference to the IR context.
-    pub fn context(&self) -> &'a Context<L> {
-        self.context
+    pub fn stage(&self) -> &'a StageInfo<L> {
+        self.stage
     }
 
     /// Set the result width for a statement.
@@ -157,21 +157,21 @@ where
 {
     /// Pretty print a statement by printing its definition.
     pub fn print_statement(&'a self, stmt: &Statement) -> ArenaDoc<'a> {
-        let stmt_info = stmt.expect_info(self.context);
+        let stmt_info = stmt.expect_info(self.stage);
         let def = stmt_info.definition();
         def.pretty_print(self)
     }
 
     /// Pretty print a block with its header and statements.
     pub fn print_block(&'a self, block: &Block) -> ArenaDoc<'a> {
-        let block_info = block.expect_info(self.context);
+        let block_info = block.expect_info(self.stage);
 
         // Build block header with arguments: ^name(%arg0: type, %arg1: type)
         // Look up block name from symbol table, fall back to ^index
         let block_name = block_info
             .name
             .and_then(|name_sym| {
-                self.context
+                self.stage
                     .symbol_table()
                     .borrow()
                     .resolve(name_sym)
@@ -188,9 +188,9 @@ where
                 if i > 0 {
                     args_doc += self.text(", ");
                 }
-                let arg_info: &Item<SSAInfo<L>> = arg.expect_info(self.context);
+                let arg_info: &Item<SSAInfo<L>> = arg.expect_info(self.stage);
                 let name = if let Some(name_sym) = arg_info.name() {
-                    self.context
+                    self.stage
                         .symbol_table()
                         .borrow()
                         .resolve(name_sym)
@@ -206,13 +206,13 @@ where
 
         // Build block body with statements
         let mut inner = self.nil();
-        for (i, stmt) in block.statements(self.context).enumerate() {
+        for (i, stmt) in block.statements(self.stage).enumerate() {
             if i > 0 {
                 inner += self.line_();
             }
             inner += self.print_statement(&stmt) + self.text(";");
         }
-        if let Some(terminator) = block.terminator(self.context) {
+        if let Some(terminator) = block.terminator(self.stage) {
             if !inner.is_nil() {
                 inner += self.line_();
             }
@@ -225,7 +225,7 @@ where
     /// Pretty print a region with its blocks.
     pub fn print_region(&'a self, region: &Region) -> ArenaDoc<'a> {
         let mut inner = self.nil();
-        for block in region.blocks(self.context) {
+        for block in region.blocks(self.stage) {
             inner += self.print_block(&block);
             inner += self.line_();
         }
@@ -248,7 +248,7 @@ where
     /// resolved via the global symbol table if available.
     pub fn print_specialized_function(&'a self, func: &SpecializedFunction) -> ArenaDoc<'a> {
         let (staged_fn, idx) = func.id();
-        let staged_info = staged_fn.expect_info(self.context);
+        let staged_info = staged_fn.expect_info(self.stage);
         let spec = &staged_info.specializations()[idx];
         let header = self.print_function_header(staged_info.name(), spec.signature());
         header + self.text(" ") + self.print_statement(spec.body())
@@ -267,7 +267,7 @@ where
     /// Function names are resolved via the global symbol table if available.
     /// Invalidated specializations are excluded.
     pub fn print_staged_function(&'a self, func: &StagedFunction) -> ArenaDoc<'a> {
-        let info = func.expect_info(self.context);
+        let info = func.expect_info(self.stage);
         let active: Vec<_> = info
             .specializations()
             .iter()
@@ -309,14 +309,14 @@ where
             .and_then(|sym| self.global_symbols.and_then(|gs| gs.resolve(sym).cloned()))
             .unwrap_or_else(|| "<unnamed>".into());
 
-        // Derive stage prefix from the context's own identity
+        // Derive stage prefix from the stage's own identity
         let prefix = self
-            .context
+            .stage
             .name()
             .and_then(|sym| self.global_symbols.and_then(|gs| gs.resolve(sym).cloned()))
             .map(|n| format!("stage @{}", n))
             .or_else(|| {
-                self.context
+                self.stage
                     .stage_id()
                     .map(|id| format!("stage {}", Id::from(id).raw()))
             });

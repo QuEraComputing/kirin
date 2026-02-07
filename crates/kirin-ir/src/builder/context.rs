@@ -6,15 +6,15 @@ use crate::arena::GetInfo;
 use crate::node::symbol::GlobalSymbol;
 use crate::node::*;
 use crate::signature::Signature;
-use crate::{Context, Dialect};
+use crate::{Dialect, StageInfo};
 
-impl<L: Dialect> Context<L> {
+impl<L: Dialect> StageInfo<L> {
     pub fn block(&mut self) -> BlockBuilder<'_, L> {
-        BlockBuilder::from_context(self)
+        BlockBuilder::from_stage(self)
     }
 
     pub fn region(&mut self) -> RegionBuilder<'_, L> {
-        RegionBuilder::from_context(self)
+        RegionBuilder::from_stage(self)
     }
 
     pub fn link_statements(&mut self, ptrs: &[Statement]) -> LinkedList<Statement> {
@@ -72,7 +72,7 @@ impl<L: Dialect> Context<L> {
 }
 
 #[bon::bon]
-impl<L: Dialect> Context<L> {
+impl<L: Dialect> StageInfo<L> {
     #[builder(finish_fn = new)]
     pub fn ssa(
         &mut self,
@@ -130,7 +130,7 @@ impl<L: Dialect> Context<L> {
     ///   exists while [`StagedNamePolicy::SingleInterface`] is active.
     ///
     /// The error preserves all construction arguments so the caller can pass
-    /// it to [`Context::redefine_staged_function`] to intentionally overwrite
+    /// it to [`StageInfo::redefine_staged_function`] to intentionally overwrite
     /// the existing staged function.
     ///
     /// Anonymous staged functions (name = `None`) are never considered
@@ -211,7 +211,7 @@ impl<L: Dialect> Context<L> {
     ///
     /// Returns `Err(SpecializeError)` if a non-invalidated specialization with
     /// the same signature already exists. The error preserves all construction
-    /// arguments so the caller can pass it to [`Context::redefine_specialization`]
+    /// arguments so the caller can pass it to [`StageInfo::redefine_specialization`]
     /// to intentionally overwrite the existing specialization.
     ///
     /// # Design: Signature ownership
@@ -279,10 +279,10 @@ impl<L: Dialect> Context<L> {
 
 /// Methods for intentionally redefining (overwriting) existing functions.
 ///
-/// These consume the error returned by [`Context::specialize`] or
-/// [`Context::staged_function`] when a duplicate is detected, invalidate the
+/// These consume the error returned by [`StageInfo::specialize`] or
+/// [`StageInfo::staged_function`] when a duplicate is detected, invalidate the
 /// conflicting entries, and register the new definition.
-impl<L: Dialect> Context<L> {
+impl<L: Dialect> StageInfo<L> {
     /// Redefine a specialization by consuming a [`SpecializeError`].
     ///
     /// Invalidates all conflicting specializations identified in the error
@@ -351,10 +351,10 @@ impl<L: Dialect> Context<L> {
 mod tests {
     use super::*;
     use crate::{
-        Block, Context, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks,
-        HasBlocksMut, HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors,
-        HasSuccessorsMut, InternTable, IsConstant, IsPure, IsTerminator, Region, ResultValue,
-        SSAValue, StagedFunctionConflictKind, StagedNamePolicy, Successor,
+        Block, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut,
+        HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
+        InternTable, IsConstant, IsPure, IsTerminator, Region, ResultValue, SSAValue, StageInfo,
+        StagedFunctionConflictKind, StagedNamePolicy, Successor,
     };
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -482,16 +482,16 @@ mod tests {
     fn staged_name_policy_defaults_to_single_interface() {
         let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
         let foo = gs.intern("foo".to_string());
-        let mut ctx: Context<TestDialect> = Context::default();
-        assert_eq!(ctx.staged_name_policy(), StagedNamePolicy::SingleInterface);
+        let mut stage: StageInfo<TestDialect> = StageInfo::default();
+        assert_eq!(stage.staged_name_policy(), StagedNamePolicy::SingleInterface);
 
-        ctx.staged_function()
+        stage.staged_function()
             .name(foo)
             .signature(sig(TestType::I32))
             .new()
             .expect("first staged function should be created");
 
-        let err = ctx
+        let err = stage
             .staged_function()
             .name(foo)
             .signature(sig(TestType::I64))
@@ -508,16 +508,16 @@ mod tests {
     fn staged_name_policy_multiple_dispatch_allows_different_signatures() {
         let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
         let foo = gs.intern("foo".to_string());
-        let mut ctx: Context<TestDialect> = Context::default();
-        ctx.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
+        let mut stage: StageInfo<TestDialect> = StageInfo::default();
+        stage.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
 
-        ctx.staged_function()
+        stage.staged_function()
             .name(foo)
             .signature(sig(TestType::I32))
             .new()
             .expect("first staged function should be created");
 
-        ctx.staged_function()
+        stage.staged_function()
             .name(foo)
             .signature(sig(TestType::I64))
             .new()
@@ -528,17 +528,17 @@ mod tests {
     fn duplicate_signature_is_rejected_even_with_multiple_dispatch() {
         let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
         let foo = gs.intern("foo".to_string());
-        let mut ctx: Context<TestDialect> = Context::default();
-        ctx.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
+        let mut stage: StageInfo<TestDialect> = StageInfo::default();
+        stage.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
 
         let i32_sig = sig(TestType::I32);
-        ctx.staged_function()
+        stage.staged_function()
             .name(foo)
             .signature(i32_sig.clone())
             .new()
             .expect("first staged function should be created");
 
-        let err = ctx
+        let err = stage
             .staged_function()
             .name(foo)
             .signature(i32_sig)

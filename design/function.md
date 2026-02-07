@@ -147,19 +147,19 @@ Invalidated entries are not deleted. They remain in the IR with their backedge i
 ```mermaid
 sequenceDiagram
     participant User
-    participant Context
+    participant StageInfo
     participant StagedFunction
 
-    User->>Context: specialize(f, signature, body)
-    Context->>StagedFunction: check for duplicate signature
-    StagedFunction-->>Context: duplicate found
-    Context-->>User: Err(SpecializeError)
+    User->>StageInfo: specialize(f, signature, body)
+    StageInfo->>StagedFunction: check for duplicate signature
+    StagedFunction-->>StageInfo: duplicate found
+    StageInfo-->>User: Err(SpecializeError)
 
     Note over User: User decides this is intentional
-    User->>Context: redefine_specialization(error)
-    Context->>StagedFunction: invalidate old specialization
-    Context->>StagedFunction: push new specialization
-    Context-->>User: Ok(new SpecializedFunction)
+    User->>StageInfo: redefine_specialization(error)
+    StageInfo->>StagedFunction: invalidate old specialization
+    StageInfo->>StagedFunction: push new specialization
+    StageInfo-->>User: Ok(new SpecializedFunction)
 
     Note over User: Caller inspects error.conflicting<br/>backedges to trigger recompilation
 ```

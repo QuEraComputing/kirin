@@ -248,7 +248,7 @@ where
 
         // Create a new SSA value with the parsed name and type
         let ssa = ctx
-            .context
+            .stage
             .ssa()
             .name(self.name.value.to_string())
             .ty(ty)
@@ -290,7 +290,7 @@ where
     type Output = kirin_ir::Symbol;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
-        ctx.context
+        ctx.stage
             .symbol_table()
             .borrow_mut()
             .intern(self.name.to_string())
@@ -344,7 +344,7 @@ where
         // in statement emission. These use BuilderBlockArgument kind.
         for (name, ty, idx) in &arg_info {
             let ssa = ctx
-                .context
+                .stage
                 .ssa()
                 .name(name.clone())
                 .ty(ty.clone())
@@ -360,7 +360,7 @@ where
             .map(|stmt_ast| {
                 let stmt = stmt_ast.value.emit(ctx);
                 let is_terminator = stmt
-                    .get_info(ctx.context)
+                    .get_info(ctx.stage)
                     .expect("statement should exist")
                     .definition()
                     .is_terminator();
@@ -370,7 +370,7 @@ where
 
         // Build the block with arguments and statements
         let block_name = self.header.value.label.name.value.to_string();
-        let mut builder = ctx.context.block().name(block_name);
+        let mut builder = ctx.stage.block().name(block_name);
 
         for (name, ty, _) in arg_info {
             builder = builder.argument_with_name(name, ty);
@@ -417,7 +417,7 @@ where
             .collect();
 
         // Build the region with the emitted blocks
-        let mut builder = ctx.context.region();
+        let mut builder = ctx.stage.region();
         for block in blocks {
             builder = builder.add_block(block);
         }

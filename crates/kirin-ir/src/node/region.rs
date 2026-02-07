@@ -41,22 +41,22 @@ impl<L: Dialect> RegionInfo<L> {
 impl<L: Dialect> GetInfo<L> for Region {
     type Info = Item<RegionInfo<L>>;
 
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
-        context.regions.get(*self)
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
+        stage.regions.get(*self)
     }
 
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
-        context.regions.get_mut(*self)
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
+        stage.regions.get_mut(*self)
     }
 }
 
 impl Region {
-    pub fn blocks<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> BlockIter<'a, L> {
-        let info = self.expect_info(context);
+    pub fn blocks<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> BlockIter<'a, L> {
+        let info = self.expect_info(stage);
         BlockIter {
             current: info.blocks.head,
             len: info.blocks.len,
-            context,
+            stage,
         }
     }
 }
@@ -64,7 +64,7 @@ impl Region {
 pub struct BlockIter<'a, L: Dialect> {
     current: Option<Block>,
     len: usize,
-    context: &'a crate::Context<L>,
+    stage: &'a crate::StageInfo<L>,
 }
 
 impl<'a, L: Dialect> Iterator for BlockIter<'a, L> {
@@ -72,7 +72,7 @@ impl<'a, L: Dialect> Iterator for BlockIter<'a, L> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(current) = self.current {
-            let current_info = current.expect_info(self.context);
+            let current_info = current.expect_info(self.stage);
             self.current = current_info.node.next;
             self.len -= 1;
             Some(current)
@@ -95,7 +95,7 @@ impl<'a, L: Dialect> ExactSizeIterator for BlockIter<'a, L> {
 impl<'a, L: Dialect> DoubleEndedIterator for BlockIter<'a, L> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if let Some(tail) = self.current {
-            let tail_info = tail.expect_info(self.context);
+            let tail_info = tail.expect_info(self.stage);
             self.current = tail_info.node.prev;
             self.len -= 1;
             Some(tail)

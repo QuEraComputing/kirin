@@ -1,7 +1,7 @@
 use kirin::*;
 
 fn main() {
-    let _ctx: ir::Context<Stage> = ir::Context::default();
+    let _ctx: ir::StageInfo<Stage> = ir::StageInfo::default();
     println!("Hello, world!");
 }
 

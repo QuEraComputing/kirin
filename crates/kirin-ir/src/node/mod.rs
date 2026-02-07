@@ -8,7 +8,7 @@ pub mod symbol;
 
 pub use block::{Block, BlockInfo, Successor};
 pub use function::{
-    CompileStageId, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
+    CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
     StagedFunction, StagedFunctionInfo, StagedNamePolicy,
 };
 pub use linked_list::{LinkedList, LinkedListNode};

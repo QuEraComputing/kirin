@@ -28,7 +28,7 @@ graph LR
 
 ## Crate Map
 
-- **`kirin-ir`** — Core IR: `Dialect`, `Context`, `Statement`, `Block`, `Region`
+- **`kirin-ir`** — Core IR: `Dialect`, `StageInfo`, `Statement`, `Block`, `Region`
 - **`kirin-chumsky`** — Parser traits: `HasParser`, `HasRecursiveParser`, `EmitIR`
 - **`kirin-prettyless`** — Pretty printer: `PrettyPrint`
 - **`kirin-chumsky-derive`** — `#[derive(HasParser, PrettyPrint)]`

@@ -12,12 +12,13 @@ identifier! {
     ///
     /// Compilation stages represent different phases in the compilation pipeline,
     /// such as parsing, optimization, code generation, etc.
-    struct CompileStageId
+    /// Can be used as a compile-time value in statement definitions.
+    struct CompileStage
 }
 
-impl CompileStageId {
+impl CompileStage {
     pub fn new(stage: Id) -> Self {
-        CompileStageId(stage)
+        CompileStage(stage)
     }
 }
 
@@ -74,7 +75,7 @@ pub struct FunctionInfo {
     /// The execution will always look for the matching stage of the target execution environment
     /// e.g an interpreter will look for the staged function at the interpreter stage.
     /// but LLVM backend will look for the staged function at the LLVM IR generation stage.
-    staged_functions: IndexMap<CompileStageId, StagedFunction>,
+    staged_functions: IndexMap<CompileStage, StagedFunction>,
 }
 
 impl FunctionInfo {
@@ -90,11 +91,11 @@ impl FunctionInfo {
         self.name
     }
 
-    pub fn staged_functions(&self) -> &IndexMap<CompileStageId, StagedFunction> {
+    pub fn staged_functions(&self) -> &IndexMap<CompileStage, StagedFunction> {
         &self.staged_functions
     }
 
-    pub fn add_staged_function(&mut self, stage: CompileStageId, func: StagedFunction) {
+    pub fn add_staged_function(&mut self, stage: CompileStage, func: StagedFunction) {
         self.staged_functions.insert(stage, func);
     }
 }
@@ -296,29 +297,29 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
 impl<L: Dialect> GetInfo<L> for StagedFunction {
     type Info = Item<StagedFunctionInfo<L>>;
 
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
-        context.staged_functions.get(*self)
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
+        stage.staged_functions.get(*self)
     }
 
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
-        context.staged_functions.get_mut(*self)
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
+        stage.staged_functions.get_mut(*self)
     }
 }
 
 impl<L: Dialect> GetInfo<L> for SpecializedFunction {
     type Info = SpecializedFunctionInfo<L>;
 
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         let (staged_func, idx) = self.id();
-        context
+        stage
             .staged_functions
             .get(staged_func)
             .and_then(|f| f.specializations.get(idx))
     }
 
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         let (staged_func, idx) = self.id();
-        context
+        stage
             .staged_functions
             .get_mut(staged_func)
             .and_then(|f| f.specializations.get_mut(idx))

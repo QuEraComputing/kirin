@@ -63,6 +63,6 @@ This allows the same dialect to be reused across languages with different type s
 - **`Dialect` trait** — `kirin-ir/src/language.rs`
 - **`TypeLattice` trait** — `kirin-ir/src/lattice.rs`
 - **Signature & specialization** — `kirin-ir/src/signature.rs` (see [signature.md](signature.md))
-- **`Context<L>`** — `kirin-ir/src/context.rs`
+- **`StageInfo<L>`** — `kirin-ir/src/context.rs`
 - **`#[derive(Dialect)]`** — `kirin-derive/`
 - **Example dialect** — `kirin-constant/src/lib.rs`

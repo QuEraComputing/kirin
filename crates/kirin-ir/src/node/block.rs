@@ -97,42 +97,45 @@ impl<L: Dialect> BlockInfo<L> {
 impl<L: Dialect> GetInfo<L> for Block {
     type Info = Item<BlockInfo<L>>;
 
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
-        context.blocks.get(*self)
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
+        stage.blocks.get(*self)
     }
 
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
-        context.blocks.get_mut(*self)
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
+        stage.blocks.get_mut(*self)
     }
 }
 
 impl<L: Dialect> GetInfo<L> for Successor {
     type Info = Item<BlockInfo<L>>;
 
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info> {
-        context.blocks.get(Block(self.0))
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
+        stage.blocks.get(Block(self.0))
     }
 
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info> {
-        context.blocks.get_mut(Block(self.0))
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
+        stage.blocks.get_mut(Block(self.0))
     }
 }
 
 impl Block {
     pub fn statements<'a, L: Dialect>(
         &self,
-        context: &'a crate::Context<L>,
+        stage: &'a crate::StageInfo<L>,
     ) -> StatementIter<'a, L> {
-        let info = self.expect_info(context);
+        let info = self.expect_info(stage);
         StatementIter {
             current: info.statements.head,
             len: info.statements.len,
-            context,
+            stage,
         }
     }
 
-    pub fn terminator<'a, L: Dialect>(&self, context: &'a crate::Context<L>) -> Option<Statement> {
-        let info = self.expect_info(context);
+    pub fn terminator<'a, L: Dialect>(
+        &self,
+        stage: &'a crate::StageInfo<L>,
+    ) -> Option<Statement> {
+        let info = self.expect_info(stage);
         info.terminator
     }
 }
@@ -140,7 +143,7 @@ impl Block {
 pub struct StatementIter<'a, L: Dialect> {
     current: Option<Statement>,
     len: usize,
-    context: &'a crate::Context<L>,
+    stage: &'a crate::StageInfo<L>,
 }
 
 impl<'a, L: Dialect> Iterator for StatementIter<'a, L> {
@@ -148,7 +151,7 @@ impl<'a, L: Dialect> Iterator for StatementIter<'a, L> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(current) = self.current {
-            let info = current.expect_info(self.context);
+            let info = current.expect_info(self.stage);
             self.current = info.node.next;
             self.len -= 1;
             Some(current)

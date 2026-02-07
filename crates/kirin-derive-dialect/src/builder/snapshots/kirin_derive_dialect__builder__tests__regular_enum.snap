@@ -4,22 +4,22 @@ expression: "case!\n{\n    #[kirin(fn, type = SomeType)] enum TestEnum\n    {\n 
 ---
 impl TestEnum {
     pub fn op_a<Lang>(
-        context: &mut ::kirin::ir::Context<Lang>,
+        stage: &mut ::kirin::ir::StageInfo<Lang>,
         value: impl Into<u32>,
     ) -> test_enum_build_result::A
     where
         Lang: ::kirin::ir::Dialect + From<TestEnum>,
         Lang::Type: From<SomeType>,
     {
-        let a_statement_id = context.statement_arena().next_id();
+        let a_statement_id = stage.statement_arena().next_id();
         let value: u32 = value.into();
-        let result: ResultValue = context
+        let result: ResultValue = stage
             .ssa()
             .kind(SSAKind::Result(a_statement_id, 0usize))
             .ty(Lang::Type::from(u32_type))
             .new()
             .into();
-        context
+        stage
             .statement()
             .definition(Self::A {
                 value: value,
@@ -32,25 +32,22 @@ impl TestEnum {
         }
     }
     pub fn op_b<Lang>(
-        context: &mut ::kirin::ir::Context<Lang>,
+        stage: &mut ::kirin::ir::StageInfo<Lang>,
         field_0: impl Into<u64>,
     ) -> test_enum_build_result::B
     where
         Lang: ::kirin::ir::Dialect + From<TestEnum>,
         Lang::Type: From<SomeType>,
     {
-        let b_statement_id = context.statement_arena().next_id();
+        let b_statement_id = stage.statement_arena().next_id();
         let field_0: u64 = field_0.into();
-        let result: ResultValue = context
+        let result: ResultValue = stage
             .ssa()
             .kind(SSAKind::Result(b_statement_id, 0usize))
             .ty(Lang::Type::from(u64_type))
             .new()
             .into();
-        context
-            .statement()
-            .definition(Self::B(field_0, result))
-            .new();
+        stage.statement().definition(Self::B(field_0, result)).new();
         test_enum_build_result::B {
             id: b_statement_id,
             result,

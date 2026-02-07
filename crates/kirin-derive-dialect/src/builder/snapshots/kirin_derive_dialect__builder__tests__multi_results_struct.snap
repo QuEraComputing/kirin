@@ -5,29 +5,29 @@ expression: "case!\n{\n    #[kirin(fn, type = L)] struct MultiResult<T: CompileT
 #[automatically_derived]
 impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> MultiResult<T, L> {
     pub fn new<Lang>(
-        context: &mut ::kirin::ir::Context<Lang>,
+        stage: &mut ::kirin::ir::StageInfo<Lang>,
         value: impl Into<T>,
     ) -> multi_result_build_result::MultiResult
     where
         Lang: ::kirin::ir::Dialect + From<MultiResult<T, L>>,
         Lang::Type: From<L>,
     {
-        let multiresult_statement_id = context.statement_arena().next_id();
+        let multiresult_statement_id = stage.statement_arena().next_id();
         let value: T = value.into();
         let marker: std::marker::PhantomData<L> = std::marker::PhantomData;
-        let result1: ResultValue = context
+        let result1: ResultValue = stage
             .ssa()
             .kind(SSAKind::Result(multiresult_statement_id, 0usize))
             .ty(Lang::Type::from(value.type_of()))
             .new()
             .into();
-        let result2: ResultValue = context
+        let result2: ResultValue = stage
             .ssa()
             .kind(SSAKind::Result(multiresult_statement_id, 1usize))
             .ty(Lang::Type::from(value.type_of()))
             .new()
             .into();
-        context
+        stage
             .statement()
             .definition(Self {
                 value: value,

@@ -26,14 +26,14 @@ impl PrettyPrint for SimpleLanguage {
 
 /// Helper to create a test context with a simple function.
 fn create_test_function() -> (
-    kirin_ir::Context<SimpleLanguage>,
+    kirin_ir::StageInfo<SimpleLanguage>,
     InternTable<String, GlobalSymbol>,
     kirin_ir::SpecializedFunction,
 ) {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_func = gs.intern("test_func".to_string());
-    let mut context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let staged_function = context
+    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let staged_function = stage
         .staged_function()
         .name(test_func)
         .signature(kirin_ir::Signature {
@@ -44,14 +44,14 @@ fn create_test_function() -> (
         .new()
         .unwrap();
 
-    let a = SimpleLanguage::op_constant(&mut context, 1.2);
-    let b = SimpleLanguage::op_constant(&mut context, 3.4);
-    let c = SimpleLanguage::op_add(&mut context, a.result, b.result);
-    let block_arg_x = context.block_argument(0);
-    let d = SimpleLanguage::op_add(&mut context, c.result, block_arg_x);
-    let ret = SimpleLanguage::op_return(&mut context, d.result);
+    let a = SimpleLanguage::op_constant(&mut stage, 1.2);
+    let b = SimpleLanguage::op_constant(&mut stage, 3.4);
+    let c = SimpleLanguage::op_add(&mut stage, a.result, b.result);
+    let block_arg_x = stage.block_argument(0);
+    let d = SimpleLanguage::op_add(&mut stage, c.result, block_arg_x);
+    let ret = SimpleLanguage::op_return(&mut stage, d.result);
 
-    let block_a: Block = context
+    let block_a: Block = stage
         .block()
         .argument(Int)
         .argument_with_name("y", Float)
@@ -62,19 +62,19 @@ fn create_test_function() -> (
         .terminator(ret)
         .new();
 
-    let ret = SimpleLanguage::op_return(&mut context, block_arg_x);
-    let block_b = context.block().argument(Float).terminator(ret).new();
+    let ret = SimpleLanguage::op_return(&mut stage, block_arg_x);
+    let block_b = stage.block().argument(Float).terminator(ret).new();
 
-    let body = context.region().add_block(block_a).add_block(block_b).new();
-    let fdef = SimpleLanguage::op_function(&mut context, body);
-    let f = context
+    let body = stage.region().add_block(block_a).add_block(block_b).new();
+    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let f = stage
         .specialize()
         .f(staged_function)
         .body(fdef)
         .new()
         .unwrap();
 
-    (context, gs, f)
+    (stage, gs, f)
 }
 
 // ============================================================================
@@ -83,10 +83,10 @@ fn create_test_function() -> (
 
 #[test]
 fn test_block() {
-    let (context, gs, f) = create_test_function();
+    let (stage, gs, f) = create_test_function();
 
     // Use the Document method API for printing IR nodes
-    let doc = Document::with_global_symbols(Default::default(), &context, &gs);
+    let doc = Document::with_global_symbols(Default::default(), &stage, &gs);
     let arena_doc = doc.print_specialized_function(&f);
     let max_width = doc.config().max_width;
     let mut buf = String::new();
@@ -96,20 +96,20 @@ fn test_block() {
 
 #[test]
 fn test_render_specialized_function() {
-    let (context, gs, f) = create_test_function();
+    let (stage, gs, f) = create_test_function();
 
     // Test the Document render method
-    let mut doc = Document::with_global_symbols(Default::default(), &context, &gs);
+    let mut doc = Document::with_global_symbols(Default::default(), &stage, &gs);
     let output = doc.render(&f).unwrap();
     insta::assert_snapshot!(output);
 }
 
 #[test]
 fn test_custom_width() {
-    let (context, gs, f) = create_test_function();
+    let (stage, gs, f) = create_test_function();
 
     let config = Config::default().with_width(40);
-    let mut doc = Document::with_global_symbols(config, &context, &gs);
+    let mut doc = Document::with_global_symbols(config, &stage, &gs);
     let output = doc.render(&f).unwrap();
     insta::assert_snapshot!(output);
 }
@@ -120,8 +120,8 @@ fn test_custom_width() {
 
 #[test]
 fn test_document_list_empty() {
-    let context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let doc = Document::new(Default::default(), &context);
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
 
     let items: Vec<i32> = vec![];
     let result = doc.list(items.iter(), ", ", |i| doc.text(format!("{}", i)));
@@ -132,8 +132,8 @@ fn test_document_list_empty() {
 
 #[test]
 fn test_document_list_single() {
-    let context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let doc = Document::new(Default::default(), &context);
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
 
     let items = vec![42];
     let result = doc.list(items.iter(), ", ", |i| doc.text(format!("{}", i)));
@@ -144,8 +144,8 @@ fn test_document_list_single() {
 
 #[test]
 fn test_document_list_multiple() {
-    let context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let doc = Document::new(Default::default(), &context);
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
 
     let items = vec![1, 2, 3];
     let result = doc.list(items.iter(), ", ", |i| doc.text(format!("{}", i)));
@@ -156,9 +156,9 @@ fn test_document_list_multiple() {
 
 #[test]
 fn test_document_indent() {
-    let context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let config = Config::default().with_tab_spaces(4);
-    let doc = Document::new(config, &context);
+    let doc = Document::new(config, &stage);
 
     // Create indented content with line breaks
     let inner = doc.text("hello") + doc.line() + doc.text("world");
@@ -176,11 +176,11 @@ fn test_document_indent() {
 fn test_constant_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let _ = context.staged_function().name(test_sym).new().unwrap();
+    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let _ = stage.staged_function().name(test_sym).new().unwrap();
 
-    let const_op = SimpleLanguage::op_constant(&mut context, 42i64);
-    let doc = Document::new(Default::default(), &context);
+    let const_op = SimpleLanguage::op_constant(&mut stage, 42i64);
+    let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_statement(&const_op.id);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
@@ -191,14 +191,14 @@ fn test_constant_pretty_print() {
 fn test_add_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let _ = context.staged_function().name(test_sym).new().unwrap();
+    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let _ = stage.staged_function().name(test_sym).new().unwrap();
 
-    let a = SimpleLanguage::op_constant(&mut context, 1i64);
-    let b = SimpleLanguage::op_constant(&mut context, 2i64);
-    let add = SimpleLanguage::op_add(&mut context, a.result, b.result);
+    let a = SimpleLanguage::op_constant(&mut stage, 1i64);
+    let b = SimpleLanguage::op_constant(&mut stage, 2i64);
+    let add = SimpleLanguage::op_add(&mut stage, a.result, b.result);
 
-    let doc = Document::new(Default::default(), &context);
+    let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_statement(&add.id);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
@@ -211,19 +211,19 @@ fn test_add_pretty_print() {
 
 #[test]
 fn test_write_to_vec() {
-    let (context, gs, f) = create_test_function();
+    let (stage, gs, f) = create_test_function();
 
-    let mut doc = Document::with_global_symbols(Default::default(), &context, &gs);
+    let mut doc = Document::with_global_symbols(Default::default(), &stage, &gs);
     let output = doc.render(&f).unwrap();
     insta::assert_snapshot!(output);
 }
 
 #[test]
 fn test_write_with_config() {
-    let (context, gs, f) = create_test_function();
+    let (stage, gs, f) = create_test_function();
 
     let config = Config::default().with_width(40);
-    let mut doc = Document::with_global_symbols(config, &context, &gs);
+    let mut doc = Document::with_global_symbols(config, &stage, &gs);
     let output = doc.render(&f).unwrap();
     insta::assert_snapshot!(output);
 }
@@ -237,8 +237,8 @@ fn test_global_symbol_with_table() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let foo = gs.intern("foo".to_string());
 
-    let context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let doc = Document::with_global_symbols(Default::default(), &context, &gs);
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::with_global_symbols(Default::default(), &stage, &gs);
     let arena_doc = foo.pretty_print(&doc);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
@@ -250,9 +250,9 @@ fn test_global_symbol_without_table() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let foo = gs.intern("foo".to_string());
 
-    let context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     // Document without global symbols -- falls back to raw ID
-    let doc = Document::new(Default::default(), &context);
+    let doc = Document::new(Default::default(), &stage);
     let arena_doc = foo.pretty_print(&doc);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
@@ -268,8 +268,8 @@ fn test_sprint_with_globals() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_func = gs.intern("my_function".to_string());
 
-    let mut context: kirin_ir::Context<SimpleLanguage> = kirin_ir::Context::default();
-    let staged_function = context
+    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let staged_function = stage
         .staged_function()
         .name(test_func)
         .signature(kirin_ir::Signature {
@@ -280,12 +280,12 @@ fn test_sprint_with_globals() {
         .new()
         .unwrap();
 
-    let a = SimpleLanguage::op_constant(&mut context, 42i64);
-    let ret = SimpleLanguage::op_return(&mut context, a.result);
-    let block = context.block().stmt(a).terminator(ret).new();
-    let body = context.region().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(&mut context, body);
-    let _ = context
+    let a = SimpleLanguage::op_constant(&mut stage, 42i64);
+    let ret = SimpleLanguage::op_return(&mut stage, a.result);
+    let block = stage.block().stmt(a).terminator(ret).new();
+    let body = stage.region().add_block(block).new();
+    let fdef = SimpleLanguage::op_function(&mut stage, body);
+    let _ = stage
         .specialize()
         .f(staged_function)
         .body(fdef)
@@ -293,7 +293,7 @@ fn test_sprint_with_globals() {
         .unwrap();
 
     // sprint_with_globals should resolve the function name
-    let output = staged_function.sprint_with_globals(&context, &gs);
+    let output = staged_function.sprint_with_globals(&stage, &gs);
     insta::assert_snapshot!(output);
 }
 
@@ -303,13 +303,13 @@ fn test_sprint_with_globals() {
 
 #[test]
 fn test_pipeline_function_print() {
-    let mut pipeline: Pipeline<kirin_ir::Context<SimpleLanguage>> = Pipeline::new();
+    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
     let func = pipeline.function().name("foo").new();
 
     // --- Stage A: a simple function with one constant ---
     let stage0_id = pipeline
         .add_stage()
-        .stage(kirin_ir::Context::default())
+        .stage(kirin_ir::StageInfo::default())
         .name("A")
         .new();
     let sf0 = pipeline
@@ -335,7 +335,7 @@ fn test_pipeline_function_print() {
     // --- Stage B: a different version with two constants ---
     let stage1_id = pipeline
         .add_stage()
-        .stage(kirin_ir::Context::default())
+        .stage(kirin_ir::StageInfo::default())
         .name("B")
         .new();
     let sf1 = pipeline
@@ -367,13 +367,13 @@ fn test_pipeline_function_print() {
 
 #[test]
 fn test_pipeline_unnamed_stage() {
-    let mut pipeline: Pipeline<kirin_ir::Context<SimpleLanguage>> = Pipeline::new();
+    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
     let func = pipeline.function().name("bar").new();
 
     // --- Unnamed stage (no .name() call) ---
     let stage_id = pipeline
         .add_stage()
-        .stage(kirin_ir::Context::default())
+        .stage(kirin_ir::StageInfo::default())
         .new();
     let sf = pipeline
         .staged_function()
@@ -402,13 +402,13 @@ fn test_pipeline_unnamed_stage() {
 
 #[test]
 fn test_pipeline_staged_function_no_specialization() {
-    let mut pipeline: Pipeline<kirin_ir::Context<SimpleLanguage>> = Pipeline::new();
+    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
     let func = pipeline.function().name("extern_fn").new();
 
     // Stage with a named stage but no specialization (declaration-only)
     let stage_id = pipeline
         .add_stage()
-        .stage(kirin_ir::Context::default())
+        .stage(kirin_ir::StageInfo::default())
         .name("host")
         .new();
     let _sf = pipeline

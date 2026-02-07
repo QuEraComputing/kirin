@@ -5,7 +5,7 @@ pub use kirin_test_utils::UnitType;
 ///
 /// This is a structural container holding the function body Region.
 /// Name, signature, and return type live on StagedFunction/SpecializedFunction,
-/// not on the body statement. See `Context::specialize()` for design rationale.
+/// not on the body statement. See `StageInfo::specialize()` for design rationale.
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = UnitType)]
 #[chumsky(format = "{body}")]
@@ -20,11 +20,11 @@ mod tests {
 
     #[test]
     fn test_simple_function() {
-        let mut context: Context<SimpleFunction> = Context::default();
-        let region = context.region().new();
-        let function = SimpleFunction::new(&mut context, region);
+        let mut stage: StageInfo<SimpleFunction> = StageInfo::default();
+        let region = stage.region().new();
+        let function = SimpleFunction::new(&mut stage, region);
         let config = Config::default();
-        let doc = Document::new(config, &context);
+        let doc = Document::new(config, &stage);
         let arena_doc = doc.print_statement(&function.id);
         let mut output = String::new();
         arena_doc

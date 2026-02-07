@@ -23,23 +23,23 @@ pub trait Identifier:
 pub trait GetInfo<L: Dialect>: std::fmt::Debug {
     type Info;
     /// Get a reference to the context info for the given node pointer.
-    fn get_info<'a>(&self, context: &'a crate::Context<L>) -> Option<&'a Self::Info>;
+    fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info>;
     /// Get a mutable reference to the context info for the given node pointer.
-    fn get_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> Option<&'a mut Self::Info>;
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info>;
     /// Get a reference to the context info for the given node pointer, panicking if not found.
-    fn expect_info<'a>(&self, context: &'a crate::Context<L>) -> &'a Self::Info {
-        self.get_info(context).unwrap_or_else(|| {
+    fn expect_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> &'a Self::Info {
+        self.get_info(stage).unwrap_or_else(|| {
             panic!(
-                "Expected to find info for ID {:?} in context, but none was found.",
+                "Expected to find info for ID {:?} in stage, but none was found.",
                 self
             )
         })
     }
     /// Get a mutable reference to the context info for the given node pointer, panicking if not found.
-    fn expect_info_mut<'a>(&self, context: &'a mut crate::Context<L>) -> &'a mut Self::Info {
-        self.get_info_mut(context).unwrap_or_else(|| {
+    fn expect_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> &'a mut Self::Info {
+        self.get_info_mut(stage).unwrap_or_else(|| {
             panic!(
-                "Expected to find mutable info for ID {:?} in context, but none was found.",
+                "Expected to find mutable info for ID {:?} in stage, but none was found.",
                 self
             )
         })
