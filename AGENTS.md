@@ -1,6 +1,13 @@
-# CLAUDE.md
+# AGENTS.md
 
-Guidance for Claude Code (claude.ai/code) when working with this repository.
+## Principles
+
+- less standalone function is better
+- every module only expects a few names to be imported, do not create giant sets of new names
+- if we have a lot of implementations (over 200 lines), it is better to split them into multiple files.
+- use `mod.rs` over `<name>.rs` for modules that contain multiple files.
+- always summarize what you did in `.agents/progress.md` in one sentence.
+- when creating tests, always put common tools created for testing in the `kirin-test-utils` crate, unless they are specific to a single crate.
 
 ## Build and Test
 
@@ -15,19 +22,21 @@ cargo insta review               # Review snapshot test changes
 
 Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
 
-## Design Documentation
-
-See [`design/`](./design/) for architecture overview:
-- [`design/ir.md`](./design/ir.md) — Dialect composability and type system
-- [`design/text-format.md`](./design/text-format.md) — Parser and pretty printer
-
 ## Commit Messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <description>`
 
 Examples: `feat(chumsky): add region parser`, `fix(derive): handle empty enum variants`
 
-## Crate Map
+## Project structure
+
+- `design` contains design documents and diagrams.
+- `example` contains example code of the top-level crate `kirin`
+- `tests` contains integration tests for the top-level crate `kirin`
+- `crates` contains the crates that make up the project, most implementation can be found here.
+- `.agents` contains agent specific implementations that is not included in this file, e.g skills.
+
+### Crates
 
 **Core:**
 - `kirin-ir` — IR types, `Dialect` trait
@@ -45,13 +54,3 @@ Examples: `feat(chumsky): add region parser`, `fix(derive): handle empty enum va
 **Derive Infrastructure:**
 - `kirin-derive-core` — Shared derive utilities
 - `kirin-derive`, `kirin-derive-dialect` — `#[derive(Dialect)]`
-
-## Key Files
-
-- Parser traits: `kirin-chumsky/src/traits.rs`
-- AST types: `kirin-chumsky/src/ast.rs`
-- Code generators: `kirin-chumsky-format/src/generate/`
-- Snapshot tests: `kirin-chumsky-format/src/snapshots/`
-- Integration tests: `kirin-chumsky-derive/tests/`
-
-Note: Crates suffixed `-old` are prior iterations, not workspace members.
