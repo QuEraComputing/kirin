@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/field/tests.rs
-expression: "case!\n{\n    #[wraps] #[kirin(fn, type_lattice = T)] struct NamedWrapper<T>\n    { wrapped: InnerStruct<T>, }\n}"
+expression: "case!\n{\n    #[wraps] #[kirin(fn, type = T)] struct NamedWrapper<T>\n    { wrapped: InnerStruct<T>, }\n}"
 ---
 #[automatically_derived]
 impl<'a, T> kirin::ir::HasArguments<'a> for NamedWrapper<T> {
@@ -8,13 +8,13 @@ impl<'a, T> kirin::ir::HasArguments<'a> for NamedWrapper<T> {
     fn arguments(&'a self) -> Self::Iter {
         let Self { wrapped } = self;
         NamedWrapperArgumentsIter {
-            inner: <InnerStruct<T> as HasArguments>::arguments(wrapped),
+            inner: <InnerStruct<T> as kirin::ir::HasArguments>::arguments(wrapped),
         }
     }
 }
 #[automatically_derived]
 pub struct NamedWrapperArgumentsIter<'a, T> {
-    inner: <InnerStruct<T> as HasArguments<'a, T>>::Iter,
+    inner: <InnerStruct<T> as kirin::ir::HasArguments<'a>>::Iter,
 }
 #[automatically_derived]
 impl<'a, T> Iterator for NamedWrapperArgumentsIter<'a, T> {
@@ -29,13 +29,13 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for NamedWrapper<T> {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         let Self { wrapped } = self;
         NamedWrapperArgumentsMutIter {
-            inner: <InnerStruct<T> as HasArgumentsMut>::arguments_mut(wrapped),
+            inner: <InnerStruct<T> as kirin::ir::HasArgumentsMut>::arguments_mut(wrapped),
         }
     }
 }
 #[automatically_derived]
 pub struct NamedWrapperArgumentsMutIter<'a, T> {
-    inner: <InnerStruct<T> as HasArgumentsMut<'a, T>>::IterMut,
+    inner: <InnerStruct<T> as kirin::ir::HasArgumentsMut<'a>>::IterMut,
 }
 #[automatically_derived]
 impl<'a, T> Iterator for NamedWrapperArgumentsMutIter<'a, T> {

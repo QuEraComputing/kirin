@@ -10,7 +10,7 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveProperty {
     ) -> darling::Result<proc_macro2::TokenStream> {
         let input = self.input_ctx()?;
         let info = self.statement_info(&data.0)?;
-        let trait_path = self.trait_path.clone();
+        let trait_path = self.full_trait_path(input);
         let input_name = &input.core.name;
         let value_type = &self.value_type;
 

@@ -63,6 +63,88 @@ impl GeneratorConfig {
     }
 }
 
+/// Builds AST generics shared by AST and EmitIR generators.
+///
+/// Returns generics like:
+/// - without Language: `<'tokens, 'src, [original type params], TypeOutput, LanguageOutput>`
+/// - with Language: `<'tokens, 'src, [original type params], TypeOutput, LanguageOutput, Language>`
+pub(crate) fn build_ast_generics(
+    base_generics: &syn::Generics,
+    include_language: bool,
+) -> syn::Generics {
+    use proc_macro2::Span;
+
+    let mut generics = base_generics.clone();
+
+    let tokens_lt = syn::Lifetime::new("'tokens", Span::call_site());
+    if !generics
+        .params
+        .iter()
+        .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
+    {
+        generics.params.insert(
+            0,
+            syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
+        );
+    }
+
+    let src_lt = syn::Lifetime::new("'src", Span::call_site());
+    if !generics
+        .params
+        .iter()
+        .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
+    {
+        let mut src_param = syn::LifetimeParam::new(src_lt);
+        src_param.bounds.push(tokens_lt);
+        generics
+            .params
+            .insert(1, syn::GenericParam::Lifetime(src_param));
+    }
+
+    let type_output_ident = syn::Ident::new("TypeOutput", Span::call_site());
+    if !generics
+        .params
+        .iter()
+        .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == type_output_ident))
+    {
+        generics
+            .params
+            .push(syn::GenericParam::Type(syn::TypeParam::from(
+                type_output_ident,
+            )));
+    }
+
+    let lang_output_ident = syn::Ident::new("LanguageOutput", Span::call_site());
+    if !generics
+        .params
+        .iter()
+        .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == lang_output_ident))
+    {
+        generics
+            .params
+            .push(syn::GenericParam::Type(syn::TypeParam::from(
+                lang_output_ident,
+            )));
+    }
+
+    if include_language {
+        let language_ident = syn::Ident::new("Language", Span::call_site());
+        if !generics
+            .params
+            .iter()
+            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == language_ident))
+        {
+            generics
+                .params
+                .push(syn::GenericParam::Type(syn::TypeParam::from(
+                    language_ident,
+                )));
+        }
+    }
+
+    generics
+}
+
 /// Gets the format string for a statement, checking extra_attrs first.
 pub(crate) fn format_for_statement(
     ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,

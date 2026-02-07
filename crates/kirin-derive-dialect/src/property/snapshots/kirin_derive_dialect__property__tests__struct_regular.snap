@@ -1,9 +1,9 @@
 ---
-source: crates/kirin-derive-core/src/kirin/property/mod.rs
-expression: content
+source: crates/kirin-derive-dialect/src/property/tests.rs
+expression: "case!\n{ #[kirin(constant, type = TestType)] struct MyStruct { a: i32, b: i32, } }"
 ---
 #[automatically_derived]
-impl IsConstant for MyStruct {
+impl ::kirin::ir::IsConstant for MyStruct {
     fn is_constant(&self) -> bool {
         true
     }

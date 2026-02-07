@@ -63,10 +63,11 @@ impl<'a> StatementBuilder<'a> {
         &self,
         statement: &ir::Statement<StandardLayout>,
     ) -> proc_macro2::TokenStream {
+        let input_builder = FieldInputBuilder::new(self.ctx, self.input);
         let wrapper = statement.wraps.as_ref().expect("wrapper expected");
         let wrapper_field = field_name_tokens(&wrapper.field);
         let wrapper_ty = &wrapper.ty;
-        let trait_path = &self.ctx.trait_path;
+        let trait_path = input_builder.full_trait_path();
         let trait_method = self.ctx.trait_method.clone();
         WrapperCallTokens::builder()
             .wrapper_ty(wrapper_ty)
@@ -84,29 +85,17 @@ impl<'a> StatementBuilder<'a> {
         let input_builder = FieldInputBuilder::new(self.ctx, self.input);
         let wrapper = statement.wraps.as_ref().expect("wrapper expected");
         let wrapper_ty = &wrapper.ty;
-        let trait_path = &self.ctx.trait_path;
+        let trait_path = input_builder.full_trait_path();
         let trait_type_iter = self.ctx.trait_type_iter.clone();
-        if self.input.is_enum {
-            let trait_generics = input_builder.trait_generics();
-            let (_, trait_ty_generics, _) = trait_generics.split_for_impl();
-            WrapperIterTypeTokens::builder()
-                .wrapper_ty(wrapper_ty)
-                .trait_path(trait_path)
-                .trait_generics(trait_ty_generics)
-                .assoc_type_ident(trait_type_iter)
-                .build()
-                .to_token_stream()
-        } else {
-            let generics_with_lt = input_builder.add_trait_lifetime(&self.input.generics);
-            let (_, wrapper_ty_generics, _) = generics_with_lt.split_for_impl();
-            WrapperIterTypeTokens::builder()
-                .wrapper_ty(wrapper_ty)
-                .trait_path(trait_path)
-                .trait_generics(wrapper_ty_generics)
-                .assoc_type_ident(trait_type_iter)
-                .build()
-                .to_token_stream()
-        }
+        let trait_generics = input_builder.trait_generics();
+        let (_, trait_ty_generics, _) = trait_generics.split_for_impl();
+        WrapperIterTypeTokens::builder()
+            .wrapper_ty(wrapper_ty)
+            .trait_path(trait_path)
+            .trait_generics(trait_ty_generics)
+            .assoc_type_ident(trait_type_iter)
+            .build()
+            .to_token_stream()
     }
 
     fn fields_for_kind<'b>(

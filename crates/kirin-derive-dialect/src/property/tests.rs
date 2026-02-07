@@ -1,29 +1,5 @@
-use std::process::{Command, Stdio};
-
 use super::{DeriveProperty, PropertyKind};
-
-fn rustfmt<S: ToString>(src: S) -> String {
-    let mut child = Command::new("rustfmt")
-        .arg("--emit")
-        .arg("stdout")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    {
-        use std::io::Write;
-        child
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all(src.to_string().as_bytes())
-            .unwrap();
-    }
-
-    let output = child.wait_with_output().unwrap();
-    String::from_utf8(output.stdout).unwrap()
-}
+use kirin_test_utils::rustfmt;
 
 fn derive_constant(input: &syn::DeriveInput) -> String {
     let mut tokens = proc_macro2::TokenStream::new();
@@ -56,6 +32,21 @@ fn test_struct_regular() {
             b: i32,
         }
     });
+}
+
+#[test]
+fn test_struct_uses_crate_trait_path() {
+    let generated = case! {
+        #[kirin(constant, type = TestType)]
+        struct MyStruct {
+            a: i32,
+        }
+    };
+    assert!(
+        generated.contains("impl ::kirin::ir::IsConstant for MyStruct"),
+        "struct property impls must use crate-qualified trait paths:\n{}",
+        generated
+    );
 }
 
 #[test]

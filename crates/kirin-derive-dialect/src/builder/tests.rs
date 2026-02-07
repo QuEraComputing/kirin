@@ -1,29 +1,5 @@
-use std::process::{Command, Stdio};
-
 use super::DeriveBuilder;
-
-fn rustfmt<S: ToString>(src: S) -> String {
-    let mut child = Command::new("rustfmt")
-        .arg("--emit")
-        .arg("stdout")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    {
-        use std::io::Write;
-        child
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all(src.to_string().as_bytes())
-            .unwrap();
-    }
-
-    let output = child.wait_with_output().unwrap();
-    String::from_utf8(output.stdout).unwrap()
-}
+use kirin_test_utils::rustfmt;
 
 fn derive_builder(input: &syn::DeriveInput) -> String {
     let mut builder = DeriveBuilder::default();

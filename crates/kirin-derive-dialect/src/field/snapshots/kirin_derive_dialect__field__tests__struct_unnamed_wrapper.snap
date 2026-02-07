@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/field/tests.rs
-expression: "case!\n{\n    #[kirin(type_lattice = T)] struct\n    TestStruct<T>(SSAValue, #[wraps] T, SSAValue, String, f64);\n}"
+expression: "case!\n{\n    #[kirin(type = T)] struct\n    TestStruct<T>(SSAValue, #[wraps] T, SSAValue, String, f64);\n}"
 ---
 #[automatically_derived]
 impl<'a, T> kirin::ir::HasArguments<'a> for TestStruct<T> {
@@ -8,13 +8,13 @@ impl<'a, T> kirin::ir::HasArguments<'a> for TestStruct<T> {
     fn arguments(&'a self) -> Self::Iter {
         let Self(field_0, field_1, field_2, field_3, field_4) = self;
         TestStructArgumentsIter {
-            inner: <T as HasArguments>::arguments(field_1),
+            inner: <T as kirin::ir::HasArguments>::arguments(field_1),
         }
     }
 }
 #[automatically_derived]
 pub struct TestStructArgumentsIter<'a, T> {
-    inner: <T as HasArguments<'a, T>>::Iter,
+    inner: <T as kirin::ir::HasArguments<'a>>::Iter,
 }
 #[automatically_derived]
 impl<'a, T> Iterator for TestStructArgumentsIter<'a, T> {
@@ -29,13 +29,13 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for TestStruct<T> {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         let Self(field_0, field_1, field_2, field_3, field_4) = self;
         TestStructArgumentsMutIter {
-            inner: <T as HasArgumentsMut>::arguments_mut(field_1),
+            inner: <T as kirin::ir::HasArgumentsMut>::arguments_mut(field_1),
         }
     }
 }
 #[automatically_derived]
 pub struct TestStructArgumentsMutIter<'a, T> {
-    inner: <T as HasArgumentsMut<'a, T>>::IterMut,
+    inner: <T as kirin::ir::HasArgumentsMut<'a>>::IterMut,
 }
 #[automatically_derived]
 impl<'a, T> Iterator for TestStructArgumentsMutIter<'a, T> {

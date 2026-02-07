@@ -1,1 +1,2 @@
 Replaced StageInfo symbol storage from Arc<RefCell<InternTable<...>>> to direct InternTable access and updated all symbol table call sites to use direct references and mutable references.
+Fixed derive trait-path and wrapper-generic generation bugs, deduplicated Dialect and AST/EmitIR configuration logic, centralized rustfmt test helpers in kirin-test-utils, and validated the changes with full workspace tests.

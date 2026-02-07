@@ -1,29 +1,5 @@
-use std::process::{Command, Stdio};
-
 use super::{DeriveFieldIter, FieldIterKind};
-
-fn rustfmt<S: ToString>(src: S) -> String {
-    let mut child = Command::new("rustfmt")
-        .arg("--emit")
-        .arg("stdout")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    {
-        use std::io::Write;
-        child
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all(src.to_string().as_bytes())
-            .unwrap();
-    }
-
-    let output = child.wait_with_output().unwrap();
-    String::from_utf8(output.stdout).unwrap()
-}
+use kirin_test_utils::rustfmt;
 
 fn derive_fields(input: &syn::DeriveInput) -> String {
     let mut tokens = proc_macro2::TokenStream::new();
@@ -187,6 +163,18 @@ fn test_struct_wrapper_iter_uses_lifetime() {
     assert!(
         generated.contains("HasArguments<'a>") && generated.contains("HasArgumentsMut<'a>"),
         "wrapper iter types must include trait lifetime:\n{}",
+        generated
+    );
+    assert!(
+        !generated.contains("HasArguments<'a, T>") && !generated.contains("HasArgumentsMut<'a, T>"),
+        "wrapper iter traits must not include input type generics:\n{}",
+        generated
+    );
+    assert!(
+        generated.contains("<InnerStruct<T> as kirin::ir::HasArguments>::arguments(wrapped)")
+            && generated
+                .contains("<InnerStruct<T> as kirin::ir::HasArgumentsMut>::arguments_mut(wrapped)"),
+        "wrapper calls must use crate-qualified trait paths:\n{}",
         generated
     );
 }

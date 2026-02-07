@@ -96,79 +96,12 @@ impl GenerateAST {
         all_types
     }
 
-    /// Builds AST generics with TypeOutput and LanguageOutput parameters.
-    ///
-    /// Returns generics like `<'tokens, 'src, [original type params], TypeOutput, LanguageOutput>`.
-    fn build_ast_generics(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-    ) -> syn::Generics {
-        use proc_macro2::Span;
-
-        let mut generics = ir_input.generics.clone();
-
-        // Add 'tokens lifetime at the beginning if not present
-        let tokens_lt = syn::Lifetime::new("'tokens", Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
-        {
-            generics.params.insert(
-                0,
-                syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
-            );
-        }
-
-        // Add 'src: 'tokens lifetime after 'tokens if not present
-        let src_lt = syn::Lifetime::new("'src", Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
-        {
-            let mut src_param = syn::LifetimeParam::new(src_lt);
-            src_param.bounds.push(tokens_lt);
-            generics
-                .params
-                .insert(1, syn::GenericParam::Lifetime(src_param));
-        }
-
-        // Add TypeOutput type parameter
-        let type_output_ident = syn::Ident::new("TypeOutput", Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == type_output_ident))
-        {
-            let type_output_param = syn::TypeParam::from(type_output_ident);
-            generics
-                .params
-                .push(syn::GenericParam::Type(type_output_param));
-        }
-
-        // Add LanguageOutput type parameter
-        let lang_output_ident = syn::Ident::new("LanguageOutput", Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Type(t) if t.ident == lang_output_ident))
-        {
-            let lang_output_param = syn::TypeParam::from(lang_output_ident);
-            generics
-                .params
-                .push(syn::GenericParam::Type(lang_output_param));
-        }
-
-        generics
-    }
-
     fn generate_ast_definition(
         &self,
         ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
     ) -> TokenStream {
-        let ast_generics = self.build_ast_generics(ir_input);
+        let ast_generics = super::build_ast_generics(&ir_input.generics, false);
         // Use impl_generics to preserve original type parameter bounds (e.g., T: TypeLattice)
         let (impl_generics, _, _) = ast_generics.split_for_impl();
 
