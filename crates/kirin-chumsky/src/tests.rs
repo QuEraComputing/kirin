@@ -7,34 +7,14 @@
 
 use crate::ast::*;
 use crate::parsers::*;
-use chumsky::input::Stream;
 use chumsky::prelude::*;
-use kirin_lexer::{Logos, Token};
 
 // === Helper macro to create parsers ===
 
 macro_rules! test_parse {
-    ($input:expr, $parser:expr) => {{
-        let input: &str = $input;
-        let tokens: Vec<_> = Token::lexer(input)
-            .spanned()
-            .map(|(tok, span)| {
-                let token = tok.unwrap_or(Token::Error);
-                (token, chumsky::span::SimpleSpan::from(span))
-            })
-            .collect();
-        let stream =
-            Stream::from_iter(tokens).map((0..input.len()).into(), |(t, s): (_, _)| (t, s));
-        let result = $parser.parse(stream);
-        if result.has_output() {
-            Ok(result.into_output().unwrap())
-        } else {
-            Err(result
-                .errors()
-                .map(|e| format!("{:?}", e))
-                .collect::<Vec<_>>())
-        }
-    }};
+    ($input:expr, $parser:expr) => {
+        kirin_test_utils::parse_tokens!($input, $parser)
+    };
 }
 
 // === Identifier Tests ===

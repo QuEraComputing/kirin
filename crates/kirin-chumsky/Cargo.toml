@@ -18,3 +18,4 @@ derive = ["kirin-chumsky-derive"]
 [dev-dependencies]
 insta.workspace = true
 kirin-derive.workspace = true
+kirin-test-utils = { workspace = true, features = ["parser"] }

@@ -4,14 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-kirin-ir.workspace = true
-
-# Optional parser support
-chumsky = { workspace = true, optional = true }
+kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
 kirin-chumsky = { workspace = true, optional = true }
 kirin-lexer = { workspace = true, optional = true }
 kirin-prettyless = { workspace = true, optional = true }
 
 [features]
 default = []
-parser = ["chumsky", "kirin-chumsky", "kirin-lexer", "kirin-prettyless"]
+simple-language = ["kirin-ir/derive"]
+parser = ["kirin-chumsky", "kirin-lexer"]
+pretty = ["kirin-prettyless"]

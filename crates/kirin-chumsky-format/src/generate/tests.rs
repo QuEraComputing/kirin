@@ -7,7 +7,7 @@ use crate::{
     ChumskyLayout, GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint,
 };
 use kirin_derive_core::ir::Input;
-use kirin_derive_core::test_util::rustfmt_tokens;
+use kirin_test_utils::rustfmt_display;
 
 /// Helper to generate all outputs for a given input.
 fn generate_all(input: &syn::DeriveInput) -> (String, String, String, String) {
@@ -18,10 +18,10 @@ fn generate_all(input: &syn::DeriveInput) -> (String, String, String, String) {
     let parser_gen = GenerateHasDialectParser::new(&ir_input);
     let pretty_gen = GeneratePrettyPrint::new(&ir_input);
 
-    let ast = rustfmt_tokens(&ast_gen.generate(&ir_input));
-    let emit = rustfmt_tokens(&emit_gen.generate(&ir_input));
-    let parser = rustfmt_tokens(&parser_gen.generate(&ir_input));
-    let pretty = rustfmt_tokens(&pretty_gen.generate(&ir_input));
+    let ast = rustfmt_display(&ast_gen.generate(&ir_input));
+    let emit = rustfmt_display(&emit_gen.generate(&ir_input));
+    let parser = rustfmt_display(&parser_gen.generate(&ir_input));
+    let pretty = rustfmt_display(&pretty_gen.generate(&ir_input));
 
     (ast, emit, parser, pretty)
 }

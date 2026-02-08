@@ -314,21 +314,9 @@ impl DirectlyParsable for String {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chumsky::input::Stream;
-    use kirin_lexer::Logos;
 
     fn parse_with<T: HasParser<'static, 'static>>(input: &'static str) -> Result<T::Output, ()> {
-        let tokens: Vec<_> = Token::lexer(input)
-            .spanned()
-            .map(|(tok, span)| {
-                let token = tok.unwrap_or(Token::Error);
-                (token, SimpleSpan::from(span))
-            })
-            .collect();
-
-        let eoi = SimpleSpan::from(input.len()..input.len());
-        let stream = Stream::from_iter(tokens).map(eoi, |(t, s)| (t, s));
-        T::parser().parse(stream).into_result().map_err(|_| ())
+        kirin_test_utils::parse_tokens!(input, T::parser()).map_err(|_| ())
     }
 
     #[test]

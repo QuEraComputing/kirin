@@ -5,7 +5,7 @@
 
 use kirin::ir::{Dialect, GetInfo, ResultValue, SSAValue, StageInfo};
 use kirin_chumsky::{EmitContext, EmitIR, HasParser, PrettyPrint, parse, parse_ast};
-use kirin_test_utils::SimpleType;
+use kirin_test_utils::{SimpleType, new_test_ssa};
 
 /// A simple dialect for testing EmitIR functionality.
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
@@ -34,18 +34,8 @@ fn test_emit_add_creates_statement() {
 
     // First, we need to set up the operand SSAs that the Add instruction will reference
     // Create SSAs for %a and %b before emitting the add instruction
-    let ssa_a = stage
-        .ssa()
-        .name("a".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
-    let ssa_b = stage
-        .ssa()
-        .name("b".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_a = new_test_ssa(&mut stage, "a", SimpleType::I32);
+    let ssa_b = new_test_ssa(&mut stage, "b", SimpleType::I32);
 
     // Parse the add instruction
     let ast = parse_ast::<EmitLang>("%result = add %a, %b").expect("parse failed");
@@ -83,12 +73,7 @@ fn test_emit_neg_creates_statement() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create the operand SSA
-    let ssa_x = stage
-        .ssa()
-        .name("x".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_x = new_test_ssa(&mut stage, "x", SimpleType::I32);
 
     // Parse the neg instruction
     let ast = parse_ast::<EmitLang>("%y = neg %x").expect("parse failed");
@@ -114,12 +99,7 @@ fn test_emit_return_creates_statement() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create the operand SSA
-    let ssa_v = stage
-        .ssa()
-        .name("v".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_v = new_test_ssa(&mut stage, "v", SimpleType::I32);
 
     // Parse the return instruction
     let ast = parse_ast::<EmitLang>("return %v").expect("parse failed");
@@ -145,12 +125,7 @@ fn test_emit_convenience_function() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create the operand SSA
-    let ssa_val = stage
-        .ssa()
-        .name("val".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_val = new_test_ssa(&mut stage, "val", SimpleType::I32);
 
     // Parse
     let ast = parse_ast::<EmitLang>("return %val").expect("parse failed");
@@ -171,18 +146,8 @@ fn test_emit_result_creates_ssa() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSAs
-    let ssa_a = stage
-        .ssa()
-        .name("a".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
-    let ssa_b = stage
-        .ssa()
-        .name("b".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_a = new_test_ssa(&mut stage, "a", SimpleType::I32);
+    let ssa_b = new_test_ssa(&mut stage, "b", SimpleType::I32);
 
     // Parse
     let ast = parse_ast::<EmitLang>("%sum = add %a, %b").expect("parse failed");
@@ -207,18 +172,8 @@ fn test_emit_chain_multiple_statements() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create initial SSAs
-    let ssa_x = stage
-        .ssa()
-        .name("x".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
-    let ssa_y = stage
-        .ssa()
-        .name("y".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_x = new_test_ssa(&mut stage, "x", SimpleType::I32);
+    let ssa_y = new_test_ssa(&mut stage, "y", SimpleType::I32);
 
     // Parse all the ASTs first
     let ast1 = parse_ast::<EmitLang>("%sum = add %x, %y").expect("parse failed");
@@ -298,18 +253,8 @@ fn test_combined_parse_workflow() {
 
     // Create initial SSAs (these would typically come from function arguments
     // or other sources in a real compiler)
-    let ssa_a = stage
-        .ssa()
-        .name("a".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
-    let ssa_b = stage
-        .ssa()
-        .name("b".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_a = new_test_ssa(&mut stage, "a", SimpleType::I32);
+    let ssa_b = new_test_ssa(&mut stage, "b", SimpleType::I32);
 
     // Create emit context and register the initial SSAs
     let mut emit_ctx = EmitContext::new(&mut stage);
@@ -347,18 +292,8 @@ fn test_roundtrip_add() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSAs
-    let ssa_a = stage
-        .ssa()
-        .name("a".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
-    let ssa_b = stage
-        .ssa()
-        .name("b".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_a = new_test_ssa(&mut stage, "a", SimpleType::I32);
+    let ssa_b = new_test_ssa(&mut stage, "b", SimpleType::I32);
 
     // Parse
     let input = "%res = add %a, %b";
@@ -392,12 +327,7 @@ fn test_roundtrip_neg() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSA
-    let ssa_x = stage
-        .ssa()
-        .name("x".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_x = new_test_ssa(&mut stage, "x", SimpleType::I32);
 
     // Parse
     let input = "%y = neg %x";
@@ -430,12 +360,7 @@ fn test_roundtrip_return() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
     // Create operand SSA
-    let ssa_v = stage
-        .ssa()
-        .name("v".to_string())
-        .ty(SimpleType::I32)
-        .kind(kirin_ir::SSAKind::Test)
-        .new();
+    let ssa_v = new_test_ssa(&mut stage, "v", SimpleType::I32);
 
     // Parse
     let input = "return %v";
