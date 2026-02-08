@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-prettyless/src/tests.rs
+source: crates/kirin-prettyless/src/tests/snapshot.rs
 expression: output
 ---
 fn @test_func(int) -> int {

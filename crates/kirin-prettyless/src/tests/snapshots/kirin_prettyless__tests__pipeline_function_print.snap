@@ -1,6 +1,5 @@
 ---
-source: crates/kirin-prettyless/src/tests.rs
-assertion_line: 364
+source: crates/kirin-prettyless/src/tests/pipeline.rs
 expression: output
 ---
 stage @A fn @foo(int) -> int {

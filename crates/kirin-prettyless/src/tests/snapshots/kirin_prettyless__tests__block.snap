@@ -1,6 +1,6 @@
 ---
-source: crates/kirin-prettyless/src/tests.rs
-expression: output
+source: crates/kirin-prettyless/src/tests/snapshot.rs
+expression: buf
 ---
 fn @test_func(int) -> int {
   ^0(%5: int, %y: float) {

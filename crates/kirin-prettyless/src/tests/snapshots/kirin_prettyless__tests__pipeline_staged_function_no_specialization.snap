@@ -1,6 +1,5 @@
 ---
-source: crates/kirin-prettyless/src/tests.rs
-assertion_line: 427
+source: crates/kirin-prettyless/src/tests/pipeline.rs
 expression: output
 ---
 stage @host fn @extern_fn(int) -> float

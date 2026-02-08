@@ -1,6 +1,5 @@
 ---
-source: crates/kirin-prettyless/src/tests.rs
-assertion_line: 296
+source: crates/kirin-prettyless/src/tests/sprint_with_globals.rs
 expression: output
 ---
 fn @my_function(int) -> int {
