@@ -1,4 +1,5 @@
 use crate::builder::statement::StatementInfo;
+use crate::common;
 use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::prelude::*;
 use std::collections::HashMap;
@@ -29,28 +30,18 @@ impl DeriveBuilder {
     }
 
     pub fn emit(&mut self, input: &syn::DeriveInput) -> darling::Result<proc_macro2::TokenStream> {
-        let input = ir::Input::<StandardLayout>::from_derive_input(input)?;
-        self.scan_input(&input)?;
-        self.emit_input(&input)
+        common::emit_from_derive_input(self, input)
     }
 
     pub(crate) fn input_ctx(&self) -> darling::Result<&InputMeta> {
-        self.input.as_ref().ok_or_else(|| {
-            darling::Error::custom("DeriveBuilder context missing, call scan_input first")
-        })
+        common::require_input_ctx(&self.input, "DeriveBuilder")
     }
 
     pub(crate) fn statement_info(
         &self,
         statement: &ir::Statement<StandardLayout>,
     ) -> darling::Result<&StatementInfo> {
-        let key = statement.name.to_string();
-        self.statements.get(&key).ok_or_else(|| {
-            darling::Error::custom(format!(
-                "Missing statement info for '{}', call scan_statement first",
-                key
-            ))
-        })
+        common::statement_info(&self.statements, statement)
     }
 
     pub(crate) fn full_crate_path(&self, input: &InputMeta) -> syn::Path {
