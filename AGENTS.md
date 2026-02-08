@@ -6,7 +6,6 @@
 - every module only expects a few names to be imported, do not create giant sets of new names
 - if we have a lot of implementations (over 200 lines), it is better to split them into multiple files.
 - use `mod.rs` over `<name>.rs` for modules that contain multiple files.
-- always summarize what you did in `.agents/progress.md` in one sentence.
 - when creating tests, always put common tools created for testing in the `kirin-test-utils` crate, unless they are specific to a single crate.
 
 ## Build and Test
