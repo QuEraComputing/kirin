@@ -27,6 +27,8 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope
 
 Examples: `feat(chumsky): add region parser`, `fix(derive): handle empty enum variants`
 
+Avoid large paragraphs in commit messages, keep them concise and focused on the changes made.
+
 ## Project structure
 
 - `design` contains design documents and diagrams.
