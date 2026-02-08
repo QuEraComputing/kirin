@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kirin RFC Writer"
+  short_description: "Draft and refine Kirin RFC proposals"
+  default_prompt: "Use $kirin-rfc-writer to draft an RFC for a Kirin framework change."
