@@ -32,7 +32,7 @@ members = [
     "crates/kirin-chumsky",
     "crates/kirin-chumsky-format",
     "crates/kirin-chumsky-derive", "crates/kirin-function",
-    "xtask",
+    "xtask", "crates/kirin-arith",
 ]
 
 [workspace.dependencies]

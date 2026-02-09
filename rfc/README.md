@@ -27,7 +27,7 @@ The canonical template is **RFC 0000**: [`0000-template.md`](./0000-template.md)
    To update both timestamp and status on an existing RFC, use:
    `cargo xtask new-rfc "<title>" --update --status Implemented`
 2. Optionally set metadata at creation time:
-   `cargo xtask new-rfc "<title>" --status Review --agent codex --author alice --tracking-issue <issue>`
+   `cargo xtask new-rfc "<title>" --status Review --agent codex --author alice --tracking-issue <issue> --dependency 0001`
 3. Fill in the body placeholders in the generated markdown file.
 4. Keep metadata up to date as discussion and implementation progress.
 
@@ -35,8 +35,9 @@ If `--author` is not provided, `xtask` tries to read Git author info (`user.name
 If Git lookup fails, it sets `authors = ["unknown"]`.
 If `--agent` is not provided, the `agents` metadata key is omitted from the file.
 If `--discussion` or `--tracking-issue` is not provided, those metadata keys are omitted from the file.
+If `--dependency` is not provided, the `dependencies` metadata key is omitted from the file.
 If `--supersedes` or `--superseded-by` is not provided, those metadata keys are omitted from the file.
-With `--update`, provided `--author` and `--agent` values are appended (deduplicated) to existing `authors`/`agents` lists.
+With `--update`, provided `--author`, `--agent`, and `--dependency` values are appended (deduplicated) to existing `authors`/`agents`/`dependencies` lists.
 
 ## Metadata Fields
 
@@ -53,5 +54,6 @@ The metadata block at the top of each RFC is TOML.
 | `last_updated` | Last substantive update timestamp (UTC RFC3339). |
 | `discussion` | Optional: link (or pointer text) to the review discussion thread. Only present when provided. |
 | `tracking_issue` | Optional: link or identifier for implementation tracking. Only present when provided. |
+| `dependencies` | Optional: list of RFC IDs this RFC depends on. Only present when provided. |
 | `supersedes` | Optional: list of RFC IDs this RFC replaces. Only present when provided. |
 | `superseded_by` | Optional: RFC ID that replaces this RFC. Only present when provided. |

@@ -40,6 +40,9 @@ struct NewRfcCli {
     /// Implementation tracking issue link or id.
     #[arg(long = "tracking-issue", value_name = "url-or-id")]
     tracking_issue: Option<String>,
+    /// RFC ID this proposal depends on (repeatable).
+    #[arg(long = "dependency", value_name = "rfc-id")]
+    dependencies: Vec<String>,
     /// RFC ID this proposal supersedes (repeatable).
     #[arg(long, value_name = "rfc-id")]
     supersedes: Vec<String>,
@@ -101,6 +104,7 @@ struct NewRfcOptions {
     authors: Vec<String>,
     discussion: Option<String>,
     tracking_issue: Option<String>,
+    dependencies: Option<Vec<String>>,
     supersedes: Option<Vec<String>>,
     superseded_by: Option<String>,
 }
@@ -148,6 +152,7 @@ impl NewRfcOptions {
             authors: vec![],
             discussion: None,
             tracking_issue: None,
+            dependencies: None,
             supersedes: None,
             superseded_by: None,
         }
@@ -187,6 +192,13 @@ fn parse_new_rfc_args(args: Vec<String>) -> Result<NewRfcOptions, String> {
     }
     if let Some(value) = cli.tracking_issue {
         options.tracking_issue = Some(non_empty(value, "--tracking-issue")?);
+    }
+    if !cli.dependencies.is_empty() {
+        let mut normalized = Vec::with_capacity(cli.dependencies.len());
+        for rfc in cli.dependencies {
+            normalized.push(non_empty(rfc, "--dependency")?);
+        }
+        options.dependencies = Some(normalized);
     }
     if !cli.supersedes.is_empty() {
         let mut normalized = Vec::with_capacity(cli.supersedes.len());
@@ -247,13 +259,14 @@ fn create_rfc_file(options: &NewRfcOptions) -> Result<NewRfcOutcome, String> {
                 options.status_overridden.then_some(options.status),
                 &options.authors,
                 &options.agents,
+                options.dependencies.as_deref().unwrap_or(&[]),
             )?;
             return Ok(NewRfcOutcome::Updated(existing.id));
         }
         return Err(format!(
             "RFC title already exists. Use a different title or edit existing RFC.\n\
              Existing RFC: {}\n\
-             Hint: if you meant to update metadata, run with --update (and optional flags like --status, --author, or --agent).",
+             Hint: if you meant to update metadata, run with --update (and optional flags like --status, --author, --agent, or --dependency).",
             existing.path.display()
         ));
     }
@@ -296,6 +309,11 @@ fn render_template(
     context.insert("discussion", &discussion);
     let tracking_issue = options.tracking_issue.as_deref().map(toml_escape);
     context.insert("tracking_issue", &tracking_issue);
+    let dependencies = options
+        .dependencies
+        .as_ref()
+        .map(|ids| ids.iter().map(|rfc| toml_escape(rfc)).collect::<Vec<_>>());
+    context.insert("dependencies", &dependencies);
     let superseded_by = options.superseded_by.as_deref().map(toml_escape);
     context.insert("superseded_by", &superseded_by);
 
@@ -457,6 +475,7 @@ fn update_existing_rfc_metadata(
     new_status: Option<RfcStatus>,
     author_additions: &[String],
     agent_additions: &[String],
+    dependency_additions: &[String],
 ) -> Result<(), String> {
     let content = fs::read_to_string(path)
         .map_err(|error| format!("Failed to read existing RFC '{}': {error}", path.display()))?;
@@ -496,6 +515,7 @@ fn update_existing_rfc_metadata(
     let mut status_index = None;
     let mut authors_index = None;
     let mut agents_index = None;
+    let mut dependencies_index = None;
     let mut legacy_agent_index = None;
     for (offset, line) in lines[(frontmatter_start + 1)..frontmatter_end]
         .iter_mut()
@@ -516,6 +536,9 @@ fn update_existing_rfc_metadata(
         }
         if line.trim_start().starts_with("agents = ") {
             agents_index = Some(index);
+        }
+        if line.trim_start().starts_with("dependencies = ") {
+            dependencies_index = Some(index);
         }
         if line.trim_start().starts_with("agent = ") {
             legacy_agent_index = Some(index);
@@ -595,6 +618,29 @@ fn update_existing_rfc_metadata(
             lines.insert(
                 insert_at,
                 format_toml_string_array_line("agents", agent_additions),
+            );
+            if insert_at <= frontmatter_end {
+                frontmatter_end += 1;
+            }
+        }
+    }
+
+    if !dependency_additions.is_empty() {
+        if let Some(index) = dependencies_index {
+            let mut dependencies =
+                parse_toml_string_array_line("dependencies", &lines[index]).ok_or_else(|| {
+                    format!(
+                        "Failed to update RFC '{}': unable to parse dependencies field as TOML string array",
+                        path.display()
+                    )
+                })?;
+            append_unique(&mut dependencies, dependency_additions);
+            lines[index] = format_toml_string_array_line("dependencies", &dependencies);
+        } else {
+            let insert_at = frontmatter_end;
+            lines.insert(
+                insert_at,
+                format_toml_string_array_line("dependencies", dependency_additions),
             );
         }
     }
@@ -813,6 +859,21 @@ mod tests {
     }
 
     #[test]
+    fn render_template_includes_dependencies_when_set() {
+        let mut options = NewRfcOptions::with_title("Has deps".to_string());
+        options.dependencies = Some(vec!["0001".to_string(), "0003".to_string()]);
+        let rendered = render_template(
+            "{% if dependencies %}dependencies = [{% for rfc in dependencies %}\"{{ rfc }}\"{% if not loop.last %}, {% endif %}{% endfor %}]{% endif %}",
+            1,
+            &options,
+            "2026-02-08T00:00:00Z",
+        )
+        .expect("template should render");
+
+        assert_eq!(rendered, "dependencies = [\"0001\", \"0003\"]");
+    }
+
+    #[test]
     fn toml_escape_escapes_quotes_and_backslashes() {
         assert_eq!(toml_escape("a\"b\\c"), "a\\\"b\\\\c");
     }
@@ -833,6 +894,10 @@ mod tests {
             "bob".to_string(),
             "--tracking-issue".to_string(),
             "https://example.com/issues/1".to_string(),
+            "--dependency".to_string(),
+            "0001".to_string(),
+            "--dependency".to_string(),
+            "0003".to_string(),
             "--supersedes".to_string(),
             "0007".to_string(),
         ])
@@ -847,6 +912,10 @@ mod tests {
         assert_eq!(
             options.tracking_issue,
             Some("https://example.com/issues/1".to_string())
+        );
+        assert_eq!(
+            options.dependencies,
+            Some(vec!["0001".to_string(), "0003".to_string()])
         );
         assert_eq!(options.supersedes, Some(vec!["0007".to_string()]));
     }
@@ -872,6 +941,7 @@ mod tests {
         assert!(options.agents.is_empty());
         assert_eq!(options.discussion, None);
         assert_eq!(options.tracking_issue, None);
+        assert_eq!(options.dependencies, None);
         assert_eq!(options.supersedes, None);
         assert_eq!(options.superseded_by, None);
     }
@@ -930,6 +1000,7 @@ mod tests {
             "{% if agents %}agents = [{% for agent in agents %}\"{{ agent }}\"{% if not loop.last %}, {% endif %}{% endfor %}]{% endif %}\n\
              {% if discussion %}discussion = \"{{ discussion }}\"{% endif %}\n\
              {% if tracking_issue %}tracking_issue = \"{{ tracking_issue }}\"{% endif %}\n\
+             {% if dependencies %}dependencies = [{% for rfc in dependencies %}\"{{ rfc }}\"{% if not loop.last %}, {% endif %}{% endfor %}]{% endif %}\n\
              {% if supersedes %}supersedes = [{% for rfc in supersedes %}\"{{ rfc }}\"{% if not loop.last %}, {% endif %}{% endfor %}]{% endif %}\n\
              {% if superseded_by %}superseded_by = \"{{ superseded_by }}\"{% endif %}",
             1,
@@ -941,6 +1012,7 @@ mod tests {
         assert!(!rendered.contains("agents ="));
         assert!(!rendered.contains("discussion ="));
         assert!(!rendered.contains("tracking_issue ="));
+        assert!(!rendered.contains("dependencies ="));
         assert!(!rendered.contains("supersedes ="));
         assert!(!rendered.contains("superseded_by ="));
     }
@@ -965,7 +1037,7 @@ last_updated = \"2026-01-01T00:00:00Z\"
 ";
         fs::write(&temp_file, original).expect("temp rfc should be written");
 
-        update_existing_rfc_metadata(&temp_file, "2026-02-08T00:00:00Z", None, &[], &[])
+        update_existing_rfc_metadata(&temp_file, "2026-02-08T00:00:00Z", None, &[], &[], &[])
             .expect("timestamp should update");
         let updated = fs::read_to_string(&temp_file).expect("updated rfc should be readable");
         assert!(updated.contains("last_updated = \"2026-02-08T00:00:00Z\""));
@@ -998,6 +1070,7 @@ last_updated = \"2026-01-01T00:00:00Z\"
             &temp_file,
             "2026-02-08T00:00:00Z",
             Some(RfcStatus::Implemented),
+            &[],
             &[],
             &[],
         )
@@ -1037,10 +1110,49 @@ last_updated = \"2026-01-01T00:00:00Z\"
             None,
             &[],
             &agent_additions,
+            &[],
         )
         .expect("agents and timestamp should update");
         let updated = fs::read_to_string(&temp_file).expect("updated rfc should be readable");
         assert!(updated.contains("agents = [\"codex\"]"));
+        assert!(updated.contains("last_updated = \"2026-02-08T00:00:00Z\""));
+
+        fs::remove_file(temp_file).expect("temp rfc should be removed");
+    }
+
+    #[test]
+    fn update_existing_rfc_metadata_adds_dependencies_when_requested() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time should be after epoch")
+            .as_nanos();
+        let temp_file = std::env::temp_dir().join(format!(
+            "xtask-rfc-update-dependency-{}-{unique}.md",
+            std::process::id()
+        ));
+        let original = "\
++++
+rfc = \"0004\"
+status = \"Draft\"
+last_updated = \"2026-01-01T00:00:00Z\"
++++
+
+# RFC
+";
+        fs::write(&temp_file, original).expect("temp rfc should be written");
+
+        let dependency_additions = vec!["0002".to_string()];
+        update_existing_rfc_metadata(
+            &temp_file,
+            "2026-02-08T00:00:00Z",
+            None,
+            &[],
+            &[],
+            &dependency_additions,
+        )
+        .expect("dependencies and timestamp should update");
+        let updated = fs::read_to_string(&temp_file).expect("updated rfc should be readable");
+        assert!(updated.contains("dependencies = [\"0002\"]"));
         assert!(updated.contains("last_updated = \"2026-02-08T00:00:00Z\""));
 
         fs::remove_file(temp_file).expect("temp rfc should be removed");
@@ -1062,6 +1174,7 @@ rfc = \"0004\"
 status = \"Review\"
 authors = [\"alice\"]
 agents = [\"codex\"]
+dependencies = [\"0001\"]
 last_updated = \"2026-01-01T00:00:00Z\"
 +++
 
@@ -1071,17 +1184,20 @@ last_updated = \"2026-01-01T00:00:00Z\"
 
         let author_additions = vec!["alice".to_string(), "bob".to_string()];
         let agent_additions = vec!["codex".to_string(), "cursor".to_string()];
+        let dependency_additions = vec!["0001".to_string(), "0003".to_string()];
         update_existing_rfc_metadata(
             &temp_file,
             "2026-02-08T00:00:00Z",
             None,
             &author_additions,
             &agent_additions,
+            &dependency_additions,
         )
         .expect("list metadata and timestamp should update");
         let updated = fs::read_to_string(&temp_file).expect("updated rfc should be readable");
         assert!(updated.contains("authors = [\"alice\", \"bob\"]"));
         assert!(updated.contains("agents = [\"codex\", \"cursor\"]"));
+        assert!(updated.contains("dependencies = [\"0001\", \"0003\"]"));
         assert!(updated.contains("last_updated = \"2026-02-08T00:00:00Z\""));
 
         fs::remove_file(temp_file).expect("temp rfc should be removed");

@@ -1118,6 +1118,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-arith"
+version = "0.1.0"
+dependencies = [
+ "kirin",
+]
+
+[[package]]
 name = "kirin-cf"
 version = "0.1.0"
 dependencies = [

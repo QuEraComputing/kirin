@@ -14,6 +14,9 @@ discussion = "{{ discussion }}"
 {% if tracking_issue -%}
 tracking_issue = "{{ tracking_issue }}"
 {% endif -%}
+{% if dependencies -%}
+dependencies = [{% for rfc in dependencies %}"{{ rfc }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% endif -%}
 {% if supersedes -%}
 supersedes = [{% for rfc in supersedes %}"{{ rfc }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 {% endif -%}

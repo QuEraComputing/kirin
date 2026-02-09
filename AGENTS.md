@@ -18,7 +18,7 @@ cargo test -p kirin-chumsky-derive test_parse_add  # Run a single test
 cargo fmt --all                  # Format code
 cargo insta review               # Review snapshot test changes
 cargo xtask quick-validate .agents/skills/<skill-name>  # Validate a skill's SKILL.md frontmatter/rules
-cargo xtask new-rfc "<title>" [--status <status> --author <name> ...]  # Render rfc/<id>-<title>.md from the Tera template rfc/0000-template.md (`--update` refreshes timestamp on existing RFC)
+cargo xtask new-rfc "<title>" [--status <status> --author <name> --dependency <rfc-id> ...]  # Render rfc/<id>-<title>.md from the Tera template rfc/0000-template.md (`--update` refreshes timestamp and can append metadata on existing RFC)
 ```
 
 Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
