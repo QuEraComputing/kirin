@@ -1,19 +1,19 @@
 +++
 rfc = "0001"
 title = "Function parser interface"
-status = "Accepted"
-agents = ["codex"]
+status = "Implemented"
+agents = ["codex", "claude opus"]
 authors = ["Roger-luo <code@rogerluo.dev>"]
 created = "2026-02-08T03:49:05.889848Z"
-last_updated = "2026-02-08T06:07:34.78824Z"
+last_updated = "2026-02-08T06:50:01Z"
 +++
 
 # RFC 0001: Function parser interface
 
 ## Summary
 
-Add text parsing for function-level IR with a public API that is trait-based and
-entry-point-driven (`parse` on pipeline/function/staged-function contexts).
+Add text parsing for function-level IR with a public API centered on
+`pipeline.parse(text)`.
 Adopt a flat v1 text format with explicit `stage` and `specialize`
 declarations, semicolon-terminated stage declarations, strict `@`-prefixed
 global symbols (including numeric names like `@1`), and whitespace/comment
@@ -34,7 +34,7 @@ format and keeps no legacy compatibility mode.
 
 ## Goals
 
-- Priority 1: dual API model, expressed as `parse` on the target IR context.
+- Priority 1: single pipeline parse entrypoint with stage-driven dialect dispatch.
 - Priority 2: deterministic, flat syntax with explicit declaration boundaries.
 - Remove linebreak-sensitive grammar behavior.
 - Keep stage/function symbols uniform as global-symbol syntax (`@...`).
@@ -81,41 +81,77 @@ API model:
 
 - Parse on `Pipeline`: parse whole-pipeline text; may contain multiple function
   names.
-- Parse on `Function`: parse text for one known abstract function; mismatched
-  function names are errors.
-- Parse on `StagedFunction`: parse specialization text for one known staged
-  function context.
+- Stage container creation is controlled by a stage-container trait, so
+  `stage @X ...;` can create missing stages during parse.
 
 ## Reference-level Explanation
 
 ### API and syntax changes
 
-Public surface is trait-first, using `parse` methods on IR contexts.
+Public surface is trait-first, using `parse` on pipeline contexts.
 
 ```rust
-pub trait ParseText {
-    type Output;
+pub trait CompileStageInfo: Sized {
+    type Languages;
 
-    fn parse(
-        &mut self,
-        src: &str,
-        global_symbols: &mut InternTable<String, GlobalSymbol>,
-    ) -> Result<Self::Output, FunctionParseError>;
+    fn stage_name(&self) -> Option<GlobalSymbol>;
+    fn set_stage_name(&mut self, name: Option<GlobalSymbol>);
+    fn stage_id(&self) -> Option<CompileStage>;
+    fn set_stage_id(&mut self, id: Option<CompileStage>);
+    fn from_stage_name(stage_name: &str) -> Result<Self, String>;
+    fn declared_stage_names() -> &'static [&'static str] { &[] }
+}
+
+pub trait ParsePipelineText {
+    fn parse(&mut self, src: &str) -> Result<Vec<Function>, FunctionParseError>;
 }
 ```
 
 Intended implementations:
 
-- `Pipeline<S>: ParseText`
-- function-scoped context (for known abstract function): `ParseText`
-- staged-function-scoped context (for known staged function): `ParseText`
+- `Pipeline<S>: ParsePipelineText`
+- `StageInfo<L>: CompileStageInfo` (default stage creation)
+- custom stage enums: `#[derive(CompileStageInfo)]` with explicit symbol mapping and
+  registered dialect list in `Languages`
 
 Notes:
 
-- Public API should minimize new names. Entry-point type determines behavior.
-- Any parser helper structs may exist internally, but they are not required as
-  public API.
-- Global symbol table input is explicit at parse call sites.
+- Public API should minimize new names.
+- Stage mapping is derive-friendly via `#[derive(CompileStageInfo)]`.
+
+### `#[derive(CompileStageInfo)]`
+
+The `CompileStageInfo` derive macro automates boilerplate for compile-stage
+enums. Unlike the dialect-oriented derives (`Dialect`, `HasParser`, etc.) which
+use the `kirin-derive-core` IR system (`#[kirin(...)]` attributes, field
+classification into arguments/results/regions), this derive targets
+**compile-stage definitions** — enums whose variants each wrap a `StageInfo<L>`.
+It uses its own `#[stage(...)]` attribute namespace and parses input directly
+with `syn`, since stage enums have no IR field categories.
+
+```rust
+#[derive(CompileStageInfo)]
+enum MixedStage {
+    #[stage(name = "parse")]
+    Parse(StageInfo<FunctionBody>),
+    #[stage(name = "lower")]
+    Lower(StageInfo<LowerBody>),
+}
+```
+
+The macro generates:
+
+- `HasStageInfo<L>` for each unique dialect type (with or-patterns when multiple
+  variants share the same dialect).
+- `CompileStageInfo` impl: stage identity delegation (`stage_name`,
+  `set_stage_name`, `stage_id`, `set_stage_id`), `from_stage_name()` dispatch,
+  `declared_stage_names()`, and the `Languages` associated type as a right-folded
+  nested tuple (e.g., `(FunctionBody, (LowerBody, ()))`) for dialect tuple
+  dispatch used by `ParsePipelineText`.
+
+An optional `#[stage(crate = "...")]` attribute on the enum overrides the
+default IR crate path (`::kirin::ir`), useful when deriving inside individual
+crates (e.g., `#[stage(crate = "kirin_ir")]`).
 
 ### Grammar (v1)
 
@@ -154,20 +190,15 @@ Shared invariants:
 - Parser performs structural checks only; type consistency checks are deferred to
   later passes.
 
-Entry-point-specific behavior:
+Pipeline parse behavior:
 
 - `Pipeline::parse(...)`
   - accepts mixed function names in one input
   - groups/creates abstract functions and staged functions accordingly
+  - supports mixed dialects in one text input; stage variant determines dialect
+  - `stage @X` creates a missing stage via `CompileStageInfo::from_stage_name`
   - `specialize` must resolve to an existing staged declaration in parse scope
     (declared in the same parse input or already present in target context)
-- function-scoped `parse(...)`
-  - function name is fixed by context
-  - mismatched function names are hard errors
-- staged-function-scoped `parse(...)`
-  - stage + function symbols are fixed by context
-  - `specialize` must match stage/function symbols
-  - intended for composable specialization ingestion
 
 Missing stage declaration behavior:
 
@@ -200,11 +231,11 @@ Guidelines:
   candidate ranking.
 - `FunctionParseErrorKind` has no stability commitment yet (pre-stable phase).
 
-Representative kinds:
+Implemented kinds:
 
 - `InvalidHeader`
 - `UnknownStage`
-- `InconsistentFunctionName`
+- `InconsistentFunctionName` (reserved for future function-scoped parse)
 - `MissingStageDeclaration`
 - `BodyParseFailed`
 - `EmitFailed`
@@ -213,10 +244,11 @@ Representative kinds:
 
 | crate | impact | tests to update |
 | --- | --- | --- |
-| `kirin-ir` | helper APIs for staged/specialized insertion paths may be needed | staged/specialized construction tests |
-| `kirin-chumsky` | v1 grammar, parser composition with dialect body parser, wrapped errors | positive/negative parser tests |
+| `kirin-ir` | `CompileStageInfo` trait, `HasStageInfo<L>`, `Pipeline` stage APIs | staged/specialized construction tests |
+| `kirin-derive-dialect` | `stage_info` code generator for `#[derive(CompileStageInfo)]` | — |
+| `kirin-derive` | proc-macro entry point for `CompileStageInfo` | — |
+| `kirin-chumsky` | v1 grammar, `ParsePipelineText`, dialect dispatch, wrapped errors | positive/negative parser tests |
 | `kirin-prettyless` | printer emits flat `stage`/`specialize` syntax | snapshot updates + roundtrip tests |
-| `kirin` | re-export parse traits in prelude (first PR) | top-level integration tests |
 
 ## Drawbacks
 
@@ -229,8 +261,8 @@ Representative kinds:
 ### Proposed approach rationale
 
 Flat `stage` + `specialize` declarations keep parsing composable and explicit,
-remove delimiter ambiguity, and align with the requirement to parse via context
-(`pipeline` vs `function` vs `staged function`) without proliferating API names.
+remove delimiter ambiguity, and provide a single pipeline-level parse entry
+point without proliferating API names.
 
 ### Alternative A: keep nested/implicit staged format
 
@@ -262,45 +294,49 @@ remove delimiter ambiguity, and align with the requirement to parse via context
   1. implement v1 parser + trait-based API
   2. update pretty printer to emit v1 flat syntax
   3. refresh snapshots and parser tests
-  4. re-export parse traits in top-level prelude
+  4. re-export parse traits in `kirin-chumsky` prelude
 - Compatibility strategy:
   - one supported syntax (v1)
   - downstream updates are expected during rollout
 
 ## How to Teach This
 
-- Teach parse entry by context type:
-  - pipeline parse: whole input, multi-function allowed
-  - function parse: single-function constrained
-  - staged-function parse: specialization ingestion
+- Teach the single parse entry point: `pipeline.parse(text)` accepts
+  whole-pipeline text with mixed function names and multiple stages.
 - Teach syntax by two declaration forms only: `stage` and `specialize`.
 - Document that body parsing is delegated to dialect parser composition.
 - Document symbol rule once: global symbols are always `@...`.
+- Teach `#[derive(CompileStageInfo)]` for multi-dialect stage enums;
+  for single-dialect pipelines, `StageInfo<L>` implements `CompileStageInfo`
+  automatically.
 
 ## Reference Implementation Plan
 
 1. Define parser AST/tokens for `stage` and `specialize` declarations.
 2. Implement whitespace/comment handling compatible with dialect parser
    composition.
-3. Implement trait-based parse entry points with explicit symbol-table argument.
-4. Implement entry-point-specific semantic checks.
+3. Implement `ParsePipelineText` trait on `Pipeline<S>`, using the pipeline's
+   internal global symbol table for name resolution.
+4. Implement pipeline-level semantic checks (unknown stage, missing stage
+   declaration, signature mismatch).
 5. Wrap chumsky diagnostics in domain parse errors.
 6. Update pretty printer to v1 flat syntax.
-7. Re-export parse traits from top-level prelude.
+7. Re-export parse traits from `kirin-chumsky` prelude.
 8. Add/refresh parser, roundtrip, and integration tests.
+9. Implement `#[derive(CompileStageInfo)]` for stage enum boilerplate.
 
 ### Acceptance Criteria
 
-- [ ] Parser accepts only v1 flat syntax (`stage` + `specialize`).
-- [ ] `stage` declarations require trailing `;`.
-- [ ] `specialize` declarations require bodies.
-- [ ] Stage/function names require `@` global-symbol syntax.
-- [ ] Parser is whitespace/newline agnostic and accepts `//` + `/* ... */`.
-- [ ] Pipeline parse supports multiple function names in one input.
-- [ ] Function-scoped parse rejects mismatched function names.
-- [ ] Missing stage declaration for `specialize` is a hard error.
-- [ ] `print -> parse -> print` matches except trailing newline differences.
-- [ ] Parse traits are re-exported from top-level prelude.
+- [x] Parser accepts only v1 flat syntax (`stage` + `specialize`).
+- [x] `stage` declarations require trailing `;`.
+- [x] `specialize` declarations require bodies.
+- [x] Stage/function names require `@` global-symbol syntax.
+- [x] Parser is whitespace/newline agnostic and accepts `//` + `/* ... */`.
+- [x] Pipeline parse supports multiple function names in one input.
+- [x] Missing stage declaration for `specialize` is a hard error.
+- [x] `print -> parse -> print` matches except trailing newline differences.
+- [x] Parse traits are re-exported from `kirin-chumsky` prelude.
+- [x] `#[derive(CompileStageInfo)]` automates stage enum boilerplate.
 
 ### Tracking Plan
 
@@ -311,11 +347,15 @@ remove delimiter ambiguity, and align with the requirement to parse via context
 
 ## Unresolved Questions
 
-- Exact function/staged-function parse context types and signatures.
 - Whether to add explicit performance thresholds as release gates.
 
 ## Future Possibilities
 
+- Function-scoped parse entry point that rejects mismatched function names
+  (would use the reserved `InconsistentFunctionName` error kind).
+- Staged-function-scoped parse for targeted specialization ingestion.
+- Re-export parse traits from a top-level `kirin` crate prelude (when a
+  top-level library crate is created).
 - Fuzz/property tests for parser/printer roundtrip behavior.
 - Optional richer serialization format for non-textual metadata.
 - Additional parser tooling around migration diagnostics.
@@ -330,3 +370,4 @@ remove delimiter ambiguity, and align with the requirement to parse via context
 | 2026-02-08T06:01:37Z | Incorporated one-by-one interview decisions (flat stage/specialize syntax, trait-first parse API, no legacy syntax, prelude re-export) |
 | 2026-02-08T06:04:42Z | Selected `strsim` + Levenshtein for best-effort stage-name hints |
 | 2026-02-08T06:07:34.78824Z | RFC status set to `Accepted` |
+| 2026-02-08 | Merged `StageIdentity` into `CompileStageInfo`, added `#[derive(CompileStageInfo)]`, aligned RFC with implementation (removed unimplemented function-scoped parse, updated crate matrix and acceptance criteria) |

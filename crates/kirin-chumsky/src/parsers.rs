@@ -246,7 +246,6 @@ where
 /// Parses a list of block arguments.
 ///
 /// Matches: `(%arg0: i32, %arg1: f64)` or `()` for empty argument lists.
-/// Note: Parentheses are always required, even for empty argument lists.
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `Vec<Spanned<BlockArgument<'src, <T as HasParser>::Output>>>`.
@@ -270,8 +269,10 @@ where
 
 /// Parses a block header.
 ///
-/// Matches: `^bb0(%arg0: i32, %arg1: f64)` or `^bb0()` for blocks with no arguments.
-/// Note: Parentheses are always required, even for empty argument lists.
+/// Matches:
+/// - `^bb0(%arg0: i32, %arg1: f64)`
+/// - `^bb0()` for explicit empty argument lists
+/// - `^bb0` for omitted empty argument lists
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `BlockHeader<'src, <T as HasParser>::Output>`.
@@ -285,8 +286,12 @@ where
     I: TokenInput<'tokens, 'src>,
     T: HasParser<'tokens, 'src>,
 {
+    let arguments = block_argument_list::<_, T>()
+        .or_not()
+        .map(|args| args.unwrap_or_default());
+
     block_label()
-        .then(block_argument_list::<_, T>())
+        .then(arguments)
         .map_with(|(label, arguments), e| Spanned {
             value: BlockHeader { label, arguments },
             span: e.span(),

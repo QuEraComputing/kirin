@@ -1,8 +1,10 @@
 ---
 source: crates/kirin-prettyless/src/tests/pipeline.rs
+assertion_line: 97
 expression: output
 ---
-stage 0 fn @bar(int, float) -> int {
+stage @0 fn @bar(int, float) -> int;
+specialize @0 fn @bar(int, float) -> int {
   ^0 {
     constant 7;
     return %0;

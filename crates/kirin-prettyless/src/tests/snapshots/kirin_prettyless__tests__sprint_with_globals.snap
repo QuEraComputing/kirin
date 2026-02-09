@@ -1,8 +1,10 @@
 ---
 source: crates/kirin-prettyless/src/tests/sprint_with_globals.rs
+assertion_line: 32
 expression: output
 ---
-fn @my_function(int) -> int {
+stage @0 fn @my_function(int) -> int;
+specialize @0 fn @my_function(int) -> int {
   ^0 {
     constant 42;
     return %0;

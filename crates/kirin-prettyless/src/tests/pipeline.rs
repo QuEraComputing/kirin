@@ -92,7 +92,7 @@ fn test_pipeline_unnamed_stage() {
     let fdef = SimpleLanguage::op_function(ctx, body);
     ctx.specialize().f(sf).body(fdef).new().unwrap();
 
-    // Should fall back to numeric index: "stage 0"
+    // Should fall back to numeric symbol form: "stage @0"
     let output = func.sprint(&pipeline);
     insta::assert_snapshot!(output);
 }

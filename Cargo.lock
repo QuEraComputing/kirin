@@ -1130,6 +1130,7 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "insta",
+ "kirin",
  "kirin-chumsky-derive",
  "kirin-derive",
  "kirin-ir",
@@ -1137,6 +1138,7 @@ dependencies = [
  "kirin-prettyless",
  "kirin-test-utils",
  "num-traits",
+ "strsim",
 ]
 
 [[package]]

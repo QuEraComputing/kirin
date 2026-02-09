@@ -234,36 +234,29 @@ where
     ///
     /// Renders as:
     /// ```text
-    /// fn @name(Type0, Type1) -> RetType {
+    /// specialize @stage fn @name(Type0, Type1) -> RetType {
     ///   <body>
     /// }
     /// ```
-    ///
-    /// The stage prefix is derived from the context's own identity (name or
-    /// stage ID), so pipeline-level rendering requires no external prefix.
-    ///
-    /// The function name is obtained from the parent [`StagedFunction`] and
-    /// resolved via the global symbol table if available.
     pub fn print_specialized_function(&'a self, func: &SpecializedFunction) -> ArenaDoc<'a> {
         let (staged_fn, idx) = func.id();
         let staged_info = staged_fn.expect_info(self.stage);
         let spec = &staged_info.specializations()[idx];
-        let header = self.print_function_header(staged_info.name(), spec.signature());
+        let header = self.print_specialize_header(staged_info.name(), spec.signature());
         header + self.text(" ") + self.print_statement(spec.body())
     }
 
     /// Pretty print a staged function with all its non-invalidated specializations.
     ///
-    /// Each specialization is rendered with the full header:
+    /// The staged signature is rendered as a declaration:
     /// ```text
-    /// stage @A fn @name(Type0, Type1) -> RetType {
-    ///   <body>
-    /// }
+    /// stage @A fn @name(Type0, Type1) -> RetType;
     /// ```
     ///
-    /// The stage prefix is derived from the context's identity automatically.
-    /// Function names are resolved via the global symbol table if available.
-    /// Invalidated specializations are excluded.
+    /// Each active specialization is then rendered as:
+    /// ```text
+    /// specialize @A fn @name(Type0, Type1) -> RetType { ... }
+    /// ```
     pub fn print_staged_function(&'a self, func: &StagedFunction) -> ArenaDoc<'a> {
         let info = func.expect_info(self.stage);
         let active: Vec<_> = info
@@ -272,30 +265,20 @@ where
             .filter(|s| !s.is_invalidated())
             .collect();
 
+        let mut doc = self.print_stage_header(info.name(), info.signature());
         if active.is_empty() {
-            // Extern / declaration-only staged function: just print the signature header
-            return self.print_function_header(info.name(), info.signature());
+            return doc;
         }
 
-        let mut doc = self.nil();
-        for (i, spec) in active.iter().enumerate() {
-            if i > 0 {
-                doc += self.line_() + self.line_();
-            }
-            // Build header from the specialization's own signature
-            doc += self.print_function_header(info.name(), spec.signature());
-            // Render the body statement (dialect provides its own formatting)
+        for spec in active {
+            doc += self.line_();
+            doc += self.print_specialize_header(info.name(), spec.signature());
             doc += self.text(" ") + self.print_statement(spec.body());
         }
         doc
     }
 
-    /// Print a function header line: `fn @name(T0, T1) -> Ret`
-    ///
-    /// The stage prefix is derived from the context's identity:
-    /// - If the context has a name, prints `stage @<name> fn @...`
-    /// - If the context has only a stage ID, prints `stage <id> fn @...`
-    /// - Otherwise, prints `fn @...` (standalone, no pipeline)
+    /// Print a standalone function header line: `fn @name(T0, T1) -> Ret`
     ///
     /// Uses the given signature for parameter types and return type.
     pub fn print_function_header(
@@ -303,37 +286,64 @@ where
         name: Option<GlobalSymbol>,
         sig: &Signature<L::Type>,
     ) -> ArenaDoc<'a> {
-        let name_str = name
-            .and_then(|sym| self.global_symbols.and_then(|gs| gs.resolve(sym).cloned()))
-            .unwrap_or_else(|| "<unnamed>".into());
+        self.text("fn @") + self.print_fn_signature(name, sig)
+    }
 
-        // Derive stage prefix from the stage's own identity
-        let prefix = self
-            .stage
-            .name()
-            .and_then(|sym| self.global_symbols.and_then(|gs| gs.resolve(sym).cloned()))
-            .map(|n| format!("stage @{}", n))
-            .or_else(|| {
-                self.stage
-                    .stage_id()
-                    .map(|id| format!("stage {}", Id::from(id).raw()))
-            });
+    fn print_stage_header(
+        &'a self,
+        name: Option<GlobalSymbol>,
+        sig: &Signature<L::Type>,
+    ) -> ArenaDoc<'a> {
+        self.text("stage @")
+            + self.text(self.stage_symbol_text())
+            + self.text(" fn @")
+            + self.print_fn_signature(name, sig)
+            + self.text(";")
+    }
 
-        let mut header = match prefix {
-            Some(p) => self.text(p) + self.text(" fn @"),
-            None => self.text("fn @"),
-        };
-        header += self.text(name_str) + self.text("(");
+    fn print_specialize_header(
+        &'a self,
+        name: Option<GlobalSymbol>,
+        sig: &Signature<L::Type>,
+    ) -> ArenaDoc<'a> {
+        self.text("specialize @")
+            + self.text(self.stage_symbol_text())
+            + self.text(" fn @")
+            + self.print_fn_signature(name, sig)
+    }
 
-        // Parameters
-        for (i, param) in sig.params.iter().enumerate() {
-            if i > 0 {
-                header += self.text(", ");
-            }
-            header += self.text(format!("{}", param));
+    /// Render `name(T0, T1) -> Ret` — shared by all header variants.
+    fn print_fn_signature(
+        &'a self,
+        name: Option<GlobalSymbol>,
+        sig: &Signature<L::Type>,
+    ) -> ArenaDoc<'a> {
+        let params = self.list(sig.params.iter(), ", ", |p| self.text(format!("{}", p)));
+        self.text(self.function_symbol_text(name))
+            + params.enclose("(", ")")
+            + self.text(" -> ")
+            + self.text(format!("{}", sig.ret))
+    }
+
+    fn function_symbol_text(&self, name: Option<GlobalSymbol>) -> String {
+        name.map(|symbol| self.resolve_global_symbol(symbol))
+            .unwrap_or_else(|| "unnamed".to_string())
+    }
+
+    fn stage_symbol_text(&self) -> String {
+        if let Some(name) = self.stage.name() {
+            return self.resolve_global_symbol(name);
         }
-        header += self.text(") -> ") + self.text(format!("{}", sig.ret));
-        header
+        if let Some(id) = self.stage.stage_id() {
+            return Id::from(id).raw().to_string();
+        }
+        "0".to_string()
+    }
+
+    fn resolve_global_symbol(&self, symbol: GlobalSymbol) -> String {
+        self.global_symbols
+            .and_then(|symbols| symbols.resolve(symbol).cloned())
+            .unwrap_or_else(|| usize::from(symbol).to_string())
     }
 }
 

@@ -2,6 +2,8 @@ pub use logos::Logos;
 
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(skip r"[ \t\n\f]+")]
+#[logos(skip r"//[^\n\r]*")]
+#[logos(skip r"/\*([^*]|\*+[^*/])*\*+/")]
 pub enum Token<'src> {
     Error,
     /// ```ignore
@@ -330,6 +332,24 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(Token::Identifier("x"))));
         assert_eq!(lexer.next(), Some(Ok(Token::Identifier("i32"))));
         assert_eq!(lexer.next(), Some(Ok(Token::RAngle)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_comments_are_skipped() {
+        let input = "foo // line comment\n/* block\ncomment */ bar";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("foo"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("bar"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_block_comments_with_trailing_stars_are_skipped() {
+        let input = "foo /*a**/ /** text **/ bar";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("foo"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("bar"))));
         assert_eq!(lexer.next(), None);
     }
 }

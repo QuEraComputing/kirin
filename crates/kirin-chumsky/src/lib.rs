@@ -30,6 +30,7 @@
 
 pub mod ast;
 mod builtins;
+mod function_text;
 mod parsers;
 mod traits;
 
@@ -39,6 +40,7 @@ pub use kirin_ir as ir;
 pub use kirin_lexer::Token;
 
 pub use ast::*;
+pub use function_text::*;
 pub use parsers::*;
 pub use traits::*;
 
@@ -56,6 +58,7 @@ pub use kirin_chumsky_derive::PrettyPrint;
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::ast;
+    pub use crate::function_text::{FunctionParseError, FunctionParseErrorKind, ParsePipelineText};
     pub use crate::parsers::*;
     pub use crate::traits::{
         BoxedParser, DirectlyParsable, EmitContext, EmitIR, HasParser, ParseError, TokenInput,

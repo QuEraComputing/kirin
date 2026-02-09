@@ -1,8 +1,9 @@
 ---
 source: crates/kirin-prettyless/src/tests/snapshot.rs
+assertion_line: 31
 expression: output
 ---
-fn @test_func(int) -> int {
+specialize @0 fn @test_func(int) -> int {
   ^0(%5: int, %y: float) {
     constant 1.2;
     constant 3.4;

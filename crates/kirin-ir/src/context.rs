@@ -8,7 +8,7 @@ pub struct StageInfo<L: Dialect> {
     /// Optional human-readable name for this compilation stage.
     ///
     /// When set, printing infrastructure can use this instead of a numeric
-    /// index (e.g., `stage @llvm_ir` instead of `stage 0`). The symbol is
+    /// index (e.g., `stage @llvm_ir` instead of `stage @0`). The symbol is
     /// interned in the pipeline's global symbol table.
     pub(crate) name: Option<GlobalSymbol>,
     pub(crate) stage_id: Option<CompileStage>,

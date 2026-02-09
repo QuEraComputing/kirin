@@ -289,3 +289,12 @@ derive_field_iter_macro!(derive_has_regions_mut, HasRegionsMut, HAS_REGIONS_MUT)
 derive_property_macro!(derive_is_terminator, IsTerminator, IS_TERMINATOR);
 derive_property_macro!(derive_is_constant, IsConstant, IS_CONSTANT);
 derive_property_macro!(derive_is_pure, IsPure, IS_PURE);
+
+#[proc_macro_derive(CompileStageInfo, attributes(stage))]
+pub fn derive_compile_stage_info(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match kirin_derive_dialect::stage_info::generate(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.into_compile_error().into(),
+    }
+}

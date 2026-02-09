@@ -55,14 +55,28 @@ impl<L: Dialect> HasStageInfo<L> for StageInfo<L> {
     }
 }
 
-/// Non-generic trait for stage identity (name and compile-stage ID).
+/// Unified trait for stage identity and stage-container metadata.
 ///
 /// Automatically implemented for [`StageInfo<L>`]. Allows [`Pipeline::add_stage`]
 /// to set both a readable name and the numeric stage ID on the stage.
 ///
-/// For enum stages, implement this trait by delegating to the
-/// active variant's context.
-pub trait StageIdentity {
+/// For enum stages, derive this trait with `#[derive(CompileStageInfo)]`:
+///
+/// ```ignore
+/// #[derive(CompileStageInfo)]
+/// enum Stage {
+///     #[stage(name = "A")]
+///     Parse(StageInfo<LangA>),
+///     #[stage(name = "B")]
+///     Lower(StageInfo<LangB>),
+/// }
+/// ```
+pub trait CompileStageInfo: Sized {
+    /// The dialect dispatch list for `pipeline.parse(text)`.
+    ///
+    /// For heterogeneous pipelines use nested tuples: `(LangA, (LangB, ()))`.
+    type Languages;
+
     /// Get the stage name, if set.
     fn stage_name(&self) -> Option<GlobalSymbol>;
     /// Set the stage name.
@@ -71,9 +85,19 @@ pub trait StageIdentity {
     fn stage_id(&self) -> Option<CompileStage>;
     /// Set the compile-stage ID.
     fn set_stage_id(&mut self, id: Option<CompileStage>);
+
+    /// Build a concrete stage from a parsed stage name (`@...`).
+    fn from_stage_name(stage_name: &str) -> Result<Self, String>;
+
+    /// The set of stage names this container recognizes (for typo suggestions).
+    fn declared_stage_names() -> &'static [&'static str] {
+        &[]
+    }
 }
 
-impl<L: Dialect> StageIdentity for StageInfo<L> {
+impl<L: Dialect> CompileStageInfo for StageInfo<L> {
+    type Languages = (L, ());
+
     fn stage_name(&self) -> Option<GlobalSymbol> {
         self.name
     }
@@ -88,6 +112,10 @@ impl<L: Dialect> StageIdentity for StageInfo<L> {
 
     fn set_stage_id(&mut self, id: Option<CompileStage>) {
         self.stage_id = id;
+    }
+
+    fn from_stage_name(_stage_name: &str) -> Result<Self, String> {
+        Ok(StageInfo::default())
     }
 }
 
@@ -205,7 +233,7 @@ impl<S> Pipeline<S> {
     /// Add a stage to the pipeline, returning its [`CompileStage`].
     ///
     /// If a `name` is provided, it is interned into the global symbol table
-    /// and set on the stage via [`StageIdentity::set_stage_name`]. This lets the
+    /// and set on the stage via [`CompileStageInfo::set_stage_name`]. This lets the
     /// printing infrastructure display a readable label (e.g., `stage @llvm_ir`)
     /// instead of a numeric index.
     ///
@@ -218,7 +246,7 @@ impl<S> Pipeline<S> {
     #[builder(finish_fn = new)]
     pub fn add_stage(&mut self, mut stage: S, #[builder(into)] name: Option<String>) -> CompileStage
     where
-        S: StageIdentity,
+        S: CompileStageInfo,
     {
         let id = CompileStage::new(Id(self.stages.len()));
         stage.set_stage_id(Some(id));
