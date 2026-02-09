@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ask User Question"
+  short_description: "Interview users to clarify requirements"
+  default_prompt: "Use $ask-user-question to ask me one focused requirements question at a time."
