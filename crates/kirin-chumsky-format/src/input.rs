@@ -12,8 +12,10 @@ use crate::ChumskyLayout;
 pub fn parse_derive_input(
     ast: &syn::DeriveInput,
 ) -> darling::Result<kirin_derive_core::ir::Input<ChumskyLayout>> {
-    if has_kirin_type_attr(ast) {
-        return kirin_derive_core::ir::Input::<ChumskyLayout>::from_derive_input(ast);
+    match kirin_derive_core::ir::Input::<ChumskyLayout>::from_derive_input(ast) {
+        Ok(input) => return Ok(input),
+        Err(err) if !is_missing_type_error(&err) => return Err(err),
+        Err(_) => {}
     }
 
     // Value-only definitions can omit #[kirin(type = ...)].
@@ -32,21 +34,9 @@ pub fn parse_derive_input(
     Ok(input)
 }
 
-fn has_kirin_type_attr(ast: &syn::DeriveInput) -> bool {
-    let mut has_type = false;
-    for attr in &ast.attrs {
-        if !attr.path().is_ident("kirin") {
-            continue;
-        }
-
-        let _ = attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("type") {
-                has_type = true;
-            }
-            Ok(())
-        });
-    }
-    has_type
+fn is_missing_type_error(err: &darling::Error) -> bool {
+    let message = err.to_string();
+    message.contains("Missing field `type`") || message.contains("missing field `type`")
 }
 
 fn input_requires_ir_type(input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> bool {
