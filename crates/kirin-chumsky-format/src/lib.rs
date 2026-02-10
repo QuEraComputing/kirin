@@ -11,6 +11,7 @@ mod field_kind;
 mod format;
 mod generate;
 mod generics;
+mod input;
 mod validation;
 mod visitor;
 
@@ -19,6 +20,7 @@ pub use field_kind::{FieldKind, collect_fields};
 pub use format::{Format, FormatElement, FormatOption};
 pub use generate::{GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint};
 pub use generics::GenericsBuilder;
+pub use input::parse_derive_input;
 pub use validation::{FieldOccurrence, ValidationResult, ValidationVisitor, validate_format};
 pub use visitor::{FormatVisitor, VisitorContext, visit_format};
 

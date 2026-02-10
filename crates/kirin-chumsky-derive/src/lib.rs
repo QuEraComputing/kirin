@@ -77,13 +77,10 @@ use syn::parse_macro_input;
 pub fn derive_has_parser(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
-    let ir_input =
-        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(
-            &ast,
-        ) {
-            Ok(ir) => ir,
-            Err(err) => return err.write_errors().into(),
-        };
+    let ir_input = match kirin_chumsky_format::parse_derive_input(&ast) {
+        Ok(ir) => ir,
+        Err(err) => return err.write_errors().into(),
+    };
 
     let ast_generator = kirin_chumsky_format::GenerateAST::new(&ir_input);
     let parser_generator = kirin_chumsky_format::GenerateHasDialectParser::new(&ir_input);
@@ -128,13 +125,10 @@ pub fn derive_has_parser(input: TokenStream) -> TokenStream {
 pub fn derive_pretty_print(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
-    let ir_input =
-        match kirin_derive_core::ir::Input::<kirin_chumsky_format::ChumskyLayout>::from_derive_input(
-            &ast,
-        ) {
-            Ok(ir) => ir,
-            Err(err) => return err.write_errors().into(),
-        };
+    let ir_input = match kirin_chumsky_format::parse_derive_input(&ast) {
+        Ok(ir) => ir,
+        Err(err) => return err.write_errors().into(),
+    };
 
     let generator = kirin_chumsky_format::GeneratePrettyPrint::new(&ir_input);
     generator.generate(&ir_input).into()
