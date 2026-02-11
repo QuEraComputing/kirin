@@ -48,6 +48,9 @@ Create RFC-style design documents that match Kirin conventions, stay grounded in
 ## Kirin-specific requirements
 
 - Keep terminology consistent with the codebase: `Dialect`, `StageInfo`, `Function`, `StagedFunction`, `SpecializedFunction`, `SignatureSemantics`, `HasParser`, `PrettyPrint`.
+- If a dialect is standalone and contains only one statement/op, always model it as a `struct` (not an `enum`).
+- For dialect-creation implementation guidance, prefer defining each statement/op as a separate `struct`, then define the dialect as a wrapper `enum` over those structs to maximize reuse.
+- If a statement group is expected to always be imported and used together (for example, arithmetic operations), prefer a single `enum` with one variant per statement/op instead of separate structs.
 - Match existing design-doc tone in `design/*.md`: concise explanation first, then examples and code locations.
 - Prefer concrete file references over abstract descriptions.
 - For syntax work, describe parser/printer roundtrip expectations (`print -> parse -> print`) when relevant.
