@@ -1,9 +1,9 @@
 use kirin::prelude::*;
-use kirin::pretty::{Config, Document};
 use kirin_arith::{ArithType, ArithValue};
 use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
+use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[wraps]
@@ -14,42 +14,8 @@ enum NumericLanguage {
     ControlFlow(ControlFlow<ArithType>),
 }
 
-fn emit_bitwise_statement(
-    input: &str,
-    operands: &[(&str, ArithType)],
-) -> (StageInfo<Bitwise<ArithType>>, Statement) {
-    let mut stage: StageInfo<Bitwise<ArithType>> = StageInfo::default();
-
-    for (name, ty) in operands {
-        stage
-            .ssa()
-            .name((*name).to_string())
-            .ty(*ty)
-            .kind(SSAKind::Test)
-            .new();
-    }
-    let statement =
-        parse::<Bitwise<ArithType>>(input, &mut stage).expect("bitwise parse should succeed");
-    (stage, statement)
-}
-
-fn render_bitwise_statement(stage: &StageInfo<Bitwise<ArithType>>, statement: Statement) -> String {
-    let dialect = statement
-        .get_info(stage)
-        .expect("statement should exist")
-        .definition();
-
-    let doc = Document::new(Config::default(), stage);
-    let mut output = String::new();
-    dialect
-        .pretty_print(&doc)
-        .render_fmt(80, &mut output)
-        .expect("render should succeed");
-    output
-}
-
 fn assert_roundtrip(input: &str, operands: &[(&str, ArithType)], speculatable: bool) {
-    let (stage, statement) = emit_bitwise_statement(input, operands);
+    let (stage, statement) = roundtrip::emit_statement::<Bitwise<ArithType>>(input, operands);
     let dialect = statement
         .get_info(&stage)
         .expect("statement should exist")
@@ -61,7 +27,10 @@ fn assert_roundtrip(input: &str, operands: &[(&str, ArithType)], speculatable: b
         "unexpected speculatability for '{}'",
         input
     );
-    assert_eq!(render_bitwise_statement(&stage, statement).trim(), input);
+    assert_eq!(
+        roundtrip::render_statement::<Bitwise<ArithType>>(&stage, statement).trim(),
+        input
+    );
 }
 
 #[test]

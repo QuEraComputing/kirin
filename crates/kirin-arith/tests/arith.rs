@@ -1,8 +1,8 @@
 use kirin::prelude::*;
-use kirin::pretty::{Config, Document};
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
+use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[wraps]
@@ -13,43 +13,8 @@ enum NumericLanguage {
     ControlFlow(ControlFlow<ArithType>),
 }
 
-fn emit_arith_statement(
-    input: &str,
-    operands: &[(&str, ArithType)],
-) -> (StageInfo<Arith<ArithType>>, Statement) {
-    let mut stage: StageInfo<Arith<ArithType>> = StageInfo::default();
-
-    for (name, ty) in operands {
-        stage
-            .ssa()
-            .name((*name).to_string())
-            .ty(*ty)
-            .kind(SSAKind::Test)
-            .new();
-    }
-
-    let statement =
-        parse::<Arith<ArithType>>(input, &mut stage).expect("arith parse should succeed");
-    (stage, statement)
-}
-
-fn render_arith_statement(stage: &StageInfo<Arith<ArithType>>, statement: Statement) -> String {
-    let dialect = statement
-        .get_info(stage)
-        .expect("statement should exist")
-        .definition();
-
-    let doc = Document::new(Config::default(), stage);
-    let mut output = String::new();
-    dialect
-        .pretty_print(&doc)
-        .render_fmt(80, &mut output)
-        .expect("render should succeed");
-    output
-}
-
 fn assert_roundtrip(input: &str, operands: &[(&str, ArithType)], speculatable: bool) {
-    let (stage, statement) = emit_arith_statement(input, operands);
+    let (stage, statement) = roundtrip::emit_statement::<Arith<ArithType>>(input, operands);
     let dialect = statement
         .get_info(&stage)
         .expect("statement should exist")
@@ -61,7 +26,10 @@ fn assert_roundtrip(input: &str, operands: &[(&str, ArithType)], speculatable: b
         "unexpected speculatability for '{}'",
         input
     );
-    assert_eq!(render_arith_statement(&stage, statement).trim(), input);
+    assert_eq!(
+        roundtrip::render_statement::<Arith<ArithType>>(&stage, statement).trim(),
+        input
+    );
 }
 
 #[test]

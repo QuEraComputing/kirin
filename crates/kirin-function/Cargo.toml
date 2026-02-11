@@ -8,4 +8,4 @@ kirin = { workspace = true }
 
 [dev-dependencies]
 kirin-arith.workspace = true
-kirin-test-utils = { workspace = true, features = ["parser", "pretty"] }
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }

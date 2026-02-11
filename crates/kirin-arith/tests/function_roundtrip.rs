@@ -1,8 +1,8 @@
-use kirin::ir::{Dialect, Pipeline, Region, StageInfo};
-use kirin::parsers::{HasParser, ParsePipelineText, PrettyPrint};
-use kirin::pretty::FunctionPrintExt;
+use kirin::ir::{Dialect, Region};
+use kirin::parsers::{HasParser, PrettyPrint};
 use kirin_arith::{Arith, ArithType};
 use kirin_cf::ControlFlow;
+use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = ArithType, crate = kirin::ir)]
@@ -36,25 +36,5 @@ specialize @arith fn @compose(i64, i64, f64, f64) -> i64 {
 }
 "#;
 
-    let mut parsed_pipeline: Pipeline<StageInfo<ArithmeticFunctionLanguage>> = Pipeline::new();
-    let parsed_functions = parsed_pipeline
-        .parse(input)
-        .expect("pipeline parse should succeed");
-    assert_eq!(parsed_functions.len(), 1, "expected one parsed function");
-
-    let function = parsed_functions[0];
-    let rendered = function.sprint(&parsed_pipeline);
-
-    let mut reparsed_pipeline: Pipeline<StageInfo<ArithmeticFunctionLanguage>> = Pipeline::new();
-    let reparsed_functions = reparsed_pipeline
-        .parse(&rendered)
-        .expect("rendered pipeline should reparse");
-    assert_eq!(
-        reparsed_functions.len(),
-        1,
-        "expected one reparsed function"
-    );
-
-    let rendered_again = reparsed_functions[0].sprint(&reparsed_pipeline);
-    assert_eq!(rendered.trim_end(), rendered_again.trim_end());
+    roundtrip::assert_pipeline_roundtrip::<ArithmeticFunctionLanguage>(input);
 }

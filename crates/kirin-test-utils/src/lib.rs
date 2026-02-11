@@ -10,6 +10,9 @@ mod value;
 #[cfg(feature = "parser")]
 pub mod parser;
 
+#[cfg(feature = "roundtrip")]
+pub mod roundtrip;
+
 pub use rustfmt::{rustfmt, rustfmt_display};
 pub use simple_ir_type::SimpleIRType;
 #[cfg(feature = "simple-language")]

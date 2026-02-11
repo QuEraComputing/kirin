@@ -10,3 +10,4 @@ kirin.workspace = true
 kirin-arith.workspace = true
 kirin-cf.workspace = true
 kirin-constant.workspace = true
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }
