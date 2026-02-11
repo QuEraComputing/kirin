@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kirin RFC Implementer"
+  short_description: "Implement RFCs and mark them Implemented"
+  default_prompt: "Use $kirin-rfc-implementer to implement this RFC and update its status to Implemented when done."
