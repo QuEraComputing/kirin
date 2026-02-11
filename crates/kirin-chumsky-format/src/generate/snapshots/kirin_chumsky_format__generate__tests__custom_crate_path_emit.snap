@@ -8,7 +8,6 @@ where
     Language: my_kirin::Dialect + From<CustomReturn>,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: my_chumsky::EmitIR<Language, Output = my_kirin::Statement>,
     SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output:
         my_chumsky::EmitIR<Language, Output = <Language as my_kirin::Dialect>::Type>,

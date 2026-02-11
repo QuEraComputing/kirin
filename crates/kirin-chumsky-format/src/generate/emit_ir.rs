@@ -2,12 +2,14 @@
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::fields::FieldCategory;
+use kirin_derive_core::ir::{
+    VariantRef,
+    fields::{FieldCategory, FieldInfo},
+};
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use kirin_derive_core::ir::fields::FieldInfo;
 
 use crate::field_kind::{FieldKind, collect_fields};
 
@@ -80,6 +82,97 @@ impl GenerateEmitIR {
         } else {
             quote! { <'tokens, 'src, #(#type_params,)* TypeOutput, LanguageOutput> }
         }
+    }
+
+    fn language_output_emit_bound(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        crate_path: &syn::Path,
+        ir_path: &syn::Path,
+    ) -> TokenStream {
+        if self.ast_needs_language_output_emit_bound(ir_input) {
+            quote! {
+                LanguageOutput: #crate_path::EmitIR<Language, Output = #ir_path::Statement>,
+            }
+        } else {
+            TokenStream::new()
+        }
+    }
+
+    fn ast_needs_language_output_emit_bound(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+    ) -> bool {
+        match &ir_input.data {
+            kirin_derive_core::ir::Data::Struct(data) => {
+                self.statement_needs_language_output_emit_bound(ir_input, &data.0)
+            }
+            kirin_derive_core::ir::Data::Enum(data) => {
+                data.iter_variants().any(|variant| match variant {
+                    VariantRef::Wrapper { .. } => false,
+                    VariantRef::Regular { stmt, .. } => {
+                        self.statement_needs_language_output_emit_bound(ir_input, stmt)
+                    }
+                })
+            }
+        }
+    }
+
+    fn statement_needs_language_output_emit_bound(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+    ) -> bool {
+        if stmt.wraps.is_some() {
+            return false;
+        }
+
+        // Fast path: if the statement has no block/region fields at all, AST filtering
+        // cannot produce recursive statement output requirements.
+        if !self.statement_contains_statement_recursion_fields(stmt) {
+            return false;
+        }
+
+        let collected = collect_fields(stmt);
+        let fields_in_fmt = get_fields_in_format(ir_input, stmt);
+        let ast_fields = filter_ast_fields(&collected, &fields_in_fmt);
+        self.ast_fields_contain_statement_recursion_fields(&ast_fields)
+    }
+
+    fn statement_contains_statement_recursion_fields(
+        &self,
+        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+    ) -> bool {
+        stmt.iter_all_fields().any(|field| {
+            matches!(
+                field.category(),
+                FieldCategory::Block | FieldCategory::Region
+            )
+        })
+    }
+
+    fn ast_fields_contain_statement_recursion_fields(
+        &self,
+        ast_fields: &[&FieldInfo<ChumskyLayout>],
+    ) -> bool {
+        ast_fields.iter().any(|field| {
+            matches!(
+                field.category(),
+                FieldCategory::Block | FieldCategory::Region
+            )
+        })
+    }
+
+    fn is_ir_type_a_type_param(&self, ir_type: &syn::Path, generics: &syn::Generics) -> bool {
+        // Type parameter must be a single segment path (e.g., `T`, not `foo::T`)
+        if ir_type.segments.len() != 1 {
+            return false;
+        }
+
+        let ir_type_name = &ir_type.segments[0].ident;
+
+        // Check if this matches any of the struct's type parameters
+        generics.type_params().any(|tp| &tp.ident == ir_type_name)
     }
 
     fn generate_emit_impl(
@@ -163,18 +256,20 @@ impl GenerateEmitIR {
         // - `<T as HasParser>::Output: EmitIR<Language, Output = Language::Type>`
         // - `<T as HasParser>::Output: EmitIR<Language, Output = T>` (from value type bounds)
         // Without this, the compiler can't prove that `Language::Type == T`.
-        let ir_type_is_param = is_ir_type_a_type_param(ir_type, &ir_input.generics);
+        let ir_type_is_param = self.is_ir_type_a_type_param(ir_type, &ir_input.generics);
         let dialect_type_bound = if ir_type_is_param {
             quote! { Language: #ir_path::Dialect<Type = #ir_type>, }
         } else {
             quote! {}
         };
+        let language_output_emit_bound =
+            self.language_output_emit_bound(ir_input, crate_path, ir_path);
         let base_bounds = quote! {
             Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
             #dialect_type_bound
             TypeOutput: Clone + PartialEq,
             LanguageOutput: Clone + PartialEq + 'tokens,
-            LanguageOutput: #crate_path::EmitIR<Language, Output = #ir_path::Statement>,
+            #language_output_emit_bound
             #ir_type: #crate_path::HasParser<'tokens, 'src> + 'tokens,
             <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output:
                 #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::Type>,
@@ -302,7 +397,7 @@ impl GenerateEmitIR {
         //
         // If ir_type is a type parameter, add explicit Language::Type bound
         // (same reasoning as in generate_emit_impl).
-        let ir_type_is_param = is_ir_type_a_type_param(ir_type, &ir_input.generics);
+        let ir_type_is_param = self.is_ir_type_a_type_param(ir_type, &ir_input.generics);
         let dialect_type_bound = if ir_type_is_param {
             quote! { Language: #ir_path::Dialect<Type = #ir_type>, }
         } else {
@@ -732,20 +827,4 @@ impl GenerateEmitIR {
             }
         }
     }
-}
-
-/// Checks if the `ir_type` path is a type parameter of the struct.
-///
-/// Returns true if `ir_type` is a single-segment path that matches
-/// one of the generic type parameters (e.g., `T` when the struct is `Foo<T>`).
-fn is_ir_type_a_type_param(ir_type: &syn::Path, generics: &syn::Generics) -> bool {
-    // Type parameter must be a single segment path (e.g., `T`, not `foo::T`)
-    if ir_type.segments.len() != 1 {
-        return false;
-    }
-
-    let ir_type_name = &ir_type.segments[0].ident;
-
-    // Check if this matches any of the struct's type parameters
-    generics.type_params().any(|tp| &tp.ident == ir_type_name)
 }

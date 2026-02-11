@@ -8,7 +8,6 @@ where
     Language: ::kirin::ir::Dialect + From<EmptyLang>,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: ::kirin::parsers::EmitIR<Language, Output = ::kirin::ir::Statement>,
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
     <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output:
         ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,

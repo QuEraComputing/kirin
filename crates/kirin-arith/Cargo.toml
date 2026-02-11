@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 kirin.workspace = true
+
+[dev-dependencies]
+kirin-cf = { version = "0.1.0", path = "../kirin-cf" }
+kirin-constant = { version = "0.1.0", path = "../kirin-constant" }

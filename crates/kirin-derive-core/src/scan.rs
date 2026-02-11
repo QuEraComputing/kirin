@@ -1,4 +1,7 @@
-use crate::ir::{Layout, fields::FieldInfo};
+use crate::ir::{
+    Layout,
+    fields::{FieldCategory, FieldInfo},
+};
 
 pub trait Scan<'ir, L: Layout> {
     fn scan_input(&mut self, input: &'ir crate::ir::Input<L>) -> darling::Result<()> {
@@ -110,8 +113,6 @@ where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
 {
-    use crate::ir::fields::FieldCategory;
-
     let mut errors = darling::Error::accumulator();
     if let Some(wrapper) = &statement.wraps {
         errors.handle_in(|| visitor.scan_wrapper(wrapper));
