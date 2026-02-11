@@ -73,6 +73,10 @@ impl<L: Dialect> SSAInfo<L> {
         }
     }
 
+    pub fn id(&self) -> SSAValue {
+        self.id
+    }
+
     pub fn name(&self) -> Option<Symbol> {
         self.name
     }

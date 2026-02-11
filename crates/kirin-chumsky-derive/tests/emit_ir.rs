@@ -226,7 +226,6 @@ fn test_emit_chain_multiple_statements() {
 ///
 /// The combined `parse` function is designed for parsing complete programs
 /// or statements where all referenced SSAs are defined within the same stage.
-/// For this test, we verify the function signature and basic usage work.
 #[test]
 fn test_combined_parse_function() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
@@ -235,15 +234,24 @@ fn test_combined_parse_function() {
     let result = parse::<EmitLang>("invalid syntax", &mut stage);
     assert!(result.is_err(), "Invalid syntax should return an error");
 
-    // For statements that reference external SSAs (like %a, %b), we need
-    // to use parse_ast + EmitContext instead, as shown in other tests.
-    // The combined parse creates a fresh EmitContext without pre-registered SSAs.
+    // Existing stage SSAs are now seeded into parse context automatically.
+    let ssa_a = new_test_ssa(&mut stage, "a", SimpleType::I32);
+    let ssa_b = new_test_ssa(&mut stage, "b", SimpleType::I32);
+    let statement = parse::<EmitLang>("%result = add %a, %b", &mut stage).expect("parse failed");
+
+    let stmt_info = statement.get_info(&stage).expect("statement should exist");
+    match stmt_info.definition() {
+        EmitLang::Add { lhs, rhs, .. } => {
+            assert_eq!(*lhs, ssa_a);
+            assert_eq!(*rhs, ssa_b);
+        }
+        _ => panic!("Expected Add variant"),
+    }
 }
 
 /// Test that demonstrates the typical workflow with the new combined parse function.
 ///
-/// This shows how to use EmitContext for multi-statement programs where
-/// SSAs from earlier statements are referenced in later ones.
+/// This shows the low-level workflow using explicit EmitContext.
 #[test]
 fn test_combined_parse_workflow() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();

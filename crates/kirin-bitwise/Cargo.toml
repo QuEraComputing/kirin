@@ -1,0 +1,12 @@
+[package]
+name = "kirin-bitwise"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin.workspace = true
+
+[dev-dependencies]
+kirin-arith = { version = "0.1.0", path = "../kirin-arith" }
+kirin-cf = { version = "0.1.0", path = "../kirin-cf" }
+kirin-constant = { version = "0.1.0", path = "../kirin-constant" }

@@ -31,8 +31,11 @@ members = [
     "crates/kirin-derive-dialect",
     "crates/kirin-chumsky",
     "crates/kirin-chumsky-format",
-    "crates/kirin-chumsky-derive", "crates/kirin-function",
-    "xtask", "crates/kirin-arith",
+    "crates/kirin-chumsky-derive",
+    "crates/kirin-function",
+    "xtask",
+    "crates/kirin-arith",
+    "crates/kirin-bitwise",
 ]
 
 [workspace.dependencies]

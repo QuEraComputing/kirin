@@ -1127,6 +1127,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-bitwise"
+version = "0.1.0"
+dependencies = [
+ "kirin",
+ "kirin-arith",
+ "kirin-cf",
+ "kirin-constant",
+]
+
+[[package]]
 name = "kirin-cf"
 version = "0.1.0"
 dependencies = [

@@ -129,6 +129,10 @@ where
 }
 
 /// Parses a source string and emits IR using the given language's parser.
+///
+/// Existing named SSAs already present in `stage` are pre-registered in the
+/// emit context, so parsed operands like `%a` can resolve against function
+/// arguments or previously-emitted statements.
 pub fn parse<'src, L>(
     input: &'src str,
     stage: &mut StageInfo<L>,
@@ -138,7 +142,23 @@ where
     L::Output: EmitIR<L>,
 {
     let ast = parse_ast::<L>(input)?;
+    let existing_ssas = {
+        let symbols = stage.symbol_table();
+        stage
+            .ssa_arena()
+            .iter()
+            .filter_map(|ssa| {
+                let symbol = ssa.name()?;
+                let name = symbols.resolve(symbol)?.clone();
+                Some((name, ssa.id()))
+            })
+            .collect::<Vec<_>>()
+    };
+
     let mut emit_ctx = EmitContext::new(stage);
+    for (name, ssa) in existing_ssas {
+        emit_ctx.register_ssa(name, ssa);
+    }
     Ok(ast.emit(&mut emit_ctx))
 }
 

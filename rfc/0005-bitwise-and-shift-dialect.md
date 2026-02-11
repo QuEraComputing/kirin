@@ -1,11 +1,11 @@
 +++
 rfc = "0005"
 title = "Bitwise And Shift Dialect"
-status = "Draft"
+status = "Implemented"
 agents = ["codex"]
 authors = ["Roger-luo <code@rogerluo.dev>"]
 created = "2026-02-09T04:05:32.043982Z"
-last_updated = "2026-02-09T04:05:32.043982Z"
+last_updated = "2026-02-11T02:56:49.123858Z"
 dependencies = ["0002", "0003"]
 +++
 
@@ -192,10 +192,10 @@ pub enum Bitwise<T: CompileTimeValue + Default> {
 
 ### Acceptance Criteria
 
-- [ ] `and`, `or`, `xor`, `not`, `shl`, `shr` parse and print with result type annotations.
-- [ ] dialect composes with other Kirin dialects through `#[kirin(wraps)]`.
-- [ ] roundtrip `print -> parse -> print` passes for all operations.
-- [ ] semantics notes document shift behavior unambiguously.
+- [x] `and`, `or`, `xor`, `not`, `shl`, `shr` parse and print with result type annotations.
+- [x] dialect composes with other Kirin dialects through `#[kirin(wraps)]`.
+- [x] roundtrip `print -> parse -> print` passes for all operations.
+- [x] semantics notes document shift behavior unambiguously.
 
 ### Tracking Plan
 
@@ -208,8 +208,7 @@ pub enum Bitwise<T: CompileTimeValue + Default> {
 ## Unresolved Questions
 
 - What are the exact semantics for out-of-range shift counts in IR (`rhs < 0`, `rhs >= bitwidth`)?
-- Given the finalized shift-count semantics, should `shl` and `shr` be marked speculatable by default under RFC 0003?
-- Should shift-count typing stay strict (`rhs` has same type as `lhs`/result) or allow a wider integer-typed `rhs` with verifier rules?
+- Given finalized out-of-range shift-count semantics, should `shl` and `shr` be marked speculatable by default under RFC 0003?
 
 ## Future Possibilities
 
@@ -224,3 +223,4 @@ pub enum Bitwise<T: CompileTimeValue + Default> {
 | 2026-02-09 | Replaced template with concrete `kirin-bitwise` dialect proposal |
 | 2026-02-09 | Decision: keep single `shr`; signedness is determined by type |
 | 2026-02-09 | Decision: shift count `rhs` must match `lhs` type/width |
+| 2026-02-11 | Implemented `kirin-bitwise` crate, parser/printer roundtrip tests, and integration composition tests |
