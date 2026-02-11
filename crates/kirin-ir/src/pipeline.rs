@@ -282,7 +282,7 @@ impl<S> Pipeline<S> {
     /// never need to pass a [`GlobalSymbol`] manually. After creation the
     /// staged function is automatically linked to the [`FunctionInfo`].
     ///
-    /// Delegates to [`Context::staged_function`] internally, so all the same
+    /// Delegates to [`crate::StageInfo::staged_function`] internally, so all the same
     /// duplicate-detection and policy rules apply.
     ///
     /// # Panics

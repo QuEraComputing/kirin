@@ -226,7 +226,7 @@ impl<L: Dialect> StageInfo<L> {
     ///
     /// Signature validation (e.g., checking that the specialized signature is a
     /// subset of the staged signature) is the caller's responsibility via
-    /// [`SignatureSemantics::applicable`].
+    /// [`crate::SignatureSemantics::applicable`].
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,

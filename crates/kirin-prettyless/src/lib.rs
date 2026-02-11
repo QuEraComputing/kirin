@@ -20,14 +20,6 @@
 //! let config = Config::default().with_width(80);
 //! let output = statement.sprint_with_config(config, &context);
 //! ```
-//!
-//! # Module Structure
-//!
-//! - [`config`] - Configuration types
-//! - [`document`] - Document builder
-//! - [`traits`] - Core traits
-//! - [`scan`] - Result width scanning
-//! - [`impls`] - Implementations for IR types
 
 mod config;
 mod document;
