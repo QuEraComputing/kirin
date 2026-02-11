@@ -20,9 +20,9 @@ where
             res: f_res,
             ..
         } = self;
-        let f_lhs_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_lhs, ctx);
-        let f_rhs_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_rhs, ctx);
-        let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
+        let f_lhs_ir = ::kirin::parsers::EmitIR::emit(f_lhs, ctx);
+        let f_rhs_ir = ::kirin::parsers::EmitIR::emit(f_rhs, ctx);
+        let f_res_ir = ::kirin::parsers::EmitIR::emit(f_res, ctx);
         let dialect_variant: Add = Add {
             lhs: f_lhs_ir.into(),
             rhs: f_rhs_ir.into(),

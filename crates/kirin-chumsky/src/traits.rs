@@ -224,6 +224,30 @@ where
     }
 }
 
+impl<T, L> EmitIR<L> for Vec<T>
+where
+    L: Dialect,
+    T: EmitIR<L>,
+{
+    type Output = Vec<T::Output>;
+
+    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output {
+        self.iter().map(|item| item.emit(ctx)).collect()
+    }
+}
+
+impl<T, L> EmitIR<L> for Option<T>
+where
+    L: Dialect,
+    T: EmitIR<L>,
+{
+    type Output = Option<T::Output>;
+
+    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output {
+        self.as_ref().map(|item| item.emit(ctx))
+    }
+}
+
 /// Emits an AST node as IR using a fresh emit context.
 pub fn emit<L, T>(ast: &T, stage: &mut StageInfo<L>) -> T::Output
 where

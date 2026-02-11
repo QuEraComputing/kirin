@@ -17,7 +17,7 @@ where
         let Self {
             target: f_target, ..
         } = self;
-        let f_target_ir: ::kirin::ir::Successor = ::kirin::parsers::EmitIR::emit(f_target, ctx);
+        let f_target_ir = ::kirin::parsers::EmitIR::emit(f_target, ctx);
         let dialect_variant: Branch = Branch {
             target: f_target_ir.into(),
         };

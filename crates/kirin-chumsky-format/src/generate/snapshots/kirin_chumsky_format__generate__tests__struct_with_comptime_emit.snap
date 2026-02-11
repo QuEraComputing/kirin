@@ -20,7 +20,7 @@ where
             ..
         } = self;
         let f_value_ir = f_value.clone();
-        let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
+        let f_res_ir = ::kirin::parsers::EmitIR::emit(f_res, ctx);
         let dialect_variant: Constant = Constant {
             value: f_value_ir,
             res: f_res_ir.into(),

@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use kirin_derive_core::ir::fields::FieldInfo;
+use kirin_derive_core::ir::fields::{Collection, FieldInfo};
 
 use crate::field_kind::FieldKind;
 use crate::format::{Format, FormatElement, FormatOption};
@@ -134,7 +134,16 @@ impl GenerateHasDialectParser {
     ) -> TokenStream {
         let kind = FieldKind::from_field_info(field);
         let base = kind.parser_expr(crate_path, opt, ast_name, ir_type, type_params);
-        field.collection.wrap_parser(base)
+        match field.collection {
+            Collection::Single => base,
+            Collection::Vec => quote! {
+                #base
+                    .separated_by(#crate_path::chumsky::prelude::just(#crate_path::Token::Comma))
+                    .allow_trailing()
+                    .collect::<::std::vec::Vec<_>>()
+            },
+            Collection::Option => quote! { #base.or_not() },
+        }
     }
 
     /// Generate AST constructor that combines field occurrences.

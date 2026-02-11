@@ -17,7 +17,7 @@ where
     type Output = ::kirin::ir::Statement;
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
         let Self(f0) = self;
-        let f0_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f0, ctx);
+        let f0_ir = ::kirin::parsers::EmitIR::emit(f0, ctx);
         let dialect_variant: GenericReturn<T> = GenericReturn(f0_ir.into());
         ctx.stage.statement().definition(dialect_variant).new()
     }

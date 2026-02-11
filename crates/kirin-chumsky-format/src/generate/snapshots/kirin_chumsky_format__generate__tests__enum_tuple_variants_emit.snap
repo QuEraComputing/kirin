@@ -16,13 +16,13 @@ where
     fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
         match self {
             TupleLangAST::Return(f0) => {
-                let f0_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f0, ctx);
+                let f0_ir = ::kirin::parsers::EmitIR::emit(f0, ctx);
                 let dialect_variant: TupleLang = TupleLang::Return(f0_ir.into());
                 ctx.stage.statement().definition(dialect_variant).new()
             }
             TupleLangAST::Neg(f0, f1) => {
-                let f0_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f0, ctx);
-                let f1_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f1, ctx);
+                let f0_ir = ::kirin::parsers::EmitIR::emit(f0, ctx);
+                let f1_ir = ::kirin::parsers::EmitIR::emit(f1, ctx);
                 let dialect_variant: TupleLang = TupleLang::Neg(f0_ir.into(), f1_ir.into());
                 ctx.stage.statement().definition(dialect_variant).new()
             }

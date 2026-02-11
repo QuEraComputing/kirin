@@ -20,11 +20,9 @@ where
             else_target: f_else_target,
             ..
         } = self;
-        let f_cond_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_cond, ctx);
-        let f_then_target_ir: ::kirin::ir::Successor =
-            ::kirin::parsers::EmitIR::emit(f_then_target, ctx);
-        let f_else_target_ir: ::kirin::ir::Successor =
-            ::kirin::parsers::EmitIR::emit(f_else_target, ctx);
+        let f_cond_ir = ::kirin::parsers::EmitIR::emit(f_cond, ctx);
+        let f_then_target_ir = ::kirin::parsers::EmitIR::emit(f_then_target, ctx);
+        let f_else_target_ir = ::kirin::parsers::EmitIR::emit(f_else_target, ctx);
         let dialect_variant: CondBranch = CondBranch {
             cond: f_cond_ir.into(),
             then_target: f_then_target_ir.into(),

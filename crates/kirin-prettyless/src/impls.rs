@@ -76,6 +76,27 @@ impl PrettyPrint for GlobalSymbol {
     }
 }
 
+impl<T: PrettyPrint> PrettyPrint for Vec<T> {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        doc.list(self.iter(), ", ", |item| item.pretty_print(doc))
+    }
+}
+
+impl<T: PrettyPrint> PrettyPrint for Option<T> {
+    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        match self {
+            Some(value) => value.pretty_print(doc),
+            None => doc.nil(),
+        }
+    }
+}
+
 impl PrettyPrintName for SSAValue {
     fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
         let info = self.expect_info(doc.stage());

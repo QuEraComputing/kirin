@@ -19,8 +19,8 @@ where
             res: f_res,
             ..
         } = self;
-        let f_addr_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_addr, ctx);
-        let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
+        let f_addr_ir = ::kirin::parsers::EmitIR::emit(f_addr, ctx);
+        let f_res_ir = ::kirin::parsers::EmitIR::emit(f_res, ctx);
         let dialect_variant: Load = Load {
             addr: f_addr_ir.into(),
             res: f_res_ir.into(),

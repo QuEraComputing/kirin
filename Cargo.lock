@@ -1245,6 +1245,7 @@ name = "kirin-function"
 version = "0.1.0"
 dependencies = [
  "kirin",
+ "kirin-arith",
  "kirin-test-utils",
 ]
 

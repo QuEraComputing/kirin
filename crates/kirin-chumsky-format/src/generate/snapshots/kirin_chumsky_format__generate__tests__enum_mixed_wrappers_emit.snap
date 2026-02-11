@@ -32,8 +32,8 @@ where
                 arg: f_arg,
                 res: f_res,
             } => {
-                let f_arg_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_arg, ctx);
-                let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
+                let f_arg_ir = ::kirin::parsers::EmitIR::emit(f_arg, ctx);
+                let f_res_ir = ::kirin::parsers::EmitIR::emit(f_res, ctx);
                 let dialect_variant: MixedLang = MixedLang::Custom {
                     arg: f_arg_ir.into(),
                     res: f_res_ir.into(),

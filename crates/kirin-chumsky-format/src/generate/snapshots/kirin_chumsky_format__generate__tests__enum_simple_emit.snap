@@ -20,9 +20,9 @@ where
                 rhs: f_rhs,
                 res: f_res,
             } => {
-                let f_lhs_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_lhs, ctx);
-                let f_rhs_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_rhs, ctx);
-                let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
+                let f_lhs_ir = ::kirin::parsers::EmitIR::emit(f_lhs, ctx);
+                let f_rhs_ir = ::kirin::parsers::EmitIR::emit(f_rhs, ctx);
+                let f_res_ir = ::kirin::parsers::EmitIR::emit(f_res, ctx);
                 let dialect_variant: SimpleLang = SimpleLang::Add {
                     lhs: f_lhs_ir.into(),
                     rhs: f_rhs_ir.into(),
@@ -31,7 +31,7 @@ where
                 ctx.stage.statement().definition(dialect_variant).new()
             }
             SimpleLangAST::Return { arg: f_arg } => {
-                let f_arg_ir: ::kirin::ir::SSAValue = ::kirin::parsers::EmitIR::emit(f_arg, ctx);
+                let f_arg_ir = ::kirin::parsers::EmitIR::emit(f_arg, ctx);
                 let dialect_variant: SimpleLang = SimpleLang::Return {
                     arg: f_arg_ir.into(),
                 };

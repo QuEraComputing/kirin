@@ -657,7 +657,6 @@ impl GenerateEmitIR {
         _is_tuple: bool,
     ) -> TokenStream {
         let crate_path = &self.config.crate_path;
-        let ir_path = &self.config.ir_path;
 
         // Get type parameter names for checking if a Value type needs EmitIR::emit
         let type_param_names: Vec<String> = generics
@@ -670,49 +669,28 @@ impl GenerateEmitIR {
             .iter()
             .zip(field_vars.iter())
             .map(|(field, var)| {
-                let emitted_var = syn::Ident::new(
-                    &format!("{}_ir", var),
-                    proc_macro2::Span::call_site(),
-                );
+                let emitted_var =
+                    syn::Ident::new(&format!("{}_ir", var), proc_macro2::Span::call_site());
 
                 // Use FieldKind to determine the emit behavior
                 let kind = FieldKind::from_field_info(field);
                 match kind {
-                    FieldKind::SSAValue => {
-                        quote! {
-                            let #emitted_var: #ir_path::SSAValue = #crate_path::EmitIR::emit(#var, ctx);
-                        }
-                    }
-                    FieldKind::ResultValue => {
-                        quote! {
-                            let #emitted_var: #ir_path::ResultValue = #crate_path::EmitIR::emit(#var, ctx);
-                        }
-                    }
-                    FieldKind::Block => {
-                        quote! {
-                            let #emitted_var: #ir_path::Block = #crate_path::EmitIR::emit(#var, ctx);
-                        }
-                    }
-                    FieldKind::Successor => {
-                        quote! {
-                            let #emitted_var: #ir_path::Successor = #crate_path::EmitIR::emit(#var, ctx);
-                        }
-                    }
-                    FieldKind::Region => {
-                        quote! {
-                            let #emitted_var: #ir_path::Region = #crate_path::EmitIR::emit(#var, ctx);
-                        }
-                    }
-                    FieldKind::Symbol => {
-                        quote! {
-                            let #emitted_var: #ir_path::Symbol = #crate_path::EmitIR::emit(#var, ctx);
-                        }
-                    }
+                    FieldKind::SSAValue
+                    | FieldKind::ResultValue
+                    | FieldKind::Block
+                    | FieldKind::Successor
+                    | FieldKind::Region
+                    | FieldKind::Symbol => quote! {
+                        let #emitted_var = #crate_path::EmitIR::emit(#var, ctx);
+                    },
                     FieldKind::Value(ref ty) => {
                         // Check if this Value type contains any type parameters
                         let needs_emit_ir = type_param_names.iter().any(|param_name| {
                             kirin_derive_core::misc::is_type(ty, param_name.as_str())
-                                || kirin_derive_core::misc::is_type_in_generic(ty, param_name.as_str())
+                                || kirin_derive_core::misc::is_type_in_generic(
+                                    ty,
+                                    param_name.as_str(),
+                                )
                         });
 
                         if needs_emit_ir {

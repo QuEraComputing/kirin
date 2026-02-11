@@ -20,8 +20,8 @@ where
             res: f_res,
             ..
         } = self;
-        let f_body_ir: ::kirin::ir::Region = ::kirin::parsers::EmitIR::emit(f_body, ctx);
-        let f_res_ir: ::kirin::ir::ResultValue = ::kirin::parsers::EmitIR::emit(f_res, ctx);
+        let f_body_ir = ::kirin::parsers::EmitIR::emit(f_body, ctx);
+        let f_res_ir = ::kirin::parsers::EmitIR::emit(f_res, ctx);
         let dialect_variant: Function = Function {
             body: f_body_ir.into(),
             res: f_res_ir.into(),

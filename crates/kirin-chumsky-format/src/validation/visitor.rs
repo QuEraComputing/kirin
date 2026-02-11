@@ -3,7 +3,6 @@
 use std::collections::HashSet;
 
 use kirin_derive_core::ir::Statement;
-use kirin_derive_core::ir::fields::Collection;
 use kirin_lexer::Token;
 
 use crate::ChumskyLayout;
@@ -32,8 +31,6 @@ pub struct ValidationVisitor<'ir> {
     name_occurrences: HashSet<usize>,
     /// Accumulated errors
     errors: Vec<syn::Error>,
-    /// Field indices that need collection validation (checked in enter_statement)
-    collection_errors: Vec<(usize, Collection)>,
 }
 
 impl<'ir> ValidationVisitor<'ir> {
@@ -46,7 +43,6 @@ impl<'ir> ValidationVisitor<'ir> {
             referenced_fields: HashSet::new(),
             name_occurrences: HashSet::new(),
             errors: Vec::new(),
-            collection_errors: Vec::new(),
         }
     }
 
@@ -57,17 +53,6 @@ impl<'ir> ValidationVisitor<'ir> {
         format: &Format<'_>,
         collected: &'ir [FieldInfo<ChumskyLayout>],
     ) -> syn::Result<ValidationResult<'ir>> {
-        // Pre-collect collection errors before visiting
-        for field in collected {
-            match field.collection {
-                Collection::Vec | Collection::Option => {
-                    self.collection_errors
-                        .push((field.index, field.collection.clone()));
-                }
-                Collection::Single => {}
-            }
-        }
-
         crate::visitor::visit_format(&mut self, stmt, format, collected)?;
 
         // Post-validation: check all required fields are present
@@ -149,33 +134,6 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
         _format: &Format<'_>,
     ) -> syn::Result<()> {
         self.stmt_span = stmt.name.span();
-
-        // Report collection errors that were pre-collected
-        // Collect error messages first to avoid borrow issues
-        let error_messages: Vec<String> = self
-            .collection_errors
-            .iter()
-            .filter_map(|(index, collection)| match collection {
-                Collection::Vec => Some(format!(
-                    "field at index {} has type Vec<...> which is not supported in format-derived parsers. \
-                     Format strings do not define list syntax (separators, delimiters). \
-                     Consider using a single-element field or implementing HasDialectParser manually.",
-                    index
-                )),
-                Collection::Option => Some(format!(
-                    "field at index {} has type Option<...> which is not supported in format-derived parsers. \
-                     Format strings do not define optional syntax. \
-                     Consider using a required field or implementing HasDialectParser manually.",
-                    index
-                )),
-                Collection::Single => None,
-            })
-            .collect();
-
-        for msg in error_messages {
-            self.add_error(msg);
-        }
-
         Ok(())
     }
 
