@@ -130,9 +130,16 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
             "the '{}' attribute is only allowed on the type level #[kirin(...)]",
             meta.path.get_ident().unwrap()
         ));
-    } else if ["constant", "pure", "terminator", "fn", "text"]
-        .iter()
-        .any(|name| meta.path.is_ident(name))
+    } else if [
+        "constant",
+        "pure",
+        "speculatable",
+        "terminator",
+        "fn",
+        "text",
+    ]
+    .iter()
+    .any(|name| meta.path.is_ident(name))
     {
         return meta.error(format!(
             "the '{}' attribute is only allowed on the per statement #[kirin(...)]",

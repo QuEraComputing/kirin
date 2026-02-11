@@ -1,17 +1,30 @@
 use super::{DeriveProperty, PropertyKind};
+use kirin_derive_core::prelude::darling;
 use kirin_test_utils::rustfmt;
 
-fn derive_constant(input: &syn::DeriveInput) -> String {
+fn derive_property(
+    input: &syn::DeriveInput,
+    kind: PropertyKind,
+    trait_name: &str,
+    method_name: &str,
+) -> darling::Result<String> {
     let mut tokens = proc_macro2::TokenStream::new();
-    let mut derive = DeriveProperty::new(
-        PropertyKind::Constant,
-        "::kirin::ir",
-        "IsConstant",
-        "is_constant",
-        "bool",
-    );
-    tokens.extend(derive.emit(input).unwrap());
-    rustfmt(tokens.to_string())
+    let mut derive = DeriveProperty::new(kind, "::kirin::ir", trait_name, method_name, "bool");
+    tokens.extend(derive.emit(input)?);
+    Ok(rustfmt(tokens.to_string()))
+}
+
+fn derive_constant(input: &syn::DeriveInput) -> String {
+    derive_property(input, PropertyKind::Constant, "IsConstant", "is_constant").unwrap()
+}
+
+fn derive_speculatable(input: &syn::DeriveInput) -> darling::Result<String> {
+    derive_property(
+        input,
+        PropertyKind::Speculatable,
+        "IsSpeculatable",
+        "is_speculatable",
+    )
 }
 
 macro_rules! case {
@@ -114,4 +127,69 @@ fn test_enum_mixed() {
             VariantD(i32, T),
         }
     });
+}
+
+#[test]
+fn test_speculatable_requires_pure_on_struct() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(speculatable, type = TestType)]
+        struct MyStruct {
+            a: i32,
+        }
+    };
+
+    let error = derive_speculatable(&input).expect_err("speculatable should require pure");
+    assert!(
+        error
+            .to_string()
+            .contains("effective #[kirin(speculatable)] requires #[kirin(pure)]"),
+        "expected pure/speculatable invariant error, got: {}",
+        error
+    );
+}
+
+#[test]
+fn test_speculatable_requires_pure_on_variant() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = TestType)]
+        enum MyEnum {
+            #[kirin(speculatable)]
+            VariantA,
+            VariantB,
+        }
+    };
+
+    let error = derive_speculatable(&input).expect_err("speculatable should require pure");
+    assert!(
+        error
+            .to_string()
+            .contains("effectively #[kirin(speculatable)]"),
+        "expected pure/speculatable invariant error, got: {}",
+        error
+    );
+}
+
+#[test]
+fn test_speculatable_works_with_global_pure() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(pure, type = TestType)]
+        enum MyEnum {
+            #[kirin(speculatable)]
+            VariantA,
+            VariantB,
+        }
+    };
+
+    let generated =
+        derive_speculatable(&input).expect("global pure should allow local speculatable");
+    assert!(
+        generated.contains("impl ::kirin::ir::IsSpeculatable for MyEnum"),
+        "expected IsSpeculatable impl generation:\n{}",
+        generated
+    );
+    assert!(
+        generated.contains("is_speculatable"),
+        "expected is_speculatable method generation:\n{}",
+        generated
+    );
 }

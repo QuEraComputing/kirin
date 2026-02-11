@@ -79,6 +79,7 @@ pub use types::{ArithType, ArithValue};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(pure, fn, type = T)]
 pub enum Arith<T: CompileTimeValue + Default> {
+    #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = add {lhs}, {rhs} -> {result:type}")]
     Add {
         lhs: SSAValue,
@@ -87,6 +88,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
+    #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = sub {lhs}, {rhs} -> {result:type}")]
     Sub {
         lhs: SSAValue,
@@ -95,6 +97,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
+    #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = mul {lhs}, {rhs} -> {result:type}")]
     Mul {
         lhs: SSAValue,
@@ -119,6 +122,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
+    #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = neg {operand} -> {result:type}")]
     Neg {
         operand: SSAValue,

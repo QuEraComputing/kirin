@@ -21,7 +21,8 @@ pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
     Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasRegions, HasRegionsMut,
-    HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsTerminator,
+    HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsSpeculatable,
+    IsTerminator,
 };
 pub use lattice::{FiniteLattice, Lattice, TypeLattice};
 pub use node::{
@@ -38,5 +39,5 @@ pub use signature::{
 #[cfg(feature = "derive")]
 pub use kirin_derive::{
     CompileStageInfo, Dialect, HasArguments, HasRegions, HasResults, HasSuccessors, IsConstant,
-    IsPure, IsTerminator,
+    IsPure, IsSpeculatable, IsTerminator,
 };

@@ -161,8 +161,14 @@ const IS_TERMINATOR: PropertyConfig =
 const IS_CONSTANT: PropertyConfig =
     PropertyConfig::new(PropertyKind::Constant, "IsConstant", "is_constant");
 const IS_PURE: PropertyConfig = PropertyConfig::new(PropertyKind::Pure, "IsPure", "is_pure");
+const IS_SPECULATABLE: PropertyConfig = PropertyConfig::new(
+    PropertyKind::Speculatable,
+    "IsSpeculatable",
+    "is_speculatable",
+);
 
-const PROPERTY_CONFIGS: [PropertyConfig; 3] = [IS_TERMINATOR, IS_CONSTANT, IS_PURE];
+const PROPERTY_CONFIGS: [PropertyConfig; 4] =
+    [IS_TERMINATOR, IS_CONSTANT, IS_PURE, IS_SPECULATABLE];
 
 fn emit_field_iter(
     ast: &syn::DeriveInput,
@@ -289,6 +295,7 @@ derive_field_iter_macro!(derive_has_regions_mut, HasRegionsMut, HAS_REGIONS_MUT)
 derive_property_macro!(derive_is_terminator, IsTerminator, IS_TERMINATOR);
 derive_property_macro!(derive_is_constant, IsConstant, IS_CONSTANT);
 derive_property_macro!(derive_is_pure, IsPure, IS_PURE);
+derive_property_macro!(derive_is_speculatable, IsSpeculatable, IS_SPECULATABLE);
 
 #[proc_macro_derive(CompileStageInfo, attributes(stage))]
 pub fn derive_compile_stage_info(input: TokenStream) -> TokenStream {

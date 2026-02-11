@@ -1,4 +1,4 @@
-//! Tests for dialect property attributes (pure, terminator, constant).
+//! Tests for dialect property attributes.
 
 use kirin_derive::Dialect;
 use kirin_ir::*;
@@ -7,7 +7,7 @@ use kirin_test_utils::*;
 #[derive(Dialect, Clone, Debug, PartialEq)]
 #[kirin(fn, type = SimpleIRType, crate = kirin_ir)]
 enum PropertyLang {
-    #[kirin(pure)]
+    #[kirin(pure, speculatable)]
     Add(SSAValue, SSAValue, ResultValue),
     #[kirin(terminator)]
     Return(SSAValue),
@@ -24,6 +24,7 @@ fn test_pure_property() {
         TestSSAValue(3).into(),
     );
     assert!(add.is_pure());
+    assert!(add.is_speculatable());
     assert!(!add.is_terminator());
     assert!(!add.is_constant());
 }
@@ -32,6 +33,7 @@ fn test_pure_property() {
 fn test_terminator_property() {
     let ret = PropertyLang::Return(TestSSAValue(1).into());
     assert!(!ret.is_pure());
+    assert!(!ret.is_speculatable());
     assert!(ret.is_terminator());
     assert!(!ret.is_constant());
 }
@@ -40,6 +42,7 @@ fn test_terminator_property() {
 fn test_constant_property() {
     let c = PropertyLang::Const(42, TestSSAValue(3).into());
     assert!(!c.is_pure());
+    assert!(!c.is_speculatable());
     assert!(!c.is_terminator());
     assert!(c.is_constant());
 }
@@ -48,6 +51,7 @@ fn test_constant_property() {
 fn test_no_properties() {
     let other = PropertyLang::Other(TestSSAValue(1).into());
     assert!(!other.is_pure());
+    assert!(!other.is_speculatable());
     assert!(!other.is_terminator());
     assert!(!other.is_constant());
 }

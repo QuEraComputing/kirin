@@ -348,8 +348,8 @@ mod tests {
     use crate::{
         Block, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut,
         HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
-        InternTable, IsConstant, IsPure, IsTerminator, Region, ResultValue, SSAValue, StageInfo,
-        StagedFunctionConflictKind, StagedNamePolicy, Successor,
+        InternTable, IsConstant, IsPure, IsSpeculatable, IsTerminator, Region, ResultValue,
+        SSAValue, StageInfo, StagedFunctionConflictKind, StagedNamePolicy, Successor,
     };
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -457,6 +457,12 @@ mod tests {
 
     impl IsPure for TestDialect {
         fn is_pure(&self) -> bool {
+            true
+        }
+    }
+
+    impl IsSpeculatable for TestDialect {
+        fn is_speculatable(&self) -> bool {
             true
         }
     }

@@ -64,6 +64,10 @@ pub trait IsPure {
     fn is_pure(&self) -> bool;
 }
 
+pub trait IsSpeculatable {
+    fn is_speculatable(&self) -> bool;
+}
+
 /// An instruction combines several traits to provide a complete interface.
 pub trait Dialect:
     for<'a> HasArguments<'a>
@@ -79,6 +83,7 @@ pub trait Dialect:
     + IsTerminator
     + IsConstant
     + IsPure
+    + IsSpeculatable
     + Clone
     + PartialEq
     + std::fmt::Debug

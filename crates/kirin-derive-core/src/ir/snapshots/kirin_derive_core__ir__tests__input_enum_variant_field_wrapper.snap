@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-derive-core/src/ir/mod.rs
+assertion_line: 122
 expression: ast
 ---
 Input {
@@ -40,6 +41,7 @@ Input {
         builder: None,
         constant: false,
         pure: false,
+        speculatable: false,
         terminator: false,
     },
     extra_attrs: (),
@@ -55,6 +57,7 @@ Input {
                         builder: None,
                         constant: false,
                         pure: false,
+                        speculatable: false,
                         terminator: false,
                     },
                     fields: [
@@ -117,6 +120,7 @@ Input {
                         builder: None,
                         constant: false,
                         pure: false,
+                        speculatable: false,
                         terminator: false,
                     },
                     fields: [

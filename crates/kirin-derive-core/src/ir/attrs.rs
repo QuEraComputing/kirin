@@ -15,6 +15,8 @@ pub struct KirinStructOptions {
     #[darling(default)]
     pub pure: bool,
     #[darling(default)]
+    pub speculatable: bool,
+    #[darling(default)]
     pub terminator: bool,
 }
 
@@ -32,6 +34,8 @@ pub struct KirinEnumOptions {
     #[darling(default)]
     pub pure: bool,
     #[darling(default)]
+    pub speculatable: bool,
+    #[darling(default)]
     pub terminator: bool,
 }
 
@@ -45,6 +49,8 @@ pub struct StatementOptions {
     pub constant: bool,
     #[darling(default)]
     pub pure: bool,
+    #[darling(default)]
+    pub speculatable: bool,
     #[darling(default)]
     pub terminator: bool,
 }
@@ -133,6 +139,7 @@ pub struct GlobalOptions {
     pub builder: Option<BuilderOptions>,
     pub constant: bool,
     pub pure: bool,
+    pub speculatable: bool,
     pub terminator: bool,
 }
 
@@ -169,6 +176,7 @@ impl From<KirinStructOptions> for GlobalOptions {
             builder: opts.builder,
             constant: opts.constant,
             pure: opts.pure,
+            speculatable: opts.speculatable,
             terminator: opts.terminator,
         }
     }
@@ -181,6 +189,7 @@ impl From<KirinStructOptions> for StatementOptions {
             builder: opts.builder,
             constant: opts.constant,
             pure: opts.pure,
+            speculatable: opts.speculatable,
             terminator: opts.terminator,
         }
     }
@@ -194,6 +203,7 @@ impl From<KirinEnumOptions> for GlobalOptions {
             builder: value.builder,
             constant: value.constant,
             pure: value.pure,
+            speculatable: value.speculatable,
             terminator: value.terminator,
         }
     }

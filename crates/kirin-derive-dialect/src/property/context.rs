@@ -9,6 +9,7 @@ use std::collections::HashMap;
 pub enum PropertyKind {
     Constant,
     Pure,
+    Speculatable,
     Terminator,
 }
 
@@ -17,6 +18,7 @@ impl PropertyKind {
         match self {
             PropertyKind::Constant => input.attrs.constant,
             PropertyKind::Pure => input.attrs.pure,
+            PropertyKind::Speculatable => input.attrs.speculatable,
             PropertyKind::Terminator => input.attrs.terminator,
         }
     }
@@ -25,6 +27,7 @@ impl PropertyKind {
         match self {
             PropertyKind::Constant => statement.attrs.constant,
             PropertyKind::Pure => statement.attrs.pure,
+            PropertyKind::Speculatable => statement.attrs.speculatable,
             PropertyKind::Terminator => statement.attrs.terminator,
         }
     }
