@@ -4,7 +4,7 @@ use kirin_ir::{Block, Dialect, GlobalSymbol, InternTable, Pipeline};
 use kirin_test_utils::*;
 use prettyless::DocAllocator;
 
-use crate::{ArenaDoc, Config, Document, FunctionPrintExt, PrettyPrint, PrettyPrintExt};
+use crate::{ArenaDoc, Config, Document, PrintExt, PrettyPrint, PrettyPrintExt};
 
 impl PrettyPrint for SimpleLanguage {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>

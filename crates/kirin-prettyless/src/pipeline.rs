@@ -129,7 +129,7 @@ impl<'a, S: RenderStage> PipelineDocument<'a, S> {
 /// let output = func.sprint(&pipeline);
 /// func.print(&pipeline);
 /// ```
-pub trait FunctionPrintExt {
+pub trait PrintExt {
     /// Render a function across all stages to a string with default config.
     fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String;
 
@@ -144,9 +144,17 @@ pub trait FunctionPrintExt {
 
     /// Write a function across all stages to a writer with default config.
     fn write<S: RenderStage>(&self, writer: &mut impl Write, pipeline: &Pipeline<S>);
+
+    /// Display a function across all stages with bat pager with default config.
+    #[cfg(feature = "bat")]
+    fn bat<S: RenderStage>(&self, pipeline: &Pipeline<S>);
+
+    /// Display a function across all stages with bat pager with custom config.
+    #[cfg(feature = "bat")]
+    fn bat_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>);
 }
 
-impl FunctionPrintExt for Function {
+impl PrintExt for Function {
     fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String {
         PipelineDocument::new(Config::default(), pipeline)
             .render_function(*self)
@@ -172,5 +180,89 @@ impl FunctionPrintExt for Function {
     fn write<S: RenderStage>(&self, writer: &mut impl Write, pipeline: &Pipeline<S>) {
         let output = self.sprint(pipeline);
         writer.write_all(output.as_bytes()).expect("write failed");
+    }
+
+    #[cfg(feature = "bat")]
+    fn bat<S: RenderStage>(&self, pipeline: &Pipeline<S>) {
+        crate::bat::print_str(&self.sprint(pipeline));
+    }
+
+    #[cfg(feature = "bat")]
+    fn bat_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>) {
+        crate::bat::print_str(&self.sprint_with_config(config, pipeline));
+    }
+}
+
+/// Extension trait for printing all functions in a [`Pipeline`].
+///
+/// ```ignore
+/// let output = pipeline.sprint();
+/// pipeline.print();
+/// ```
+pub trait PipelinePrintExt {
+    /// Render all functions in the pipeline to a string with default config.
+    fn sprint(&self) -> String;
+
+    /// Render all functions in the pipeline to a string with custom config.
+    fn sprint_with_config(&self, config: Config) -> String;
+
+    /// Print all functions in the pipeline to stdout with default config.
+    fn print(&self);
+
+    /// Print all functions in the pipeline to stdout with custom config.
+    fn print_with_config(&self, config: Config);
+
+    /// Write all functions in the pipeline to a writer with default config.
+    fn write(&self, writer: &mut impl Write);
+
+    /// Display all functions in the pipeline with bat pager with default config.
+    #[cfg(feature = "bat")]
+    fn bat(&self);
+
+    /// Display all functions in the pipeline with bat pager with custom config.
+    #[cfg(feature = "bat")]
+    fn bat_with_config(&self, config: Config);
+}
+
+impl<S: RenderStage> PipelinePrintExt for Pipeline<S> {
+    fn sprint(&self) -> String {
+        self.sprint_with_config(Config::default())
+    }
+
+    fn sprint_with_config(&self, config: Config) -> String {
+        let doc = PipelineDocument::new(config, self);
+        let mut parts = Vec::new();
+        for func_info in self.function_arena().iter() {
+            let rendered = doc.render_function(func_info.id()).expect("render failed");
+            if !rendered.is_empty() {
+                parts.push(rendered);
+            }
+        }
+        parts.join("\n")
+    }
+
+    fn print(&self) {
+        let output = self.sprint();
+        stdout().write_all(output.as_bytes()).expect("write failed");
+    }
+
+    fn print_with_config(&self, config: Config) {
+        let output = self.sprint_with_config(config);
+        stdout().write_all(output.as_bytes()).expect("write failed");
+    }
+
+    fn write(&self, writer: &mut impl Write) {
+        let output = self.sprint();
+        writer.write_all(output.as_bytes()).expect("write failed");
+    }
+
+    #[cfg(feature = "bat")]
+    fn bat(&self) {
+        crate::bat::print_str(&self.sprint());
+    }
+
+    #[cfg(feature = "bat")]
+    fn bat_with_config(&self, config: Config) {
+        crate::bat::print_str(&self.sprint_with_config(config));
     }
 }

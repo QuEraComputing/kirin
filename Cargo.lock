@@ -1110,7 +1110,10 @@ name = "kirin"
 version = "0.1.0"
 dependencies = [
  "chumsky",
+ "kirin-arith",
+ "kirin-cf",
  "kirin-chumsky",
+ "kirin-function",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
@@ -1280,9 +1283,20 @@ dependencies = [
  "bon",
  "insta",
  "kirin-ir",
+ "kirin-prettyless-derive",
  "kirin-test-utils",
  "prettyless",
  "serde",
+]
+
+[[package]]
+name = "kirin-prettyless-derive"
+version = "0.1.0"
+dependencies = [
+ "kirin-derive-core",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

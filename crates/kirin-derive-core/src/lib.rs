@@ -4,6 +4,7 @@ pub mod emit;
 pub mod ir;
 pub mod misc;
 pub mod scan;
+pub mod stage;
 pub mod test_util;
 pub mod tokens;
 

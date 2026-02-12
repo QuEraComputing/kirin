@@ -7,11 +7,13 @@ edition = "2024"
 bat = { version = "0.26", optional = true }
 bon = "3.8"
 kirin-ir.workspace = true
+kirin-prettyless-derive = { workspace = true, optional = true }
 prettyless = "0.3"
 serde = { workspace = true, optional = true, features = ["derive"] }
 
 [features]
 default = ["serde", "bat"]
+derive = ["dep:kirin-prettyless-derive"]
 serde = ["dep:serde"]
 bat = ["dep:bat"]
 

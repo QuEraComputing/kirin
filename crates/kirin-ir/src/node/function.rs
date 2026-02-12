@@ -87,6 +87,10 @@ impl FunctionInfo {
         }
     }
 
+    pub fn id(&self) -> Function {
+        self.id
+    }
+
     pub fn name(&self) -> Option<GlobalSymbol> {
         self.name
     }

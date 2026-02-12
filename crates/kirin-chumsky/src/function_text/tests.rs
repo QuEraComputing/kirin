@@ -5,7 +5,7 @@ use kirin_ir::{
     FiniteLattice, Function, FunctionInfo, GlobalSymbol, InternTable, Lattice, Pipeline, Region,
     Signature, StageInfo, TypeLattice,
 };
-use kirin_prettyless::FunctionPrintExt;
+use kirin_prettyless::PrintExt;
 
 use crate::{BoxedParser, DirectlyParsable, ParsePipelineText, Token, TokenInput};
 

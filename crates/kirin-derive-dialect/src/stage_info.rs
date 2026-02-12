@@ -30,47 +30,18 @@
 
 use std::collections::BTreeMap;
 
+use kirin_derive_core::stage::{self, StageVariantInfo};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{DeriveInput, Fields, GenericArgument, PathArguments, Type};
-
-const DEFAULT_IR_CRATE: &str = "::kirin::ir";
-
-/// Parsed info for a single enum variant annotated with `#[stage(name = "...")]`.
-struct VariantInfo {
-    ident: syn::Ident,
-    stage_name: String,
-    dialect_ty: Type,
-}
+use syn::{DeriveInput, Type};
 
 /// Generate `HasStageInfo<L>` + `CompileStageInfo` impls for a stage enum.
 pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
-    let enum_data = match &input.data {
-        syn::Data::Enum(data) => data,
-        _ => {
-            return Err(syn::Error::new_spanned(
-                input,
-                "CompileStageInfo can only be derived for enums",
-            ));
-        }
-    };
+    let variants = stage::parse_stage_variants(input)?;
 
-    let ir_crate = parse_crate_attr(input)?;
-    let ir_crate: syn::Path = syn::parse_str(&ir_crate)
+    let ir_crate_str = stage::parse_ir_crate_path(&input.attrs)?;
+    let ir_crate: syn::Path = syn::parse_str(&ir_crate_str)
         .map_err(|e| syn::Error::new_spanned(input, format!("invalid crate path: {e}")))?;
-
-    let variants: Vec<VariantInfo> = enum_data
-        .variants
-        .iter()
-        .map(parse_variant)
-        .collect::<Result<_, _>>()?;
-
-    if variants.is_empty() {
-        return Err(syn::Error::new_spanned(
-            input,
-            "CompileStageInfo requires at least one variant",
-        ));
-    }
 
     let enum_ident = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -78,7 +49,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let mut tokens = TokenStream::new();
 
     // Group variants by dialect type (using the string representation for dedup).
-    let mut dialect_groups: BTreeMap<String, Vec<&VariantInfo>> = BTreeMap::new();
+    let mut dialect_groups: BTreeMap<String, Vec<&StageVariantInfo>> = BTreeMap::new();
     for v in &variants {
         let ty = &v.dialect_ty;
         let key = quote!(#ty).to_string();
@@ -100,7 +71,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     // 1. HasStageInfo<L> per unique dialect
     for (key, group) in &dialect_groups {
         let dialect_ty = &group[0].dialect_ty;
-        let non_group_variants: Vec<&VariantInfo> = variants
+        let non_group_variants: Vec<&StageVariantInfo> = variants
             .iter()
             .filter(|v| {
                 let ty = &v.dialect_ty;
@@ -224,106 +195,4 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     });
 
     Ok(tokens)
-}
-
-/// Parse the optional `#[stage(crate = ...)]` attribute on the enum.
-fn parse_crate_attr(input: &DeriveInput) -> Result<String, syn::Error> {
-    for attr in &input.attrs {
-        if !attr.path().is_ident("stage") {
-            continue;
-        }
-        let mut crate_path = None;
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("crate") {
-                let value = meta.value()?;
-                let lit: syn::LitStr = value.parse()?;
-                crate_path = Some(lit.value());
-                Ok(())
-            } else {
-                Err(meta.error("expected `crate = \"...\"`"))
-            }
-        })?;
-        if let Some(path) = crate_path {
-            return Ok(path);
-        }
-    }
-    Ok(DEFAULT_IR_CRATE.to_string())
-}
-
-/// Parse a single enum variant: extract `#[stage(name = "...")]` and dialect type from `StageInfo<L>`.
-fn parse_variant(variant: &syn::Variant) -> Result<VariantInfo, syn::Error> {
-    // Extract stage name from attribute
-    let stage_name = parse_stage_name_attr(variant)?;
-
-    // Extract the single field type: must be StageInfo<L>
-    let field_ty = match &variant.fields {
-        Fields::Unnamed(fields) if fields.unnamed.len() == 1 => &fields.unnamed[0].ty,
-        _ => {
-            return Err(syn::Error::new_spanned(
-                variant,
-                "each variant must be a single-field tuple, e.g. `Variant(StageInfo<L>)`",
-            ));
-        }
-    };
-
-    let dialect_ty = extract_stage_info_type_param(field_ty).ok_or_else(|| {
-        syn::Error::new_spanned(
-            field_ty,
-            "field type must be `StageInfo<L>` where L is a dialect type",
-        )
-    })?;
-
-    Ok(VariantInfo {
-        ident: variant.ident.clone(),
-        stage_name,
-        dialect_ty,
-    })
-}
-
-/// Parse `#[stage(name = "...")]` from a variant's attributes.
-fn parse_stage_name_attr(variant: &syn::Variant) -> Result<String, syn::Error> {
-    for attr in &variant.attrs {
-        if !attr.path().is_ident("stage") {
-            continue;
-        }
-        let mut name = None;
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("name") {
-                let value = meta.value()?;
-                let lit: syn::LitStr = value.parse()?;
-                name = Some(lit.value());
-                Ok(())
-            } else {
-                Err(meta.error("expected `name = \"...\"`"))
-            }
-        })?;
-        if let Some(n) = name {
-            return Ok(n);
-        }
-    }
-    Err(syn::Error::new_spanned(
-        variant,
-        "missing `#[stage(name = \"...\")]` attribute",
-    ))
-}
-
-/// Extract the type parameter `L` from `StageInfo<L>`.
-fn extract_stage_info_type_param(ty: &Type) -> Option<Type> {
-    let path = match ty {
-        Type::Path(tp) => &tp.path,
-        _ => return None,
-    };
-
-    let last_segment = path.segments.last()?;
-    if last_segment.ident != "StageInfo" {
-        return None;
-    }
-
-    match &last_segment.arguments {
-        PathArguments::AngleBracketed(args) if args.args.len() == 1 => match &args.args[0] {
-            GenericArgument::Type(t) => Some(t.clone()),
-            _ => None,
-        },
-        _ => None,
-    }
 }

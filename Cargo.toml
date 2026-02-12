@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
-kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless" }
+kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless", features = ["derive"] }
 kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky", features = ["derive"] }
 serde = { version = "1.0.228", optional = true }
 
@@ -13,8 +13,17 @@ serde = { version = "1.0.228", optional = true }
 chumsky = "0.10"
 kirin-lexer = { version = "0.1.0", path = "crates/kirin-lexer" }
 
+[dev-dependencies]
+kirin-arith = { workspace = true }
+kirin-cf = { workspace = true }
+kirin-function = { workspace = true }
+
 [features]
 serde = ["dep:serde"]
+
+[[example]]
+name = "simple"
+path = "example/simple.rs"
 
 [workspace]
 resolver = "2"
@@ -36,6 +45,7 @@ members = [
     "xtask",
     "crates/kirin-arith",
     "crates/kirin-bitwise",
+    "crates/kirin-prettyless-derive",
 ]
 
 [workspace.dependencies]
@@ -76,3 +86,4 @@ kirin-scf = { version = "0.1.0", path = "crates/kirin-scf" }
 kirin-function = { version = "0.1.0", path = "crates/kirin-function" }
 kirin-arith = { version = "0.1.0", path = "crates/kirin-arith" }
 kirin-bitwise = { version = "0.1.0", path = "crates/kirin-bitwise" }
+kirin-prettyless-derive = { version = "0.1.0", path = "crates/kirin-prettyless-derive" }

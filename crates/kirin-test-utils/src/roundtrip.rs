@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use kirin_chumsky::{EmitIR, HasParser, ParsePipelineText, PrettyPrint, parse};
 use kirin_ir::{Dialect, GetInfo, Pipeline, SSAKind, StageInfo, Statement};
-use kirin_prettyless::{Config, Document, FunctionPrintExt, RenderStage};
+use kirin_prettyless::{Config, Document, PipelinePrintExt, RenderStage};
 
 /// Parse a single statement with pre-registered operands.
 pub fn emit_statement<'src, L>(
@@ -80,11 +80,7 @@ where
         !parsed_functions.is_empty(),
         "expected at least one parsed function"
     );
-    let rendered = parsed_functions
-        .iter()
-        .map(|function| function.sprint(&parsed_pipeline))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let rendered = parsed_pipeline.sprint();
 
     let mut reparsed_pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
     let reparsed_functions = reparsed_pipeline
@@ -95,10 +91,6 @@ where
         parsed_functions.len(),
         "expected same number of parsed functions"
     );
-    let rendered_again = reparsed_functions
-        .iter()
-        .map(|function| function.sprint(&reparsed_pipeline))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let rendered_again = reparsed_pipeline.sprint();
     assert_eq!(rendered.trim_end(), rendered_again.trim_end());
 }
