@@ -31,7 +31,7 @@ mod traits;
 // Re-export main types
 pub use config::Config;
 pub use document::Document;
-pub use pipeline::{PipelinePrintExt, PrintExt, PipelineDocument, RenderStage};
+pub use pipeline::{PipelineDocument, PipelinePrintExt, PrintExt, RenderStage};
 
 #[cfg(feature = "derive")]
 pub use kirin_prettyless_derive::RenderStage;
@@ -45,8 +45,8 @@ pub type ArenaDoc<'a> = prettyless::DocBuilder<'a, Arena<'a>>;
 /// Prelude module for common imports.
 pub mod prelude {
     pub use crate::{
-        ArenaDoc, Config, DocAllocator, Document, PipelinePrintExt, PrintExt, PipelineDocument,
-        PrettyPrint, PrettyPrintExt, PrettyPrintName, PrettyPrintType, RenderStage,
+        ArenaDoc, Config, DocAllocator, Document, PipelineDocument, PipelinePrintExt, PrettyPrint,
+        PrettyPrintExt, PrettyPrintName, PrettyPrintType, PrintExt, RenderStage,
     };
     pub use prettyless;
 }
