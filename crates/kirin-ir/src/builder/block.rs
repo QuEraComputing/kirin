@@ -99,6 +99,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
 
         for &stmt_id in &self.statements {
             let info = &mut self.stage.statements[stmt_id];
+            info.parent = Some(id);
             for arg in info.definition.arguments_mut() {
                 let ssa_info = self
                     .stage
@@ -110,6 +111,11 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                     *arg = block_args[arg_index].into();
                 }
             }
+        }
+
+        if let Some(term_id) = self.terminator {
+            let info = &mut self.stage.statements[term_id];
+            info.parent = Some(id);
         }
 
         let block = BlockInfo::builder()
