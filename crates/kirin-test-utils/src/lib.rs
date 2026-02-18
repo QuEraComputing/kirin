@@ -7,6 +7,9 @@ mod ssa;
 mod unit_type;
 mod value;
 
+#[cfg(feature = "interpreter")]
+mod interval;
+
 #[cfg(feature = "parser")]
 pub mod parser;
 
@@ -21,6 +24,9 @@ pub use simple_type::SimpleType;
 pub use ssa::new_test_ssa;
 pub use unit_type::UnitType;
 pub use value::Value;
+
+#[cfg(feature = "interpreter")]
+pub use interval::{Bound, Interval, interval_add, interval_mul, interval_neg, interval_sub};
 
 pub use SimpleIRType::*;
 

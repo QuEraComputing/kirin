@@ -8,6 +8,7 @@ kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
 kirin-chumsky = { workspace = true, optional = true }
 kirin-lexer = { workspace = true, optional = true }
 kirin-prettyless = { workspace = true, optional = true }
+kirin-interpreter = { workspace = true, optional = true }
 
 [features]
 default = []
@@ -15,3 +16,4 @@ simple-language = ["kirin-ir/derive"]
 parser = ["kirin-chumsky", "kirin-lexer"]
 pretty = ["kirin-prettyless"]
 roundtrip = ["parser", "pretty"]
+interpreter = ["kirin-interpreter"]

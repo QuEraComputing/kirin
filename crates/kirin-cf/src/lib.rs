@@ -16,3 +16,6 @@ pub enum ControlFlow<T: CompileTimeValue + Default> {
     #[kirin(format = "ret {0}")]
     Return(SSAValue),
 }
+
+#[cfg(feature = "interpret")]
+mod interpret_impl;

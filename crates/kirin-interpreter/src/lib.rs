@@ -1,0 +1,21 @@
+mod abstract_interp;
+mod control;
+mod error;
+mod frame;
+mod interpretable;
+mod interpreter;
+mod result;
+mod stack;
+mod value;
+mod widening;
+
+pub use abstract_interp::AbstractInterpreter;
+pub use control::{AbstractControl, ConcreteControl, InterpretControl};
+pub use error::InterpError;
+pub use frame::Frame;
+pub use interpretable::Interpretable;
+pub use interpreter::{Interpreter, InterpreterError};
+pub use result::AnalysisResult;
+pub use stack::StackInterpreter;
+pub use value::AbstractValue;
+pub use widening::WideningStrategy;

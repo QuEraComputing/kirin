@@ -12,6 +12,9 @@ pub use call::Call;
 pub use lambda::Lambda;
 pub use ret::Return;
 
+#[cfg(feature = "interpret")]
+mod interpret_impl;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
 #[kirin(fn, type = T)]

@@ -1,11 +1,11 @@
 +++
 rfc = "0009"
 title = "interpreter framework"
-status = "Accepted"
+status = "Implemented"
 agents = ["codex", "claude"]
 authors = ["Roger-luo <code@rogerluo.dev>"]
 created = "2026-02-12T16:09:01.905258Z"
-last_updated = "2026-02-13T02:16:50.64439Z"
+last_updated = "2026-02-13T03:15:52.071005Z"
 +++
 
 # RFC 0009: interpreter framework

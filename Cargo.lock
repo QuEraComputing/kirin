@@ -1146,6 +1146,7 @@ name = "kirin-cf"
 version = "0.1.0"
 dependencies = [
  "kirin",
+ "kirin-interpreter",
 ]
 
 [[package]]
@@ -1251,6 +1252,21 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-arith",
+ "kirin-interpreter",
+ "kirin-test-utils",
+]
+
+[[package]]
+name = "kirin-interpreter"
+version = "0.1.0"
+dependencies = [
+ "fxhash",
+ "kirin-arith",
+ "kirin-cf",
+ "kirin-constant",
+ "kirin-derive",
+ "kirin-function",
+ "kirin-ir",
  "kirin-test-utils",
 ]
 
@@ -1311,6 +1327,7 @@ name = "kirin-test-utils"
 version = "0.1.0"
 dependencies = [
  "kirin-chumsky",
+ "kirin-interpreter",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",

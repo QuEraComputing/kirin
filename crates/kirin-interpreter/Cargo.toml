@@ -1,0 +1,16 @@
+[package]
+name = "kirin-interpreter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-ir = { workspace = true, features = ["derive"] }
+fxhash = "0.2"
+
+[dev-dependencies]
+kirin-arith = { workspace = true }
+kirin-cf = { workspace = true }
+kirin-constant = { workspace = true }
+kirin-function = { workspace = true }
+kirin-derive = { workspace = true }
+kirin-test-utils = { workspace = true, features = ["interpreter"] }

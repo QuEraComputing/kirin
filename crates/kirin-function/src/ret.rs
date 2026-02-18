@@ -4,7 +4,7 @@ use kirin::prelude::*;
 #[kirin(terminator, fn, type = T)]
 #[chumsky(format = "ret {value}")]
 pub struct Return<T: CompileTimeValue + Default> {
-    value: SSAValue,
+    pub(crate) value: SSAValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
