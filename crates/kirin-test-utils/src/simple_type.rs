@@ -1,4 +1,4 @@
-use kirin_ir::{FiniteLattice, Lattice, TypeLattice};
+use kirin_ir::{HasBottom, HasTop, Lattice, TypeLattice};
 
 /// Simple type lattice used for parser integration tests.
 ///
@@ -36,11 +36,13 @@ impl Lattice for SimpleType {
     }
 }
 
-impl FiniteLattice for SimpleType {
+impl HasBottom for SimpleType {
     fn bottom() -> Self {
         SimpleType::Unit
     }
+}
 
+impl HasTop for SimpleType {
     fn top() -> Self {
         SimpleType::Unit
     }

@@ -9,7 +9,7 @@ mod stack;
 mod value;
 mod widening;
 
-pub use abstract_interp::AbstractInterpreter;
+pub use abstract_interp::{AbstractInterpreter, SummaryState};
 pub use control::{AbstractContinuation, ConcreteContinuation, ConcreteExt, Continuation};
 pub use error::InterpreterError;
 pub use frame::Frame;

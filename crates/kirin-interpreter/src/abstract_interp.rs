@@ -27,6 +27,50 @@ pub(crate) struct FixpointState {
     visit_counts: FxHashMap<Block, usize>,
 }
 
+/// State of a function summary in the analysis cache.
+#[derive(Debug, Clone)]
+pub enum SummaryState<V> {
+    /// Summary computed by analysis, may be re-computed on re-analysis.
+    Computed {
+        args: Vec<V>,
+        result: AnalysisResult<V>,
+    },
+    /// Tentative summary during recursive fixpoint iteration (not yet stable).
+    Tentative {
+        args: Vec<V>,
+        result: AnalysisResult<V>,
+    },
+    /// User-provided summary, never overwritten by analysis.
+    UserFixed(AnalysisResult<V>),
+    /// User-provided seed, analysis may refine it.
+    UserSeed {
+        args: Vec<V>,
+        result: AnalysisResult<V>,
+    },
+}
+
+impl<V> SummaryState<V> {
+    /// Get the args and result if this state carries them.
+    fn args_and_result(&self) -> Option<(&[V], &AnalysisResult<V>)> {
+        match self {
+            SummaryState::Computed { args, result }
+            | SummaryState::Tentative { args, result }
+            | SummaryState::UserSeed { args, result } => Some((args, result)),
+            SummaryState::UserFixed(result) => Some((&[], result)),
+        }
+    }
+
+    /// Get the result from any summary state.
+    fn result(&self) -> &AnalysisResult<V> {
+        match self {
+            SummaryState::Computed { result, .. }
+            | SummaryState::Tentative { result, .. }
+            | SummaryState::UserSeed { result, .. }
+            | SummaryState::UserFixed(result) => result,
+        }
+    }
+}
+
 /// Worklist-based abstract interpreter for fixpoint computation.
 ///
 /// Unlike [`crate::StackInterpreter`] which follows a single concrete execution
@@ -46,9 +90,37 @@ where
     widening_strategy: WideningStrategy,
     max_iterations: usize,
     narrowing_iterations: usize,
-    summaries: FxHashMap<SpecializedFunction, (Vec<V>, AnalysisResult<V>)>,
+    summaries: FxHashMap<SpecializedFunction, SummaryState<V>>,
     max_depth: Option<usize>,
+    max_summary_iterations: usize,
     _error: PhantomData<E>,
+}
+
+/// Builder for inserting function summaries into an [`AbstractInterpreter`].
+///
+/// Obtained via [`AbstractInterpreter::insert_summary`].
+pub struct SummaryInserter<'a, 'ir, V, S, E, G>
+where
+    S: CompileStageInfo,
+{
+    interp: &'a mut AbstractInterpreter<'ir, V, S, E, G>,
+    callee: SpecializedFunction,
+}
+
+impl<V: Clone, S: CompileStageInfo, E, G> SummaryInserter<'_, '_, V, S, E, G> {
+    /// Insert an immutable summary. Analysis will never re-analyze this function.
+    pub fn fixed(self, result: AnalysisResult<V>) {
+        self.interp
+            .summaries
+            .insert(self.callee, SummaryState::UserFixed(result));
+    }
+
+    /// Insert a refinable seed. Analysis may improve upon this summary.
+    pub fn seed(self, args: Vec<V>, result: AnalysisResult<V>) {
+        self.interp
+            .summaries
+            .insert(self.callee, SummaryState::UserSeed { args, result });
+    }
 }
 
 // -- Constructors -----------------------------------------------------------
@@ -68,6 +140,7 @@ where
             frames: Vec::new(),
             summaries: FxHashMap::default(),
             max_depth: None,
+            max_summary_iterations: 100,
             _error: PhantomData,
         }
     }
@@ -84,6 +157,7 @@ where
             frames: self.frames,
             summaries: self.summaries,
             max_depth: self.max_depth,
+            max_summary_iterations: self.max_summary_iterations,
             _error: PhantomData,
         }
     }
@@ -114,6 +188,11 @@ where
         self.max_depth = Some(depth);
         self
     }
+
+    pub fn with_max_summary_iterations(mut self, n: usize) -> Self {
+        self.max_summary_iterations = n;
+        self
+    }
 }
 
 // -- Accessors --------------------------------------------------------------
@@ -132,7 +211,18 @@ where
 
     /// Look up a cached function summary.
     pub fn summary(&self, callee: SpecializedFunction) -> Option<&AnalysisResult<V>> {
-        self.summaries.get(&callee).map(|(_, result)| result)
+        self.summaries.get(&callee).map(|s| s.result())
+    }
+
+    /// Return a builder for inserting a function summary.
+    pub fn insert_summary(
+        &mut self,
+        callee: SpecializedFunction,
+    ) -> SummaryInserter<'_, 'ir, V, S, E, G> {
+        SummaryInserter {
+            interp: self,
+            callee,
+        }
     }
 }
 
@@ -201,11 +291,11 @@ where
     /// (`new_arg ⊑ cached_arg`). This ensures context-sensitive soundness —
     /// calls with more precise arguments trigger a fresh analysis.
     ///
-    /// Recursive calls and depth-limit violations return appropriate errors.
-    ///
-    /// Dialect `Interpretable` impls for call statements should resolve the
-    /// callee to a [`SpecializedFunction`], call this method, bind the return
-    /// value, and return [`AbstractControl::Continue`].
+    /// Recursive calls are handled via tentative summaries and an
+    /// inter-procedural fixpoint loop. When a callee is already on the frame
+    /// stack, its current tentative summary (or `bottom` if none) is returned
+    /// immediately. The outermost call drives re-analysis until all summaries
+    /// stabilize.
     pub fn analyze<L>(
         &mut self,
         callee: SpecializedFunction,
@@ -215,52 +305,113 @@ where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<Self>,
     {
-        // Check summary cache: reuse only if new args ⊑ cached args
-        if let Some((cached_args, cached_result)) = self.summaries.get(&callee) {
-            let subsumed = cached_args.len() == args.len()
-                && args
-                    .iter()
-                    .zip(cached_args.iter())
-                    .all(|(new, cached)| new.is_subseteq(cached));
-            if subsumed {
-                return Ok(cached_result.clone());
+        // 1. UserFixed summaries are always returned as-is
+        if let Some(SummaryState::UserFixed(result)) = self.summaries.get(&callee) {
+            return Ok(result.clone());
+        }
+
+        // 2. Check computed/seed cache — reuse if args subsumed
+        if let Some(state) = self.summaries.get(&callee) {
+            if let Some((cached_args, cached_result)) = state.args_and_result() {
+                if !cached_args.is_empty() {
+                    let subsumed = cached_args.len() == args.len()
+                        && args
+                            .iter()
+                            .zip(cached_args.iter())
+                            .all(|(new, cached)| new.is_subseteq(cached));
+                    if subsumed {
+                        return Ok(cached_result.clone());
+                    }
+                }
             }
         }
 
-        // Check recursion
-        if self.frames.iter().any(|f| f.callee() == callee) {
-            return Err(
-                InterpreterError::UnexpectedControl("recursive call detected".to_owned()).into(),
-            );
+        // 3. Check for recursion (callee already on frame stack)
+        let is_recursive = self.frames.iter().any(|f| f.callee() == callee);
+        if is_recursive {
+            // Return tentative summary (bottom if none exists yet)
+            let result = match self.summaries.get(&callee) {
+                Some(state) => state.result().clone(),
+                None => AnalysisResult::bottom(),
+            };
+            return Ok(result);
         }
 
-        // Check depth limit
+        // 4. Depth check
         if let Some(max) = self.max_depth {
             if self.frames.len() >= max {
                 return Err(InterpreterError::MaxDepthExceeded.into());
             }
         }
 
-        // Resolve entry block
+        // 5. Resolve entry block
         let entry = self
             .resolve_entry_block::<L>(callee)
             .ok_or_else(|| InterpreterError::MissingEntry.into())?;
 
-        // Push frame with fresh fixpoint state
-        self.frames
-            .push(Frame::new(callee, FixpointState::default()));
+        // 6. Insert tentative summary before pushing frame
+        self.summaries.insert(
+            callee,
+            SummaryState::Tentative {
+                args: args.to_vec(),
+                result: AnalysisResult::bottom(),
+            },
+        );
 
-        // Run fixpoint analysis on the callee
-        let result = self.run_forward::<L>(entry, args);
+        // 7. Outer fixpoint loop for inter-procedural convergence
+        let mut summary_iterations = 0;
+        let final_result = loop {
+            summary_iterations += 1;
+            if summary_iterations > self.max_summary_iterations {
+                return Err(InterpreterError::FuelExhausted.into());
+            }
 
-        // Pop frame
-        self.frames.pop().expect("frame stack underflow");
+            // Push frame and run forward analysis
+            self.frames
+                .push(Frame::new(callee, FixpointState::default()));
+            let result = self.run_forward::<L>(entry, args);
+            self.frames.pop().expect("frame stack underflow");
 
-        // Cache and return
-        let result = result?;
-        self.summaries
-            .insert(callee, (args.to_vec(), result.clone()));
-        Ok(result)
+            let result = result?;
+
+            // Check if summary changed
+            let old_return = self
+                .summaries
+                .get(&callee)
+                .and_then(|s| s.result().return_value().cloned());
+            let new_return = result.return_value().cloned();
+
+            // Update tentative summary
+            self.summaries.insert(
+                callee,
+                SummaryState::Tentative {
+                    args: args.to_vec(),
+                    result: result.clone(),
+                },
+            );
+
+            // Converged if return value stabilized
+            let converged = match (&old_return, &new_return) {
+                (Some(old), Some(new)) => new.is_subseteq(old),
+                (None, None) => true,
+                _ => summary_iterations > 1,
+            };
+
+            if converged {
+                break result;
+            }
+        };
+
+        // 8. Mark as Computed (stable)
+        self.summaries.insert(
+            callee,
+            SummaryState::Computed {
+                args: args.to_vec(),
+                result: final_result.clone(),
+            },
+        );
+
+        Ok(final_result)
     }
 
     /// Run forward abstract interpretation starting from `entry` block with
@@ -472,10 +623,7 @@ where
                     result,
                 } => {
                     let analysis = self.analyze::<L>(callee, &args)?;
-                    let return_val = analysis
-                        .return_value()
-                        .cloned()
-                        .ok_or_else(|| InterpreterError::MissingEntry.into())?;
+                    let return_val = analysis.return_value().cloned().unwrap_or_else(V::bottom);
                     self.write(result, return_val)?;
                 }
                 other => return Ok(other),

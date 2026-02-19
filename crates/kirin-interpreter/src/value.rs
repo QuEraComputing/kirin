@@ -1,4 +1,4 @@
-use kirin_ir::Lattice;
+use kirin_ir::HasBottom;
 
 /// Decidability of a branch condition.
 ///
@@ -31,7 +31,7 @@ impl BranchCondition for i64 {
 ///
 /// **Narrowing**: `x ⊓ y ⊑ narrow(x, y) ⊑ x`. The descending chain must
 /// also stabilize in finite steps.
-pub trait AbstractValue: Lattice {
+pub trait AbstractValue: HasBottom {
     /// Widen `self` with `next` to guarantee ascending chain termination.
     fn widen(&self, next: &Self) -> Self;
 

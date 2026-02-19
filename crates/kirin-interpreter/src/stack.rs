@@ -126,6 +126,24 @@ where
     pub fn clear_breakpoints(&mut self) {
         self.breakpoints.clear();
     }
+
+    /// Returns the number of times `callee` currently appears on the call stack.
+    ///
+    /// This enables dialect-specific recursion limits. For example, a dialect
+    /// can check the recursion depth and return a default value instead of
+    /// recursing further:
+    ///
+    /// ```ignore
+    /// let depth = interp.recursion_depth(self.body_func);
+    /// if depth > 100 {
+    ///     interp.write(self.result, V::default())?;
+    ///     return Ok(Continuation::Continue);
+    /// }
+    /// Ok(Continuation::Call { callee: self.body_func, args, result: self.result })
+    /// ```
+    pub fn recursion_depth(&self, callee: SpecializedFunction) -> usize {
+        self.frames.iter().filter(|f| f.callee() == callee).count()
+    }
 }
 
 // -- Frame management (inherent, not on the trait) --------------------------

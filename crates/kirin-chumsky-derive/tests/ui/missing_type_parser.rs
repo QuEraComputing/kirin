@@ -2,7 +2,7 @@
 //!
 //! This test should fail to compile with a clear error message.
 
-use kirin::ir::{Dialect, FiniteLattice, Lattice, ResultValue, SSAValue, TypeLattice};
+use kirin::ir::{Dialect, HasBottom, HasTop, Lattice, ResultValue, SSAValue, TypeLattice};
 use kirin_chumsky::{HasParser, PrettyPrint};
 
 /// A type lattice that does NOT implement HasParser.
@@ -24,8 +24,11 @@ impl Lattice for NoParserType {
     }
 }
 
-impl FiniteLattice for NoParserType {
+impl HasBottom for NoParserType {
     fn bottom() -> Self { NoParserType::Int }
+}
+
+impl HasTop for NoParserType {
     fn top() -> Self { NoParserType::Int }
 }
 

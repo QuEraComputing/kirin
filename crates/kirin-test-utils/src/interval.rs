@@ -1,4 +1,4 @@
-use kirin_ir::{FiniteLattice, Lattice};
+use kirin_ir::{HasBottom, HasTop, Lattice};
 
 // ============================================================================
 // Interval Domain
@@ -239,10 +239,13 @@ impl Lattice for Interval {
     }
 }
 
-impl FiniteLattice for Interval {
+impl HasBottom for Interval {
     fn bottom() -> Self {
         Interval::bottom_interval()
     }
+}
+
+impl HasTop for Interval {
     fn top() -> Self {
         Interval {
             lo: Bound::NegInf,

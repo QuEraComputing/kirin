@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use chumsky::prelude::*;
 use kirin_ir::{
-    FiniteLattice, Function, FunctionInfo, GlobalSymbol, InternTable, Lattice, Pipeline, Region,
-    Signature, StageInfo, TypeLattice,
+    Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
+    Region, Signature, StageInfo, TypeLattice,
 };
 use kirin_prettyless::PrintExt;
 
@@ -39,11 +39,14 @@ macro_rules! trivial_type_lattice {
             }
         }
 
-        impl FiniteLattice for $name {
-            fn top() -> Self {
+        impl HasBottom for $name {
+            fn bottom() -> Self {
                 $name
             }
-            fn bottom() -> Self {
+        }
+
+        impl HasTop for $name {
+            fn top() -> Self {
                 $name
             }
         }

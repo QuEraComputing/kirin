@@ -37,11 +37,13 @@ impl Lattice for SimpleIRType {
     }
 }
 
-impl FiniteLattice for SimpleIRType {
+impl HasBottom for SimpleIRType {
     fn bottom() -> Self {
         SimpleIRType::Bottom
     }
+}
 
+impl HasTop for SimpleIRType {
     fn top() -> Self {
         SimpleIRType::Any
     }

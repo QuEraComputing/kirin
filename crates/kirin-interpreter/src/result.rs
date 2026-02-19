@@ -13,6 +13,16 @@ pub struct AnalysisResult<V> {
     return_value: Option<V>,
 }
 
+impl<V: std::fmt::Debug> std::fmt::Debug for AnalysisResult<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AnalysisResult")
+            .field("values", &self.values)
+            .field("block_args", &self.block_args)
+            .field("return_value", &self.return_value)
+            .finish()
+    }
+}
+
 impl<V: Clone> Clone for AnalysisResult<V> {
     fn clone(&self) -> Self {
         Self {
@@ -24,6 +34,15 @@ impl<V: Clone> Clone for AnalysisResult<V> {
 }
 
 impl<V> AnalysisResult<V> {
+    /// Create a bottom analysis result (no values, no return).
+    pub fn bottom() -> Self {
+        Self {
+            values: FxHashMap::default(),
+            block_args: FxHashMap::default(),
+            return_value: None,
+        }
+    }
+
     pub(crate) fn new(
         values: FxHashMap<SSAValue, V>,
         block_args: FxHashMap<Block, Vec<SSAValue>>,

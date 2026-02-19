@@ -4,7 +4,7 @@
 //! invariants. No interpreter needed — just the domain types from kirin-test-utils.
 
 use kirin_interpreter::AbstractValue;
-use kirin_ir::{FiniteLattice, Lattice};
+use kirin_ir::{HasBottom, HasTop, Lattice};
 use kirin_test_utils::{Bound, Interval, interval_add, interval_sub};
 
 // ============================================================================
@@ -21,7 +21,7 @@ fn test_interval_lattice_basic() {
     assert!(Interval::new(2, 8).is_subseteq(&a));
     assert!(!b.is_subseteq(&a));
 
-    let bot = Interval::bottom();
+    let bot = <Interval as HasBottom>::bottom();
     assert!(bot.is_empty());
     assert!(bot.is_subseteq(&a));
     assert_eq!(bot.join(&a), a);
@@ -126,7 +126,7 @@ fn test_manual_fixpoint_widening_narrowing() {
 
 fn representative_intervals() -> Vec<Interval> {
     vec![
-        Interval::bottom(),
+        Interval::bottom_interval(),
         Interval::top(),
         Interval::constant(0),
         Interval::constant(42),
@@ -191,7 +191,7 @@ fn test_join_commutativity() {
 
 #[test]
 fn test_bottom_is_identity_for_join() {
-    let bot = Interval::bottom();
+    let bot = <Interval as HasBottom>::bottom();
     for a in &representative_intervals() {
         assert_eq!(a.join(&bot), *a);
         assert_eq!(bot.join(a), *a);

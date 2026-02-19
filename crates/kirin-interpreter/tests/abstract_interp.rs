@@ -100,5 +100,5 @@ fn test_session_abstract_interp_with_args() {
     // top + [1,1] = top
     assert_eq!(call_with(Interval::top()), Interval::top());
     // bottom + anything = bottom
-    assert!(call_with(Interval::bottom()).is_empty());
+    assert!(call_with(Interval::bottom_interval()).is_empty());
 }

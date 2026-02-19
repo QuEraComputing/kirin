@@ -1,4 +1,4 @@
-use kirin_ir::{FiniteLattice, Lattice, TypeLattice};
+use kirin_ir::{HasBottom, HasTop, Lattice, TypeLattice};
 
 /// A minimal type lattice with a single value.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Default)]
@@ -24,12 +24,14 @@ impl Lattice for UnitType {
     }
 }
 
-impl FiniteLattice for UnitType {
-    fn top() -> Self {
+impl HasBottom for UnitType {
+    fn bottom() -> Self {
         UnitType
     }
+}
 
-    fn bottom() -> Self {
+impl HasTop for UnitType {
+    fn top() -> Self {
         UnitType
     }
 }

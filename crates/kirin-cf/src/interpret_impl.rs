@@ -10,9 +10,7 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         match self {
-            ControlFlow::Branch { target } => {
-                Ok(Continuation::Jump((*target).into(), vec![]))
-            }
+            ControlFlow::Branch { target } => Ok(Continuation::Jump((*target).into(), vec![])),
             ControlFlow::Return(value) => {
                 let v = interp.read(*value)?;
                 Ok(Continuation::Return(v))

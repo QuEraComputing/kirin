@@ -24,7 +24,7 @@ pub use language::{
     HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsSpeculatable,
     IsTerminator,
 };
-pub use lattice::{FiniteLattice, Lattice, TypeLattice};
+pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice};
 pub use node::{
     Block, BlockArgument, BlockInfo, CompileStage, DeletedSSAValue, Function, FunctionInfo,
     GlobalSymbol, LinkedList, LinkedListNode, Region, ResultValue, SSAInfo, SSAKind, SSAValue,

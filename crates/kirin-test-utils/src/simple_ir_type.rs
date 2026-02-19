@@ -1,4 +1,4 @@
-use kirin_ir::{FiniteLattice, Lattice, TypeLattice, Typeof};
+use kirin_ir::{HasBottom, HasTop, Lattice, TypeLattice, Typeof};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum SimpleIRType {
@@ -35,11 +35,13 @@ impl Lattice for SimpleIRType {
     }
 }
 
-impl FiniteLattice for SimpleIRType {
+impl HasBottom for SimpleIRType {
     fn bottom() -> Self {
         SimpleIRType::Bottom
     }
+}
 
+impl HasTop for SimpleIRType {
     fn top() -> Self {
         SimpleIRType::Any
     }
