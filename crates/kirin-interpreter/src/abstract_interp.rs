@@ -43,7 +43,7 @@ where
     widening_strategy: WideningStrategy,
     max_iterations: usize,
     narrowing_iterations: usize,
-    summaries: FxHashMap<SpecializedFunction, AnalysisResult<V>>,
+    summaries: FxHashMap<SpecializedFunction, (Vec<V>, AnalysisResult<V>)>,
     max_depth: Option<usize>,
     _error: PhantomData<E>,
 }
@@ -62,8 +62,8 @@ where
             widening_strategy: WideningStrategy::AllJoins,
             max_iterations: 1000,
             narrowing_iterations: 3,
-            summaries: FxHashMap::default(),
             frames: Vec::new(),
+            summaries: FxHashMap::default(),
             max_depth: None,
             _error: PhantomData,
         }
@@ -78,8 +78,8 @@ where
             widening_strategy: self.widening_strategy,
             max_iterations: self.max_iterations,
             narrowing_iterations: self.narrowing_iterations,
-            summaries: self.summaries,
             frames: self.frames,
+            summaries: self.summaries,
             max_depth: self.max_depth,
             _error: PhantomData,
         }
@@ -129,7 +129,7 @@ where
 
     /// Look up a cached function summary.
     pub fn summary(&self, callee: SpecializedFunction) -> Option<&AnalysisResult<V>> {
-        self.summaries.get(&callee)
+        self.summaries.get(&callee).map(|(_, result)| result)
     }
 }
 
@@ -193,9 +193,12 @@ where
 
     /// Analyze a function, returning its [`AnalysisResult`].
     ///
-    /// Results are cached in a context-insensitive summary table keyed by
-    /// `callee`. Recursive calls and depth-limit violations return
-    /// appropriate errors.
+    /// Results are cached per `(callee, args)`: a cached entry is reused only
+    /// when every new argument is subsumed by the corresponding cached argument
+    /// (`new_arg ⊑ cached_arg`). This ensures context-sensitive soundness —
+    /// calls with more precise arguments trigger a fresh analysis.
+    ///
+    /// Recursive calls and depth-limit violations return appropriate errors.
     ///
     /// Dialect `Interpretable` impls for call statements should resolve the
     /// callee to a [`SpecializedFunction`], call this method, bind the return
@@ -209,9 +212,16 @@ where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<Self>,
     {
-        // Check summary cache
-        if let Some(cached) = self.summaries.get(&callee) {
-            return Ok(cached.clone());
+        // Check summary cache: reuse only if new args ⊑ cached args
+        if let Some((cached_args, cached_result)) = self.summaries.get(&callee) {
+            let subsumed = cached_args.len() == args.len()
+                && args
+                    .iter()
+                    .zip(cached_args.iter())
+                    .all(|(new, cached)| new.is_subseteq(cached));
+            if subsumed {
+                return Ok(cached_result.clone());
+            }
         }
 
         // Check recursion
@@ -243,7 +253,8 @@ where
 
         // Cache and return
         let result = result?;
-        self.summaries.insert(callee, result.clone());
+        self.summaries
+            .insert(callee, (args.to_vec(), result.clone()));
         Ok(result)
     }
 

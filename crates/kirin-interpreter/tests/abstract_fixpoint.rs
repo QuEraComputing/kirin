@@ -246,14 +246,14 @@ fn test_abstract_interp_call_caches_summary() {
     let result1 = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
     assert_eq!(result1.return_value(), Some(&Interval::constant(10)));
 
-    // Summary should be cached
+    // Summary should be cached (args subsumed)
     assert!(interp.summary(spec_fn).is_some());
     assert_eq!(
         interp.summary(spec_fn).unwrap().return_value(),
         Some(&Interval::constant(10))
     );
 
-    // Second call — returns cached summary
+    // Second call with same args — returns cached summary
     let result2 = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
     assert_eq!(result2.return_value(), Some(&Interval::constant(10)));
 }
