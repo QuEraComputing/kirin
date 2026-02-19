@@ -9,7 +9,7 @@ use kirin_ir::{ResultValue, SSAValue, SpecializedFunction, Statement};
 /// - [`StackInterpreter`](crate::StackInterpreter) uses
 ///   `Frame<V, Option<Statement>>` (instruction cursor).
 /// - [`AbstractInterpreter`](crate::AbstractInterpreter) uses
-///   `Frame<V, FixpointState<V>>` (worklist + block entry states).
+///   `Frame<V, FixpointState>` (worklist + block arg tracking).
 #[derive(Debug)]
 pub struct Frame<V, X> {
     callee: SpecializedFunction,
@@ -50,6 +50,15 @@ impl<V, X> Frame<V, X> {
 
     pub fn extra_mut(&mut self) -> &mut X {
         &mut self.extra
+    }
+
+    pub fn values(&self) -> &FxHashMap<SSAValue, V> {
+        &self.values
+    }
+
+    /// Simultaneous mutable access to the values map and extra state.
+    pub fn values_and_extra_mut(&mut self) -> (&mut FxHashMap<SSAValue, V>, &mut X) {
+        (&mut self.values, &mut self.extra)
     }
 
     pub fn read(&self, value: SSAValue) -> Option<&V> {

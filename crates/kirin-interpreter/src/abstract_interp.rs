@@ -13,27 +13,13 @@ use crate::{AbstractControl, AbstractValue, Frame, Interpretable, Interpreter, I
 
 /// Per-function fixpoint state stored as frame extra data.
 ///
-/// Uses a single flat map for all SSA values. Only block argument SSA
-/// values need join/widen at edges — everything else is write-once.
-#[derive(Debug)]
-pub(crate) struct FixpointState<V> {
-    current_block: Option<Block>,
-    /// Single flat map for ALL SSA values (block args + statement results).
-    values: FxHashMap<SSAValue, V>,
+/// Block argument SSA value IDs are tracked here; the actual SSA values
+/// (both block args and statement results) live in [`Frame::values`].
+#[derive(Debug, Default)]
+pub(crate) struct FixpointState {
     worklist: VecDeque<Block>,
     /// Per-block argument SSA value IDs. Key presence = block visited.
     block_args: FxHashMap<Block, Vec<SSAValue>>,
-}
-
-impl<V> Default for FixpointState<V> {
-    fn default() -> Self {
-        Self {
-            current_block: None,
-            values: FxHashMap::default(),
-            worklist: VecDeque::new(),
-            block_args: FxHashMap::default(),
-        }
-    }
 }
 
 /// Worklist-based abstract interpreter for fixpoint computation.
@@ -51,7 +37,7 @@ where
     pipeline: &'ir Pipeline<S>,
     active_stage: CompileStage,
     global: G,
-    frames: Vec<Frame<V, FixpointState<V>>>,
+    frames: Vec<Frame<V, FixpointState>>,
     widening_strategy: WideningStrategy,
     max_iterations: usize,
     narrowing_iterations: usize,
@@ -149,28 +135,6 @@ where
     }
 }
 
-// -- Frame helpers ----------------------------------------------------------
-
-impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
-where
-    E: InterpreterError,
-    S: CompileStageInfo,
-{
-    fn current_fixpoint(&self) -> Result<&FixpointState<V>, E> {
-        self.frames
-            .last()
-            .map(|f| f.extra())
-            .ok_or_else(E::no_frame)
-    }
-
-    fn current_fixpoint_mut(&mut self) -> Result<&mut FixpointState<V>, E> {
-        self.frames
-            .last_mut()
-            .map(|f| f.extra_mut())
-            .ok_or_else(E::no_frame)
-    }
-}
-
 // -- Interpreter trait impl -------------------------------------------------
 
 impl<'ir, V, S, E, G> Interpreter for AbstractInterpreter<'ir, V, S, E, G>
@@ -184,14 +148,17 @@ where
     type Control = AbstractControl<V>;
 
     fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
-        let fp = self.current_fixpoint()?;
-        fp.values.get(&value).ok_or_else(|| E::unbound_value(value))
+        self.frames
+            .last()
+            .and_then(|f| f.read(value))
+            .ok_or_else(|| E::unbound_value(value))
     }
 
     fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.current_fixpoint_mut()?
-            .values
-            .insert(result.into(), value);
+        self.frames
+            .last_mut()
+            .ok_or_else(E::no_frame)?
+            .write(result, value);
         Ok(())
     }
 }
@@ -296,9 +263,10 @@ where
                 .iter()
                 .map(|ba| SSAValue::from(*ba))
                 .collect();
-            let fp = self.current_fixpoint_mut()?;
+            let frame = self.frames.last_mut().ok_or_else(E::no_frame)?;
+            let (values, fp) = frame.values_and_extra_mut();
             for (ssa, val) in arg_ssas.iter().zip(initial_args.iter()) {
-                fp.values.insert(*ssa, val.clone());
+                values.insert(*ssa, val.clone());
             }
             fp.block_args.insert(entry, arg_ssas);
             fp.worklist.push_back(entry);
@@ -310,7 +278,7 @@ where
         // 2. Widening fixpoint loop
         loop {
             let block = {
-                let fp = self.current_fixpoint_mut()?;
+                let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
                 fp.worklist.pop_front()
             };
             let Some(block) = block else { break };
@@ -320,49 +288,17 @@ where
                 break;
             }
 
-            // Set current block for interpretation
-            {
-                let fp = self.current_fixpoint_mut()?;
-                fp.current_block = Some(block);
-            }
-
-            // Interpret the block
             let control = self.interpret_block::<L>(block)?;
-
-            // Handle control flow
-            match control {
-                AbstractControl::Jump(target, ref args) => {
-                    if self.propagate_block_args::<L>(target, args, false) {
-                        let fp = self.current_fixpoint_mut()?;
-                        if !fp.worklist.contains(&target) {
-                            fp.worklist.push_back(target);
-                        }
-                    }
-                }
-                AbstractControl::Fork(ref targets) => {
-                    for (target, args) in targets {
-                        if self.propagate_block_args::<L>(*target, args, false) {
-                            let fp = self.current_fixpoint_mut()?;
-                            if !fp.worklist.contains(target) {
-                                fp.worklist.push_back(*target);
-                            }
-                        }
-                    }
-                }
-                AbstractControl::Return(ref v) => {
-                    return_value = Some(match return_value {
-                        Some(existing) => existing.join(v),
-                        None => v.clone(),
-                    });
-                }
-                AbstractControl::Continue | AbstractControl::Call { .. } => {}
-            }
+            self.propagate_control::<L>(&control, false, &mut return_value)?;
         }
 
         // 3. Narrowing phase
         if self.narrowing_iterations > 0 {
             let blocks: Vec<Block> = self
-                .current_fixpoint()?
+                .frames
+                .last()
+                .ok_or_else(E::no_frame)?
+                .extra()
                 .block_args
                 .keys()
                 .copied()
@@ -370,34 +306,8 @@ where
             for _ in 0..self.narrowing_iterations {
                 let mut changed = false;
                 for &block in &blocks {
-                    {
-                        let fp = self.current_fixpoint_mut()?;
-                        fp.current_block = Some(block);
-                    }
-
                     let control = self.interpret_block::<L>(block)?;
-
-                    match control {
-                        AbstractControl::Jump(target, ref args) => {
-                            if self.propagate_block_args::<L>(target, args, true) {
-                                changed = true;
-                            }
-                        }
-                        AbstractControl::Fork(ref targets) => {
-                            for (target, args) in targets {
-                                if self.propagate_block_args::<L>(*target, args, true) {
-                                    changed = true;
-                                }
-                            }
-                        }
-                        AbstractControl::Return(ref v) => {
-                            return_value = Some(match return_value {
-                                Some(existing) => existing.narrow(v),
-                                None => v.clone(),
-                            });
-                        }
-                        _ => {}
-                    }
+                    changed |= self.propagate_control::<L>(&control, true, &mut return_value)?;
                 }
                 if !changed {
                     break;
@@ -405,10 +315,10 @@ where
             }
         }
 
-        let fp = self.current_fixpoint()?;
+        let frame = self.frames.last().ok_or_else(E::no_frame)?;
         Ok(AnalysisResult::new(
-            fp.values.clone(),
-            fp.block_args.clone(),
+            frame.values().clone(),
+            frame.extra().block_args.clone(),
             return_value,
         ))
     }
@@ -424,6 +334,63 @@ where
             .stage(self.active_stage)
             .and_then(|s| s.try_stage_info())
             .expect("active stage does not contain StageInfo for this dialect")
+    }
+
+    /// Handle control flow edge propagation for both widening and narrowing.
+    ///
+    /// During widening (`narrowing=false`), changed targets are enqueued to
+    /// the worklist. Returns whether any edge changed.
+    fn propagate_control<L>(
+        &mut self,
+        control: &AbstractControl<V>,
+        narrowing: bool,
+        return_value: &mut Option<V>,
+    ) -> Result<bool, E>
+    where
+        S: HasStageInfo<L>,
+        L: Dialect,
+    {
+        let mut changed = false;
+        match control {
+            AbstractControl::Jump(target, args) => {
+                if self.propagate_block_args::<L>(*target, args, narrowing) {
+                    changed = true;
+                    if !narrowing {
+                        let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
+                        if !fp.worklist.contains(target) {
+                            fp.worklist.push_back(*target);
+                        }
+                    }
+                }
+            }
+            AbstractControl::Fork(targets) => {
+                for (target, args) in targets {
+                    if self.propagate_block_args::<L>(*target, args, narrowing) {
+                        changed = true;
+                        if !narrowing {
+                            let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
+                            if !fp.worklist.contains(target) {
+                                fp.worklist.push_back(*target);
+                            }
+                        }
+                    }
+                }
+            }
+            AbstractControl::Return(v) => {
+                *return_value = Some(match return_value.take() {
+                    Some(existing) => {
+                        if narrowing {
+                            existing.narrow(v)
+                        } else {
+                            existing.join(v)
+                        }
+                    }
+                    None => v.clone(),
+                });
+            }
+            AbstractControl::Continue | AbstractControl::Call { .. } => {}
+        }
+        Ok(changed)
     }
 
     /// Interpret all statements in a block sequentially, returning the
@@ -477,10 +444,9 @@ where
             Ok(control)
         } else {
             Ok(AbstractControl::Return(
-                self.current_fixpoint()?
-                    .values
-                    .values()
-                    .next()
+                self.frames
+                    .last()
+                    .and_then(|f| f.values().values().next())
                     .cloned()
                     .ok_or_else(E::no_frame)?,
             ))
@@ -489,7 +455,7 @@ where
 
     /// Propagate block argument values to the target block. Only block
     /// argument SSA values are joined/widened — all other SSA values in
-    /// the flat map are write-once and shared across all paths.
+    /// the frame are write-once and shared across all paths.
     ///
     /// Returns `true` if the target's block arg state changed (or first visit).
     fn propagate_block_args<L>(&mut self, target: Block, args: &[V], narrowing: bool) -> bool
@@ -508,42 +474,48 @@ where
                 .collect()
         };
 
-        let fp = self.frames.last_mut().expect("no active frame");
-        let fp_state = fp.extra_mut();
+        // Copy widening strategy before borrowing frames mutably
+        let widening_strategy = self.widening_strategy;
 
-        let first_visit = !fp_state.block_args.contains_key(&target);
+        let frame = self.frames.last_mut().expect("no active frame");
+        let (values, fp) = frame.values_and_extra_mut();
+
+        let first_visit = !fp.block_args.contains_key(&target);
 
         if first_visit {
-            // First visit: write arg values to flat map, record block arg SSA IDs
+            // First visit: write arg values, record block arg SSA IDs
             for (ssa, val) in target_arg_ssas.iter().zip(args.iter()) {
-                fp_state.values.insert(*ssa, val.clone());
+                values.insert(*ssa, val.clone());
             }
-            fp_state.block_args.insert(target, target_arg_ssas);
+            fp.block_args.insert(target, target_arg_ssas);
             true
         } else {
             // Subsequent visit: widen/narrow only block arg values
             let mut changed = false;
             for (ssa, new_val) in target_arg_ssas.iter().zip(args.iter()) {
-                let merged = match fp_state.values.get(ssa) {
-                    Some(old_val) => {
-                        if narrowing {
-                            old_val.narrow(new_val)
+                use fxhash::FxHashMap as Map;
+                use std::collections::hash_map::Entry;
+
+                // Transmute-free: FxHashMap uses the same Entry API
+                match (values as &mut Map<SSAValue, V>).entry(*ssa) {
+                    Entry::Occupied(mut entry) => {
+                        let merged = if narrowing {
+                            entry.get().narrow(new_val)
                         } else {
-                            match self.widening_strategy {
-                                WideningStrategy::AllJoins => old_val.widen(new_val),
+                            match widening_strategy {
+                                WideningStrategy::AllJoins => entry.get().widen(new_val),
                             }
+                        };
+                        if !merged.is_subseteq(entry.get()) || !entry.get().is_subseteq(&merged) {
+                            changed = true;
                         }
+                        *entry.get_mut() = merged;
                     }
-                    None => new_val.clone(),
-                };
-                if let Some(old_val) = fp_state.values.get(ssa) {
-                    if !merged.is_subseteq(old_val) || !old_val.is_subseteq(&merged) {
+                    Entry::Vacant(entry) => {
+                        entry.insert(new_val.clone());
                         changed = true;
                     }
-                } else {
-                    changed = true;
                 }
-                fp_state.values.insert(*ssa, merged);
             }
             changed
         }
