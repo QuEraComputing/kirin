@@ -36,8 +36,6 @@ pub trait ArithmeticValue: Clone + Sized {
     fn arith_rem(&self, other: &Self) -> Option<Self>;
     fn arith_neg(&self) -> Self;
     fn from_arith_value(v: &ArithValue) -> Self;
-    fn is_negative(&self) -> bool;
-    fn is_non_negative(&self) -> bool;
 }
 
 impl ArithmeticValue for i64 {
@@ -76,12 +74,6 @@ impl ArithmeticValue for i64 {
             _ => panic!("unsupported ArithValue for i64: {v:?}"),
         }
     }
-    fn is_negative(&self) -> bool {
-        *self < 0
-    }
-    fn is_non_negative(&self) -> bool {
-        *self >= 0
-    }
 }
 
 impl ArithmeticValue for Interval {
@@ -113,22 +105,6 @@ impl ArithmeticValue for Interval {
             _ => Interval::top(),
         }
     }
-    fn is_negative(&self) -> bool {
-        // Conservative: only negative if entire interval is below 0
-        match self.hi {
-            kirin_test_utils::Bound::NegInf => true,
-            kirin_test_utils::Bound::Finite(h) => h < 0,
-            kirin_test_utils::Bound::PosInf => false,
-        }
-    }
-    fn is_non_negative(&self) -> bool {
-        // Conservative: only non-negative if entire interval is >= 0
-        match self.lo {
-            kirin_test_utils::Bound::Finite(l) => l >= 0,
-            kirin_test_utils::Bound::PosInf => true,
-            kirin_test_utils::Bound::NegInf => false,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +131,10 @@ where
     I: Interpreter<Error = InterpreterError>,
     I::Value: ArithmeticValue + BranchCondition,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, InterpreterError> {
+    fn interpret(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, InterpreterError> {
         match self {
             TestDialect::Arith(arith) => match arith {
                 Arith::Add {
