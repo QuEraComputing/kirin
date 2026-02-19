@@ -303,7 +303,7 @@ where
 
             iterations += 1;
             if iterations > self.max_iterations {
-                break;
+                return Err(E::fuel_exhausted());
             }
 
             let control = self.interpret_block::<L>(block)?;
