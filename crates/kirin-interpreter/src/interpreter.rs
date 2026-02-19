@@ -1,13 +1,13 @@
-use kirin_ir::{CompileStage, CompileStageInfo, Pipeline, ResultValue, SSAValue};
+use std::fmt;
 
-use crate::InterpretControl;
+use kirin_ir::{CompileStage, CompileStageInfo, Pipeline, ResultValue, SSAValue};
 
 /// Minimal state contract for interpreter implementations.
 ///
-/// Provides SSA value read/write only. The associated `Control` type
-/// determines which control flow actions are available — concrete
-/// interpreters use [`crate::ConcreteControl`] while abstract interpreters
-/// use [`crate::AbstractControl`].
+/// Provides SSA value read/write only. The associated `Ext` type
+/// determines which extra continuation variants are available — concrete
+/// interpreters use [`crate::ConcreteExt`] while abstract interpreters
+/// use [`std::convert::Infallible`].
 ///
 /// Call semantics are inherent on each interpreter type
 /// (e.g. [`crate::StackInterpreter::call`],
@@ -15,7 +15,7 @@ use crate::InterpretControl;
 pub trait Interpreter: Sized {
     type Value;
     type Error;
-    type Control: InterpretControl<Self::Value>;
+    type Ext: fmt::Debug;
     type StageInfo: CompileStageInfo;
 
     /// Returns a reference to the bound value without cloning.

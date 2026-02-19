@@ -5,7 +5,7 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    BranchCondition, InterpretControl, Interpretable, Interpreter, InterpreterError,
+    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
 };
 use kirin_ir::*;
 use kirin_test_utils::{Interval, interval_add, interval_mul, interval_neg, interval_sub};
@@ -155,7 +155,7 @@ where
     I: Interpreter<Error = InterpreterError>,
     I::Value: ArithmeticValue + BranchCondition,
 {
-    fn interpret(&self, interp: &mut I) -> Result<I::Control, InterpreterError> {
+    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, InterpreterError> {
         match self {
             TestDialect::Arith(arith) => match arith {
                 Arith::Add {
@@ -164,7 +164,7 @@ where
                     let a = interp.read(*lhs)?;
                     let b = interp.read(*rhs)?;
                     interp.write(*result, a.arith_add(&b))?;
-                    Ok(I::Control::ctrl_continue())
+                    Ok(Continuation::Continue)
                 }
                 Arith::Sub {
                     lhs, rhs, result, ..
@@ -172,7 +172,7 @@ where
                     let a = interp.read(*lhs)?;
                     let b = interp.read(*rhs)?;
                     interp.write(*result, a.arith_sub(&b))?;
-                    Ok(I::Control::ctrl_continue())
+                    Ok(Continuation::Continue)
                 }
                 Arith::Mul {
                     lhs, rhs, result, ..
@@ -180,7 +180,7 @@ where
                     let a = interp.read(*lhs)?;
                     let b = interp.read(*rhs)?;
                     interp.write(*result, a.arith_mul(&b))?;
-                    Ok(I::Control::ctrl_continue())
+                    Ok(Continuation::Continue)
                 }
                 Arith::Div {
                     lhs, rhs, result, ..
@@ -191,7 +191,7 @@ where
                         .arith_div(&b)
                         .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
                     interp.write(*result, v)?;
-                    Ok(I::Control::ctrl_continue())
+                    Ok(Continuation::Continue)
                 }
                 Arith::Rem {
                     lhs, rhs, result, ..
@@ -202,14 +202,14 @@ where
                         .arith_rem(&b)
                         .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
                     interp.write(*result, v)?;
-                    Ok(I::Control::ctrl_continue())
+                    Ok(Continuation::Continue)
                 }
                 Arith::Neg {
                     operand, result, ..
                 } => {
                     let a = interp.read(*operand)?;
                     interp.write(*result, a.arith_neg())?;
-                    Ok(I::Control::ctrl_continue())
+                    Ok(Continuation::Continue)
                 }
             },
 
@@ -218,10 +218,10 @@ where
             TestDialect::Constant(c) => {
                 let val = I::Value::from_arith_value(&c.value);
                 interp.write(c.result, val)?;
-                Ok(I::Control::ctrl_continue())
+                Ok(Continuation::Continue)
             }
 
-            TestDialect::FunctionBody(_) => Ok(I::Control::ctrl_continue()),
+            TestDialect::FunctionBody(_) => Ok(Continuation::Continue),
         }
     }
 }

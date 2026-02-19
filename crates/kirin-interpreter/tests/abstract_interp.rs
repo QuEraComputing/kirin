@@ -7,7 +7,7 @@ use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
-use kirin_interpreter::{ConcreteControl, Frame, StackInterpreter};
+use kirin_interpreter::{Continuation, Frame, StackInterpreter};
 use kirin_ir::*;
 use kirin_test_utils::Interval;
 
@@ -84,7 +84,7 @@ fn test_session_abstract_interp_with_args() {
         interp.push_call_frame(frame).unwrap();
         loop {
             match interp.run::<TestDialect>().unwrap() {
-                ConcreteControl::Return(v) => {
+                Continuation::Return(v) => {
                     interp.pop_call_frame().unwrap();
                     return v;
                 }

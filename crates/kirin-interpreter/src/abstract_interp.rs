@@ -9,7 +9,10 @@ use kirin_ir::{
 
 use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
-use crate::{AbstractControl, AbstractValue, Frame, Interpretable, Interpreter, InterpreterError};
+use crate::{
+    AbstractContinuation, AbstractValue, Continuation, Frame, Interpretable, Interpreter,
+    InterpreterError,
+};
 
 /// Per-function fixpoint state stored as frame extra data.
 ///
@@ -143,7 +146,7 @@ where
 {
     type Value = V;
     type Error = E;
-    type Control = AbstractControl<V>;
+    type Ext = std::convert::Infallible;
     type StageInfo = S;
 
     fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
@@ -379,7 +382,7 @@ where
     /// the worklist. Returns whether any edge changed.
     fn propagate_control<L>(
         &mut self,
-        control: &AbstractControl<V>,
+        control: &AbstractContinuation<V>,
         narrowing: bool,
         return_value: &mut Option<V>,
     ) -> Result<bool, E>
@@ -389,15 +392,15 @@ where
     {
         let mut changed = false;
         match control {
-            AbstractControl::Jump(target, args) => {
+            Continuation::Jump(target, args) => {
                 changed |= self.propagate_edge::<L>(*target, args, narrowing)?;
             }
-            AbstractControl::Fork(targets) => {
+            Continuation::Fork(targets) => {
                 for (target, args) in targets {
                     changed |= self.propagate_edge::<L>(*target, args, narrowing)?;
                 }
             }
-            AbstractControl::Return(v) => {
+            Continuation::Return(v) => {
                 *return_value = Some(match return_value.take() {
                     Some(existing) => {
                         if narrowing {
@@ -409,7 +412,8 @@ where
                     None => v.clone(),
                 });
             }
-            AbstractControl::Continue | AbstractControl::Call { .. } => {}
+            Continuation::Continue | Continuation::Call { .. } => {}
+            Continuation::Ext(inf) => match *inf {},
         }
         Ok(changed)
     }
@@ -439,7 +443,7 @@ where
 
     /// Interpret all statements in a block sequentially, returning the
     /// final control action from the terminator.
-    fn interpret_block<L>(&mut self, block: Block) -> Result<AbstractControl<V>, E>
+    fn interpret_block<L>(&mut self, block: Block) -> Result<AbstractContinuation<V>, E>
     where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<Self>,
@@ -461,8 +465,8 @@ where
                 def.interpret(self)?
             };
             match control {
-                AbstractControl::Continue => {}
-                AbstractControl::Call {
+                Continuation::Continue => {}
+                Continuation::Call {
                     callee,
                     args,
                     result,

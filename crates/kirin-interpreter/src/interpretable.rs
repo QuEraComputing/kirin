@@ -1,19 +1,14 @@
-use crate::Interpreter;
+use crate::{Continuation, Interpreter};
 use kirin_ir::Dialect;
 
 /// Dialect execution hook. Each dialect implements this to define how its
-/// operations affect interpreter state and which control action happens next.
+/// operations affect interpreter state and which continuation happens next.
 ///
-/// The return type `I::Control` is determined by the interpreter:
-/// - [`crate::StackInterpreter`] uses [`crate::ConcreteControl`]
-/// - [`crate::AbstractInterpreter`] uses [`crate::AbstractControl`]
-///
-/// Dialect impls that only need shared control actions (`Continue`, `Jump`,
-/// `Return`, `Call`) can be generic over `I: Interpreter` and use
-/// [`crate::InterpretControl`] constructors like `I::Control::ctrl_continue()`.
+/// Dialect impls construct [`Continuation`] variants directly:
+/// `Continuation::Continue`, `Continuation::Jump(block, args)`, etc.
 pub trait Interpretable<I>: Dialect
 where
     I: Interpreter,
 {
-    fn interpret(&self, interpreter: &mut I) -> Result<I::Control, I::Error>;
+    fn interpret(&self, interpreter: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>;
 }

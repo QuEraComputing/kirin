@@ -6,7 +6,10 @@ use kirin_ir::{
     SSAValue, SpecializedFunction, StageInfo, Statement,
 };
 
-use crate::{ConcreteControl, Frame, Interpretable, Interpreter, InterpreterError};
+use crate::{
+    ConcreteContinuation, ConcreteExt, Continuation, Frame, Interpretable, Interpreter,
+    InterpreterError,
+};
 
 type StackFrame<V> = Frame<V, Option<Statement>>;
 
@@ -171,7 +174,7 @@ where
 {
     type Value = V;
     type Error = E;
-    type Control = ConcreteControl<V>;
+    type Ext = ConcreteExt;
     type StageInfo = S;
 
     fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
@@ -216,13 +219,13 @@ where
         loop {
             let control = self.run::<L>()?;
             match &control {
-                ConcreteControl::Call { result, .. } => pending_results.push(*result),
-                ConcreteControl::Halt => {
+                Continuation::Call { result, .. } => pending_results.push(*result),
+                Continuation::Ext(ConcreteExt::Halt) => {
                     return Err(
                         InterpreterError::UnexpectedControl("halt during call".to_owned()).into(),
                     );
                 }
-                ConcreteControl::Return(_) => {}
+                Continuation::Return(_) => {}
                 _ => {
                     return Err(InterpreterError::UnexpectedControl(
                         "unexpected variant during call".to_owned(),
@@ -232,7 +235,7 @@ where
             }
 
             let v = match &control {
-                ConcreteControl::Return(v) => Some(v.clone()),
+                Continuation::Return(v) => Some(v.clone()),
                 _ => None,
             };
 
@@ -260,8 +263,8 @@ where
     S: CompileStageInfo,
 {
     /// Execute the current statement's dialect semantics.
-    /// Returns the raw [`ConcreteControl`] without advancing the cursor.
-    pub fn step<L>(&mut self) -> Result<ConcreteControl<V>, E>
+    /// Returns the raw [`ConcreteContinuation`] without advancing the cursor.
+    pub fn step<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<Self>,
@@ -281,29 +284,35 @@ where
         def.interpret(self)
     }
 
-    /// Apply cursor mutations for a control action.
-    pub fn advance<L>(&mut self, control: &ConcreteControl<V>) -> Result<(), E>
+    /// Apply cursor mutations for a continuation.
+    pub fn advance<L>(&mut self, control: &ConcreteContinuation<V>) -> Result<(), E>
     where
         S: HasStageInfo<L>,
         L: Dialect,
     {
         match control {
-            ConcreteControl::Continue => {
+            Continuation::Continue => {
                 self.advance_cursor::<L>()?;
             }
-            ConcreteControl::Jump(block, args) => {
+            Continuation::Jump(block, args) => {
                 self.bind_block_args::<L>(*block, args)?;
                 let first = self.first_stmt_in_block::<L>(*block);
                 self.current_frame_mut()?.set_cursor(first);
             }
-            ConcreteControl::Call { callee, args, .. } => {
+            Continuation::Fork(_) => {
+                return Err(InterpreterError::UnexpectedControl(
+                    "Fork is not supported by concrete interpreters".to_owned(),
+                )
+                .into());
+            }
+            Continuation::Call { callee, args, .. } => {
                 self.advance_cursor::<L>()?;
                 self.push_call_frame_with_args::<L>(*callee, args)?;
             }
-            ConcreteControl::Return(_) => {
+            Continuation::Return(_) => {
                 self.pop_call_frame()?;
             }
-            ConcreteControl::Break | ConcreteControl::Halt => {
+            Continuation::Ext(ConcreteExt::Break | ConcreteExt::Halt) => {
                 // No cursor change
             }
         }
@@ -312,7 +321,7 @@ where
 
     /// Run statements until Return, Halt, or Call.
     /// Ignores breakpoints and Break from dialect intrinsics.
-    pub fn run<L>(&mut self) -> Result<ConcreteControl<V>, E>
+    pub fn run<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<Self>,
@@ -320,11 +329,11 @@ where
         loop {
             let control = self.step::<L>()?;
             match &control {
-                ConcreteControl::Continue | ConcreteControl::Jump(..) => {
+                Continuation::Continue | Continuation::Jump(..) => {
                     self.advance::<L>(&control)?;
                 }
-                ConcreteControl::Break => {
-                    self.advance::<L>(&ConcreteControl::Continue)?;
+                Continuation::Ext(ConcreteExt::Break) => {
+                    self.advance::<L>(&Continuation::Continue)?;
                 }
                 _ => return Ok(control),
             }
@@ -332,7 +341,7 @@ where
     }
 
     /// Run statements until a breakpoint, Return, Halt, or Call.
-    pub fn run_until_break<L>(&mut self) -> Result<ConcreteControl<V>, E>
+    pub fn run_until_break<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<Self>,
@@ -340,12 +349,12 @@ where
         loop {
             if let Some(cursor) = self.current_frame()?.cursor() {
                 if self.breakpoints.contains(&cursor) {
-                    return Ok(ConcreteControl::Break);
+                    return Ok(Continuation::Ext(ConcreteExt::Break));
                 }
             }
             let control = self.step::<L>()?;
             match &control {
-                ConcreteControl::Continue | ConcreteControl::Jump(..) => {
+                Continuation::Continue | Continuation::Jump(..) => {
                     self.advance::<L>(&control)?;
                 }
                 _ => return Ok(control),
