@@ -1,4 +1,4 @@
-use kirin_ir::{ResultValue, SSAValue};
+use kirin_ir::{CompileStage, CompileStageInfo, Pipeline, ResultValue, SSAValue};
 
 use crate::InterpretControl;
 
@@ -42,6 +42,7 @@ pub trait Interpreter: Sized {
     type Value;
     type Error;
     type Control: InterpretControl<Self::Value>;
+    type StageInfo: CompileStageInfo;
 
     /// Returns a reference to the bound value without cloning.
     fn read_ref(&self, value: SSAValue) -> Result<&Self::Value, Self::Error>;
@@ -56,4 +57,10 @@ pub trait Interpreter: Sized {
 
     /// Bind a result to a value.
     fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;
+
+    /// Reference to the IR pipeline.
+    fn pipeline(&self) -> &Pipeline<Self::StageInfo>;
+
+    /// The currently active compilation stage.
+    fn active_stage(&self) -> CompileStage;
 }

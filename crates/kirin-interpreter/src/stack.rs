@@ -108,10 +108,6 @@ impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
     S: CompileStageInfo,
 {
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
-    }
-
     pub fn global(&self) -> &G {
         &self.global
     }
@@ -170,6 +166,7 @@ where
     type Value = V;
     type Error = E;
     type Control = ConcreteControl<V>;
+    type StageInfo = S;
 
     fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
         self.current_frame()?
@@ -180,6 +177,14 @@ where
     fn write(&mut self, result: kirin_ir::ResultValue, value: V) -> Result<(), E> {
         self.current_frame_mut()?.write(result, value);
         Ok(())
+    }
+
+    fn pipeline(&self) -> &'ir Pipeline<S> {
+        self.pipeline
+    }
+
+    fn active_stage(&self) -> CompileStage {
+        self.active_stage
     }
 }
 

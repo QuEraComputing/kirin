@@ -20,6 +20,8 @@ pub(crate) struct FixpointState {
     worklist: VecDeque<Block>,
     /// Per-block argument SSA value IDs. Key presence = block visited.
     block_args: FxHashMap<Block, Vec<SSAValue>>,
+    /// Per-block visit counts for [`WideningStrategy::Delayed`].
+    visit_counts: FxHashMap<Block, usize>,
 }
 
 /// Worklist-based abstract interpreter for fixpoint computation.
@@ -117,10 +119,6 @@ impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
     S: CompileStageInfo,
 {
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
-    }
-
     pub fn global(&self) -> &G {
         &self.global
     }
@@ -146,6 +144,7 @@ where
     type Value = V;
     type Error = E;
     type Control = AbstractControl<V>;
+    type StageInfo = S;
 
     fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
         self.frames
@@ -160,6 +159,14 @@ where
             .ok_or_else(E::no_frame)?
             .write(result, value);
         Ok(())
+    }
+
+    fn pipeline(&self) -> &'ir Pipeline<S> {
+        self.pipeline
+    }
+
+    fn active_stage(&self) -> CompileStage {
+        self.active_stage
     }
 }
 
@@ -353,27 +360,11 @@ where
         let mut changed = false;
         match control {
             AbstractControl::Jump(target, args) => {
-                if self.propagate_block_args::<L>(*target, args, narrowing) {
-                    changed = true;
-                    if !narrowing {
-                        let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
-                        if !fp.worklist.contains(target) {
-                            fp.worklist.push_back(*target);
-                        }
-                    }
-                }
+                changed |= self.propagate_edge::<L>(*target, args, narrowing)?;
             }
             AbstractControl::Fork(targets) => {
                 for (target, args) in targets {
-                    if self.propagate_block_args::<L>(*target, args, narrowing) {
-                        changed = true;
-                        if !narrowing {
-                            let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
-                            if !fp.worklist.contains(target) {
-                                fp.worklist.push_back(*target);
-                            }
-                        }
-                    }
+                    changed |= self.propagate_edge::<L>(*target, args, narrowing)?;
                 }
             }
             AbstractControl::Return(v) => {
@@ -391,6 +382,25 @@ where
             AbstractControl::Continue | AbstractControl::Call { .. } => {}
         }
         Ok(changed)
+    }
+
+    /// Propagate a single control flow edge and enqueue the target if changed.
+    fn propagate_edge<L>(&mut self, target: Block, args: &[V], narrowing: bool) -> Result<bool, E>
+    where
+        S: HasStageInfo<L>,
+        L: Dialect,
+    {
+        if self.propagate_block_args::<L>(target, args, narrowing) {
+            if !narrowing {
+                let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
+                if !fp.worklist.contains(&target) {
+                    fp.worklist.push_back(target);
+                }
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Interpret all statements in a block sequentially, returning the
@@ -443,13 +453,7 @@ where
             };
             Ok(control)
         } else {
-            Ok(AbstractControl::Return(
-                self.frames
-                    .last()
-                    .and_then(|f| f.values().values().next())
-                    .cloned()
-                    .ok_or_else(E::no_frame)?,
-            ))
+            Err(E::missing_entry())
         }
     }
 
@@ -463,9 +467,8 @@ where
         S: HasStageInfo<L>,
         L: Dialect,
     {
-        // Look up target block's argument SSA values from stage info
         let target_arg_ssas: Vec<SSAValue> = {
-            let stage: &StageInfo<L> = self.resolve_stage::<L>();
+            let stage = self.resolve_stage::<L>();
             let block_info = target.expect_info(stage);
             block_info
                 .arguments
@@ -474,44 +477,38 @@ where
                 .collect()
         };
 
-        // Copy widening strategy before borrowing frames mutably
         let widening_strategy = self.widening_strategy;
-
         let frame = self.frames.last_mut().expect("no active frame");
         let (values, fp) = frame.values_and_extra_mut();
 
         let first_visit = !fp.block_args.contains_key(&target);
 
         if first_visit {
-            // First visit: write arg values, record block arg SSA IDs
             for (ssa, val) in target_arg_ssas.iter().zip(args.iter()) {
                 values.insert(*ssa, val.clone());
             }
             fp.block_args.insert(target, target_arg_ssas);
             true
         } else {
-            // Subsequent visit: widen/narrow only block arg values
+            let visit_count = fp.visit_counts.entry(target).or_insert(0);
+            *visit_count += 1;
+            let current_count = *visit_count;
+
             let mut changed = false;
             for (ssa, new_val) in target_arg_ssas.iter().zip(args.iter()) {
-                use fxhash::FxHashMap as Map;
-                use std::collections::hash_map::Entry;
-
-                // Transmute-free: FxHashMap uses the same Entry API
-                match (values as &mut Map<SSAValue, V>).entry(*ssa) {
-                    Entry::Occupied(mut entry) => {
+                match values.entry(*ssa) {
+                    std::collections::hash_map::Entry::Occupied(mut entry) => {
                         let merged = if narrowing {
                             entry.get().narrow(new_val)
                         } else {
-                            match widening_strategy {
-                                WideningStrategy::AllJoins => entry.get().widen(new_val),
-                            }
+                            widening_strategy.merge(entry.get(), new_val, current_count)
                         };
                         if !merged.is_subseteq(entry.get()) || !entry.get().is_subseteq(&merged) {
                             changed = true;
                         }
                         *entry.get_mut() = merged;
                     }
-                    Entry::Vacant(entry) => {
+                    std::collections::hash_map::Entry::Vacant(entry) => {
                         entry.insert(new_val.clone());
                         changed = true;
                     }
