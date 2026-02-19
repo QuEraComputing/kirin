@@ -12,6 +12,6 @@ thiserror = { workspace = true }
 kirin-arith = { workspace = true }
 kirin-cf = { workspace = true, features = ["interpret"] }
 kirin-constant = { workspace = true }
-kirin-function = { workspace = true }
+kirin-function = { workspace = true, features = ["interpret"] }
 kirin-derive = { workspace = true }
 kirin-test-utils = { workspace = true, features = ["interpreter"] }

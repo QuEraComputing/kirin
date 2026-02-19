@@ -7,7 +7,7 @@ use kirin::prelude::*;
 #[kirin(fn, type = T)]
 #[chumsky(format = "{body}")]
 pub struct FunctionBody<T: CompileTimeValue + Default> {
-    body: Region,
+    pub(crate) body: Region,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }

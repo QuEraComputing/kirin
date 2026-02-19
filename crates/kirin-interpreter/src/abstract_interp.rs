@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use fxhash::FxHashMap;
 use kirin_ir::{
     Block, CompileStage, CompileStageInfo, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
-    SSAValue, SpecializedFunction, StageInfo,
+    SSAValue, SpecializedFunction,
 };
 
 use crate::result::AnalysisResult;
@@ -156,11 +156,7 @@ where
 impl<V: Clone, S: CompileStageInfo, E, G> SummaryInserter<'_, '_, V, S, E, G> {
     /// Insert an immutable summary. Analysis will never re-analyze this function.
     pub fn fixed(self, result: AnalysisResult<V>) {
-        self.interp
-            .summaries
-            .entry(self.callee)
-            .or_default()
-            .fixed = Some(result);
+        self.interp.summaries.entry(self.callee).or_default().fixed = Some(result);
     }
 
     /// Insert a refinable seed. Analysis may improve upon this summary.
@@ -381,19 +377,6 @@ where
     E: From<InterpreterError>,
     S: CompileStageInfo,
 {
-    /// Resolve the entry block of a specialized function.
-    fn resolve_entry_block<L>(&self, callee: SpecializedFunction) -> Option<Block>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect,
-    {
-        let stage = self.resolve_stage::<L>();
-        let spec = callee.expect_info(stage);
-        let body_stmt = *spec.body();
-        let region = body_stmt.regions::<L>(stage).next()?;
-        region.blocks(stage).next()
-    }
-
     /// Analyze a function, returning its [`AnalysisResult`].
     ///
     /// Results are cached per `(callee, args)`: a cached entry is reused only
@@ -413,7 +396,7 @@ where
     ) -> Result<AnalysisResult<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self>,
+        L: Dialect + Interpretable<Self, L>,
     {
         // 1. UserFixed summaries are always returned as-is
         if let Some(cache) = self.summaries.get(&callee) {
@@ -449,10 +432,17 @@ where
             }
         }
 
-        // 5. Resolve entry block
-        let entry = self
-            .resolve_entry_block::<L>(callee)
-            .ok_or_else(|| InterpreterError::MissingEntry.into())?;
+        // 5. Resolve entry block by delegating to the body statement's Interpretable impl
+        let entry = {
+            let stage = self.resolve_stage::<L>();
+            let spec = callee.expect_info(stage);
+            let body_stmt = *spec.body();
+            let def: &L = body_stmt.definition(stage);
+            match def.interpret(self)? {
+                Continuation::Jump(block, _) => block,
+                _ => return Err(InterpreterError::MissingEntry.into()),
+            }
+        };
 
         // 6. Insert tentative summary before pushing frame
         self.summaries.entry(callee).or_default().tentative = Some(SummaryEntry {
@@ -528,7 +518,7 @@ where
     ) -> Result<AnalysisResult<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self>,
+        L: Dialect + Interpretable<Self, L>,
     {
         // 1. Seed entry block
         {
@@ -618,7 +608,12 @@ where
 
     // -- Internal helpers ---------------------------------------------------
 
-    fn resolve_stage<L>(&self) -> &'ir StageInfo<L>
+    /// Resolve the [`StageInfo`] for dialect `L` from the active stage.
+    ///
+    /// This inherent method shadows [`Interpreter::resolve_stage`] to return
+    /// a reference with the pipeline lifetime `'ir` instead of `&self`,
+    /// allowing subsequent mutable borrows of `self`.
+    fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
     where
         S: HasStageInfo<L>,
         L: Dialect,
@@ -699,7 +694,7 @@ where
     fn interpret_block<L>(&mut self, block: Block) -> Result<AbstractContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self>,
+        L: Dialect + Interpretable<Self, L>,
     {
         // Collect statement IDs and terminator up front (cheap Copy)
         // to avoid holding a borrow on stage across interpret calls.

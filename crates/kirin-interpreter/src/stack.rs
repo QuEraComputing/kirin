@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CompileStage, CompileStageInfo, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
-    SSAValue, SpecializedFunction, StageInfo, Statement,
+    SSAValue, SpecializedFunction, Statement,
 };
 
 use crate::{
@@ -226,7 +226,7 @@ where
     /// Call a specialized function and return its result value.
     pub fn call<L>(&mut self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: Dialect + Interpretable<Self>,
+        L: Dialect + Interpretable<Self, L>,
         S: HasStageInfo<L>,
     {
         let initial_depth = self.frames.len();
@@ -285,7 +285,7 @@ where
     pub fn step<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self>,
+        L: Dialect + Interpretable<Self, L>,
     {
         if let Some(ref mut fuel) = self.fuel {
             if *fuel == 0 {
@@ -306,7 +306,7 @@ where
     pub fn advance<L>(&mut self, control: &ConcreteContinuation<V>) -> Result<(), E>
     where
         S: HasStageInfo<L>,
-        L: Dialect,
+        L: Dialect + Interpretable<Self, L>,
     {
         match control {
             Continuation::Continue => {
@@ -342,7 +342,7 @@ where
     pub fn run<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self>,
+        L: Dialect + Interpretable<Self, L>,
     {
         loop {
             let control = self.step::<L>()?;
@@ -362,7 +362,7 @@ where
     pub fn run_until_break<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self>,
+        L: Dialect + Interpretable<Self, L>,
     {
         loop {
             if let Some(cursor) = self.current_frame()?.cursor() {
@@ -381,6 +381,22 @@ where
     }
 
     // -- Internal helpers ---------------------------------------------------
+
+    /// Resolve the [`StageInfo`] for dialect `L` from the active stage.
+    ///
+    /// This inherent method shadows [`Interpreter::resolve_stage`] to return
+    /// a reference with the pipeline lifetime `'ir` instead of `&self`,
+    /// allowing subsequent mutable borrows of `self`.
+    fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
+    where
+        S: HasStageInfo<L>,
+        L: Dialect,
+    {
+        self.pipeline
+            .stage(self.active_stage)
+            .and_then(|s| s.try_stage_info())
+            .expect("active stage does not contain StageInfo for this dialect")
+    }
 
     /// Advance the current frame's cursor past the current statement.
     fn advance_cursor<L>(&mut self) -> Result<(), E>
@@ -414,30 +430,6 @@ where
             }
         }
         Ok(())
-    }
-
-    fn resolve_stage<L>(&self) -> &'ir StageInfo<L>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect,
-    {
-        self.pipeline
-            .stage(self.active_stage)
-            .and_then(|s| s.try_stage_info())
-            .expect("active stage does not contain StageInfo for this dialect")
-    }
-
-    fn resolve_entry<L>(&self, callee: SpecializedFunction) -> Option<Statement>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect,
-    {
-        let stage = self.resolve_stage::<L>();
-        let spec = callee.expect_info(stage);
-        let body_stmt = *spec.body();
-        let region = body_stmt.regions::<L>(stage).next()?;
-        let block = region.blocks(stage).next()?;
-        self.first_stmt_in_block::<L>(block)
     }
 
     fn first_stmt_in_block<L>(&self, block: Block) -> Option<Statement>
@@ -476,6 +468,9 @@ where
     }
 
     /// Create a new frame for `callee`, bind arguments, and push it.
+    ///
+    /// Entry block resolution is delegated to the body statement's
+    /// [`Interpretable`] impl, which returns `Jump(entry_block, _)`.
     fn push_call_frame_with_args<L>(
         &mut self,
         callee: SpecializedFunction,
@@ -483,9 +478,19 @@ where
     ) -> Result<(), E>
     where
         S: HasStageInfo<L>,
-        L: Dialect,
+        L: Dialect + Interpretable<Self, L>,
     {
-        let entry = self.resolve_entry::<L>(callee);
+        // Delegate entry resolution to the body statement's Interpretable impl
+        let entry = {
+            let stage = self.resolve_stage::<L>();
+            let spec = callee.expect_info(stage);
+            let body_stmt = *spec.body();
+            let def: &L = body_stmt.definition(stage);
+            match def.interpret(self)? {
+                Continuation::Jump(block, _) => self.first_stmt_in_block::<L>(block),
+                _ => None,
+            }
+        };
         let mut frame = Frame::new(callee, entry);
         if let Some(entry_stmt) = entry {
             let stage = self.resolve_stage::<L>();

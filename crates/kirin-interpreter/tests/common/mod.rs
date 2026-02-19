@@ -126,9 +126,10 @@ impl std::error::Error for DivisionByZero {}
 // Generic Interpretable impl
 // ---------------------------------------------------------------------------
 
-impl<I> Interpretable<I> for TestDialect
+impl<I> Interpretable<I, Self> for TestDialect
 where
     I: Interpreter<Error = InterpreterError>,
+    I::StageInfo: HasStageInfo<Self>,
     I::Value: ArithmeticValue + BranchCondition,
 {
     fn interpret(
@@ -192,7 +193,9 @@ where
                 }
             },
 
-            TestDialect::ControlFlow(cf) => cf.interpret(interp),
+            TestDialect::ControlFlow(cf) => {
+                <ControlFlow<ArithType> as Interpretable<I, Self>>::interpret(cf, interp)
+            }
 
             TestDialect::Constant(c) => {
                 let val = I::Value::from_arith_value(&c.value);
@@ -200,7 +203,9 @@ where
                 Ok(Continuation::Continue)
             }
 
-            TestDialect::FunctionBody(_) => Ok(Continuation::Continue),
+            TestDialect::FunctionBody(body) => {
+                <FunctionBody<ArithType> as Interpretable<I, Self>>::interpret(body, interp)
+            }
         }
     }
 }

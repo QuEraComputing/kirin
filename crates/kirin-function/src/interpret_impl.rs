@@ -1,21 +1,32 @@
-use kirin_interpreter::{Continuation, Interpretable, Interpreter};
+use kirin::prelude::{Dialect, HasStageInfo};
+use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
 
 use crate::{FunctionBody, Return};
 
-impl<I, T> Interpretable<I> for FunctionBody<T>
+impl<I, L, T> Interpretable<I, L> for FunctionBody<T>
 where
     I: Interpreter,
+    I::StageInfo: HasStageInfo<L>,
+    I::Error: From<InterpreterError>,
+    L: Dialect,
     T: kirin::prelude::CompileTimeValue + Default,
 {
-    fn interpret(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
-        Ok(Continuation::Continue)
+    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+        let stage = interp.resolve_stage::<L>();
+        let entry = self
+            .body
+            .blocks(stage)
+            .next()
+            .ok_or(InterpreterError::MissingEntry)?;
+        Ok(Continuation::Jump(entry, vec![]))
     }
 }
 
-impl<I, T> Interpretable<I> for Return<T>
+impl<I, L, T> Interpretable<I, L> for Return<T>
 where
     I: Interpreter,
     I::Value: Clone,
+    L: Dialect,
     T: kirin::prelude::CompileTimeValue + Default,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {

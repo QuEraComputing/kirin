@@ -262,9 +262,9 @@ fn test_abstract_interp_call_caches_summary() {
     assert_eq!(result1.return_value(), Some(&Interval::constant(10)));
 
     // Summary should be cached (args subsumed)
-    assert!(interp.summary(spec_fn).is_some());
+    assert!(interp.summary(spec_fn, &[]).is_some());
     assert_eq!(
-        interp.summary(spec_fn).unwrap().return_value(),
+        interp.summary(spec_fn, &[]).unwrap().return_value(),
         Some(&Interval::constant(10))
     );
 

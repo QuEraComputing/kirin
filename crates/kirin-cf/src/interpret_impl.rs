@@ -1,11 +1,13 @@
+use kirin::prelude::Dialect;
 use kirin_interpreter::{BranchCondition, Continuation, Interpretable, Interpreter};
 
 use crate::ControlFlow;
 
-impl<I, T> Interpretable<I> for ControlFlow<T>
+impl<I, L, T> Interpretable<I, L> for ControlFlow<T>
 where
     I: Interpreter,
     I::Value: Clone + BranchCondition,
+    L: Dialect,
     T: kirin::prelude::CompileTimeValue + Default,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {

@@ -1,6 +1,9 @@
 use std::fmt;
 
-use kirin_ir::{CompileStage, CompileStageInfo, Pipeline, ResultValue, SSAValue};
+use kirin_ir::{
+    CompileStage, CompileStageInfo, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue,
+    StageInfo,
+};
 
 /// Minimal state contract for interpreter implementations.
 ///
@@ -37,4 +40,20 @@ pub trait Interpreter: Sized {
 
     /// The currently active compilation stage.
     fn active_stage(&self) -> CompileStage;
+
+    /// Resolve the [`StageInfo`] for dialect `L` from the active stage.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active stage does not contain a `StageInfo<L>`.
+    fn resolve_stage<L>(&self) -> &StageInfo<L>
+    where
+        Self::StageInfo: HasStageInfo<L>,
+        L: Dialect,
+    {
+        self.pipeline()
+            .stage(self.active_stage())
+            .and_then(|s| s.try_stage_info())
+            .expect("active stage does not contain StageInfo for this dialect")
+    }
 }
