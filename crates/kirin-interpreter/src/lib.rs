@@ -11,10 +11,10 @@ mod widening;
 
 pub use abstract_interp::AbstractInterpreter;
 pub use control::{AbstractControl, ConcreteControl, InterpretControl};
-pub use error::InterpError;
+pub use error::InterpreterError;
 pub use frame::Frame;
 pub use interpretable::Interpretable;
-pub use interpreter::{Interpreter, InterpreterError};
+pub use interpreter::Interpreter;
 pub use result::AnalysisResult;
 pub use stack::StackInterpreter;
 pub use value::AbstractValue;

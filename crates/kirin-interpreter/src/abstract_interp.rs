@@ -32,7 +32,7 @@ pub(crate) struct FixpointState {
 ///
 /// Widening is applied at join points to guarantee termination for infinite
 /// abstract domains.
-pub struct AbstractInterpreter<'ir, V, S, E = crate::InterpError, G = ()>
+pub struct AbstractInterpreter<'ir, V, S, E = InterpreterError, G = ()>
 where
     S: CompileStageInfo,
 {
@@ -138,7 +138,7 @@ where
 impl<'ir, V, S, E, G> Interpreter for AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone,
-    E: InterpreterError,
+    E: From<InterpreterError>,
     S: CompileStageInfo,
 {
     type Value = V;
@@ -150,13 +150,13 @@ where
         self.frames
             .last()
             .and_then(|f| f.read(value))
-            .ok_or_else(|| E::unbound_value(value))
+            .ok_or_else(|| InterpreterError::UnboundValue(value).into())
     }
 
     fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
         self.frames
             .last_mut()
-            .ok_or_else(E::no_frame)?
+            .ok_or_else(|| InterpreterError::NoFrame.into())?
             .write(result, value);
         Ok(())
     }
@@ -175,7 +175,7 @@ where
 impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone,
-    E: InterpreterError,
+    E: From<InterpreterError>,
     S: CompileStageInfo,
 {
     /// Resolve the entry block of a specialized function.
@@ -226,20 +226,22 @@ where
 
         // Check recursion
         if self.frames.iter().any(|f| f.callee() == callee) {
-            return Err(E::unexpected_control("recursive call detected"));
+            return Err(
+                InterpreterError::UnexpectedControl("recursive call detected".to_owned()).into(),
+            );
         }
 
         // Check depth limit
         if let Some(max) = self.max_depth {
             if self.frames.len() >= max {
-                return Err(E::max_depth_exceeded());
+                return Err(InterpreterError::MaxDepthExceeded.into());
             }
         }
 
         // Resolve entry block
         let entry = self
             .resolve_entry_block::<L>(callee)
-            .ok_or_else(E::missing_entry)?;
+            .ok_or_else(|| InterpreterError::MissingEntry.into())?;
 
         // Push frame with fresh fixpoint state
         self.frames
@@ -281,7 +283,17 @@ where
                 .iter()
                 .map(|ba| SSAValue::from(*ba))
                 .collect();
-            let frame = self.frames.last_mut().ok_or_else(E::no_frame)?;
+            if arg_ssas.len() != initial_args.len() {
+                return Err(InterpreterError::ArityMismatch {
+                    expected: arg_ssas.len(),
+                    got: initial_args.len(),
+                }
+                .into());
+            }
+            let frame = self
+                .frames
+                .last_mut()
+                .ok_or_else(|| InterpreterError::NoFrame.into())?;
             let (values, fp) = frame.values_and_extra_mut();
             for (ssa, val) in arg_ssas.iter().zip(initial_args.iter()) {
                 values.insert(*ssa, val.clone());
@@ -296,14 +308,18 @@ where
         // 2. Widening fixpoint loop
         loop {
             let block = {
-                let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
+                let fp = self
+                    .frames
+                    .last_mut()
+                    .ok_or_else(|| InterpreterError::NoFrame.into())?
+                    .extra_mut();
                 fp.worklist.pop_front()
             };
             let Some(block) = block else { break };
 
             iterations += 1;
             if iterations > self.max_iterations {
-                return Err(E::fuel_exhausted());
+                return Err(InterpreterError::FuelExhausted.into());
             }
 
             let control = self.interpret_block::<L>(block)?;
@@ -315,7 +331,7 @@ where
             let blocks: Vec<Block> = self
                 .frames
                 .last()
-                .ok_or_else(E::no_frame)?
+                .ok_or_else(|| InterpreterError::NoFrame.into())?
                 .extra()
                 .block_args
                 .keys()
@@ -333,7 +349,10 @@ where
             }
         }
 
-        let frame = self.frames.last().ok_or_else(E::no_frame)?;
+        let frame = self
+            .frames
+            .last()
+            .ok_or_else(|| InterpreterError::NoFrame.into())?;
         Ok(AnalysisResult::new(
             frame.values().clone(),
             frame.extra().block_args.clone(),
@@ -396,14 +415,23 @@ where
     }
 
     /// Propagate a single control flow edge and enqueue the target if changed.
-    fn propagate_edge<L>(&mut self, target: Block, args: &[V], narrowing: bool) -> Result<bool, E>
+    fn propagate_edge<L>(
+        &mut self,
+        target: Block,
+        args: &[V],
+        narrowing: bool,
+    ) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
         L: Dialect,
     {
-        if self.propagate_block_args::<L>(target, args, narrowing) {
+        if self.propagate_block_args::<L>(target, args, narrowing)? {
             if !narrowing {
-                let fp = self.frames.last_mut().ok_or_else(E::no_frame)?.extra_mut();
+                let fp = self
+                    .frames
+                    .last_mut()
+                    .ok_or_else(|| InterpreterError::NoFrame.into())?
+                    .extra_mut();
                 if !fp.worklist.contains(&target) {
                     fp.worklist.push_back(target);
                 }
@@ -448,7 +476,7 @@ where
                     let return_val = analysis
                         .return_value()
                         .cloned()
-                        .ok_or_else(E::missing_entry)?;
+                        .ok_or_else(|| InterpreterError::MissingEntry.into())?;
                     self.write(result, return_val)?;
                 }
                 other => return Ok(other),
@@ -464,7 +492,7 @@ where
             };
             Ok(control)
         } else {
-            Err(E::missing_entry())
+            Err(InterpreterError::MissingEntry.into())
         }
     }
 
@@ -473,7 +501,12 @@ where
     /// the frame are write-once and shared across all paths.
     ///
     /// Returns `true` if the target's block arg state changed (or first visit).
-    fn propagate_block_args<L>(&mut self, target: Block, args: &[V], narrowing: bool) -> bool
+    fn propagate_block_args<L>(
+        &mut self,
+        target: Block,
+        args: &[V],
+        narrowing: bool,
+    ) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
         L: Dialect,
@@ -488,8 +521,19 @@ where
                 .collect()
         };
 
+        if target_arg_ssas.len() != args.len() {
+            return Err(InterpreterError::ArityMismatch {
+                expected: target_arg_ssas.len(),
+                got: args.len(),
+            }
+            .into());
+        }
+
         let widening_strategy = self.widening_strategy;
-        let frame = self.frames.last_mut().expect("no active frame");
+        let frame = self
+            .frames
+            .last_mut()
+            .ok_or_else(|| InterpreterError::NoFrame.into())?;
         let (values, fp) = frame.values_and_extra_mut();
 
         let first_visit = !fp.block_args.contains_key(&target);
@@ -499,7 +543,7 @@ where
                 values.insert(*ssa, val.clone());
             }
             fp.block_args.insert(target, target_arg_ssas);
-            true
+            Ok(true)
         } else {
             let visit_count = fp.visit_counts.entry(target).or_insert(0);
             *visit_count += 1;
@@ -525,7 +569,7 @@ where
                     }
                 }
             }
-            changed
+            Ok(changed)
         }
     }
 }

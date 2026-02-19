@@ -1,70 +1,41 @@
-use std::fmt;
-
 use kirin_ir::SSAValue;
 
-use crate::InterpreterError;
-
-/// Default error type for interpreter failures.
+/// Error type for interpreter failures.
 ///
-/// Covers the error conditions required by [`InterpreterError`].
-/// Users who need additional error variants (e.g. division by zero,
-/// type errors) should define their own error type and implement
-/// [`InterpreterError`] for it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InterpError {
+/// Framework errors cover common interpreter failure modes. User-defined
+/// errors (e.g. division by zero, type errors) go in the [`Custom`](Self::Custom)
+/// variant via [`InterpreterError::custom`].
+#[derive(Debug, thiserror::Error)]
+pub enum InterpreterError {
     /// No call frame on the stack.
+    #[error("no active call frame")]
     NoFrame,
     /// An SSA value was read before being written.
+    #[error("unbound SSA value: {0:?}")]
     UnboundValue(SSAValue),
     /// Step fuel has been exhausted.
+    #[error("step fuel exhausted")]
     FuelExhausted,
     /// Call depth exceeded the configured maximum.
+    #[error("call depth exceeded maximum")]
     MaxDepthExceeded,
     /// Function entry block could not be resolved.
+    #[error("function entry block not found")]
     MissingEntry,
     /// An unexpected control flow action was encountered.
+    #[error("unexpected control flow: {0}")]
     UnexpectedControl(String),
+    /// Argument count does not match block/function parameter count.
+    #[error("arity mismatch: expected {expected} arguments, got {got}")]
+    ArityMismatch { expected: usize, got: usize },
+    /// User-defined error.
+    #[error(transparent)]
+    Custom(Box<dyn std::error::Error + Send + Sync>),
 }
 
-impl InterpreterError for InterpError {
-    fn no_frame() -> Self {
-        InterpError::NoFrame
-    }
-
-    fn unbound_value(value: SSAValue) -> Self {
-        InterpError::UnboundValue(value)
-    }
-
-    fn fuel_exhausted() -> Self {
-        InterpError::FuelExhausted
-    }
-
-    fn max_depth_exceeded() -> Self {
-        InterpError::MaxDepthExceeded
-    }
-
-    fn missing_entry() -> Self {
-        InterpError::MissingEntry
-    }
-
-    fn unexpected_control(msg: &str) -> Self {
-        InterpError::UnexpectedControl(msg.to_owned())
+impl InterpreterError {
+    /// Wrap an arbitrary error as [`InterpreterError::Custom`].
+    pub fn custom(error: impl std::error::Error + Send + Sync + 'static) -> Self {
+        InterpreterError::Custom(Box::new(error))
     }
 }
-
-impl fmt::Display for InterpError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            InterpError::NoFrame => write!(f, "no active call frame"),
-            InterpError::UnboundValue(v) => write!(f, "unbound SSA value: {v:?}"),
-            InterpError::FuelExhausted => write!(f, "step fuel exhausted"),
-            InterpError::MaxDepthExceeded => write!(f, "call depth exceeded maximum"),
-            InterpError::MissingEntry => write!(f, "function entry block not found"),
-            InterpError::UnexpectedControl(msg) => {
-                write!(f, "unexpected control flow: {msg}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for InterpError {}

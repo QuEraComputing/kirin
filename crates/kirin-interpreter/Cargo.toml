@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 kirin-ir = { workspace = true, features = ["derive"] }
 fxhash = "0.2"
+thiserror = { workspace = true }
 
 [dev-dependencies]
 kirin-arith = { workspace = true }

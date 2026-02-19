@@ -1,6 +1,6 @@
 mod common;
 
-use common::{InterpError, TestDialect};
+use common::TestDialect;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
@@ -38,7 +38,7 @@ fn test_abstract_interp_constants() {
     let body = FunctionBody::<ArithType>::new(stage, region);
     let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
 
-    let mut interp: AbstractInterpreter<Interval, _, InterpError> =
+    let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
@@ -105,7 +105,7 @@ fn test_abstract_interp_branch_fork() {
     let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
 
     // Run with interval spanning zero: both branches should be explored via Fork
-    let mut interp: AbstractInterpreter<Interval, _, InterpError> =
+    let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp
@@ -124,48 +124,53 @@ fn test_abstract_interp_branch_fork() {
 // Test 3: Loop with back-edge and worklist convergence
 // ---------------------------------------------------------------------------
 
-/// Build a loop where the condition is always undecidable (Fork), exercising
-/// the worklist, back-edge state propagation, and join stabilization:
+/// Build a loop with an unknown function input, exercising the worklist,
+/// back-edge state propagation, and join stabilization:
 ///
-///   header(x):              -- block arg x = [-5, 5] (spans zero)
+///   entry(x):               -- function arg x = [-5, 5] (unknown input)
+///     br header             -- jump to loop header (no block args)
+///   header:                 -- no block args; x is in scope from entry
 ///     cond_br x loop_body loop_exit
 ///   loop_body:
 ///     c1 = const 1
 ///     sum = add x, c1
-///     br header              -- back-edge (full state propagation)
+///     br header             -- back-edge (no block args)
 ///   loop_exit:
 ///     ret x
 ///
 /// Since x = [-5, 5] is neither fully negative nor fully non-negative,
 /// cond_br always returns Fork, exploring both paths. The back-edge
-/// propagates full SSA state; the worklist converges once no new values
-/// appear at the header's join point.
+/// triggers worklist re-processing of header. The worklist converges
+/// once no new SSA values appear.
 ///
 /// This tests that:
+/// - Unknown function input propagates through the loop
 /// - The worklist converges (doesn't exceed max_iterations)
-/// - Full state propagation through back-edges works
+/// - Back-edge state propagation works correctly
 /// - Joining at the loop header stabilizes
 #[test]
 fn test_abstract_interp_loop_convergence() {
     let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    // Phase 1: Build header block with argument (no terminator yet)
+    // Phase 1: Build entry block with function argument (no terminator yet)
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let sf = stage.staged_function().new().unwrap();
 
-    let header = stage.block().argument(ArithType::I64).new();
+    let entry = stage.block().argument(ArithType::I64).new();
 
-    // Phase 2: Get the real block argument SSA value
+    // Phase 2: Get the real block argument SSA value (the unknown function input)
     let x: SSAValue = {
         let si = pipeline.stage(stage_id).unwrap();
-        let bi = header.expect_info(si);
+        let bi = entry.expect_info(si);
         bi.arguments[0].into()
     };
 
-    // Phase 3: Build loop_body and loop_exit using the real block arg
+    // Phase 3: Build header block (no block args — x is in scope from entry)
     let stage = pipeline.stage_mut(stage_id).unwrap();
+    let header = stage.block().new();
 
+    // Phase 4: Build loop_body and loop_exit using x
     // loop_exit: ret x
     let ret_x = ControlFlow::<ArithType>::op_return(stage, x);
     let loop_exit = stage.block().terminator(ret_x).new();
@@ -176,16 +181,25 @@ fn test_abstract_interp_loop_convergence() {
     let br_back = ControlFlow::<ArithType>::op_branch(stage, header);
     let loop_body = stage.block().stmt(c1).stmt(sum).terminator(br_back).new();
 
-    // Phase 4: Add terminator to header (needs loop_body and loop_exit block IDs)
+    // Phase 5: Add terminators
+    // entry: br header
+    let br_header = ControlFlow::<ArithType>::op_branch(stage, header);
+    {
+        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        entry_info.terminator = Some(br_header.into());
+    }
+
+    // header: cond_br x loop_body loop_exit
     let cond_br = ControlFlow::<ArithType>::op_conditional_branch(stage, x, loop_body, loop_exit);
     {
         let header_info: &mut Item<BlockInfo<TestDialect>> = header.get_info_mut(stage).unwrap();
         header_info.terminator = Some(cond_br.into());
     }
 
-    // Phase 5: Assemble region and function body
+    // Phase 6: Assemble region and function body
     let region = stage
         .region()
+        .add_block(entry)
         .add_block(header)
         .add_block(loop_body)
         .add_block(loop_exit)
@@ -193,9 +207,9 @@ fn test_abstract_interp_loop_convergence() {
     let body = FunctionBody::<ArithType>::new(stage, region);
     let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
 
-    // Phase 6: Run abstract interpretation with Interval(-5, 5)
-    // x spans zero → cond_br always Forks → both paths always explored.
-    let mut interp: AbstractInterpreter<Interval, _, InterpError> =
+    // Phase 7: Run abstract interpretation with Interval(-5, 5)
+    // The unknown function input x spans zero → cond_br always Forks.
+    let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id).with_max_iterations(100);
 
     let result = interp
@@ -205,8 +219,9 @@ fn test_abstract_interp_loop_convergence() {
     // The analysis should converge and produce a return value from loop_exit.
     let ret = result.return_value().unwrap();
 
-    // The return value is x at the header, which is [-5, 5] (unchanged
-    // because Branch doesn't pass block arguments to update x).
+    // The return value is x at the header, which is the original function
+    // input [-5, 5]. Branch/Fork don't carry block args, so x is never
+    // updated — but the unknown input flows through the entire loop.
     assert_eq!(*ret, Interval::new(-5, 5));
 }
 
@@ -239,7 +254,7 @@ fn test_abstract_interp_call_caches_summary() {
     let body = FunctionBody::<ArithType>::new(stage, region);
     let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
 
-    let mut interp: AbstractInterpreter<Interval, _, InterpError> =
+    let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
 
     // First call — runs the analysis

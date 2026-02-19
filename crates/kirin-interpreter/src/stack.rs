@@ -1,11 +1,12 @@
 use std::collections::HashSet;
+use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CompileStage, CompileStageInfo, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
     SSAValue, SpecializedFunction, StageInfo, Statement,
 };
 
-use crate::{ConcreteControl, Frame, InterpError, Interpretable, Interpreter, InterpreterError};
+use crate::{ConcreteControl, Frame, Interpretable, Interpreter, InterpreterError};
 
 type StackFrame<V> = Frame<V, Option<Statement>>;
 
@@ -15,24 +16,23 @@ type StackFrame<V> = Frame<V, Option<Statement>>;
 /// (step/advance/run/call) in one type. Different interpreter implementations
 /// (e.g. [`crate::AbstractInterpreter`]) provide different walking strategies.
 ///
-/// # Examples
+/// # Error type
 ///
-/// Simple usage with default error type:
-///
-/// ```ignore
-/// let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
-/// let result = interp.call::<MyDialect>(func, &[10, 3])?;
-/// ```
-///
-/// With global state and resource limits:
+/// Defaults to [`InterpreterError`]. Users who need additional error variants
+/// can define their own error type with `#[from] InterpreterError`:
 ///
 /// ```ignore
-/// let mut interp = StackInterpreter::<i64, _, MyError>::new(&pipeline, stage)
-///     .with_global(my_state)
-///     .with_fuel(10_000)
-///     .with_max_depth(256);
+/// #[derive(Debug, thiserror::Error)]
+/// enum MyError {
+///     #[error(transparent)]
+///     Interp(#[from] InterpreterError),
+///     #[error("division by zero")]
+///     DivisionByZero,
+/// }
+///
+/// let mut interp = StackInterpreter::<i64, _, MyError>::new(&pipeline, stage);
 /// ```
-pub struct StackInterpreter<'ir, V, S, E = InterpError, G = ()>
+pub struct StackInterpreter<'ir, V, S, E = InterpreterError, G = ()>
 where
     S: CompileStageInfo,
 {
@@ -43,7 +43,7 @@ where
     breakpoints: HashSet<Statement>,
     fuel: Option<u64>,
     max_depth: Option<usize>,
-    _error: std::marker::PhantomData<E>,
+    _error: PhantomData<E>,
 }
 
 // -- Constructors -----------------------------------------------------------
@@ -61,7 +61,7 @@ where
             breakpoints: HashSet::default(),
             fuel: None,
             max_depth: None,
-            _error: std::marker::PhantomData,
+            _error: PhantomData,
         }
     }
 
@@ -80,7 +80,7 @@ where
             breakpoints: self.breakpoints,
             fuel: self.fuel,
             max_depth: self.max_depth,
-            _error: std::marker::PhantomData,
+            _error: PhantomData,
         }
     }
 }
@@ -129,21 +129,25 @@ where
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    E: InterpreterError,
+    E: From<InterpreterError>,
     S: CompileStageInfo,
 {
     pub fn current_frame(&self) -> Result<&StackFrame<V>, E> {
-        self.frames.last().ok_or_else(E::no_frame)
+        self.frames
+            .last()
+            .ok_or_else(|| InterpreterError::NoFrame.into())
     }
 
     pub fn current_frame_mut(&mut self) -> Result<&mut StackFrame<V>, E> {
-        self.frames.last_mut().ok_or_else(E::no_frame)
+        self.frames
+            .last_mut()
+            .ok_or_else(|| InterpreterError::NoFrame.into())
     }
 
     pub fn push_call_frame(&mut self, frame: StackFrame<V>) -> Result<(), E> {
         if let Some(max) = self.max_depth {
             if self.frames.len() >= max {
-                return Err(E::max_depth_exceeded());
+                return Err(InterpreterError::MaxDepthExceeded.into());
             }
         }
         self.frames.push(frame);
@@ -151,7 +155,9 @@ where
     }
 
     pub fn pop_call_frame(&mut self) -> Result<StackFrame<V>, E> {
-        self.frames.pop().ok_or_else(E::no_frame)
+        self.frames
+            .pop()
+            .ok_or_else(|| InterpreterError::NoFrame.into())
     }
 }
 
@@ -160,7 +166,7 @@ where
 impl<'ir, V, S, E, G> Interpreter for StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone,
-    E: InterpreterError,
+    E: From<InterpreterError>,
     S: CompileStageInfo,
 {
     type Value = V;
@@ -171,10 +177,10 @@ where
     fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
         self.current_frame()?
             .read(value)
-            .ok_or_else(|| E::unbound_value(value))
+            .ok_or_else(|| InterpreterError::UnboundValue(value).into())
     }
 
-    fn write(&mut self, result: kirin_ir::ResultValue, value: V) -> Result<(), E> {
+    fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
         self.current_frame_mut()?.write(result, value);
         Ok(())
     }
@@ -193,7 +199,7 @@ where
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone,
-    E: InterpreterError,
+    E: From<InterpreterError>,
     S: CompileStageInfo,
 {
     /// Call a specialized function and return its result value.
@@ -212,10 +218,18 @@ where
             match &control {
                 ConcreteControl::Call { result, .. } => pending_results.push(*result),
                 ConcreteControl::Halt => {
-                    return Err(E::unexpected_control("halt during call"));
+                    return Err(InterpreterError::UnexpectedControl(
+                        "halt during call".to_owned(),
+                    )
+                    .into());
                 }
                 ConcreteControl::Return(_) => {}
-                _ => return Err(E::unexpected_control("unexpected variant during call")),
+                _ => {
+                    return Err(InterpreterError::UnexpectedControl(
+                        "unexpected variant during call".to_owned(),
+                    )
+                    .into());
+                }
             }
 
             let v = match &control {
@@ -229,7 +243,9 @@ where
                 if self.frames.len() == initial_depth {
                     return Ok(v);
                 }
-                let result = pending_results.pop().ok_or_else(E::no_frame)?;
+                let result = pending_results
+                    .pop()
+                    .ok_or_else(|| InterpreterError::NoFrame.into())?;
                 self.write(result, v)?;
             }
         }
@@ -241,7 +257,7 @@ where
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone,
-    E: InterpreterError,
+    E: From<InterpreterError>,
     S: CompileStageInfo,
 {
     /// Execute the current statement's dialect semantics.
@@ -253,12 +269,15 @@ where
     {
         if let Some(ref mut fuel) = self.fuel {
             if *fuel == 0 {
-                return Err(E::fuel_exhausted());
+                return Err(InterpreterError::FuelExhausted.into());
             }
             *fuel -= 1;
         }
         let stage = self.resolve_stage::<L>();
-        let cursor = self.current_frame()?.cursor().ok_or_else(E::no_frame)?;
+        let cursor = self
+            .current_frame()?
+            .cursor()
+            .ok_or_else(|| InterpreterError::NoFrame.into())?;
         let def: &L = cursor.definition(stage);
         def.interpret(self)
     }
@@ -344,7 +363,10 @@ where
         L: Dialect,
     {
         let stage = self.resolve_stage::<L>();
-        let cursor = self.current_frame()?.cursor().ok_or_else(E::no_frame)?;
+        let cursor = self
+            .current_frame()?
+            .cursor()
+            .ok_or_else(|| InterpreterError::NoFrame.into())?;
         let next = *cursor.next::<L>(stage);
         if let Some(next_stmt) = next {
             self.current_frame_mut()?.set_cursor(Some(next_stmt));
@@ -413,6 +435,13 @@ where
     {
         let stage = self.resolve_stage::<L>();
         let block_info = block.expect_info(stage);
+        if block_info.arguments.len() != args.len() {
+            return Err(InterpreterError::ArityMismatch {
+                expected: block_info.arguments.len(),
+                got: args.len(),
+            }
+            .into());
+        }
         for (ba, val) in block_info.arguments.iter().zip(args.iter()) {
             self.current_frame_mut()?
                 .write_ssa(SSAValue::from(*ba), val.clone());
@@ -437,6 +466,13 @@ where
             let parent_block = *entry_stmt.parent::<L>(stage);
             if let Some(block) = parent_block {
                 let block_info = block.expect_info(stage);
+                if block_info.arguments.len() != args.len() {
+                    return Err(InterpreterError::ArityMismatch {
+                        expected: block_info.arguments.len(),
+                        got: args.len(),
+                    }
+                    .into());
+                }
                 for (ba, val) in block_info.arguments.iter().zip(args.iter()) {
                     frame.write_ssa(SSAValue::from(*ba), val.clone());
                 }

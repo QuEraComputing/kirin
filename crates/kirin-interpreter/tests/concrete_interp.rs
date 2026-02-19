@@ -1,6 +1,6 @@
 mod common;
 
-use common::{InterpError, TestDialect};
+use common::TestDialect;
 use kirin_arith::ArithType;
 use kirin_cf::ControlFlow;
 use kirin_function::FunctionBody;
@@ -77,8 +77,7 @@ fn test_concrete_abs() {
 
     let spec_func = build_abs_program(&mut pipeline, stage_id);
 
-    let mut interp: StackInterpreter<i64, _, InterpError> =
-        StackInterpreter::new(&pipeline, stage_id);
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
 
     // abs(10 - 3) = 7
     let result = interp.call::<TestDialect>(spec_func, &[10, 3]).unwrap();

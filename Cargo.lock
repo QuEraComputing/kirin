@@ -1268,6 +1268,7 @@ dependencies = [
  "kirin-function",
  "kirin-ir",
  "kirin-test-utils",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

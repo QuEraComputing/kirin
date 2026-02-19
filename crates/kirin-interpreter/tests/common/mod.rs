@@ -1,3 +1,5 @@
+use std::fmt;
+
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
@@ -135,42 +137,15 @@ impl ArithmeticValue for Interval {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
-#[allow(dead_code)]
-pub enum InterpError {
-    NoFrame,
-    UnboundValue(SSAValue),
-    FuelExhausted,
-    MaxDepthExceeded,
-    MissingEntry,
-    UnexpectedControl(String),
-    DivisionByZero,
-}
+pub struct DivisionByZero;
 
-impl InterpreterError for InterpError {
-    fn no_frame() -> Self {
-        InterpError::NoFrame
-    }
-
-    fn unbound_value(value: SSAValue) -> Self {
-        InterpError::UnboundValue(value)
-    }
-
-    fn fuel_exhausted() -> Self {
-        InterpError::FuelExhausted
-    }
-
-    fn max_depth_exceeded() -> Self {
-        InterpError::MaxDepthExceeded
-    }
-
-    fn missing_entry() -> Self {
-        InterpError::MissingEntry
-    }
-
-    fn unexpected_control(msg: &str) -> Self {
-        InterpError::UnexpectedControl(msg.to_owned())
+impl fmt::Display for DivisionByZero {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "division by zero")
     }
 }
+
+impl std::error::Error for DivisionByZero {}
 
 // ---------------------------------------------------------------------------
 // ConditionalBranchControl: test-local trait for branch/fork dispatch
@@ -228,11 +203,11 @@ impl<V> ConditionalBranchControl<V> for AbstractControl<V> {
 
 impl<I> Interpretable<I> for TestDialect
 where
-    I: Interpreter<Error = InterpError>,
+    I: Interpreter<Error = InterpreterError>,
     I::Value: ArithmeticValue,
     I::Control: ConditionalBranchControl<I::Value>,
 {
-    fn interpret(&self, interp: &mut I) -> Result<I::Control, InterpError> {
+    fn interpret(&self, interp: &mut I) -> Result<I::Control, InterpreterError> {
         match self {
             TestDialect::Arith(arith) => match arith {
                 Arith::Add {
@@ -264,7 +239,9 @@ where
                 } => {
                     let a = interp.read(*lhs)?;
                     let b = interp.read(*rhs)?;
-                    let v = a.arith_div(&b).ok_or(InterpError::DivisionByZero)?;
+                    let v = a
+                        .arith_div(&b)
+                        .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
                     interp.write(*result, v)?;
                     Ok(I::Control::ctrl_continue())
                 }
@@ -273,7 +250,9 @@ where
                 } => {
                     let a = interp.read(*lhs)?;
                     let b = interp.read(*rhs)?;
-                    let v = a.arith_rem(&b).ok_or(InterpError::DivisionByZero)?;
+                    let v = a
+                        .arith_rem(&b)
+                        .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
                     interp.write(*result, v)?;
                     Ok(I::Control::ctrl_continue())
                 }

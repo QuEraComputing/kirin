@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::{InterpError, TestDialect};
+use common::TestDialect;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
@@ -36,8 +36,7 @@ fn test_session_abstract_interp_constants() {
     let body = FunctionBody::<ArithType>::new(stage, region);
     let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
 
-    let mut interp: StackInterpreter<Interval, _, InterpError> =
-        StackInterpreter::new(&pipeline, stage_id);
+    let mut interp: StackInterpreter<Interval, _> = StackInterpreter::new(&pipeline, stage_id);
 
     let result = interp.call::<TestDialect>(spec_fn, &[]).unwrap();
     assert_eq!(result, Interval::constant(42));
@@ -79,7 +78,7 @@ fn test_session_abstract_interp_with_args() {
     let block_args: Vec<_> = block_info.arguments.iter().copied().collect();
 
     let call_with = |input: Interval| -> Interval {
-        let mut interp: StackInterpreter<Interval, _, InterpError> =
+        let mut interp: StackInterpreter<Interval, _> =
             StackInterpreter::new(&pipeline, stage_id);
         let mut frame = Frame::new(spec_fn, first_stmt);
         frame.write_ssa(SSAValue::from(block_args[0]), input);
