@@ -27,47 +27,93 @@ pub(crate) struct FixpointState {
     visit_counts: FxHashMap<Block, usize>,
 }
 
-/// State of a function summary in the analysis cache.
+/// A single context-sensitive summary entry in the cache.
 #[derive(Debug, Clone)]
-pub enum SummaryState<V> {
-    /// Summary computed by analysis, may be re-computed on re-analysis.
-    Computed {
-        args: Vec<V>,
-        result: AnalysisResult<V>,
-    },
-    /// Tentative summary during recursive fixpoint iteration (not yet stable).
-    Tentative {
-        args: Vec<V>,
-        result: AnalysisResult<V>,
-    },
-    /// User-provided summary, never overwritten by analysis.
-    UserFixed(AnalysisResult<V>),
-    /// User-provided seed, analysis may refine it.
-    UserSeed {
-        args: Vec<V>,
-        result: AnalysisResult<V>,
-    },
+pub struct SummaryEntry<V> {
+    /// Argument abstract values this entry was computed for.
+    pub args: Vec<V>,
+    /// The analysis result for this context.
+    pub result: AnalysisResult<V>,
+    /// Whether this entry has been invalidated. Invalidated entries are
+    /// skipped during lookup but retained until garbage-collected.
+    pub invalidated: bool,
 }
 
-impl<V> SummaryState<V> {
-    /// Get the args and result if this state carries them.
-    fn args_and_result(&self) -> Option<(&[V], &AnalysisResult<V>)> {
-        match self {
-            SummaryState::Computed { args, result }
-            | SummaryState::Tentative { args, result }
-            | SummaryState::UserSeed { args, result } => Some((args, result)),
-            SummaryState::UserFixed(result) => Some((&[], result)),
+/// Per-function summary cache supporting multiple call contexts.
+///
+/// Each function may have:
+/// - An optional **fixed** summary that is always returned and never
+///   overwritten by analysis.
+/// - Zero or more **computed** entries, each for a different call context
+///   (argument abstract values). Lookup finds the tightest (most specific)
+///   non-invalidated entry whose args subsume the query.
+/// - At most one **tentative** entry used during recursive fixpoint iteration.
+#[derive(Debug, Clone)]
+pub struct SummaryCache<V> {
+    /// User-provided fixed summary. Not subject to invalidation.
+    fixed: Option<AnalysisResult<V>>,
+    /// Computed and seed entries, possibly for multiple call contexts.
+    ///
+    /// Lookup is a linear scan (`find_best_match`). This is fine for the
+    /// expected cardinality (single-digit contexts per function). If profiling
+    /// shows this is hot, consider a lattice-height–based index — note that
+    /// `BTreeMap` does not apply here because `Vec<V>` under subsumption is a
+    /// partial order, not a total order.
+    entries: Vec<SummaryEntry<V>>,
+    /// Tentative entry during recursive fixpoint (at most one active).
+    tentative: Option<SummaryEntry<V>>,
+}
+
+impl<V> Default for SummaryCache<V> {
+    fn default() -> Self {
+        Self {
+            fixed: None,
+            entries: Vec::new(),
+            tentative: None,
         }
     }
+}
 
-    /// Get the result from any summary state.
-    fn result(&self) -> &AnalysisResult<V> {
-        match self {
-            SummaryState::Computed { result, .. }
-            | SummaryState::Tentative { result, .. }
-            | SummaryState::UserSeed { result, .. }
-            | SummaryState::UserFixed(result) => result,
+impl<V: AbstractValue + Clone> SummaryCache<V> {
+    /// Find the tightest non-invalidated entry whose args subsume `query_args`.
+    ///
+    /// "Tightest" means: among all matching entries, the one whose args are
+    /// pointwise subsumed by every other match (i.e. the most specific).
+    fn find_best_match(&self, query_args: &[V]) -> Option<&SummaryEntry<V>> {
+        let mut best: Option<&SummaryEntry<V>> = None;
+        for entry in &self.entries {
+            if entry.invalidated {
+                continue;
+            }
+            if entry.args.len() != query_args.len() {
+                continue;
+            }
+            let subsumes = query_args
+                .iter()
+                .zip(entry.args.iter())
+                .all(|(q, cached)| q.is_subseteq(cached));
+            if !subsumes {
+                continue;
+            }
+            best = Some(match best {
+                None => entry,
+                Some(current) => {
+                    // Pick the entry with tighter (more specific) args
+                    let tighter = entry
+                        .args
+                        .iter()
+                        .zip(current.args.iter())
+                        .all(|(e, b)| e.is_subseteq(b));
+                    if tighter { entry } else { current }
+                }
+            });
         }
+        best
+    }
+
+    /// Get the tentative result (for recursive fixpoint), if any.
+    fn tentative_result(&self) -> Option<&AnalysisResult<V>> {
+        self.tentative.as_ref().map(|t| &t.result)
     }
 }
 
@@ -90,7 +136,7 @@ where
     widening_strategy: WideningStrategy,
     max_iterations: usize,
     narrowing_iterations: usize,
-    summaries: FxHashMap<SpecializedFunction, SummaryState<V>>,
+    summaries: FxHashMap<SpecializedFunction, SummaryCache<V>>,
     max_depth: Option<usize>,
     max_summary_iterations: usize,
     _error: PhantomData<E>,
@@ -112,14 +158,23 @@ impl<V: Clone, S: CompileStageInfo, E, G> SummaryInserter<'_, '_, V, S, E, G> {
     pub fn fixed(self, result: AnalysisResult<V>) {
         self.interp
             .summaries
-            .insert(self.callee, SummaryState::UserFixed(result));
+            .entry(self.callee)
+            .or_default()
+            .fixed = Some(result);
     }
 
     /// Insert a refinable seed. Analysis may improve upon this summary.
     pub fn seed(self, args: Vec<V>, result: AnalysisResult<V>) {
         self.interp
             .summaries
-            .insert(self.callee, SummaryState::UserSeed { args, result });
+            .entry(self.callee)
+            .or_default()
+            .entries
+            .push(SummaryEntry {
+                args,
+                result,
+                invalidated: false,
+            });
     }
 }
 
@@ -209,9 +264,24 @@ where
         &mut self.global
     }
 
-    /// Look up a cached function summary.
-    pub fn summary(&self, callee: SpecializedFunction) -> Option<&AnalysisResult<V>> {
-        self.summaries.get(&callee).map(|s| s.result())
+    /// Look up the best cached summary for `callee` given `args`.
+    ///
+    /// Returns the fixed summary if one exists, otherwise finds the tightest
+    /// non-invalidated entry whose cached args subsume the query.
+    pub fn summary(&self, callee: SpecializedFunction, args: &[V]) -> Option<&AnalysisResult<V>>
+    where
+        V: AbstractValue + Clone,
+    {
+        let cache = self.summaries.get(&callee)?;
+        if let Some(ref fixed) = cache.fixed {
+            return Some(fixed);
+        }
+        cache.find_best_match(args).map(|e| &e.result)
+    }
+
+    /// Look up the full summary cache for `callee`.
+    pub fn summary_cache(&self, callee: SpecializedFunction) -> Option<&SummaryCache<V>> {
+        self.summaries.get(&callee)
     }
 
     /// Return a builder for inserting a function summary.
@@ -223,6 +293,46 @@ where
             interp: self,
             callee,
         }
+    }
+
+    /// Mark all computed entries for `callee` as invalidated so the next
+    /// [`analyze`](Self::analyze) call re-runs the analysis. Invalidated
+    /// entries are retained (for inspection) until
+    /// [`gc_summaries`](Self::gc_summaries) is called.
+    ///
+    /// User-fixed summaries are **not** affected.
+    ///
+    /// Returns the number of entries invalidated.
+    pub fn invalidate_summary(&mut self, callee: SpecializedFunction) -> usize {
+        let Some(cache) = self.summaries.get_mut(&callee) else {
+            return 0;
+        };
+        let mut count = 0;
+        for entry in &mut cache.entries {
+            if !entry.invalidated {
+                entry.invalidated = true;
+                count += 1;
+            }
+        }
+        cache.tentative = None;
+        count
+    }
+
+    /// Remove invalidated entries across all functions, freeing memory.
+    pub fn gc_summaries(&mut self) {
+        for cache in self.summaries.values_mut() {
+            cache.entries.retain(|e| !e.invalidated);
+        }
+        self.summaries.retain(|_, cache| {
+            cache.fixed.is_some() || !cache.entries.is_empty() || cache.tentative.is_some()
+        });
+    }
+
+    /// Unconditionally remove all summaries (including user-fixed) for `callee`.
+    ///
+    /// Returns `true` if a cache entry was present.
+    pub fn remove_summary(&mut self, callee: SpecializedFunction) -> bool {
+        self.summaries.remove(&callee).is_some()
     }
 }
 
@@ -306,23 +416,16 @@ where
         L: Dialect + Interpretable<Self>,
     {
         // 1. UserFixed summaries are always returned as-is
-        if let Some(SummaryState::UserFixed(result)) = self.summaries.get(&callee) {
-            return Ok(result.clone());
+        if let Some(cache) = self.summaries.get(&callee) {
+            if let Some(ref fixed) = cache.fixed {
+                return Ok(fixed.clone());
+            }
         }
 
-        // 2. Check computed/seed cache — reuse if args subsumed
-        if let Some(state) = self.summaries.get(&callee) {
-            if let Some((cached_args, cached_result)) = state.args_and_result() {
-                if !cached_args.is_empty() {
-                    let subsumed = cached_args.len() == args.len()
-                        && args
-                            .iter()
-                            .zip(cached_args.iter())
-                            .all(|(new, cached)| new.is_subseteq(cached));
-                    if subsumed {
-                        return Ok(cached_result.clone());
-                    }
-                }
+        // 2. Check computed/seed cache — find tightest non-invalidated match
+        if let Some(cache) = self.summaries.get(&callee) {
+            if let Some(entry) = cache.find_best_match(args) {
+                return Ok(entry.result.clone());
             }
         }
 
@@ -330,10 +433,12 @@ where
         let is_recursive = self.frames.iter().any(|f| f.callee() == callee);
         if is_recursive {
             // Return tentative summary (bottom if none exists yet)
-            let result = match self.summaries.get(&callee) {
-                Some(state) => state.result().clone(),
-                None => AnalysisResult::bottom(),
-            };
+            let result = self
+                .summaries
+                .get(&callee)
+                .and_then(|c| c.tentative_result())
+                .cloned()
+                .unwrap_or_else(AnalysisResult::bottom);
             return Ok(result);
         }
 
@@ -350,13 +455,11 @@ where
             .ok_or_else(|| InterpreterError::MissingEntry.into())?;
 
         // 6. Insert tentative summary before pushing frame
-        self.summaries.insert(
-            callee,
-            SummaryState::Tentative {
-                args: args.to_vec(),
-                result: AnalysisResult::bottom(),
-            },
-        );
+        self.summaries.entry(callee).or_default().tentative = Some(SummaryEntry {
+            args: args.to_vec(),
+            result: AnalysisResult::bottom(),
+            invalidated: false,
+        });
 
         // 7. Outer fixpoint loop for inter-procedural convergence
         let mut summary_iterations = 0;
@@ -378,17 +481,16 @@ where
             let old_return = self
                 .summaries
                 .get(&callee)
-                .and_then(|s| s.result().return_value().cloned());
+                .and_then(|c| c.tentative_result())
+                .and_then(|r| r.return_value().cloned());
             let new_return = result.return_value().cloned();
 
             // Update tentative summary
-            self.summaries.insert(
-                callee,
-                SummaryState::Tentative {
-                    args: args.to_vec(),
-                    result: result.clone(),
-                },
-            );
+            self.summaries.entry(callee).or_default().tentative = Some(SummaryEntry {
+                args: args.to_vec(),
+                result: result.clone(),
+                invalidated: false,
+            });
 
             // Converged if return value stabilized
             let converged = match (&old_return, &new_return) {
@@ -402,14 +504,14 @@ where
             }
         };
 
-        // 8. Mark as Computed (stable)
-        self.summaries.insert(
-            callee,
-            SummaryState::Computed {
-                args: args.to_vec(),
-                result: final_result.clone(),
-            },
-        );
+        // 8. Promote tentative to computed entry
+        let cache = self.summaries.entry(callee).or_default();
+        cache.tentative = None;
+        cache.entries.push(SummaryEntry {
+            args: args.to_vec(),
+            result: final_result.clone(),
+            invalidated: false,
+        });
 
         Ok(final_result)
     }
