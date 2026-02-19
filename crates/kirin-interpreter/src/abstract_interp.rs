@@ -415,12 +415,7 @@ where
     }
 
     /// Propagate a single control flow edge and enqueue the target if changed.
-    fn propagate_edge<L>(
-        &mut self,
-        target: Block,
-        args: &[V],
-        narrowing: bool,
-    ) -> Result<bool, E>
+    fn propagate_edge<L>(&mut self, target: Block, args: &[V], narrowing: bool) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
         L: Dialect,

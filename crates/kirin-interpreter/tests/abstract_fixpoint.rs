@@ -49,9 +49,9 @@ fn test_abstract_interp_constants() {
 // Test 2: Branching with Fork (undecidable condition)
 // ---------------------------------------------------------------------------
 
-/// Build abs(x) = if (x < 0) then -x else x
-/// Pass Interval(-10, 10) which spans zero — ConditionalBranch returns Fork.
-/// Verify both branches explored, return value is join of neg and non-neg paths.
+/// Build: if (is_truthy x) then -x else x
+/// Pass Interval(-10, 10) which spans zero — is_truthy returns None → Fork.
+/// Verify both branches explored, return value is join of both paths.
 #[test]
 fn test_abstract_interp_branch_fork() {
     let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
@@ -138,7 +138,7 @@ fn test_abstract_interp_branch_fork() {
 ///   loop_exit:
 ///     ret x
 ///
-/// Since x = [-5, 5] is neither fully negative nor fully non-negative,
+/// Since x = [-5, 5] spans zero, is_truthy returns None and
 /// cond_br always returns Fork, exploring both paths. The back-edge
 /// triggers worklist re-processing of header. The worklist converges
 /// once no new SSA values appear.

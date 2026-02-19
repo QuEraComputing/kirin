@@ -1,5 +1,23 @@
 use kirin_ir::Lattice;
 
+/// Decidability of a branch condition.
+///
+/// Interpreter value types implement this to support conditional branching
+/// in [`kirin_cf::ControlFlow::ConditionalBranch`].
+///
+/// - `Some(true)` — definitely truthy, take the true branch.
+/// - `Some(false)` — definitely falsy, take the false branch.
+/// - `None` — undecidable (abstract interpreters should fork).
+pub trait BranchCondition {
+    fn is_truthy(&self) -> Option<bool>;
+}
+
+impl BranchCondition for i64 {
+    fn is_truthy(&self) -> Option<bool> {
+        Some(*self != 0)
+    }
+}
+
 /// Abstract value extending [`Lattice`] with widening and narrowing.
 ///
 /// No blanket implementation — every abstract value type must explicitly

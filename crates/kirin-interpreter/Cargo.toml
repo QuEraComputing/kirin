@@ -10,7 +10,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 kirin-arith = { workspace = true }
-kirin-cf = { workspace = true }
+kirin-cf = { workspace = true, features = ["interpret"] }
 kirin-constant = { workspace = true }
 kirin-function = { workspace = true }
 kirin-derive = { workspace = true }

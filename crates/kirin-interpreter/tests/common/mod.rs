@@ -5,8 +5,7 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    AbstractControl, ConcreteControl, InterpretControl, Interpretable, Interpreter,
-    InterpreterError,
+    BranchCondition, InterpretControl, Interpretable, Interpreter, InterpreterError,
 };
 use kirin_ir::*;
 use kirin_test_utils::{Interval, interval_add, interval_mul, interval_neg, interval_sub};
@@ -148,64 +147,13 @@ impl fmt::Display for DivisionByZero {
 impl std::error::Error for DivisionByZero {}
 
 // ---------------------------------------------------------------------------
-// ConditionalBranchControl: test-local trait for branch/fork dispatch
-// ---------------------------------------------------------------------------
-
-/// Abstracts over conditional branch semantics so a single generic
-/// `Interpretable` impl can produce the right control for both concrete
-/// and abstract interpreters.
-pub trait ConditionalBranchControl<V>: InterpretControl<V> {
-    fn cond_branch(
-        is_negative: bool,
-        is_non_negative: bool,
-        true_target: Block,
-        false_target: Block,
-    ) -> Self;
-}
-
-impl<V> ConditionalBranchControl<V> for ConcreteControl<V> {
-    fn cond_branch(
-        is_negative: bool,
-        _is_non_negative: bool,
-        true_target: Block,
-        false_target: Block,
-    ) -> Self {
-        // Concrete: condition is always decidable
-        if is_negative {
-            Self::ctrl_jump(true_target, vec![])
-        } else {
-            Self::ctrl_jump(false_target, vec![])
-        }
-    }
-}
-
-impl<V> ConditionalBranchControl<V> for AbstractControl<V> {
-    fn cond_branch(
-        is_negative: bool,
-        is_non_negative: bool,
-        true_target: Block,
-        false_target: Block,
-    ) -> Self {
-        if is_negative {
-            Self::ctrl_jump(true_target, vec![])
-        } else if is_non_negative {
-            Self::ctrl_jump(false_target, vec![])
-        } else {
-            // Undecidable: fork into both branches
-            AbstractControl::Fork(vec![(true_target, vec![]), (false_target, vec![])])
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Generic Interpretable impl
 // ---------------------------------------------------------------------------
 
 impl<I> Interpretable<I> for TestDialect
 where
     I: Interpreter<Error = InterpreterError>,
-    I::Value: ArithmeticValue,
-    I::Control: ConditionalBranchControl<I::Value>,
+    I::Value: ArithmeticValue + BranchCondition,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Control, InterpreterError> {
         match self {
@@ -265,29 +213,7 @@ where
                 }
             },
 
-            TestDialect::ControlFlow(cf) => match cf {
-                ControlFlow::Branch { target } => {
-                    Ok(I::Control::ctrl_jump((*target).into(), vec![]))
-                }
-                ControlFlow::ConditionalBranch {
-                    condition,
-                    true_target,
-                    false_target,
-                    ..
-                } => {
-                    let cond = interp.read(*condition)?;
-                    Ok(I::Control::cond_branch(
-                        cond.is_negative(),
-                        cond.is_non_negative(),
-                        (*true_target).into(),
-                        (*false_target).into(),
-                    ))
-                }
-                ControlFlow::Return(value) => {
-                    let v = interp.read(*value)?;
-                    Ok(I::Control::ctrl_return(v))
-                }
-            },
+            TestDialect::ControlFlow(cf) => cf.interpret(interp),
 
             TestDialect::Constant(c) => {
                 let val = I::Value::from_arith_value(&c.value);

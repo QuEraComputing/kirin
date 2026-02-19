@@ -78,8 +78,7 @@ fn test_session_abstract_interp_with_args() {
     let block_args: Vec<_> = block_info.arguments.iter().copied().collect();
 
     let call_with = |input: Interval| -> Interval {
-        let mut interp: StackInterpreter<Interval, _> =
-            StackInterpreter::new(&pipeline, stage_id);
+        let mut interp: StackInterpreter<Interval, _> = StackInterpreter::new(&pipeline, stage_id);
         let mut frame = Frame::new(spec_fn, first_stmt);
         frame.write_ssa(SSAValue::from(block_args[0]), input);
         interp.push_call_frame(frame).unwrap();

@@ -14,6 +14,17 @@ pub trait InterpretControl<V>: Sized {
     /// Call a specialized function with arguments, writing the return value
     /// to `result` in the caller's frame.
     fn ctrl_call(callee: SpecializedFunction, args: Vec<V>, result: ResultValue) -> Self;
+
+    /// Fork into multiple targets (undecidable branch).
+    ///
+    /// Default: panics. Only abstract interpreters provide a meaningful
+    /// implementation. Concrete interpreters should never reach an
+    /// undecidable branch because [`BranchCondition::is_truthy`] always
+    /// returns `Some` for concrete values.
+    fn ctrl_fork(targets: Vec<(Block, Vec<V>)>) -> Self {
+        let _ = targets;
+        panic!("ctrl_fork is only supported by abstract interpreters")
+    }
 }
 
 /// Control protocol for concrete (stack-based) interpretation.
@@ -101,5 +112,8 @@ impl<V> InterpretControl<V> for AbstractControl<V> {
             args,
             result,
         }
+    }
+    fn ctrl_fork(targets: Vec<(Block, Vec<V>)>) -> Self {
+        AbstractControl::Fork(targets)
     }
 }

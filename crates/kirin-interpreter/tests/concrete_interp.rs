@@ -1,17 +1,22 @@
 mod common;
 
 use common::TestDialect;
-use kirin_arith::ArithType;
+use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
+use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::StackInterpreter;
-use kirin_ir::*;
+use kirin_ir::{query::ParentInfo, *};
 
 // ---------------------------------------------------------------------------
-// IR builder: abs(x, y) = if (x - y) < 0 then -(x - y) else (x - y)
+// IR builder: select(x) = if x != 0 then x+1 else 42
+//
+// Uses is_truthy semantics: nonzero → true branch, zero → false branch.
+// We add x+1 on the true path to have a statement that produces a result
+// (avoiding cross-block block-argument scoping questions).
 // ---------------------------------------------------------------------------
 
-fn build_abs_program(
+fn build_select_program(
     pipeline: &mut Pipeline<StageInfo<TestDialect>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
@@ -19,46 +24,46 @@ fn build_abs_program(
 
     let sf = stage.staged_function().new().unwrap();
 
-    // Block arguments for the entry block
-    let x_ba = stage.block_argument(0);
-    let y_ba = stage.block_argument(1);
-    let x: SSAValue = x_ba.into();
-    let y: SSAValue = y_ba.into();
+    // entry block with argument x
+    let entry = stage.block().argument(ArithType::I64).new();
 
-    // entry: diff = sub(x, y)
-    let diff = kirin_arith::Arith::<ArithType>::op_sub(stage, x, y);
+    // Get real block argument SSA value
+    let x: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        let bi = entry.expect_info(si);
+        bi.arguments[0].into()
+    };
 
-    // neg_block: negate diff and return
-    let neg_result = kirin_arith::Arith::<ArithType>::op_neg(stage, diff.result);
-    let ret_neg = ControlFlow::<ArithType>::op_return(stage, neg_result.result);
-    let neg_block = stage.block().stmt(neg_result).terminator(ret_neg).new();
+    let stage = pipeline.stage_mut(stage_id).unwrap();
 
-    // non_neg_block: return diff directly
-    let ret_pos = ControlFlow::<ArithType>::op_return(stage, diff.result);
-    let non_neg_block = stage.block().terminator(ret_pos).new();
+    // truthy_block: c1 = const 1; sum = add x c1; return sum
+    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
+    let sum = kirin_arith::Arith::<ArithType>::op_add(stage, x, c1.result);
+    let ret_sum = ControlFlow::<ArithType>::op_return(stage, sum.result);
+    let truthy_block = stage.block().stmt(c1).stmt(sum).terminator(ret_sum).new();
 
-    // entry: cond_br diff -> neg_block (if < 0), non_neg_block (if >= 0)
-    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
-        stage,
-        diff.result,
-        neg_block,
-        non_neg_block,
-    );
+    // falsy_block: c42 = const 42; return c42
+    let c42 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(42));
+    let ret_42 = ControlFlow::<ArithType>::op_return(stage, c42.result);
+    let falsy_block = stage.block().stmt(c42).terminator(ret_42).new();
 
-    let entry_block = stage
-        .block()
-        .argument(ArithType::I64)
-        .argument(ArithType::I64)
-        .stmt(diff)
-        .terminator(cond_br)
-        .new();
+    // Add terminator to entry: cond_br x -> truthy_block, falsy_block
+    let cond_br =
+        ControlFlow::<ArithType>::op_conditional_branch(stage, x, truthy_block, falsy_block);
+    {
+        let cond_br_stmt: Statement = cond_br.into();
+        // Set the terminator's parent block so the interpreter can resolve block arguments.
+        let info = cond_br_stmt.expect_info_mut(stage);
+        *info.get_parent_mut() = Some(entry);
+        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        entry_info.terminator = Some(cond_br_stmt);
+    }
 
-    // Region containing all blocks (entry first)
     let region = stage
         .region()
-        .add_block(entry_block)
-        .add_block(neg_block)
-        .add_block(non_neg_block)
+        .add_block(entry)
+        .add_block(truthy_block)
+        .add_block(falsy_block)
         .new();
 
     let body = FunctionBody::<ArithType>::new(stage, region);
@@ -71,23 +76,23 @@ fn build_abs_program(
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_concrete_abs() {
+fn test_concrete_select() {
     let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let spec_func = build_abs_program(&mut pipeline, stage_id);
+    let spec_func = build_select_program(&mut pipeline, stage_id);
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
 
-    // abs(10 - 3) = 7
-    let result = interp.call::<TestDialect>(spec_func, &[10, 3]).unwrap();
-    assert_eq!(result, 7);
+    // select(7) → 7+1 = 8 (truthy: nonzero)
+    let result = interp.call::<TestDialect>(spec_func, &[7]).unwrap();
+    assert_eq!(result, 8);
 
-    // abs(3 - 10) = 7
-    let result = interp.call::<TestDialect>(spec_func, &[3, 10]).unwrap();
-    assert_eq!(result, 7);
+    // select(-3) → -3+1 = -2 (truthy: nonzero)
+    let result = interp.call::<TestDialect>(spec_func, &[-3]).unwrap();
+    assert_eq!(result, -2);
 
-    // abs(5 - 5) = 0
-    let result = interp.call::<TestDialect>(spec_func, &[5, 5]).unwrap();
-    assert_eq!(result, 0);
+    // select(0) → 42 (falsy: zero)
+    let result = interp.call::<TestDialect>(spec_func, &[0]).unwrap();
+    assert_eq!(result, 42);
 }

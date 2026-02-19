@@ -218,10 +218,9 @@ where
             match &control {
                 ConcreteControl::Call { result, .. } => pending_results.push(*result),
                 ConcreteControl::Halt => {
-                    return Err(InterpreterError::UnexpectedControl(
-                        "halt during call".to_owned(),
-                    )
-                    .into());
+                    return Err(
+                        InterpreterError::UnexpectedControl("halt during call".to_owned()).into(),
+                    );
                 }
                 ConcreteControl::Return(_) => {}
                 _ => {

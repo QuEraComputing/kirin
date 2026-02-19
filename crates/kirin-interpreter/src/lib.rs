@@ -17,5 +17,5 @@ pub use interpretable::Interpretable;
 pub use interpreter::Interpreter;
 pub use result::AnalysisResult;
 pub use stack::StackInterpreter;
-pub use value::AbstractValue;
+pub use value::{AbstractValue, BranchCondition};
 pub use widening::WideningStrategy;
