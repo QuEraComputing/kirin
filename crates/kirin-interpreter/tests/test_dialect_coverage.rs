@@ -1,0 +1,701 @@
+//! Extended test coverage for interpreter features using TestDialect.
+//!
+//! Covers: fuel exhaustion, division/remainder by zero, breakpoints,
+//! sequential calls, abstract widening strategies, fixed summaries,
+//! summary invalidation/GC, and AnalysisResult queries.
+
+mod common;
+
+use std::collections::HashSet;
+
+use common::TestDialect;
+use kirin_arith::{ArithType, ArithValue};
+use kirin_cf::ControlFlow;
+use kirin_constant::Constant;
+use kirin_function::FunctionBody;
+use kirin_interpreter::{
+    AbstractInterpreter, AnalysisResult, ConcreteExt, Continuation, InterpreterError,
+    StackInterpreter, WideningStrategy,
+};
+use kirin_ir::{query::ParentInfo, *};
+use kirin_test_utils::Interval;
+
+// ===========================================================================
+// IR builder helpers
+// ===========================================================================
+
+/// Build an infinite loop:
+///   entry(x): br header
+///   header: cond_br x body exit  (nonzero x always takes true branch)
+///   body: br header  (back-edge)
+///   exit: ret x
+fn build_infinite_loop(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    // Create entry block first to get real block arg
+    let entry = stage.block().argument(ArithType::I64).new();
+    let x: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        entry.expect_info(si).arguments[0].into()
+    };
+
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+
+    // header block (no arguments — loop target)
+    let header = stage.block().new();
+
+    // exit: ret x
+    let ret_x = ControlFlow::<ArithType>::op_return(stage, x);
+    let exit = stage.block().terminator(ret_x).new();
+
+    // body: br header (back-edge, no block args)
+    let br_back = ControlFlow::<ArithType>::op_branch(stage, header);
+    let body = stage.block().terminator(br_back).new();
+
+    // header terminator: cond_br x body exit
+    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(stage, x, body, exit);
+    {
+        let cond_stmt: Statement = cond_br.into();
+        cond_stmt
+            .expect_info_mut(stage)
+            .get_parent_mut()
+            .replace(header);
+        let header_info: &mut Item<BlockInfo<TestDialect>> = header.get_info_mut(stage).unwrap();
+        header_info.terminator = Some(cond_stmt);
+    }
+
+    // entry terminator: br header
+    let br_header = ControlFlow::<ArithType>::op_branch(stage, header);
+    {
+        let br_stmt: Statement = br_header.into();
+        br_stmt
+            .expect_info_mut(stage)
+            .get_parent_mut()
+            .replace(entry);
+        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        entry_info.terminator = Some(br_stmt);
+    }
+
+    let region = stage
+        .region()
+        .add_block(entry)
+        .add_block(header)
+        .add_block(body)
+        .add_block(exit)
+        .new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(func_body).new().unwrap()
+}
+
+/// Build `f(x) = c0 = const 0; result = div(x, c0); return result`
+fn build_div_by_zero(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    let ba_x = stage.block_argument(0);
+    let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
+    let div = kirin_arith::Arith::<ArithType>::op_div(stage, SSAValue::from(ba_x), c0.result);
+    let ret = ControlFlow::<ArithType>::op_return(stage, div.result);
+
+    let block = stage
+        .block()
+        .argument(ArithType::I64)
+        .stmt(c0)
+        .stmt(div)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(func_body).new().unwrap()
+}
+
+/// Build `f(x) = c0 = const 0; result = rem(x, c0); return result`
+fn build_rem_by_zero(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    let ba_x = stage.block_argument(0);
+    let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
+    let rem = kirin_arith::Arith::<ArithType>::op_rem(stage, SSAValue::from(ba_x), c0.result);
+    let ret = ControlFlow::<ArithType>::op_return(stage, rem.result);
+
+    let block = stage
+        .block()
+        .argument(ArithType::I64)
+        .stmt(c0)
+        .stmt(rem)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(func_body).new().unwrap()
+}
+
+/// Build `f() = c1 = const 5; c2 = const 10; sum = add(c1, c2); ret sum`
+/// Returns (spec_fn, add_statement) where add_statement can be used as breakpoint.
+fn build_linear_program(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+) -> (SpecializedFunction, Statement) {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(5));
+    let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(10));
+    let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
+    let add_stmt: Statement = add.id;
+    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+
+    let block = stage
+        .block()
+        .stmt(c1)
+        .stmt(c2)
+        .stmt(add)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    let spec_fn = stage.specialize().f(sf).body(func_body).new().unwrap();
+    (spec_fn, add_stmt)
+}
+
+/// Build `f(x) = c1 = const 1; sum = add(x, c1); ret sum`
+fn build_add_one(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    let ba_x = stage.block_argument(0);
+    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
+    let add = kirin_arith::Arith::<ArithType>::op_add(stage, SSAValue::from(ba_x), c1.result);
+    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+
+    let block = stage
+        .block()
+        .argument(ArithType::I64)
+        .stmt(c1)
+        .stmt(add)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(func_body).new().unwrap()
+}
+
+/// Build a loop (no block-arg counter, uses entry arg directly):
+///   entry(x) -> br header
+///   header: cond_br x body exit
+///   body: c1 = const 1; sum = add x, c1; br header
+///   exit: ret x
+fn build_loop_program(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    let entry = stage.block().argument(ArithType::I64).new();
+    let x: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        entry.expect_info(si).arguments[0].into()
+    };
+
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let header = stage.block().new();
+
+    // exit: ret x
+    let ret_x = ControlFlow::<ArithType>::op_return(stage, x);
+    let loop_exit = stage.block().terminator(ret_x).new();
+
+    // body: c1 = const 1; sum = add x, c1; br header
+    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
+    let sum = kirin_arith::Arith::<ArithType>::op_add(stage, x, c1.result);
+    let br_back = ControlFlow::<ArithType>::op_branch(stage, header);
+    let loop_body = stage.block().stmt(c1).stmt(sum).terminator(br_back).new();
+
+    // entry: br header
+    let br_header = ControlFlow::<ArithType>::op_branch(stage, header);
+    {
+        let br_stmt: Statement = br_header.into();
+        br_stmt
+            .expect_info_mut(stage)
+            .get_parent_mut()
+            .replace(entry);
+        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        entry_info.terminator = Some(br_stmt);
+    }
+
+    // header: cond_br x body exit
+    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(stage, x, loop_body, loop_exit);
+    {
+        let cond_stmt: Statement = cond_br.into();
+        cond_stmt
+            .expect_info_mut(stage)
+            .get_parent_mut()
+            .replace(header);
+        let header_info: &mut Item<BlockInfo<TestDialect>> = header.get_info_mut(stage).unwrap();
+        header_info.terminator = Some(cond_stmt);
+    }
+
+    let region = stage
+        .region()
+        .add_block(entry)
+        .add_block(header)
+        .add_block(loop_body)
+        .add_block(loop_exit)
+        .new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(func_body).new().unwrap()
+}
+
+/// Build a multi-block branching program (same structure as build_select_program):
+///   entry(x): cond_br x then_block else_block
+///   then_block: c1 = const 1; sum = add x, c1; ret sum
+///   else_block: c42 = const 42; ret c42
+fn build_multi_block(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    // Create entry block first to get real block arg SSA
+    let entry = stage.block().argument(ArithType::I64).new();
+    let x: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        entry.expect_info(si).arguments[0].into()
+    };
+
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+
+    // then_block: c1 = const 1; sum = add x, c1; ret sum
+    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
+    let add = kirin_arith::Arith::<ArithType>::op_add(stage, x, c1.result);
+    let ret_sum = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let then_block = stage.block().stmt(c1).stmt(add).terminator(ret_sum).new();
+
+    // else_block: c42 = const 42; ret c42
+    let c42 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(42));
+    let ret_42 = ControlFlow::<ArithType>::op_return(stage, c42.result);
+    let else_block = stage.block().stmt(c42).terminator(ret_42).new();
+
+    // entry terminator: cond_br x then_block else_block
+    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(stage, x, then_block, else_block);
+    {
+        let cond_stmt: Statement = cond_br.into();
+        cond_stmt
+            .expect_info_mut(stage)
+            .get_parent_mut()
+            .replace(entry);
+        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        entry_info.terminator = Some(cond_stmt);
+    }
+
+    let region = stage
+        .region()
+        .add_block(entry)
+        .add_block(then_block)
+        .add_block(else_block)
+        .new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(func_body).new().unwrap()
+}
+
+// ===========================================================================
+// Concrete interpreter tests
+// ===========================================================================
+
+#[test]
+fn test_concrete_fuel_exhaustion() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_infinite_loop(&mut pipeline, stage_id);
+
+    let mut interp: StackInterpreter<i64, _> =
+        StackInterpreter::new(&pipeline, stage_id).with_fuel(20);
+
+    let result = interp.call::<TestDialect>(spec_fn, &[42]);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, InterpreterError::FuelExhausted),
+        "expected FuelExhausted, got: {err:?}"
+    );
+}
+
+#[test]
+fn test_concrete_division_by_zero() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_div_by_zero(&mut pipeline, stage_id);
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+
+    let result = interp.call::<TestDialect>(spec_fn, &[10]);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, InterpreterError::Custom(_)),
+        "expected Custom error, got: {err:?}"
+    );
+    assert!(
+        err.to_string().contains("division by zero"),
+        "expected 'division by zero' in message, got: {err}"
+    );
+}
+
+#[test]
+fn test_concrete_remainder_by_zero() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_rem_by_zero(&mut pipeline, stage_id);
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+
+    let result = interp.call::<TestDialect>(spec_fn, &[10]);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, InterpreterError::Custom(_)),
+        "expected Custom error, got: {err:?}"
+    );
+    assert!(
+        err.to_string().contains("division by zero"),
+        "expected 'division by zero' in message, got: {err}"
+    );
+}
+
+#[test]
+fn test_concrete_breakpoints() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let (spec_fn, add_stmt) = build_linear_program(&mut pipeline, stage_id);
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+
+    // Resolve entry and push frame manually for run_until_break
+    let stage_info = pipeline.stage(stage_id).unwrap();
+    let spec_info = spec_fn.expect_info(stage_info);
+    let body_stmt = *spec_info.body();
+    let regions: Vec<_> = body_stmt.regions::<TestDialect>(stage_info).collect();
+    let blocks: Vec<_> = regions[0].blocks(stage_info).collect();
+    let block_info = blocks[0].expect_info(stage_info);
+    let first_stmt = block_info.statements.head().copied();
+
+    let frame = kirin_interpreter::Frame::new(spec_fn, first_stmt);
+    interp.push_call_frame(frame).unwrap();
+
+    // Set breakpoint at the add statement
+    interp.set_breakpoints(HashSet::from([add_stmt]));
+
+    // Run until break — should stop before executing add
+    let control = interp.run_until_break::<TestDialect>().unwrap();
+    assert!(
+        matches!(control, Continuation::Ext(ConcreteExt::Break)),
+        "expected Break, got: {control:?}"
+    );
+
+    // Clear breakpoints and continue to completion
+    interp.clear_breakpoints();
+    let control = interp.run::<TestDialect>().unwrap();
+    match control {
+        Continuation::Return(v) => assert_eq!(v, 15, "expected 5 + 10 = 15"),
+        other => panic!("expected Return, got: {other:?}"),
+    }
+}
+
+#[test]
+fn test_concrete_sequential_calls() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+
+    // Call f(5) -> 6
+    let result = interp.call::<TestDialect>(spec_fn, &[5]).unwrap();
+    assert_eq!(result, 6);
+
+    // Call f(10) -> 11 — interpreter resets between calls
+    let result = interp.call::<TestDialect>(spec_fn, &[10]).unwrap();
+    assert_eq!(result, 11);
+
+    // Call f(-1) -> 0
+    let result = interp.call::<TestDialect>(spec_fn, &[-1]).unwrap();
+    assert_eq!(result, 0);
+}
+
+#[test]
+fn test_concrete_fuel_sufficient() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    // Enough fuel for a short program
+    let mut interp: StackInterpreter<i64, _> =
+        StackInterpreter::new(&pipeline, stage_id).with_fuel(100);
+
+    let result = interp.call::<TestDialect>(spec_fn, &[5]).unwrap();
+    assert_eq!(result, 6);
+}
+
+// ===========================================================================
+// Abstract interpreter tests
+// ===========================================================================
+
+#[test]
+fn test_abstract_widening_never() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_loop_program(&mut pipeline, stage_id);
+
+    // WideningStrategy::Never only joins (no widening). For Interval domain
+    // the ascending chain can be long, so we use a generous iteration limit.
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id)
+            .with_widening(WideningStrategy::Never)
+            .with_max_iterations(50);
+
+    let result = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .unwrap();
+
+    // Analysis should produce a return value
+    assert!(result.return_value().is_some());
+}
+
+#[test]
+fn test_abstract_widening_delayed() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_loop_program(&mut pipeline, stage_id);
+
+    // Delayed(3): join for first 3 visits, then widen
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id)
+            .with_widening(WideningStrategy::Delayed(3))
+            .with_max_iterations(100);
+
+    let result = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .unwrap();
+
+    let ret = result.return_value().unwrap();
+    assert!(
+        !ret.is_empty(),
+        "return value should not be bottom after delayed widening"
+    );
+}
+
+#[test]
+fn test_abstract_widening_all_joins() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_loop_program(&mut pipeline, stage_id);
+
+    // AllJoins: widen at every join point — converges quickly
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id)
+            .with_widening(WideningStrategy::AllJoins)
+            .with_max_iterations(100);
+
+    let result = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .unwrap();
+
+    let ret = result.return_value().unwrap();
+    assert!(
+        !ret.is_empty(),
+        "return value should not be bottom with AllJoins widening"
+    );
+}
+
+#[test]
+fn test_abstract_fixed_summary() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    // Insert a fixed summary that returns [100, 200] regardless of input
+    let fixed_result = AnalysisResult::new(
+        Default::default(),
+        Default::default(),
+        Some(Interval::new(100, 200)),
+    );
+    interp.insert_summary(spec_fn).fixed(fixed_result);
+
+    // Analyze should return the fixed summary without computing
+    let result = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::new(0, 10)])
+        .unwrap();
+    assert_eq!(result.return_value(), Some(&Interval::new(100, 200)));
+
+    // Even with different args, the fixed summary is returned
+    let result2 = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::top()])
+        .unwrap();
+    assert_eq!(result2.return_value(), Some(&Interval::new(100, 200)));
+}
+
+#[test]
+fn test_abstract_summary_invalidation_and_gc() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    // Analyze to populate the cache
+    let result = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::new(0, 10)])
+        .unwrap();
+    assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
+
+    // Verify summary is cached
+    assert!(interp.summary(spec_fn, &[Interval::new(0, 10)]).is_some());
+
+    // Invalidate computed summaries
+    let count = interp.invalidate_summary(spec_fn);
+    assert!(count > 0, "expected at least one invalidated entry");
+
+    // After invalidation, summary lookup should skip invalidated entries
+    assert!(interp.summary(spec_fn, &[Interval::new(0, 10)]).is_none());
+
+    // GC removes invalidated entries
+    interp.gc_summaries();
+
+    // Re-analyze should work fresh
+    let result = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::new(0, 10)])
+        .unwrap();
+    assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
+}
+
+#[test]
+fn test_abstract_remove_summary() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    // Analyze to populate cache
+    interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::constant(5)])
+        .unwrap();
+    assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_some());
+
+    // Remove all summaries unconditionally
+    assert!(interp.remove_summary(spec_fn));
+
+    // Now it should be gone
+    assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_none());
+
+    // Removing again returns false
+    assert!(!interp.remove_summary(spec_fn));
+}
+
+#[test]
+fn test_abstract_analysis_result_queries() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_fn = build_multi_block(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    // Analyze with interval spanning zero -> fork at cond_br
+    let result = interp
+        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .unwrap();
+
+    // Should have visited multiple blocks (entry + then + else = 3)
+    let visited: Vec<_> = result.visited_blocks().collect();
+    assert!(
+        visited.len() >= 3,
+        "expected at least 3 visited blocks, got {}",
+        visited.len()
+    );
+
+    // Return value should be the join of both paths
+    let ret = result.return_value().unwrap();
+    assert!(!ret.is_empty(), "return value should not be bottom");
+}
+
+#[test]
+fn test_abstract_analysis_result_ssa_values() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+
+    // Build: c1 = const 7; c2 = const 3; sum = add c1, c2; ret sum
+    let sf = stage.staged_function().new().unwrap();
+    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(7));
+    let c1_result = c1.result;
+    let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(3));
+    let c2_result = c2.result;
+    let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
+    let add_result = add.result;
+    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+
+    let block = stage
+        .block()
+        .stmt(c1)
+        .stmt(c2)
+        .stmt(add)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    let spec_fn = stage.specialize().f(sf).body(func_body).new().unwrap();
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    let result = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
+
+    // Query individual SSA values
+    assert_eq!(
+        result.ssa_value(c1_result.into()),
+        Some(&Interval::constant(7))
+    );
+    assert_eq!(
+        result.ssa_value(c2_result.into()),
+        Some(&Interval::constant(3))
+    );
+    assert_eq!(
+        result.ssa_value(add_result.into()),
+        Some(&Interval::constant(10))
+    );
+    assert_eq!(result.return_value(), Some(&Interval::constant(10)));
+}
