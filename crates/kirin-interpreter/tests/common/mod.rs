@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::fmt;
 
 use kirin_arith::{Arith, ArithType, ArithValue};
