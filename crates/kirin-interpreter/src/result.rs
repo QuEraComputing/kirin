@@ -43,7 +43,7 @@ impl<V> AnalysisResult<V> {
         }
     }
 
-    pub(crate) fn new(
+    pub fn new(
         values: FxHashMap<SSAValue, V>,
         block_args: FxHashMap<Block, Vec<SSAValue>>,
         return_value: Option<V>,

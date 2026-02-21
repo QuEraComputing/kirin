@@ -1,7 +1,24 @@
 use kirin::prelude::{Dialect, HasStageInfo};
-use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
+use kirin_interpreter::{
+    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion,
+};
 
 use crate::{FunctionBody, Return};
+
+impl<T> SSACFGRegion for FunctionBody<T>
+where
+    T: kirin::prelude::CompileTimeValue + Default,
+{
+    fn entry_block<L: Dialect>(
+        &self,
+        stage: &kirin::prelude::StageInfo<L>,
+    ) -> Result<kirin::prelude::Block, InterpreterError> {
+        self.body
+            .blocks(stage)
+            .next()
+            .ok_or(InterpreterError::MissingEntry)
+    }
+}
 
 impl<I, L, T> Interpretable<I, L> for FunctionBody<T>
 where

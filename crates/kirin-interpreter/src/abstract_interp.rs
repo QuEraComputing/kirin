@@ -10,8 +10,8 @@ use kirin_ir::{
 use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
 use crate::{
-    AbstractContinuation, AbstractValue, Continuation, Frame, Interpretable, Interpreter,
-    InterpreterError,
+    AbstractContinuation, AbstractValue, CallSemantics, Continuation, Frame, Interpretable,
+    Interpreter, InterpreterError,
 };
 
 /// Per-function fixpoint state stored as frame extra data.
@@ -19,12 +19,12 @@ use crate::{
 /// Block argument SSA value IDs are tracked here; the actual SSA values
 /// (both block args and statement results) live in [`Frame::values`].
 #[derive(Debug, Default)]
-pub(crate) struct FixpointState {
-    worklist: VecDeque<Block>,
+pub struct FixpointState {
+    pub(crate) worklist: VecDeque<Block>,
     /// Per-block argument SSA value IDs. Key presence = block visited.
-    block_args: FxHashMap<Block, Vec<SSAValue>>,
+    pub(crate) block_args: FxHashMap<Block, Vec<SSAValue>>,
     /// Per-block visit counts for [`WideningStrategy::Delayed`].
-    visit_counts: FxHashMap<Block, usize>,
+    pub(crate) visit_counts: FxHashMap<Block, usize>,
 }
 
 /// A single context-sensitive summary entry in the cache.
@@ -139,6 +139,16 @@ where
     summaries: FxHashMap<SpecializedFunction, SummaryCache<V>>,
     max_depth: Option<usize>,
     max_summary_iterations: usize,
+    /// Type-erased call handler installed by [`analyze`](Self::analyze) so that
+    /// [`interpret_block`] can dispatch nested calls through [`CallSemantics`]
+    /// without requiring `L: CallSemantics` in its own bounds.
+    call_handler: Option<
+        fn(
+            &mut AbstractInterpreter<'ir, V, S, E, G>,
+            SpecializedFunction,
+            &[V],
+        ) -> Result<AnalysisResult<V>, E>,
+    >,
     _error: PhantomData<E>,
 }
 
@@ -192,6 +202,7 @@ where
             summaries: FxHashMap::default(),
             max_depth: None,
             max_summary_iterations: 100,
+            call_handler: None,
             _error: PhantomData,
         }
     }
@@ -209,6 +220,7 @@ where
             summaries: self.summaries,
             max_depth: self.max_depth,
             max_summary_iterations: self.max_summary_iterations,
+            call_handler: None,
             _error: PhantomData,
         }
     }
@@ -396,7 +408,7 @@ where
     ) -> Result<AnalysisResult<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<Self, L> + CallSemantics<Self, L, Result = AnalysisResult<V>> + 'ir,
     {
         // 1. UserFixed summaries are always returned as-is
         if let Some(cache) = self.summaries.get(&callee) {
@@ -432,78 +444,15 @@ where
             }
         }
 
-        // 5. Resolve entry block by delegating to the body statement's Interpretable impl
-        let entry = {
-            let stage = self.resolve_stage::<L>();
-            let spec = callee.expect_info(stage);
-            let body_stmt = *spec.body();
-            let def: &L = body_stmt.definition(stage);
-            match def.interpret(self)? {
-                Continuation::Jump(block, _) => block,
-                _ => return Err(InterpreterError::MissingEntry.into()),
-            }
-        };
+        // 5. Install call handler so interpret_block can dispatch nested calls
+        self.call_handler = Some(Self::analyze::<L>);
 
-        // 6. Insert tentative summary before pushing frame
-        self.summaries.entry(callee).or_default().tentative = Some(SummaryEntry {
-            args: args.to_vec(),
-            result: AnalysisResult::bottom(),
-            invalidated: false,
-        });
-
-        // 7. Outer fixpoint loop for inter-procedural convergence
-        let mut summary_iterations = 0;
-        let final_result = loop {
-            summary_iterations += 1;
-            if summary_iterations > self.max_summary_iterations {
-                return Err(InterpreterError::FuelExhausted.into());
-            }
-
-            // Push frame and run forward analysis
-            self.frames
-                .push(Frame::new(callee, FixpointState::default()));
-            let result = self.run_forward::<L>(entry, args);
-            self.frames.pop().expect("frame stack underflow");
-
-            let result = result?;
-
-            // Check if summary changed
-            let old_return = self
-                .summaries
-                .get(&callee)
-                .and_then(|c| c.tentative_result())
-                .and_then(|r| r.return_value().cloned());
-            let new_return = result.return_value().cloned();
-
-            // Update tentative summary
-            self.summaries.entry(callee).or_default().tentative = Some(SummaryEntry {
-                args: args.to_vec(),
-                result: result.clone(),
-                invalidated: false,
-            });
-
-            // Converged if return value stabilized
-            let converged = match (&old_return, &new_return) {
-                (Some(old), Some(new)) => new.is_subseteq(old),
-                (None, None) => true,
-                _ => summary_iterations > 1,
-            };
-
-            if converged {
-                break result;
-            }
-        };
-
-        // 8. Promote tentative to computed entry
-        let cache = self.summaries.entry(callee).or_default();
-        cache.tentative = None;
-        cache.entries.push(SummaryEntry {
-            args: args.to_vec(),
-            result: final_result.clone(),
-            invalidated: false,
-        });
-
-        Ok(final_result)
+        // 6. Delegate to CallSemantics
+        let stage = self.resolve_stage::<L>();
+        let spec = callee.expect_info(stage);
+        let body_stmt = *spec.body();
+        let def: &L = body_stmt.definition(stage);
+        def.call_semantics(self, callee, args)
     }
 
     /// Run forward abstract interpretation starting from `entry` block with
@@ -518,7 +467,7 @@ where
     ) -> Result<AnalysisResult<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<Self, L> + 'ir,
     {
         // 1. Seed entry block
         {
@@ -613,15 +562,72 @@ where
     /// This inherent method shadows [`Interpreter::resolve_stage`] to return
     /// a reference with the pipeline lifetime `'ir` instead of `&self`,
     /// allowing subsequent mutable borrows of `self`.
-    fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
+    pub(crate) fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
     where
         S: HasStageInfo<L>,
-        L: Dialect,
+        L: Dialect + 'ir,
     {
         self.pipeline
             .stage(self.active_stage)
             .and_then(|s| s.try_stage_info())
             .expect("active stage does not contain StageInfo for this dialect")
+    }
+
+    /// Push a new analysis frame for `callee`.
+    pub(crate) fn push_analysis_frame(&mut self, callee: SpecializedFunction) {
+        self.frames
+            .push(Frame::new(callee, FixpointState::default()));
+    }
+
+    /// Pop the current analysis frame. Panics if no frame exists.
+    pub(crate) fn pop_analysis_frame(&mut self) {
+        self.frames.pop().expect("frame stack underflow");
+    }
+
+    /// Set the tentative summary for `callee`.
+    pub(crate) fn set_tentative(
+        &mut self,
+        callee: SpecializedFunction,
+        args: &[V],
+        result: AnalysisResult<V>,
+    ) {
+        self.summaries.entry(callee).or_default().tentative = Some(SummaryEntry {
+            args: args.to_vec(),
+            result,
+            invalidated: false,
+        });
+    }
+
+    /// Get the tentative return value for `callee`.
+    pub(crate) fn tentative_return_value(
+        &self,
+        callee: SpecializedFunction,
+    ) -> Option<&V> {
+        self.summaries
+            .get(&callee)
+            .and_then(|c| c.tentative_result())
+            .and_then(|r| r.return_value())
+    }
+
+    /// Promote the tentative summary to a computed entry.
+    pub(crate) fn promote_tentative(
+        &mut self,
+        callee: SpecializedFunction,
+        args: &[V],
+        result: AnalysisResult<V>,
+    ) {
+        let cache = self.summaries.entry(callee).or_default();
+        cache.tentative = None;
+        cache.entries.push(SummaryEntry {
+            args: args.to_vec(),
+            result,
+            invalidated: false,
+        });
+    }
+
+    /// Return the maximum number of summary iterations.
+    pub(crate) fn max_summary_iterations(&self) -> usize {
+        self.max_summary_iterations
     }
 
     /// Handle control flow edge propagation for both widening and narrowing.
@@ -636,7 +642,7 @@ where
     ) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect,
+        L: Dialect + 'ir,
     {
         let mut changed = false;
         match control {
@@ -670,7 +676,7 @@ where
     fn propagate_edge<L>(&mut self, target: Block, args: &[V], narrowing: bool) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect,
+        L: Dialect + 'ir,
     {
         if self.propagate_block_args::<L>(target, args, narrowing)? {
             if !narrowing {
@@ -691,10 +697,13 @@ where
 
     /// Interpret all statements in a block sequentially, returning the
     /// final control action from the terminator.
-    fn interpret_block<L>(&mut self, block: Block) -> Result<AbstractContinuation<V>, E>
+    fn interpret_block<L>(
+        &mut self,
+        block: Block,
+    ) -> Result<AbstractContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<Self, L> + 'ir,
     {
         // Collect statement IDs and terminator up front (cheap Copy)
         // to avoid holding a borrow on stage across interpret calls.
@@ -719,7 +728,10 @@ where
                     args,
                     result,
                 } => {
-                    let analysis = self.analyze::<L>(callee, &args)?;
+                    let handler = self
+                        .call_handler
+                        .expect("call_handler not set: analyze() must be used as entry point");
+                    let analysis = handler(self, callee, &args)?;
                     let return_val = analysis.return_value().cloned().unwrap_or_else(V::bottom);
                     self.write(result, return_val)?;
                 }
@@ -753,7 +765,7 @@ where
     ) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect,
+        L: Dialect + 'ir,
     {
         let target_arg_ssas: Vec<SSAValue> = {
             let stage = self.resolve_stage::<L>();

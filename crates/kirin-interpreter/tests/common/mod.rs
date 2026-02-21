@@ -5,7 +5,7 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
+    BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
 };
 use kirin_ir::*;
 use kirin_test_utils::{Interval, interval_add, interval_mul, interval_neg, interval_sub};
@@ -125,6 +125,28 @@ impl std::error::Error for DivisionByZero {}
 // ---------------------------------------------------------------------------
 // Generic Interpretable impl
 // ---------------------------------------------------------------------------
+
+impl<I> CallSemantics<I, TestDialect> for TestDialect
+where
+    I: Interpreter<Error = InterpreterError>,
+    I::StageInfo: HasStageInfo<TestDialect>,
+    I::Value: ArithmeticValue + BranchCondition,
+    FunctionBody<ArithType>: CallSemantics<I, TestDialect>,
+{
+    type Result = <FunctionBody<ArithType> as CallSemantics<I, TestDialect>>::Result;
+
+    fn call_semantics(
+        &self,
+        interp: &mut I,
+        callee: SpecializedFunction,
+        args: &[I::Value],
+    ) -> Result<Self::Result, InterpreterError> {
+        match self {
+            TestDialect::FunctionBody(body) => body.call_semantics(interp, callee, args),
+            _ => Err(InterpreterError::MissingEntry),
+        }
+    }
+}
 
 impl<I> Interpretable<I, Self> for TestDialect
 where

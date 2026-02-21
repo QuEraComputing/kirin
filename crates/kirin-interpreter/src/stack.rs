@@ -7,8 +7,8 @@ use kirin_ir::{
 };
 
 use crate::{
-    ConcreteContinuation, ConcreteExt, Continuation, Frame, Interpretable, Interpreter,
-    InterpreterError,
+    CallSemantics, ConcreteContinuation, ConcreteExt, Continuation, Frame, Interpretable,
+    Interpreter, InterpreterError,
 };
 
 type StackFrame<V> = Frame<V, Option<Statement>>;
@@ -226,49 +226,14 @@ where
     /// Call a specialized function and return its result value.
     pub fn call<L>(&mut self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<Self, L> + CallSemantics<Self, L, Result = V>,
         S: HasStageInfo<L>,
     {
-        let initial_depth = self.frames.len();
-        let mut pending_results: Vec<ResultValue> = Vec::new();
-
-        self.push_call_frame_with_args::<L>(callee, args)?;
-
-        loop {
-            let control = self.run::<L>()?;
-            match &control {
-                Continuation::Call { result, .. } => pending_results.push(*result),
-                Continuation::Ext(ConcreteExt::Halt) => {
-                    return Err(
-                        InterpreterError::UnexpectedControl("halt during call".to_owned()).into(),
-                    );
-                }
-                Continuation::Return(_) => {}
-                _ => {
-                    return Err(InterpreterError::UnexpectedControl(
-                        "unexpected variant during call".to_owned(),
-                    )
-                    .into());
-                }
-            }
-
-            let v = match &control {
-                Continuation::Return(v) => Some(v.clone()),
-                _ => None,
-            };
-
-            self.advance::<L>(&control)?;
-
-            if let Some(v) = v {
-                if self.frames.len() == initial_depth {
-                    return Ok(v);
-                }
-                let result = pending_results
-                    .pop()
-                    .ok_or_else(|| InterpreterError::NoFrame.into())?;
-                self.write(result, v)?;
-            }
-        }
+        let stage = self.resolve_stage::<L>();
+        let spec = callee.expect_info(stage);
+        let body_stmt = *spec.body();
+        let def: &L = body_stmt.definition(stage);
+        def.call_semantics(self, callee, args)
     }
 }
 
@@ -387,7 +352,7 @@ where
     /// This inherent method shadows [`Interpreter::resolve_stage`] to return
     /// a reference with the pipeline lifetime `'ir` instead of `&self`,
     /// allowing subsequent mutable borrows of `self`.
-    fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
+    pub(crate) fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
     where
         S: HasStageInfo<L>,
         L: Dialect,
@@ -432,7 +397,11 @@ where
         Ok(())
     }
 
-    fn first_stmt_in_block<L>(&self, block: Block) -> Option<Statement>
+    pub(crate) fn frames_len(&self) -> usize {
+        self.frames.len()
+    }
+
+    pub(crate) fn first_stmt_in_block<L>(&self, block: Block) -> Option<Statement>
     where
         S: HasStageInfo<L>,
         L: Dialect,
@@ -446,7 +415,7 @@ where
         }
     }
 
-    fn bind_block_args<L>(&mut self, block: Block, args: &[V]) -> Result<(), E>
+    pub(crate) fn bind_block_args<L>(&mut self, block: Block, args: &[V]) -> Result<(), E>
     where
         S: HasStageInfo<L>,
         L: Dialect,
