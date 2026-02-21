@@ -1114,6 +1114,7 @@ dependencies = [
  "kirin-cf",
  "kirin-chumsky",
  "kirin-function",
+ "kirin-interpreter",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
@@ -1247,6 +1248,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-derive-interpreter"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "kirin-derive-core",
+ "kirin-test-utils",
+ "manyhow",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "kirin-function"
 version = "0.1.0"
 dependencies = [
@@ -1265,6 +1279,7 @@ dependencies = [
  "kirin-cf",
  "kirin-constant",
  "kirin-derive",
+ "kirin-derive-interpreter",
  "kirin-function",
  "kirin-ir",
  "kirin-test-utils",

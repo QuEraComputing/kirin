@@ -7,6 +7,7 @@ edition = "2024"
 kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
 kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless", features = ["derive"] }
 kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky", features = ["derive"] }
+kirin-interpreter = { version = "0.1.0", path = "crates/kirin-interpreter", features = ["derive"], optional = true }
 serde = { version = "1.0.228", optional = true }
 
 # Re-export dependencies needed by derive macros
@@ -19,6 +20,8 @@ kirin-cf = { workspace = true }
 kirin-function = { workspace = true }
 
 [features]
+default = ["interpreter"]
+interpreter = ["dep:kirin-interpreter"]
 serde = ["dep:serde"]
 
 [[example]]
@@ -45,7 +48,9 @@ members = [
     "xtask",
     "crates/kirin-arith",
     "crates/kirin-bitwise",
-    "crates/kirin-prettyless-derive", "crates/kirin-interpreter",
+    "crates/kirin-prettyless-derive",
+    "crates/kirin-interpreter",
+    "crates/kirin-derive-interpreter",
 ]
 
 [workspace.dependencies]
@@ -91,3 +96,4 @@ kirin-arith = { version = "0.1.0", path = "crates/kirin-arith" }
 kirin-bitwise = { version = "0.1.0", path = "crates/kirin-bitwise" }
 kirin-prettyless-derive = { version = "0.1.0", path = "crates/kirin-prettyless-derive" }
 kirin-interpreter = { version = "0.1.0", path = "crates/kirin-interpreter" }
+kirin-derive-interpreter = { version = "0.1.0", path = "crates/kirin-derive-interpreter" }

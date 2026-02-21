@@ -21,3 +21,6 @@ pub use result::AnalysisResult;
 pub use stack::StackInterpreter;
 pub use value::{AbstractValue, BranchCondition};
 pub use widening::WideningStrategy;
+
+#[cfg(feature = "derive")]
+pub use kirin_derive_interpreter::CallSemantics;

@@ -408,7 +408,10 @@ where
     ) -> Result<AnalysisResult<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L> + CallSemantics<Self, L, Result = AnalysisResult<V>> + 'ir,
+        L: Dialect
+            + Interpretable<Self, L>
+            + CallSemantics<Self, L, Result = AnalysisResult<V>>
+            + 'ir,
     {
         // 1. UserFixed summaries are always returned as-is
         if let Some(cache) = self.summaries.get(&callee) {
@@ -599,10 +602,7 @@ where
     }
 
     /// Get the tentative return value for `callee`.
-    pub(crate) fn tentative_return_value(
-        &self,
-        callee: SpecializedFunction,
-    ) -> Option<&V> {
+    pub(crate) fn tentative_return_value(&self, callee: SpecializedFunction) -> Option<&V> {
         self.summaries
             .get(&callee)
             .and_then(|c| c.tentative_result())
@@ -697,10 +697,7 @@ where
 
     /// Interpret all statements in a block sequentially, returning the
     /// final control action from the terminator.
-    fn interpret_block<L>(
-        &mut self,
-        block: Block,
-    ) -> Result<AbstractContinuation<V>, E>
+    fn interpret_block<L>(&mut self, block: Block) -> Result<AbstractContinuation<V>, E>
     where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<Self, L> + 'ir,

@@ -1,0 +1,22 @@
+---
+source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
+assertion_line: 60
+expression: "case!\n{ #[kirin(type = TestType)] struct Wrapper { #[wraps] inner: InnerType, } }"
+---
+impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, Wrapper> for Wrapper
+where
+    __CallSemI: ::kirin_interpreter::Interpreter,
+    __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+    InnerType: ::kirin_interpreter::CallSemantics<__CallSemI, Wrapper>,
+{
+    type Result = <InnerType as ::kirin_interpreter::CallSemantics<__CallSemI, Wrapper>>::Result;
+    fn call_semantics(
+        &self,
+        interpreter: &mut __CallSemI,
+        callee: ::kirin::ir::SpecializedFunction,
+        args: &[__CallSemI::Value],
+    ) -> Result<Self::Result, __CallSemI::Error> {
+        let Self { inner } = self;
+        inner.call_semantics(interpreter, callee, args)
+    }
+}

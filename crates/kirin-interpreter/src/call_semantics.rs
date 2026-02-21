@@ -2,7 +2,7 @@ use kirin_ir::{
     Block, CompileStageInfo, Dialect, GetInfo, HasStageInfo, SpecializedFunction, StageInfo,
 };
 
-use crate::{InterpreterError, Interpreter};
+use crate::{Interpreter, InterpreterError};
 
 /// Trait for customizing how a function body is executed.
 ///
@@ -124,17 +124,14 @@ where
 // Blanket impl: SSACFGRegion → CallSemantics<AbstractInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T>
-    CallSemantics<crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, L, T> CallSemantics<crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
 where
     T: SSACFGRegion,
     V: crate::AbstractValue + Clone,
     E: From<InterpreterError>,
     S: CompileStageInfo + HasStageInfo<L>,
     G: 'ir,
-    L: Dialect
-        + crate::Interpretable<crate::AbstractInterpreter<'ir, V, S, E, G>, L>
-        + 'ir,
+    L: Dialect + crate::Interpretable<crate::AbstractInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     type Result = crate::AnalysisResult<V>;
 

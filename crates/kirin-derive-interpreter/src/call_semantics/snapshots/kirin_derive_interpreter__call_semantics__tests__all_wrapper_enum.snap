@@ -1,0 +1,41 @@
+---
+source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
+expression: "case!\n{\n    #[kirin(type = ArithType)] #[wraps] enum TestDialect\n    {\n        Arith(Arith<ArithType>), ControlFlow(ControlFlow<ArithType>),\n        Constant(Constant<ArithValue, ArithType>),\n    }\n}"
+---
+impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect> for TestDialect
+where
+    __CallSemI: ::kirin_interpreter::Interpreter,
+    __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+    Arith<ArithType>: ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect>,
+    ControlFlow<ArithType>: ::kirin_interpreter::CallSemantics<
+        __CallSemI,
+        TestDialect,
+        Result = <Arith<ArithType> as ::kirin_interpreter::CallSemantics<
+            __CallSemI,
+            TestDialect,
+        >>::Result,
+    >,
+    Constant<ArithValue, ArithType>: ::kirin_interpreter::CallSemantics<
+        __CallSemI,
+        TestDialect,
+        Result = <Arith<ArithType> as ::kirin_interpreter::CallSemantics<
+            __CallSemI,
+            TestDialect,
+        >>::Result,
+    >,
+{
+    type Result =
+        <Arith<ArithType> as ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect>>::Result;
+    fn call_semantics(
+        &self,
+        interpreter: &mut __CallSemI,
+        callee: ::kirin::ir::SpecializedFunction,
+        args: &[__CallSemI::Value],
+    ) -> Result<Self::Result, __CallSemI::Error> {
+        match self {
+            Self::Arith(field_0) => field_0.call_semantics(interpreter, callee, args),
+            Self::ControlFlow(field_0) => field_0.call_semantics(interpreter, callee, args),
+            Self::Constant(field_0) => field_0.call_semantics(interpreter, callee, args),
+        }
+    }
+}

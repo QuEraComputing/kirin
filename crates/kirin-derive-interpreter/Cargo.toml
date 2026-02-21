@@ -1,0 +1,18 @@
+[package]
+name = "kirin-derive-interpreter"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+kirin-derive-core.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+manyhow.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+kirin-test-utils.workspace = true

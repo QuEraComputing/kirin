@@ -1,7 +1,5 @@
 use kirin::prelude::{Dialect, HasStageInfo};
-use kirin_interpreter::{
-    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion,
-};
+use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion};
 
 use crate::{FunctionBody, Return};
 

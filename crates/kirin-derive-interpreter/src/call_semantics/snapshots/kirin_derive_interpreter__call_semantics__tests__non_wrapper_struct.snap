@@ -1,0 +1,20 @@
+---
+source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
+assertion_line: 71
+expression: "case! { #[kirin(type = TestType)] struct Regular { a: i32, b: i32, } }"
+---
+impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, Regular> for Regular
+where
+    __CallSemI: ::kirin_interpreter::Interpreter,
+    __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+{
+    type Result = __CallSemI::Value;
+    fn call_semantics(
+        &self,
+        _interpreter: &mut __CallSemI,
+        _callee: ::kirin::ir::SpecializedFunction,
+        _args: &[__CallSemI::Value],
+    ) -> Result<Self::Result, __CallSemI::Error> {
+        Err(::kirin_interpreter::InterpreterError::MissingEntry.into())
+    }
+}

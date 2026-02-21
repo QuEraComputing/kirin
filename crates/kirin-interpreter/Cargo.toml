@@ -5,8 +5,12 @@ edition = "2024"
 
 [dependencies]
 kirin-ir = { workspace = true, features = ["derive"] }
+kirin-derive-interpreter = { workspace = true, optional = true }
 fxhash = "0.2"
 thiserror = { workspace = true }
+
+[features]
+derive = ["dep:kirin-derive-interpreter"]
 
 [dev-dependencies]
 kirin-arith = { workspace = true }
@@ -14,4 +18,5 @@ kirin-cf = { workspace = true, features = ["interpret"] }
 kirin-constant = { workspace = true }
 kirin-function = { workspace = true, features = ["interpret"] }
 kirin-derive = { workspace = true }
+kirin-derive-interpreter = { workspace = true }
 kirin-test-utils = { workspace = true, features = ["interpreter"] }
