@@ -85,7 +85,7 @@ where
                     match cond.is_truthy() {
                         Some(true) => Ok(Continuation::Jump((*true_target).into(), vec![])),
                         Some(false) => Ok(Continuation::Jump((*false_target).into(), vec![])),
-                        None => Ok(Continuation::Fork(vec![
+                        None => Ok(Continuation::Fork(smallvec::smallvec![
                             ((*true_target).into(), vec![]),
                             ((*false_target).into(), vec![]),
                         ])),

@@ -22,5 +22,7 @@ pub use stack::StackInterpreter;
 pub use value::{AbstractValue, BranchCondition};
 pub use widening::WideningStrategy;
 
+pub use smallvec::{self, SmallVec};
+
 #[cfg(feature = "derive")]
 pub use kirin_derive_interpreter::CallSemantics;

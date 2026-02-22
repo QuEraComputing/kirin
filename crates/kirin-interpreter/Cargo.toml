@@ -7,6 +7,7 @@ edition = "2024"
 kirin-ir = { workspace = true, features = ["derive"] }
 kirin-derive-interpreter = { workspace = true, optional = true }
 fxhash = "0.2"
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 
 [features]

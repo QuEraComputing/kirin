@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 
 use kirin_ir::{Block, ResultValue, SpecializedFunction};
+use smallvec::SmallVec;
 
 /// Describes how execution continues after interpreting a statement.
 ///
@@ -23,7 +24,7 @@ pub enum Continuation<V, Ext = Infallible> {
     /// Only reachable when [`crate::BranchCondition::is_truthy`] returns
     /// `None`, which cannot happen for concrete values. The concrete
     /// interpreter panics if it encounters this variant.
-    Fork(Vec<(Block, Vec<V>)>),
+    Fork(SmallVec<[(Block, Vec<V>); 2]>),
     /// Call a specialized function with arguments, writing the return value
     /// to `result` in the caller's frame.
     Call {

@@ -1285,6 +1285,7 @@ dependencies = [
  "kirin-function",
  "kirin-ir",
  "kirin-test-utils",
+ "smallvec",
  "thiserror 2.0.17",
 ]
 
