@@ -76,3 +76,49 @@ fn test_non_wrapper_struct() {
         }
     });
 }
+
+#[test]
+fn test_callable_per_variant() {
+    // #[wraps] on all, #[callable] only on FunctionBody → only that one forwards
+    insta::assert_snapshot!(case! {
+        #[kirin(type = ArithType)]
+        #[wraps]
+        enum TestDialect {
+            Arith(Arith<ArithType>),
+            ControlFlow(ControlFlow<ArithType>),
+            #[callable]
+            FunctionBody(FunctionBody<ArithType>),
+        }
+    });
+}
+
+#[test]
+fn test_callable_global() {
+    // #[callable] on enum + #[wraps] on all → all forward
+    insta::assert_snapshot!(case! {
+        #[kirin(type = ArithType)]
+        #[wraps]
+        #[callable]
+        enum TestDialect {
+            Arith(Arith<ArithType>),
+            ControlFlow(ControlFlow<ArithType>),
+            FunctionBody(FunctionBody<ArithType>),
+        }
+    });
+}
+
+#[test]
+fn test_callable_global_mixed_wraps() {
+    // #[callable] on enum, #[wraps] only on some → only #[wraps] variants forward
+    insta::assert_snapshot!(case! {
+        #[kirin(type = TestType)]
+        #[callable]
+        enum TestDialect {
+            #[wraps]
+            Arith(Arith<TestType>),
+            ControlFlow(ControlFlow<TestType>),
+            #[wraps]
+            FunctionBody(FunctionBody<TestType>),
+        }
+    });
+}

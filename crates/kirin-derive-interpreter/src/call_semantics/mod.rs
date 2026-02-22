@@ -1,5 +1,8 @@
 mod emit;
+mod layout;
 mod scan;
+
+pub use layout::CallSemanticsLayout;
 
 use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::misc::from_str;
@@ -20,12 +23,14 @@ pub struct DeriveCallSemantics {
 #[derive(Clone, Debug)]
 pub(crate) struct InputContext {
     pub(crate) core: InputMeta,
+    pub(crate) callable_all: bool,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct StatementInfo {
     pub(crate) name: syn::Ident,
     pub(crate) is_wrapper: bool,
+    pub(crate) is_callable: bool,
     pub(crate) wrapper_ty: Option<syn::Type>,
     pub(crate) wrapper_binding: Option<proc_macro2::TokenStream>,
     pub(crate) pattern: FieldPatternTokens,
@@ -44,7 +49,7 @@ impl Default for DeriveCallSemantics {
 
 impl DeriveCallSemantics {
     pub fn emit(&mut self, input: &syn::DeriveInput) -> darling::Result<proc_macro2::TokenStream> {
-        let input = ir::Input::<StandardLayout>::from_derive_input(input)?;
+        let input = ir::Input::<CallSemanticsLayout>::from_derive_input(input)?;
         self.scan_input(&input)?;
         self.emit_input(&input)
     }
@@ -57,7 +62,7 @@ impl DeriveCallSemantics {
 
     pub(crate) fn statement_info(
         &self,
-        statement: &ir::Statement<StandardLayout>,
+        statement: &ir::Statement<CallSemanticsLayout>,
     ) -> darling::Result<&StatementInfo> {
         let key = statement.name.to_string();
         self.statements.get(&key).ok_or_else(|| {

@@ -1,0 +1,37 @@
+---
+source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
+assertion_line: 113
+expression: "case!\n{\n    #[kirin(type = TestType)] #[callable] enum TestDialect\n    {\n        #[wraps] Arith(Arith<TestType>), ControlFlow(ControlFlow<TestType>),\n        #[wraps] FunctionBody(FunctionBody<TestType>),\n    }\n}"
+---
+impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect> for TestDialect
+where
+    __CallSemI: ::kirin_interpreter::Interpreter,
+    __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+    Arith<TestType>: ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect>,
+    FunctionBody<TestType>:
+        ::kirin_interpreter::CallSemantics<
+            __CallSemI,
+            TestDialect,
+            Result = <Arith<TestType> as ::kirin_interpreter::CallSemantics<
+                __CallSemI,
+                TestDialect,
+            >>::Result,
+        >,
+{
+    type Result =
+        <Arith<TestType> as ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect>>::Result;
+    fn call_semantics(
+        &self,
+        interpreter: &mut __CallSemI,
+        callee: ::kirin::ir::SpecializedFunction,
+        args: &[__CallSemI::Value],
+    ) -> Result<Self::Result, __CallSemI::Error> {
+        match self {
+            Self::Arith(field_0) => field_0.call_semantics(interpreter, callee, args),
+            Self::ControlFlow(field_0) => {
+                Err(::kirin_interpreter::InterpreterError::MissingEntry.into())
+            }
+            Self::FunctionBody(field_0) => field_0.call_semantics(interpreter, callee, args),
+        }
+    }
+}

@@ -1,11 +1,11 @@
-use super::DeriveCallSemantics;
+use super::{CallSemanticsLayout, DeriveCallSemantics};
 use kirin_derive_core::prelude::*;
 use quote::quote;
 
-impl<'ir> Emit<'ir, StandardLayout> for DeriveCallSemantics {
+impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
     fn emit_struct(
         &mut self,
-        data: &'ir ir::DataStruct<StandardLayout>,
+        data: &'ir ir::DataStruct<CallSemanticsLayout>,
     ) -> darling::Result<proc_macro2::TokenStream> {
         let input = self.input_ctx()?;
         let info = self.statement_info(&data.0)?;
@@ -69,7 +69,7 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveCallSemantics {
 
     fn emit_enum(
         &mut self,
-        data: &'ir ir::DataEnum<StandardLayout>,
+        data: &'ir ir::DataEnum<CallSemanticsLayout>,
     ) -> darling::Result<proc_macro2::TokenStream> {
         let input = self.input_ctx()?;
         let interp_crate = self.interpreter_crate_path();
@@ -79,6 +79,13 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveCallSemantics {
         let (impl_generics, _, _) = generics.split_for_impl();
         let (_, ty_generics, where_clause) = input.core.generics.split_for_impl();
 
+        // Determine if #[callable] is used anywhere (enum-level or any variant).
+        let any_callable = input.callable_all
+            || self
+                .statements
+                .values()
+                .any(|info| info.is_callable);
+
         let mut wrapper_types: Vec<&syn::Type> = Vec::new();
         let mut match_arms = Vec::new();
 
@@ -87,7 +94,16 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveCallSemantics {
             let variant_name = &info.name;
             let pattern = &info.pattern;
 
-            if info.is_wrapper {
+            // A variant forwards call_semantics if:
+            // - No #[callable] used anywhere: fall back to #[wraps] (backward compat)
+            // - #[callable] used: only callable wrappers forward
+            let is_call_wrapper = if any_callable {
+                info.is_wrapper && info.is_callable
+            } else {
+                info.is_wrapper
+            };
+
+            if is_call_wrapper {
                 let wrapper_ty = info.wrapper_ty.as_ref().unwrap();
                 wrapper_types.push(wrapper_ty);
                 let binding = info.wrapper_binding.as_ref().unwrap();
@@ -121,7 +137,6 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveCallSemantics {
                         #ty: #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>,
                     }
                 } else {
-                    // Constrain subsequent wrappers to have the same Result type
                     quote! {
                         #ty: #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics, Result = #result_type>,
                     }
