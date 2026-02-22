@@ -1,6 +1,3 @@
-mod common;
-
-use common::TestDialect;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
@@ -8,6 +5,7 @@ use kirin_function::FunctionBody;
 use kirin_interpreter::AbstractInterpreter;
 use kirin_ir::*;
 use kirin_test_utils::Interval;
+use kirin_test_utils::TestDialect;
 
 // ---------------------------------------------------------------------------
 // Test 1: Straight-line constant propagation

@@ -1,116 +1,30 @@
-mod common;
-
-use common::ArithmeticValue;
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
+use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::FunctionBody;
-use kirin_interpreter::{
-    BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
-    StackInterpreter,
-};
+use kirin_interpreter::StackInterpreter;
 use kirin_ir::*;
 
 // ---------------------------------------------------------------------------
-// Dialect with derived CallSemantics (mixed wrapper/non-wrapper).
+// Dialect with derived Interpretable + derived CallSemantics using #[callable].
 //
-// Only FunctionBody is #[wraps]: the derived CallSemantics forwards to its
-// inner SSACFGRegion impl. Arith, ControlFlow, and Constant are non-wrappers:
-// the derived CallSemantics returns MissingEntry for them.
+// Only FunctionBody is #[callable]: derived CallSemantics forwards to its
+// inner SSACFGRegion impl. Arith, ControlFlow, and Constant are
+// non-callable: derived CallSemantics returns MissingEntry for them.
+// Interpretable is derived with all variants as #[wraps].
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, CallSemantics)]
-#[kirin(fn, type = ArithType, crate = "kirin_ir")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
+#[wraps]
+#[kirin(fn, type = ArithType, crate = kirin_ir)]
 pub enum DerivedDialect {
-    #[wraps]
+    #[callable]
     FunctionBody(FunctionBody<ArithType>),
     Arith(Arith<ArithType>),
     #[kirin(terminator)]
     ControlFlow(ControlFlow<ArithType>),
     Constant(Constant<ArithValue, ArithType>),
-}
-
-// From impls for the non-wrapper variants (builders need them)
-impl From<Arith<ArithType>> for DerivedDialect {
-    fn from(v: Arith<ArithType>) -> Self {
-        Self::Arith(v)
-    }
-}
-impl From<ControlFlow<ArithType>> for DerivedDialect {
-    fn from(v: ControlFlow<ArithType>) -> Self {
-        Self::ControlFlow(v)
-    }
-}
-impl From<Constant<ArithValue, ArithType>> for DerivedDialect {
-    fn from(v: Constant<ArithValue, ArithType>) -> Self {
-        Self::Constant(v)
-    }
-}
-
-impl<I> Interpretable<I, Self> for DerivedDialect
-where
-    I: Interpreter<Error = InterpreterError>,
-    I::StageInfo: HasStageInfo<Self>,
-    I::Value: ArithmeticValue + BranchCondition,
-{
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, InterpreterError> {
-        match self {
-            DerivedDialect::Arith(arith) => match arith {
-                Arith::Add {
-                    lhs, rhs, result, ..
-                } => {
-                    let a = interp.read(*lhs)?;
-                    let b = interp.read(*rhs)?;
-                    interp.write(*result, a.arith_add(&b))?;
-                    Ok(Continuation::Continue)
-                }
-                _ => Err(InterpreterError::MissingEntry),
-            },
-            DerivedDialect::ControlFlow(cf) => match cf {
-                ControlFlow::Branch { target } => {
-                    Ok(Continuation::Jump((*target).into(), smallvec::smallvec![]))
-                }
-                ControlFlow::Return(value) => {
-                    let v = interp.read(*value)?;
-                    Ok(Continuation::Return(v))
-                }
-                ControlFlow::ConditionalBranch {
-                    condition,
-                    true_target,
-                    false_target,
-                    ..
-                } => {
-                    let cond = interp.read(*condition)?;
-                    match cond.is_truthy() {
-                        Some(true) => Ok(Continuation::Jump(
-                            (*true_target).into(),
-                            smallvec::smallvec![],
-                        )),
-                        Some(false) => Ok(Continuation::Jump(
-                            (*false_target).into(),
-                            smallvec::smallvec![],
-                        )),
-                        None => Ok(Continuation::Fork(smallvec::smallvec![
-                            ((*true_target).into(), smallvec::smallvec![]),
-                            ((*false_target).into(), smallvec::smallvec![]),
-                        ])),
-                    }
-                }
-            },
-            DerivedDialect::Constant(c) => {
-                let val = I::Value::from_arith_value(&c.value);
-                interp.write(c.result, val)?;
-                Ok(Continuation::Continue)
-            }
-            // FunctionBody is #[wraps] — forward to the inner dialect.
-            DerivedDialect::FunctionBody(body) => {
-                <FunctionBody<ArithType> as Interpretable<I, Self>>::interpret(body, interp)
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +70,7 @@ fn build_add_one(
 }
 
 // ---------------------------------------------------------------------------
-// End-to-end test: the derived CallSemantics (only FunctionBody is #[wraps])
+// End-to-end test: the derived CallSemantics with #[callable] on FunctionBody
 // produces a working impl that StackInterpreter::call can use.
 // ---------------------------------------------------------------------------
 

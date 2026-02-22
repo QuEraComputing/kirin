@@ -1,8 +1,5 @@
 //! Abstract interpretation tests using StackInterpreter with the Interval domain.
 
-mod common;
-
-use common::TestDialect;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
@@ -10,6 +7,7 @@ use kirin_function::FunctionBody;
 use kirin_interpreter::{Continuation, Frame, StackInterpreter};
 use kirin_ir::*;
 use kirin_test_utils::Interval;
+use kirin_test_utils::TestDialect;
 
 /// Build `c1 = constant 10; c2 = constant 32; y = add c1, c2; return y`
 /// Run with Interval values through StackInterpreter.

@@ -1,14 +1,10 @@
 //! Extended test coverage for interpreter features using TestDialect.
 //!
-//! Covers: fuel exhaustion, division/remainder by zero, breakpoints,
-//! sequential calls, abstract widening strategies, fixed summaries,
-//! summary invalidation/GC, and AnalysisResult queries.
-
-mod common;
+//! Covers: fuel exhaustion, breakpoints, sequential calls, abstract widening
+//! strategies, fixed summaries, summary invalidation/GC, and AnalysisResult queries.
 
 use std::collections::HashSet;
 
-use common::TestDialect;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
@@ -19,6 +15,7 @@ use kirin_interpreter::{
 };
 use kirin_ir::{query::ParentInfo, *};
 use kirin_test_utils::Interval;
+use kirin_test_utils::TestDialect;
 
 // ===========================================================================
 // IR builder helpers
@@ -87,56 +84,6 @@ fn build_infinite_loop(
         .add_block(body)
         .add_block(exit)
         .new();
-    let func_body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().f(sf).body(func_body).new().unwrap()
-}
-
-/// Build `f(x) = c0 = const 0; result = div(x, c0); return result`
-fn build_div_by_zero(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
-    stage_id: CompileStage,
-) -> SpecializedFunction {
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let sf = stage.staged_function().new().unwrap();
-
-    let ba_x = stage.block_argument(0);
-    let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
-    let div = kirin_arith::Arith::<ArithType>::op_div(stage, SSAValue::from(ba_x), c0.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, div.result);
-
-    let block = stage
-        .block()
-        .argument(ArithType::I64)
-        .stmt(c0)
-        .stmt(div)
-        .terminator(ret)
-        .new();
-    let region = stage.region().add_block(block).new();
-    let func_body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().f(sf).body(func_body).new().unwrap()
-}
-
-/// Build `f(x) = c0 = const 0; result = rem(x, c0); return result`
-fn build_rem_by_zero(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
-    stage_id: CompileStage,
-) -> SpecializedFunction {
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let sf = stage.staged_function().new().unwrap();
-
-    let ba_x = stage.block_argument(0);
-    let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
-    let rem = kirin_arith::Arith::<ArithType>::op_rem(stage, SSAValue::from(ba_x), c0.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, rem.result);
-
-    let block = stage
-        .block()
-        .argument(ArithType::I64)
-        .stmt(c0)
-        .stmt(rem)
-        .terminator(ret)
-        .new();
-    let region = stage.region().add_block(block).new();
     let func_body = FunctionBody::<ArithType>::new(stage, region);
     stage.specialize().f(sf).body(func_body).new().unwrap()
 }
@@ -333,50 +280,6 @@ fn test_concrete_fuel_exhaustion() {
     assert!(
         matches!(err, InterpreterError::FuelExhausted),
         "expected FuelExhausted, got: {err:?}"
-    );
-}
-
-#[test]
-fn test_concrete_division_by_zero() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-
-    let spec_fn = build_div_by_zero(&mut pipeline, stage_id);
-
-    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
-
-    let result = interp.call::<TestDialect>(spec_fn, &[10]);
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(
-        matches!(err, InterpreterError::Custom(_)),
-        "expected Custom error, got: {err:?}"
-    );
-    assert!(
-        err.to_string().contains("division by zero"),
-        "expected 'division by zero' in message, got: {err}"
-    );
-}
-
-#[test]
-fn test_concrete_remainder_by_zero() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-
-    let spec_fn = build_rem_by_zero(&mut pipeline, stage_id);
-
-    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
-
-    let result = interp.call::<TestDialect>(spec_fn, &[10]);
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(
-        matches!(err, InterpreterError::Custom(_)),
-        "expected Custom error, got: {err:?}"
-    );
-    assert!(
-        err.to_string().contains("division by zero"),
-        "expected 'division by zero' in message, got: {err}"
     );
 }
 

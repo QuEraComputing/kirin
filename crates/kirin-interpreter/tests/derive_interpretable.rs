@@ -1,5 +1,3 @@
-mod common;
-
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
@@ -16,7 +14,7 @@ use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = "kirin_ir")]
+#[kirin(fn, type = ArithType, crate = kirin_ir)]
 pub enum DerivedDialect {
     Arith(Arith<ArithType>),
     #[kirin(terminator)]

@@ -1,12 +1,10 @@
-mod common;
-
-use common::TestDialect;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::StackInterpreter;
 use kirin_ir::{query::ParentInfo, *};
+use kirin_test_utils::TestDialect;
 
 // ---------------------------------------------------------------------------
 // IR builder: select(x) = if x != 0 then x+1 else 42
