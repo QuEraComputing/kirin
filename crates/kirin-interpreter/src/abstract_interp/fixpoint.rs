@@ -1,385 +1,15 @@
-use std::collections::VecDeque;
-use std::marker::PhantomData;
-
-use fxhash::FxHashMap;
 use kirin_ir::{
-    Block, CompileStage, CompileStageInfo, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
-    SSAValue, SpecializedFunction,
+    Block, CompileStageInfo, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction,
 };
 
+use super::FixpointState;
 use crate::result::AnalysisResult;
-use crate::widening::WideningStrategy;
 use crate::{
     AbstractContinuation, AbstractValue, CallSemantics, Continuation, Frame, Interpretable,
     Interpreter, InterpreterError,
 };
 
-/// Per-function fixpoint state stored as frame extra data.
-///
-/// Block argument SSA value IDs are tracked here; the actual SSA values
-/// (both block args and statement results) live in [`Frame::values`].
-#[derive(Debug, Default)]
-pub struct FixpointState {
-    pub(crate) worklist: VecDeque<Block>,
-    /// Per-block argument SSA value IDs. Key presence = block visited.
-    pub(crate) block_args: FxHashMap<Block, Vec<SSAValue>>,
-    /// Per-block visit counts for [`WideningStrategy::Delayed`].
-    pub(crate) visit_counts: FxHashMap<Block, usize>,
-}
-
-/// A single context-sensitive summary entry in the cache.
-#[derive(Debug, Clone)]
-pub struct SummaryEntry<V> {
-    /// Argument abstract values this entry was computed for.
-    pub args: Vec<V>,
-    /// The analysis result for this context.
-    pub result: AnalysisResult<V>,
-    /// Whether this entry has been invalidated. Invalidated entries are
-    /// skipped during lookup but retained until garbage-collected.
-    pub invalidated: bool,
-}
-
-/// Per-function summary cache supporting multiple call contexts.
-///
-/// Each function may have:
-/// - An optional **fixed** summary that is always returned and never
-///   overwritten by analysis.
-/// - Zero or more **computed** entries, each for a different call context
-///   (argument abstract values). Lookup finds the tightest (most specific)
-///   non-invalidated entry whose args subsume the query.
-/// - At most one **tentative** entry used during recursive fixpoint iteration.
-#[derive(Debug, Clone)]
-pub struct SummaryCache<V> {
-    /// User-provided fixed summary. Not subject to invalidation.
-    fixed: Option<AnalysisResult<V>>,
-    /// Computed and seed entries, possibly for multiple call contexts.
-    ///
-    /// Lookup is a linear scan (`find_best_match`). This is fine for the
-    /// expected cardinality (single-digit contexts per function). If profiling
-    /// shows this is hot, consider a lattice-height–based index — note that
-    /// `BTreeMap` does not apply here because `Vec<V>` under subsumption is a
-    /// partial order, not a total order.
-    entries: Vec<SummaryEntry<V>>,
-    /// Tentative entry during recursive fixpoint (at most one active).
-    tentative: Option<SummaryEntry<V>>,
-}
-
-impl<V> Default for SummaryCache<V> {
-    fn default() -> Self {
-        Self {
-            fixed: None,
-            entries: Vec::new(),
-            tentative: None,
-        }
-    }
-}
-
-impl<V: AbstractValue + Clone> SummaryCache<V> {
-    /// Find the tightest non-invalidated entry whose args subsume `query_args`.
-    ///
-    /// "Tightest" means: among all matching entries, the one whose args are
-    /// pointwise subsumed by every other match (i.e. the most specific).
-    fn find_best_match(&self, query_args: &[V]) -> Option<&SummaryEntry<V>> {
-        let mut best: Option<&SummaryEntry<V>> = None;
-        for entry in &self.entries {
-            if entry.invalidated {
-                continue;
-            }
-            if entry.args.len() != query_args.len() {
-                continue;
-            }
-            let subsumes = query_args
-                .iter()
-                .zip(entry.args.iter())
-                .all(|(q, cached)| q.is_subseteq(cached));
-            if !subsumes {
-                continue;
-            }
-            best = Some(match best {
-                None => entry,
-                Some(current) => {
-                    // Pick the entry with tighter (more specific) args
-                    let tighter = entry
-                        .args
-                        .iter()
-                        .zip(current.args.iter())
-                        .all(|(e, b)| e.is_subseteq(b));
-                    if tighter { entry } else { current }
-                }
-            });
-        }
-        best
-    }
-
-    /// Get the tentative result (for recursive fixpoint), if any.
-    fn tentative_result(&self) -> Option<&AnalysisResult<V>> {
-        self.tentative.as_ref().map(|t| &t.result)
-    }
-}
-
-/// Worklist-based abstract interpreter for fixpoint computation.
-///
-/// Unlike [`crate::StackInterpreter`] which follows a single concrete execution
-/// path, `AbstractInterpreter` explores all reachable paths by joining abstract
-/// states at block entry points and iterating until a fixpoint is reached.
-///
-/// Widening is applied at join points to guarantee termination for infinite
-/// abstract domains.
-pub struct AbstractInterpreter<'ir, V, S, E = InterpreterError, G = ()>
-where
-    S: CompileStageInfo,
-{
-    pipeline: &'ir Pipeline<S>,
-    active_stage: CompileStage,
-    global: G,
-    frames: Vec<Frame<V, FixpointState>>,
-    widening_strategy: WideningStrategy,
-    max_iterations: usize,
-    narrowing_iterations: usize,
-    summaries: FxHashMap<SpecializedFunction, SummaryCache<V>>,
-    max_depth: Option<usize>,
-    max_summary_iterations: usize,
-    /// Type-erased call handler installed by [`analyze`](Self::analyze) so that
-    /// [`interpret_block`] can dispatch nested calls through [`CallSemantics`]
-    /// without requiring `L: CallSemantics` in its own bounds.
-    call_handler: Option<
-        fn(
-            &mut AbstractInterpreter<'ir, V, S, E, G>,
-            SpecializedFunction,
-            &[V],
-        ) -> Result<AnalysisResult<V>, E>,
-    >,
-    _error: PhantomData<E>,
-}
-
-/// Builder for inserting function summaries into an [`AbstractInterpreter`].
-///
-/// Obtained via [`AbstractInterpreter::insert_summary`].
-pub struct SummaryInserter<'a, 'ir, V, S, E, G>
-where
-    S: CompileStageInfo,
-{
-    interp: &'a mut AbstractInterpreter<'ir, V, S, E, G>,
-    callee: SpecializedFunction,
-}
-
-impl<V: Clone, S: CompileStageInfo, E, G> SummaryInserter<'_, '_, V, S, E, G> {
-    /// Insert an immutable summary. Analysis will never re-analyze this function.
-    pub fn fixed(self, result: AnalysisResult<V>) {
-        self.interp.summaries.entry(self.callee).or_default().fixed = Some(result);
-    }
-
-    /// Insert a refinable seed. Analysis may improve upon this summary.
-    pub fn seed(self, args: Vec<V>, result: AnalysisResult<V>) {
-        self.interp
-            .summaries
-            .entry(self.callee)
-            .or_default()
-            .entries
-            .push(SummaryEntry {
-                args,
-                result,
-                invalidated: false,
-            });
-    }
-}
-
-// -- Constructors -----------------------------------------------------------
-
-impl<'ir, V, S, E> AbstractInterpreter<'ir, V, S, E, ()>
-where
-    S: CompileStageInfo,
-{
-    pub fn new(pipeline: &'ir Pipeline<S>, active_stage: CompileStage) -> Self {
-        Self {
-            pipeline,
-            active_stage,
-            global: (),
-            widening_strategy: WideningStrategy::AllJoins,
-            max_iterations: 1000,
-            narrowing_iterations: 3,
-            frames: Vec::new(),
-            summaries: FxHashMap::default(),
-            max_depth: None,
-            max_summary_iterations: 100,
-            call_handler: None,
-            _error: PhantomData,
-        }
-    }
-
-    /// Attach global state, transforming `G` from `()` to the provided type.
-    pub fn with_global<G>(self, global: G) -> AbstractInterpreter<'ir, V, S, E, G> {
-        AbstractInterpreter {
-            pipeline: self.pipeline,
-            active_stage: self.active_stage,
-            global,
-            widening_strategy: self.widening_strategy,
-            max_iterations: self.max_iterations,
-            narrowing_iterations: self.narrowing_iterations,
-            frames: self.frames,
-            summaries: self.summaries,
-            max_depth: self.max_depth,
-            max_summary_iterations: self.max_summary_iterations,
-            call_handler: None,
-            _error: PhantomData,
-        }
-    }
-}
-
-// -- Builder methods --------------------------------------------------------
-
-impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
-where
-    S: CompileStageInfo,
-{
-    pub fn with_widening(mut self, strategy: WideningStrategy) -> Self {
-        self.widening_strategy = strategy;
-        self
-    }
-
-    pub fn with_max_iterations(mut self, max: usize) -> Self {
-        self.max_iterations = max;
-        self
-    }
-
-    pub fn with_narrowing_iterations(mut self, n: usize) -> Self {
-        self.narrowing_iterations = n;
-        self
-    }
-
-    pub fn with_max_depth(mut self, depth: usize) -> Self {
-        self.max_depth = Some(depth);
-        self
-    }
-
-    pub fn with_max_summary_iterations(mut self, n: usize) -> Self {
-        self.max_summary_iterations = n;
-        self
-    }
-}
-
-// -- Accessors --------------------------------------------------------------
-
-impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
-where
-    S: CompileStageInfo,
-{
-    pub fn global(&self) -> &G {
-        &self.global
-    }
-
-    pub fn global_mut(&mut self) -> &mut G {
-        &mut self.global
-    }
-
-    /// Look up the best cached summary for `callee` given `args`.
-    ///
-    /// Returns the fixed summary if one exists, otherwise finds the tightest
-    /// non-invalidated entry whose cached args subsume the query.
-    pub fn summary(&self, callee: SpecializedFunction, args: &[V]) -> Option<&AnalysisResult<V>>
-    where
-        V: AbstractValue + Clone,
-    {
-        let cache = self.summaries.get(&callee)?;
-        if let Some(ref fixed) = cache.fixed {
-            return Some(fixed);
-        }
-        cache.find_best_match(args).map(|e| &e.result)
-    }
-
-    /// Look up the full summary cache for `callee`.
-    pub fn summary_cache(&self, callee: SpecializedFunction) -> Option<&SummaryCache<V>> {
-        self.summaries.get(&callee)
-    }
-
-    /// Return a builder for inserting a function summary.
-    pub fn insert_summary(
-        &mut self,
-        callee: SpecializedFunction,
-    ) -> SummaryInserter<'_, 'ir, V, S, E, G> {
-        SummaryInserter {
-            interp: self,
-            callee,
-        }
-    }
-
-    /// Mark all computed entries for `callee` as invalidated so the next
-    /// [`analyze`](Self::analyze) call re-runs the analysis. Invalidated
-    /// entries are retained (for inspection) until
-    /// [`gc_summaries`](Self::gc_summaries) is called.
-    ///
-    /// User-fixed summaries are **not** affected.
-    ///
-    /// Returns the number of entries invalidated.
-    pub fn invalidate_summary(&mut self, callee: SpecializedFunction) -> usize {
-        let Some(cache) = self.summaries.get_mut(&callee) else {
-            return 0;
-        };
-        let mut count = 0;
-        for entry in &mut cache.entries {
-            if !entry.invalidated {
-                entry.invalidated = true;
-                count += 1;
-            }
-        }
-        cache.tentative = None;
-        count
-    }
-
-    /// Remove invalidated entries across all functions, freeing memory.
-    pub fn gc_summaries(&mut self) {
-        for cache in self.summaries.values_mut() {
-            cache.entries.retain(|e| !e.invalidated);
-        }
-        self.summaries.retain(|_, cache| {
-            cache.fixed.is_some() || !cache.entries.is_empty() || cache.tentative.is_some()
-        });
-    }
-
-    /// Unconditionally remove all summaries (including user-fixed) for `callee`.
-    ///
-    /// Returns `true` if a cache entry was present.
-    pub fn remove_summary(&mut self, callee: SpecializedFunction) -> bool {
-        self.summaries.remove(&callee).is_some()
-    }
-}
-
-// -- Interpreter trait impl -------------------------------------------------
-
-impl<'ir, V, S, E, G> Interpreter for AbstractInterpreter<'ir, V, S, E, G>
-where
-    V: AbstractValue + Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo,
-{
-    type Value = V;
-    type Error = E;
-    type Ext = std::convert::Infallible;
-    type StageInfo = S;
-
-    fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
-        self.frames
-            .last()
-            .and_then(|f| f.read(value))
-            .ok_or_else(|| InterpreterError::UnboundValue(value).into())
-    }
-
-    fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.frames
-            .last_mut()
-            .ok_or_else(|| InterpreterError::NoFrame.into())?
-            .write(result, value);
-        Ok(())
-    }
-
-    fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
-    }
-
-    fn active_stage(&self) -> CompileStage {
-        self.active_stage
-    }
-}
+use super::interp::AbstractInterpreter;
 
 // -- Execution engine -------------------------------------------------------
 
@@ -415,8 +45,8 @@ where
     {
         // 1. UserFixed summaries are always returned as-is
         if let Some(cache) = self.summaries.get(&callee) {
-            if let Some(ref fixed) = cache.fixed {
-                return Ok(fixed.clone());
+            if let Some(ref fixed) = cache.fixed() {
+                return Ok((*fixed).clone());
             }
         }
 
@@ -594,11 +224,10 @@ where
         args: &[V],
         result: AnalysisResult<V>,
     ) {
-        self.summaries.entry(callee).or_default().tentative = Some(SummaryEntry {
-            args: args.to_vec(),
-            result,
-            invalidated: false,
-        });
+        self.summaries
+            .entry(callee)
+            .or_default()
+            .set_tentative(args.to_vec(), result);
     }
 
     /// Get the tentative return value for `callee`.
@@ -616,13 +245,10 @@ where
         args: &[V],
         result: AnalysisResult<V>,
     ) {
-        let cache = self.summaries.entry(callee).or_default();
-        cache.tentative = None;
-        cache.entries.push(SummaryEntry {
-            args: args.to_vec(),
-            result,
-            invalidated: false,
-        });
+        self.summaries
+            .entry(callee)
+            .or_default()
+            .promote_tentative(args.to_vec(), result);
     }
 
     /// Return the maximum number of summary iterations.

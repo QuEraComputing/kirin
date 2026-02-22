@@ -8,7 +8,13 @@ use crate::Arith;
 impl<I, L, T> Interpretable<I, L> for Arith<T>
 where
     I: Interpreter,
-    I::Value: Clone + Add<Output = I::Value> + Sub<Output = I::Value> + Mul<Output = I::Value> + Div<Output = I::Value> + Rem<Output = I::Value> + Neg<Output = I::Value>,
+    I::Value: Clone
+        + Add<Output = I::Value>
+        + Sub<Output = I::Value>
+        + Mul<Output = I::Value>
+        + Div<Output = I::Value>
+        + Rem<Output = I::Value>
+        + Neg<Output = I::Value>,
     I::Error: From<InterpreterError>,
     L: Dialect,
     T: CompileTimeValue + Default,

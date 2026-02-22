@@ -70,7 +70,9 @@ where
                 _ => Err(InterpreterError::MissingEntry),
             },
             DerivedDialect::ControlFlow(cf) => match cf {
-                ControlFlow::Branch { target } => Ok(Continuation::Jump((*target).into(), smallvec::smallvec![])),
+                ControlFlow::Branch { target } => {
+                    Ok(Continuation::Jump((*target).into(), smallvec::smallvec![]))
+                }
                 ControlFlow::Return(value) => {
                     let v = interp.read(*value)?;
                     Ok(Continuation::Return(v))
@@ -83,8 +85,14 @@ where
                 } => {
                     let cond = interp.read(*condition)?;
                     match cond.is_truthy() {
-                        Some(true) => Ok(Continuation::Jump((*true_target).into(), smallvec::smallvec![])),
-                        Some(false) => Ok(Continuation::Jump((*false_target).into(), smallvec::smallvec![])),
+                        Some(true) => Ok(Continuation::Jump(
+                            (*true_target).into(),
+                            smallvec::smallvec![],
+                        )),
+                        Some(false) => Ok(Continuation::Jump(
+                            (*false_target).into(),
+                            smallvec::smallvec![],
+                        )),
                         None => Ok(Continuation::Fork(smallvec::smallvec![
                             ((*true_target).into(), smallvec::smallvec![]),
                             ((*false_target).into(), smallvec::smallvec![]),
