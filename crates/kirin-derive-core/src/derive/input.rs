@@ -1,4 +1,4 @@
-use crate::ir::{self, BuilderOptions, StandardLayout};
+use crate::ir::{self, BuilderOptions, Layout};
 
 /// Metadata extracted from the derive input.
 ///
@@ -15,7 +15,7 @@ pub struct InputMeta {
 }
 
 impl InputMeta {
-    pub fn from_input(input: &ir::Input<StandardLayout>) -> Self {
+    pub fn from_input<L: Layout>(input: &ir::Input<L>) -> Self {
         Self {
             name: input.name.clone(),
             generics: input.generics.clone(),
