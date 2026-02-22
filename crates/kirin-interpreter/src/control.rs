@@ -3,6 +3,12 @@ use std::convert::Infallible;
 use kirin_ir::{Block, ResultValue, SpecializedFunction};
 use smallvec::SmallVec;
 
+/// Inline argument list for continuation variants.
+///
+/// Most block/call arguments fit in 2 elements (or are empty), so we
+/// avoid heap allocation for the common case.
+pub type Args<V> = SmallVec<[V; 2]>;
+
 /// Describes how execution continues after interpreting a statement.
 ///
 /// The `Ext` parameter allows interpreter-specific variants. Defaults to
@@ -13,7 +19,7 @@ pub enum Continuation<V, Ext = Infallible> {
     /// Advance to the next statement in the current block.
     Continue,
     /// Jump to a target block, binding argument values to its block arguments.
-    Jump(Block, Vec<V>),
+    Jump(Block, Args<V>),
     /// Fork into multiple targets (undecidable branch).
     ///
     /// Lives in the base enum rather than as an `Ext` variant because
@@ -24,12 +30,12 @@ pub enum Continuation<V, Ext = Infallible> {
     /// Only reachable when [`crate::BranchCondition::is_truthy`] returns
     /// `None`, which cannot happen for concrete values. The concrete
     /// interpreter panics if it encounters this variant.
-    Fork(SmallVec<[(Block, Vec<V>); 2]>),
+    Fork(SmallVec<[(Block, Args<V>); 2]>),
     /// Call a specialized function with arguments, writing the return value
     /// to `result` in the caller's frame.
     Call {
         callee: SpecializedFunction,
-        args: Vec<V>,
+        args: Args<V>,
         /// Where to write the return value in the caller's frame.
         result: ResultValue,
     },

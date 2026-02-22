@@ -1,4 +1,5 @@
 use kirin::prelude::Dialect;
+use kirin_interpreter::smallvec::smallvec;
 use kirin_interpreter::{BranchCondition, Continuation, Interpretable, Interpreter};
 
 use crate::ControlFlow;
@@ -12,7 +13,9 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         match self {
-            ControlFlow::Branch { target } => Ok(Continuation::Jump((*target).into(), vec![])),
+            ControlFlow::Branch { target } => {
+                Ok(Continuation::Jump((*target).into(), smallvec![]))
+            }
             ControlFlow::Return(value) => {
                 let v = interp.read(*value)?;
                 Ok(Continuation::Return(v))
@@ -25,11 +28,13 @@ where
             } => {
                 let cond = interp.read(*condition)?;
                 match cond.is_truthy() {
-                    Some(true) => Ok(Continuation::Jump((*true_target).into(), vec![])),
-                    Some(false) => Ok(Continuation::Jump((*false_target).into(), vec![])),
-                    None => Ok(Continuation::Fork(kirin_interpreter::smallvec::smallvec![
-                        ((*true_target).into(), vec![]),
-                        ((*false_target).into(), vec![]),
+                    Some(true) => Ok(Continuation::Jump((*true_target).into(), smallvec![])),
+                    Some(false) => {
+                        Ok(Continuation::Jump((*false_target).into(), smallvec![]))
+                    }
+                    None => Ok(Continuation::Fork(smallvec![
+                        ((*true_target).into(), smallvec![]),
+                        ((*false_target).into(), smallvec![]),
                     ])),
                 }
             }

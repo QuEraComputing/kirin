@@ -1,4 +1,5 @@
 use kirin::prelude::{Dialect, HasStageInfo};
+use kirin_interpreter::smallvec::smallvec;
 use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion};
 
 use crate::{FunctionBody, Return};
@@ -33,7 +34,7 @@ where
             .blocks(stage)
             .next()
             .ok_or(InterpreterError::MissingEntry)?;
-        Ok(Continuation::Jump(entry, vec![]))
+        Ok(Continuation::Jump(entry, smallvec![]))
     }
 }
 
