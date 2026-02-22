@@ -1,3 +1,6 @@
+#[cfg(feature = "interpret")]
+mod interpret_impl;
+
 use kirin::prelude::*;
 
 // Note: HasParser and PrettyPrint are not derived because T and L are generic type parameters

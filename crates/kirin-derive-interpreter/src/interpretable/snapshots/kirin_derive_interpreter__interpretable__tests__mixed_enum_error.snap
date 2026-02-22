@@ -1,0 +1,6 @@
+---
+source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
+assertion_line: 83
+expression: "err_case!\n{\n    #[kirin(type = TestType)] enum TestDialect\n    {\n        #[wraps] Arith(Arith<TestType>), #[wraps]\n        ControlFlow(ControlFlow<TestType>), Custom { a: i32, b: i32 },\n    }\n}"
+---
+Cannot derive `Interpretable` for enum `TestDialect`: variant(s) Custom are not `#[wraps]`. Either implement `Interpretable` manually, or split each variant as a separate struct, impl `Interpretable` on it, then wrap it with `#[wraps]`.

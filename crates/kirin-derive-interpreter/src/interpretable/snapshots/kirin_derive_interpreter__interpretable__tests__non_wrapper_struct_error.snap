@@ -1,0 +1,6 @@
+---
+source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
+assertion_line: 72
+expression: "err_case! { #[kirin(type = TestType)] struct Regular { a: i32, b: i32, } }"
+---
+Cannot derive `Interpretable` for struct `Regular` without `#[wraps]`. Either implement `Interpretable` manually, or wrap an inner type with `#[wraps]`.

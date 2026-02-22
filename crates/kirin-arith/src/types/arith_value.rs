@@ -156,6 +156,25 @@ impl Display for ArithValue {
     }
 }
 
+impl From<ArithValue> for i64 {
+    fn from(v: ArithValue) -> Self {
+        match v {
+            ArithValue::I8(x) => x as i64,
+            ArithValue::I16(x) => x as i64,
+            ArithValue::I32(x) => x as i64,
+            ArithValue::I64(x) => x,
+            ArithValue::I128(x) => x as i64,
+            ArithValue::U8(x) => x as i64,
+            ArithValue::U16(x) => x as i64,
+            ArithValue::U32(x) => x as i64,
+            ArithValue::U64(x) => x as i64,
+            ArithValue::U128(x) => x as i64,
+            ArithValue::F32(x) => x as i64,
+            ArithValue::F64(x) => x as i64,
+        }
+    }
+}
+
 impl Typeof<ArithType> for ArithValue {
     fn type_of(&self) -> ArithType {
         match self {

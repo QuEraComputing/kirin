@@ -1,0 +1,24 @@
+---
+source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
+assertion_line: 49
+expression: "case!\n{\n    #[kirin(type = T)] #[wraps] enum TestDialect<T>\n    { Arith(Arith<T>), ControlFlow(ControlFlow<T>), }\n}"
+---
+impl<T, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<__InterpI, __InterpL>
+    for TestDialect<T>
+where
+    __InterpI: ::kirin_interpreter::Interpreter,
+    __InterpL: ::kirin_ir::Dialect,
+    Arith<T>: ::kirin_interpreter::Interpretable<__InterpI, __InterpL>,
+    ControlFlow<T>: ::kirin_interpreter::Interpretable<__InterpI, __InterpL>,
+{
+    fn interpret(
+        &self,
+        interpreter: &mut __InterpI,
+    ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    {
+        match self {
+            Self::Arith(field_0) => field_0.interpret(interpreter),
+            Self::ControlFlow(field_0) => field_0.interpret(interpreter),
+        }
+    }
+}

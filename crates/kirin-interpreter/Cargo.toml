@@ -13,9 +13,9 @@ thiserror = { workspace = true }
 derive = ["dep:kirin-derive-interpreter"]
 
 [dev-dependencies]
-kirin-arith = { workspace = true }
+kirin-arith = { workspace = true, features = ["interpret"] }
 kirin-cf = { workspace = true, features = ["interpret"] }
-kirin-constant = { workspace = true }
+kirin-constant = { workspace = true, features = ["interpret"] }
 kirin-function = { workspace = true, features = ["interpret"] }
 kirin-derive = { workspace = true }
 kirin-derive-interpreter = { workspace = true }

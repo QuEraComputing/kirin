@@ -1,0 +1,20 @@
+---
+source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
+assertion_line: 61
+expression: "case!\n{ #[kirin(type = TestType)] struct Wrapper { #[wraps] inner: InnerType, } }"
+---
+impl<__InterpI, __InterpL> ::kirin_interpreter::Interpretable<__InterpI, __InterpL> for Wrapper
+where
+    __InterpI: ::kirin_interpreter::Interpreter,
+    __InterpL: ::kirin_ir::Dialect,
+    InnerType: ::kirin_interpreter::Interpretable<__InterpI, __InterpL>,
+{
+    fn interpret(
+        &self,
+        interpreter: &mut __InterpI,
+    ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    {
+        let Self { inner } = self;
+        inner.interpret(interpreter)
+    }
+}

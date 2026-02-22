@@ -1,0 +1,20 @@
+use kirin::prelude::{CompileTimeValue, Dialect, Typeof};
+use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
+
+use crate::Constant;
+
+impl<I, L, T, Ty> Interpretable<I, L> for Constant<T, Ty>
+where
+    I: Interpreter,
+    I::Value: From<T>,
+    I::Error: From<InterpreterError>,
+    L: Dialect,
+    T: CompileTimeValue + Typeof<Ty> + Clone,
+    Ty: CompileTimeValue + Default,
+{
+    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+        let val = I::Value::from(self.value.clone());
+        interp.write(self.result, val)?;
+        Ok(Continuation::Continue)
+    }
+}

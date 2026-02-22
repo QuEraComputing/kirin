@@ -42,6 +42,9 @@
 //! big integers, decimal-first arithmetic, or domain-specific units), prefer
 //! defining your own type/value pair and instantiate `Arith<YourType>`.
 
+#[cfg(feature = "interpret")]
+mod interpret_impl;
+
 mod types;
 
 use kirin::prelude::*;
