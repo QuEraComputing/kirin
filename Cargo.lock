@@ -1345,7 +1345,13 @@ dependencies = [
 name = "kirin-test-utils"
 version = "0.1.0"
 dependencies = [
+ "kirin-arith",
+ "kirin-cf",
  "kirin-chumsky",
+ "kirin-constant",
+ "kirin-derive",
+ "kirin-derive-interpreter",
+ "kirin-function",
  "kirin-interpreter",
  "kirin-ir",
  "kirin-lexer",

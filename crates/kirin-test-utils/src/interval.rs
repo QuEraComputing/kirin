@@ -284,6 +284,61 @@ impl kirin_interpreter::BranchCondition for Interval {
     }
 }
 
+impl From<kirin_arith::ArithValue> for Interval {
+    fn from(v: kirin_arith::ArithValue) -> Self {
+        use kirin_arith::ArithValue;
+        match v {
+            ArithValue::I64(x) => Interval::constant(x),
+            ArithValue::I32(x) => Interval::constant(x as i64),
+            ArithValue::I16(x) => Interval::constant(x as i64),
+            ArithValue::I8(x) => Interval::constant(x as i64),
+            _ => Interval::top(),
+        }
+    }
+}
+
+impl std::ops::Add for Interval {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        interval_add(&self, &rhs)
+    }
+}
+
+impl std::ops::Sub for Interval {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        interval_sub(&self, &rhs)
+    }
+}
+
+impl std::ops::Mul for Interval {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self {
+        interval_mul(&self, &rhs)
+    }
+}
+
+impl std::ops::Div for Interval {
+    type Output = Self;
+    fn div(self, _rhs: Self) -> Self {
+        Interval::top()
+    }
+}
+
+impl std::ops::Rem for Interval {
+    type Output = Self;
+    fn rem(self, _rhs: Self) -> Self {
+        Interval::top()
+    }
+}
+
+impl std::ops::Neg for Interval {
+    type Output = Self;
+    fn neg(self) -> Self {
+        interval_neg(&self)
+    }
+}
+
 impl kirin_interpreter::AbstractValue for Interval {
     fn widen(&self, next: &Self) -> Self {
         if self.is_empty() {

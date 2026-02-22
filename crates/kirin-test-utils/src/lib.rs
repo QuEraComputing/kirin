@@ -9,6 +9,8 @@ mod value;
 
 #[cfg(feature = "interpreter")]
 mod interval;
+#[cfg(feature = "interpreter")]
+mod test_dialect;
 
 #[cfg(feature = "parser")]
 pub mod parser;
@@ -27,6 +29,8 @@ pub use value::Value;
 
 #[cfg(feature = "interpreter")]
 pub use interval::{Bound, Interval, interval_add, interval_mul, interval_neg, interval_sub};
+#[cfg(feature = "interpreter")]
+pub use test_dialect::TestDialect;
 
 pub use SimpleIRType::*;
 
