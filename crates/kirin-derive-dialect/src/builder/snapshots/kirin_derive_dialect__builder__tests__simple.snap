@@ -2,6 +2,7 @@
 source: crates/kirin-derive-dialect/src/builder/tests.rs
 expression: "case!\n{\n    #[kirin(fn, type = SimpleIRType, crate = kirin_ir)] pub enum\n    SimpleLanguage\n    {\n        Add(SSAValue, SSAValue, #[kirin(type = SimpleIRType::Float)]\n        ResultValue,),\n        Constant(#[kirin(into)] Value, #[kirin(type = SimpleIRType::Float)]\n        ResultValue,), #[kirin(terminator)] Return(SSAValue),\n        Function(Region, #[kirin(type = SimpleIRType::Float)] ResultValue,),\n    }\n}"
 ---
+#[automatically_derived]
 impl SimpleLanguage {
     pub fn op_add<Lang>(
         stage: &mut kirin_ir::StageInfo<Lang>,

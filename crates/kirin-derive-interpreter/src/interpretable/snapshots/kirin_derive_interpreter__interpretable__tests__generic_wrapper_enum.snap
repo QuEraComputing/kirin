@@ -1,8 +1,8 @@
 ---
 source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
-assertion_line: 49
 expression: "case!\n{\n    #[kirin(type = T)] #[wraps] enum TestDialect<T>\n    { Arith(Arith<T>), ControlFlow(ControlFlow<T>), }\n}"
 ---
+#[automatically_derived]
 impl<T, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<__InterpI, __InterpL>
     for TestDialect<T>
 where

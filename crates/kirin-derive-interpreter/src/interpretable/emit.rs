@@ -21,6 +21,7 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
             let binding = info.wrapper_binding.as_ref().unwrap();
 
             Ok(quote! {
+                #[automatically_derived]
                 impl #impl_generics #interp_crate::Interpretable<__InterpI, __InterpL>
                     for #type_name #ty_generics
                 where
@@ -106,6 +107,7 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
             .collect();
 
         Ok(quote! {
+            #[automatically_derived]
             impl #impl_generics #interp_crate::Interpretable<__InterpI, __InterpL>
                 for #type_name #ty_generics
             where

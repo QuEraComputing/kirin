@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput, Language>
     ::kirin::parsers::EmitIR<Language>
     for WrapperWithGenericsAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
@@ -28,6 +29,7 @@ where
         }
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src, T: TypeLattice, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
     for WrapperWithGenericsASTSelf<'tokens, 'src, T, TypeOutput>
 where

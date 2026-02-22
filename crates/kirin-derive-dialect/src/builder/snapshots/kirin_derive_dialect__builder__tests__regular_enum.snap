@@ -2,6 +2,7 @@
 source: crates/kirin-derive-dialect/src/builder/tests.rs
 expression: "case!\n{\n    #[kirin(fn, type = SomeType)] enum TestEnum\n    {\n        A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, B(#[kirin(into)] u64, #[kirin(type = u64_type)] ResultValue,),\n    }\n}"
 ---
+#[automatically_derived]
 impl TestEnum {
     pub fn op_a<Lang>(
         stage: &mut ::kirin::ir::StageInfo<Lang>,

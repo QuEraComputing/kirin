@@ -1,8 +1,8 @@
 ---
 source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
-assertion_line: 113
 expression: "case!\n{\n    #[kirin(type = TestType)] #[callable] enum TestDialect\n    {\n        #[wraps] Arith(Arith<TestType>), ControlFlow(ControlFlow<TestType>),\n        #[wraps] FunctionBody(FunctionBody<TestType>),\n    }\n}"
 ---
+#[automatically_derived]
 impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect> for TestDialect
 where
     __CallSemI: ::kirin_interpreter::Interpreter,

@@ -292,6 +292,7 @@ impl GenerateEmitIR {
         let where_clause = quote! { where #(#all_bounds)* };
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #crate_path::EmitIR<Language> for #ast_name #ty_generics
             #where_clause
             {
@@ -430,6 +431,7 @@ impl GenerateEmitIR {
         let where_clause = quote! { where #(#all_bounds)* };
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #crate_path::EmitIR<Language> for #ast_self_name #ast_self_ty_generics
             #where_clause
             {

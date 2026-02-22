@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for SimpleLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
@@ -24,6 +25,7 @@ where
         { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("add")))) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| (((res_name , lhs) , rhs) , res_type) | -> SimpleLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { SimpleLangAST :: Add { lhs : lhs , rhs : rhs , res : :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } } }) } . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . map (| arg | -> SimpleLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { SimpleLangAST :: Return { arg : arg } }) }) . boxed ()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for SimpleLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,

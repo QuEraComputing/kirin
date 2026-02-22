@@ -111,6 +111,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         };
 
         tokens.extend(quote! {
+            #[automatically_derived]
             impl #impl_generics #ir_crate::HasStageInfo<#dialect_ty> for #enum_ident #ty_generics #where_clause {
                 fn try_stage_info(&self) -> Option<&#ir_crate::StageInfo<#dialect_ty>> {
                     match self { #try_ref_arms }
@@ -162,6 +163,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let stage_names: Vec<&str> = variants.iter().map(|v| v.stage_name.as_str()).collect();
 
     tokens.extend(quote! {
+        #[automatically_derived]
         impl #impl_generics #ir_crate::CompileStageInfo for #enum_ident #ty_generics #where_clause {
             type Languages = #languages_ty;
 

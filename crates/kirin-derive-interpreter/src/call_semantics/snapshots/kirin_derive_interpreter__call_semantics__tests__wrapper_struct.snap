@@ -1,8 +1,8 @@
 ---
 source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
-assertion_line: 60
 expression: "case!\n{ #[kirin(type = TestType)] struct Wrapper { #[wraps] inner: InnerType, } }"
 ---
+#[automatically_derived]
 impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, Wrapper> for Wrapper
 where
     __CallSemI: ::kirin_interpreter::Interpreter,

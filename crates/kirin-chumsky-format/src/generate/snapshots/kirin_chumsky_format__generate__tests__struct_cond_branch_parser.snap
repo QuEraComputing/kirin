@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for CondBranch
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
@@ -24,6 +25,7 @@ where
         { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("br")) . ignore_then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin :: parsers :: block_label ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Comma)) . then (:: kirin :: parsers :: block_label ()) . map (| ((cond , then_target) , else_target) | -> CondBranchAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { CondBranchAST { cond : cond , then_target : then_target , else_target : else_target , _marker : :: core :: marker :: PhantomData :: < fn () -> (& 'tokens () , & 'src () , __TypeOutput , __LanguageOutput) > } }) } . boxed ()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for CondBranch
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,

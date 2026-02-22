@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for ComposedLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
@@ -26,6 +27,7 @@ where
         < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __TypeOutput , __LanguageOutput > (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { ComposedLangAST :: Arith (inner) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __TypeOutput , __LanguageOutput > (language . clone ()) . map (| inner | -> ComposedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { ComposedLangAST :: Control (inner) })) . boxed ()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for ComposedLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,

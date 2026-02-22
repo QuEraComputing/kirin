@@ -1,12 +1,14 @@
 ---
 source: crates/kirin-derive-dialect/src/builder/tests.rs
-expression: "case!\n{\n    #[wraps] #[kirin(fn, type_lattice = T)] pub enum StructuredControlFlow<T:\n    TypeLattice> { If(If<T>), For(For<T>), }\n}"
+expression: "case!\n{\n    #[wraps] #[kirin(fn, type = T)] pub enum StructuredControlFlow<T:\n    TypeLattice> { If(If<T>), For(For<T>), }\n}"
 ---
+#[automatically_derived]
 impl<T: TypeLattice> From<If<T>> for StructuredControlFlow<T> {
     fn from(value: If<T>) -> Self {
         Self::If(value)
     }
 }
+#[automatically_derived]
 impl<T: TypeLattice> From<For<T>> for StructuredControlFlow<T> {
     fn from(value: For<T>) -> Self {
         Self::For(value)

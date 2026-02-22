@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for EmptyLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
@@ -26,6 +27,7 @@ where
             .boxed()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for EmptyLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,

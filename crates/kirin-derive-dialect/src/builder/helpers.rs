@@ -353,6 +353,7 @@ where
     }
 
     Ok(quote! {
+        #[automatically_derived]
         impl #impl_generics #name #ty_generics #where_clause {
             #(#functions)*
         }
@@ -514,6 +515,7 @@ pub(crate) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
         };
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
                 fn from(value: #wrapper_ty) -> Self {
                     #init_head #initialization
@@ -542,6 +544,7 @@ pub(crate) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
         };
 
         quote! {
+        #[automatically_derived]
         impl #impl_generics From<#wrapper_ty> for #name #ty_generics #where_clause {
             fn from(value: #wrapper_ty) -> Self {
                 #(#let_name_eq_input;)*

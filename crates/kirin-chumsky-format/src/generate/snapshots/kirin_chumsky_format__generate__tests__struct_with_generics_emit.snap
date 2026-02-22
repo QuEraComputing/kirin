@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput, Language>
     ::kirin::parsers::EmitIR<Language>
     for GenericReturnAST<'tokens, 'src, T, TypeOutput, LanguageOutput>
@@ -22,6 +23,7 @@ where
         ctx.stage.statement().definition(dialect_variant).new()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src, T: TypeLattice, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
     for GenericReturnASTSelf<'tokens, 'src, T, TypeOutput>
 where

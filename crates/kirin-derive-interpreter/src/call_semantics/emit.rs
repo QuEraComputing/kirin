@@ -22,6 +22,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
             let binding = info.wrapper_binding.as_ref().unwrap();
 
             Ok(quote! {
+                #[automatically_derived]
                 impl #impl_generics #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
@@ -45,6 +46,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
             })
         } else {
             Ok(quote! {
+                #[automatically_derived]
                 impl #impl_generics #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
@@ -145,6 +147,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
             .collect();
 
         Ok(quote! {
+            #[automatically_derived]
             impl #impl_generics #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>
                 for #type_name #ty_generics
             where

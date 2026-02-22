@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: emit
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput, Language>
     ::kirin::parsers::EmitIR<Language> for EmptyLangAST<'tokens, 'src, TypeOutput, LanguageOutput>
 where
@@ -19,6 +20,7 @@ where
         }
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
     for EmptyLangASTSelf<'tokens, 'src, TypeOutput>
 where

@@ -72,6 +72,7 @@ impl GenerateHasDialectParser {
         let type_output = quote! { <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output };
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
             #where_clause
             {
@@ -130,6 +131,7 @@ impl GenerateHasDialectParser {
         };
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
             #where_clause
             {
@@ -208,6 +210,7 @@ impl GenerateHasDialectParser {
         let ast_type = self.build_ast_type_with_type_params(ir_input, ast_name);
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #crate_path::HasDialectParser<'tokens, 'src>
                 for #original_name #ty_generics
             #final_where
@@ -379,6 +382,7 @@ impl GenerateHasDialectParser {
         };
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #crate_path::HasDialectParser<'tokens, 'src>
                 for #original_name #ty_generics
             #final_where

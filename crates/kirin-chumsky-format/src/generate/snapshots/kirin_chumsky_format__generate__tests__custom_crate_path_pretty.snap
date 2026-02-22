@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: pretty
 ---
+#[automatically_derived]
 impl ::kirin::pretty::PrettyPrint for CustomReturn {
     fn pretty_print<'a, __L: my_kirin::Dialect + ::kirin::pretty::PrettyPrint>(
         &self,

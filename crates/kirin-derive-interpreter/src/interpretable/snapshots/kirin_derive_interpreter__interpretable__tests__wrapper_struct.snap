@@ -1,8 +1,8 @@
 ---
 source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
-assertion_line: 61
 expression: "case!\n{ #[kirin(type = TestType)] struct Wrapper { #[wraps] inner: InnerType, } }"
 ---
+#[automatically_derived]
 impl<__InterpI, __InterpL> ::kirin_interpreter::Interpretable<__InterpI, __InterpL> for Wrapper
 where
     __InterpI: ::kirin_interpreter::Interpreter,

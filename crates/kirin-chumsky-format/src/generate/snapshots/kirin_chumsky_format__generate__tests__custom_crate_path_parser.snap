@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> my_chumsky::HasDialectParser<'tokens, 'src> for CustomReturn
 where
     SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,
@@ -39,6 +40,7 @@ where
         .boxed()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> my_chumsky::HasParser<'tokens, 'src> for CustomReturn
 where
     SimpleType: my_chumsky::HasParser<'tokens, 'src> + 'tokens,

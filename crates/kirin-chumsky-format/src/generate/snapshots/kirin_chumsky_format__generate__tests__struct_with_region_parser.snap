@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for Function
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
@@ -24,6 +25,7 @@ where
         { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("function")))) . then (:: kirin :: parsers :: region :: < _ , SimpleType , _ > (language . clone ())) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| ((res_name , body) , res_type) | -> FunctionAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { FunctionAST { body : body , res : :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } , _marker : :: core :: marker :: PhantomData :: < fn () -> (& 'tokens () , & 'src () , __TypeOutput , __LanguageOutput) > } }) } . boxed ()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for Function
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,

@@ -97,6 +97,7 @@ impl GeneratePrettyPrint {
         // The trait method has fixed bounds: L: Dialect + PrettyPrint, L::Type: Display
         // All implementations must match these bounds
         quote! {
+            #[automatically_derived]
             impl #impl_generics #prettyless_path::PrettyPrint
                 for #dialect_name #ty_generics
             #where_clause
@@ -148,6 +149,7 @@ impl GeneratePrettyPrint {
         };
 
         quote! {
+            #[automatically_derived]
             impl #impl_generics #prettyless_path::PrettyPrint
                 for #dialect_name #ty_generics
             #final_where

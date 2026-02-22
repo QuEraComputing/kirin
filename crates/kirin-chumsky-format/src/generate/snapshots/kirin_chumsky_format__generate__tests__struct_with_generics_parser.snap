@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens, T: TypeLattice> ::kirin::parsers::HasDialectParser<'tokens, 'src>
     for GenericReturn<T>
 where
@@ -25,6 +26,7 @@ where
         { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("return")) . ignore_then (:: kirin :: parsers :: ssa_value :: < _ , T > ()) . map (| field_0 | -> GenericReturnAST < 'tokens , 'src , T , __TypeOutput , __LanguageOutput > { GenericReturnAST (field_0 , :: core :: marker :: PhantomData :: < fn () -> (& 'tokens () , & 'src () , T , __TypeOutput , __LanguageOutput) >) }) } . boxed ()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens, T: TypeLattice> ::kirin::parsers::HasParser<'tokens, 'src>
     for GenericReturn<T>
 where

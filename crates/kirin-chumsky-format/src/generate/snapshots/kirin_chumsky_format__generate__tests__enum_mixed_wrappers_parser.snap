@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: parser
 ---
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for MixedLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
@@ -26,6 +27,7 @@ where
         < ArithDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __TypeOutput , __LanguageOutput > (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { MixedLangAST :: Arith (inner) }) . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Identifier ("custom")))) . then (:: kirin :: parsers :: ssa_value :: < _ , SimpleType > ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| ((res_name , arg) , res_type) | -> MixedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { MixedLangAST :: Custom { arg : arg , res : :: kirin :: parsers :: ResultValue { name : :: kirin :: parsers :: Spanned { value : res_name . name , span : res_name . span } , ty : Some (res_type . ty . clone ()) , } } }) }) . or (< ControlDialect as :: kirin :: parsers :: HasDialectParser < 'tokens , 'src >> :: recursive_parser :: < I , __TypeOutput , __LanguageOutput > (language . clone ()) . map (| inner | -> MixedLangAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { MixedLangAST :: Control (inner) })) . boxed ()
     }
 }
+#[automatically_derived]
 impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for MixedLang
 where
     SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
