@@ -55,9 +55,26 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - `kirin-chumsky-derive` — `#[derive(HasParser, PrettyPrint)]`
 - `kirin-chumsky-format` — Code generation (internal)
 
+**Interpreter:**
+- `kirin-interpreter` — Interpreter traits, `StackInterpreter`, `AbstractInterpreter`
+- `kirin-derive-interpreter` — `#[derive(Interpretable, CallSemantics)]`
+
 **Dialects:**
-- `kirin-cf`, `kirin-scf`, `kirin-constant`
+- `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-function`
 
 **Derive Infrastructure:**
 - `kirin-derive-core` — Shared derive utilities
 - `kirin-derive`, `kirin-derive-dialect` — `#[derive(Dialect)]`
+
+**Testing:**
+- `kirin-test-utils` — Shared test utilities (test dialects, `rustfmt` helper, interval domain)
+
+## Derive Infrastructure Conventions
+
+- **Darling re-export rule**: Derive crates that depend on `kirin-derive-core` must use `kirin_derive_core::prelude::darling` — never import `darling` directly. The workspace has multiple darling versions (0.20 via `bon`, 0.23 via `kirin-derive-core`); a direct import may resolve to the wrong version.
+
+- **Bare attribute pattern**: Darling's `#[darling(attributes(...))]` only works for `#[attr(key = val)]` form. For bare flag attributes like `#[wraps]` or `#[callable]`, implement `FromDeriveInput`/`FromVariant` manually using `attrs.iter().any(|a| a.path().is_ident("name"))`.
+
+- **Custom Layout for derive-specific attributes**: When a derive macro needs attributes beyond `StandardLayout` (which has `()` for all extras), define a custom `Layout` impl in that derive module. This keeps derive-specific attributes out of the core IR. See `CallSemanticsLayout` in `kirin-derive-interpreter` as an example.
+
+- **`#[kirin(...)]` attribute convention**: Use path syntax for `crate`: `#[kirin(crate = kirin_ir)]` not `#[kirin(crate = "kirin_ir")]`. Darling parses `syn::Path` and supports bare idents directly.
