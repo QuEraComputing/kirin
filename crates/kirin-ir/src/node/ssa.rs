@@ -1,7 +1,7 @@
 use crate::arena::{GetInfo, Id, Identifier};
 use crate::identifier;
 use crate::{Dialect, Symbol};
-use fxhash::FxHashSet;
+use rustc_hash::FxHashSet;
 
 use super::{block::Block, stmt::Statement};
 

@@ -1,4 +1,4 @@
-use fxhash::FxHashMap;
+use rustc_hash::FxHashMap;
 use kirin_ir::{ResultValue, SSAValue, SpecializedFunction, Statement};
 
 /// A call frame for one [`SpecializedFunction`] invocation.

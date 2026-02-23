@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use fxhash::FxHashMap;
+use rustc_hash::FxHashMap;
 use kirin_ir::{
     CompileStage, CompileStageInfo, Pipeline, ResultValue, SSAValue, SpecializedFunction,
 };

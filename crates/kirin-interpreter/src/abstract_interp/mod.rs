@@ -9,7 +9,7 @@ pub use summary::{SummaryCache, SummaryEntry};
 
 use std::collections::VecDeque;
 
-use fxhash::FxHashMap;
+use rustc_hash::FxHashMap;
 use kirin_ir::{Block, SSAValue};
 
 /// Per-function fixpoint state stored as frame extra data.
