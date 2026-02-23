@@ -21,3 +21,4 @@ kirin-function = { workspace = true, features = ["interpret"] }
 kirin-derive = { workspace = true }
 kirin-derive-interpreter = { workspace = true }
 kirin-test-utils = { workspace = true, features = ["interpreter"] }
+insta = { workspace = true }

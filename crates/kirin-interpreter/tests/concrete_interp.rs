@@ -4,14 +4,22 @@ use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::StackInterpreter;
 use kirin_ir::{query::ParentInfo, *};
-use kirin_test_utils::TestDialect;
+use kirin_test_utils::{TestDialect, dump_function};
 
 // ---------------------------------------------------------------------------
 // IR builder: select(x) = if x != 0 then x+1 else 42
 //
-// Uses is_truthy semantics: nonzero → true branch, zero → false branch.
-// We add x+1 on the true path to have a statement that produces a result
-// (avoiding cross-block block-argument scoping questions).
+// Uses block arguments to pass values across control flow edges:
+//
+//   entry(x):
+//     c1 = const 1
+//     sum = add x, c1          // x + 1
+//     c42 = const 42
+//     cond_br x then=truthy_block(sum) else=falsy_block(c42)
+//   truthy_block(val):          // receives sum via block arg
+//     ret val
+//   falsy_block(val):           // receives 42 via block arg
+//     ret val
 // ---------------------------------------------------------------------------
 
 fn build_select_program(
@@ -25,7 +33,7 @@ fn build_select_program(
     // entry block with argument x
     let entry = stage.block().argument(ArithType::I64).new();
 
-    // Get real block argument SSA value
+    // Get real block argument SSA value for x
     let x: SSAValue = {
         let si = pipeline.stage(stage_id).unwrap();
         let bi = entry.expect_info(si);
@@ -34,26 +42,68 @@ fn build_select_program(
 
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
-    // truthy_block: c1 = const 1; sum = add x c1; return sum
+    // truthy_block(val): receives sum via block arg, returns val
+    let truthy_block = stage.block().argument(ArithType::I64).new();
+    let truthy_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        let bi = truthy_block.expect_info(si);
+        bi.arguments[0].into()
+    };
+
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let ret_truthy = ControlFlow::<ArithType>::op_return(stage, truthy_val);
+    {
+        let truthy_info: &mut Item<BlockInfo<TestDialect>> =
+            truthy_block.get_info_mut(stage).unwrap();
+        truthy_info.terminator = Some(ret_truthy.into());
+    }
+
+    // falsy_block(val): receives c42 via block arg, returns val
+    let falsy_block = stage.block().argument(ArithType::I64).new();
+    let falsy_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        let bi = falsy_block.expect_info(si);
+        bi.arguments[0].into()
+    };
+
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let ret_falsy = ControlFlow::<ArithType>::op_return(stage, falsy_val);
+    {
+        let falsy_info: &mut Item<BlockInfo<TestDialect>> =
+            falsy_block.get_info_mut(stage).unwrap();
+        falsy_info.terminator = Some(ret_falsy.into());
+    }
+
+    // Compute values in entry block before branching
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let sum = kirin_arith::Arith::<ArithType>::op_add(stage, x, c1.result);
-    let ret_sum = ControlFlow::<ArithType>::op_return(stage, sum.result);
-    let truthy_block = stage.block().stmt(c1).stmt(sum).terminator(ret_sum).new();
-
-    // falsy_block: c42 = const 42; return c42
     let c42 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(42));
-    let ret_42 = ControlFlow::<ArithType>::op_return(stage, c42.result);
-    let falsy_block = stage.block().stmt(c42).terminator(ret_42).new();
 
-    // Add terminator to entry: cond_br x -> truthy_block, falsy_block
-    let cond_br =
-        ControlFlow::<ArithType>::op_conditional_branch(stage, x, truthy_block, falsy_block);
+    // Add terminator to entry: cond_br x -> truthy_block(sum), falsy_block(c42)
+    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
+        stage,
+        x,
+        truthy_block,
+        vec![sum.result.into()],
+        falsy_block,
+        vec![c42.result.into()],
+    );
+
+    // Wire up entry block: statements + terminator
     {
+        let stmts: Vec<Statement> = vec![c1.into(), sum.into(), c42.into()];
+        for &s in &stmts {
+            let info = s.expect_info_mut(stage);
+            *info.get_parent_mut() = Some(entry);
+        }
+        let linked = stage.link_statements(&stmts);
+
         let cond_br_stmt: Statement = cond_br.into();
-        // Set the terminator's parent block so the interpreter can resolve block arguments.
         let info = cond_br_stmt.expect_info_mut(stage);
         *info.get_parent_mut() = Some(entry);
+
         let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        entry_info.statements = linked;
         entry_info.terminator = Some(cond_br_stmt);
     }
 
@@ -72,6 +122,16 @@ fn build_select_program(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[test]
+fn test_select_ir_snapshot() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let spec_func = build_select_program(&mut pipeline, stage_id);
+    let ir = dump_function(spec_func, &pipeline, stage_id);
+    insta::assert_snapshot!(ir);
+}
 
 #[test]
 fn test_concrete_select() {

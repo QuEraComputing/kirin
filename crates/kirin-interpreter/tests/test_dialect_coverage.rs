@@ -21,11 +21,11 @@ use kirin_test_utils::TestDialect;
 // IR builder helpers
 // ===========================================================================
 
-/// Build an infinite loop:
-///   entry(x): br header
-///   header: cond_br x body exit  (nonzero x always takes true branch)
-///   body: br header  (back-edge)
-///   exit: ret x
+/// Build an infinite loop with block args:
+///   entry(x): br header(x)
+///   header(i): cond_br i body(i) exit(i)
+///   body(val): br header(val)  (back-edge, passes val unchanged)
+///   exit(result): ret result
 fn build_infinite_loop(
     pipeline: &mut Pipeline<StageInfo<TestDialect>>,
     stage_id: CompileStage,
@@ -42,19 +42,49 @@ fn build_infinite_loop(
 
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
-    // header block (no arguments — loop target)
-    let header = stage.block().new();
+    // header(i) — loop target with block arg
+    let header = stage.block().argument(ArithType::I64).new();
+    let i: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        header.expect_info(si).arguments[0].into()
+    };
 
-    // exit: ret x
-    let ret_x = ControlFlow::<ArithType>::op_return(stage, x);
-    let exit = stage.block().terminator(ret_x).new();
+    let stage = pipeline.stage_mut(stage_id).unwrap();
 
-    // body: br header (back-edge, no block args)
-    let br_back = ControlFlow::<ArithType>::op_branch(stage, header);
-    let body = stage.block().terminator(br_back).new();
+    // exit(result): ret result
+    let exit = stage.block().argument(ArithType::I64).new();
+    let exit_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        exit.expect_info(si).arguments[0].into()
+    };
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
+    {
+        let exit_info: &mut Item<BlockInfo<TestDialect>> = exit.get_info_mut(stage).unwrap();
+        exit_info.terminator = Some(ret_exit.into());
+    }
 
-    // header terminator: cond_br x body exit
-    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(stage, x, body, exit);
+    // body(val): br header(val) (back-edge, passes val unchanged)
+    let body = stage.block().argument(ArithType::I64).new();
+    let body_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        body.expect_info(si).arguments[0].into()
+    };
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let br_back = ControlFlow::<ArithType>::op_branch(stage, header, vec![body_val]);
+    {
+        let br_stmt: Statement = br_back.into();
+        br_stmt
+            .expect_info_mut(stage)
+            .get_parent_mut()
+            .replace(body);
+        let body_info: &mut Item<BlockInfo<TestDialect>> = body.get_info_mut(stage).unwrap();
+        body_info.terminator = Some(br_stmt);
+    }
+
+    // header terminator: cond_br i body(i) exit(i)
+    let cond_br =
+        ControlFlow::<ArithType>::op_conditional_branch(stage, i, body, vec![i], exit, vec![i]);
     {
         let cond_stmt: Statement = cond_br.into();
         cond_stmt
@@ -65,8 +95,8 @@ fn build_infinite_loop(
         header_info.terminator = Some(cond_stmt);
     }
 
-    // entry terminator: br header
-    let br_header = ControlFlow::<ArithType>::op_branch(stage, header);
+    // entry terminator: br header(x)
+    let br_header = ControlFlow::<ArithType>::op_branch(stage, header, vec![x]);
     {
         let br_stmt: Statement = br_header.into();
         br_stmt
@@ -141,11 +171,11 @@ fn build_add_one(
     stage.specialize().f(sf).body(func_body).new().unwrap()
 }
 
-/// Build a loop (no block-arg counter, uses entry arg directly):
-///   entry(x) -> br header
-///   header: cond_br x body exit
-///   body: c1 = const 1; sum = add x, c1; br header
-///   exit: ret x
+/// Build a loop with block args for the loop variable:
+///   entry(x): br header(x)
+///   header(i): cond_br i loop_body(i) loop_exit(i)
+///   loop_body(val): c1 = const 1; sum = add val, c1; br header(sum)
+///   loop_exit(result): ret result
 fn build_loop_program(
     pipeline: &mut Pipeline<StageInfo<TestDialect>>,
     stage_id: CompileStage,
@@ -160,20 +190,61 @@ fn build_loop_program(
     };
 
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let header = stage.block().new();
 
-    // exit: ret x
-    let ret_x = ControlFlow::<ArithType>::op_return(stage, x);
-    let loop_exit = stage.block().terminator(ret_x).new();
+    // header(i) — loop header with block arg
+    let header = stage.block().argument(ArithType::I64).new();
+    let i: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        header.expect_info(si).arguments[0].into()
+    };
 
-    // body: c1 = const 1; sum = add x, c1; br header
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+
+    // loop_exit(result): ret result
+    let loop_exit = stage.block().argument(ArithType::I64).new();
+    let exit_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        loop_exit.expect_info(si).arguments[0].into()
+    };
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
+    {
+        let exit_info: &mut Item<BlockInfo<TestDialect>> = loop_exit.get_info_mut(stage).unwrap();
+        exit_info.terminator = Some(ret_exit.into());
+    }
+
+    // loop_body(val): c1 = const 1; sum = add val, c1; br header(sum)
+    let loop_body = stage.block().argument(ArithType::I64).new();
+    let body_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        loop_body.expect_info(si).arguments[0].into()
+    };
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
-    let sum = kirin_arith::Arith::<ArithType>::op_add(stage, x, c1.result);
-    let br_back = ControlFlow::<ArithType>::op_branch(stage, header);
-    let loop_body = stage.block().stmt(c1).stmt(sum).terminator(br_back).new();
+    let sum = kirin_arith::Arith::<ArithType>::op_add(stage, body_val, c1.result);
+    let br_back = ControlFlow::<ArithType>::op_branch(stage, header, vec![sum.result.into()]);
+    {
+        let stmts: Vec<Statement> = vec![c1.into(), sum.into()];
+        for &s in &stmts {
+            let info = s.expect_info_mut(stage);
+            *info.get_parent_mut() = Some(loop_body);
+        }
+        let linked = stage.link_statements(&stmts);
 
-    // entry: br header
-    let br_header = ControlFlow::<ArithType>::op_branch(stage, header);
+        let br_stmt: Statement = br_back.into();
+        br_stmt
+            .expect_info_mut(stage)
+            .get_parent_mut()
+            .replace(loop_body);
+
+        let body_info: &mut Item<BlockInfo<TestDialect>> = loop_body.get_info_mut(stage).unwrap();
+        body_info.statements = linked;
+        body_info.terminator = Some(br_stmt);
+    }
+
+    // entry: br header(x)
+    let br_header = ControlFlow::<ArithType>::op_branch(stage, header, vec![x]);
     {
         let br_stmt: Statement = br_header.into();
         br_stmt
@@ -184,8 +255,15 @@ fn build_loop_program(
         entry_info.terminator = Some(br_stmt);
     }
 
-    // header: cond_br x body exit
-    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(stage, x, loop_body, loop_exit);
+    // header: cond_br i loop_body(i) loop_exit(i)
+    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
+        stage,
+        i,
+        loop_body,
+        vec![i],
+        loop_exit,
+        vec![i],
+    );
     {
         let cond_stmt: Statement = cond_br.into();
         cond_stmt
@@ -207,10 +285,11 @@ fn build_loop_program(
     stage.specialize().f(sf).body(func_body).new().unwrap()
 }
 
-/// Build a multi-block branching program (same structure as build_select_program):
-///   entry(x): cond_br x then_block else_block
-///   then_block: c1 = const 1; sum = add x, c1; ret sum
-///   else_block: c42 = const 42; ret c42
+/// Build a multi-block branching program with block args:
+///   entry(x): c1 = const 1; sum = add x, c1; c42 = const 42;
+///             cond_br x then=then_block(sum) else=else_block(c42)
+///   then_block(val): ret val
+///   else_block(val): ret val
 fn build_multi_block(
     pipeline: &mut Pipeline<StageInfo<TestDialect>>,
     stage_id: CompileStage,
@@ -227,26 +306,62 @@ fn build_multi_block(
 
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
-    // then_block: c1 = const 1; sum = add x, c1; ret sum
+    // then_block(val): ret val
+    let then_block = stage.block().argument(ArithType::I64).new();
+    let then_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        then_block.expect_info(si).arguments[0].into()
+    };
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let ret_then = ControlFlow::<ArithType>::op_return(stage, then_val);
+    {
+        let then_info: &mut Item<BlockInfo<TestDialect>> = then_block.get_info_mut(stage).unwrap();
+        then_info.terminator = Some(ret_then.into());
+    }
+
+    // else_block(val): ret val
+    let else_block = stage.block().argument(ArithType::I64).new();
+    let else_val: SSAValue = {
+        let si = pipeline.stage(stage_id).unwrap();
+        else_block.expect_info(si).arguments[0].into()
+    };
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let ret_else = ControlFlow::<ArithType>::op_return(stage, else_val);
+    {
+        let else_info: &mut Item<BlockInfo<TestDialect>> = else_block.get_info_mut(stage).unwrap();
+        else_info.terminator = Some(ret_else.into());
+    }
+
+    // Entry block statements: c1 = const 1; sum = add x, c1; c42 = const 42
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, x, c1.result);
-    let ret_sum = ControlFlow::<ArithType>::op_return(stage, add.result);
-    let then_block = stage.block().stmt(c1).stmt(add).terminator(ret_sum).new();
-
-    // else_block: c42 = const 42; ret c42
     let c42 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(42));
-    let ret_42 = ControlFlow::<ArithType>::op_return(stage, c42.result);
-    let else_block = stage.block().stmt(c42).terminator(ret_42).new();
 
-    // entry terminator: cond_br x then_block else_block
-    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(stage, x, then_block, else_block);
+    // cond_br x then=then_block(sum) else=else_block(c42)
+    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
+        stage,
+        x,
+        then_block,
+        vec![add.result.into()],
+        else_block,
+        vec![c42.result.into()],
+    );
     {
+        let stmts: Vec<Statement> = vec![c1.into(), add.into(), c42.into()];
+        for &s in &stmts {
+            let info = s.expect_info_mut(stage);
+            *info.get_parent_mut() = Some(entry);
+        }
+        let linked = stage.link_statements(&stmts);
+
         let cond_stmt: Statement = cond_br.into();
         cond_stmt
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(entry);
+
         let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        entry_info.statements = linked;
         entry_info.terminator = Some(cond_stmt);
     }
 
@@ -371,19 +486,20 @@ fn test_abstract_widening_never() {
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
-    // WideningStrategy::Never only joins (no widening). For Interval domain
-    // the ascending chain can be long, so we use a generous iteration limit.
+    // WideningStrategy::Never only joins (no widening). With block args the
+    // loop variable grows each iteration (add 1), so the ascending chain
+    // never converges — expect FuelExhausted.
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id)
             .with_widening(WideningStrategy::Never)
             .with_max_iterations(50);
 
-    let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
-        .unwrap();
+    let result = interp.analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)]);
 
-    // Analysis should produce a return value
-    assert!(result.return_value().is_some());
+    assert!(
+        matches!(result, Err(InterpreterError::FuelExhausted)),
+        "expected FuelExhausted without widening, got: {result:?}"
+    );
 }
 
 #[test]

@@ -1277,6 +1277,7 @@ name = "kirin-interpreter"
 version = "0.1.0"
 dependencies = [
  "fxhash",
+ "insta",
  "kirin-arith",
  "kirin-cf",
  "kirin-constant",

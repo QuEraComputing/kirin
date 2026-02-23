@@ -32,6 +32,18 @@ pub use interval::{Bound, Interval, interval_add, interval_mul, interval_neg, in
 #[cfg(feature = "interpreter")]
 pub use test_dialect::TestDialect;
 
+/// Dump a specialized function's IR using the builtin pretty printer.
+#[cfg(feature = "interpreter")]
+pub fn dump_function(
+    spec_fn: kirin_ir::SpecializedFunction,
+    pipeline: &kirin_ir::Pipeline<kirin_ir::StageInfo<TestDialect>>,
+    stage_id: kirin_ir::CompileStage,
+) -> String {
+    use kirin_prettyless::PrettyPrintExt;
+    let stage = pipeline.stage(stage_id).unwrap();
+    spec_fn.sprint(stage)
+}
+
 pub use SimpleIRType::*;
 
 #[cfg(feature = "parser")]

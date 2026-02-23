@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, Dialect, Typeof};
+use kirin::prelude::{CompileTimeValue, Dialect, PrettyPrint, Typeof};
 use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
 
 use crate::Constant;
@@ -9,7 +9,7 @@ where
     I::Value: From<T>,
     I::Error: From<InterpreterError>,
     L: Dialect,
-    T: CompileTimeValue + Typeof<Ty> + Clone,
+    T: CompileTimeValue + Typeof<Ty> + Clone + PrettyPrint,
     Ty: CompileTimeValue + Default,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {

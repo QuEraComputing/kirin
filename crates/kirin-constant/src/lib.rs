@@ -3,14 +3,11 @@ mod interpret_impl;
 
 use kirin::prelude::*;
 
-// Note: HasParser and PrettyPrint are not derived because T and L are generic type parameters
-// that would need complex lifetime bounds. For generic constants, implement HasParser manually.
-// The format string would be: "{result} = constant {value} -> {result:type}"
-#[derive(HasParser)]
+#[derive(HasParser, PrettyPrint)]
 #[chumsky(format = "{result:name} = constant {value} -> {result:type}")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(constant, fn = new, type = Ty)]
-pub struct Constant<T: CompileTimeValue + Typeof<Ty>, Ty: CompileTimeValue + Default> {
+pub struct Constant<T: CompileTimeValue + Typeof<Ty> + PrettyPrint, Ty: CompileTimeValue + Default> {
     #[kirin(into)]
     pub value: T,
     #[kirin(type = value.type_of())]
