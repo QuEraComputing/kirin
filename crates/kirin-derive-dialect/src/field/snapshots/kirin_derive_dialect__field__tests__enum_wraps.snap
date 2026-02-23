@@ -17,6 +17,7 @@ impl<'a, T: TypeLattice> kirin::ir::HasArguments<'a> for StructuredControlFlow<T
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum StructuredControlFlowArgumentsIter<'a, T: TypeLattice> {
     If(<If<T> as kirin::ir::HasArguments<'a>>::Iter),
     For(<For<T> as kirin::ir::HasArguments<'a>>::Iter),
@@ -46,6 +47,7 @@ impl<'a, T: TypeLattice> kirin::ir::HasArgumentsMut<'a> for StructuredControlFlo
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum StructuredControlFlowArgumentsMutIter<'a, T: TypeLattice> {
     If(<If<T> as kirin::ir::HasArgumentsMut<'a>>::IterMut),
     For(<For<T> as kirin::ir::HasArgumentsMut<'a>>::IterMut),

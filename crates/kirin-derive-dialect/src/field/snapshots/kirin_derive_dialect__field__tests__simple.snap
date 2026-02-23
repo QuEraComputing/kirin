@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/field/tests.rs
-expression: "case!\n{\n    #[kirin(fn, type_lattice = SimpleTypeLattice, crate = kirin_ir)] pub enum\n    SimpleLanguage\n    {\n        Add(SSAValue, SSAValue, #[kirin(type = SimpleTypeLattice::Float)]\n        ResultValue,),\n        Constant(#[kirin(into)] Value,\n        #[kirin(type = SimpleTypeLattice::Float)] ResultValue,),\n        #[kirin(terminator)] Return(SSAValue),\n        Function(Region, #[kirin(type = SimpleTypeLattice::Float)]\n        ResultValue,),\n    }\n}"
+expression: "case!\n{\n    #[kirin(fn, type = SimpleType, crate = kirin_ir)] pub enum SimpleLanguage\n    {\n        Add(SSAValue, SSAValue, #[kirin(type = SimpleType::Float)]\n        ResultValue,),\n        Constant(#[kirin(into)] Value, #[kirin(type = SimpleType::Float)]\n        ResultValue,), #[kirin(terminator)] Return(SSAValue),\n        Function(Region, #[kirin(type = SimpleType::Float)] ResultValue,),\n    }\n}"
 ---
 #[automatically_derived]
 impl<'a> kirin_ir::HasArguments<'a> for SimpleLanguage {
@@ -21,6 +21,7 @@ impl<'a> kirin_ir::HasArguments<'a> for SimpleLanguage {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum SimpleLanguageArgumentsIter<'a> {
     Add(
         std::iter::Chain<
@@ -69,6 +70,7 @@ impl<'a> kirin_ir::HasArgumentsMut<'a> for SimpleLanguage {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum SimpleLanguageArgumentsMutIter<'a> {
     Add(
         std::iter::Chain<

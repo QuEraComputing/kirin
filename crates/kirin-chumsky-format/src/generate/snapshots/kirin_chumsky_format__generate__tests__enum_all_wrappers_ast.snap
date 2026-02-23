@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[doc(hidden)]
 pub enum ComposedLangAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
 where
     TypeOutput: Clone + PartialEq + 'tokens,
@@ -95,10 +96,7 @@ where
         }
     }
 }
-#[doc = r" Self-referential wrapper for standalone use."]
-#[doc = r""]
-#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
-#[doc = r" AST type suitable for use with `HasParser`."]
+#[doc(hidden)]
 pub struct ComposedLangASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
     pub ComposedLangAST<'tokens, 'src, TypeOutput, ComposedLangASTSelf<'tokens, 'src, TypeOutput>>,
     ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,

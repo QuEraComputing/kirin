@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/field/tests.rs
-expression: "case!\n{\n    #[kirin(type_lattice = RegularLattice)] enum TestEnum<T>\n    {\n        VariantA { a: SSAValue, b: T, c: SSAValue },\n        VariantB(SSAValue, f64, SSAValue),\n    }\n}"
+expression: "case!\n{\n    #[kirin(type = RegularType)] enum TestEnum<T>\n    {\n        VariantA { a: SSAValue, b: T, c: SSAValue },\n        VariantB(SSAValue, f64, SSAValue),\n    }\n}"
 ---
 #[automatically_derived]
 impl<'a, T> kirin::ir::HasArguments<'a> for TestEnum<T> {
@@ -17,6 +17,7 @@ impl<'a, T> kirin::ir::HasArguments<'a> for TestEnum<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum TestEnumArgumentsIter<'a> {
     VariantA(
         std::iter::Chain<
@@ -56,6 +57,7 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for TestEnum<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum TestEnumArgumentsMutIter<'a> {
     VariantA(
         std::iter::Chain<

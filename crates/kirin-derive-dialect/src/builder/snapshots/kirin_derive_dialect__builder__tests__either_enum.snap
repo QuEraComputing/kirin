@@ -34,9 +34,11 @@ impl EitherEnum {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub mod either_enum_build_result {
     use kirin::ir::{ResultValue, Statement};
     #[automatically_derived]
+    #[doc(hidden)]
     pub struct A {
         pub id: Statement,
         pub result: ResultValue,

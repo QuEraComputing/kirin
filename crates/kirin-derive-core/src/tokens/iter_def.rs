@@ -55,6 +55,7 @@ impl ToTokens for IterStructDefTokens {
         let inner_type = &self.inner_type;
         tokens.extend(quote! {
             #[automatically_derived]
+            #[doc(hidden)]
             pub struct #name #generics {
                 inner: #inner_type,
             }
@@ -185,6 +186,7 @@ impl ToTokens for IterEnumDefTokens {
         let variants = &self.variants;
         tokens.extend(quote! {
             #[automatically_derived]
+            #[doc(hidden)]
             pub enum #name #generics {
                 #(#variants),*
             }

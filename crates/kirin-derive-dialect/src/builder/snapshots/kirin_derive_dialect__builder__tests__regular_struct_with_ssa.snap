@@ -39,9 +39,11 @@ impl<T: CompileTimeValue + Typeof<L>, L: TypeLattice> TestStruct<T, L> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub mod test_struct_build_result {
     use kirin::ir::{ResultValue, Statement};
     #[automatically_derived]
+    #[doc(hidden)]
     pub struct TestStruct {
         pub id: Statement,
         pub result: ResultValue,

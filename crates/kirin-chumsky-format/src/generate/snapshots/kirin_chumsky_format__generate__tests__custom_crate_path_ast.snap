@@ -3,6 +3,7 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
+#[doc(hidden)]
 pub struct CustomReturnAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>(
     pub my_chumsky::SSAValue<'src, <SimpleType as my_chumsky::HasParser<'tokens, 'src>>::Output>,
     ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
@@ -10,11 +11,8 @@ pub struct CustomReturnAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>(
 where
     TypeOutput: Clone + PartialEq + 'tokens,
     LanguageOutput: Clone + PartialEq + 'tokens;
-#[doc = r" Self-referential wrapper for standalone use."]
-#[doc = r""]
-#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
-#[doc = r" AST type suitable for use with `HasParser`."]
 #[derive(Clone, Debug, PartialEq)]
+#[doc(hidden)]
 pub struct CustomReturnASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
     pub CustomReturnAST<'tokens, 'src, TypeOutput, CustomReturnASTSelf<'tokens, 'src, TypeOutput>>,
     ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,

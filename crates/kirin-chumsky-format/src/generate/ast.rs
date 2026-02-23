@@ -174,6 +174,7 @@ impl GenerateAST {
 
                     if is_tuple {
                         quote! {
+                            #[doc(hidden)]
                             pub struct #ast_name #impl_generics (
                                 #fields,
                                 #phantom,
@@ -186,6 +187,7 @@ impl GenerateAST {
                         }
                     } else {
                         quote! {
+                            #[doc(hidden)]
                             pub struct #ast_name #impl_generics
                             where
                                 #base_bounds
@@ -203,6 +205,7 @@ impl GenerateAST {
                     // For tuple structs, the where clause must come after the tuple body
                     quote! {
                         #[derive(Clone, Debug, PartialEq)]
+                        #[doc(hidden)]
                         pub struct #ast_name #impl_generics (
                             #fields,
                             #phantom,
@@ -214,6 +217,7 @@ impl GenerateAST {
                 } else {
                     quote! {
                         #[derive(Clone, Debug, PartialEq)]
+                        #[doc(hidden)]
                         pub struct #ast_name #impl_generics
                         where
                             #base_bounds
@@ -245,6 +249,7 @@ impl GenerateAST {
                     );
 
                     quote! {
+                        #[doc(hidden)]
                         pub enum #ast_name #impl_generics
                         where
                             #base_bounds
@@ -261,6 +266,7 @@ impl GenerateAST {
                 } else {
                     quote! {
                         #[derive(Clone, Debug, PartialEq)]
+                        #[doc(hidden)]
                         pub enum #ast_name #impl_generics
                         where
                             #base_bounds
@@ -580,10 +586,7 @@ impl GenerateAST {
             let ast_self_name_str = ast_self_name.to_string();
 
             quote! {
-                /// Self-referential wrapper for standalone use.
-                ///
-                /// This type sets `LanguageOutput = Self`, creating a self-referential
-                /// AST type suitable for use with `HasParser`.
+                #[doc(hidden)]
                 pub struct #ast_self_name #ast_self_def_generics (
                     pub #inner_ast_type,
                     #phantom,
@@ -628,11 +631,8 @@ impl GenerateAST {
             }
         } else {
             quote! {
-                /// Self-referential wrapper for standalone use.
-                ///
-                /// This type sets `LanguageOutput = Self`, creating a self-referential
-                /// AST type suitable for use with `HasParser`.
                 #[derive(Clone, Debug, PartialEq)]
+                #[doc(hidden)]
                 pub struct #ast_self_name #ast_self_def_generics (
                     pub #inner_ast_type,
                     #phantom,

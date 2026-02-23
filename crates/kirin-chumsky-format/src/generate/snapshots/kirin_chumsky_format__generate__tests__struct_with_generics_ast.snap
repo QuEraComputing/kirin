@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[doc(hidden)]
 pub struct GenericReturnAST<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput>(
     pub ::kirin::parsers::SSAValue<'src, <T as ::kirin::parsers::HasParser<'tokens, 'src>>::Output>,
     ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), T, TypeOutput, LanguageOutput)>,
@@ -50,10 +51,7 @@ where
         a0 == b0
     }
 }
-#[doc = r" Self-referential wrapper for standalone use."]
-#[doc = r""]
-#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
-#[doc = r" AST type suitable for use with `HasParser`."]
+#[doc(hidden)]
 pub struct GenericReturnASTSelf<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput>(
     pub  GenericReturnAST<
         'tokens,

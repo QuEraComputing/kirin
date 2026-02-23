@@ -2,6 +2,7 @@
 source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
+#[doc(hidden)]
 pub enum WrapperWithGenericsAST<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput, LanguageOutput>
 where
     TypeOutput: Clone + PartialEq + 'tokens,
@@ -79,10 +80,7 @@ where
         }
     }
 }
-#[doc = r" Self-referential wrapper for standalone use."]
-#[doc = r""]
-#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
-#[doc = r" AST type suitable for use with `HasParser`."]
+#[doc(hidden)]
 pub struct WrapperWithGenericsASTSelf<'tokens, 'src: 'tokens, T: TypeLattice, TypeOutput>(
     pub  WrapperWithGenericsAST<
         'tokens,

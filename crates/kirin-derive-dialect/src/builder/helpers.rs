@@ -405,6 +405,7 @@ pub(crate) fn build_result_impl(
 
     Ok(quote! {
         #[automatically_derived]
+        #[doc(hidden)]
         pub struct #build_result_name {
             pub id: Statement,
             #(#fields)*
@@ -431,6 +432,7 @@ pub(crate) fn build_result_module(
 
     quote! {
         #[automatically_derived]
+        #[doc(hidden)]
         pub mod #mod_name {
             use #crate_path::{Statement, ResultValue};
             #build_result_impl
@@ -454,6 +456,7 @@ where
     }
     Ok(quote! {
         #[automatically_derived]
+        #[doc(hidden)]
         pub mod #mod_name {
             use #crate_path::{Statement, ResultValue};
             #(#impls)*

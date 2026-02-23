@@ -98,9 +98,11 @@ impl SimpleLanguage {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub mod simple_language_build_result {
     use kirin_ir::{ResultValue, Statement};
     #[automatically_derived]
+    #[doc(hidden)]
     pub struct Add {
         pub id: Statement,
         pub result: ResultValue,
@@ -112,6 +114,7 @@ pub mod simple_language_build_result {
         }
     }
     #[automatically_derived]
+    #[doc(hidden)]
     pub struct Constant {
         pub id: Statement,
         pub result: ResultValue,
@@ -123,6 +126,7 @@ pub mod simple_language_build_result {
         }
     }
     #[automatically_derived]
+    #[doc(hidden)]
     pub struct Return {
         pub id: Statement,
     }
@@ -133,6 +137,7 @@ pub mod simple_language_build_result {
         }
     }
     #[automatically_derived]
+    #[doc(hidden)]
     pub struct Function {
         pub id: Statement,
         pub result: ResultValue,

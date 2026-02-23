@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/field/tests.rs
-expression: "case!\n{\n    #[kirin(type_lattice = ArithLattice)] pub enum ArithInstruction<T>\n    {\n        Add(SSAValue, Vec<SSAValue>, ResultValue, T),\n        Sub(SSAValue, Vec<SSAValue>, ResultValue, T),\n        Mul(SSAValue, Vec<SSAValue>, ResultValue),\n        Div(SSAValue, Vec<SSAValue>, ResultValue),\n    }\n}"
+expression: "case!\n{\n    #[kirin(type = ArithType)] pub enum ArithInstruction<T>\n    {\n        Add(SSAValue, Vec<SSAValue>, ResultValue, T),\n        Sub(SSAValue, Vec<SSAValue>, ResultValue, T),\n        Mul(SSAValue, Vec<SSAValue>, ResultValue),\n        Div(SSAValue, Vec<SSAValue>, ResultValue),\n    }\n}"
 ---
 #[automatically_derived]
 impl<'a, T> kirin::ir::HasArguments<'a> for ArithInstruction<T> {
@@ -23,6 +23,7 @@ impl<'a, T> kirin::ir::HasArguments<'a> for ArithInstruction<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum ArithInstructionArgumentsIter<'a> {
     Add(
         std::iter::Chain<
@@ -82,6 +83,7 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for ArithInstruction<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum ArithInstructionArgumentsMutIter<'a> {
     Add(
         std::iter::Chain<

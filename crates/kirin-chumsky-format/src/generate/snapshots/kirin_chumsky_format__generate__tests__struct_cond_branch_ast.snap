@@ -3,6 +3,7 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
+#[doc(hidden)]
 pub struct CondBranchAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
 where
     TypeOutput: Clone + PartialEq + 'tokens,
@@ -18,11 +19,8 @@ where
     _marker:
         ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
 }
-#[doc = r" Self-referential wrapper for standalone use."]
-#[doc = r""]
-#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
-#[doc = r" AST type suitable for use with `HasParser`."]
 #[derive(Clone, Debug, PartialEq)]
+#[doc(hidden)]
 pub struct CondBranchASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
     pub CondBranchAST<'tokens, 'src, TypeOutput, CondBranchASTSelf<'tokens, 'src, TypeOutput>>,
     ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,

@@ -13,6 +13,7 @@ impl<'a, T> kirin::ir::HasArguments<'a> for TestStruct<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub struct TestStructArgumentsIter<'a, T> {
     inner: <T as kirin::ir::HasArguments<'a>>::Iter,
 }
@@ -34,6 +35,7 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for TestStruct<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub struct TestStructArgumentsMutIter<'a, T> {
     inner: <T as kirin::ir::HasArgumentsMut<'a>>::IterMut,
 }

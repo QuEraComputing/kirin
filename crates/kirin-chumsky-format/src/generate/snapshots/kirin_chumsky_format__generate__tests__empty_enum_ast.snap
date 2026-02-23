@@ -3,6 +3,7 @@ source: crates/kirin-chumsky-format/src/generate/tests.rs
 expression: ast
 ---
 #[derive(Clone, Debug, PartialEq)]
+#[doc(hidden)]
 pub enum EmptyLangAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
 where
     TypeOutput: Clone + PartialEq + 'tokens,
@@ -14,11 +15,8 @@ where
         ::core::convert::Infallible,
     ),
 }
-#[doc = r" Self-referential wrapper for standalone use."]
-#[doc = r""]
-#[doc = r" This type sets `LanguageOutput = Self`, creating a self-referential"]
-#[doc = r" AST type suitable for use with `HasParser`."]
 #[derive(Clone, Debug, PartialEq)]
+#[doc(hidden)]
 pub struct EmptyLangASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
     pub EmptyLangAST<'tokens, 'src, TypeOutput, EmptyLangASTSelf<'tokens, 'src, TypeOutput>>,
     ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,

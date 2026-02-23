@@ -17,6 +17,7 @@ impl<'a, T> kirin::ir::HasArguments<'a> for TestEnum<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum TestEnumArgumentsIter<'a, T> {
     VariantA(<InnerStructA<T> as kirin::ir::HasArguments<'a>>::Iter),
     VariantB(<InnerStructB as kirin::ir::HasArguments<'a>>::Iter),
@@ -46,6 +47,7 @@ impl<'a, T> kirin::ir::HasArgumentsMut<'a> for TestEnum<T> {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum TestEnumArgumentsMutIter<'a, T> {
     VariantA(<InnerStructA<T> as kirin::ir::HasArgumentsMut<'a>>::IterMut),
     VariantB(<InnerStructB as kirin::ir::HasArgumentsMut<'a>>::IterMut),

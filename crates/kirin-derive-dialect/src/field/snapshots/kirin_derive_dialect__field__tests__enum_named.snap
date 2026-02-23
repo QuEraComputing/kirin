@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-dialect/src/field/tests.rs
-expression: "case!\n{\n    #[kirin(type_lattice = CFlowLattice)] pub enum ControlFlowInstruction\n    {\n        Branch { target: Block, }, ConditionalBranch\n        { condition: SSAValue, true_target: Block, false_target: Block, },\n        Return(SSAValue),\n    }\n}"
+expression: "case!\n{\n    #[kirin(type = CFlowType)] pub enum ControlFlowInstruction\n    {\n        Branch { target: Block, }, ConditionalBranch\n        { condition: SSAValue, true_target: Block, false_target: Block, },\n        Return(SSAValue),\n    }\n}"
 ---
 #[automatically_derived]
 impl<'a> kirin::ir::HasArguments<'a> for ControlFlowInstruction {
@@ -24,6 +24,7 @@ impl<'a> kirin::ir::HasArguments<'a> for ControlFlowInstruction {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum ControlFlowInstructionArgumentsIter<'a> {
     Branch(std::iter::Empty<&'a kirin::ir::SSAValue>),
     ConditionalBranch(std::iter::Once<&'a kirin::ir::SSAValue>),
@@ -64,6 +65,7 @@ impl<'a> kirin::ir::HasArgumentsMut<'a> for ControlFlowInstruction {
     }
 }
 #[automatically_derived]
+#[doc(hidden)]
 pub enum ControlFlowInstructionArgumentsMutIter<'a> {
     Branch(std::iter::Empty<&'a mut kirin::ir::SSAValue>),
     ConditionalBranch(std::iter::Once<&'a mut kirin::ir::SSAValue>),
