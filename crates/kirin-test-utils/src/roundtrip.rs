@@ -1,17 +1,17 @@
 use std::fmt::Display;
 
-use kirin_chumsky::{EmitIR, HasParser, ParsePipelineText, PrettyPrint, parse};
+use kirin_chumsky::{ParsePipelineText, ParseStatementTextExt, PrettyPrint};
 use kirin_ir::{Dialect, GetInfo, Pipeline, SSAKind, StageInfo, Statement};
 use kirin_prettyless::{Config, Document, PipelinePrintExt, RenderStage};
 
 /// Parse a single statement with pre-registered operands.
-pub fn emit_statement<'src, L>(
-    input: &'src str,
+pub fn emit_statement<L>(
+    input: &str,
     operands: &[(&str, L::Type)],
 ) -> (StageInfo<L>, Statement)
 where
-    L: Dialect + HasParser<'src, 'src>,
-    L::Output: EmitIR<L, Output = Statement>,
+    L: Dialect,
+    StageInfo<L>: ParseStatementTextExt<L>,
     L::Type: Clone,
 {
     let mut stage: StageInfo<L> = StageInfo::default();
@@ -25,7 +25,7 @@ where
             .new();
     }
 
-    let statement = parse::<L>(input, &mut stage).expect("parse should succeed");
+    let statement = stage.parse_statement(input).expect("parse should succeed");
     (stage, statement)
 }
 
@@ -52,8 +52,8 @@ where
 /// Assert that a statement roundtrips: parse → render → reparse → render → compare.
 pub fn assert_statement_roundtrip<L>(input: &str, operands: &[(&str, L::Type)])
 where
-    L: Dialect + PrettyPrint + for<'a> HasParser<'a, 'a>,
-    for<'a> <L as HasParser<'a, 'a>>::Output: EmitIR<L, Output = Statement>,
+    L: Dialect + PrettyPrint,
+    StageInfo<L>: ParseStatementTextExt<L>,
     L::Type: Clone + Display,
 {
     let (stage, statement) = emit_statement::<L>(input, operands);

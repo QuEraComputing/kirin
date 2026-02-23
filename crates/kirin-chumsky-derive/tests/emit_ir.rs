@@ -4,7 +4,9 @@
 //! using the EmitIR trait.
 
 use kirin::ir::{Dialect, GetInfo, ResultValue, SSAValue, StageInfo};
-use kirin_chumsky::{EmitContext, EmitIR, HasParser, PrettyPrint, parse, parse_ast};
+use kirin_chumsky::{
+    EmitContext, EmitIR, HasParser, ParseStatementTextExt, PrettyPrint, parse_ast,
+};
 use kirin_test_languages::SimpleType;
 use kirin_test_utils::new_test_ssa;
 
@@ -231,14 +233,16 @@ fn test_emit_chain_multiple_statements() {
 fn test_combined_parse_function() {
     let mut stage: StageInfo<EmitLang> = StageInfo::default();
 
-    // Test that the parse function works for syntax errors (returns Err)
-    let result = parse::<EmitLang>("invalid syntax", &mut stage);
+    // Test that parse_statement works for syntax errors (returns Err)
+    let result = stage.parse_statement("invalid syntax");
     assert!(result.is_err(), "Invalid syntax should return an error");
 
     // Existing stage SSAs are now seeded into parse context automatically.
     let ssa_a = new_test_ssa(&mut stage, "a", SimpleType::I32);
     let ssa_b = new_test_ssa(&mut stage, "b", SimpleType::I32);
-    let statement = parse::<EmitLang>("%result = add %a, %b", &mut stage).expect("parse failed");
+    let statement = stage
+        .parse_statement("%result = add %a, %b")
+        .expect("parse failed");
 
     let stmt_info = statement.get_info(&stage).expect("statement should exist");
     match stmt_info.definition() {

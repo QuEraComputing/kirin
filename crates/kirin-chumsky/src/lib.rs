@@ -3,30 +3,44 @@
 //! Runtime API for Kirin chumsky parsers, providing traits and common syntax nodes
 //! for parsing dialect definitions.
 //!
-//! This crate provides:
-//! - Core traits: `HasParser`, `HasDialectParser`, `EmitIR`
-//! - Common syntax nodes: `Spanned`, `SSAValue`, `ResultValue`, `Block`, `Region`, etc.
-//! - Parser combinators for common syntaxes
-//! - IR emission via `EmitContext` and `EmitIR` trait
+//! # Quick Start
 //!
-//! # Usage
+//! Two primary parsing APIs:
 //!
-//! Import both `HasParser` and `PrettyPrint` traits/derives for full dialect support:
+//! - **Statement-level** — [`ParseStatementText::parse_statement`] on `StageInfo<L>`:
+//!
+//!   ```ignore
+//!   use kirin_chumsky::prelude::*;
+//!
+//!   let mut stage: StageInfo<MyLang> = StageInfo::default();
+//!   let stmt = stage.parse_statement("%res = add %a, %b")?;
+//!   ```
+//!
+//! - **File-level** — [`ParsePipelineText::parse`] on `Pipeline<StageInfo<L>>`:
+//!
+//!   ```ignore
+//!   use kirin_chumsky::prelude::*;
+//!
+//!   let mut pipeline: Pipeline<StageInfo<MyLang>> = Pipeline::new();
+//!   let functions = pipeline.parse(src)?;
+//!   ```
+//!
+//! For lower-level control, [`parse_ast`] parses text into an AST without emitting
+//! IR, and [`EmitContext`] gives full control over SSA name registration.
+//!
+//! # Defining Dialects
 //!
 //! ```ignore
 //! use kirin::parsers::{HasParser, PrettyPrint};
 //! use kirin::ir::Dialect;
 //!
 //! #[derive(Dialect, HasParser, PrettyPrint)]
-//! #[kirin(type_lattice = MyType)]
+//! #[kirin(type = MyType)]
 //! pub enum MyDialect {
 //!     #[chumsky(format = "{res:name} = add {lhs}, {rhs}")]
 //!     Add { res: ResultValue, lhs: SSAValue, rhs: SSAValue },
 //! }
 //! ```
-//!
-//! - `HasParser` enables parsing via `MyDialect::parser()` or `parse::<MyDialect>(...)`
-//! - `PrettyPrint` enables roundtrip-compatible printing
 
 pub mod ast;
 mod builtins;
@@ -61,8 +75,9 @@ pub mod prelude {
     pub use crate::function_text::{FunctionParseError, FunctionParseErrorKind, ParsePipelineText};
     pub use crate::parsers::*;
     pub use crate::traits::{
-        BoxedParser, DirectlyParsable, EmitContext, EmitIR, HasParser, ParseError, TokenInput,
-        emit, parse, parse_ast,
+        BoxedParser, DirectlyParsable, EmitContext, EmitIR, HasDialectParser, HasParser,
+        ParseError, ParseStatementText, ParseStatementTextExt, ParserError, RecursiveParser,
+        TokenInput, parse_ast,
     };
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;
