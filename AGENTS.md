@@ -50,7 +50,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - `kirin-lexer` — Logos tokenizer
 
 **Parser/Printer:**
-- `kirin-chumsky` — Parser traits (`HasParser`, `HasRecursiveParser`, `EmitIR`)
+- `kirin-chumsky` — Parser traits (`HasParser`, `HasDialectParser`, `EmitIR`), text APIs (`ParseStatementText`, `ParsePipelineText`)
 - `kirin-prettyless` — Pretty printer (`PrettyPrint`)
 - `kirin-chumsky-derive` — `#[derive(HasParser, PrettyPrint)]`
 - `kirin-chumsky-format` — Code generation (internal)
@@ -78,3 +78,9 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - **Custom Layout for derive-specific attributes**: When a derive macro needs attributes beyond `StandardLayout` (which has `()` for all extras), define a custom `Layout` impl in that derive module. This keeps derive-specific attributes out of the core IR. See `CallSemanticsLayout` in `kirin-derive-interpreter` as an example.
 
 - **`#[kirin(...)]` attribute convention**: Use path syntax for `crate`: `#[kirin(crate = kirin_ir)]` not `#[kirin(crate = "kirin_ir")]`. Darling parses `syn::Path` and supports bare idents directly.
+
+## Chumsky Parser Conventions
+
+- **`for<'src> HasParser` lifetime pattern**: `HasParser<'src, 'src>` ties the AST output lifetime to the input string. When writing trait impls that call `parse_ast::<L>(input)` and then `emit()`, the return type (`Statement`) does not borrow the input — but the compiler cannot prove this through the associated type chain. Do **not** use an associated `Output` type derived from `<<L as HasParser<'static, 'static>>::Output as EmitIR<L>>::Output` — it creates an unsatisfiable `'static` requirement on the input. Instead, hardcode `Statement` as the return type or use a helper function generic over `'src`.
+
+- **`Ctx` default parameter for unified traits**: When the same trait method needs extra context for some implementors (e.g., `CompileStage` for `Pipeline`) but not others (e.g., `StageInfo`), use a default type parameter `Ctx = ()` on the trait. Pair with a blanket `Ext` trait that erases the `()` arg for ergonomic call sites. See `ParseStatementText<L, Ctx>` / `ParseStatementTextExt<L>`.
