@@ -1,0 +1,14 @@
+[package]
+name = "kirin-interval"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
+kirin-interpreter = { workspace = true, optional = true }
+kirin-arith = { workspace = true, optional = true }
+
+[features]
+default = []
+interpreter = ["kirin-interpreter"]
+arith = ["kirin-arith"]

@@ -5,10 +5,7 @@ use kirin_derive_core::tokens::FieldPatternTokens;
 use quote::quote;
 
 impl<'ir> Scan<'ir, CallSemanticsLayout> for DeriveCallSemantics {
-    fn scan_input(
-        &mut self,
-        input: &'ir ir::Input<CallSemanticsLayout>,
-    ) -> darling::Result<()> {
+    fn scan_input(&mut self, input: &'ir ir::Input<CallSemanticsLayout>) -> darling::Result<()> {
         self.input = Some(InputContext {
             core: InputMeta::from_input(input),
             callable_all: input.extra_attrs.callable,

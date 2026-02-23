@@ -5,7 +5,8 @@
 
 use kirin::ir::{Dialect, GetInfo, ResultValue, SSAValue, StageInfo};
 use kirin_chumsky::{EmitContext, EmitIR, HasParser, PrettyPrint, parse, parse_ast};
-use kirin_test_utils::{SimpleType, new_test_ssa};
+use kirin_test_languages::SimpleType;
+use kirin_test_utils::new_test_ssa;
 
 /// A simple dialect for testing EmitIR functionality.
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]

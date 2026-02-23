@@ -254,49 +254,6 @@ impl HasTop for Interval {
     }
 }
 
-#[cfg(feature = "interpreter")]
-impl kirin_interpreter::BranchCondition for Interval {
-    fn is_truthy(&self) -> Option<bool> {
-        if self.is_empty() {
-            return None;
-        }
-        // Entirely below zero → definitely nonzero → truthy
-        let all_negative = match self.hi {
-            Bound::NegInf => true,
-            Bound::Finite(h) => h < 0,
-            Bound::PosInf => false,
-        };
-        // Entirely above zero → definitely nonzero → truthy
-        let all_positive = match self.lo {
-            Bound::PosInf => true,
-            Bound::Finite(l) => l > 0,
-            Bound::NegInf => false,
-        };
-        if all_negative || all_positive {
-            return Some(true);
-        }
-        // Exactly [0, 0] → definitely zero → falsy
-        if *self == Interval::constant(0) {
-            return Some(false);
-        }
-        // Spans zero — undecidable
-        None
-    }
-}
-
-impl From<kirin_arith::ArithValue> for Interval {
-    fn from(v: kirin_arith::ArithValue) -> Self {
-        use kirin_arith::ArithValue;
-        match v {
-            ArithValue::I64(x) => Interval::constant(x),
-            ArithValue::I32(x) => Interval::constant(x as i64),
-            ArithValue::I16(x) => Interval::constant(x as i64),
-            ArithValue::I8(x) => Interval::constant(x as i64),
-            _ => Interval::top(),
-        }
-    }
-}
-
 impl std::ops::Add for Interval {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
@@ -339,6 +296,47 @@ impl std::ops::Neg for Interval {
     }
 }
 
+#[cfg(feature = "interpreter")]
+impl kirin_interpreter::BranchCondition for Interval {
+    fn is_truthy(&self) -> Option<bool> {
+        if self.is_empty() {
+            return None;
+        }
+        let all_negative = match self.hi {
+            Bound::NegInf => true,
+            Bound::Finite(h) => h < 0,
+            Bound::PosInf => false,
+        };
+        let all_positive = match self.lo {
+            Bound::PosInf => true,
+            Bound::Finite(l) => l > 0,
+            Bound::NegInf => false,
+        };
+        if all_negative || all_positive {
+            return Some(true);
+        }
+        if *self == Interval::constant(0) {
+            return Some(false);
+        }
+        None
+    }
+}
+
+#[cfg(feature = "arith")]
+impl From<kirin_arith::ArithValue> for Interval {
+    fn from(v: kirin_arith::ArithValue) -> Self {
+        use kirin_arith::ArithValue;
+        match v {
+            ArithValue::I64(x) => Interval::constant(x),
+            ArithValue::I32(x) => Interval::constant(x as i64),
+            ArithValue::I16(x) => Interval::constant(x as i64),
+            ArithValue::I8(x) => Interval::constant(x as i64),
+            _ => Interval::top(),
+        }
+    }
+}
+
+#[cfg(feature = "interpreter")]
 impl kirin_interpreter::AbstractValue for Interval {
     fn widen(&self, next: &Self) -> Self {
         if self.is_empty() {

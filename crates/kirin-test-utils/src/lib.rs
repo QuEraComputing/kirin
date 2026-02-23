@@ -1,16 +1,6 @@
 mod rustfmt;
-mod simple_ir_type;
-#[cfg(feature = "simple-language")]
-mod simple_language;
-mod simple_type;
 mod ssa;
 mod unit_type;
-mod value;
-
-#[cfg(feature = "interpreter")]
-mod interval;
-#[cfg(feature = "composite-language")]
-mod composite_language;
 
 #[cfg(feature = "parser")]
 pub mod parser;
@@ -19,32 +9,20 @@ pub mod parser;
 pub mod roundtrip;
 
 pub use rustfmt::{rustfmt, rustfmt_display};
-pub use simple_ir_type::SimpleIRType;
-#[cfg(feature = "simple-language")]
-pub use simple_language::SimpleLanguage;
-pub use simple_type::SimpleType;
 pub use ssa::new_test_ssa;
 pub use unit_type::UnitType;
-pub use value::Value;
-
-#[cfg(feature = "interpreter")]
-pub use interval::{Bound, Interval, interval_add, interval_mul, interval_neg, interval_sub};
-#[cfg(feature = "composite-language")]
-pub use composite_language::CompositeLanguage;
 
 /// Dump a specialized function's IR using the builtin pretty printer.
 #[cfg(feature = "interpreter")]
 pub fn dump_function(
     spec_fn: kirin_ir::SpecializedFunction,
-    pipeline: &kirin_ir::Pipeline<kirin_ir::StageInfo<CompositeLanguage>>,
+    pipeline: &kirin_ir::Pipeline<kirin_ir::StageInfo<kirin_test_languages::CompositeLanguage>>,
     stage_id: kirin_ir::CompileStage,
 ) -> String {
     use kirin_prettyless::PrettyPrintExt;
     let stage = pipeline.stage(stage_id).unwrap();
     spec_fn.sprint(stage)
 }
-
-pub use SimpleIRType::*;
 
 #[cfg(feature = "parser")]
 #[macro_export]

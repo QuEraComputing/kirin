@@ -5,7 +5,7 @@
 
 use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::{HasParser, PrettyPrint};
-use kirin_test_utils::SimpleType;
+use kirin_test_languages::SimpleType;
 
 // A simple dialect for testing pretty print derive
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]

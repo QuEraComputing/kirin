@@ -1181,6 +1181,7 @@ dependencies = [
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
+ "kirin-test-languages",
  "kirin-test-utils",
  "proc-macro2",
  "quote",
@@ -1218,7 +1219,7 @@ dependencies = [
  "kirin-derive-core",
  "kirin-derive-dialect",
  "kirin-ir",
- "kirin-test-utils",
+ "kirin-test-languages",
  "paste",
  "proc-macro2",
  "quote",
@@ -1269,6 +1270,7 @@ dependencies = [
  "kirin",
  "kirin-arith",
  "kirin-interpreter",
+ "kirin-test-languages",
  "kirin-test-utils",
 ]
 
@@ -1284,10 +1286,21 @@ dependencies = [
  "kirin-derive",
  "kirin-derive-interpreter",
  "kirin-function",
+ "kirin-interval",
  "kirin-ir",
+ "kirin-test-languages",
  "kirin-test-utils",
  "smallvec",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "kirin-interval"
+version = "0.1.0"
+dependencies = [
+ "kirin-arith",
+ "kirin-interpreter",
+ "kirin-ir",
 ]
 
 [[package]]
@@ -1320,7 +1333,7 @@ dependencies = [
  "insta",
  "kirin-ir",
  "kirin-prettyless-derive",
- "kirin-test-utils",
+ "kirin-test-languages",
  "prettyless",
  "serde",
 ]
@@ -1343,7 +1356,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kirin-test-utils"
+name = "kirin-test-languages"
 version = "0.1.0"
 dependencies = [
  "kirin-arith",
@@ -1358,6 +1371,17 @@ dependencies = [
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
+]
+
+[[package]]
+name = "kirin-test-utils"
+version = "0.1.0"
+dependencies = [
+ "kirin-chumsky",
+ "kirin-ir",
+ "kirin-lexer",
+ "kirin-prettyless",
+ "kirin-test-languages",
 ]
 
 [[package]]

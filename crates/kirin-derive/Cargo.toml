@@ -16,4 +16,4 @@ proc-macro = true
 
 [dev-dependencies]
 kirin-ir.workspace = true
-kirin-test-utils.workspace = true
+kirin-test-languages.workspace = true

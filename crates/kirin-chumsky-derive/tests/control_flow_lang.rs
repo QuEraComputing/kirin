@@ -2,7 +2,7 @@
 
 use kirin::ir::{Dialect, ResultValue, SSAValue, Successor};
 use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
-use kirin_test_utils::SimpleType;
+use kirin_test_languages::SimpleType;
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(type = SimpleType)]

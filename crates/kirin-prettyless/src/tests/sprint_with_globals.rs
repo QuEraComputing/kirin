@@ -8,8 +8,8 @@ fn test_sprint_with_globals() {
         .staged_function()
         .name(test_func)
         .signature(kirin_ir::Signature {
-            params: vec![Int],
-            ret: Int,
+            params: vec![SimpleType::I64],
+            ret: SimpleType::I64,
             constraints: (),
         })
         .new()

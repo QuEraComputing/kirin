@@ -4,7 +4,7 @@ use kirin::ir::{Dialect, StageInfo};
 use kirin_chumsky::prelude::Document;
 use kirin_chumsky::{HasParser, PrettyPrint, parse_ast};
 use kirin_prettyless::Config;
-use kirin_test_utils::SimpleType;
+use kirin_test_languages::SimpleType;
 
 #[derive(Debug, Clone, PartialEq, HasParser, PrettyPrint)]
 #[chumsky(crate = kirin_chumsky)]

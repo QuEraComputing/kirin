@@ -6,9 +6,11 @@ use kirin_function::FunctionBody;
 use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
+#[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
 #[cfg_attr(feature = "pretty", derive(kirin_chumsky_derive::PrettyPrint))]
 #[kirin(fn, type = ArithType, crate = kirin_ir)]
-#[pretty(crate = kirin_prettyless)]
+#[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
+#[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
 #[wraps]
 pub enum CompositeLanguage {
     Arith(Arith<ArithType>),

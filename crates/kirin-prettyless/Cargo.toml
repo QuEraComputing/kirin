@@ -19,4 +19,4 @@ bat = ["dep:bat"]
 
 [dev-dependencies]
 insta.workspace = true
-kirin-test-utils = { workspace = true, features = ["simple-language"] }
+kirin-test-languages = { workspace = true, features = ["simple-language"] }

@@ -1,0 +1,25 @@
+[package]
+name = "kirin-test-languages"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
+kirin-chumsky = { workspace = true, optional = true }
+kirin-lexer = { workspace = true, optional = true }
+kirin-prettyless = { workspace = true, optional = true }
+kirin-arith = { workspace = true, optional = true, features = ["interpret"] }
+kirin-cf = { workspace = true, optional = true, features = ["interpret"] }
+kirin-constant = { workspace = true, optional = true, features = ["interpret"] }
+kirin-function = { workspace = true, optional = true, features = ["interpret"] }
+kirin-derive = { workspace = true, optional = true }
+kirin-derive-interpreter = { workspace = true, optional = true }
+kirin-chumsky-derive = { workspace = true, optional = true }
+kirin-interpreter = { workspace = true, optional = true }
+
+[features]
+default = []
+simple-language = ["kirin-ir/derive"]
+composite-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-constant", "kirin-function", "kirin-derive", "kirin-derive-interpreter", "kirin-chumsky-derive", "kirin-interpreter"]
+parser = ["kirin-chumsky/derive", "kirin-lexer"]
+pretty = ["kirin-prettyless"]

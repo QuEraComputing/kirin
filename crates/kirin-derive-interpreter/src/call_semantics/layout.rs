@@ -1,5 +1,5 @@
-use kirin_derive_core::prelude::darling::{self, FromDeriveInput, FromVariant};
 use kirin_derive_core::ir::Layout;
+use kirin_derive_core::prelude::darling::{self, FromDeriveInput, FromVariant};
 
 #[derive(Debug, Clone)]
 pub struct CallSemanticsLayout;

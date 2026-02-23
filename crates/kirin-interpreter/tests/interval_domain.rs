@@ -5,7 +5,7 @@
 
 use kirin_interpreter::AbstractValue;
 use kirin_ir::{HasBottom, HasTop, Lattice};
-use kirin_test_utils::{Bound, Interval, interval_add, interval_sub};
+use kirin_interval::{Bound, Interval, interval_add, interval_sub};
 
 // ============================================================================
 // Tests: Lattice properties

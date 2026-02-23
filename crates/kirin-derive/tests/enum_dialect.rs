@@ -2,10 +2,10 @@
 
 use kirin_derive::Dialect;
 use kirin_ir::*;
-use kirin_test_utils::*;
+use kirin_test_languages::*;
 
 #[derive(Dialect, Clone, Debug, PartialEq)]
-#[kirin(fn, type = SimpleIRType, crate = kirin_ir)]
+#[kirin(fn, type = SimpleType, crate = kirin_ir)]
 enum EnumDialect {
     Named { arg: SSAValue },
     Tuple(SSAValue, SSAValue),

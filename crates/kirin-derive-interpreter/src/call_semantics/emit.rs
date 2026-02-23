@@ -82,11 +82,8 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
         let (_, ty_generics, where_clause) = input.core.generics.split_for_impl();
 
         // Determine if #[callable] is used anywhere (enum-level or any variant).
-        let any_callable = input.callable_all
-            || self
-                .statements
-                .values()
-                .any(|info| info.is_callable);
+        let any_callable =
+            input.callable_all || self.statements.values().any(|info| info.is_callable);
 
         let mut wrapper_types: Vec<&syn::Type> = Vec::new();
         let mut match_arms = Vec::new();

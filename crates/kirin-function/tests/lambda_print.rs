@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 use kirin_function::{Bind, Return};
-use kirin_test_utils::SimpleType;
+use kirin_test_languages::SimpleType;
 use kirin_test_utils::roundtrip;
 
 // NOTE: Lambda (and other Region-containing types) cannot currently be used

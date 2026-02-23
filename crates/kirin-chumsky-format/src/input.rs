@@ -87,13 +87,9 @@ pub fn parse_pretty_derive_input(
     Ok(input)
 }
 
-fn pretty_input_requires_ir_type(
-    input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
-) -> bool {
+fn pretty_input_requires_ir_type(input: &kirin_derive_core::ir::Input<PrettyPrintLayout>) -> bool {
     match &input.data {
-        kirin_derive_core::ir::Data::Struct(data) => {
-            pretty_statement_requires_ir_type(&data.0)
-        }
+        kirin_derive_core::ir::Data::Struct(data) => pretty_statement_requires_ir_type(&data.0),
         kirin_derive_core::ir::Data::Enum(data) => {
             data.variants.iter().any(pretty_statement_requires_ir_type)
         }

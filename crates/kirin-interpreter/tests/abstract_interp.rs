@@ -6,8 +6,8 @@ use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{Continuation, Frame, StackInterpreter};
 use kirin_ir::*;
-use kirin_test_utils::Interval;
-use kirin_test_utils::CompositeLanguage;
+use kirin_test_languages::CompositeLanguage;
+use kirin_interval::Interval;
 
 /// Build `c1 = constant 10; c2 = constant 32; y = add c1, c2; return y`
 /// Run with Interval values through StackInterpreter.

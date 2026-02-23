@@ -4,7 +4,8 @@ use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::StackInterpreter;
 use kirin_ir::{query::ParentInfo, *};
-use kirin_test_utils::{CompositeLanguage, dump_function};
+use kirin_test_languages::CompositeLanguage;
+use kirin_test_utils::dump_function;
 
 // ---------------------------------------------------------------------------
 // IR builder: select(x) = if x != 0 then x+1 else 42
@@ -102,7 +103,8 @@ fn build_select_program(
         let info = cond_br_stmt.expect_info_mut(stage);
         *info.get_parent_mut() = Some(entry);
 
-        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> = entry.get_info_mut(stage).unwrap();
+        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
+            entry.get_info_mut(stage).unwrap();
         entry_info.statements = linked;
         entry_info.terminator = Some(cond_br_stmt);
     }

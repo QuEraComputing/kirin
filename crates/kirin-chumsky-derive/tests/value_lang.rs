@@ -5,7 +5,7 @@ use kirin::ir::{Dialect, ResultValue, SSAValue};
 use kirin_chumsky::prelude::{ArenaDoc, DocAllocator, Document};
 use kirin_chumsky::{BoxedParser, HasParser, PrettyPrint, TokenInput, parse_ast};
 use kirin_lexer::Token;
-use kirin_test_utils::SimpleType;
+use kirin_test_languages::SimpleType;
 
 /// A custom compile-time value type that parses any identifier.
 #[derive(Debug, Clone, PartialEq)]

@@ -21,4 +21,5 @@ kirin-chumsky.workspace = true
 kirin-ir = { workspace = true, features = ["derive"] }
 kirin-lexer.workspace = true
 kirin-prettyless.workspace = true
+kirin-test-languages = { workspace = true, features = ["parser"] }
 kirin-test-utils = { workspace = true, features = ["parser"] }

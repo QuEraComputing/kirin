@@ -51,6 +51,8 @@ members = [
     "crates/kirin-prettyless-derive",
     "crates/kirin-interpreter",
     "crates/kirin-derive-interpreter",
+    "crates/kirin-test-languages",
+    "crates/kirin-interval",
 ]
 
 [workspace.dependencies]
@@ -85,6 +87,8 @@ kirin-derive-core = { version = "0.1.0", path = "crates/kirin-derive-core" }
 kirin-derive-dialect = { version = "0.1.0", path = "crates/kirin-derive-dialect" }
 kirin-derive = { version = "0.1.0", path = "crates/kirin-derive" }
 kirin-test-utils = { version = "0.1.0", path = "crates/kirin-test-utils" }
+kirin-test-languages = { version = "0.1.0", path = "crates/kirin-test-languages" }
+kirin-interval = { version = "0.1.0", path = "crates/kirin-interval" }
 kirin-chumsky-format = { version = "0.1.0", path = "crates/kirin-chumsky-format" }
 kirin-chumsky-derive = { version = "0.1.0", path = "crates/kirin-chumsky-derive" }
 kirin = { version = "0.1.0", path = "." }

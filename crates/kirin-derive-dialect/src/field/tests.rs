@@ -198,22 +198,22 @@ fn test_struct_unnamed_regular() {
 #[test]
 fn test_simple() {
     insta::assert_snapshot!(case! {
-        #[kirin(fn, type = SimpleIRType, crate = kirin_ir)]
+        #[kirin(fn, type = SimpleType, crate = kirin_ir)]
         pub enum SimpleLanguage {
             Add(
                 SSAValue,
                 SSAValue,
-                #[kirin(type = SimpleIRType::Float)] ResultValue,
+                #[kirin(type = SimpleType::Float)] ResultValue,
             ),
             Constant(
                 #[kirin(into)] Value,
-                #[kirin(type = SimpleIRType::Float)] ResultValue,
+                #[kirin(type = SimpleType::Float)] ResultValue,
             ),
             #[kirin(terminator)]
             Return(SSAValue),
             Function(
                 Region,
-                #[kirin(type = SimpleIRType::Float)] ResultValue,
+                #[kirin(type = SimpleType::Float)] ResultValue,
             ),
         }
     });

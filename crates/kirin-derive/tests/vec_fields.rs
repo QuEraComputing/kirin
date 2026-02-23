@@ -2,12 +2,12 @@
 
 use kirin_derive::Dialect;
 use kirin_ir::*;
-use kirin_test_utils::*;
+use kirin_test_languages::*;
 
 // Note: 'fn' attribute is omitted to disable builder generation,
 // avoiding 'ResultValue field cannot be a Vec' error.
 #[derive(Dialect, Clone, Debug, PartialEq)]
-#[kirin(type = SimpleIRType, crate = kirin_ir)]
+#[kirin(type = SimpleType, crate = kirin_ir)]
 struct VecOp {
     args: Vec<SSAValue>,
     res: Vec<ResultValue>,

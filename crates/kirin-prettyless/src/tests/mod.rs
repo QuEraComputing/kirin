@@ -1,7 +1,7 @@
 //! Integration and unit tests for pretty printing.
 
 use kirin_ir::{Block, Dialect, GlobalSymbol, InternTable, Pipeline};
-use kirin_test_utils::*;
+use kirin_test_languages::*;
 use prettyless::DocAllocator;
 
 use crate::{ArenaDoc, Config, Document, PrettyPrint, PrettyPrintExt, PrintExt};
@@ -13,10 +13,7 @@ impl PrettyPrint for SimpleLanguage {
     {
         match self {
             SimpleLanguage::Add(lhs, rhs, _) => doc.text(format!("add {}, {}", *lhs, *rhs)),
-            SimpleLanguage::Constant(value, _) => match value {
-                Value::I64(v) => doc.text(format!("constant {}", v)),
-                Value::F64(v) => doc.text(format!("constant {}", v)),
-            },
+            SimpleLanguage::Constant(value, _) => doc.text(format!("constant {}", value)),
             SimpleLanguage::Return(retval) => doc.text(format!("return {}", *retval)),
             SimpleLanguage::Function(region, _) => doc.print_region(region),
         }
@@ -35,8 +32,8 @@ fn create_test_function() -> (
         .staged_function()
         .name(test_func)
         .signature(kirin_ir::Signature {
-            params: vec![Int],
-            ret: Int,
+            params: vec![SimpleType::I64],
+            ret: SimpleType::I64,
             constraints: (),
         })
         .new()
@@ -51,8 +48,8 @@ fn create_test_function() -> (
 
     let block_a: Block = stage
         .block()
-        .argument(Int)
-        .argument_with_name("y", Float)
+        .argument(SimpleType::I64)
+        .argument_with_name("y", SimpleType::F64)
         .stmt(a)
         .stmt(b)
         .stmt(c)
@@ -61,7 +58,7 @@ fn create_test_function() -> (
         .new();
 
     let ret = SimpleLanguage::op_return(&mut stage, block_arg_x);
-    let block_b = stage.block().argument(Float).terminator(ret).new();
+    let block_b = stage.block().argument(SimpleType::F64).terminator(ret).new();
 
     let body = stage.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);

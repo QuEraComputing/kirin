@@ -14,8 +14,8 @@ fn test_pipeline_function_print() {
         .func(func)
         .stage(stage0_id)
         .signature(kirin_ir::Signature {
-            params: vec![Int],
-            ret: Int,
+            params: vec![SimpleType::I64],
+            ret: SimpleType::I64,
             constraints: (),
         })
         .new()
@@ -40,8 +40,8 @@ fn test_pipeline_function_print() {
         .func(func)
         .stage(stage1_id)
         .signature(kirin_ir::Signature {
-            params: vec![Int],
-            ret: Int,
+            params: vec![SimpleType::I64],
+            ret: SimpleType::I64,
             constraints: (),
         })
         .new()
@@ -77,8 +77,8 @@ fn test_pipeline_unnamed_stage() {
         .func(func)
         .stage(stage_id)
         .signature(kirin_ir::Signature {
-            params: vec![Int, Float],
-            ret: Int,
+            params: vec![SimpleType::I64, SimpleType::F64],
+            ret: SimpleType::I64,
             constraints: (),
         })
         .new()
@@ -113,8 +113,8 @@ fn test_pipeline_staged_function_no_specialization() {
         .func(func)
         .stage(stage_id)
         .signature(kirin_ir::Signature {
-            params: vec![Int],
-            ret: Float,
+            params: vec![SimpleType::I64],
+            ret: SimpleType::F64,
             constraints: (),
         })
         .new()

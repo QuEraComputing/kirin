@@ -20,5 +20,7 @@ kirin-constant = { workspace = true, features = ["interpret"] }
 kirin-function = { workspace = true, features = ["interpret"] }
 kirin-derive = { workspace = true }
 kirin-derive-interpreter = { workspace = true }
-kirin-test-utils = { workspace = true, features = ["interpreter", "composite-language"] }
+kirin-interval = { workspace = true, features = ["interpreter", "arith"] }
+kirin-test-languages = { workspace = true, features = ["composite-language"] }
+kirin-test-utils = { workspace = true, features = ["interpreter"] }
 insta = { workspace = true }

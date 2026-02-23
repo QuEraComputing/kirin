@@ -13,8 +13,8 @@ pub(crate) use bounds::BoundsBuilder;
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::{Layout, VariantRef};
 use kirin_derive_core::ir::fields::FieldInfo;
+use kirin_derive_core::ir::{Layout, VariantRef};
 use proc_macro2::TokenStream;
 use quote::quote;
 

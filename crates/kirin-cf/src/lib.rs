@@ -8,7 +8,9 @@ pub enum ControlFlow<T: CompileTimeValue + Default> {
         target: Successor,
         args: Vec<SSAValue>,
     },
-    #[chumsky(format = "cond_br {condition} then={true_target}({true_args}) else={false_target}({false_args})")]
+    #[chumsky(
+        format = "cond_br {condition} then={true_target}({true_args}) else={false_target}({false_args})"
+    )]
     ConditionalBranch {
         condition: SSAValue,
         true_target: Successor,

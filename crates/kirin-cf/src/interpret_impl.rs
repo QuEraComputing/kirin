@@ -33,12 +33,11 @@ where
                 ..
             } => {
                 let cond = interp.read(*condition)?;
-                let read_args =
-                    |interp: &mut I, args: &[SSAValue]| -> Result<_, I::Error> {
-                        args.iter()
-                            .map(|v| interp.read(*v))
-                            .collect::<Result<_, _>>()
-                    };
+                let read_args = |interp: &mut I, args: &[SSAValue]| -> Result<_, I::Error> {
+                    args.iter()
+                        .map(|v| interp.read(*v))
+                        .collect::<Result<_, _>>()
+                };
                 match cond.is_truthy() {
                     Some(true) => {
                         let values = read_args(interp, true_args)?;

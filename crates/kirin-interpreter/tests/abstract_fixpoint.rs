@@ -4,7 +4,9 @@ use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{AbstractInterpreter, WideningStrategy};
 use kirin_ir::{query::ParentInfo, *};
-use kirin_test_utils::{Interval, CompositeLanguage, dump_function};
+use kirin_test_languages::CompositeLanguage;
+use kirin_interval::Interval;
+use kirin_test_utils::dump_function;
 
 // ---------------------------------------------------------------------------
 // IR builders
@@ -39,7 +41,8 @@ fn build_branch_fork_program(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_neg = ControlFlow::<ArithType>::op_return(stage, neg_val);
     {
-        let neg_info: &mut Item<BlockInfo<CompositeLanguage>> = neg_block.get_info_mut(stage).unwrap();
+        let neg_info: &mut Item<BlockInfo<CompositeLanguage>> =
+            neg_block.get_info_mut(stage).unwrap();
         neg_info.terminator = Some(ret_neg.into());
     }
 
@@ -52,7 +55,8 @@ fn build_branch_fork_program(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_pos = ControlFlow::<ArithType>::op_return(stage, pos_val);
     {
-        let pos_info: &mut Item<BlockInfo<CompositeLanguage>> = pos_block.get_info_mut(stage).unwrap();
+        let pos_info: &mut Item<BlockInfo<CompositeLanguage>> =
+            pos_block.get_info_mut(stage).unwrap();
         pos_info.terminator = Some(ret_pos.into());
     }
 
@@ -134,7 +138,8 @@ fn build_loop_program(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
     {
-        let exit_info: &mut Item<BlockInfo<CompositeLanguage>> = loop_exit.get_info_mut(stage).unwrap();
+        let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
+            loop_exit.get_info_mut(stage).unwrap();
         exit_info.terminator = Some(ret_exit.into());
     }
 
@@ -163,7 +168,8 @@ fn build_loop_program(
             .get_parent_mut()
             .replace(loop_body);
 
-        let body_info: &mut Item<BlockInfo<CompositeLanguage>> = loop_body.get_info_mut(stage).unwrap();
+        let body_info: &mut Item<BlockInfo<CompositeLanguage>> =
+            loop_body.get_info_mut(stage).unwrap();
         body_info.statements = linked;
         body_info.terminator = Some(br_stmt);
     }
@@ -176,7 +182,8 @@ fn build_loop_program(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(entry);
-        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> = entry.get_info_mut(stage).unwrap();
+        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
+            entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);
     }
 
@@ -195,7 +202,8 @@ fn build_loop_program(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(header);
-        let header_info: &mut Item<BlockInfo<CompositeLanguage>> = header.get_info_mut(stage).unwrap();
+        let header_info: &mut Item<BlockInfo<CompositeLanguage>> =
+            header.get_info_mut(stage).unwrap();
         header_info.terminator = Some(cond_stmt);
     }
 

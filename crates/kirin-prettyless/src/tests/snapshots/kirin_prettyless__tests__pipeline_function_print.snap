@@ -1,18 +1,17 @@
 ---
 source: crates/kirin-prettyless/src/tests/pipeline.rs
-assertion_line: 62
 expression: output
 ---
-stage @A fn @foo(int) -> int;
-specialize @A fn @foo(int) -> int {
+stage @A fn @foo(i64) -> i64;
+specialize @A fn @foo(i64) -> i64 {
   ^0 {
     constant 42;
     return %0;
   }
 }
 
-stage @B fn @foo(int) -> int;
-specialize @B fn @foo(int) -> int {
+stage @B fn @foo(i64) -> i64;
+specialize @B fn @foo(i64) -> i64 {
   ^0 {
     constant 10;
     constant 20;
