@@ -32,3 +32,12 @@ pub struct ChumskyStatementAttrs {
 pub struct ChumskyFieldAttrs {
     // Currently no field-level chumsky attributes
 }
+
+/// Global attributes for the `PrettyPrint` derive macro via `#[pretty(...)]`.
+#[derive(Debug, Clone, FromDeriveInput)]
+#[darling(attributes(pretty))]
+pub struct PrettyGlobalAttrs {
+    /// The path to the kirin-prettyless crate.
+    #[darling(rename = "crate")]
+    pub crate_path: Option<syn::Path>,
+}

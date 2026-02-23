@@ -5,6 +5,7 @@
 
 use crate::{
     ChumskyLayout, GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint,
+    PrettyPrintLayout,
 };
 use kirin_derive_core::ir::Input;
 use kirin_test_utils::rustfmt_display;
@@ -12,16 +13,17 @@ use kirin_test_utils::rustfmt_display;
 /// Helper to generate all outputs for a given input.
 fn generate_all(input: &syn::DeriveInput) -> (String, String, String, String) {
     let ir_input: Input<ChumskyLayout> = Input::from_derive_input(input).unwrap();
+    let pretty_input: Input<PrettyPrintLayout> = Input::from_derive_input(input).unwrap();
 
     let ast_gen = GenerateAST::new(&ir_input);
     let emit_gen = GenerateEmitIR::new(&ir_input);
     let parser_gen = GenerateHasDialectParser::new(&ir_input);
-    let pretty_gen = GeneratePrettyPrint::new(&ir_input);
+    let pretty_gen = GeneratePrettyPrint::new(&pretty_input);
 
     let ast = rustfmt_display(&ast_gen.generate(&ir_input));
     let emit = rustfmt_display(&emit_gen.generate(&ir_input));
     let parser = rustfmt_display(&parser_gen.generate(&ir_input));
-    let pretty = rustfmt_display(&pretty_gen.generate(&ir_input));
+    let pretty = rustfmt_display(&pretty_gen.generate(&pretty_input));
 
     (ast, emit, parser, pretty)
 }

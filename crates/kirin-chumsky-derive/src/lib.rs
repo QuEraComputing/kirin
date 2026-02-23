@@ -121,11 +121,11 @@ pub fn derive_has_parser(input: TokenStream) -> TokenStream {
 /// // Output for Add { res: %x, lhs: %a, rhs: %b } would be:
 /// // %x = add %a, %b
 /// ```
-#[proc_macro_derive(PrettyPrint, attributes(kirin, chumsky, wraps))]
+#[proc_macro_derive(PrettyPrint, attributes(kirin, chumsky, wraps, pretty))]
 pub fn derive_pretty_print(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
-    let ir_input = match kirin_chumsky_format::parse_derive_input(&ast) {
+    let ir_input = match kirin_chumsky_format::parse_pretty_derive_input(&ast) {
         Ok(ir) => ir,
         Err(err) => return err.write_errors().into(),
     };

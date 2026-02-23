@@ -13,12 +13,13 @@ pub(crate) use bounds::BoundsBuilder;
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::VariantRef;
+use kirin_derive_core::ir::{Layout, VariantRef};
 use kirin_derive_core::ir::fields::FieldInfo;
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
+use crate::ChumskyStatementAttrs;
 use crate::field_kind::{ValueTypeScanner, collect_fields, fields_in_format};
 use crate::format::Format;
 
@@ -145,16 +146,40 @@ pub(crate) fn build_ast_generics(
     generics
 }
 
-/// Gets the format string for a statement, checking extra_attrs first.
-pub(crate) fn format_for_statement(
-    ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-    stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
-) -> Option<String> {
+/// Gets the format string for a statement from a layout that uses `ChumskyStatementAttrs`.
+///
+/// Checks statement-level `#[chumsky(format = ...)]`, then `#[kirin(format = ...)]`,
+/// then falls back to a global format provider.
+pub(crate) fn format_for_statement<L>(
+    ir_input: &kirin_derive_core::ir::Input<L>,
+    stmt: &kirin_derive_core::ir::Statement<L>,
+) -> Option<String>
+where
+    L: Layout<ExtraStatementAttrs = ChumskyStatementAttrs>,
+    L::ExtraGlobalAttrs: HasGlobalFormat,
+{
     stmt.extra_attrs
         .format
         .clone()
         .or(stmt.attrs.format.clone())
-        .or(ir_input.extra_attrs.format.clone())
+        .or(ir_input.extra_attrs.global_format())
+}
+
+/// Trait for global attrs that may provide a fallback format string.
+pub(crate) trait HasGlobalFormat {
+    fn global_format(&self) -> Option<String>;
+}
+
+impl HasGlobalFormat for crate::ChumskyGlobalAttrs {
+    fn global_format(&self) -> Option<String> {
+        self.format.clone()
+    }
+}
+
+impl HasGlobalFormat for crate::PrettyGlobalAttrs {
+    fn global_format(&self) -> Option<String> {
+        None
+    }
 }
 
 /// Gets the set of field indices that are in the format string.
@@ -246,16 +271,16 @@ pub(crate) fn filter_ast_fields<'a>(
 /// - `wrapper_handler`: Closure that generates code for wrapper variants
 /// - `regular_handler`: Closure that generates code for regular variants
 /// - `marker_handler`: Optional closure for the `__Marker` variant (for AST enums)
-pub(crate) fn generate_enum_match<F, G>(
+pub(crate) fn generate_enum_match<L: Layout, F, G>(
     type_name: &syn::Ident,
-    data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
+    data: &kirin_derive_core::ir::DataEnum<L>,
     wrapper_handler: F,
     regular_handler: G,
     marker_handler: Option<TokenStream>,
 ) -> TokenStream
 where
     F: Fn(&syn::Ident, &kirin_derive_core::ir::fields::Wrapper) -> TokenStream,
-    G: Fn(&syn::Ident, &kirin_derive_core::ir::Statement<ChumskyLayout>) -> TokenStream,
+    G: Fn(&syn::Ident, &kirin_derive_core::ir::Statement<L>) -> TokenStream,
 {
     let arms: Vec<TokenStream> = data
         .iter_variants()

@@ -4,6 +4,7 @@
 
 use std::collections::HashSet;
 
+use kirin_derive_core::ir::Layout;
 use kirin_derive_core::ir::fields::{FieldCategory, FieldInfo};
 use kirin_derive_core::misc::is_type_in_generic;
 use kirin_derive_core::scan::Scan;
@@ -36,7 +37,7 @@ pub enum FieldKind {
 
 impl FieldKind {
     /// Creates a `FieldKind` from a `FieldInfo`.
-    pub fn from_field_info(field: &FieldInfo<ChumskyLayout>) -> Self {
+    pub fn from_field_info<L: Layout>(field: &FieldInfo<L>) -> Self {
         match field.category() {
             FieldCategory::Argument => FieldKind::SSAValue,
             FieldCategory::Result => FieldKind::ResultValue,
@@ -285,9 +286,9 @@ impl FieldKind {
 }
 
 /// Collects all fields from a statement using the method on Statement.
-pub fn collect_fields(
-    stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
-) -> Vec<FieldInfo<ChumskyLayout>> {
+pub fn collect_fields<L: Layout>(
+    stmt: &kirin_derive_core::ir::Statement<L>,
+) -> Vec<FieldInfo<L>> {
     stmt.collect_fields()
 }
 
@@ -376,9 +377,9 @@ impl<'ir> Scan<'ir, ChumskyLayout> for ValueTypeScanner<'_> {
 ///
 /// This is used to determine which fields need to be included in the AST
 /// (fields not in format string but with defaults are excluded).
-pub fn fields_in_format(
+pub fn fields_in_format<L: Layout>(
     format: &Format<'_>,
-    stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+    stmt: &kirin_derive_core::ir::Statement<L>,
 ) -> HashSet<usize> {
     let map_by_ident = stmt.field_name_to_index();
     let mut indices = HashSet::new();

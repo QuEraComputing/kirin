@@ -15,11 +15,12 @@ kirin-constant = { workspace = true, optional = true, features = ["interpret"] }
 kirin-function = { workspace = true, optional = true, features = ["interpret"] }
 kirin-derive = { workspace = true, optional = true }
 kirin-derive-interpreter = { workspace = true, optional = true }
+kirin-chumsky-derive = { workspace = true, optional = true }
 
 [features]
 default = []
 simple-language = ["kirin-ir/derive"]
-composite-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-constant", "kirin-function", "kirin-derive", "kirin-derive-interpreter"]
+composite-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-constant", "kirin-function", "kirin-derive", "kirin-derive-interpreter", "kirin-chumsky-derive"]
 parser = ["kirin-chumsky", "kirin-lexer"]
 pretty = ["kirin-prettyless"]
 roundtrip = ["parser", "pretty"]

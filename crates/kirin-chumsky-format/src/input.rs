@@ -2,7 +2,7 @@
 
 use kirin_derive_core::ir::fields::FieldCategory;
 
-use crate::ChumskyLayout;
+use crate::{ChumskyLayout, PrettyPrintLayout};
 
 /// Parses derive input for chumsky macros.
 ///
@@ -49,6 +49,60 @@ fn input_requires_ir_type(input: &kirin_derive_core::ir::Input<ChumskyLayout>) -
 }
 
 fn statement_requires_ir_type(stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>) -> bool {
+    stmt.collect_fields().iter().any(|field| {
+        matches!(
+            field.category(),
+            FieldCategory::Argument
+                | FieldCategory::Result
+                | FieldCategory::Block
+                | FieldCategory::Region
+        )
+    })
+}
+
+/// Parses derive input for the `PrettyPrint` derive macro.
+///
+/// Same as [`parse_derive_input`] but uses [`PrettyPrintLayout`] to parse
+/// `#[pretty(crate = ...)]` as the global attrs.
+pub fn parse_pretty_derive_input(
+    ast: &syn::DeriveInput,
+) -> darling::Result<kirin_derive_core::ir::Input<PrettyPrintLayout>> {
+    match kirin_derive_core::ir::Input::<PrettyPrintLayout>::from_derive_input(ast) {
+        Ok(input) => return Ok(input),
+        Err(err) if !is_missing_type_error(&err) => return Err(err),
+        Err(_) => {}
+    }
+
+    let mut patched = ast.clone();
+    patched.attrs.push(syn::parse_quote!(#[kirin(type = bool)]));
+    let input = kirin_derive_core::ir::Input::<PrettyPrintLayout>::from_derive_input(&patched)?;
+
+    if pretty_input_requires_ir_type(&input) {
+        return Err(darling::Error::custom(
+            "`#[kirin(type = ...)]` is required when using SSAValue, ResultValue, Block, or Region fields",
+        )
+        .with_span(&ast.ident));
+    }
+
+    Ok(input)
+}
+
+fn pretty_input_requires_ir_type(
+    input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
+) -> bool {
+    match &input.data {
+        kirin_derive_core::ir::Data::Struct(data) => {
+            pretty_statement_requires_ir_type(&data.0)
+        }
+        kirin_derive_core::ir::Data::Enum(data) => {
+            data.variants.iter().any(pretty_statement_requires_ir_type)
+        }
+    }
+}
+
+fn pretty_statement_requires_ir_type(
+    stmt: &kirin_derive_core::ir::Statement<PrettyPrintLayout>,
+) -> bool {
     stmt.collect_fields().iter().any(|field| {
         matches!(
             field.category(),

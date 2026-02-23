@@ -8,14 +8,14 @@ use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::ChumskyLayout;
+use crate::PrettyPrintLayout;
 use kirin_derive_core::ir::fields::FieldInfo;
 
 use crate::field_kind::{FieldKind, collect_fields};
 use crate::format::{Format, FormatElement};
 use kirin_lexer::Token;
 
-use super::{GeneratorConfig, generate_enum_match};
+use super::generate_enum_match;
 
 /// Generator for the `PrettyPrint` trait implementation.
 pub struct GeneratePrettyPrint {
@@ -25,18 +25,26 @@ pub struct GeneratePrettyPrint {
 
 impl GeneratePrettyPrint {
     /// Creates a new generator.
-    pub fn new(ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> Self {
-        // Get the prettyless crate path from extra_attrs first (e.g., #[chumsky(crate = ...)])
-        // or fall back to attrs, then derive the prettyless path
-        let crate_path = ir_input
-            .extra_attrs
+    ///
+    /// Resolution order for the prettyless crate path:
+    /// 1. `#[pretty(crate = ...)]` — explicit prettyless path
+    /// 2. `#[kirin(crate = ...)]` — derive from kirin crate path
+    /// 3. Default: `::kirin::pretty`
+    pub fn new(ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>) -> Self {
+        // If #[pretty(crate = ...)] is specified, use it directly
+        if let Some(path) = &ir_input.extra_attrs.crate_path {
+            return Self {
+                prettyless_path: path.clone(),
+            };
+        }
+
+        // Fall back to deriving from #[kirin(crate = ...)]
+        let prettyless_path = ir_input
+            .attrs
             .crate_path
             .as_ref()
-            .or(ir_input.attrs.crate_path.as_ref());
-
-        let prettyless_path = crate_path
             .map(|p| {
-                // If user specified a crate path like `kirin::parsers`, derive prettyless as sibling
+                // If user specified a kirin crate re-export path, derive prettyless as sibling
                 // e.g., `kirin::parsers` -> `kirin::pretty`
                 let mut segments = p.segments.clone();
                 if let Some(last) = segments.last_mut() {
@@ -60,7 +68,10 @@ impl GeneratePrettyPrint {
     /// Generates `impl PrettyPrint for Self` with a method generic over `L: Dialect`.
     /// This avoids the trait resolution overflow that occurred with the old
     /// `impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Block` pattern.
-    pub fn generate(&self, ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>) -> TokenStream {
+    pub fn generate(
+        &self,
+        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
+    ) -> TokenStream {
         // For wrapper structs, forward to the wrapped type's PrettyPrint
         if let kirin_derive_core::ir::Data::Struct(data) = &ir_input.data {
             if let Some(wrapper) = &data.0.wraps {
@@ -71,16 +82,24 @@ impl GeneratePrettyPrint {
         self.generate_pretty_print(ir_input)
     }
 
+    /// Resolves the IR crate path from `#[kirin(crate = ...)]` or default.
+    fn ir_path(ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>) -> syn::Path {
+        ir_input
+            .attrs
+            .crate_path
+            .clone()
+            .unwrap_or_else(|| syn::parse_quote!(::kirin::ir))
+    }
+
     /// Generates `impl PrettyPrint for Self`.
     fn generate_pretty_print(
         &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
     ) -> TokenStream {
         let dialect_name = &ir_input.name;
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
         let prettyless_path = &self.prettyless_path;
-        let config = GeneratorConfig::new(ir_input);
-        let ir_path = &config.ir_path;
+        let ir_path = Self::ir_path(ir_input);
 
         // Generate the pretty print body based on struct/enum
         let print_body = match &ir_input.data {
@@ -121,14 +140,13 @@ impl GeneratePrettyPrint {
     /// For wrapper structs, we delegate to the wrapped type's PrettyPrint implementation.
     fn generate_wrapper_struct_pretty_print(
         &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
         wrapper: &kirin_derive_core::ir::fields::Wrapper,
     ) -> TokenStream {
         let dialect_name = &ir_input.name;
         let wrapped_ty = &wrapper.ty;
         let prettyless_path = &self.prettyless_path;
-        let config = GeneratorConfig::new(ir_input);
-        let ir_path = &config.ir_path;
+        let ir_path = Self::ir_path(ir_input);
 
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
         let (impl_generics, _, _) = ir_input.generics.split_for_impl();
@@ -171,8 +189,8 @@ impl GeneratePrettyPrint {
 
     fn generate_struct_print(
         &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
+        stmt: &kirin_derive_core::ir::Statement<PrettyPrintLayout>,
         dialect_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
     ) -> TokenStream {
@@ -190,8 +208,8 @@ impl GeneratePrettyPrint {
     /// This is shared between struct and variant print generation.
     fn build_print_components(
         &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        stmt: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
+        stmt: &kirin_derive_core::ir::Statement<PrettyPrintLayout>,
         dialect_name: &syn::Ident,
         variant_name: Option<&syn::Ident>,
     ) -> (TokenStream, TokenStream) {
@@ -242,8 +260,8 @@ impl GeneratePrettyPrint {
     /// Wrapper variants delegate to the wrapped type's PrettyPrint implementation.
     fn generate_enum_print(
         &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        data: &kirin_derive_core::ir::DataEnum<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
+        data: &kirin_derive_core::ir::DataEnum<PrettyPrintLayout>,
         dialect_name: &syn::Ident,
     ) -> TokenStream {
         let prettyless_path = &self.prettyless_path;
@@ -266,8 +284,8 @@ impl GeneratePrettyPrint {
     /// Generates pretty print code for a single enum variant.
     fn generate_variant_print(
         &self,
-        ir_input: &kirin_derive_core::ir::Input<ChumskyLayout>,
-        variant: &kirin_derive_core::ir::Statement<ChumskyLayout>,
+        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
+        variant: &kirin_derive_core::ir::Statement<PrettyPrintLayout>,
         dialect_name: &syn::Ident,
         variant_name: &syn::Ident,
     ) -> TokenStream {
@@ -284,8 +302,8 @@ impl GeneratePrettyPrint {
     fn generate_format_print(
         &self,
         format: &Format,
-        field_map: &IndexMap<String, (usize, &FieldInfo<ChumskyLayout>)>,
-        _collected: &[FieldInfo<ChumskyLayout>],
+        field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
+        _collected: &[FieldInfo<PrettyPrintLayout>],
         field_vars: &[syn::Ident],
     ) -> TokenStream {
         let prettyless_path = &self.prettyless_path;
@@ -345,8 +363,8 @@ impl GeneratePrettyPrint {
 /// For named fields, both the field name and its index are added as keys.
 /// This allows format strings to use either `{field_name}` or `{0}` syntax.
 fn build_field_map(
-    collected: &[FieldInfo<ChumskyLayout>],
-) -> IndexMap<String, (usize, &FieldInfo<ChumskyLayout>)> {
+    collected: &[FieldInfo<PrettyPrintLayout>],
+) -> IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)> {
     let mut map = IndexMap::new();
     for (idx, field) in collected.iter().enumerate() {
         // Always add the index as a key (for {0}, {1}, etc. syntax)

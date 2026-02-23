@@ -1349,6 +1349,7 @@ dependencies = [
  "kirin-arith",
  "kirin-cf",
  "kirin-chumsky",
+ "kirin-chumsky-derive",
  "kirin-constant",
  "kirin-derive",
  "kirin-derive-interpreter",
