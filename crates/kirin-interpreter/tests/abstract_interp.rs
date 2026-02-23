@@ -7,13 +7,13 @@ use kirin_function::FunctionBody;
 use kirin_interpreter::{Continuation, Frame, StackInterpreter};
 use kirin_ir::*;
 use kirin_test_utils::Interval;
-use kirin_test_utils::TestDialect;
+use kirin_test_utils::CompositeLanguage;
 
 /// Build `c1 = constant 10; c2 = constant 32; y = add c1, c2; return y`
 /// Run with Interval values through StackInterpreter.
 #[test]
 fn test_session_abstract_interp_constants() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
@@ -36,7 +36,7 @@ fn test_session_abstract_interp_constants() {
 
     let mut interp: StackInterpreter<Interval, _> = StackInterpreter::new(&pipeline, stage_id);
 
-    let result = interp.call::<TestDialect>(spec_fn, &[]).unwrap();
+    let result = interp.call::<CompositeLanguage>(spec_fn, &[]).unwrap();
     assert_eq!(result, Interval::constant(42));
 }
 
@@ -44,7 +44,7 @@ fn test_session_abstract_interp_constants() {
 /// Run with various Interval inputs.
 #[test]
 fn test_session_abstract_interp_with_args() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
@@ -69,7 +69,7 @@ fn test_session_abstract_interp_with_args() {
     let stage_info = pipeline.stage(stage_id).unwrap();
     let spec_info = spec_fn.expect_info(stage_info);
     let body_stmt = *spec_info.body();
-    let regions: Vec<_> = body_stmt.regions::<TestDialect>(stage_info).collect();
+    let regions: Vec<_> = body_stmt.regions::<CompositeLanguage>(stage_info).collect();
     let blocks: Vec<_> = regions[0].blocks(stage_info).collect();
     let block_info = blocks[0].expect_info(stage_info);
     let first_stmt = block_info.statements.head().copied();
@@ -81,7 +81,7 @@ fn test_session_abstract_interp_with_args() {
         frame.write_ssa(SSAValue::from(block_args[0]), input);
         interp.push_call_frame(frame).unwrap();
         loop {
-            match interp.run::<TestDialect>().unwrap() {
+            match interp.run::<CompositeLanguage>().unwrap() {
                 Continuation::Return(v) => {
                     interp.pop_call_frame().unwrap();
                     return v;

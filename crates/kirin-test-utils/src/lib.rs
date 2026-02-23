@@ -9,8 +9,8 @@ mod value;
 
 #[cfg(feature = "interpreter")]
 mod interval;
-#[cfg(feature = "interpreter")]
-mod test_dialect;
+#[cfg(feature = "composite-language")]
+mod composite_language;
 
 #[cfg(feature = "parser")]
 pub mod parser;
@@ -29,14 +29,14 @@ pub use value::Value;
 
 #[cfg(feature = "interpreter")]
 pub use interval::{Bound, Interval, interval_add, interval_mul, interval_neg, interval_sub};
-#[cfg(feature = "interpreter")]
-pub use test_dialect::TestDialect;
+#[cfg(feature = "composite-language")]
+pub use composite_language::CompositeLanguage;
 
 /// Dump a specialized function's IR using the builtin pretty printer.
 #[cfg(feature = "interpreter")]
 pub fn dump_function(
     spec_fn: kirin_ir::SpecializedFunction,
-    pipeline: &kirin_ir::Pipeline<kirin_ir::StageInfo<TestDialect>>,
+    pipeline: &kirin_ir::Pipeline<kirin_ir::StageInfo<CompositeLanguage>>,
     stage_id: kirin_ir::CompileStage,
 ) -> String {
     use kirin_prettyless::PrettyPrintExt;

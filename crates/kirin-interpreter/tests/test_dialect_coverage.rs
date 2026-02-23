@@ -1,4 +1,4 @@
-//! Extended test coverage for interpreter features using TestDialect.
+//! Extended test coverage for interpreter features using CompositeLanguage.
 //!
 //! Covers: fuel exhaustion, breakpoints, sequential calls, abstract widening
 //! strategies, fixed summaries, summary invalidation/GC, and AnalysisResult queries.
@@ -15,7 +15,7 @@ use kirin_interpreter::{
 };
 use kirin_ir::{query::ParentInfo, *};
 use kirin_test_utils::Interval;
-use kirin_test_utils::TestDialect;
+use kirin_test_utils::CompositeLanguage;
 
 // ===========================================================================
 // IR builder helpers
@@ -27,7 +27,7 @@ use kirin_test_utils::TestDialect;
 ///   body(val): br header(val)  (back-edge, passes val unchanged)
 ///   exit(result): ret result
 fn build_infinite_loop(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
@@ -60,7 +60,7 @@ fn build_infinite_loop(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
     {
-        let exit_info: &mut Item<BlockInfo<TestDialect>> = exit.get_info_mut(stage).unwrap();
+        let exit_info: &mut Item<BlockInfo<CompositeLanguage>> = exit.get_info_mut(stage).unwrap();
         exit_info.terminator = Some(ret_exit.into());
     }
 
@@ -78,7 +78,7 @@ fn build_infinite_loop(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(body);
-        let body_info: &mut Item<BlockInfo<TestDialect>> = body.get_info_mut(stage).unwrap();
+        let body_info: &mut Item<BlockInfo<CompositeLanguage>> = body.get_info_mut(stage).unwrap();
         body_info.terminator = Some(br_stmt);
     }
 
@@ -91,7 +91,7 @@ fn build_infinite_loop(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(header);
-        let header_info: &mut Item<BlockInfo<TestDialect>> = header.get_info_mut(stage).unwrap();
+        let header_info: &mut Item<BlockInfo<CompositeLanguage>> = header.get_info_mut(stage).unwrap();
         header_info.terminator = Some(cond_stmt);
     }
 
@@ -103,7 +103,7 @@ fn build_infinite_loop(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(entry);
-        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> = entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);
     }
 
@@ -121,7 +121,7 @@ fn build_infinite_loop(
 /// Build `f() = c1 = const 5; c2 = const 10; sum = add(c1, c2); ret sum`
 /// Returns (spec_fn, add_statement) where add_statement can be used as breakpoint.
 fn build_linear_program(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
     stage_id: CompileStage,
 ) -> (SpecializedFunction, Statement) {
     let stage = pipeline.stage_mut(stage_id).unwrap();
@@ -148,7 +148,7 @@ fn build_linear_program(
 
 /// Build `f(x) = c1 = const 1; sum = add(x, c1); ret sum`
 fn build_add_one(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
@@ -177,7 +177,7 @@ fn build_add_one(
 ///   loop_body(val): c1 = const 1; sum = add val, c1; br header(sum)
 ///   loop_exit(result): ret result
 fn build_loop_program(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
@@ -209,7 +209,7 @@ fn build_loop_program(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
     {
-        let exit_info: &mut Item<BlockInfo<TestDialect>> = loop_exit.get_info_mut(stage).unwrap();
+        let exit_info: &mut Item<BlockInfo<CompositeLanguage>> = loop_exit.get_info_mut(stage).unwrap();
         exit_info.terminator = Some(ret_exit.into());
     }
 
@@ -238,7 +238,7 @@ fn build_loop_program(
             .get_parent_mut()
             .replace(loop_body);
 
-        let body_info: &mut Item<BlockInfo<TestDialect>> = loop_body.get_info_mut(stage).unwrap();
+        let body_info: &mut Item<BlockInfo<CompositeLanguage>> = loop_body.get_info_mut(stage).unwrap();
         body_info.statements = linked;
         body_info.terminator = Some(br_stmt);
     }
@@ -251,7 +251,7 @@ fn build_loop_program(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(entry);
-        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> = entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);
     }
 
@@ -270,7 +270,7 @@ fn build_loop_program(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(header);
-        let header_info: &mut Item<BlockInfo<TestDialect>> = header.get_info_mut(stage).unwrap();
+        let header_info: &mut Item<BlockInfo<CompositeLanguage>> = header.get_info_mut(stage).unwrap();
         header_info.terminator = Some(cond_stmt);
     }
 
@@ -291,7 +291,7 @@ fn build_loop_program(
 ///   then_block(val): ret val
 ///   else_block(val): ret val
 fn build_multi_block(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
@@ -315,7 +315,7 @@ fn build_multi_block(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_then = ControlFlow::<ArithType>::op_return(stage, then_val);
     {
-        let then_info: &mut Item<BlockInfo<TestDialect>> = then_block.get_info_mut(stage).unwrap();
+        let then_info: &mut Item<BlockInfo<CompositeLanguage>> = then_block.get_info_mut(stage).unwrap();
         then_info.terminator = Some(ret_then.into());
     }
 
@@ -328,7 +328,7 @@ fn build_multi_block(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_else = ControlFlow::<ArithType>::op_return(stage, else_val);
     {
-        let else_info: &mut Item<BlockInfo<TestDialect>> = else_block.get_info_mut(stage).unwrap();
+        let else_info: &mut Item<BlockInfo<CompositeLanguage>> = else_block.get_info_mut(stage).unwrap();
         else_info.terminator = Some(ret_else.into());
     }
 
@@ -360,7 +360,7 @@ fn build_multi_block(
             .get_parent_mut()
             .replace(entry);
 
-        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> = entry.get_info_mut(stage).unwrap();
         entry_info.statements = linked;
         entry_info.terminator = Some(cond_stmt);
     }
@@ -381,7 +381,7 @@ fn build_multi_block(
 
 #[test]
 fn test_concrete_fuel_exhaustion() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_infinite_loop(&mut pipeline, stage_id);
@@ -389,7 +389,7 @@ fn test_concrete_fuel_exhaustion() {
     let mut interp: StackInterpreter<i64, _> =
         StackInterpreter::new(&pipeline, stage_id).with_fuel(20);
 
-    let result = interp.call::<TestDialect>(spec_fn, &[42]);
+    let result = interp.call::<CompositeLanguage>(spec_fn, &[42]);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
@@ -400,7 +400,7 @@ fn test_concrete_fuel_exhaustion() {
 
 #[test]
 fn test_concrete_breakpoints() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let (spec_fn, add_stmt) = build_linear_program(&mut pipeline, stage_id);
@@ -411,7 +411,7 @@ fn test_concrete_breakpoints() {
     let stage_info = pipeline.stage(stage_id).unwrap();
     let spec_info = spec_fn.expect_info(stage_info);
     let body_stmt = *spec_info.body();
-    let regions: Vec<_> = body_stmt.regions::<TestDialect>(stage_info).collect();
+    let regions: Vec<_> = body_stmt.regions::<CompositeLanguage>(stage_info).collect();
     let blocks: Vec<_> = regions[0].blocks(stage_info).collect();
     let block_info = blocks[0].expect_info(stage_info);
     let first_stmt = block_info.statements.head().copied();
@@ -423,7 +423,7 @@ fn test_concrete_breakpoints() {
     interp.set_breakpoints(HashSet::from([add_stmt]));
 
     // Run until break — should stop before executing add
-    let control = interp.run_until_break::<TestDialect>().unwrap();
+    let control = interp.run_until_break::<CompositeLanguage>().unwrap();
     assert!(
         matches!(control, Continuation::Ext(ConcreteExt::Break)),
         "expected Break, got: {control:?}"
@@ -431,7 +431,7 @@ fn test_concrete_breakpoints() {
 
     // Clear breakpoints and continue to completion
     interp.clear_breakpoints();
-    let control = interp.run::<TestDialect>().unwrap();
+    let control = interp.run::<CompositeLanguage>().unwrap();
     match control {
         Continuation::Return(v) => assert_eq!(v, 15, "expected 5 + 10 = 15"),
         other => panic!("expected Return, got: {other:?}"),
@@ -440,7 +440,7 @@ fn test_concrete_breakpoints() {
 
 #[test]
 fn test_concrete_sequential_calls() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_add_one(&mut pipeline, stage_id);
@@ -448,21 +448,21 @@ fn test_concrete_sequential_calls() {
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
 
     // Call f(5) -> 6
-    let result = interp.call::<TestDialect>(spec_fn, &[5]).unwrap();
+    let result = interp.call::<CompositeLanguage>(spec_fn, &[5]).unwrap();
     assert_eq!(result, 6);
 
     // Call f(10) -> 11 — interpreter resets between calls
-    let result = interp.call::<TestDialect>(spec_fn, &[10]).unwrap();
+    let result = interp.call::<CompositeLanguage>(spec_fn, &[10]).unwrap();
     assert_eq!(result, 11);
 
     // Call f(-1) -> 0
-    let result = interp.call::<TestDialect>(spec_fn, &[-1]).unwrap();
+    let result = interp.call::<CompositeLanguage>(spec_fn, &[-1]).unwrap();
     assert_eq!(result, 0);
 }
 
 #[test]
 fn test_concrete_fuel_sufficient() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_add_one(&mut pipeline, stage_id);
@@ -471,7 +471,7 @@ fn test_concrete_fuel_sufficient() {
     let mut interp: StackInterpreter<i64, _> =
         StackInterpreter::new(&pipeline, stage_id).with_fuel(100);
 
-    let result = interp.call::<TestDialect>(spec_fn, &[5]).unwrap();
+    let result = interp.call::<CompositeLanguage>(spec_fn, &[5]).unwrap();
     assert_eq!(result, 6);
 }
 
@@ -481,7 +481,7 @@ fn test_concrete_fuel_sufficient() {
 
 #[test]
 fn test_abstract_widening_never() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
@@ -494,7 +494,7 @@ fn test_abstract_widening_never() {
             .with_widening(WideningStrategy::Never)
             .with_max_iterations(50);
 
-    let result = interp.analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)]);
+    let result = interp.analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)]);
 
     assert!(
         matches!(result, Err(InterpreterError::FuelExhausted)),
@@ -504,7 +504,7 @@ fn test_abstract_widening_never() {
 
 #[test]
 fn test_abstract_widening_delayed() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
@@ -516,7 +516,7 @@ fn test_abstract_widening_delayed() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     let ret = result.return_value().unwrap();
@@ -528,7 +528,7 @@ fn test_abstract_widening_delayed() {
 
 #[test]
 fn test_abstract_widening_all_joins() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
@@ -540,7 +540,7 @@ fn test_abstract_widening_all_joins() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     let ret = result.return_value().unwrap();
@@ -552,7 +552,7 @@ fn test_abstract_widening_all_joins() {
 
 #[test]
 fn test_abstract_fixed_summary() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_add_one(&mut pipeline, stage_id);
@@ -570,20 +570,20 @@ fn test_abstract_fixed_summary() {
 
     // Analyze should return the fixed summary without computing
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(0, 10)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(100, 200)));
 
     // Even with different args, the fixed summary is returned
     let result2 = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::top()])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::top()])
         .unwrap();
     assert_eq!(result2.return_value(), Some(&Interval::new(100, 200)));
 }
 
 #[test]
 fn test_abstract_summary_invalidation_and_gc() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_add_one(&mut pipeline, stage_id);
@@ -593,7 +593,7 @@ fn test_abstract_summary_invalidation_and_gc() {
 
     // Analyze to populate the cache
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(0, 10)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
 
@@ -612,14 +612,14 @@ fn test_abstract_summary_invalidation_and_gc() {
 
     // Re-analyze should work fresh
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(0, 10)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
 }
 
 #[test]
 fn test_abstract_remove_summary() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_add_one(&mut pipeline, stage_id);
@@ -629,7 +629,7 @@ fn test_abstract_remove_summary() {
 
     // Analyze to populate cache
     interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::constant(5)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::constant(5)])
         .unwrap();
     assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_some());
 
@@ -645,7 +645,7 @@ fn test_abstract_remove_summary() {
 
 #[test]
 fn test_abstract_analysis_result_queries() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_multi_block(&mut pipeline, stage_id);
@@ -655,7 +655,7 @@ fn test_abstract_analysis_result_queries() {
 
     // Analyze with interval spanning zero -> fork at cond_br
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     // Should have visited multiple blocks (entry + then + else = 3)
@@ -673,7 +673,7 @@ fn test_abstract_analysis_result_queries() {
 
 #[test]
 fn test_abstract_analysis_result_ssa_values() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
@@ -701,7 +701,7 @@ fn test_abstract_analysis_result_ssa_values() {
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
 
-    let result = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
+    let result = interp.analyze::<CompositeLanguage>(spec_fn, &[]).unwrap();
 
     // Query individual SSA values
     assert_eq!(

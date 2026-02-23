@@ -4,7 +4,7 @@ use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{AbstractInterpreter, WideningStrategy};
 use kirin_ir::{query::ParentInfo, *};
-use kirin_test_utils::{Interval, TestDialect, dump_function};
+use kirin_test_utils::{Interval, CompositeLanguage, dump_function};
 
 // ---------------------------------------------------------------------------
 // IR builders
@@ -14,7 +14,7 @@ use kirin_test_utils::{Interval, TestDialect, dump_function};
 ///        neg_block(val): ret val
 ///        pos_block(val): ret val
 fn build_branch_fork_program(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
@@ -39,7 +39,7 @@ fn build_branch_fork_program(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_neg = ControlFlow::<ArithType>::op_return(stage, neg_val);
     {
-        let neg_info: &mut Item<BlockInfo<TestDialect>> = neg_block.get_info_mut(stage).unwrap();
+        let neg_info: &mut Item<BlockInfo<CompositeLanguage>> = neg_block.get_info_mut(stage).unwrap();
         neg_info.terminator = Some(ret_neg.into());
     }
 
@@ -52,7 +52,7 @@ fn build_branch_fork_program(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_pos = ControlFlow::<ArithType>::op_return(stage, pos_val);
     {
-        let pos_info: &mut Item<BlockInfo<TestDialect>> = pos_block.get_info_mut(stage).unwrap();
+        let pos_info: &mut Item<BlockInfo<CompositeLanguage>> = pos_block.get_info_mut(stage).unwrap();
         pos_info.terminator = Some(ret_pos.into());
     }
 
@@ -80,7 +80,7 @@ fn build_branch_fork_program(
         let info = cond_br_stmt.expect_info_mut(stage);
         *info.get_parent_mut() = Some(entry_block_node);
 
-        let entry_info: &mut Item<BlockInfo<TestDialect>> =
+        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
             entry_block_node.get_info_mut(stage).unwrap();
         entry_info.statements = linked;
         entry_info.terminator = Some(cond_br_stmt);
@@ -103,7 +103,7 @@ fn build_branch_fork_program(
 ///   loop_body(val): c1 = const 1; sum = add val, c1; br header(sum)
 ///   loop_exit(result): ret result
 fn build_loop_program(
-    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
@@ -134,7 +134,7 @@ fn build_loop_program(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
     {
-        let exit_info: &mut Item<BlockInfo<TestDialect>> = loop_exit.get_info_mut(stage).unwrap();
+        let exit_info: &mut Item<BlockInfo<CompositeLanguage>> = loop_exit.get_info_mut(stage).unwrap();
         exit_info.terminator = Some(ret_exit.into());
     }
 
@@ -163,7 +163,7 @@ fn build_loop_program(
             .get_parent_mut()
             .replace(loop_body);
 
-        let body_info: &mut Item<BlockInfo<TestDialect>> = loop_body.get_info_mut(stage).unwrap();
+        let body_info: &mut Item<BlockInfo<CompositeLanguage>> = loop_body.get_info_mut(stage).unwrap();
         body_info.statements = linked;
         body_info.terminator = Some(br_stmt);
     }
@@ -176,7 +176,7 @@ fn build_loop_program(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(entry);
-        let entry_info: &mut Item<BlockInfo<TestDialect>> = entry.get_info_mut(stage).unwrap();
+        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> = entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);
     }
 
@@ -195,7 +195,7 @@ fn build_loop_program(
             .expect_info_mut(stage)
             .get_parent_mut()
             .replace(header);
-        let header_info: &mut Item<BlockInfo<TestDialect>> = header.get_info_mut(stage).unwrap();
+        let header_info: &mut Item<BlockInfo<CompositeLanguage>> = header.get_info_mut(stage).unwrap();
         header_info.terminator = Some(cond_stmt);
     }
 
@@ -216,7 +216,7 @@ fn build_loop_program(
 
 #[test]
 fn test_branch_fork_ir_snapshot() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
@@ -226,7 +226,7 @@ fn test_branch_fork_ir_snapshot() {
 
 #[test]
 fn test_loop_convergence_ir_snapshot() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
@@ -242,7 +242,7 @@ fn test_loop_convergence_ir_snapshot() {
 /// Run through AbstractInterpreter and verify return value.
 #[test]
 fn test_abstract_interp_constants() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
@@ -266,7 +266,7 @@ fn test_abstract_interp_constants() {
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
 
-    let result = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
+    let result = interp.analyze::<CompositeLanguage>(spec_fn, &[]).unwrap();
     assert_eq!(result.return_value(), Some(&Interval::constant(42)));
 }
 
@@ -278,7 +278,7 @@ fn test_abstract_interp_constants() {
 /// Verify both branches explored, return value is join of both paths.
 #[test]
 fn test_abstract_interp_branch_fork() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
@@ -287,7 +287,7 @@ fn test_abstract_interp_branch_fork() {
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(-10, 10)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-10, 10)])
         .unwrap();
 
     // The return value is the join of:
@@ -308,7 +308,7 @@ fn test_abstract_interp_branch_fork() {
 /// - Back-edge state propagation works correctly
 #[test]
 fn test_abstract_interp_loop_convergence() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
@@ -319,7 +319,7 @@ fn test_abstract_interp_loop_convergence() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze::<TestDialect>(spec_fn, &[Interval::new(-5, 5)])
+        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     // The analysis should converge and produce a non-empty return value.
@@ -339,7 +339,7 @@ fn test_abstract_interp_loop_convergence() {
 /// after the first call and reused on the second.
 #[test]
 fn test_abstract_interp_call_caches_summary() {
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage = pipeline.stage_mut(stage_id).unwrap();
 
@@ -364,7 +364,7 @@ fn test_abstract_interp_call_caches_summary() {
         AbstractInterpreter::new(&pipeline, stage_id);
 
     // First call — runs the analysis
-    let result1 = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
+    let result1 = interp.analyze::<CompositeLanguage>(spec_fn, &[]).unwrap();
     assert_eq!(result1.return_value(), Some(&Interval::constant(10)));
 
     // Summary should be cached (args subsumed)
@@ -375,6 +375,6 @@ fn test_abstract_interp_call_caches_summary() {
     );
 
     // Second call with same args — returns cached summary
-    let result2 = interp.analyze::<TestDialect>(spec_fn, &[]).unwrap();
+    let result2 = interp.analyze::<CompositeLanguage>(spec_fn, &[]).unwrap();
     assert_eq!(result2.return_value(), Some(&Interval::constant(10)));
 }
