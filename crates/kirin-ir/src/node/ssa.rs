@@ -1,7 +1,7 @@
 use crate::arena::{GetInfo, Id, Identifier};
 use crate::identifier;
 use crate::{Dialect, Symbol};
-use std::collections::HashSet;
+use fxhash::FxHashSet;
 
 use super::{block::Block, stmt::Statement};
 
@@ -59,7 +59,7 @@ pub struct SSAInfo<L: Dialect> {
     pub(crate) name: Option<Symbol>,
     pub(crate) ty: L::Type,
     pub(crate) kind: SSAKind,
-    pub(crate) uses: HashSet<Use>,
+    pub(crate) uses: FxHashSet<Use>,
 }
 
 impl<L: Dialect> SSAInfo<L> {
@@ -69,7 +69,7 @@ impl<L: Dialect> SSAInfo<L> {
             name,
             ty,
             kind,
-            uses: HashSet::new(),
+            uses: FxHashSet::default(),
         }
     }
 
@@ -93,11 +93,11 @@ impl<L: Dialect> SSAInfo<L> {
         &self.kind
     }
 
-    pub fn uses(&self) -> &HashSet<Use> {
+    pub fn uses(&self) -> &FxHashSet<Use> {
         &self.uses
     }
 
-    pub fn uses_mut(&mut self) -> &mut HashSet<Use> {
+    pub fn uses_mut(&mut self) -> &mut FxHashSet<Use> {
         &mut self.uses
     }
 }
