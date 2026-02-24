@@ -68,7 +68,14 @@ pub trait IsSpeculatable {
     fn is_speculatable(&self) -> bool;
 }
 
-/// An instruction combines several traits to provide a complete interface.
+/// The base trait that all dialects must implement.
+///
+/// Every dialect carries the full set of IR accessor and property traits as
+/// supertraits. Most dialects only use a subset of these (returning empty
+/// iterators for the rest), but requiring them all here means downstream code
+/// can rely on a single `Dialect` bound instead of enumerating individual
+/// capabilities. The `#[derive(Dialect)]` macro generates all required impls
+/// automatically, so dialect authors pay no boilerplate cost.
 pub trait Dialect:
     for<'a> HasArguments<'a>
     + for<'a> HasResults<'a>
