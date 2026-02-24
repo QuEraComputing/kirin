@@ -1,4 +1,4 @@
-use kirin_ir::{Block, SSAValue};
+use kirin_ir::{Block, Lattice, SSAValue};
 use rustc_hash::FxHashMap;
 
 /// Result of an abstract interpretation analysis run.
@@ -77,5 +77,39 @@ impl<V> AnalysisResult<V> {
     /// Get the joined return value from all return paths.
     pub fn return_value(&self) -> Option<&V> {
         self.return_value.as_ref()
+    }
+
+    /// Check if this result is subsumed by `other` (i.e. `self ⊑ other`).
+    ///
+    /// Compares return values and all block argument abstract values pointwise.
+    /// A block present in `self` but absent in `other` means `other` has not
+    /// yet discovered it, so subsumption fails.
+    pub fn is_subseteq(&self, other: &Self) -> bool
+    where
+        V: Lattice,
+    {
+        // Check return values
+        match (&self.return_value, &other.return_value) {
+            (Some(a), Some(b)) if !a.is_subseteq(b) => return false,
+            (Some(_), None) => return false,
+            _ => {}
+        }
+
+        // Check block argument values pointwise
+        for (block, self_args) in &self.block_args {
+            let Some(other_args) = other.block_args.get(block) else {
+                return false;
+            };
+            debug_assert_eq!(self_args.len(), other_args.len());
+            for ssa in self_args {
+                match (self.values.get(ssa), other.values.get(ssa)) {
+                    (Some(a), Some(b)) if !a.is_subseteq(b) => return false,
+                    (Some(_), None) => return false,
+                    _ => {}
+                }
+            }
+        }
+
+        true
     }
 }

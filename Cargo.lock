@@ -1103,6 +1103,7 @@ dependencies = [
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
+ "kirin-test-languages",
  "serde",
 ]
 

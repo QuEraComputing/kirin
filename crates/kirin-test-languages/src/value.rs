@@ -52,6 +52,45 @@ impl std::fmt::Display for Value {
     }
 }
 
+#[cfg(feature = "pretty")]
+mod pretty_impl {
+    use super::Value;
+    use kirin_ir::Dialect;
+    use kirin_prettyless::{
+        ArenaDoc, DocAllocator, Document, PrettyPrint, PrettyPrintName, PrettyPrintType,
+    };
+
+    impl PrettyPrint for Value {
+        fn pretty_print<'a, L: Dialect + PrettyPrint>(
+            &self,
+            doc: &'a Document<'a, L>,
+        ) -> ArenaDoc<'a>
+        where
+            L::Type: std::fmt::Display,
+        {
+            doc.text(self.to_string())
+        }
+    }
+
+    impl PrettyPrintName for Value {
+        fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+            doc.text(self.to_string())
+        }
+    }
+
+    impl PrettyPrintType for Value {
+        fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+        where
+            L::Type: std::fmt::Display,
+        {
+            match self {
+                Value::I64(_) => doc.text("i64"),
+                Value::F64(_) => doc.text("f64"),
+            }
+        }
+    }
+}
+
 #[cfg(feature = "parser")]
 mod parser_impl {
     use super::Value;

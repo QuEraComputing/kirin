@@ -1,263 +1,34 @@
 use kirin::prelude::*;
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum SimpleIRType {
-    Any,
-    Int,
-    Float,
-    DataType,
-    Bottom,
-}
-
-pub use SimpleIRType::*;
-
-impl Lattice for SimpleIRType {
-    fn is_subseteq(&self, other: &Self) -> bool {
-        matches!((self, other), (a, b) if a == b)
-    }
-
-    fn join(&self, other: &Self) -> Self {
-        if self.is_subseteq(other) {
-            other.clone()
-        } else if other.is_subseteq(self) {
-            self.clone()
-        } else {
-            SimpleIRType::Any
-        }
-    }
-
-    fn meet(&self, other: &Self) -> Self {
-        if self.is_subseteq(other) {
-            self.clone()
-        } else if other.is_subseteq(self) {
-            other.clone()
-        } else {
-            SimpleIRType::Bottom
-        }
-    }
-}
-
-impl HasBottom for SimpleIRType {
-    fn bottom() -> Self {
-        SimpleIRType::Bottom
-    }
-}
-
-impl HasTop for SimpleIRType {
-    fn top() -> Self {
-        SimpleIRType::Any
-    }
-}
-
-impl Default for SimpleIRType {
-    fn default() -> Self {
-        SimpleIRType::Any
-    }
-}
-
-impl crate::TypeLattice for SimpleIRType {}
-
-impl DirectlyParsable for SimpleIRType {}
-
-impl std::fmt::Display for SimpleIRType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SimpleIRType::Any => write!(f, "any"),
-            SimpleIRType::Int => write!(f, "int"),
-            SimpleIRType::Float => write!(f, "float"),
-            SimpleIRType::DataType => write!(f, "datatype"),
-            SimpleIRType::Bottom => write!(f, "bottom"),
-        }
-    }
-}
-
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleIRType {
-    type Output = SimpleIRType;
-
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
-    where
-        I: TokenInput<'tokens, 'src>,
-    {
-        select! {
-            Token::Identifier("any") => SimpleIRType::Any,
-            Token::Identifier("int") => SimpleIRType::Int,
-            Token::Identifier("float") => SimpleIRType::Float,
-            Token::Identifier("datatype") => SimpleIRType::DataType,
-            Token::Identifier("bottom") => SimpleIRType::Bottom,
-        }
-        .labelled("type")
-        .boxed()
-    }
-}
-
-impl Typeof<SimpleIRType> for i64 {
-    fn type_of(&self) -> SimpleIRType {
-        SimpleIRType::Int
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value {
-    I64(i64),
-    F64(f64),
-}
-impl std::hash::Hash for Value {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        match self {
-            Value::I64(v) => {
-                0u8.hash(state);
-                v.hash(state);
-            }
-            Value::F64(v) => {
-                1u8.hash(state);
-                v.to_bits().hash(state);
-            }
-        }
-    }
-}
-
-impl Typeof<SimpleIRType> for Value {
-    fn type_of(&self) -> SimpleIRType {
-        match self {
-            Value::I64(_) => SimpleIRType::Int,
-            Value::F64(_) => SimpleIRType::Float,
-        }
-    }
-}
-
-impl From<i64> for Value {
-    fn from(v: i64) -> Self {
-        Value::I64(v)
-    }
-}
-
-impl From<f64> for Value {
-    fn from(v: f64) -> Self {
-        Value::F64(v)
-    }
-}
-
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::I64(v) => write!(f, "{}", v),
-            Value::F64(v) => write!(f, "{}", v),
-        }
-    }
-}
-
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Value {
-    type Output = Value;
-
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
-    where
-        I: TokenInput<'tokens, 'src>,
-    {
-        let int = select! {
-            Token::Int(s) => s.parse::<i64>().unwrap()
-        }
-        .map(Value::I64);
-
-        let float = select! {
-            Token::Float(s) => s.parse::<f64>().unwrap()
-        }
-        .map(Value::F64);
-
-        float.or(int).labelled("value").boxed()
-    }
-}
-
-// PrettyPrint traits for Value (used by PrettyPrint derive)
-
-impl kirin::pretty::PrettyPrint for Value {
-    fn pretty_print<'a, L: Dialect + kirin::pretty::PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        doc.text(self.to_string())
-    }
-}
-
-impl PrettyPrintName for Value {
-    fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
-        doc.text(self.to_string())
-    }
-}
-
-impl PrettyPrintType for Value {
-    fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        // Value doesn't have a separate type - use empty or the type of the value
-        match self {
-            Value::I64(_) => doc.text("int"),
-            Value::F64(_) => doc.text("float"),
-        }
-    }
-}
-
-// A simpler dialect without Region fields for testing parse/print roundtrip
-#[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
-#[kirin(type = SimpleIRType, fn)]
-#[chumsky(crate = kirin::parsers)]
-pub enum SimpleLang {
-    #[chumsky(format = "{res:name} = add {lhs}, {rhs} -> {res:type}")]
-    Add {
-        lhs: SSAValue,
-        rhs: SSAValue,
-        #[kirin(type = SimpleIRType::Float)]
-        res: ResultValue,
-    },
-    #[chumsky(format = "{res:name} = constant {value} -> {res:type}")]
-    Constant {
-        #[kirin(into)]
-        value: Value,
-        #[kirin(type = SimpleIRType::Float)]
-        res: ResultValue,
-    },
-    #[kirin(terminator)]
-    #[chumsky(format = "return {arg}")]
-    Return { arg: SSAValue },
-    #[chumsky(format = "{1:name} = function {0}")]
-    Function {
-        region: Region,
-        #[kirin(type = SimpleIRType::Float)]
-        res: ResultValue,
-    },
-}
+use kirin_test_languages::{SimpleLanguage, SimpleType};
 
 #[test]
 fn test_block() {
     let mut gs: kirin_ir::InternTable<String, kirin_ir::GlobalSymbol> =
         kirin_ir::InternTable::default();
     let foo = gs.intern("foo".to_string());
-    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
+    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
     let staged_function = stage
         .staged_function()
         .name(foo)
         .signature(kirin_ir::Signature {
-            params: vec![Int],
-            ret: Int,
+            params: vec![SimpleType::I64],
+            ret: SimpleType::I64,
             constraints: (),
         })
         .new()
         .unwrap();
 
-    let a = SimpleLang::op_constant(&mut stage, 1.2);
-    let b = SimpleLang::op_constant(&mut stage, 3.4);
-    let c = SimpleLang::op_add(&mut stage, a.res, b.res);
+    let a = SimpleLanguage::op_constant(&mut stage, 1.2);
+    let b = SimpleLanguage::op_constant(&mut stage, 3.4);
+    let c = SimpleLanguage::op_add(&mut stage, a.result, b.result);
     let block_arg_x = stage.block_argument(0);
-    let d = SimpleLang::op_add(&mut stage, c.res, block_arg_x);
-    let ret = SimpleLang::op_return(&mut stage, d.res);
+    let d = SimpleLanguage::op_add(&mut stage, c.result, block_arg_x);
+    let ret = SimpleLanguage::op_return(&mut stage, d.result);
 
     let block_a: Block = stage
         .block()
-        .argument(Int)
-        .argument_with_name("y", Float)
+        .argument(SimpleType::I64)
+        .argument_with_name("y", SimpleType::F64)
         .stmt(a)
         .stmt(b)
         .stmt(c)
@@ -265,11 +36,15 @@ fn test_block() {
         .terminator(ret)
         .new();
 
-    let ret = SimpleLang::op_return(&mut stage, block_arg_x);
-    let block_b = stage.block().argument(Float).terminator(ret).new();
+    let ret = SimpleLanguage::op_return(&mut stage, block_arg_x);
+    let block_b = stage
+        .block()
+        .argument(SimpleType::F64)
+        .terminator(ret)
+        .new();
 
     let body = stage.region().add_block(block_a).add_block(block_b).new();
-    let fdef = SimpleLang::op_function(&mut stage, body);
+    let fdef = SimpleLanguage::op_function(&mut stage, body);
     let f = stage
         .specialize()
         .f(staged_function)
@@ -301,25 +76,25 @@ use kirin::pretty::Config;
 /// Test roundtrip: parse -> emit -> print should produce output matching input.
 #[test]
 fn test_roundtrip_add() {
-    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
+    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
 
     // Create operand SSAs with types
     let ssa_a = stage
         .ssa()
         .name("a".to_string())
-        .ty(Int)
+        .ty(SimpleType::I64)
         .kind(SSAKind::Test)
         .new();
     let ssa_b = stage
         .ssa()
         .name("b".to_string())
-        .ty(Int)
+        .ty(SimpleType::I64)
         .kind(SSAKind::Test)
         .new();
 
     // Parse - type annotation in input
-    let input = "%res = add %a, %b -> float";
-    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+    let input = "%res = add %a, %b -> f64";
+    let ast = parse_ast::<SimpleLanguage>(input).expect("parse failed");
 
     // Emit to get the dialect variant
     let mut emit_ctx = EmitContext::new(&mut stage);
@@ -331,13 +106,13 @@ fn test_roundtrip_add() {
     let dialect = stmt_info.definition();
 
     // Verify the result has the correct type by checking the SSA
-    if let SimpleLang::Add { res, .. } = dialect {
+    if let SimpleLanguage::Add(_, _, res) = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
         let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
         assert_eq!(
             res_info.ty(),
-            &SimpleIRType::Float,
-            "Result type should be Float"
+            &SimpleType::F64,
+            "Result type should be F64"
         );
     }
 
@@ -359,11 +134,11 @@ fn test_roundtrip_add() {
 fn test_roundtrip_constant() {
     use kirin::pretty::PrettyPrint as _;
 
-    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
+    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
 
     // Parse - type annotation in input
-    let input = "%x = constant 42 -> float";
-    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+    let input = "%x = constant 42 -> f64";
+    let ast = parse_ast::<SimpleLanguage>(input).expect("parse failed");
 
     // Emit
     let mut emit_ctx = EmitContext::new(&mut stage);
@@ -372,13 +147,13 @@ fn test_roundtrip_constant() {
     let dialect = stmt_info.definition();
 
     // Verify the result has the correct type
-    if let SimpleLang::Constant { res, .. } = dialect {
+    if let SimpleLanguage::Constant(_, res) = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
         let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
         assert_eq!(
             res_info.ty(),
-            &SimpleIRType::Float,
-            "Result type should be Float"
+            &SimpleType::F64,
+            "Result type should be F64"
         );
     }
 
@@ -400,19 +175,19 @@ fn test_roundtrip_constant() {
 fn test_roundtrip_return() {
     use kirin::pretty::PrettyPrint as _;
 
-    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
+    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
 
     // Create operand SSA
     let ssa_v = stage
         .ssa()
         .name("v".to_string())
-        .ty(Int)
+        .ty(SimpleType::I64)
         .kind(SSAKind::Test)
         .new();
 
     // Parse
     let input = "return %v";
-    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+    let ast = parse_ast::<SimpleLanguage>(input).expect("parse failed");
 
     // Emit
     let mut emit_ctx = EmitContext::new(&mut stage);
@@ -455,19 +230,19 @@ pub fn strip_trailing_whitespace(s: &str) -> String {
 /// (e.g., block names, result alignment), but the core structure is preserved.
 #[test]
 fn test_roundtrip_function() {
-    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
+    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
 
     // Parse a function with a region containing a block with multiple statements
     let input = r#"%f = function {
-    ^entry(%x: float) {
-        %y = add %x, %x -> float;
-        %z = constant 42 -> float;
-        %w = add %y, %z -> float;
+    ^entry(%x: f64) {
+        %y = add %x, %x -> f64;
+        %z = constant 42 -> f64;
+        %w = add %y, %z -> f64;
         return %w;
     }
 }"#;
 
-    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+    let ast = parse_ast::<SimpleLanguage>(input).expect("parse failed");
 
     // Emit to IR
     let mut emit_ctx = EmitContext::new(&mut stage);
@@ -501,21 +276,21 @@ fn test_roundtrip_function() {
 /// The exact output format may differ from input due to Block/Region pretty printing details.
 #[test]
 fn test_roundtrip_function_multiple_blocks() {
-    let mut stage: StageInfo<SimpleLang> = StageInfo::default();
+    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
 
     // Parse a function with a region containing multiple blocks
     let input = r#"%f = function {
-    ^entry(%x: float) {
-        %y = add %x, %x -> float;
+    ^entry(%x: f64) {
+        %y = add %x, %x -> f64;
         return %y;
     }
-    ^second(%a: float) {
-        %b = constant 100 -> float;
+    ^second(%a: f64) {
+        %b = constant 100 -> f64;
         return %b;
     }
 }"#;
 
-    let ast = parse_ast::<SimpleLang>(input).expect("parse failed");
+    let ast = parse_ast::<SimpleLanguage>(input).expect("parse failed");
 
     // Emit to IR
     let mut emit_ctx = EmitContext::new(&mut stage);

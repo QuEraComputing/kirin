@@ -163,18 +163,16 @@ where
 
             let result = result?;
 
-            // Check if summary changed
-            let old_return = interp.tentative_return_value(callee).cloned();
-            let new_return = result.return_value().cloned();
+            // Check convergence against old tentative result
+            let old_result = interp.tentative_result(callee).cloned();
 
             // Update tentative summary
             interp.set_tentative(callee, args, result.clone());
 
-            // Converged if return value stabilized
-            let converged = match (&old_return, &new_return) {
-                (Some(old), Some(new)) => new.is_subseteq(old),
-                (None, None) => true,
-                _ => summary_iterations > 1,
+            // Converged if all block argument states and return value stabilized
+            let converged = match old_result {
+                Some(ref old) => result.is_subseteq(old),
+                None => summary_iterations > 1,
             };
 
             if converged {

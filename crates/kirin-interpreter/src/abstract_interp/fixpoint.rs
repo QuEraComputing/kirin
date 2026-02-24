@@ -230,12 +230,14 @@ where
             .set_tentative(args.to_vec(), result);
     }
 
-    /// Get the tentative return value for `callee`.
-    pub(crate) fn tentative_return_value(&self, callee: SpecializedFunction) -> Option<&V> {
+    /// Get the full tentative analysis result for `callee`.
+    pub(crate) fn tentative_result(
+        &self,
+        callee: SpecializedFunction,
+    ) -> Option<&AnalysisResult<V>> {
         self.summaries
             .get(&callee)
             .and_then(|c| c.tentative_result())
-            .and_then(|r| r.return_value())
     }
 
     /// Promote the tentative summary to a computed entry.
