@@ -54,7 +54,8 @@ impl Region {
     pub fn blocks<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> BlockIter<'a, L> {
         let info = self.expect_info(stage);
         BlockIter {
-            current: info.blocks.head,
+            head: info.blocks.head,
+            tail: info.blocks.tail,
             len: info.blocks.len,
             stage,
         }
@@ -62,7 +63,8 @@ impl Region {
 }
 
 pub struct BlockIter<'a, L: Dialect> {
-    current: Option<Block>,
+    head: Option<Block>,
+    tail: Option<Block>,
     len: usize,
     stage: &'a crate::StageInfo<L>,
 }
@@ -71,11 +73,16 @@ impl<'a, L: Dialect> Iterator for BlockIter<'a, L> {
     type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(current) = self.current {
-            let current_info = current.expect_info(self.stage);
-            self.current = current_info.node.next;
+        if let Some(head) = self.head {
+            let head_info = head.expect_info(self.stage);
             self.len -= 1;
-            Some(current)
+            if self.len == 0 {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.head = head_info.node.next;
+            }
+            Some(head)
         } else {
             None
         }
@@ -94,10 +101,15 @@ impl<'a, L: Dialect> ExactSizeIterator for BlockIter<'a, L> {
 
 impl<'a, L: Dialect> DoubleEndedIterator for BlockIter<'a, L> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        if let Some(tail) = self.current {
+        if let Some(tail) = self.tail {
             let tail_info = tail.expect_info(self.stage);
-            self.current = tail_info.node.prev;
             self.len -= 1;
+            if self.len == 0 {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.tail = tail_info.node.prev;
+            }
             Some(tail)
         } else {
             None

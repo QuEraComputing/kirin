@@ -125,7 +125,8 @@ impl Block {
     ) -> StatementIter<'a, L> {
         let info = self.expect_info(stage);
         StatementIter {
-            current: info.statements.head,
+            head: info.statements.head,
+            tail: info.statements.tail,
             len: info.statements.len,
             stage,
         }
@@ -138,7 +139,8 @@ impl Block {
 }
 
 pub struct StatementIter<'a, L: Dialect> {
-    current: Option<Statement>,
+    head: Option<Statement>,
+    tail: Option<Statement>,
     len: usize,
     stage: &'a crate::StageInfo<L>,
 }
@@ -147,11 +149,16 @@ impl<'a, L: Dialect> Iterator for StatementIter<'a, L> {
     type Item = Statement;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(current) = self.current {
-            let info = current.expect_info(self.stage);
-            self.current = info.node.next;
+        if let Some(head) = self.head {
+            let info = head.expect_info(self.stage);
             self.len -= 1;
-            Some(current)
+            if self.len == 0 {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.head = info.node.next;
+            }
+            Some(head)
         } else {
             None
         }
@@ -159,6 +166,24 @@ impl<'a, L: Dialect> Iterator for StatementIter<'a, L> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len, Some(self.len))
+    }
+}
+
+impl<'a, L: Dialect> DoubleEndedIterator for StatementIter<'a, L> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if let Some(tail) = self.tail {
+            let info = tail.expect_info(self.stage);
+            self.len -= 1;
+            if self.len == 0 {
+                self.head = None;
+                self.tail = None;
+            } else {
+                self.tail = info.node.prev;
+            }
+            Some(tail)
+        } else {
+            None
+        }
     }
 }
 
