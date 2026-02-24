@@ -15,9 +15,7 @@
     <span class=k>return</span> <span class=n>sin</span><span class=p>(</span><span class=n>x</span><span class=p>)</span> <span class=c1># linter now thinks this is a function</span>
 
 <span class=n>sin</span><span class=p>(</span><span class=mf>1.0</span><span class=p>)</span> <span class=c1># this will raise a NotImplementedError(&quot;Binding of sin can only be called from a kernel&quot;)</span>
-</code></pre></div> <details class=quote> <summary>Source code in <code>src/kirin/lowering/python/binding.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>19</span>
-<span class=normal>20</span>
-<span class=normal>21</span>
+</code></pre></div> <details class=quote> <summary>Source code in <code>src/kirin/lowering/python/binding.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>21</span>
 <span class=normal>22</span>
 <span class=normal>23</span>
 <span class=normal>24</span>
@@ -58,7 +56,9 @@
 <span class=normal>59</span>
 <span class=normal>60</span>
 <span class=normal>61</span>
-<span class=normal>62</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>wraps</span><span class=p>(</span><span class=n>parent</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=s2>&quot;Statement&quot;</span><span class=p>]):</span>
+<span class=normal>62</span>
+<span class=normal>63</span>
+<span class=normal>64</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span> <span class=nf>wraps</span><span class=p>(</span><span class=n>parent</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=s2>&quot;Statement&quot;</span><span class=p>]):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Wraps a [`Statement`][kirin.ir.nodes.stmt.Statement] to a `Binding` object</span>
 <span class=sd>    which will be special cased in the lowering process.</span>
 
