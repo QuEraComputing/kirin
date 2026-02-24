@@ -1,0 +1,16 @@
+[package]
+name = "kirin-cmp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin.workspace = true
+kirin-interpreter = { workspace = true, optional = true }
+
+[features]
+interpret = ["kirin-interpreter"]
+
+[dev-dependencies]
+kirin-cf.workspace = true
+kirin-constant.workspace = true
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }

@@ -54,6 +54,7 @@ members = [
     "crates/kirin-derive-interpreter",
     "crates/kirin-test-languages",
     "crates/kirin-interval",
+    "crates/kirin-cmp",
 ]
 
 [workspace.dependencies]
@@ -102,4 +103,5 @@ kirin-bitwise = { version = "0.1.0", path = "crates/kirin-bitwise" }
 kirin-prettyless-derive = { version = "0.1.0", path = "crates/kirin-prettyless-derive" }
 kirin-interpreter = { version = "0.1.0", path = "crates/kirin-interpreter" }
 kirin-derive-interpreter = { version = "0.1.0", path = "crates/kirin-derive-interpreter" }
+kirin-cmp = { version = "0.1.0", path = "crates/kirin-cmp" }
 smallvec = "1.13"
