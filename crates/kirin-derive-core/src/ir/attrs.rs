@@ -1,5 +1,18 @@
 use darling::{Error, FromDeriveInput, FromField, FromMeta, FromVariant};
 
+/// Parsed `#[kirin(...)]` attributes on a struct-level statement definition.
+///
+/// # Attributes
+///
+/// - `type = <Path>` — (**required**) the IR type this statement produces
+///   (e.g. `ArithType`, `SimpleIRType::Float`).
+/// - `crate = <Path>` — override the default IR crate path (`::kirin::ir`).
+/// - `format = "<string>"` — custom format string for pretty-printing.
+/// - `fn` / `fn = <ident>` — generate a builder function (auto-named or with the given name).
+/// - `constant` — mark as a constant-foldable operation.
+/// - `pure` — mark as a pure (side-effect-free) operation.
+/// - `speculatable` — mark as safe to speculatively execute.
+/// - `terminator` — mark as a block terminator.
 #[derive(Debug, Clone, FromDeriveInput)]
 #[darling(attributes(kirin), supports(struct_any))]
 pub struct KirinStructOptions {
@@ -20,6 +33,10 @@ pub struct KirinStructOptions {
     pub terminator: bool,
 }
 
+/// Parsed `#[kirin(...)]` attributes on an enum-level statement definition.
+///
+/// Same attributes as [`KirinStructOptions`] except `format` is specified per-variant
+/// via [`StatementOptions`].
 #[derive(Debug, Clone, FromDeriveInput)]
 #[darling(attributes(kirin), supports(enum_any))]
 pub struct KirinEnumOptions {
@@ -39,6 +56,16 @@ pub struct KirinEnumOptions {
     pub terminator: bool,
 }
 
+/// Parsed `#[kirin(...)]` attributes on an enum variant (one variant = one statement kind).
+///
+/// # Attributes
+///
+/// - `format = "<string>"` — custom format string for pretty-printing this variant.
+/// - `fn` / `fn = <ident>` — generate a builder function for this variant.
+/// - `constant` — mark as a constant-foldable operation.
+/// - `pure` — mark as a pure (side-effect-free) operation.
+/// - `speculatable` — mark as safe to speculatively execute.
+/// - `terminator` — mark as a block terminator.
 #[derive(Debug, Clone, FromVariant)]
 #[darling(attributes(kirin))]
 pub struct StatementOptions {
@@ -55,6 +82,17 @@ pub struct StatementOptions {
     pub terminator: bool,
 }
 
+/// Parsed `#[kirin(...)]` attributes on a field within a statement struct or enum variant.
+///
+/// # Attributes
+///
+/// - `into` — call `.into()` on the builder argument before storing (allows ergonomic
+///   type conversions).
+/// - `default` / `default = <expr>` — provide a default value for the field. The bare
+///   `#[kirin(default)]` form uses `Default::default()`; the expression form uses the
+///   given expression.
+/// - `type = <expr>` — the SSA type expression for this field's IR value
+///   (e.g. `ArithType::Float`, `SimpleIRType::default()`).
 #[derive(Debug, Clone, FromField)]
 #[darling(attributes(kirin))]
 pub struct KirinFieldOptions {
