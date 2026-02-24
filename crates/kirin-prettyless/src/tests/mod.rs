@@ -58,7 +58,11 @@ fn create_test_function() -> (
         .new();
 
     let ret = SimpleLanguage::op_return(&mut stage, block_arg_x);
-    let block_b = stage.block().argument(SimpleType::F64).terminator(ret).new();
+    let block_b = stage
+        .block()
+        .argument(SimpleType::F64)
+        .terminator(ret)
+        .new();
 
     let body = stage.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);

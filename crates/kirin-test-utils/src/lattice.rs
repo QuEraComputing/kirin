@@ -315,7 +315,9 @@ fn check_bottom_laws<L: HasBottom + PartialEq + Debug>(elements: &[L], v: &mut V
             ));
         }
         if bot.join(x) != *x {
-            v.push(format!("bottom identity violated: bottom().join({x:?}) != {x:?}"));
+            v.push(format!(
+                "bottom identity violated: bottom().join({x:?}) != {x:?}"
+            ));
         }
         if bot.meet(x) != bot {
             v.push(format!(

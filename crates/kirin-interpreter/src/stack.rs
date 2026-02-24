@@ -277,9 +277,9 @@ where
             Continuation::Continue => {
                 self.advance_cursor::<L>()?;
             }
-            Continuation::Jump(block, args) => {
-                self.bind_block_args::<L>(*block, args)?;
-                let first = self.first_stmt_in_block::<L>(*block);
+            Continuation::Jump(succ, args) => {
+                self.bind_block_args::<L>(succ.target(), args)?;
+                let first = self.first_stmt_in_block::<L>(succ.target());
                 self.current_frame_mut()?.set_cursor(first);
             }
             Continuation::Fork(_) => {
@@ -456,7 +456,7 @@ where
             let body_stmt = *spec.body();
             let def: &L = body_stmt.definition(stage);
             match def.interpret(self)? {
-                Continuation::Jump(block, _) => self.first_stmt_in_block::<L>(block),
+                Continuation::Jump(succ, _) => self.first_stmt_in_block::<L>(succ.target()),
                 _ => None,
             }
         };

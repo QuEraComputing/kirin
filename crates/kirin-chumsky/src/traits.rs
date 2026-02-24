@@ -164,10 +164,7 @@ pub trait ParseStatementText<L: Dialect, Ctx = ()> {
 /// This lets `StageInfo<L>` users write `stage.parse_statement(input)` instead
 /// of `stage.parse_statement((), input)`.
 pub trait ParseStatementTextExt<L: Dialect>: ParseStatementText<L, ()> {
-    fn parse_statement(
-        &mut self,
-        input: &str,
-    ) -> Result<kirin_ir::Statement, Vec<ParseError>>;
+    fn parse_statement(&mut self, input: &str) -> Result<kirin_ir::Statement, Vec<ParseError>>;
 }
 
 impl<T, L> ParseStatementTextExt<L> for T
@@ -175,10 +172,7 @@ where
     L: Dialect,
     T: ParseStatementText<L, ()>,
 {
-    fn parse_statement(
-        &mut self,
-        input: &str,
-    ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
+    fn parse_statement(&mut self, input: &str) -> Result<kirin_ir::Statement, Vec<ParseError>> {
         <Self as ParseStatementText<L, ()>>::parse_statement(self, (), input)
     }
 }
@@ -243,17 +237,19 @@ where
         stage_id: kirin_ir::CompileStage,
         input: &str,
     ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
-        let stage_entry = self
-            .stage_mut(stage_id)
-            .ok_or_else(|| vec![ParseError {
+        let stage_entry = self.stage_mut(stage_id).ok_or_else(|| {
+            vec![ParseError {
                 message: format!("stage {stage_id:?} not found in pipeline"),
                 span: SimpleSpan::from(0..0),
-            }])?;
-        let stage = <S as kirin_ir::HasStageInfo<L>>::try_stage_info_mut(stage_entry)
-            .ok_or_else(|| vec![ParseError {
-                message: "stage does not contain the requested dialect".to_string(),
-                span: SimpleSpan::from(0..0),
-            }])?;
+            }]
+        })?;
+        let stage =
+            <S as kirin_ir::HasStageInfo<L>>::try_stage_info_mut(stage_entry).ok_or_else(|| {
+                vec![ParseError {
+                    message: "stage does not contain the requested dialect".to_string(),
+                    span: SimpleSpan::from(0..0),
+                }]
+            })?;
         parse_statement_on_stage::<L>(stage, input)
     }
 }
@@ -343,4 +339,3 @@ where
         self.as_ref().map(|item| item.emit(ctx))
     }
 }
-

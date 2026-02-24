@@ -24,14 +24,14 @@ identifier! {
     struct Successor
 }
 
-impl From<Successor> for Block {
-    fn from(succ: Successor) -> Self {
-        Block(succ.0)
+impl Successor {
+    /// Extracts the underlying block this successor targets.
+    pub fn target(self) -> Block {
+        Block(self.0)
     }
-}
 
-impl From<Block> for Successor {
-    fn from(block: Block) -> Self {
+    /// Creates a successor from a block identifier.
+    pub fn from_block(block: Block) -> Self {
         Successor(block.0)
     }
 }
@@ -110,11 +110,11 @@ impl<L: Dialect> GetInfo<L> for Successor {
     type Info = Item<BlockInfo<L>>;
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
-        stage.blocks.get(Block(self.0))
+        stage.blocks.get(self.target())
     }
 
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
-        stage.blocks.get_mut(Block(self.0))
+        stage.blocks.get_mut(self.target())
     }
 }
 

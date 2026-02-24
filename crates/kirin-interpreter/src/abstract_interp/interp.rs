@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
-use rustc_hash::FxHashMap;
 use kirin_ir::{
     CompileStage, CompileStageInfo, Pipeline, ResultValue, SSAValue, SpecializedFunction,
 };
+use rustc_hash::FxHashMap;
 
 use super::{FixpointState, SummaryCache};
 use crate::result::AnalysisResult;

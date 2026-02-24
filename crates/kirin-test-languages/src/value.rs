@@ -70,17 +70,19 @@ mod parser_impl {
         {
             let integer = select! { Token::Int(value) = e => (value, e.span()) }.try_map(
                 |(value, span), _| {
-                    value.parse::<i64>().map(Value::I64).map_err(|_| {
-                        Rich::custom(span, format!("invalid i64 literal: {value}"))
-                    })
+                    value
+                        .parse::<i64>()
+                        .map(Value::I64)
+                        .map_err(|_| Rich::custom(span, format!("invalid i64 literal: {value}")))
                 },
             );
 
             let float = select! { Token::Float(value) = e => (value, e.span()) }.try_map(
                 |(value, span), _| {
-                    value.parse::<f64>().map(Value::F64).map_err(|_| {
-                        Rich::custom(span, format!("invalid f64 literal: {value}"))
-                    })
+                    value
+                        .parse::<f64>()
+                        .map(Value::F64)
+                        .map_err(|_| Rich::custom(span, format!("invalid f64 literal: {value}")))
                 },
             );
 

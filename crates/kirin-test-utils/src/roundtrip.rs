@@ -5,10 +5,7 @@ use kirin_ir::{Dialect, GetInfo, Pipeline, SSAKind, StageInfo, Statement};
 use kirin_prettyless::{Config, Document, PipelinePrintExt, RenderStage};
 
 /// Parse a single statement with pre-registered operands.
-pub fn emit_statement<L>(
-    input: &str,
-    operands: &[(&str, L::Type)],
-) -> (StageInfo<L>, Statement)
+pub fn emit_statement<L>(input: &str, operands: &[(&str, L::Type)]) -> (StageInfo<L>, Statement)
 where
     L: Dialect,
     StageInfo<L>: ParseStatementTextExt<L>,

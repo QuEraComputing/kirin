@@ -84,9 +84,9 @@ fn build_select_program(
     let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
         stage,
         x,
-        truthy_block,
+        Successor::from_block(truthy_block),
         vec![sum.result.into()],
-        falsy_block,
+        Successor::from_block(falsy_block),
         vec![c42.result.into()],
     );
 

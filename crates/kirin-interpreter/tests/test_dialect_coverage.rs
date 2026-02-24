@@ -13,9 +13,9 @@ use kirin_interpreter::{
     AbstractInterpreter, AnalysisResult, ConcreteExt, Continuation, InterpreterError,
     StackInterpreter, WideningStrategy,
 };
+use kirin_interval::Interval;
 use kirin_ir::{query::ParentInfo, *};
 use kirin_test_languages::CompositeLanguage;
-use kirin_interval::Interval;
 
 // ===========================================================================
 // IR builder helpers
@@ -71,7 +71,8 @@ fn build_infinite_loop(
         body.expect_info(si).arguments[0].into()
     };
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let br_back = ControlFlow::<ArithType>::op_branch(stage, header, vec![body_val]);
+    let br_back =
+        ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(header), vec![body_val]);
     {
         let br_stmt: Statement = br_back.into();
         br_stmt
@@ -83,8 +84,14 @@ fn build_infinite_loop(
     }
 
     // header terminator: cond_br i body(i) exit(i)
-    let cond_br =
-        ControlFlow::<ArithType>::op_conditional_branch(stage, i, body, vec![i], exit, vec![i]);
+    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
+        stage,
+        i,
+        Successor::from_block(body),
+        vec![i],
+        Successor::from_block(exit),
+        vec![i],
+    );
     {
         let cond_stmt: Statement = cond_br.into();
         cond_stmt
@@ -97,7 +104,8 @@ fn build_infinite_loop(
     }
 
     // entry terminator: br header(x)
-    let br_header = ControlFlow::<ArithType>::op_branch(stage, header, vec![x]);
+    let br_header =
+        ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(header), vec![x]);
     {
         let br_stmt: Statement = br_header.into();
         br_stmt
@@ -226,7 +234,11 @@ fn build_loop_program(
 
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let sum = kirin_arith::Arith::<ArithType>::op_add(stage, body_val, c1.result);
-    let br_back = ControlFlow::<ArithType>::op_branch(stage, header, vec![sum.result.into()]);
+    let br_back = ControlFlow::<ArithType>::op_branch(
+        stage,
+        Successor::from_block(header),
+        vec![sum.result.into()],
+    );
     {
         let stmts: Vec<Statement> = vec![c1.into(), sum.into()];
         for &s in &stmts {
@@ -248,7 +260,8 @@ fn build_loop_program(
     }
 
     // entry: br header(x)
-    let br_header = ControlFlow::<ArithType>::op_branch(stage, header, vec![x]);
+    let br_header =
+        ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(header), vec![x]);
     {
         let br_stmt: Statement = br_header.into();
         br_stmt
@@ -264,9 +277,9 @@ fn build_loop_program(
     let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
         stage,
         i,
-        loop_body,
+        Successor::from_block(loop_body),
         vec![i],
-        loop_exit,
+        Successor::from_block(loop_exit),
         vec![i],
     );
     {
@@ -349,9 +362,9 @@ fn build_multi_block(
     let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
         stage,
         x,
-        then_block,
+        Successor::from_block(then_block),
         vec![add.result.into()],
-        else_block,
+        Successor::from_block(else_block),
         vec![c42.result.into()],
     );
     {

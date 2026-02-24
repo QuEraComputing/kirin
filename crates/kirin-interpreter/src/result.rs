@@ -1,5 +1,5 @@
-use rustc_hash::FxHashMap;
 use kirin_ir::{Block, SSAValue};
+use rustc_hash::FxHashMap;
 
 /// Result of an abstract interpretation analysis run.
 ///

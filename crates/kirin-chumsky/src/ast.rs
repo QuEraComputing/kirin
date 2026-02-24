@@ -276,7 +276,7 @@ where
         let block = ctx
             .lookup_block(self.name.value)
             .unwrap_or_else(|| panic!("Undefined block: ^{}", self.name.value));
-        block.into()
+        kirin_ir::Successor::from_block(block)
     }
 }
 

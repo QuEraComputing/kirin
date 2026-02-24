@@ -6,7 +6,10 @@ use kirin_ir::{Dialect, Region, ResultValue, SSAKind, SSAValue};
 #[kirin(fn, type = SimpleType, crate = kirin_ir)]
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 pub enum SimpleLanguage {
-    #[cfg_attr(feature = "parser", chumsky(format = "{2:name} = add {0}, {1} -> {2:type}"))]
+    #[cfg_attr(
+        feature = "parser",
+        chumsky(format = "{2:name} = add {0}, {1} -> {2:type}")
+    )]
     Add(
         SSAValue,
         SSAValue,

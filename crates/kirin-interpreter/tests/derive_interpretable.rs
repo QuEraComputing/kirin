@@ -80,7 +80,7 @@ fn build_add_one(
     let code_block = stage.block().stmt(c1).stmt(sum).terminator(ret).new();
 
     // Add branch from entry to code_block.
-    let br = ControlFlow::<ArithType>::op_branch(stage, code_block, vec![]);
+    let br = ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(code_block), vec![]);
     {
         use kirin_ir::query::ParentInfo;
         let br_stmt: Statement = br.into();

@@ -4,8 +4,8 @@
 //! invariants. No interpreter needed — just the domain types from kirin-test-utils.
 
 use kirin_interpreter::AbstractValue;
-use kirin_ir::{HasBottom, HasTop, Lattice};
 use kirin_interval::{Bound, Interval, interval_add, interval_sub};
+use kirin_ir::{HasBottom, HasTop, Lattice};
 
 // ============================================================================
 // Tests: Lattice properties

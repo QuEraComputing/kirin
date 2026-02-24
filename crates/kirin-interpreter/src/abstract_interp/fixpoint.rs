@@ -272,12 +272,12 @@ where
     {
         let mut changed = false;
         match control {
-            Continuation::Jump(target, args) => {
-                changed |= self.propagate_edge::<L>(*target, args, narrowing)?;
+            Continuation::Jump(succ, args) => {
+                changed |= self.propagate_edge::<L>(succ.target(), args, narrowing)?;
             }
             Continuation::Fork(targets) => {
-                for (target, args) in targets {
-                    changed |= self.propagate_edge::<L>(*target, args, narrowing)?;
+                for (succ, args) in targets {
+                    changed |= self.propagate_edge::<L>(succ.target(), args, narrowing)?;
                 }
             }
             Continuation::Return(v) => {
