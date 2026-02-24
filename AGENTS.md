@@ -73,7 +73,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 - **Darling re-export rule**: Derive crates that depend on `kirin-derive-core` must use `kirin_derive_core::prelude::darling` — never import `darling` directly. The workspace has multiple darling versions (0.20 via `bon`, 0.23 via `kirin-derive-core`); a direct import may resolve to the wrong version.
 
-- **Bare attribute pattern**: Darling's `#[darling(attributes(...))]` only works for `#[attr(key = val)]` form. For bare flag attributes like `#[wraps]` or `#[callable]`, implement `FromDeriveInput`/`FromVariant` manually using `attrs.iter().any(|a| a.path().is_ident("name"))`.
+- **Helper attribute pattern**: `#[wraps]` and `#[callable]` are intentionally separate from `#[kirin(...)]` for composability. `#[kirin(...)]` is the carry attribute for dialect-specific options (parsed by darling). `#[wraps]` is a generic helper for delegation/wrapper patterns, and `#[callable]` is interpreter-specific. Keeping them as bare attributes lets different derive macros compose independently — e.g. a type can use `#[wraps]` with both `#[derive(Dialect)]` and `#[derive(Interpretable)]` without coupling those derives. Since darling's `#[darling(attributes(...))]` only supports `#[attr(key = val)]` form, bare flag attributes are parsed manually via `attrs.iter().any(|a| a.path().is_ident("name"))`.
 
 - **Custom Layout for derive-specific attributes**: When a derive macro needs attributes beyond `StandardLayout` (which has `()` for all extras), define a custom `Layout` impl in that derive module. This keeps derive-specific attributes out of the core IR. See `CallSemanticsLayout` in `kirin-derive-interpreter` as an example.
 

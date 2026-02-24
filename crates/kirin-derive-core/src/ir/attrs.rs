@@ -1,3 +1,19 @@
+//! Parsed `#[kirin(...)]` attributes for dialect derive macros.
+//!
+//! This module handles the **`#[kirin(...)]`** carry attribute, which contains
+//! dialect-specific options (type, crate path, format, builder, markers).
+//!
+//! Helper attributes like **`#[wraps]`** and **`#[callable]`** are intentionally
+//! *not* part of `#[kirin(...)]`. They are bare attributes parsed separately so
+//! that different derive macros can compose independently:
+//!
+//! - `#[wraps]` — generic delegation/wrapper pattern, used by `#[derive(Dialect)]`
+//!   and potentially other derives.
+//! - `#[callable]` — interpreter-specific, used by `#[derive(CallSemantics)]`.
+//!
+//! This separation lets a single type opt into multiple derive macros without
+//! coupling their attribute namespaces.
+
 use darling::{Error, FromDeriveInput, FromField, FromMeta, FromVariant};
 
 /// Parsed `#[kirin(...)]` attributes on a struct-level statement definition.
