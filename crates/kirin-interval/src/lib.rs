@@ -336,6 +336,27 @@ impl From<kirin_arith::ArithValue> for Interval {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_test_utils::lattice::assert_finite_lattice_laws;
+
+    #[test]
+    fn interval_lattice_laws() {
+        let elements = vec![
+            Interval::bottom(),
+            Interval::constant(0),
+            Interval::constant(42),
+            Interval::new(0, 10),
+            Interval::new(-5, 5),
+            Interval::new(3, 7),
+            Interval::new(-100, 100),
+            Interval::top(),
+        ];
+        assert_finite_lattice_laws(&elements);
+    }
+}
+
 #[cfg(feature = "interpreter")]
 impl kirin_interpreter::AbstractValue for Interval {
     fn widen(&self, next: &Self) -> Self {

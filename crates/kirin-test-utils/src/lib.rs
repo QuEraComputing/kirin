@@ -1,3 +1,4 @@
+pub mod lattice;
 mod rustfmt;
 mod ssa;
 mod unit_type;
