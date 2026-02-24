@@ -16,6 +16,8 @@ class Binding(Generic[Params, RetType]):
         raise NotImplementedError(
             f"Binding of {self.parent.name} can only be called from a kernel"
         )
+
+
 def wraps(parent: type["Statement"]):
     """Wraps a [`Statement`][kirin.ir.nodes.stmt.Statement] to a `Binding` object
     which will be special cased in the lowering process.
