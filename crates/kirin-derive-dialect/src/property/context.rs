@@ -72,6 +72,13 @@ impl DeriveProperty {
         common::emit_from_derive_input(self, input)
     }
 
+    pub fn emit_from_input(
+        &mut self,
+        input: &ir::Input<StandardLayout>,
+    ) -> darling::Result<proc_macro2::TokenStream> {
+        common::emit_from_ir(self, input)
+    }
+
     pub(crate) fn input_ctx(&self) -> darling::Result<&InputContext> {
         common::require_input_ctx(&self.input, "DeriveProperty")
     }

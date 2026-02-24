@@ -174,6 +174,17 @@ fn emit_field_iter(
     ast: &syn::DeriveInput,
     config: FieldIterConfig,
 ) -> darling::Result<proc_macro2::TokenStream> {
+    new_field_iter(config).emit(ast)
+}
+
+fn emit_property(
+    ast: &syn::DeriveInput,
+    config: PropertyConfig,
+) -> darling::Result<proc_macro2::TokenStream> {
+    new_property(config).emit(ast)
+}
+
+fn new_field_iter(config: FieldIterConfig) -> DeriveFieldIter {
     DeriveFieldIter::new(
         config.kind,
         config.mutable,
@@ -184,13 +195,9 @@ fn emit_field_iter(
         config.trait_type_iter,
     )
     .with_trait_lifetime(TRAIT_LIFETIME)
-    .emit(ast)
 }
 
-fn emit_property(
-    ast: &syn::DeriveInput,
-    config: PropertyConfig,
-) -> darling::Result<proc_macro2::TokenStream> {
+fn new_property(config: PropertyConfig) -> DeriveProperty {
     DeriveProperty::new(
         config.kind,
         DEFAULT_IR_CRATE,
@@ -198,47 +205,47 @@ fn emit_property(
         config.trait_method,
         "bool",
     )
-    .emit(ast)
 }
 
 #[proc_macro_derive(Dialect, attributes(kirin, wraps))]
 pub fn derive_statement(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    let mut tokens = proc_macro2::TokenStream::new();
-
-    for config in FIELD_ITER_CONFIGS {
-        match emit_field_iter(&ast, config) {
-            Ok(t) => tokens.extend(t),
-            Err(e) => tokens.extend(e.write_errors()),
-        }
-    }
-
-    for config in PROPERTY_CONFIGS {
-        match emit_property(&ast, config) {
-            Ok(t) => tokens.extend(t),
-            Err(e) => tokens.extend(e.write_errors()),
-        }
-    }
-
-    match DeriveBuilder::default().emit(&ast) {
-        Ok(t) => tokens.extend(t),
-        Err(e) => tokens.extend(e.write_errors()),
-    }
 
     let ir_input =
         kirin_derive_core::ir::Input::<kirin_derive_core::ir::StandardLayout>::from_derive_input(
             &ast,
         );
 
-    match ir_input {
-        Ok(ir) => {
-            let default_crate: syn::Path = syn::parse_quote!(::kirin::ir);
-            let crate_path = ir.attrs.crate_path.as_ref().unwrap_or(&default_crate);
-            let trait_path: syn::Path = syn::parse_quote!(#crate_path::Dialect);
-            marker::derive_marker(&ir, &trait_path).to_tokens(&mut tokens);
+    let ir = match ir_input {
+        Ok(ir) => ir,
+        Err(e) => return e.write_errors().into(),
+    };
+
+    let mut tokens = proc_macro2::TokenStream::new();
+
+    for config in FIELD_ITER_CONFIGS {
+        match new_field_iter(config).emit_from_input(&ir) {
+            Ok(t) => tokens.extend(t),
+            Err(e) => tokens.extend(e.write_errors()),
         }
+    }
+
+    for config in PROPERTY_CONFIGS {
+        match new_property(config).emit_from_input(&ir) {
+            Ok(t) => tokens.extend(t),
+            Err(e) => tokens.extend(e.write_errors()),
+        }
+    }
+
+    match DeriveBuilder::default().emit_from_input(&ir) {
+        Ok(t) => tokens.extend(t),
         Err(e) => tokens.extend(e.write_errors()),
     }
+
+    let default_crate: syn::Path = syn::parse_quote!(::kirin::ir);
+    let crate_path = ir.attrs.crate_path.as_ref().unwrap_or(&default_crate);
+    let trait_path: syn::Path = syn::parse_quote!(#crate_path::Dialect);
+    marker::derive_marker(&ir, &trait_path).to_tokens(&mut tokens);
 
     tokens.into()
 }

@@ -9,8 +9,18 @@ where
     for<'ir> T: Scan<'ir, StandardLayout> + Emit<'ir, StandardLayout>,
 {
     let input = ir::Input::<StandardLayout>::from_derive_input(input)?;
-    derive.scan_input(&input)?;
-    derive.emit_input(&input)
+    emit_from_ir(derive, &input)
+}
+
+pub(crate) fn emit_from_ir<T>(
+    derive: &mut T,
+    input: &ir::Input<StandardLayout>,
+) -> darling::Result<proc_macro2::TokenStream>
+where
+    for<'ir> T: Scan<'ir, StandardLayout> + Emit<'ir, StandardLayout>,
+{
+    derive.scan_input(input)?;
+    derive.emit_input(input)
 }
 
 pub(crate) fn require_input_ctx<'a, T>(
