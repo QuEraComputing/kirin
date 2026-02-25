@@ -43,7 +43,15 @@
 <span class=normal>180</span>
 <span class=normal>181</span>
 <span class=normal>182</span>
-<span class=normal>183</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>exception_handler</span><span class=p>(</span><span class=n>exc_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=ne>BaseException</span><span class=p>],</span> <span class=n>exc_value</span><span class=p>:</span> <span class=ne>BaseException</span><span class=p>,</span> <span class=n>exc_tb</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TracebackType</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>183</span>
+<span class=normal>184</span>
+<span class=normal>185</span>
+<span class=normal>186</span>
+<span class=normal>187</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>exception_handler</span><span class=p>(</span>
+    <span class=n>exc_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=ne>BaseException</span><span class=p>],</span>
+    <span class=n>exc_value</span><span class=p>:</span> <span class=ne>BaseException</span><span class=p>,</span>
+    <span class=n>exc_tb</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TracebackType</span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Custom exception handler to format and print exceptions.&quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=n>KIRIN_PYTHON_STACKTRACE</span> <span class=ow>and</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>exc_value</span><span class=p>,</span> <span class=n>StaticCheckError</span><span class=p>):</span>
         <span class=n>console</span> <span class=o>=</span> <span class=n>Console</span><span class=p>(</span><span class=n>force_terminal</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
