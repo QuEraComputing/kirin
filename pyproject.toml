@@ -87,19 +87,9 @@ exclude = [
 ]
 
 [tool.ty.rules]
+# Keep only clearly low-risk / noisy rules disabled; allow core type checks to run.
 empty-body = "ignore"
-abstract-method-in-final-class = "ignore"
-invalid-method-override = "ignore"
-unresolved-attribute = "ignore"
-invalid-argument-type = "ignore"
-invalid-assignment = "ignore"
-index-out-of-bounds = "ignore"
-invalid-return-type = "ignore"
-invalid-type-form = "ignore"
-missing-argument = "ignore"
-unresolved-import = "ignore"
 unused-type-ignore-comment = "ignore"
-redundant-cast = "ignore"
 
 [dependency-groups]
 doc = [
