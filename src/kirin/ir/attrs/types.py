@@ -768,7 +768,10 @@ class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
     ) -> "FunctionType":
         args = list(typ)
         if len(args) == 2:
-            return FunctionType(tuple(typing.cast(typing.Sequence[TypeArg], args[0])), typing.cast(TypeArg, args[1]))
+            return FunctionType(
+                tuple(typing.cast(typing.Sequence[TypeArg], args[0])),
+                typing.cast(TypeArg, args[1]),
+            )
         elif len(args) == 1:
             return FunctionType(tuple(typing.cast(typing.Sequence[TypeArg], args[0])))
         else:
@@ -827,7 +830,10 @@ class FunctionType(TypeAttribute):
     ) -> "FunctionType":
         args = list(typ)
         if len(args) == 2:
-            return self.where(typing.cast(tuple[TypeAttribute, ...], args[0]), typing.cast(TypeAttribute, args[1]))
+            return self.where(
+                typing.cast(tuple[TypeAttribute, ...], args[0]),
+                typing.cast(TypeAttribute, args[1]),
+            )
         elif len(args) == 1:
             return self.where(typing.cast(tuple[TypeAttribute, ...], args[0]))
         else:

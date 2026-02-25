@@ -37,9 +37,7 @@ class Constant(ir.Statement, Generic[T]):
         if isinstance(value, ir.Method):
             arg_types = cast(tuple[types.TypeAttribute, ...], value.arg_types)
             return_type = cast(types.TypeAttribute, value.return_type)
-            data = ir.PyAttr(
-                value, pytype=types.FunctionType(arg_types, return_type)
-            )
+            data = ir.PyAttr(value, pytype=types.FunctionType(arg_types, return_type))
         elif isinstance(value, ir.Data):
             data = value
         else:

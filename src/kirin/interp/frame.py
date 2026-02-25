@@ -28,7 +28,9 @@ class FrameABC(ABC, Generic[KeyType, ValueType]):
     code: Statement
     """statement whose region is being interpreted, e.g a function.
     """
-    parent: "FrameABC | None" = field(default=None, kw_only=True, compare=True, repr=False)
+    parent: "FrameABC | None" = field(
+        default=None, kw_only=True, compare=True, repr=False
+    )
     """Parent frame.
     """
     has_parent_access: bool = field(default=False, kw_only=True, compare=True)

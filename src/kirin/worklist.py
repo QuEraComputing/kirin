@@ -32,4 +32,3 @@ class WorkList(SimpleQueue, Generic[ElemType]):
         if self.empty():
             return None
         return self.get_nowait()
-

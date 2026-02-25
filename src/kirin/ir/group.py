@@ -205,9 +205,9 @@ class DialectGroup(Generic[PassParams]):
         frame = inspect.currentframe()
 
         def wrapper(py_func: Callable) -> Method:
-            assert isinstance(py_func, types.FunctionType), (
-                f"Expected a function, got {type(py_func)}"
-            )
+            assert isinstance(
+                py_func, types.FunctionType
+            ), f"Expected a function, got {type(py_func)}"
             if py_func.__name__ == "<lambda>":
                 raise ValueError("Cannot compile lambda functions")
 
