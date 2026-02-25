@@ -67,26 +67,11 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.pyright]
 include = ["src"]
+venvPath = "."
+venv = ".venv"
 
 [tool.coverage.run]
 include = ["src/kirin/*"]
-
-[tool.uv]
-dev-dependencies = [
-    "black>=26.1.0",
-    "coverage>=7.6.4",
-    "ipykernel>=6.29.5",
-    "ipython>=8.29.0",
-    "isort>=5.13.2",
-    "mypy>=1.13.0",
-    "numpy>=1.25.0",
-    "pre-commit>=4.0.1",
-    "pyright>=1.1.388",
-    "pytest>=8.3.3",
-    "ruff>=0.7.3",
-    "rust-just>=1.36.0",
-    "tomlkit>=0.13.2",
-]
 
 [tool.ty.environment]
 root = ["src"]
@@ -127,4 +112,19 @@ doc = [
     "mkdocs-material>=9.5.44",
     "mkdocs-minify-plugin>=0.8.0",
     "mkdocstrings[python]>=0.27.0",
+]
+dev = [
+    "black>=26.1.0",
+    "coverage>=7.6.4",
+    "ipykernel>=6.29.5",
+    "ipython>=8.29.0",
+    "isort>=5.13.2",
+    "mypy>=1.13.0",
+    "numpy>=1.25.0",
+    "pre-commit>=4.0.1",
+    "pyright>=1.1.388",
+    "pytest>=8.3.3",
+    "ruff>=0.7.3",
+    "rust-just>=1.36.0",
+    "tomlkit>=0.13.2",
 ]
