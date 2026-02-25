@@ -73,7 +73,7 @@ include = ["src/kirin/*"]
 
 [tool.uv]
 dev-dependencies = [
-    "black>=24.10.0",
+    "black>=26.1.0",
     "coverage>=7.6.4",
     "ipykernel>=6.29.5",
     "ipython>=8.29.0",
