@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import special
+from scipy import special  # type: ignore[reportMissingImports]  # optional dependency
 
 from kirin import types
 from kirin.interp import Frame, MethodTable, impl

@@ -1,6 +1,3 @@
-from typing import cast
-from dataclasses import field, dataclass
-
 from kirin import ir
 from kirin.rewrite.abc import RewriteRule, RewriteResult
 
@@ -38,7 +35,6 @@ class ScfRule(RewriteRule):
         assert (
             curr_block is not None and curr_block.IS_BLOCK
         ), "Node must be inside a block"
-        curr_block = cast(ir.Block, curr_block)
 
         curr_block.stmts.append(
             Branch(arguments=(), successor=(entr_block := ir.Block()))
@@ -52,11 +48,9 @@ class ScfRule(RewriteRule):
         region = node.parent_region
 
         assert region is not None and region.IS_REGION, "Node must be inside a region"
-        region = cast(ir.Region, region)
         assert (
             curr_block is not None and curr_block.IS_BLOCK
         ), "Node must be inside a block"
-        curr_block = cast(ir.Block, curr_block)
 
         block_idx = region._block_idx[curr_block]
         return region, block_idx
@@ -174,11 +168,11 @@ class IfElseRule(ScfRule):
         return RewriteResult(has_done_something=True)
 
 
-@dataclass
 class ScfToCfRule(RewriteRule):
 
-    for_rule: ForRule = field(default_factory=ForRule, init=False)
-    if_else_rule: IfElseRule = field(default_factory=IfElseRule, init=False)
+    def __init__(self) -> None:
+        self.for_rule = ForRule()
+        self.if_else_rule = IfElseRule()
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         if isinstance(node, For):

@@ -5,8 +5,10 @@ lowering rules for `ast.Name` and `ast.Expr`.
 """
 
 import ast
+from typing import cast
 
 from kirin import ir, interp, lowering
+from kirin.lowering.abc import Result
 
 dialect = ir.Dialect("py.base")
 
@@ -27,7 +29,7 @@ class PythonLowering(lowering.FromPythonAST):
             raise lowering.BuildError("unhandled del operation")
 
     def lower_Expr(self, state: lowering.State, node: ast.Expr) -> lowering.Result:
-        return state.parent.visit(state, node.value)
+        return cast(Result, state.parent.visit(state, node.value))
 
 
 @dialect.register(key="emit.julia")

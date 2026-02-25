@@ -260,8 +260,9 @@ class FromPythonWithSingleItem(FromPythonWith[StatementType]):
 
         result = results[0]
         if item.optional_vars is not None and isinstance(item.optional_vars, ast.Name):
-            result.name = item.optional_vars.id
-            state.current_frame.defs[result.name] = result
+            name = item.optional_vars.id
+            result.name = name
+            state.current_frame.defs[name] = result
         return
 
     def verify(self, node: ir.Statement):

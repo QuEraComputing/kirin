@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, cast
 from dataclasses import field, dataclass
 
 from kirin.interp.frame import FrameABC
@@ -60,7 +60,7 @@ class InterpreterState(Generic[FrameType]):
         if self._current_frame is None:
             raise ValueError("no frame to pop")
         frame = self._current_frame
-        self._current_frame = self._current_frame.parent
+        self._current_frame = cast(FrameType | None, self._current_frame.parent)
         self.depth -= 1
         frame.parent = None
         return frame

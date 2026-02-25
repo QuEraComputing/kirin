@@ -328,8 +328,13 @@ class Deserializer:
                 raise ValueError(
                     f"Attribute class {inner.class_name} not found in dialect {belong_to_dialect.name}"
                 )
-        cls = get_cls_from_name(inner)
-        return cls.deserialize(inner, self)
+        attr_cls = get_cls_from_name(inner)
+        deserialize_fn = getattr(attr_cls, "deserialize", None)
+        if deserialize_fn is None:
+            raise ValueError(
+                f"Class {attr_cls.__name__} does not have a deserialize method"
+            )
+        return deserialize_fn(inner, self)
 
     def deserialize_resultvalue(self, serUnit: SerializationUnit) -> ir.ResultValue:
         ssa_name = serUnit.data["id"]

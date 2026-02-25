@@ -374,20 +374,23 @@ class Block(IRNode["Region"]):
         for stmt in self.stmts:
             stmt.delete(safe=safe)
 
-    def is_structurally_equal(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def is_structurally_equal(
         self,
-        other: Self,
+        other: IRNode,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
         """Check if the Block is structurally equal to another Block.
 
         Args:
-            other (Self): The other Block to compare with.
+            other (IRNode): The other node to compare with.
             context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.
 
         Returns:
             bool: True if the Block is structurally equal to the other Block.
         """
+        if not isinstance(other, Block):
+            return False
+
         if context is None:
             context = {}
 

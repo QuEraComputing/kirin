@@ -4,8 +4,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar, ClassVar, Iterator
 from dataclasses import field, dataclass
 
-from typing_extensions import Self
-
 from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue
 from kirin.source import SourceInfo
@@ -94,7 +92,7 @@ class IRNode(Generic[ParentType], ABC, Printable):
     @abstractmethod
     def is_structurally_equal(
         self,
-        other: Self,
+        other: "IRNode",
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
         """Check if the current node is structurally equal to the other node.
