@@ -125,9 +125,11 @@ class Lowering(lowering.FromPythonAST):
             case ast.Assign(
                 targets=[ast.Name(lhs_name, ast.Store())], value=ast.Name(_, ast.Load())
             ):
+
                 stmt = Alias(
                     value=result.data[0], target=ir.PyAttr(lhs_name)
                 )  # NOTE: this is guaranteed to be one result
+
                 stmt.result.name = lhs_name
                 current_frame.defs[lhs_name] = current_frame.push(stmt).result
             case _:

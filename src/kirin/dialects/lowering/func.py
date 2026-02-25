@@ -22,6 +22,9 @@ class Lowering(lowering.FromPythonAST):
     def lower_FunctionDef(
         self, state: lowering.State[ast.AST], node: ast.FunctionDef
     ) -> lowering.Result:
+
+        frame = state.current_frame
+        slots = tuple(arg.arg for arg in node.args.args)
         self.assert_simple_arguments(node.args)
         signature = func.Signature(
             inputs=tuple(
@@ -29,9 +32,7 @@ class Lowering(lowering.FromPythonAST):
             ),
             output=self.get_hint(state, node.returns),
         )
-        frame = state.current_frame
 
-        slots = tuple(arg.arg for arg in node.args.args)
         entries: dict[str, ir.SSAValue] = {}
         entr_block = ir.Block()
         fn_self = entr_block.args.append_from(
@@ -108,6 +109,74 @@ class Lowering(lowering.FromPythonAST):
         frame.push(lambda_stmt)
         # NOTE: Python automatically assigns the lambda to the name
         frame.defs[node.name] = lambda_stmt.result
+
+    def lower_Lambda(
+        self, state: lowering.State[ast.AST], node: ast.Lambda
+    ) -> lowering.Result:
+
+        frame = state.current_frame
+        slots = tuple(arg.arg for arg in node.args.args)
+        self.assert_simple_arguments(node.args)
+        signature = func.Signature(
+            inputs=tuple(
+                self.get_hint(state, arg.annotation) for arg in node.args.args
+            ),
+            output=types.Any,
+        )
+        node_name = f"lambda_0x{id(node)}"
+
+        entries: dict[str, ir.SSAValue] = {}
+        entr_block = ir.Block()
+        fn_self = entr_block.args.append_from(
+            types.MethodType[list(signature.inputs), signature.output],
+            node_name + "_self",
+        )
+        entries[node_name] = fn_self
+        for arg, type in zip(node.args.args, signature.inputs):
+            entries[arg.arg] = entr_block.args.append_from(type, arg.arg)
+
+        def callback(frame: lowering.Frame, value: ir.SSAValue):
+            first_stmt = entr_block.first_stmt
+            stmt = func.GetField(obj=fn_self, field=len(frame.captures) - 1)
+            if value.name:
+                stmt.result.name = value.name
+            stmt.result.type = value.type
+            stmt.source = state.source
+            if first_stmt:
+                stmt.insert_before(first_stmt)
+            else:
+                entr_block.stmts.append(stmt)
+            return stmt.result
+
+        with state.frame(
+            [node.body], entr_block=entr_block, capture_callback=callback
+        ) as func_frame:
+            func_frame.defs.update(entries)
+            func_frame.exhaust()
+
+            last_stmt = func_frame.curr_region.blocks[0].last_stmt
+            # assert hasattr(last_stmt,"result"), "python lambda should always have a return value"
+            rtrn_stmt = func.Return(last_stmt)
+            func_frame.curr_block.stmts.append(rtrn_stmt)
+
+        first_stmt = func_frame.curr_region.blocks[0].first_stmt
+        if first_stmt is None:
+            raise lowering.BuildError("empty lambda body")
+
+        func_frame.curr_region.blocks[1].delete()
+
+        lambda_stmt = func.Lambda(
+            tuple(value for value in func_frame.captures.values()),
+            sym_name=node_name,
+            slots=slots,
+            signature=signature,
+            body=func_frame.curr_region,
+        )
+
+        lambda_stmt.result.name = node_name
+        frame.push(lambda_stmt)
+        frame.defs[node_name] = lambda_stmt.result
+        return lambda_stmt.result
 
     def assert_simple_arguments(self, node: ast.arguments) -> None:
         if node.kwonlyargs:
