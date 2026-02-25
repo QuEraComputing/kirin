@@ -311,10 +311,10 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
         self.data = data
         self.type = datatype or PyClass(type(data))
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Literal):
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, Literal):
             return False
-        return self.data == other.data and self.type == other.type
+        return self.data == value.data and self.type == value.type
 
     def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
         return self.is_subseteq(other.bound)
@@ -628,10 +628,11 @@ class Generic(TypeAttribute, typing.Generic[PyClassType]):
         return self.where(typ)
 
     def where(self, typ: TypeVarValue | tuple[TypeVarValue, ...]) -> "Generic":
-        if isinstance(typ, tuple):
-            typs = typ
-        else:
+        typs: tuple[TypeVarValue, ...]
+        if isinstance(typ, (TypeAttribute, Vararg, list)):
             typs = (typ,)
+        else:
+            typs = typ
 
         args, vararg = _split_type_args(typs)
         if self.vararg is None and vararg is None:
@@ -749,14 +750,30 @@ class TypeofMethodType(TypeAttribute, metaclass=SingletonTypeMeta):
     ) -> "TypeofMethodType":
         return TypeofMethodType()
 
+    @typing.overload
+    def __getitem__(
+        self,
+        typ: tuple[typing.Sequence[TypeArg], TypeArg],
+    ) -> "FunctionType": ...
+
+    @typing.overload
+    def __getitem__(
+        self,
+        typ: tuple[typing.Sequence[TypeArg]],
+    ) -> "FunctionType": ...
+
     def __getitem__(
         self,
         typ: tuple[typing.Sequence[TypeArg], TypeArg] | tuple[typing.Sequence[TypeArg]],
     ) -> "FunctionType":
-        if isinstance(typ, tuple) and len(typ) == 2:
-            return FunctionType(tuple(typ[0]), typ[1])
-        elif isinstance(typ, tuple) and len(typ) == 1:
-            return FunctionType(tuple(typ[0]))
+        args = list(typ)
+        if len(args) == 2:
+            return FunctionType(
+                tuple(typing.cast(typing.Sequence[TypeArg], args[0])),
+                typing.cast(TypeArg, args[1]),
+            )
+        elif len(args) == 1:
+            return FunctionType(tuple(typing.cast(typing.Sequence[TypeArg], args[0])))
         else:
             raise TypeError("Invalid type arguments for TypeofMethodType")
 
@@ -795,14 +812,30 @@ class FunctionType(TypeAttribute):
         else:
             printer.plain_print("None")
 
+    @typing.overload
+    def __getitem__(
+        self,
+        typ: tuple[tuple[TypeArg, ...], TypeArg],
+    ) -> "FunctionType": ...
+
+    @typing.overload
+    def __getitem__(
+        self,
+        typ: tuple[tuple[TypeArg, ...]],
+    ) -> "FunctionType": ...
+
     def __getitem__(
         self,
         typ: tuple[tuple[TypeArg, ...], TypeArg] | tuple[tuple[TypeArg, ...]],
     ) -> "FunctionType":
-        if isinstance(typ, tuple) and len(typ) == 2:
-            return self.where(typ[0], typ[1])
-        elif isinstance(typ, tuple) and len(typ) == 1:
-            return self.where(typ[0])
+        args = list(typ)
+        if len(args) == 2:
+            return self.where(
+                typing.cast(tuple[TypeAttribute, ...], args[0]),
+                typing.cast(TypeAttribute, args[1]),
+            )
+        elif len(args) == 1:
+            return self.where(typing.cast(tuple[TypeAttribute, ...], args[0]))
         else:
             raise TypeError("Invalid type arguments for MethodType")
 
@@ -873,7 +906,15 @@ class FunctionType(TypeAttribute):
 
 def _typeparams_list2tuple(args: tuple[TypeVarValue, ...]) -> tuple[TypeOrVararg, ...]:
     "provides the syntax sugar [A, B, C] type Generic(tuple, A, B, C)"
-    return tuple(Generic(tuple, *arg) if isinstance(arg, list) else arg for arg in args)
+    result: list[TypeOrVararg] = []
+    for arg in args:
+        if isinstance(arg, (TypeAttribute, Vararg)):
+            result.append(arg)
+        elif isinstance(arg, list):
+            result.append(Generic(tuple, *arg))
+        else:
+            result.append(arg)
+    return tuple(result)
 
 
 def _split_type_args(

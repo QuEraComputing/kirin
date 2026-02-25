@@ -17,6 +17,6 @@ SUPPORTED_PYTHON_TYPES = Union[
     str,
     tuple,
     type,
-    type(None),
+    None,
     Sequence,
 ]

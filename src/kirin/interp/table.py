@@ -60,8 +60,8 @@ class Def(Generic[MethodTableType, InterpreterType, FrameType, NodeType, Ret]):
             self.signature = (signature,)
             self.method = func
 
-        self.__name__ = func.__name__
-        self.__doc__ = func.__doc__
+        self.__name__: str = getattr(func, "__name__", "")
+        self.__doc__ = getattr(func, "__doc__", None)
 
     def __get__(
         self,
@@ -98,7 +98,8 @@ class BoundedDef(Generic[MethodTableType, InterpreterType, FrameType, NodeType, 
         return self.method(self.parent, interpreter, frame, node)
 
     def __repr__(self) -> str:
-        return f"impl {self.method.__name__} in {repr(self.parent.__class__)}"
+        name = getattr(self.method, "__name__", "?")
+        return f"impl {name} in {repr(self.parent.__class__)}"
 
 
 @overload

@@ -546,15 +546,15 @@ class Statement(IRNode["Block"]):
         if include_self and region_first:
             yield self
 
-    def is_structurally_equal(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def is_structurally_equal(
         self,
-        other: Self,
+        other: IRNode,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
         """Check if the Statement is structurally equal to another Statement.
 
         Args:
-            other (Self): The other Statelemt to compare with.
+            other (IRNode): The other node to compare with.
             context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.
 
         Returns:
@@ -562,6 +562,9 @@ class Statement(IRNode["Block"]):
         """
         if self is other:
             return True
+
+        if not isinstance(other, Statement):
+            return False
 
         if context is None:
             context = {}

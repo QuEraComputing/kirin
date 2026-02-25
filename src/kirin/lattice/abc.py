@@ -1,5 +1,5 @@
 from abc import ABC, ABCMeta, abstractmethod
-from typing import Generic, TypeVar, Iterable
+from typing import Generic, TypeVar, Iterable, cast
 
 
 class LatticeMeta(ABCMeta):
@@ -105,14 +105,17 @@ class UnionMeta(LatticeMeta):
     ):
         from kirin.lattice.abc import Lattice
 
-        if isinstance(typ, Lattice):
-            typs: Iterable[LatticeType] = (typ, *others)
-        elif not others:
-            typs = typ
+        typs: Iterable[LatticeType]
+        if others:
+            if not isinstance(typ, Lattice):
+                raise ValueError(
+                    "Expected an iterable of types or variadic arguments of types"
+                )
+            typs = cast(Iterable[LatticeType], [typ, *others])
+        elif isinstance(typ, Lattice):
+            typs = cast(Iterable[LatticeType], [typ])
         else:
-            raise ValueError(
-                "Expected an iterable of types or variadic arguments of types"
-            )
+            typs = typ
 
         # try if the union can be simplified
         params: list[LatticeType] = []

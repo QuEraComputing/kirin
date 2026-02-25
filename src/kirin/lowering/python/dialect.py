@@ -38,10 +38,11 @@ class akin:
         if isinstance(func, Transform):
             return Transform((self.obj,) + func.objs, func.func)
 
-        if not func.__name__.startswith("lower_Call_"):
+        func_name = getattr(func, "__name__", "")
+        if not func_name.startswith("lower_Call_"):
             raise SyntaxError(
                 "lowering function should be prefixed with lower_Call_"
-                f" but got {func.__name__}"
+                f" but got {func_name}"
             )
         return Transform((self.obj,), func)
 

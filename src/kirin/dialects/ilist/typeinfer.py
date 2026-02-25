@@ -123,6 +123,7 @@ class TypeInfer(MethodTable):
             obj_len = obj_type.vars[1]
             if not isinstance(obj_len, types.Literal):
                 return (IListType[obj_type.vars[0], types.Any],)
+            assert isinstance(obj_len.data, int)
             LenT = types.Literal(len(range(obj_len.data)[index_]))
             return (IListType[obj_type.vars[0], LenT],)
         else:

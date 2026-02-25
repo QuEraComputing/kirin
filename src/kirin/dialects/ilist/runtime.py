@@ -80,8 +80,8 @@ class IList(ir.Data[Sequence[T]], Sequence[T], Generic[T, L]):
             return IList(self.data[index])
         return self.data[index]
 
-    def __contains__(self, item: object) -> bool:
-        return item in self.data
+    def __contains__(self, value: object) -> bool:
+        return value in self.data
 
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, IList):
