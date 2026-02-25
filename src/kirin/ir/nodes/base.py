@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar, ClassVar, Iterator
 from dataclasses import field, dataclass
 
-
 from kirin.print import Printer, Printable
 from kirin.ir.ssa import SSAValue
 from kirin.source import SourceInfo
