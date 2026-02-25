@@ -85,8 +85,8 @@
                 }
               });
             </script> <p>Bottom element of the lattice.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.lattice.Bottom.is_subseteq class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">is_subseteq</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Subseteq operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>65</span>
-<span class=normal>66</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Subseteq operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>68</span>
+<span class=normal>69</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
     <span class=k>return</span> <span class=kc>True</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h2 id=kirin.analysis.const.lattice.PartialConst class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">PartialConst</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small> </span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>PartialConst</span><span class=p>()</span>
 </code></pre></div> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Result</span>
@@ -273,19 +273,19 @@
                   return '';
                 }
               });
-            </script> <p>Partial lambda constant value.</p> <p>This represents a closure with captured variables.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>194</span>
-<span class=normal>195</span>
-<span class=normal>196</span>
-<span class=normal>197</span>
-<span class=normal>198</span>
-<span class=normal>199</span>
-<span class=normal>200</span>
-<span class=normal>201</span>
-<span class=normal>202</span>
-<span class=normal>203</span>
-<span class=normal>204</span>
-<span class=normal>205</span>
-<span class=normal>206</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
+            </script> <p>Partial lambda constant value.</p> <p>This represents a closure with captured variables.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>206</span>
+<span class=normal>207</span>
+<span class=normal>208</span>
+<span class=normal>209</span>
+<span class=normal>210</span>
+<span class=normal>211</span>
+<span class=normal>212</span>
+<span class=normal>213</span>
+<span class=normal>214</span>
+<span class=normal>215</span>
+<span class=normal>216</span>
+<span class=normal>217</span>
+<span class=normal>218</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>code</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span>
     <span class=n>captured</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
@@ -299,24 +299,24 @@
     <span class=bp>self</span><span class=o>.</span><span class=n>code</span> <span class=o>=</span> <span class=n>code</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>captured</span> <span class=o>=</span> <span class=n>captured</span>
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.lattice.PartialLambda.join class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">join</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>join</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>219</span>
-<span class=normal>220</span>
-<span class=normal>221</span>
-<span class=normal>222</span>
-<span class=normal>223</span>
-<span class=normal>224</span>
-<span class=normal>225</span>
-<span class=normal>226</span>
-<span class=normal>227</span>
-<span class=normal>228</span>
-<span class=normal>229</span>
-<span class=normal>230</span>
-<span class=normal>231</span>
-<span class=normal>232</span>
-<span class=normal>233</span>
-<span class=normal>234</span>
-<span class=normal>235</span>
-<span class=normal>236</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>239</span>
+<span class=normal>240</span>
+<span class=normal>241</span>
+<span class=normal>242</span>
+<span class=normal>243</span>
+<span class=normal>244</span>
+<span class=normal>245</span>
+<span class=normal>246</span>
+<span class=normal>247</span>
+<span class=normal>248</span>
+<span class=normal>249</span>
+<span class=normal>250</span>
+<span class=normal>251</span>
+<span class=normal>252</span>
+<span class=normal>253</span>
+<span class=normal>254</span>
+<span class=normal>255</span>
+<span class=normal>256</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
     <span class=k>if</span> <span class=n>other</span> <span class=ow>is</span> <span class=n>other</span><span class=o>.</span><span class=n>bottom</span><span class=p>():</span>
         <span class=k>return</span> <span class=bp>self</span>
 
@@ -335,21 +335,21 @@
         <span class=bp>self</span><span class=o>.</span><span class=n>argnames</span><span class=p>,</span>
     <span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.lattice.PartialLambda.meet class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">meet</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>meet</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>238</span>
-<span class=normal>239</span>
-<span class=normal>240</span>
-<span class=normal>241</span>
-<span class=normal>242</span>
-<span class=normal>243</span>
-<span class=normal>244</span>
-<span class=normal>245</span>
-<span class=normal>246</span>
-<span class=normal>247</span>
-<span class=normal>248</span>
-<span class=normal>249</span>
-<span class=normal>250</span>
-<span class=normal>251</span>
-<span class=normal>252</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>258</span>
+<span class=normal>259</span>
+<span class=normal>260</span>
+<span class=normal>261</span>
+<span class=normal>262</span>
+<span class=normal>263</span>
+<span class=normal>264</span>
+<span class=normal>265</span>
+<span class=normal>266</span>
+<span class=normal>267</span>
+<span class=normal>268</span>
+<span class=normal>269</span>
+<span class=normal>270</span>
+<span class=normal>271</span>
+<span class=normal>272</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
     <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>other</span><span class=p>,</span> <span class=n>PartialLambda</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>Unknown</span><span class=p>()</span><span class=o>.</span><span class=n>meet</span><span class=p>(</span><span class=n>other</span><span class=p>)</span>
 
@@ -460,18 +460,18 @@
                 }
               });
             </script> <p>Partial tuple constant value.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.lattice.PartialTuple.join class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">join</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>join</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>129</span>
-<span class=normal>130</span>
-<span class=normal>131</span>
-<span class=normal>132</span>
-<span class=normal>133</span>
-<span class=normal>134</span>
-<span class=normal>135</span>
-<span class=normal>136</span>
-<span class=normal>137</span>
-<span class=normal>138</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>138</span>
 <span class=normal>139</span>
-<span class=normal>140</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
+<span class=normal>140</span>
+<span class=normal>141</span>
+<span class=normal>142</span>
+<span class=normal>143</span>
+<span class=normal>144</span>
+<span class=normal>145</span>
+<span class=normal>146</span>
+<span class=normal>147</span>
+<span class=normal>148</span>
+<span class=normal>149</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
     <span class=k>if</span> <span class=n>other</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
         <span class=k>return</span> <span class=bp>self</span>
     <span class=k>elif</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>):</span>
@@ -484,18 +484,18 @@
         <span class=p>)</span>
     <span class=k>return</span> <span class=n>Unknown</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.lattice.PartialTuple.meet class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">meet</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>meet</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>142</span>
-<span class=normal>143</span>
-<span class=normal>144</span>
-<span class=normal>145</span>
-<span class=normal>146</span>
-<span class=normal>147</span>
-<span class=normal>148</span>
-<span class=normal>149</span>
-<span class=normal>150</span>
-<span class=normal>151</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/lattice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>151</span>
 <span class=normal>152</span>
-<span class=normal>153</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
+<span class=normal>153</span>
+<span class=normal>154</span>
+<span class=normal>155</span>
+<span class=normal>156</span>
+<span class=normal>157</span>
+<span class=normal>158</span>
+<span class=normal>159</span>
+<span class=normal>160</span>
+<span class=normal>161</span>
+<span class=normal>162</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>):</span>
         <span class=k>return</span> <span class=bp>self</span>
     <span class=k>elif</span> <span class=n>other</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>

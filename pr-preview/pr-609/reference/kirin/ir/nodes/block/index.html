@@ -186,12 +186,17 @@
     <span class=k>for</span> <span class=n>stmt</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>stmts</span><span class=p>:</span>
         <span class=n>stmt</span><span class=o>.</span><span class=n>drop_all_references</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.block.Block.is_structurally_equal class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">is_structurally_equal</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>is_structurally_equal</span><span class=p>(</span>
-    <span class=n>other</span><span class=p>:</span> <span class=n>Self</span><span class=p>,</span>
+    <span class=n>other</span><span class=p>:</span> <span class=n>IRNode</span><span class=p>,</span>
     <span class=n>context</span><span class=p>:</span> <span class=p>(</span>
         <span class=nb>dict</span><span class=p>[</span><span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span>
     <span class=p>)</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Check if the Block is structurally equal to another Block.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>other</code> </td> <td> <code><span title=typing_extensions.Self>Self</span></code> </td> <td> <div class=doc-md-description> <p>The other Block to compare with.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>context</code> </td> <td> <code><span title=dict>dict</span>[<a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IRNode</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Check if the Block is structurally equal to another Block.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>other</code> </td> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IRNode</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span> (<code>kirin.ir.nodes.base.IRNode</code>)' href=../base/#kirin.ir.nodes.base.IRNode>IRNode</a></code> </td> <td> <div class=doc-md-description> <p>The other node to compare with.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>context</code> </td> <td> <code><span title=dict>dict</span>[<a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IRNode</span>
 
 
   <span class="doc doc-labels">
@@ -247,20 +252,26 @@
 <span class=normal>410</span>
 <span class=normal>411</span>
 <span class=normal>412</span>
-<span class=normal>413</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_structurally_equal</span><span class=p>(</span>  <span class=c1># pyright: ignore[reportIncompatibleMethodOverride]</span>
+<span class=normal>413</span>
+<span class=normal>414</span>
+<span class=normal>415</span>
+<span class=normal>416</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_structurally_equal</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
-    <span class=n>other</span><span class=p>:</span> <span class=n>Self</span><span class=p>,</span>
+    <span class=n>other</span><span class=p>:</span> <span class=n>IRNode</span><span class=p>,</span>
     <span class=n>context</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Check if the Block is structurally equal to another Block.</span>
 
 <span class=sd>    Args:</span>
-<span class=sd>        other (Self): The other Block to compare with.</span>
+<span class=sd>        other (IRNode): The other node to compare with.</span>
 <span class=sd>        context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.</span>
 
 <span class=sd>    Returns:</span>
 <span class=sd>        bool: True if the Block is structurally equal to the other Block.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>other</span><span class=p>,</span> <span class=n>Block</span><span class=p>):</span>
+        <span class=k>return</span> <span class=kc>False</span>
+
     <span class=k>if</span> <span class=n>context</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
         <span class=n>context</span> <span class=o>=</span> <span class=p>{}</span>
 
@@ -285,10 +296,7 @@
 
     <span class=k>return</span> <span class=kc>True</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.block.Block.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=kirin.ir.exception.ValidationError>ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>457</span>
-<span class=normal>458</span>
-<span class=normal>459</span>
-<span class=normal>460</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=kirin.ir.exception.ValidationError>ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>460</span>
 <span class=normal>461</span>
 <span class=normal>462</span>
 <span class=normal>463</span>
@@ -297,7 +305,10 @@
 <span class=normal>466</span>
 <span class=normal>467</span>
 <span class=normal>468</span>
-<span class=normal>469</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>469</span>
+<span class=normal>470</span>
+<span class=normal>471</span>
+<span class=normal>472</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Verify the correctness of the Block.</span>
 
 <span class=sd>    Raises:</span>
@@ -311,14 +322,14 @@
     <span class=k>for</span> <span class=n>stmt</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>stmts</span><span class=p>:</span>
         <span class=n>stmt</span><span class=o>.</span><span class=n>verify</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.block.Block.verify_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify_type</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify_type</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Verify the types of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=kirin.ir.exception.ValidationError>ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>471</span>
-<span class=normal>472</span>
-<span class=normal>473</span>
-<span class=normal>474</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Verify the types of the Block.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=kirin.ir.exception.ValidationError>ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Block is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>474</span>
 <span class=normal>475</span>
 <span class=normal>476</span>
 <span class=normal>477</span>
-<span class=normal>478</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>478</span>
+<span class=normal>479</span>
+<span class=normal>480</span>
+<span class=normal>481</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Verify the types of the Block.</span>
 
 <span class=sd>    Raises:</span>
@@ -334,10 +345,7 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.nodes.stmt.Statement</code>)' href=../stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements in the Block in the specified order.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>418</span>
-<span class=normal>419</span>
-<span class=normal>420</span>
-<span class=normal>421</span>
+  </span> (<code>kirin.ir.nodes.stmt.Statement</code>)' href=../stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements in the Block in the specified order.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/block.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>421</span>
 <span class=normal>422</span>
 <span class=normal>423</span>
 <span class=normal>424</span>
@@ -347,7 +355,10 @@
 <span class=normal>428</span>
 <span class=normal>429</span>
 <span class=normal>430</span>
-<span class=normal>431</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>walk</span><span class=p>(</span>
+<span class=normal>431</span>
+<span class=normal>432</span>
+<span class=normal>433</span>
+<span class=normal>434</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>walk</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=o>*</span><span class=p>,</span> <span class=n>reverse</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span><span class=p>,</span> <span class=n>region_first</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Iterator</span><span class=p>[</span><span class=n>Statement</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Traversal the Statements in a Block.</span>

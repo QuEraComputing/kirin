@@ -15,8 +15,10 @@
     <span class=k>global</span> <span class=n>KIRIN_PYTHON_STACKTRACE</span>
     <span class=n>KIRIN_PYTHON_STACKTRACE</span> <span class=o>=</span> <span class=kc>True</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h2 id=kirin.exception.exception_handler class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">exception_handler</span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>exception_handler</span><span class=p>(</span>
-    <span class=n>exc_type</span><span class=p>,</span> <span class=n>exc_value</span><span class=p>,</span> <span class=n>exc_tb</span><span class=p>:</span> <span class=n>TracebackType</span>
-<span class=p>)</span>
+    <span class=n>exc_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=ne>BaseException</span><span class=p>],</span>
+    <span class=n>exc_value</span><span class=p>:</span> <span class=ne>BaseException</span><span class=p>,</span>
+    <span class=n>exc_tb</span><span class=p>:</span> <span class=n>TracebackType</span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Custom exception handler to format and print exceptions.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/exception.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>159</span>
 <span class=normal>160</span>
 <span class=normal>161</span>
@@ -40,9 +42,10 @@
 <span class=normal>179</span>
 <span class=normal>180</span>
 <span class=normal>181</span>
-<span class=normal>182</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>exception_handler</span><span class=p>(</span><span class=n>exc_type</span><span class=p>,</span> <span class=n>exc_value</span><span class=p>,</span> <span class=n>exc_tb</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TracebackType</span><span class=p>):</span>
+<span class=normal>182</span>
+<span class=normal>183</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>exception_handler</span><span class=p>(</span><span class=n>exc_type</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=ne>BaseException</span><span class=p>],</span> <span class=n>exc_value</span><span class=p>:</span> <span class=ne>BaseException</span><span class=p>,</span> <span class=n>exc_tb</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TracebackType</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Custom exception handler to format and print exceptions.&quot;&quot;&quot;</span>
-    <span class=k>if</span> <span class=ow>not</span> <span class=n>KIRIN_PYTHON_STACKTRACE</span> <span class=ow>and</span> <span class=nb>issubclass</span><span class=p>(</span><span class=n>exc_type</span><span class=p>,</span> <span class=n>StaticCheckError</span><span class=p>):</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>KIRIN_PYTHON_STACKTRACE</span> <span class=ow>and</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>exc_value</span><span class=p>,</span> <span class=n>StaticCheckError</span><span class=p>):</span>
         <span class=n>console</span> <span class=o>=</span> <span class=n>Console</span><span class=p>(</span><span class=n>force_terminal</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
         <span class=k>with</span> <span class=n>console</span><span class=o>.</span><span class=n>capture</span><span class=p>()</span> <span class=k>as</span> <span class=n>capture</span><span class=p>:</span>
             <span class=n>console</span><span class=o>.</span><span class=n>print</span><span class=p>(</span>
@@ -56,6 +59,7 @@
 
     <span class=k>if</span> <span class=p>(</span>
         <span class=ow>not</span> <span class=n>KIRIN_PYTHON_STACKTRACE</span>
+        <span class=ow>and</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>exc_value</span><span class=p>,</span> <span class=ne>Exception</span><span class=p>)</span>
         <span class=ow>and</span> <span class=p>(</span><span class=n>state</span> <span class=o>:=</span> <span class=nb>getattr</span><span class=p>(</span><span class=n>exc_value</span><span class=p>,</span> <span class=n>KIRIN_INTERP_STATE</span><span class=p>,</span> <span class=kc>None</span><span class=p>))</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span>
     <span class=p>):</span>
         <span class=c1># Handle custom stack trace exceptions</span>
