@@ -5,7 +5,7 @@ import types
 import inspect
 import textwrap
 from types import ModuleType
-from typing import Any, Callable, Iterable
+from typing import Any, Iterable
 from dataclasses import dataclass
 
 from kirin import ir
