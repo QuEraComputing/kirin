@@ -69,8 +69,7 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span>' href=../stmt/#kirin.ir.nodes.stmt.Statement><code>Statement</code></a> object. Defaults to None.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>103</span>
-<span class=normal>104</span>
+  </span>' href=../stmt/#kirin.ir.nodes.stmt.Statement><code>Statement</code></a> object. Defaults to None.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>104</span>
 <span class=normal>105</span>
 <span class=normal>106</span>
 <span class=normal>107</span>
@@ -90,7 +89,8 @@
 <span class=normal>121</span>
 <span class=normal>122</span>
 <span class=normal>123</span>
-<span class=normal>124</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>124</span>
+<span class=normal>125</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>blocks</span><span class=p>:</span> <span class=n>Block</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Block</span><span class=p>]</span> <span class=o>=</span> <span class=p>(),</span>
     <span class=n>parent</span><span class=p>:</span> <span class=n>Statement</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
@@ -126,8 +126,7 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a></code> </td> <td> <div class=doc-md-description> <p>The block to get the index of.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=ValueError>ValueError</span></code> </td> <td> <div class=doc-md-description> <p>If the block does not belong to the region.</p> </div> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>int</code></td> <td> <code><span title=int>int</span></code> </td> <td> <div class=doc-md-description> <p>The index of the block within the region.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>126</span>
-<span class=normal>127</span>
+  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a></code> </td> <td> <div class=doc-md-description> <p>The block to get the index of.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=ValueError>ValueError</span></code> </td> <td> <div class=doc-md-description> <p>If the block does not belong to the region.</p> </div> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>int</code></td> <td> <code><span title=int>int</span></code> </td> <td> <div class=doc-md-description> <p>The index of the block within the region.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>127</span>
 <span class=normal>128</span>
 <span class=normal>129</span>
 <span class=normal>130</span>
@@ -140,7 +139,8 @@
 <span class=normal>137</span>
 <span class=normal>138</span>
 <span class=normal>139</span>
-<span class=normal>140</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__getitem__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>block</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>int</span><span class=p>:</span>
+<span class=normal>140</span>
+<span class=normal>141</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__getitem__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>block</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>int</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Get the index of a block within the region.</span>
 
 <span class=sd>    Args:</span>
@@ -158,8 +158,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.clone class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">clone</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>clone</span><span class=p>(</span>
     <span class=n>ssamap</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Region</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Clone a region. This will clone all blocks and statements in the region. <code>SSAValue</code> defined outside the region will not be cloned unless provided in <code>ssamap</code>.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>145</span>
-<span class=normal>146</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Clone a region. This will clone all blocks and statements in the region. <code>SSAValue</code> defined outside the region will not be cloned unless provided in <code>ssamap</code>.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>146</span>
 <span class=normal>147</span>
 <span class=normal>148</span>
 <span class=normal>149</span>
@@ -189,7 +188,8 @@
 <span class=normal>173</span>
 <span class=normal>174</span>
 <span class=normal>175</span>
-<span class=normal>176</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>clone</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>ssamap</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Region</span><span class=p>:</span>
+<span class=normal>176</span>
+<span class=normal>177</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>clone</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>ssamap</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>SSAValue</span><span class=p>,</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Region</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Clone a region. This will clone all blocks and statements in the region.</span>
 <span class=sd>    `SSAValue` defined outside the region will not be cloned unless provided in `ssamap`.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
@@ -222,8 +222,7 @@
 
     <span class=k>return</span> <span class=n>ret</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.delete class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">delete</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>delete</span><span class=p>(</span><span class=n>safe</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Delete the Region completely from the IR graph.</p> <details class=note open> <summary>Note</summary> <p>This method will detach + remove references of the Region.</p> </details> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>safe</code> </td> <td> <code><span title=bool>bool</span></code> </td> <td> <div class=doc-md-description> <p>If True, raise error if there is anything that still reference components in the Region. Defaults to True.</p> </div> </td> <td> <code>True</code> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>238</span>
-<span class=normal>239</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Delete the Region completely from the IR graph.</p> <details class=note open> <summary>Note</summary> <p>This method will detach + remove references of the Region.</p> </details> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>safe</code> </td> <td> <code><span title=bool>bool</span></code> </td> <td> <div class=doc-md-description> <p>If True, raise error if there is anything that still reference components in the Region. Defaults to True.</p> </div> </td> <td> <code>True</code> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>239</span>
 <span class=normal>240</span>
 <span class=normal>241</span>
 <span class=normal>242</span>
@@ -232,7 +231,8 @@
 <span class=normal>245</span>
 <span class=normal>246</span>
 <span class=normal>247</span>
-<span class=normal>248</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>delete</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>safe</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>248</span>
+<span class=normal>249</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>delete</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>safe</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Delete the Region completely from the IR graph.</span>
 
 <span class=sd>    Note:</span>
@@ -244,8 +244,7 @@
     <span class=bp>self</span><span class=o>.</span><span class=n>detach</span><span class=p>()</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>drop_all_references</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.detach class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">detach</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>detach</span><span class=p>(</span><span class=n>index</span><span class=p>:</span> <span class=nb>int</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Detach this Region from the IR tree graph.</p> <details class=note open> <summary>Note</summary> <p>Detach only detach the Region from the IR graph. It does not remove uses that reference the Region.</p> </details> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>214</span>
-<span class=normal>215</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Detach this Region from the IR tree graph.</p> <details class=note open> <summary>Note</summary> <p>Detach only detach the Region from the IR graph. It does not remove uses that reference the Region.</p> </details> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>215</span>
 <span class=normal>216</span>
 <span class=normal>217</span>
 <span class=normal>218</span>
@@ -260,7 +259,8 @@
 <span class=normal>227</span>
 <span class=normal>228</span>
 <span class=normal>229</span>
-<span class=normal>230</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>detach</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>index</span><span class=p>:</span> <span class=nb>int</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>230</span>
+<span class=normal>231</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>detach</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>index</span><span class=p>:</span> <span class=nb>int</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Detach this Region from the IR tree graph.</span>
 
 <span class=sd>    Note:</span>
@@ -278,22 +278,27 @@
     <span class=k>del</span> <span class=bp>self</span><span class=o>.</span><span class=n>parent_node</span><span class=o>.</span><span class=n>_regions</span><span class=p>[</span><span class=n>region_idx</span><span class=p>]</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>parent_node</span> <span class=o>=</span> <span class=kc>None</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.drop_all_references class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">drop_all_references</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>drop_all_references</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Remove all the dependency that reference/uses this Region.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>232</span>
-<span class=normal>233</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Remove all the dependency that reference/uses this Region.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>233</span>
 <span class=normal>234</span>
 <span class=normal>235</span>
-<span class=normal>236</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>drop_all_references</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>236</span>
+<span class=normal>237</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>drop_all_references</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Remove all the dependency that reference/uses this Region.&quot;&quot;&quot;</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>parent_node</span> <span class=o>=</span> <span class=kc>None</span>
     <span class=k>for</span> <span class=n>block</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>_blocks</span><span class=p>:</span>
         <span class=n>block</span><span class=o>.</span><span class=n>drop_all_references</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.is_structurally_equal class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">is_structurally_equal</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>is_structurally_equal</span><span class=p>(</span>
-    <span class=n>other</span><span class=p>:</span> <span class=n>Self</span><span class=p>,</span>
+    <span class=n>other</span><span class=p>:</span> <span class=n>IRNode</span><span class=p>,</span>
     <span class=n>context</span><span class=p>:</span> <span class=p>(</span>
         <span class=nb>dict</span><span class=p>[</span><span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span>
     <span class=p>)</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Check if the Region is structurally equal to another Region.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>other</code> </td> <td> <code><span title=typing_extensions.Self>Self</span></code> </td> <td> <div class=doc-md-description> <p>The other Region to compare with.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>context</code> </td> <td> <code><span title=dict>dict</span>[<a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IRNode</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Check if the Region is structurally equal to another Region.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>other</code> </td> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IRNode</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span> (<code>kirin.ir.nodes.base.IRNode</code>)' href=../base/#kirin.ir.nodes.base.IRNode>IRNode</a></code> </td> <td> <div class=doc-md-description> <p>The other node to compare with.</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>context</code> </td> <td> <code><span title=dict>dict</span>[<a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">IRNode</span>
 
 
   <span class="doc doc-labels">
@@ -313,8 +318,7 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.ssa.SSAValue</code>)' href=../../ssa/#kirin.ir.ssa.SSAValue>SSAValue</a>] | None</code> </td> <td> <div class=doc-md-description> <p>A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>bool</code></td> <td> <code><span title=bool>bool</span></code> </td> <td> <div class=doc-md-description> <p>True if the Region is structurally equal to the other Region.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>250</span>
-<span class=normal>251</span>
+  </span> (<code>kirin.ir.ssa.SSAValue</code>)' href=../../ssa/#kirin.ir.ssa.SSAValue>SSAValue</a>] | None</code> </td> <td> <div class=doc-md-description> <p>A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.</p> </div> </td> <td> <code>None</code> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>bool</code></td> <td> <code><span title=bool>bool</span></code> </td> <td> <div class=doc-md-description> <p>True if the Region is structurally equal to the other Region.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>251</span>
 <span class=normal>252</span>
 <span class=normal>253</span>
 <span class=normal>254</span>
@@ -342,20 +346,27 @@
 <span class=normal>276</span>
 <span class=normal>277</span>
 <span class=normal>278</span>
-<span class=normal>279</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_structurally_equal</span><span class=p>(</span>  <span class=c1># pyright: ignore[reportIncompatibleMethodOverride]</span>
+<span class=normal>279</span>
+<span class=normal>280</span>
+<span class=normal>281</span>
+<span class=normal>282</span>
+<span class=normal>283</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_structurally_equal</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
-    <span class=n>other</span><span class=p>:</span> <span class=n>Self</span><span class=p>,</span>
+    <span class=n>other</span><span class=p>:</span> <span class=n>IRNode</span><span class=p>,</span>
     <span class=n>context</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>,</span> <span class=n>IRNode</span> <span class=o>|</span> <span class=n>SSAValue</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Check if the Region is structurally equal to another Region.</span>
 
 <span class=sd>    Args:</span>
-<span class=sd>        other (Self): The other Region to compare with.</span>
+<span class=sd>        other (IRNode): The other node to compare with.</span>
 <span class=sd>        context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.</span>
 
 <span class=sd>    Returns:</span>
 <span class=sd>        bool: True if the Region is structurally equal to the other Region.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>other</span><span class=p>,</span> <span class=n>Region</span><span class=p>):</span>
+        <span class=k>return</span> <span class=kc>False</span>
+
     <span class=k>if</span> <span class=n>context</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
         <span class=n>context</span> <span class=o>=</span> <span class=p>{}</span>
     <span class=n>context</span><span class=p>[</span><span class=bp>self</span><span class=p>]</span> <span class=o>=</span> <span class=n>other</span>
@@ -378,14 +389,14 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.nodes.stmt.Statement</code>)' href=../stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements of Blocks in the Region.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>296</span>
-<span class=normal>297</span>
-<span class=normal>298</span>
-<span class=normal>299</span>
-<span class=normal>300</span>
+  </span> (<code>kirin.ir.nodes.stmt.Statement</code>)' href=../stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements of Blocks in the Region.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>300</span>
 <span class=normal>301</span>
 <span class=normal>302</span>
-<span class=normal>303</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>stmts</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Iterator</span><span class=p>[</span><span class=n>Statement</span><span class=p>]:</span>
+<span class=normal>303</span>
+<span class=normal>304</span>
+<span class=normal>305</span>
+<span class=normal>306</span>
+<span class=normal>307</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>stmts</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Iterator</span><span class=p>[</span><span class=n>Statement</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Iterate over all the Statements in the Region. This does not walk into nested Regions.</span>
 
 <span class=sd>    Yields:</span>
@@ -394,11 +405,7 @@
     <span class=k>for</span> <span class=n>block</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>blocks</span><span class=p>:</span>
         <span class=k>yield from</span> <span class=n>block</span><span class=o>.</span><span class=n>stmts</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.verify class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Region.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=kirin.ir.exception.ValidationError>ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Region is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>328</span>
-<span class=normal>329</span>
-<span class=normal>330</span>
-<span class=normal>331</span>
-<span class=normal>332</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Verify the correctness of the Region.</p> <p><span class=doc-section-title>Raises:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><span title=kirin.ir.exception.ValidationError>ValidationError</span></code> </td> <td> <div class=doc-md-description> <p>If the Region is not correct.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>332</span>
 <span class=normal>333</span>
 <span class=normal>334</span>
 <span class=normal>335</span>
@@ -408,7 +415,11 @@
 <span class=normal>339</span>
 <span class=normal>340</span>
 <span class=normal>341</span>
-<span class=normal>342</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>342</span>
+<span class=normal>343</span>
+<span class=normal>344</span>
+<span class=normal>345</span>
+<span class=normal>346</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Verify the correctness of the Region.</span>
 
 <span class=sd>    Raises:</span>
@@ -424,9 +435,9 @@
     <span class=k>for</span> <span class=n>block</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>blocks</span><span class=p>:</span>
         <span class=n>block</span><span class=o>.</span><span class=n>verify</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.verify_type class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">verify_type</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>verify_type</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>verify the type of the node.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>344</span>
-<span class=normal>345</span>
-<span class=normal>346</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>verify the type of the node.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>348</span>
+<span class=normal>349</span>
+<span class=normal>350</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>verify_type</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
     <span class=k>for</span> <span class=n>block</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>blocks</span><span class=p>:</span>
         <span class=n>block</span><span class=o>.</span><span class=n>verify_type</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.Region.walk class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">walk</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>walk</span><span class=p>(</span>
@@ -437,11 +448,7 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.nodes.stmt.Statement</code>)' href=../stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements of Blocks in the Region, in the specified order.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>281</span>
-<span class=normal>282</span>
-<span class=normal>283</span>
-<span class=normal>284</span>
-<span class=normal>285</span>
+  </span> (<code>kirin.ir.nodes.stmt.Statement</code>)' href=../stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>Iterator[Statement]: An iterator that yield Statements of Blocks in the Region, in the specified order.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>285</span>
 <span class=normal>286</span>
 <span class=normal>287</span>
 <span class=normal>288</span>
@@ -450,7 +457,11 @@
 <span class=normal>291</span>
 <span class=normal>292</span>
 <span class=normal>293</span>
-<span class=normal>294</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>walk</span><span class=p>(</span>
+<span class=normal>294</span>
+<span class=normal>295</span>
+<span class=normal>296</span>
+<span class=normal>297</span>
+<span class=normal>298</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>walk</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=o>*</span><span class=p>,</span> <span class=n>reverse</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span><span class=p>,</span> <span class=n>region_first</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Iterator</span><span class=p>[</span><span class=n>Statement</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Traversal the Statements of Blocks in the Region.</span>
@@ -521,7 +532,7 @@
               });
             </script> <p>A View object that contains a list of Blocks of a Region.</p> <details class=description open> <summary>Description</summary> <p>This is a proxy object that provide safe API to manipulate the Blocks of a Region.</p> </details> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.nodes.region.RegionBlocks.__setitem__ class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">__setitem__</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>__setitem__</span><span class=p>(</span>
     <span class=n>idx</span><span class=p>:</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>,</span>
-    <span class=n>block_or_blocks</span><span class=p>:</span> <span class=n>Block</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Block</span><span class=p>],</span>
+    <span class=n>block_or_blocks</span><span class=p>:</span> <span class=n>Block</span> <span class=o>|</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>Block</span><span class=p>],</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Replace/Set the Blocks of the Region.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>idx</code> </td> <td> <code><span title=int>int</span> | <span title=slice>slice</span></code> </td> <td> <div class=doc-md-description> <p>The index or slice to replace the <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Block</span>
 
@@ -533,7 +544,7 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a> | <span title=typing.Iterable>Iterable</span>[<a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Block</span>
+  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a> | <span title=typing.Sequence>Sequence</span>[<a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Block</span>
 
 
   <span class="doc doc-labels">
@@ -561,14 +572,15 @@
 <span class=normal>52</span>
 <span class=normal>53</span>
 <span class=normal>54</span>
-<span class=normal>55</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__setitem__</span><span class=p>(</span>
-    <span class=bp>self</span><span class=p>,</span> <span class=n>idx</span><span class=p>:</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>,</span> <span class=n>block_or_blocks</span><span class=p>:</span> <span class=n>Block</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=n>Block</span><span class=p>]</span>
+<span class=normal>55</span>
+<span class=normal>56</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__setitem__</span><span class=p>(</span>  <span class=c1># ty: ignore[invalid-method-override]  # generic TypeVar resolution</span>
+    <span class=bp>self</span><span class=p>,</span> <span class=n>idx</span><span class=p>:</span> <span class=nb>int</span> <span class=o>|</span> <span class=nb>slice</span><span class=p>,</span> <span class=n>block_or_blocks</span><span class=p>:</span> <span class=n>Block</span> <span class=o>|</span> <span class=n>Sequence</span><span class=p>[</span><span class=n>Block</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Replace/Set the Blocks of the Region.</span>
 
 <span class=sd>    Args:</span>
 <span class=sd>        idx (int | slice): The index or slice to replace the [`Blocks`][kirin.ir.Block].</span>
-<span class=sd>        block_or_blocks (Block | Iterable[Block]): The Block or Blocks to replace the Blocks.</span>
+<span class=sd>        block_or_blocks (Block | Sequence[Block]): The Block or Blocks to replace the Blocks.</span>
 
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span> <span class=nb>int</span><span class=p>)</span> <span class=ow>and</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>block_or_blocks</span><span class=p>,</span> <span class=n>Block</span><span class=p>):</span>
@@ -576,10 +588,11 @@
         <span class=n>block_or_blocks</span><span class=o>.</span><span class=n>attach</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>node</span><span class=p>)</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>field</span><span class=p>[</span><span class=n>idx</span><span class=p>]</span> <span class=o>=</span> <span class=n>block_or_blocks</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>node</span><span class=o>.</span><span class=n>_block_idx</span><span class=p>[</span><span class=n>block_or_blocks</span><span class=p>]</span> <span class=o>=</span> <span class=n>idx</span>
-    <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span> <span class=nb>slice</span><span class=p>)</span> <span class=ow>and</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>block_or_blocks</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>):</span>
-        <span class=k>for</span> <span class=n>block</span> <span class=ow>in</span> <span class=n>block_or_blocks</span><span class=p>:</span>
+    <span class=k>elif</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span> <span class=nb>slice</span><span class=p>)</span> <span class=ow>and</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>block_or_blocks</span><span class=p>,</span> <span class=n>Block</span><span class=p>):</span>
+        <span class=n>blocks</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>block_or_blocks</span><span class=p>)</span>
+        <span class=k>for</span> <span class=n>block</span> <span class=ow>in</span> <span class=n>blocks</span><span class=p>:</span>
             <span class=n>block</span><span class=o>.</span><span class=n>attach</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>node</span><span class=p>)</span>
-        <span class=bp>self</span><span class=o>.</span><span class=n>field</span><span class=p>[</span><span class=n>idx</span><span class=p>]</span> <span class=o>=</span> <span class=n>block_or_blocks</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>field</span><span class=p>[</span><span class=n>idx</span><span class=p>]</span> <span class=o>=</span> <span class=n>blocks</span>
         <span class=bp>self</span><span class=o>.</span><span class=n>node</span><span class=o>.</span><span class=n>_block_idx</span> <span class=o>=</span> <span class=p>{</span>
             <span class=n>block</span><span class=p>:</span> <span class=n>i</span> <span class=k>for</span> <span class=n>i</span><span class=p>,</span> <span class=n>block</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>field</span><span class=p>)</span>
         <span class=p>}</span>  <span class=c1># reindex</span>
@@ -591,15 +604,15 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a></code> </td> <td> <div class=doc-md-description> <p>The block to be appended.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>77</span>
-<span class=normal>78</span>
+  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a></code> </td> <td> <div class=doc-md-description> <p>The block to be appended.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>78</span>
 <span class=normal>79</span>
 <span class=normal>80</span>
 <span class=normal>81</span>
 <span class=normal>82</span>
 <span class=normal>83</span>
 <span class=normal>84</span>
-<span class=normal>85</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>append</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>85</span>
+<span class=normal>86</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>append</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Append a Block to the Region.</span>
 
 <span class=sd>    Args:</span>
@@ -614,8 +627,7 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a></code> </td> <td> <div class=doc-md-description> <p>The block to be inserted.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>65</span>
-<span class=normal>66</span>
+  </span> (<code>kirin.ir.nodes.block.Block</code>)' href=../block/#kirin.ir.nodes.block.Block>Block</a></code> </td> <td> <div class=doc-md-description> <p>The block to be inserted.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/nodes/region.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>66</span>
 <span class=normal>67</span>
 <span class=normal>68</span>
 <span class=normal>69</span>
@@ -624,7 +636,8 @@
 <span class=normal>72</span>
 <span class=normal>73</span>
 <span class=normal>74</span>
-<span class=normal>75</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>insert</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>idx</span><span class=p>:</span> <span class=nb>int</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>75</span>
+<span class=normal>76</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>insert</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>idx</span><span class=p>:</span> <span class=nb>int</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>Block</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Inserts a Block at the specified index.</span>
 
 <span class=sd>    Args:</span>
