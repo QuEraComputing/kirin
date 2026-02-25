@@ -79,6 +79,10 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 - **`#[kirin(...)]` attribute convention**: Use path syntax for `crate`: `#[kirin(crate = kirin_ir)]` not `#[kirin(crate = "kirin_ir")]`. Darling parses `syn::Path` and supports bare idents directly.
 
+## IR Design Conventions
+
+- **Block vs Region**: A `Block` is a single linear sequence of statements with an optional terminator. A `Region` is a container for multiple blocks (`LinkedList<Block>`). When modeling MLIR-style operations, check whether the MLIR op uses `SingleBlock` regions — if so, use `Block` in Kirin, not `Region`. For example, MLIR's `scf.if` and `scf.for` have `SingleBlock` + `SingleBlockImplicitTerminator<scf::YieldOp>` traits, so `kirin-scf` correctly uses `Block` fields for their bodies.
+
 ## Chumsky Parser Conventions
 
 - **`for<'src> HasParser` lifetime pattern**: `HasParser<'src, 'src>` ties the AST output lifetime to the input string. When writing trait impls that call `parse_ast::<L>(input)` and then `emit()`, the return type (`Statement`) does not borrow the input — but the compiler cannot prove this through the associated type chain. Do **not** use an associated `Output` type derived from `<<L as HasParser<'static, 'static>>::Output as EmitIR<L>>::Output` — it creates an unsatisfiable `'static` requirement on the input. Instead, hardcode `Statement` as the return type or use a helper function generic over `'src`.
