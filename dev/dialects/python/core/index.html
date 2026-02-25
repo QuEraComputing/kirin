@@ -4317,9 +4317,7 @@
                 }
               });
             </script> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.assign.Lowering.assign_item class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">assign_item</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>assign_item</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>result</span><span class=p>:</span> <span class=n>Result</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>189</span>
-<span class=normal>190</span>
-<span class=normal>191</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>191</span>
 <span class=normal>192</span>
 <span class=normal>193</span>
 <span class=normal>194</span>
@@ -4328,7 +4326,9 @@
 <span class=normal>197</span>
 <span class=normal>198</span>
 <span class=normal>199</span>
-<span class=normal>200</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>200</span>
+<span class=normal>201</span>
+<span class=normal>202</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span><span class=w> </span><span class=nf>assign_item</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>result</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=o>.</span><span class=n>Result</span><span class=p>):</span>
     <span class=k>match</span> <span class=n>target</span><span class=p>:</span>
         <span class=k>case</span> <span class=n>ast</span><span class=o>.</span><span class=n>Tuple</span><span class=p>(</span><span class=n>elts</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Store</span><span class=p>()):</span>
@@ -4341,9 +4341,7 @@
         <span class=k>case</span><span class=w> </span><span class=k>_</span><span class=p>:</span>
             <span class=bp>cls</span><span class=o>.</span><span class=n>assign_item_value</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>result</span><span class=o>.</span><span class=n>expect_one</span><span class=p>())</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.assign.Lowering.assign_item_value class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">assign_item_value</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small> </span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>assign_item_value</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>SSAValue</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>170</span>
-<span class=normal>171</span>
-<span class=normal>172</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>172</span>
 <span class=normal>173</span>
 <span class=normal>174</span>
 <span class=normal>175</span>
@@ -4358,7 +4356,9 @@
 <span class=normal>184</span>
 <span class=normal>185</span>
 <span class=normal>186</span>
-<span class=normal>187</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
+<span class=normal>187</span>
+<span class=normal>188</span>
+<span class=normal>189</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@classmethod</span>
 <span class=k>def</span><span class=w> </span><span class=nf>assign_item_value</span><span class=p>(</span><span class=bp>cls</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>target</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>):</span>
     <span class=n>current_frame</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>current_frame</span>
     <span class=k>match</span> <span class=n>target</span><span class=p>:</span>
@@ -4379,13 +4379,13 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.assign.Lowering.lower_AnnAssign class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_AnnAssign</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_AnnAssign</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>AnnAssign</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>137</span>
-<span class=normal>138</span>
-<span class=normal>139</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>139</span>
 <span class=normal>140</span>
 <span class=normal>141</span>
 <span class=normal>142</span>
-<span class=normal>143</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_AnnAssign</span><span class=p>(</span>
+<span class=normal>143</span>
+<span class=normal>144</span>
+<span class=normal>145</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_AnnAssign</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>AnnAssign</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=n>type_hint</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_hint</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>node</span><span class=o>.</span><span class=n>annotation</span><span class=p>)</span>
@@ -4407,16 +4407,20 @@
 <span class=normal>132</span>
 <span class=normal>133</span>
 <span class=normal>134</span>
-<span class=normal>135</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_Assign</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Assign</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
+<span class=normal>135</span>
+<span class=normal>136</span>
+<span class=normal>137</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_Assign</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Assign</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=n>result</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>value</span><span class=p>)</span>
     <span class=n>current_frame</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>current_frame</span>
     <span class=k>match</span> <span class=n>node</span><span class=p>:</span>
         <span class=k>case</span> <span class=n>ast</span><span class=o>.</span><span class=n>Assign</span><span class=p>(</span>
             <span class=n>targets</span><span class=o>=</span><span class=p>[</span><span class=n>ast</span><span class=o>.</span><span class=n>Name</span><span class=p>(</span><span class=n>lhs_name</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Store</span><span class=p>())],</span> <span class=n>value</span><span class=o>=</span><span class=n>ast</span><span class=o>.</span><span class=n>Name</span><span class=p>(</span><span class=n>_</span><span class=p>,</span> <span class=n>ast</span><span class=o>.</span><span class=n>Load</span><span class=p>())</span>
         <span class=p>):</span>
+
             <span class=n>stmt</span> <span class=o>=</span> <span class=n>Alias</span><span class=p>(</span>
                 <span class=n>value</span><span class=o>=</span><span class=n>result</span><span class=o>.</span><span class=n>data</span><span class=p>[</span><span class=mi>0</span><span class=p>],</span> <span class=n>target</span><span class=o>=</span><span class=n>ir</span><span class=o>.</span><span class=n>PyAttr</span><span class=p>(</span><span class=n>lhs_name</span><span class=p>)</span>
             <span class=p>)</span>  <span class=c1># NOTE: this is guaranteed to be one result</span>
+
             <span class=n>stmt</span><span class=o>.</span><span class=n>result</span><span class=o>.</span><span class=n>name</span> <span class=o>=</span> <span class=n>lhs_name</span>
             <span class=n>current_frame</span><span class=o>.</span><span class=n>defs</span><span class=p>[</span><span class=n>lhs_name</span><span class=p>]</span> <span class=o>=</span> <span class=n>current_frame</span><span class=o>.</span><span class=n>push</span><span class=p>(</span><span class=n>stmt</span><span class=p>)</span><span class=o>.</span><span class=n>result</span>
         <span class=k>case</span><span class=w> </span><span class=k>_</span><span class=p>:</span>
@@ -4425,9 +4429,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.assign.Lowering.lower_AugAssign class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_AugAssign</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_AugAssign</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>AugAssign</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>145</span>
-<span class=normal>146</span>
-<span class=normal>147</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>147</span>
 <span class=normal>148</span>
 <span class=normal>149</span>
 <span class=normal>150</span>
@@ -4441,7 +4443,9 @@
 <span class=normal>158</span>
 <span class=normal>159</span>
 <span class=normal>160</span>
-<span class=normal>161</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_AugAssign</span><span class=p>(</span>
+<span class=normal>161</span>
+<span class=normal>162</span>
+<span class=normal>163</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_AugAssign</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>AugAssign</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>match</span> <span class=n>node</span><span class=o>.</span><span class=n>target</span><span class=p>:</span>
@@ -4461,12 +4465,12 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.assign.Lowering.lower_NamedExpr class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_NamedExpr</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_NamedExpr</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>NamedExpr</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>163</span>
-<span class=normal>164</span>
-<span class=normal>165</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/assign.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>165</span>
 <span class=normal>166</span>
 <span class=normal>167</span>
-<span class=normal>168</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_NamedExpr</span><span class=p>(</span>
+<span class=normal>168</span>
+<span class=normal>169</span>
+<span class=normal>170</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_NamedExpr</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>NamedExpr</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=n>value</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>value</span><span class=p>)</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>
