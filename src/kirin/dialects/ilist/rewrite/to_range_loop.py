@@ -5,7 +5,7 @@ from kirin.ir.nodes.stmt import Statement
 
 
 class ToRangeFor(RewriteRule):
-    """Rewrite for-loops over `IList` iterable an for loop over the range of the length.
+    """Rewrite for-loops over `IList` iterables into for-loops over the range of their length.
 
     For example, rewrites:
 
