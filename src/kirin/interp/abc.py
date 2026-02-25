@@ -264,7 +264,12 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         self.state.push_frame(frame)
         try:
             yield frame
-        finally:
+        except BaseException:
+            # NOTE: Don't pop frames on exception so that eval_context
+            # can capture the full frame chain for the stack trace.
+            # The state is re-initialized on the next eval_context call.
+            raise
+        else:
             self.state.pop_frame()
 
     def frame_eval(

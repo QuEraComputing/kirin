@@ -60,9 +60,7 @@ with open(os.path.join(os.path.dirname(__file__), "stmts.py"), "w") as f:
             ret_type = "types.Bool"
         else:
             ret_type = "types.Float"
-        f.write(
-            textwrap.dedent(
-                f"""
+        f.write(textwrap.dedent(f"""
 @statement(dialect=dialect)
 class {name}(ir.Statement):
     \"\"\"{name} statement, wrapping the math.{name} function
@@ -71,9 +69,7 @@ class {name}(ir.Statement):
     traits = frozenset({{ir.Pure(), lowering2.FromPythonCall()}})
 {fields}
     result: ir.ResultValue = info.result({ret_type})
-"""
-            )
-        )
+"""))
 
 
 with open(os.path.join(os.path.dirname(__file__), "interp.py"), "w") as f:
@@ -89,23 +85,19 @@ with open(os.path.join(os.path.dirname(__file__), "interp.py"), "w") as f:
         fields = ", ".join(
             [f"values[{idx}]" for idx, _ in enumerate(sig.parameters.keys())]
         )
-        implements.append(
-            f"""
+        implements.append(f"""
     @impl(stmts.{name})
     def {name}(self, interp, frame: Frame, stmt: stmts.{name}):
         values = frame.get_values(stmt.args)
-        return (math.{name}({fields}),)"""
-        )
+        return (math.{name}({fields}),)""")
 
     # Write the interpreter class
     methods = "\n\n".join(implements)
-    f.write(
-        f"""
+    f.write(f"""
 @dialect.register
 class MathMethodTable(MethodTable):
 {methods}
-"""
-    )
+""")
 
 # __init__.py
 with open(os.path.join(os.path.dirname(__file__), "__init__.py"), "w") as f:
@@ -124,14 +116,10 @@ with open(os.path.join(os.path.dirname(__file__), "__init__.py"), "w") as f:
             ret_type = "bool"
         else:
             ret_type = "float"
-        f.write(
-            textwrap.dedent(
-                f"""
+        f.write(textwrap.dedent(f"""
         @lowering2.wraps(stmts.{name})
         def {name}({", ".join(f"{arg}: {ret_type}" for arg in sig.parameters.keys())}) -> {ret_type}: ...
-        """
-            )
-        )
+        """))
     f.write("\n")
 
 for file in ["__init__.py", "interp.py", "stmts.py"]:
@@ -178,9 +166,7 @@ with open(project_dir.joinpath("test", "dialects", "math", "test_basic.py"), "w"
         args = ", ".join(arg for arg in sig.parameters.keys())
         inputs = ", ".join("0.42" for _ in sig.parameters.keys())
 
-        f.write(
-            textwrap.dedent(
-                f"""
+        f.write(textwrap.dedent(f"""
                 @basic
                 def {name}_func({args}):
                     return math.{name}({args})
@@ -188,6 +174,4 @@ with open(project_dir.joinpath("test", "dialects", "math", "test_basic.py"), "w"
                 def test_{name}():
                     truth = pymath.{name}({inputs})
                     assert ({name}_func({inputs}) - truth) < 1e-6
-                """
-            )
-        )
+                """))

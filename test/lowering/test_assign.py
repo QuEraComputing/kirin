@@ -21,7 +21,7 @@ dummy_dialect = basic_no_opt.add(dialect)
 def test_multi_result():
     @dummy_dialect
     def multi_assign():
-        (x, y) = MultiResult()  # type: ignore
+        x, y = MultiResult()  # type: ignore
         return x, y
 
     stmt = multi_assign.callable_region.blocks[0].stmts.at(0)
@@ -33,7 +33,7 @@ def test_multi_result():
 
         @dummy_dialect
         def multi_assign_error():
-            (x, y, z) = MultiResult()  # type: ignore
+            x, y, z = MultiResult()  # type: ignore
             return x, y, z
 
 
