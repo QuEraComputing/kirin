@@ -94,7 +94,7 @@ class IRNode(Generic[ParentType], ABC, Printable):
     @abstractmethod
     def is_structurally_equal(
         self,
-        other: Self,
+        other: "IRNode",
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
         """Check if the current node is structurally equal to the other node.

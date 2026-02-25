@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Iterable, overload
 from dataclasses import field, dataclass
 
-from typing_extensions import Self
-
 from kirin.ir import Block, SSAValue, Statement
 
 from .undefined import Undefined, is_undefined
@@ -30,7 +28,7 @@ class FrameABC(ABC, Generic[KeyType, ValueType]):
     code: Statement
     """statement whose region is being interpreted, e.g a function.
     """
-    parent: Self | None = field(default=None, kw_only=True, compare=True, repr=False)
+    parent: "FrameABC | None" = field(default=None, kw_only=True, compare=True, repr=False)
     """Parent frame.
     """
     has_parent_access: bool = field(default=False, kw_only=True, compare=True)

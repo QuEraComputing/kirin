@@ -93,7 +93,7 @@ class Printer:
     "Theme to use for printing"
 
     def __post_init__(self):
-        if isinstance(self.theme, dict):
+        if isinstance(self.theme, dict) and not isinstance(self.theme, Theme):
             self.theme = Theme(self.theme)
         elif isinstance(self.theme, str):
             self.theme = DEFAULT_THEME[self.theme]

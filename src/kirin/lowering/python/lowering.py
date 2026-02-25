@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import types
 import inspect
 import textwrap
 from types import ModuleType
@@ -49,7 +50,7 @@ class Python(LoweringABC[ast.AST]):
 
     def python_function(
         self,
-        func: Callable,
+        func: types.FunctionType,
         *,
         globals: dict[str, Any] | None = None,
         lineno_offset: int = 0,
@@ -135,7 +136,7 @@ class Python(LoweringABC[ast.AST]):
         return LoweringABC.Result(GlobalExprEval(state.current_frame).visit(node))
 
     # Python AST visitor methods
-    def visit(self, state: State[ast.AST], node: ast.AST) -> Result:
+    def visit(self, state: State[ast.AST], node: ast.AST) -> Result:  # ty: ignore[invalid-method-override]  # generic TypeVar resolution
         if hasattr(node, "lineno"):
             state.source = SourceInfo.from_ast(node, state.file)
             state.source.offset(state.lineno_offset, state.col_offset)

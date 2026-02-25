@@ -33,7 +33,3 @@ class WorkList(SimpleQueue, Generic[ElemType]):
             return None
         return self.get_nowait()
 
-
-# Remove one function call from critical speed bottleneck
-WorkList.is_empty = WorkList.empty
-WorkList.append = WorkList.put_nowait

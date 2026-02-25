@@ -8,6 +8,7 @@ from typing import (
     Optional,
     Sequence,
     Generator,
+    cast,
     overload,
 )
 from contextlib import contextmanager
@@ -104,7 +105,8 @@ class State(Generic[ASTNodeType]):
             return self.Result(tuple())
         elif isinstance(result, SSAValue):
             return self.Result((result,))
-        return self.Result(result)
+        assert isinstance(result, tuple)
+        return self.Result(cast(tuple[SSAValue, ...], result))
 
     def get_literal(self, value) -> SSAValue:
         return self.parent.lower_literal(self, value)

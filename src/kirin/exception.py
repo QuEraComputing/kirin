@@ -156,9 +156,9 @@ def print_stacktrace(exception: Exception, state: interp.InterpreterState):
             print("     " + stmt.print_str(end=""), file=sys.stderr)
 
 
-def exception_handler(exc_type, exc_value, exc_tb: types.TracebackType):
+def exception_handler(exc_type: type[BaseException], exc_value: BaseException, exc_tb: types.TracebackType | None) -> None:
     """Custom exception handler to format and print exceptions."""
-    if not KIRIN_PYTHON_STACKTRACE and issubclass(exc_type, StaticCheckError):
+    if not KIRIN_PYTHON_STACKTRACE and isinstance(exc_value, StaticCheckError):
         console = Console(force_terminal=True)
         with console.capture() as capture:
             console.print(
@@ -172,6 +172,7 @@ def exception_handler(exc_type, exc_value, exc_tb: types.TracebackType):
 
     if (
         not KIRIN_PYTHON_STACKTRACE
+        and isinstance(exc_value, Exception)
         and (state := getattr(exc_value, KIRIN_INTERP_STATE, None)) is not None
     ):
         # Handle custom stack trace exceptions

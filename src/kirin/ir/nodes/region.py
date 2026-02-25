@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Iterable, Iterator, cast
+from typing import TYPE_CHECKING, ClassVar, Iterable, Iterator, Sequence, cast, overload
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
@@ -29,14 +29,14 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
 
     """
 
-    def __setitem__(
-        self, idx: int | slice, block_or_blocks: Block | Iterable[Block]
+    def __setitem__(  # ty: ignore[invalid-method-override]  # generic TypeVar resolution
+        self, idx: int | slice, block_or_blocks: Block | Sequence[Block]
     ) -> None:
         """Replace/Set the Blocks of the Region.
 
         Args:
             idx (int | slice): The index or slice to replace the [`Blocks`][kirin.ir.Block].
-            block_or_blocks (Block | Iterable[Block]): The Block or Blocks to replace the Blocks.
+            block_or_blocks (Block | Sequence[Block]): The Block or Blocks to replace the Blocks.
 
         """
         if isinstance(idx, int) and isinstance(block_or_blocks, Block):
@@ -44,10 +44,11 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
             block_or_blocks.attach(self.node)
             self.field[idx] = block_or_blocks
             self.node._block_idx[block_or_blocks] = idx
-        elif isinstance(idx, slice) and isinstance(block_or_blocks, Iterable):
-            for block in block_or_blocks:
+        elif isinstance(idx, slice) and not isinstance(block_or_blocks, Block):
+            blocks = list(block_or_blocks)
+            for block in blocks:
                 block.attach(self.node)
-            self.field[idx] = block_or_blocks
+            self.field[idx] = blocks
             self.node._block_idx = {
                 block: i for i, block in enumerate(self.field)
             }  # reindex
@@ -247,20 +248,23 @@ class Region(IRNode["Statement"]):
         self.detach()
         self.drop_all_references()
 
-    def is_structurally_equal(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def is_structurally_equal(
         self,
-        other: Self,
+        other: IRNode,
         context: dict[IRNode | SSAValue, IRNode | SSAValue] | None = None,
     ) -> bool:
         """Check if the Region is structurally equal to another Region.
 
         Args:
-            other (Self): The other Region to compare with.
+            other (IRNode): The other node to compare with.
             context (dict[IRNode  |  SSAValue, IRNode  |  SSAValue] | None, optional): A map of IRNode/SSAValue to hint that they are equivalent so the check will treat them as equivalent. Defaults to None.
 
         Returns:
             bool: True if the Region is structurally equal to the other Region.
         """
+        if not isinstance(other, Region):
+            return False
+
         if context is None:
             context = {}
         context[self] = other

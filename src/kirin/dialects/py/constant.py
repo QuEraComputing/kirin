@@ -13,7 +13,7 @@ This dialect maps `ast.Constant` nodes to the `Constant` statement.
 from __future__ import annotations
 
 import ast
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 from kirin import ir, emit, types, interp, lowering
 from kirin.decl import info, statement
@@ -33,16 +33,21 @@ class Constant(ir.Statement, Generic[T]):
 
     # NOTE: we allow py.Constant take data.PyAttr too
     def __init__(self, value: T | ir.Data[T]) -> None:
+        data: ir.Data[Any]
         if isinstance(value, ir.Method):
-            value = ir.PyAttr(
-                value, pytype=types.MethodType[list(value.arg_types), value.return_type]
+            arg_types = cast(tuple[types.TypeAttribute, ...], value.arg_types)
+            return_type = cast(types.TypeAttribute, value.return_type)
+            data = ir.PyAttr(
+                value, pytype=types.FunctionType(arg_types, return_type)
             )
-        elif not isinstance(value, ir.Data):
-            value = ir.PyAttr(value)
+        elif isinstance(value, ir.Data):
+            data = value
+        else:
+            data = ir.PyAttr(value)
 
         super().__init__(
-            attributes={"value": value},
-            result_types=(value.type,),
+            attributes={"value": data},
+            result_types=(data.type,),
         )
 
     def print_impl(self, printer: Printer) -> None:

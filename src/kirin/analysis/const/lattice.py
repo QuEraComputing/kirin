@@ -48,6 +48,9 @@ class Unknown(Result, metaclass=SingletonLatticeAttributeMeta):
     def is_subseteq(self, other: Result) -> bool:
         return isinstance(other, Unknown)
 
+    def __eq__(self, value: object) -> bool:
+        return isinstance(value, Unknown)
+
     def __hash__(self) -> int:
         return id(self)
 
@@ -64,6 +67,9 @@ class Bottom(Result, metaclass=SingletonLatticeAttributeMeta):
 
     def is_subseteq(self, other: Result) -> bool:
         return True
+
+    def __eq__(self, value: object) -> bool:
+        return isinstance(value, Bottom)
 
     def __hash__(self) -> int:
         return id(self)
@@ -83,6 +89,9 @@ class Value(Result):
 
     def is_subseteq_Value(self, other: "Value") -> bool:
         return self.data == other.data
+
+    def __eq__(self, value: object) -> bool:
+        return isinstance(value, Value) and self.data == value.data
 
     def __hash__(self) -> int:
         # NOTE: we use id here because the data
@@ -160,6 +169,9 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
             return all(x.is_subseteq(Value(y)) for x, y in zip(self.data, other.data))
         return False
 
+    def __eq__(self, value: object) -> bool:
+        return isinstance(value, PartialTuple) and self.data == value.data
+
     def __hash__(self) -> int:
         return hash(self.data)
 
@@ -204,6 +216,14 @@ class PartialLambda(PartialConst):
         ]
         self.code = code
         self.captured = captured
+
+    def __eq__(self, value: object) -> bool:
+        return (
+            isinstance(value, PartialLambda)
+            and self.code is value.code
+            and self.argnames == value.argnames
+            and self.captured == value.captured
+        )
 
     def __hash__(self) -> int:
         return hash((self.argnames, self.code, self.captured))
