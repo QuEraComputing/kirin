@@ -1,5 +1,5 @@
 use kirin_ir::{
-    Block, CompileStageInfo, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction,
+    Block, StageMeta, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction,
 };
 
 use super::FixpointState;
@@ -17,7 +17,7 @@ impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + 'ir,
+    S: StageMeta + 'ir,
     G: 'ir,
 {
     /// Analyze a function, returning its [`AnalysisResult`].

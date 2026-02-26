@@ -10,7 +10,7 @@ use kirin_prettyless::PrintExt;
 use crate::{BoxedParser, DirectlyParsable, ParsePipelineText, Token, TokenInput};
 
 use kirin_chumsky_derive::{HasParser, PrettyPrint};
-use kirin_derive::CompileStageInfo;
+use kirin_derive::StageMeta;
 
 // ---------------------------------------------------------------------------
 // Test type lattices
@@ -96,7 +96,7 @@ struct LowerBody {
 // Stage enum: StageBucket (same dialect in both variants)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, CompileStageInfo)]
+#[derive(Debug, StageMeta)]
 #[stage(crate = "kirin_ir")]
 enum StageBucket {
     #[stage(name = "A")]
@@ -109,7 +109,7 @@ enum StageBucket {
 // Stage enum: MixedStage (different dialect per variant)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, CompileStageInfo)]
+#[derive(Debug, StageMeta)]
 #[stage(crate = "kirin_ir")]
 enum MixedStage {
     #[stage(name = "A")]

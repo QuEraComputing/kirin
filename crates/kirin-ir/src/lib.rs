@@ -31,13 +31,13 @@ pub use node::{
     SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo,
     StagedNamePolicy, Statement, StatementInfo, Successor, Symbol, TestSSAValue,
 };
-pub use pipeline::{CompileStageInfo, HasStageInfo, Pipeline};
+pub use pipeline::{HasStageInfo, Pipeline, StageMeta};
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
 
 #[cfg(feature = "derive")]
 pub use kirin_derive::{
-    CompileStageInfo, Dialect, HasArguments, HasRegions, HasResults, HasSuccessors, IsConstant,
-    IsPure, IsSpeculatable, IsTerminator,
+    Dialect, HasArguments, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
+    IsSpeculatable, IsTerminator, StageMeta,
 };

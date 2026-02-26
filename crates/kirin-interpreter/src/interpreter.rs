@@ -1,7 +1,7 @@
 use std::fmt;
 
 use kirin_ir::{
-    CompileStage, CompileStageInfo, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue,
+    CompileStage, StageMeta, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue,
     StageInfo,
 };
 
@@ -19,7 +19,7 @@ pub trait Interpreter<'ir>: Sized + 'ir {
     type Value;
     type Error;
     type Ext: fmt::Debug;
-    type StageInfo: CompileStageInfo;
+    type StageInfo: StageMeta;
 
     /// Returns a reference to the bound value without cloning.
     fn read_ref(&self, value: SSAValue) -> Result<&Self::Value, Self::Error>;

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
-    CompileStage, CompileStageInfo, Dialect, Function, GetInfo, HasStageInfo, Id, Pipeline,
+    CompileStage, StageMeta, Dialect, Function, GetInfo, HasStageInfo, Id, Pipeline,
     StagedFunction, Statement,
 };
 use kirin_lexer::Token;
@@ -64,7 +64,7 @@ impl ParseState {
     }
 }
 
-trait StageDialects<S: CompileStageInfo> {
+trait StageDialects<S: StageMeta> {
     fn first_pass<'src>(
         pipeline: &mut Pipeline<S>,
         tokens: &[(Token<'src>, SimpleSpan)],
@@ -88,7 +88,7 @@ trait StageDialects<S: CompileStageInfo> {
 
 impl<S> StageDialects<S> for ()
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     fn first_pass<'src>(
         _pipeline: &mut Pipeline<S>,
@@ -123,7 +123,7 @@ where
 
 impl<S, L, Tail> StageDialects<S> for (L, Tail)
 where
-    S: CompileStageInfo + HasStageInfo<L>,
+    S: StageMeta + HasStageInfo<L>,
     Tail: StageDialects<S>,
     L: Dialect,
     for<'src> L: HasParser<'src, 'src>,
@@ -218,7 +218,7 @@ where
 
 impl<S> ParsePipelineText for Pipeline<S>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
     S::Languages: StageDialects<S>,
 {
     fn parse(&mut self, src: &str) -> Result<Vec<Function>, FunctionParseError> {
@@ -525,7 +525,7 @@ fn resolve_or_create_stage_symbol<'src, S>(
     stage_symbol: &SymbolName<'src>,
 ) -> Result<CompileStage, FunctionParseError>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     if let Some(stage_id) = find_stage_symbol(pipeline, stage_symbol.name) {
         return Ok(stage_id);
@@ -552,7 +552,7 @@ fn stage_creation_error_message<S>(
     message: String,
 ) -> String
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     let mut output = message;
     let mut candidates = stage_candidates(pipeline);
@@ -573,7 +573,7 @@ where
 /// Lookup a stage by symbolic name (`@A`) or numeric symbol (`@1`).
 fn find_stage_symbol<S>(pipeline: &Pipeline<S>, stage_symbol: &str) -> Option<CompileStage>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     for stage in pipeline.stages() {
         if let Some(name) = stage
@@ -603,7 +603,7 @@ where
 
 fn stage_candidates<S>(pipeline: &Pipeline<S>) -> Vec<String>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     let mut names = Vec::new();
     for (index, stage) in pipeline.stages().iter().enumerate() {

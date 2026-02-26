@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    CompileStage, CompileStageInfo, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
+    CompileStage, StageMeta, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
     SSAValue, SpecializedFunction, Statement,
 };
 
@@ -37,7 +37,7 @@ type StackFrame<V> = Frame<V, Option<Statement>>;
 /// ```
 pub struct StackInterpreter<'ir, V, S, E = InterpreterError, G = ()>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     frames: Vec<StackFrame<V>>,
     global: G,
@@ -53,7 +53,7 @@ where
 
 impl<'ir, V, S, E> StackInterpreter<'ir, V, S, E, ()>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub fn new(pipeline: &'ir Pipeline<S>, active_stage: CompileStage) -> Self {
         Self {
@@ -92,7 +92,7 @@ where
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub fn with_fuel(mut self, fuel: u64) -> Self {
         self.fuel = Some(fuel);
@@ -109,7 +109,7 @@ where
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub fn global(&self) -> &G {
         &self.global
@@ -151,7 +151,7 @@ where
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
     E: From<InterpreterError>,
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub fn current_frame(&self) -> Result<&StackFrame<V>, E> {
         self.frames
@@ -188,7 +188,7 @@ impl<'ir, V, S, E, G> Interpreter<'ir> for StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + 'ir,
+    S: StageMeta + 'ir,
     G: 'ir,
 {
     type Value = V;
@@ -227,7 +227,7 @@ impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + 'ir,
+    S: StageMeta + 'ir,
     G: 'ir,
 {
     /// Call a specialized function and return its result value.
@@ -250,7 +250,7 @@ impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + 'ir,
+    S: StageMeta + 'ir,
     G: 'ir,
 {
     /// Execute the current statement's dialect semantics.

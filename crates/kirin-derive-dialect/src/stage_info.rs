@@ -1,4 +1,4 @@
-//! Code generator for `#[derive(CompileStageInfo)]`.
+//! Code generator for `#[derive(StageMeta)]`.
 //!
 //! Unlike the other modules in this crate (`builder`, `field`, `marker`,
 //! `property`), this generator does **not** use the `kirin-derive-core` IR
@@ -12,7 +12,7 @@
 //! The input is parsed directly with `syn` using `#[stage(...)]` attributes:
 //!
 //! ```ignore
-//! #[derive(CompileStageInfo)]
+//! #[derive(StageMeta)]
 //! #[stage(crate = "kirin_ir")]          // optional crate path override
 //! enum MixedStage {
 //!     #[stage(name = "parse")]
@@ -25,7 +25,7 @@
 //! The macro generates:
 //! - `HasStageInfo<L>` for each unique dialect type (with or-patterns when
 //!   multiple variants share the same dialect).
-//! - `CompileStageInfo` with stage identity delegation, `from_stage_name()`
+//! - `StageMeta` with stage identity delegation, `from_stage_name()`
 //!   dispatch, and the `Languages` associated type for dialect tuple dispatch.
 
 use std::collections::BTreeMap;
@@ -35,7 +35,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DeriveInput, Type};
 
-/// Generate `HasStageInfo<L>` + `CompileStageInfo` impls for a stage enum.
+/// Generate `HasStageInfo<L>` + `StageMeta` impls for a stage enum.
 pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let variants = stage::parse_stage_variants(input)?;
 
@@ -123,7 +123,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         });
     }
 
-    // 2. CompileStageInfo impl
+    // 2. StageMeta impl
     // Build Languages tuple: (A, (B, ()))
     let languages_ty = unique_dialects
         .iter()
@@ -134,16 +134,16 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let all_idents: Vec<&syn::Ident> = variants.iter().map(|v| &v.ident).collect();
 
     let stage_name_arms = quote! {
-        #( #enum_ident::#all_idents(s) => #ir_crate::CompileStageInfo::stage_name(s), )*
+        #( #enum_ident::#all_idents(s) => #ir_crate::StageMeta::stage_name(s), )*
     };
     let set_stage_name_arms = quote! {
-        #( #enum_ident::#all_idents(s) => #ir_crate::CompileStageInfo::set_stage_name(s, name), )*
+        #( #enum_ident::#all_idents(s) => #ir_crate::StageMeta::set_stage_name(s, name), )*
     };
     let stage_id_arms = quote! {
-        #( #enum_ident::#all_idents(s) => #ir_crate::CompileStageInfo::stage_id(s), )*
+        #( #enum_ident::#all_idents(s) => #ir_crate::StageMeta::stage_id(s), )*
     };
     let set_stage_id_arms = quote! {
-        #( #enum_ident::#all_idents(s) => #ir_crate::CompileStageInfo::set_stage_id(s, id), )*
+        #( #enum_ident::#all_idents(s) => #ir_crate::StageMeta::set_stage_id(s, id), )*
     };
 
     // from_stage_name
@@ -164,7 +164,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
     tokens.extend(quote! {
         #[automatically_derived]
-        impl #impl_generics #ir_crate::CompileStageInfo for #enum_ident #ty_generics #where_clause {
+        impl #impl_generics #ir_crate::StageMeta for #enum_ident #ty_generics #where_clause {
             type Languages = #languages_ty;
 
             fn stage_name(&self) -> Option<#ir_crate::GlobalSymbol> {

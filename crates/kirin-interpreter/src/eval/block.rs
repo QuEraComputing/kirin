@@ -1,5 +1,5 @@
 use kirin_ir::{
-    Block, CompileStageInfo, Dialect, GetInfo, HasStageInfo, ResultValue, SSAValue, StageInfo,
+    Block, StageMeta, Dialect, GetInfo, HasStageInfo, ResultValue, SSAValue, StageInfo,
 };
 
 use crate::{
@@ -64,7 +64,7 @@ impl<'ir, V, S, E, G, L> EvalBlock<'ir, L> for StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + HasStageInfo<L> + 'ir,
+    S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
     L: Dialect + Interpretable<'ir, Self, L>,
 {
@@ -124,7 +124,7 @@ impl<'ir, V, S, E, G, L> EvalBlock<'ir, L> for AbstractInterpreter<'ir, V, S, E,
 where
     V: AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + HasStageInfo<L> + 'ir,
+    S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
     L: Dialect + Interpretable<'ir, Self, L> + 'ir,
 {

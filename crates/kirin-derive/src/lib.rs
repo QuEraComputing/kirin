@@ -304,8 +304,8 @@ derive_property_macro!(derive_is_constant, IsConstant, IS_CONSTANT);
 derive_property_macro!(derive_is_pure, IsPure, IS_PURE);
 derive_property_macro!(derive_is_speculatable, IsSpeculatable, IS_SPECULATABLE);
 
-#[proc_macro_derive(CompileStageInfo, attributes(stage))]
-pub fn derive_compile_stage_info(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(StageMeta, attributes(stage))]
+pub fn derive_stage_meta(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match kirin_derive_dialect::stage_info::generate(&ast) {
         Ok(tokens) => tokens.into(),

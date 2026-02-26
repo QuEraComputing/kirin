@@ -60,10 +60,10 @@ impl<L: Dialect> HasStageInfo<L> for StageInfo<L> {
 /// Automatically implemented for [`StageInfo<L>`]. Allows [`Pipeline::add_stage`]
 /// to set both a readable name and the numeric stage ID on the stage.
 ///
-/// For enum stages, derive this trait with `#[derive(CompileStageInfo)]`:
+/// For enum stages, derive this trait with `#[derive(StageMeta)]`:
 ///
 /// ```ignore
-/// #[derive(CompileStageInfo)]
+/// #[derive(StageMeta)]
 /// enum Stage {
 ///     #[stage(name = "A")]
 ///     Parse(StageInfo<LangA>),
@@ -71,7 +71,7 @@ impl<L: Dialect> HasStageInfo<L> for StageInfo<L> {
 ///     Lower(StageInfo<LangB>),
 /// }
 /// ```
-pub trait CompileStageInfo: Sized {
+pub trait StageMeta: Sized {
     /// The dialect dispatch list for `pipeline.parse(text)`.
     ///
     /// For heterogeneous pipelines use nested tuples: `(LangA, (LangB, ()))`.
@@ -95,7 +95,7 @@ pub trait CompileStageInfo: Sized {
     }
 }
 
-impl<L: Dialect> CompileStageInfo for StageInfo<L> {
+impl<L: Dialect> StageMeta for StageInfo<L> {
     type Languages = (L, ());
 
     fn stage_name(&self) -> Option<GlobalSymbol> {
@@ -233,7 +233,7 @@ impl<S> Pipeline<S> {
     /// Add a stage to the pipeline, returning its [`CompileStage`].
     ///
     /// If a `name` is provided, it is interned into the global symbol table
-    /// and set on the stage via [`CompileStageInfo::set_stage_name`]. This lets the
+    /// and set on the stage via [`StageMeta::set_stage_name`]. This lets the
     /// printing infrastructure display a readable label (e.g., `stage @llvm_ir`)
     /// instead of a numeric index.
     ///
@@ -246,7 +246,7 @@ impl<S> Pipeline<S> {
     #[builder(finish_fn = new)]
     pub fn add_stage(&mut self, mut stage: S, #[builder(into)] name: Option<String>) -> CompileStage
     where
-        S: CompileStageInfo,
+        S: StageMeta,
     {
         let id = CompileStage::new(Id(self.stages.len()));
         stage.set_stage_id(Some(id));

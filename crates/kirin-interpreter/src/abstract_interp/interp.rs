@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    CompileStage, CompileStageInfo, Pipeline, ResultValue, SSAValue, SpecializedFunction,
+    CompileStage, StageMeta, Pipeline, ResultValue, SSAValue, SpecializedFunction,
 };
 use rustc_hash::FxHashMap;
 
@@ -20,7 +20,7 @@ use crate::{AbstractValue, Frame, Interpreter, InterpreterError};
 /// abstract domains.
 pub struct AbstractInterpreter<'ir, V, S, E = InterpreterError, G = ()>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub(crate) pipeline: &'ir Pipeline<S>,
     pub(crate) active_stage: CompileStage,
@@ -50,13 +50,13 @@ where
 /// Obtained via [`AbstractInterpreter::insert_summary`].
 pub struct SummaryInserter<'a, 'ir, V, S, E, G>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     interp: &'a mut AbstractInterpreter<'ir, V, S, E, G>,
     callee: SpecializedFunction,
 }
 
-impl<V: Clone, S: CompileStageInfo, E, G> SummaryInserter<'_, '_, V, S, E, G> {
+impl<V: Clone, S: StageMeta, E, G> SummaryInserter<'_, '_, V, S, E, G> {
     /// Insert an immutable summary. Analysis will never re-analyze this function.
     pub fn fixed(self, result: AnalysisResult<V>) {
         self.interp
@@ -80,7 +80,7 @@ impl<V: Clone, S: CompileStageInfo, E, G> SummaryInserter<'_, '_, V, S, E, G> {
 
 impl<'ir, V, S, E> AbstractInterpreter<'ir, V, S, E, ()>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub fn new(pipeline: &'ir Pipeline<S>, active_stage: CompileStage) -> Self {
         Self {
@@ -122,7 +122,7 @@ where
 
 impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub fn with_widening(mut self, strategy: WideningStrategy) -> Self {
         self.widening_strategy = strategy;
@@ -154,7 +154,7 @@ where
 
 impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
-    S: CompileStageInfo,
+    S: StageMeta,
 {
     pub fn global(&self) -> &G {
         &self.global
@@ -228,7 +228,7 @@ impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + 'ir,
+    S: StageMeta + 'ir,
     G: 'ir,
 {
     type Value = V;

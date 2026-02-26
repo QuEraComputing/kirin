@@ -2,7 +2,7 @@
 //!
 //! Stage enums are enums whose variants each wrap a `StageInfo<L>` for some
 //! dialect `L`, annotated with `#[stage(...)]` attributes. This module provides
-//! the common parsing infrastructure used by both `CompileStageInfo` and
+//! the common parsing infrastructure used by both `StageMeta` and
 //! `RenderStage` derive macros.
 
 use syn::{DeriveInput, Fields, GenericArgument, PathArguments, Type};

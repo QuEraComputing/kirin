@@ -1,4 +1,4 @@
-use kirin_ir::{Block, CompileStageInfo, Dialect, HasStageInfo, SpecializedFunction, StageInfo};
+use kirin_ir::{Block, StageMeta, Dialect, HasStageInfo, SpecializedFunction, StageInfo};
 
 use crate::{Interpreter, InterpreterError};
 
@@ -39,7 +39,7 @@ where
     T: SSACFGRegion,
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + HasStageInfo<L> + 'ir,
+    S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
     L: Dialect + crate::Interpretable<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
@@ -111,7 +111,7 @@ where
     T: SSACFGRegion,
     V: crate::AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: CompileStageInfo + HasStageInfo<L> + 'ir,
+    S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
     L: Dialect + crate::Interpretable<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
