@@ -89,7 +89,7 @@ where
                         InterpreterError::UnexpectedControl("halt during call".to_owned()).into(),
                     );
                 }
-                crate::Continuation::Return(_) => {}
+                crate::Continuation::Return(_) | crate::Continuation::Yield(_) => {}
                 _ => {
                     return Err(InterpreterError::UnexpectedControl(
                         "unexpected variant during call".to_owned(),
@@ -99,7 +99,9 @@ where
             }
 
             let v = match &control {
-                crate::Continuation::Return(v) => Some(v.clone()),
+                crate::Continuation::Return(v) | crate::Continuation::Yield(v) => {
+                    Some(v.clone())
+                }
                 _ => None,
             };
 

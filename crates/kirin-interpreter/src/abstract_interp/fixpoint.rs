@@ -282,7 +282,7 @@ where
                     changed |= self.propagate_edge::<L>(succ.target(), args, narrowing)?;
                 }
             }
-            Continuation::Return(v) => {
+            Continuation::Return(v) | Continuation::Yield(v) => {
                 *return_value = Some(match return_value.take() {
                     Some(existing) => {
                         if narrowing {

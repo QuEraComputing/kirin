@@ -1126,6 +1126,7 @@ dependencies = [
  "kirin-arith",
  "kirin-cf",
  "kirin-constant",
+ "kirin-interpreter",
  "kirin-test-utils",
 ]
 
@@ -1352,6 +1353,7 @@ name = "kirin-scf"
 version = "0.1.0"
 dependencies = [
  "kirin",
+ "kirin-interpreter",
 ]
 
 [[package]]

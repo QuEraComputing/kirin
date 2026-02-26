@@ -295,6 +295,9 @@ where
             Continuation::Return(_) => {
                 self.pop_call_frame()?;
             }
+            Continuation::Yield(_) => {
+                // No cursor change — the parent op (e.g. execute_block) handles this
+            }
             Continuation::Ext(ConcreteExt::Break | ConcreteExt::Halt) => {
                 // No cursor change
             }
@@ -482,3 +485,4 @@ where
         Ok(())
     }
 }
+

@@ -41,6 +41,9 @@ pub enum Continuation<V, Ext = Infallible> {
     },
     /// Return a single value from the current function frame.
     Return(V),
+    /// Yield a value from an inline body block (e.g. `scf.yield`) without
+    /// popping a call frame. The parent operation handles cursor restoration.
+    Yield(V),
     /// Interpreter-specific extension variant.
     Ext(Ext),
 }

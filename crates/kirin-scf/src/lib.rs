@@ -1,3 +1,8 @@
+#[cfg(feature = "interpret")]
+mod interpret_impl;
+#[cfg(feature = "interpret")]
+pub use interpret_impl::ForLoopValue;
+
 use kirin::ir::*;
 use kirin::parsers::prelude::*;
 
@@ -7,6 +12,8 @@ use kirin::parsers::prelude::*;
 pub enum StructuredControlFlow<T: CompileTimeValue + Default> {
     If(If<T>),
     For(For<T>),
+    #[kirin(terminator)]
+    Yield(Yield<T>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
@@ -29,6 +36,17 @@ pub struct For<T: CompileTimeValue + Default> {
     end: SSAValue,
     step: SSAValue,
     body: Block,
+    #[kirin(default)]
+    marker: std::marker::PhantomData<T>,
+}
+
+/// Terminates an SCF body block, yielding a value back to the parent
+/// `If` or `For` operation. Analogous to MLIR's `scf.yield`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[chumsky(format = "yield {value}")]
+#[kirin(terminator, type = T)]
+pub struct Yield<T: CompileTimeValue + Default> {
+    value: SSAValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
