@@ -1,38 +1,35 @@
 ---
-source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
+source: crates/kirin-derive-interpreter/src/eval_call/tests.rs
 expression: "case!\n{\n    #[kirin(type = TestType)] enum TestDialect\n    {\n        #[wraps] Arith(Arith<TestType>), #[wraps]\n        ControlFlow(ControlFlow<TestType>), Custom { a: i32, b: i32 },\n    }\n}"
 ---
 #[automatically_derived]
-impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, TestDialect>
+impl<'__ir, __CallSemI> ::kirin_interpreter::EvalCall<'__ir, __CallSemI, TestDialect>
     for TestDialect
 where
     __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
-    Arith<TestType>: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, TestDialect>,
-    ControlFlow<TestType>: ::kirin_interpreter::CallSemantics<
+    Arith<TestType>: ::kirin_interpreter::EvalCall<'__ir, __CallSemI, TestDialect>,
+    ControlFlow<TestType>: ::kirin_interpreter::EvalCall<
         __CallSemI,
         TestDialect,
-        Result = <Arith<TestType> as ::kirin_interpreter::CallSemantics<
+        Result = <Arith<TestType> as ::kirin_interpreter::EvalCall<
             '__ir,
             __CallSemI,
             TestDialect,
         >>::Result,
     >,
 {
-    type Result = <Arith<TestType> as ::kirin_interpreter::CallSemantics<
-        '__ir,
-        __CallSemI,
-        TestDialect,
-    >>::Result;
-    fn call_semantics(
+    type Result =
+        <Arith<TestType> as ::kirin_interpreter::EvalCall<'__ir, __CallSemI, TestDialect>>::Result;
+    fn eval_call(
         &self,
         interpreter: &mut __CallSemI,
         callee: ::kirin::ir::SpecializedFunction,
         args: &[__CallSemI::Value],
     ) -> Result<Self::Result, __CallSemI::Error> {
         match self {
-            Self::Arith(field_0) => field_0.call_semantics(interpreter, callee, args),
-            Self::ControlFlow(field_0) => field_0.call_semantics(interpreter, callee, args),
+            Self::Arith(field_0) => field_0.eval_call(interpreter, callee, args),
+            Self::ControlFlow(field_0) => field_0.eval_call(interpreter, callee, args),
             Self::Custom { a, b } => {
                 Err(::kirin_interpreter::InterpreterError::MissingEntry.into())
             }

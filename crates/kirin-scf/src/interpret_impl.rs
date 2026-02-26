@@ -1,7 +1,7 @@
 use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo, Successor};
 use kirin_interpreter::smallvec::smallvec;
 use kirin_interpreter::{
-    BlockExecutor, BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
+    EvalBlock, BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
 };
 
 use crate::{For, If, StructuredControlFlow, Yield};
@@ -48,7 +48,7 @@ where
 
 impl<'ir, I, L, T> Interpretable<'ir, I, L> for For<T>
 where
-    I: Interpreter<'ir> + BlockExecutor<'ir, L>,
+    I: Interpreter<'ir> + EvalBlock<'ir, L>,
     I::Value: Clone + ForLoopValue,
     I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
@@ -88,7 +88,7 @@ where
 
 impl<'ir, I, L, T> Interpretable<'ir, I, L> for StructuredControlFlow<T>
 where
-    I: Interpreter<'ir> + BlockExecutor<'ir, L>,
+    I: Interpreter<'ir> + EvalBlock<'ir, L>,
     I::Value: Clone + BranchCondition + ForLoopValue,
     I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,

@@ -2,7 +2,7 @@ mod emit;
 mod layout;
 mod scan;
 
-pub use layout::CallSemanticsLayout;
+pub use layout::EvalCallLayout;
 
 use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::misc::from_str;
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 #[cfg(test)]
 mod tests;
 
-pub struct DeriveCallSemantics {
+pub struct DeriveEvalCall {
     pub(crate) default_interpreter_crate: syn::Path,
     pub(crate) default_ir_crate: syn::Path,
     pub(crate) input: Option<InputContext>,
@@ -36,7 +36,7 @@ pub(crate) struct StatementInfo {
     pub(crate) pattern: FieldPatternTokens,
 }
 
-impl Default for DeriveCallSemantics {
+impl Default for DeriveEvalCall {
     fn default() -> Self {
         Self {
             default_interpreter_crate: from_str("::kirin_interpreter"),
@@ -47,22 +47,22 @@ impl Default for DeriveCallSemantics {
     }
 }
 
-impl DeriveCallSemantics {
+impl DeriveEvalCall {
     pub fn emit(&mut self, input: &syn::DeriveInput) -> darling::Result<proc_macro2::TokenStream> {
-        let input = ir::Input::<CallSemanticsLayout>::from_derive_input(input)?;
+        let input = ir::Input::<EvalCallLayout>::from_derive_input(input)?;
         self.scan_input(&input)?;
         self.emit_input(&input)
     }
 
     pub(crate) fn input_ctx(&self) -> darling::Result<&InputContext> {
         self.input.as_ref().ok_or_else(|| {
-            darling::Error::custom("DeriveCallSemantics context missing, call scan_input first")
+            darling::Error::custom("DeriveEvalCall context missing, call scan_input first")
         })
     }
 
     pub(crate) fn statement_info(
         &self,
-        statement: &ir::Statement<CallSemanticsLayout>,
+        statement: &ir::Statement<EvalCallLayout>,
     ) -> darling::Result<&StatementInfo> {
         let key = statement.name.to_string();
         self.statements.get(&key).ok_or_else(|| {

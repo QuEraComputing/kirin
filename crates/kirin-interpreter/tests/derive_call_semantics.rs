@@ -1,21 +1,21 @@
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_derive_interpreter::{CallSemantics, Interpretable};
+use kirin_derive_interpreter::{EvalCall, Interpretable};
 use kirin_function::FunctionBody;
 use kirin_interpreter::StackInterpreter;
 use kirin_ir::*;
 
 // ---------------------------------------------------------------------------
-// Dialect with derived Interpretable + derived CallSemantics using #[callable].
+// Dialect with derived Interpretable + derived EvalCall using #[callable].
 //
-// Only FunctionBody is #[callable]: derived CallSemantics forwards to its
+// Only FunctionBody is #[callable]: derived EvalCall forwards to its
 // inner SSACFGRegion impl. Arith, ControlFlow, and Constant are
-// non-callable: derived CallSemantics returns MissingEntry for them.
+// non-callable: derived EvalCall returns MissingEntry for them.
 // Interpretable is derived with all variants as #[wraps].
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, EvalCall)]
 #[wraps]
 #[kirin(fn, type = ArithType, crate = kirin_ir)]
 pub enum DerivedDialect {
@@ -70,12 +70,12 @@ fn build_add_one(
 }
 
 // ---------------------------------------------------------------------------
-// End-to-end test: the derived CallSemantics with #[callable] on FunctionBody
+// End-to-end test: the derived EvalCall with #[callable] on FunctionBody
 // produces a working impl that StackInterpreter::call can use.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_derived_call_semantics() {
+fn test_derived_eval_call() {
     let mut pipeline: Pipeline<StageInfo<DerivedDialect>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let sf = build_add_one(&mut pipeline, stage_id);

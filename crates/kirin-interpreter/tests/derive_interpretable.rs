@@ -4,7 +4,7 @@ use kirin_constant::Constant;
 use kirin_derive_interpreter::Interpretable;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    BranchCondition, CallSemantics, Interpreter, InterpreterError, StackInterpreter,
+    BranchCondition, EvalCall, Interpreter, InterpreterError, StackInterpreter,
 };
 use kirin_ir::*;
 
@@ -23,8 +23,8 @@ pub enum DerivedDialect {
     FunctionBody(FunctionBody<ArithType>),
 }
 
-// CallSemantics impl (needed by StackInterpreter::call)
-impl<'ir, I> CallSemantics<'ir, I, DerivedDialect> for DerivedDialect
+// EvalCall impl (needed by StackInterpreter::call)
+impl<'ir, I> EvalCall<'ir, I, DerivedDialect> for DerivedDialect
 where
     I: Interpreter<'ir, Error = InterpreterError>,
     I::StageInfo: HasStageInfo<DerivedDialect>,
@@ -36,18 +36,18 @@ where
         + std::ops::Neg<Output = I::Value>
         + From<ArithValue>
         + BranchCondition,
-    FunctionBody<ArithType>: CallSemantics<'ir, I, DerivedDialect>,
+    FunctionBody<ArithType>: EvalCall<'ir, I, DerivedDialect>,
 {
-    type Result = <FunctionBody<ArithType> as CallSemantics<'ir, I, DerivedDialect>>::Result;
+    type Result = <FunctionBody<ArithType> as EvalCall<'ir, I, DerivedDialect>>::Result;
 
-    fn call_semantics(
+    fn eval_call(
         &self,
         interp: &mut I,
         callee: SpecializedFunction,
         args: &[I::Value],
     ) -> Result<Self::Result, InterpreterError> {
         match self {
-            DerivedDialect::FunctionBody(body) => body.call_semantics(interp, callee, args),
+            DerivedDialect::FunctionBody(body) => body.eval_call(interp, callee, args),
             _ => Err(InterpreterError::MissingEntry),
         }
     }

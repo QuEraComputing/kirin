@@ -2,12 +2,12 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, CompileStageInfo, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
+    CompileStage, CompileStageInfo, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
     SSAValue, SpecializedFunction, Statement,
 };
 
 use crate::{
-    CallSemantics, ConcreteContinuation, ConcreteExt, Continuation, Frame, Interpretable,
+    EvalCall, ConcreteContinuation, ConcreteExt, Continuation, Frame, Interpretable,
     Interpreter, InterpreterError,
 };
 
@@ -233,14 +233,14 @@ where
     /// Call a specialized function and return its result value.
     pub fn call<L>(&mut self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: Dialect + Interpretable<'ir, Self, L> + CallSemantics<'ir, Self, L, Result = V>,
+        L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V>,
         S: HasStageInfo<L>,
     {
         let stage = self.active_stage_info::<L>();
         let spec = callee.expect_info(stage);
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
-        def.call_semantics(self, callee, args)
+        def.eval_call(self, callee, args)
     }
 }
 
@@ -287,7 +287,7 @@ where
             }
             Continuation::Jump(succ, args) => {
                 let stage = self.active_stage_info::<L>();
-                crate::BlockExecutor::bind_block_args(self, stage, succ.target(), args)?;
+                crate::EvalBlock::bind_block_args(self, stage, succ.target(), args)?;
                 let first = succ.target().first_statement(stage);
                 self.current_frame_mut()?.set_cursor(first);
             }
@@ -425,7 +425,7 @@ where
         let first = entry_block.and_then(|b| b.first_statement(stage));
         self.push_call_frame(Frame::new(callee, first))?;
         if let Some(block) = entry_block {
-            crate::BlockExecutor::bind_block_args(self, stage, block, args)?;
+            crate::EvalBlock::bind_block_args(self, stage, block, args)?;
         }
         Ok(())
     }

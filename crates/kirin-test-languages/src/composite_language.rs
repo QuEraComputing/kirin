@@ -1,11 +1,11 @@
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_derive_interpreter::{CallSemantics, Interpretable};
+use kirin_derive_interpreter::{EvalCall, Interpretable};
 use kirin_function::FunctionBody;
 use kirin_ir::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, EvalCall)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
 #[cfg_attr(feature = "pretty", derive(kirin_chumsky_derive::PrettyPrint))]
 #[kirin(fn, type = ArithType, crate = kirin_ir)]

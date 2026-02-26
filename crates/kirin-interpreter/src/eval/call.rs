@@ -9,10 +9,10 @@ use crate::{Interpreter, InterpreterError};
 /// - Non-SSA bodies (e.g. circuit graphs) can implement this directly
 ///
 /// `L` is the composed dialect enum that this body is part of.
-pub trait CallSemantics<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
+pub trait EvalCall<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
     type Result;
 
-    fn call_semantics(
+    fn eval_call(
         &self,
         interpreter: &mut I,
         callee: SpecializedFunction,
@@ -22,7 +22,7 @@ pub trait CallSemantics<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
 
 /// Marker trait for body types that represent SSA CFG regions.
 ///
-/// Implementing this trait provides blanket [`CallSemantics`] impls for both
+/// Implementing this trait provides blanket [`EvalCall`] impls for both
 /// [`crate::StackInterpreter`] and [`crate::AbstractInterpreter`], using the
 /// standard CFG traversal / fixpoint computation logic.
 pub trait SSACFGRegion: Dialect {
@@ -30,10 +30,10 @@ pub trait SSACFGRegion: Dialect {
 }
 
 // ---------------------------------------------------------------------------
-// Blanket impl: SSACFGRegion → CallSemantics<StackInterpreter>
+// Blanket impl: SSACFGRegion → EvalCall<StackInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, L, T> EvalCall<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> for T
 where
     T: SSACFGRegion,
     V: Clone + 'ir,
@@ -44,7 +44,7 @@ where
 {
     type Result = V;
 
-    fn call_semantics(
+    fn eval_call(
         &self,
         interp: &mut crate::StackInterpreter<'ir, V, S, E, G>,
         callee: SpecializedFunction,
@@ -56,7 +56,7 @@ where
         // Push frame and bind entry block args
         let first = entry.first_statement(stage);
         interp.push_call_frame(crate::Frame::new(callee, first))?;
-        crate::BlockExecutor::bind_block_args(interp, stage, entry, args)?;
+        crate::EvalBlock::bind_block_args(interp, stage, entry, args)?;
 
         let initial_depth = interp.frames_len();
         let mut pending_results: Vec<kirin_ir::ResultValue> = Vec::new();
@@ -102,10 +102,10 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Blanket impl: SSACFGRegion → CallSemantics<AbstractInterpreter>
+// Blanket impl: SSACFGRegion → EvalCall<AbstractInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, L, T> EvalCall<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
 where
     T: SSACFGRegion,
     V: crate::AbstractValue + Clone + 'ir,
@@ -116,7 +116,7 @@ where
 {
     type Result = crate::AnalysisResult<V>;
 
-    fn call_semantics(
+    fn eval_call(
         &self,
         interp: &mut crate::AbstractInterpreter<'ir, V, S, E, G>,
         callee: SpecializedFunction,

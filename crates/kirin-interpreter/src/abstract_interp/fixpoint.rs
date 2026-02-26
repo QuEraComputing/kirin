@@ -5,7 +5,7 @@ use kirin_ir::{
 use super::FixpointState;
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractContinuation, AbstractValue, BlockExecutor, CallSemantics, Continuation, Frame,
+    AbstractContinuation, AbstractValue, EvalBlock, EvalCall, Continuation, Frame,
     Interpretable, Interpreter, InterpreterError,
 };
 
@@ -41,7 +41,7 @@ where
         S: HasStageInfo<L>,
         L: Dialect
             + Interpretable<'ir, Self, L>
-            + CallSemantics<'ir, Self, L, Result = AnalysisResult<V>>
+            + EvalCall<'ir, Self, L, Result = AnalysisResult<V>>
             + 'ir,
     {
         // 1. UserFixed summaries are always returned as-is
@@ -81,12 +81,12 @@ where
         // 5. Install call handler so eval_block can dispatch nested calls
         self.call_handler = Some(Self::analyze::<L>);
 
-        // 6. Delegate to CallSemantics
+        // 6. Delegate to EvalCall
         let stage = self.active_stage_info::<L>();
         let spec = callee.expect_info(stage);
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
-        def.call_semantics(self, callee, args)
+        def.eval_call(self, callee, args)
     }
 
     /// Run forward abstract interpretation starting from `entry` block with
@@ -152,7 +152,7 @@ where
                 return Err(InterpreterError::FuelExhausted.into());
             }
 
-            let control = BlockExecutor::<'ir, L>::eval_block(self, stage, block)?;
+            let control = EvalBlock::<'ir, L>::eval_block(self, stage, block)?;
             self.propagate_control::<L>(stage, &control, false, &mut return_value)?;
         }
 
@@ -170,7 +170,7 @@ where
             for _ in 0..self.narrowing_iterations {
                 let mut changed = false;
                 for &block in &blocks {
-                    let control = BlockExecutor::<'ir, L>::eval_block(self, stage, block)?;
+                    let control = EvalBlock::<'ir, L>::eval_block(self, stage, block)?;
                     changed |=
                         self.propagate_control::<L>(stage, &control, true, &mut return_value)?;
                 }

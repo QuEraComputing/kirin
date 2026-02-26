@@ -2,21 +2,21 @@ use kirin_derive_core::ir::Layout;
 use kirin_derive_core::prelude::darling::{self, FromDeriveInput, FromVariant};
 
 #[derive(Debug, Clone)]
-pub struct CallSemanticsLayout;
+pub struct EvalCallLayout;
 
-impl Layout for CallSemanticsLayout {
+impl Layout for EvalCallLayout {
     type StatementExtra = ();
-    type ExtraGlobalAttrs = CallSemanticsGlobalAttrs;
-    type ExtraStatementAttrs = CallSemanticsStatementAttrs;
+    type ExtraGlobalAttrs = EvalCallGlobalAttrs;
+    type ExtraStatementAttrs = EvalCallStatementAttrs;
     type ExtraFieldAttrs = ();
 }
 
 #[derive(Debug, Clone)]
-pub struct CallSemanticsGlobalAttrs {
+pub struct EvalCallGlobalAttrs {
     pub callable: bool,
 }
 
-impl FromDeriveInput for CallSemanticsGlobalAttrs {
+impl FromDeriveInput for EvalCallGlobalAttrs {
     fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
         Ok(Self {
             callable: input.attrs.iter().any(|a| a.path().is_ident("callable")),
@@ -25,11 +25,11 @@ impl FromDeriveInput for CallSemanticsGlobalAttrs {
 }
 
 #[derive(Debug, Clone)]
-pub struct CallSemanticsStatementAttrs {
+pub struct EvalCallStatementAttrs {
     pub callable: bool,
 }
 
-impl FromDeriveInput for CallSemanticsStatementAttrs {
+impl FromDeriveInput for EvalCallStatementAttrs {
     fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
         Ok(Self {
             callable: input.attrs.iter().any(|a| a.path().is_ident("callable")),
@@ -37,7 +37,7 @@ impl FromDeriveInput for CallSemanticsStatementAttrs {
     }
 }
 
-impl FromVariant for CallSemanticsStatementAttrs {
+impl FromVariant for EvalCallStatementAttrs {
     fn from_variant(variant: &syn::Variant) -> darling::Result<Self> {
         Ok(Self {
             callable: variant.attrs.iter().any(|a| a.path().is_ident("callable")),

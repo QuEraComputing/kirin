@@ -1,11 +1,11 @@
-use super::{CallSemanticsLayout, DeriveCallSemantics, InputContext, StatementInfo};
+use super::{EvalCallLayout, DeriveEvalCall, InputContext, StatementInfo};
 use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::prelude::*;
 use kirin_derive_core::tokens::FieldPatternTokens;
 use quote::quote;
 
-impl<'ir> Scan<'ir, CallSemanticsLayout> for DeriveCallSemantics {
-    fn scan_input(&mut self, input: &'ir ir::Input<CallSemanticsLayout>) -> darling::Result<()> {
+impl<'ir> Scan<'ir, EvalCallLayout> for DeriveEvalCall {
+    fn scan_input(&mut self, input: &'ir ir::Input<EvalCallLayout>) -> darling::Result<()> {
         self.input = Some(InputContext {
             core: InputMeta::from_input(input),
             callable_all: input.extra_attrs.callable,
@@ -16,7 +16,7 @@ impl<'ir> Scan<'ir, CallSemanticsLayout> for DeriveCallSemantics {
 
     fn scan_statement(
         &mut self,
-        statement: &'ir ir::Statement<CallSemanticsLayout>,
+        statement: &'ir ir::Statement<EvalCallLayout>,
     ) -> darling::Result<()> {
         let is_wrapper = statement.wraps.is_some();
         let wrapper_ty = statement.wraps.as_ref().map(|w| w.ty.clone());
@@ -43,7 +43,7 @@ impl<'ir> Scan<'ir, CallSemanticsLayout> for DeriveCallSemantics {
     }
 }
 
-fn build_pattern(statement: &ir::Statement<CallSemanticsLayout>) -> FieldPatternTokens {
+fn build_pattern(statement: &ir::Statement<EvalCallLayout>) -> FieldPatternTokens {
     let mut fields = Vec::new();
     if let Some(wrapper) = &statement.wraps {
         fields.push(wrapper.field.clone());

@@ -13,7 +13,7 @@ use crate::{
 /// Callers are responsible for binding block arguments via
 /// [`bind_block_args`](Self::bind_block_args) before calling
 /// [`eval_block`](Self::eval_block).
-pub trait BlockExecutor<'ir, L: Dialect>: Interpreter<'ir> {
+pub trait EvalBlock<'ir, L: Dialect>: Interpreter<'ir> {
     /// Execute a body block whose arguments have already been bound.
     ///
     /// Returns the [`Continuation`] produced by the block's terminator.
@@ -60,7 +60,7 @@ pub trait BlockExecutor<'ir, L: Dialect>: Interpreter<'ir> {
     }
 }
 
-impl<'ir, V, S, E, G, L> BlockExecutor<'ir, L> for StackInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G, L> EvalBlock<'ir, L> for StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -72,7 +72,7 @@ where
     /// calls. Returns `Continuation::Yield(v)` with the value produced by the
     /// block's yield terminator.
     ///
-    /// This mirrors the call-semantics loop in [`CallSemantics`] but operates
+    /// This mirrors the call-semantics loop in [`EvalCall`] but operates
     /// within the current frame rather than pushing a new one. Used by
     /// structured control flow operations like `scf.for` that need to
     /// repeatedly execute a body block.
@@ -88,7 +88,7 @@ where
         let first = block.first_statement(stage);
         self.current_frame_mut()?.set_cursor(first);
 
-        // Run body, handling nested Call/Return pairs (same pattern as CallSemantics)
+        // Run body, handling nested Call/Return pairs (same pattern as EvalCall)
         let mut pending_results: Vec<ResultValue> = Vec::new();
         loop {
             let control = self.run::<L>()?;
@@ -120,7 +120,7 @@ where
     }
 }
 
-impl<'ir, V, S, E, G, L> BlockExecutor<'ir, L> for AbstractInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G, L> EvalBlock<'ir, L> for AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,

@@ -1,8 +1,8 @@
-use super::DeriveCallSemantics;
+use super::DeriveEvalCall;
 use kirin_test_utils::rustfmt;
 
-fn derive_call_semantics(input: &syn::DeriveInput) -> String {
-    let mut derive = DeriveCallSemantics::default();
+fn derive_eval_call(input: &syn::DeriveInput) -> String {
+    let mut derive = DeriveEvalCall::default();
     let tokens = derive.emit(input).unwrap();
     rustfmt(tokens.to_string())
 }
@@ -12,7 +12,7 @@ macro_rules! case {
         let input: syn::DeriveInput = syn::parse_quote! {
             $($tt)*
         };
-        derive_call_semantics(&input)
+        derive_eval_call(&input)
     }};
 }
 

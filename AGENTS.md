@@ -57,7 +57,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 **Interpreter:**
 - `kirin-interpreter` — Interpreter traits, `StackInterpreter`, `AbstractInterpreter`
-- `kirin-derive-interpreter` — `#[derive(Interpretable, CallSemantics)]`
+- `kirin-derive-interpreter` — `#[derive(Interpretable, EvalCall)]`
 
 **Dialects:**
 - `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-function`
@@ -75,13 +75,21 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 - **Helper attribute pattern**: `#[wraps]` and `#[callable]` are intentionally separate from `#[kirin(...)]` for composability. `#[kirin(...)]` is the carry attribute for dialect-specific options (parsed by darling). `#[wraps]` is a generic helper for delegation/wrapper patterns, and `#[callable]` is interpreter-specific. Keeping them as bare attributes lets different derive macros compose independently — e.g. a type can use `#[wraps]` with both `#[derive(Dialect)]` and `#[derive(Interpretable)]` without coupling those derives. Since darling's `#[darling(attributes(...))]` only supports `#[attr(key = val)]` form, bare flag attributes are parsed manually via `attrs.iter().any(|a| a.path().is_ident("name"))`.
 
-- **Custom Layout for derive-specific attributes**: When a derive macro needs attributes beyond `StandardLayout` (which has `()` for all extras), define a custom `Layout` impl in that derive module. This keeps derive-specific attributes out of the core IR. See `CallSemanticsLayout` in `kirin-derive-interpreter` as an example.
+- **Custom Layout for derive-specific attributes**: When a derive macro needs attributes beyond `StandardLayout` (which has `()` for all extras), define a custom `Layout` impl in that derive module. This keeps derive-specific attributes out of the core IR. See `EvalCallLayout` in `kirin-derive-interpreter` as an example.
 
 - **`#[kirin(...)]` attribute convention**: Use path syntax for `crate`: `#[kirin(crate = kirin_ir)]` not `#[kirin(crate = "kirin_ir")]`. Darling parses `syn::Path` and supports bare idents directly.
 
 ## IR Design Conventions
 
 - **Block vs Region**: A `Block` is a single linear sequence of statements with an optional terminator. A `Region` is a container for multiple blocks (`LinkedList<Block>`). When modeling MLIR-style operations, check whether the MLIR op uses `SingleBlock` regions — if so, use `Block` in Kirin, not `Region`. For example, MLIR's `scf.if` and `scf.for` have `SingleBlock` + `SingleBlockImplicitTerminator<scf::YieldOp>` traits, so `kirin-scf` correctly uses `Block` fields for their bodies.
+
+- **`BlockInfo::terminator` is a cached pointer**: The `terminator` field in `BlockInfo` is a cached pointer to the last statement in the block — it is NOT a separate statement. `StatementIter` only iterates the linked list of non-terminator statements. When querying the last statement, use `Block::last_statement(stage)` which returns `terminator.or_else(|| statements.tail())`. Do not assume the terminator is distinct from the statements list.
+
+## Interpreter Conventions
+
+- **`Interpreter<'ir>` lifetime pattern**: The `Interpreter` trait is parameterized by `'ir` so that `pipeline()` and `active_stage_info::<L>()` return `&'ir`-lived references. This requires `Self: 'ir` on the trait, which cascades: all type parameters on implementing structs (`V`, `S`, `E`, `G`) need `'ir` bounds in every impl block. The `'ir` lifetime is also threaded through `Interpretable<'ir, I, L>`, `EvalBlock<'ir, L>`, and `EvalCall<'ir, I, L>`.
+
+- **Stage accessor naming**: `active_stage()` returns `CompileStage` (the stage key), `active_stage_info::<L>()` returns `&'ir StageInfo<L>` (the resolved dialect-specific stage info). Resolve once at the top of a method and pass through to avoid repeated lookups.
 
 ## Chumsky Parser Conventions
 

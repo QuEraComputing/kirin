@@ -1,11 +1,11 @@
-use super::{CallSemanticsLayout, DeriveCallSemantics};
+use super::{EvalCallLayout, DeriveEvalCall};
 use kirin_derive_core::prelude::*;
 use quote::quote;
 
-impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
+impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
     fn emit_struct(
         &mut self,
-        data: &'ir ir::DataStruct<CallSemanticsLayout>,
+        data: &'ir ir::DataStruct<EvalCallLayout>,
     ) -> darling::Result<proc_macro2::TokenStream> {
         let input = self.input_ctx()?;
         let info = self.statement_info(&data.0)?;
@@ -23,31 +23,31 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
 
             Ok(quote! {
                 #[automatically_derived]
-                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
+                impl #impl_generics #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
                     __CallSemI: #interp_crate::Interpreter<'__ir>,
                     __CallSemI::Error: From<#interp_crate::InterpreterError>,
-                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
+                    #wrapper_ty: #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>,
                     #where_clause
                 {
-                    type Result = <#wrapper_ty as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result;
+                    type Result = <#wrapper_ty as #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>>::Result;
 
-                    fn call_semantics(
+                    fn eval_call(
                         &self,
                         interpreter: &mut __CallSemI,
                         callee: #ir_crate::SpecializedFunction,
                         args: &[__CallSemI::Value],
                     ) -> Result<Self::Result, __CallSemI::Error> {
                         let Self #pattern = self;
-                        #binding.call_semantics(interpreter, callee, args)
+                        #binding.eval_call(interpreter, callee, args)
                     }
                 }
             })
         } else {
             Ok(quote! {
                 #[automatically_derived]
-                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
+                impl #impl_generics #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
                     __CallSemI: #interp_crate::Interpreter<'__ir>,
@@ -56,7 +56,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
                 {
                     type Result = __CallSemI::Value;
 
-                    fn call_semantics(
+                    fn eval_call(
                         &self,
                         _interpreter: &mut __CallSemI,
                         _callee: #ir_crate::SpecializedFunction,
@@ -71,7 +71,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
 
     fn emit_enum(
         &mut self,
-        data: &'ir ir::DataEnum<CallSemanticsLayout>,
+        data: &'ir ir::DataEnum<EvalCallLayout>,
     ) -> darling::Result<proc_macro2::TokenStream> {
         let input = self.input_ctx()?;
         let interp_crate = self.interpreter_crate_path();
@@ -93,7 +93,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
             let variant_name = &info.name;
             let pattern = &info.pattern;
 
-            // A variant forwards call_semantics if:
+            // A variant forwards eval_call if:
             // - No #[callable] used anywhere: fall back to #[wraps] (backward compat)
             // - #[callable] used: only callable wrappers forward
             let is_call_wrapper = if any_callable {
@@ -108,7 +108,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
                 let binding = info.wrapper_binding.as_ref().unwrap();
 
                 match_arms.push(quote! {
-                    Self::#variant_name #pattern => #binding.call_semantics(interpreter, callee, args)
+                    Self::#variant_name #pattern => #binding.eval_call(interpreter, callee, args)
                 });
             } else if info.pattern.is_empty() {
                 match_arms.push(quote! {
@@ -122,7 +122,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
         }
 
         let result_type = if let Some(first_wrapper) = wrapper_types.first() {
-            quote! { <#first_wrapper as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result }
+            quote! { <#first_wrapper as #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>>::Result }
         } else {
             quote! { __CallSemI::Value }
         };
@@ -133,11 +133,11 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
             .map(|(i, ty)| {
                 if i == 0 {
                     quote! {
-                        #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
+                        #ty: #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>,
                     }
                 } else {
                     quote! {
-                        #ty: #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics, Result = #result_type>,
+                        #ty: #interp_crate::EvalCall<__CallSemI, #type_name #ty_generics, Result = #result_type>,
                     }
                 }
             })
@@ -145,7 +145,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
 
         Ok(quote! {
             #[automatically_derived]
-            impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
+            impl #impl_generics #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>
                 for #type_name #ty_generics
             where
                 __CallSemI: #interp_crate::Interpreter<'__ir>,
@@ -155,7 +155,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
             {
                 type Result = #result_type;
 
-                fn call_semantics(
+                fn eval_call(
                     &self,
                     interpreter: &mut __CallSemI,
                     callee: #ir_crate::SpecializedFunction,

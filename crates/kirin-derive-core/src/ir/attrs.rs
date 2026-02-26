@@ -9,7 +9,7 @@
 //!
 //! - `#[wraps]` — generic delegation/wrapper pattern, used by `#[derive(Dialect)]`
 //!   and potentially other derives.
-//! - `#[callable]` — interpreter-specific, used by `#[derive(CallSemantics)]`.
+//! - `#[callable]` — interpreter-specific, used by `#[derive(EvalCall)]`.
 //!
 //! This separation lets a single type opt into multiple derive macros without
 //! coupling their attribute namespaces.
