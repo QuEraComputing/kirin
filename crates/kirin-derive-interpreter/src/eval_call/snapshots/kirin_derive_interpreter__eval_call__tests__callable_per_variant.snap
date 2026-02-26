@@ -18,6 +18,7 @@ where
     fn eval_call(
         &self,
         interpreter: &mut __CallSemI,
+        stage: &'__ir ::kirin::ir::StageInfo<TestDialect>,
         callee: ::kirin::ir::SpecializedFunction,
         args: &[__CallSemI::Value],
     ) -> Result<Self::Result, __CallSemI::Error> {
@@ -26,7 +27,7 @@ where
             Self::ControlFlow(field_0) => {
                 Err(::kirin_interpreter::InterpreterError::MissingEntry.into())
             }
-            Self::FunctionBody(field_0) => field_0.eval_call(interpreter, callee, args),
+            Self::FunctionBody(field_0) => field_0.eval_call(interpreter, stage, callee, args),
         }
     }
 }

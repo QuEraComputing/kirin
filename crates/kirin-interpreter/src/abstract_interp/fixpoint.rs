@@ -86,7 +86,7 @@ where
         let spec = callee.expect_info(stage);
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
-        def.eval_call(self, callee, args)
+        def.eval_call(self, stage, callee, args)
     }
 
     /// Run forward abstract interpretation starting from `entry` block with

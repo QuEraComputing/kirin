@@ -36,11 +36,12 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
                     fn eval_call(
                         &self,
                         interpreter: &mut __CallSemI,
+                        stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics>,
                         callee: #ir_crate::SpecializedFunction,
                         args: &[__CallSemI::Value],
                     ) -> Result<Self::Result, __CallSemI::Error> {
                         let Self #pattern = self;
-                        #binding.eval_call(interpreter, callee, args)
+                        #binding.eval_call(interpreter, stage, callee, args)
                     }
                 }
             })
@@ -59,6 +60,7 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
                     fn eval_call(
                         &self,
                         _interpreter: &mut __CallSemI,
+                        _stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics>,
                         _callee: #ir_crate::SpecializedFunction,
                         _args: &[__CallSemI::Value],
                     ) -> Result<Self::Result, __CallSemI::Error> {
@@ -108,7 +110,7 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
                 let binding = info.wrapper_binding.as_ref().unwrap();
 
                 match_arms.push(quote! {
-                    Self::#variant_name #pattern => #binding.eval_call(interpreter, callee, args)
+                    Self::#variant_name #pattern => #binding.eval_call(interpreter, stage, callee, args)
                 });
             } else if info.pattern.is_empty() {
                 match_arms.push(quote! {
@@ -158,6 +160,7 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
                 fn eval_call(
                     &self,
                     interpreter: &mut __CallSemI,
+                    stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics>,
                     callee: #ir_crate::SpecializedFunction,
                     args: &[__CallSemI::Value],
                 ) -> Result<Self::Result, __CallSemI::Error> {

@@ -13,10 +13,11 @@ where
     fn eval_call(
         &self,
         interpreter: &mut __CallSemI,
+        stage: &'__ir ::kirin::ir::StageInfo<Wrapper>,
         callee: ::kirin::ir::SpecializedFunction,
         args: &[__CallSemI::Value],
     ) -> Result<Self::Result, __CallSemI::Error> {
         let Self { inner } = self;
-        inner.eval_call(interpreter, callee, args)
+        inner.eval_call(interpreter, stage, callee, args)
     }
 }

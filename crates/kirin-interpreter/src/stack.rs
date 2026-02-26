@@ -233,14 +233,14 @@ where
     /// Call a specialized function and return its result value.
     pub fn call<L>(&mut self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V>,
+        L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V> + 'ir,
         S: HasStageInfo<L>,
     {
         let stage = self.active_stage_info::<L>();
         let spec = callee.expect_info(stage);
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
-        def.eval_call(self, callee, args)
+        def.eval_call(self, stage, callee, args)
     }
 }
 

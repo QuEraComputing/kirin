@@ -15,6 +15,7 @@ pub trait EvalCall<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
     fn eval_call(
         &self,
         interpreter: &mut I,
+        stage: &'ir StageInfo<L>,
         callee: SpecializedFunction,
         args: &[I::Value],
     ) -> Result<Self::Result, I::Error>;
@@ -47,10 +48,10 @@ where
     fn eval_call(
         &self,
         interp: &mut crate::StackInterpreter<'ir, V, S, E, G>,
+        stage: &'ir StageInfo<L>,
         callee: SpecializedFunction,
         args: &[V],
     ) -> Result<V, E> {
-        let stage = interp.active_stage_info::<L>();
         let entry = self.entry_block::<L>(stage)?;
 
         // Push frame and bind entry block args
@@ -119,10 +120,10 @@ where
     fn eval_call(
         &self,
         interp: &mut crate::AbstractInterpreter<'ir, V, S, E, G>,
+        stage: &'ir StageInfo<L>,
         callee: SpecializedFunction,
         args: &[V],
     ) -> Result<crate::AnalysisResult<V>, E> {
-        let stage = interp.active_stage_info::<L>();
         let entry = self.entry_block::<L>(stage)?;
 
         // Insert tentative summary before pushing frame

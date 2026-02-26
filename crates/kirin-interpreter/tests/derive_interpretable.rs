@@ -43,11 +43,12 @@ where
     fn eval_call(
         &self,
         interp: &mut I,
+        stage: &'ir kirin_ir::StageInfo<DerivedDialect>,
         callee: SpecializedFunction,
         args: &[I::Value],
     ) -> Result<Self::Result, InterpreterError> {
         match self {
-            DerivedDialect::FunctionBody(body) => body.eval_call(interp, callee, args),
+            DerivedDialect::FunctionBody(body) => body.eval_call(interp, stage, callee, args),
             _ => Err(InterpreterError::MissingEntry),
         }
     }

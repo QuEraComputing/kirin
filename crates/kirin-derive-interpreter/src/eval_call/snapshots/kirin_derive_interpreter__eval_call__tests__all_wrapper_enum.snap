@@ -33,13 +33,14 @@ where
     fn eval_call(
         &self,
         interpreter: &mut __CallSemI,
+        stage: &'__ir ::kirin::ir::StageInfo<TestDialect>,
         callee: ::kirin::ir::SpecializedFunction,
         args: &[__CallSemI::Value],
     ) -> Result<Self::Result, __CallSemI::Error> {
         match self {
-            Self::Arith(field_0) => field_0.eval_call(interpreter, callee, args),
-            Self::ControlFlow(field_0) => field_0.eval_call(interpreter, callee, args),
-            Self::Constant(field_0) => field_0.eval_call(interpreter, callee, args),
+            Self::Arith(field_0) => field_0.eval_call(interpreter, stage, callee, args),
+            Self::ControlFlow(field_0) => field_0.eval_call(interpreter, stage, callee, args),
+            Self::Constant(field_0) => field_0.eval_call(interpreter, stage, callee, args),
         }
     }
 }
