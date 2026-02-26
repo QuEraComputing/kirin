@@ -3,9 +3,9 @@ source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
 expression: "case! { #[kirin(type = TestType)] struct Regular { a: i32, b: i32, } }"
 ---
 #[automatically_derived]
-impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, Regular> for Regular
+impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, Regular> for Regular
 where
-    __CallSemI: ::kirin_interpreter::Interpreter,
+    __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
 {
     type Result = __CallSemI::Value;

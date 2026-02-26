@@ -4,9 +4,9 @@ use kirin_interpreter::{BranchCondition, Continuation, Interpretable, Interprete
 
 use crate::ControlFlow;
 
-impl<I, L, T> Interpretable<I, L> for ControlFlow<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for ControlFlow<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition,
     L: Dialect,
     T: kirin::prelude::CompileTimeValue + Default,

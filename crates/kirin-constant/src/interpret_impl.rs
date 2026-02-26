@@ -3,9 +3,9 @@ use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterErr
 
 use crate::Constant;
 
-impl<I, L, T, Ty> Interpretable<I, L> for Constant<T, Ty>
+impl<'ir, I, L, T, Ty> Interpretable<'ir, I, L> for Constant<T, Ty>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: From<T>,
     I::Error: From<InterpreterError>,
     L: Dialect,

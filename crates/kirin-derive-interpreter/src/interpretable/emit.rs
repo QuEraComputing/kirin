@@ -22,12 +22,12 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
 
             Ok(quote! {
                 #[automatically_derived]
-                impl #impl_generics #interp_crate::Interpretable<__InterpI, __InterpL>
+                impl #impl_generics #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>
                     for #type_name #ty_generics
                 where
-                    __InterpI: #interp_crate::Interpreter,
+                    __InterpI: #interp_crate::Interpreter<'__ir>,
                     __InterpL: ::kirin_ir::Dialect,
-                    #wrapper_ty: #interp_crate::Interpretable<__InterpI, __InterpL>,
+                    #wrapper_ty: #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>,
                     #where_clause
                 {
                     fn interpret(
@@ -101,17 +101,17 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
             .iter()
             .map(|ty| {
                 quote! {
-                    #ty: #interp_crate::Interpretable<__InterpI, __InterpL>,
+                    #ty: #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>,
                 }
             })
             .collect();
 
         Ok(quote! {
             #[automatically_derived]
-            impl #impl_generics #interp_crate::Interpretable<__InterpI, __InterpL>
+            impl #impl_generics #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>
                 for #type_name #ty_generics
             where
-                __InterpI: #interp_crate::Interpreter,
+                __InterpI: #interp_crate::Interpreter<'__ir>,
                 __InterpL: ::kirin_ir::Dialect,
                 #(#where_bounds)*
                 #where_clause
@@ -131,8 +131,12 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
 
 fn add_interpreter_params(base: &syn::Generics) -> syn::Generics {
     let mut generics = base.clone();
+    let lt_param: syn::LifetimeParam = syn::parse_quote! { '__ir };
     let interp_param: syn::TypeParam = syn::parse_quote! { __InterpI };
     let lang_param: syn::TypeParam = syn::parse_quote! { __InterpL };
+    generics
+        .params
+        .insert(0, syn::GenericParam::Lifetime(lt_param));
     generics.params.push(syn::GenericParam::Type(interp_param));
     generics.params.push(syn::GenericParam::Type(lang_param));
     generics

@@ -1,7 +1,7 @@
-use kirin::prelude::{CompileTimeValue, Dialect, Successor};
+use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo, Successor};
 use kirin_interpreter::smallvec::smallvec;
 use kirin_interpreter::{
-    BlockExecutor, BranchCondition, Continuation, Interpretable, Interpreter,
+    BlockExecutor, BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
 };
 
 use crate::{For, If, StructuredControlFlow, Yield};
@@ -24,9 +24,9 @@ impl ForLoopValue for i64 {
     }
 }
 
-impl<I, L, T> Interpretable<I, L> for If<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for If<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition,
     L: Dialect,
     T: CompileTimeValue + Default,
@@ -46,10 +46,12 @@ where
     }
 }
 
-impl<I, L, T> Interpretable<I, L> for For<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for For<T>
 where
-    I: Interpreter + BlockExecutor<L>,
+    I: Interpreter<'ir> + BlockExecutor<'ir, L>,
     I::Value: Clone + ForLoopValue,
+    I::StageInfo: HasStageInfo<L>,
+    I::Error: From<InterpreterError>,
     L: Dialect,
     T: CompileTimeValue + Default,
 {
@@ -57,17 +59,23 @@ where
         let mut iv = interp.read(self.start)?;
         let end = interp.read(self.end)?;
         let step = interp.read(self.step)?;
+        let stage = interp.active_stage_info::<L>();
         while iv.loop_condition(&end) == Some(true) {
-            let _yielded = interp.execute_block(self.body, &[iv.clone()])?;
+            interp.bind_block_args(stage, self.body, &[iv.clone()])?;
+            let control = interp.eval_block(stage, self.body)?;
+            match control {
+                Continuation::Yield(_) => {}
+                other => return Ok(other),
+            }
             iv = iv.loop_step(&step);
         }
         Ok(Continuation::Continue)
     }
 }
 
-impl<I, L, T> Interpretable<I, L> for Yield<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Yield<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: Clone,
     L: Dialect,
     T: CompileTimeValue + Default,
@@ -78,21 +86,25 @@ where
     }
 }
 
-impl<I, L, T> Interpretable<I, L> for StructuredControlFlow<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for StructuredControlFlow<T>
 where
-    I: Interpreter + BlockExecutor<L>,
+    I: Interpreter<'ir> + BlockExecutor<'ir, L>,
     I::Value: Clone + BranchCondition + ForLoopValue,
+    I::StageInfo: HasStageInfo<L>,
+    I::Error: From<InterpreterError>,
     L: Dialect,
     T: CompileTimeValue + Default,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         match self {
-            StructuredControlFlow::If(op) => <If<T> as Interpretable<I, L>>::interpret(op, interp),
+            StructuredControlFlow::If(op) => {
+                <If<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
+            }
             StructuredControlFlow::For(op) => {
-                <For<T> as Interpretable<I, L>>::interpret(op, interp)
+                <For<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
             }
             StructuredControlFlow::Yield(op) => {
-                <Yield<T> as Interpretable<I, L>>::interpret(op, interp)
+                <Yield<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
             }
         }
     }

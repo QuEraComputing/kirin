@@ -224,11 +224,12 @@ where
 
 // -- Interpreter trait impl -------------------------------------------------
 
-impl<'ir, V, S, E, G> Interpreter for AbstractInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
 where
-    V: AbstractValue + Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo,
+    V: AbstractValue + Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: CompileStageInfo + 'ir,
+    G: 'ir,
 {
     type Value = V;
     type Error = E;
@@ -247,6 +248,14 @@ where
             .last_mut()
             .ok_or_else(|| InterpreterError::NoFrame.into())?
             .write(result, value);
+        Ok(())
+    }
+
+    fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
+        self.frames
+            .last_mut()
+            .ok_or_else(|| InterpreterError::NoFrame.into())?
+            .write_ssa(ssa, value);
         Ok(())
     }
 

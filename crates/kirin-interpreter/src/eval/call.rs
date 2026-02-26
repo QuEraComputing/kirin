@@ -1,6 +1,4 @@
-use kirin_ir::{
-    Block, CompileStageInfo, Dialect, GetInfo, HasStageInfo, SpecializedFunction, StageInfo,
-};
+use kirin_ir::{Block, CompileStageInfo, Dialect, HasStageInfo, SpecializedFunction, StageInfo};
 
 use crate::{Interpreter, InterpreterError};
 
@@ -11,7 +9,7 @@ use crate::{Interpreter, InterpreterError};
 /// - Non-SSA bodies (e.g. circuit graphs) can implement this directly
 ///
 /// `L` is the composed dialect enum that this body is part of.
-pub trait CallSemantics<I: Interpreter, L: Dialect>: Dialect {
+pub trait CallSemantics<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
     type Result;
 
     fn call_semantics(
@@ -35,14 +33,14 @@ pub trait SSACFGRegion: Dialect {
 // Blanket impl: SSACFGRegion → CallSemantics<StackInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> CallSemantics<crate::StackInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> for T
 where
     T: SSACFGRegion,
-    V: Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo + HasStageInfo<L>,
+    V: Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: CompileStageInfo + HasStageInfo<L> + 'ir,
     G: 'ir,
-    L: Dialect + crate::Interpretable<crate::StackInterpreter<'ir, V, S, E, G>, L>,
+    L: Dialect + crate::Interpretable<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     type Result = V;
 
@@ -52,30 +50,13 @@ where
         callee: SpecializedFunction,
         args: &[V],
     ) -> Result<V, E> {
-        let stage = interp.resolve_stage::<L>();
+        let stage = interp.active_stage_info::<L>();
         let entry = self.entry_block::<L>(stage)?;
 
-        // Push frame with entry block cursor and bind args
-        let first = interp.first_stmt_in_block::<L>(entry);
-        let mut frame = crate::Frame::new(callee, first);
-        if let Some(entry_stmt) = first {
-            let stage = interp.resolve_stage::<L>();
-            let parent_block = *entry_stmt.parent::<L>(stage);
-            if let Some(block) = parent_block {
-                let block_info = block.expect_info(stage);
-                if block_info.arguments.len() != args.len() {
-                    return Err(InterpreterError::ArityMismatch {
-                        expected: block_info.arguments.len(),
-                        got: args.len(),
-                    }
-                    .into());
-                }
-                for (ba, val) in block_info.arguments.iter().zip(args) {
-                    frame.write_ssa(kirin_ir::SSAValue::from(*ba), V::clone(val));
-                }
-            }
-        }
-        interp.push_call_frame(frame)?;
+        // Push frame and bind entry block args
+        let first = entry.first_statement(stage);
+        interp.push_call_frame(crate::Frame::new(callee, first))?;
+        crate::BlockExecutor::bind_block_args(interp, stage, entry, args)?;
 
         let initial_depth = interp.frames_len();
         let mut pending_results: Vec<kirin_ir::ResultValue> = Vec::new();
@@ -99,9 +80,7 @@ where
             }
 
             let v = match &control {
-                crate::Continuation::Return(v) | crate::Continuation::Yield(v) => {
-                    Some(v.clone())
-                }
+                crate::Continuation::Return(v) | crate::Continuation::Yield(v) => Some(v.clone()),
                 _ => None,
             };
 
@@ -114,7 +93,7 @@ where
                 let result = pending_results
                     .pop()
                     .ok_or_else(|| InterpreterError::NoFrame.into())?;
-                <crate::StackInterpreter<'ir, V, S, E, G> as Interpreter>::write(
+                <crate::StackInterpreter<'ir, V, S, E, G> as Interpreter<'ir>>::write(
                     interp, result, v,
                 )?;
             }
@@ -126,14 +105,14 @@ where
 // Blanket impl: SSACFGRegion → CallSemantics<AbstractInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> CallSemantics<crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
 where
     T: SSACFGRegion,
-    V: crate::AbstractValue + Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo + HasStageInfo<L>,
+    V: crate::AbstractValue + Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: CompileStageInfo + HasStageInfo<L> + 'ir,
     G: 'ir,
-    L: Dialect + crate::Interpretable<crate::AbstractInterpreter<'ir, V, S, E, G>, L> + 'ir,
+    L: Dialect + crate::Interpretable<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     type Result = crate::AnalysisResult<V>;
 
@@ -143,7 +122,7 @@ where
         callee: SpecializedFunction,
         args: &[V],
     ) -> Result<crate::AnalysisResult<V>, E> {
-        let stage = interp.resolve_stage::<L>();
+        let stage = interp.active_stage_info::<L>();
         let entry = self.entry_block::<L>(stage)?;
 
         // Insert tentative summary before pushing frame

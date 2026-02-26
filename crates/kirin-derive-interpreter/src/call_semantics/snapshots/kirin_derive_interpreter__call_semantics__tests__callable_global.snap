@@ -3,15 +3,17 @@ source: crates/kirin-derive-interpreter/src/call_semantics/tests.rs
 expression: "case!\n{\n    #[kirin(type = ArithType)] #[wraps] #[callable] enum TestDialect\n    {\n        Arith(Arith<ArithType>), ControlFlow(ControlFlow<ArithType>),\n        FunctionBody(FunctionBody<ArithType>),\n    }\n}"
 ---
 #[automatically_derived]
-impl<__CallSemI> ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect> for TestDialect
+impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, TestDialect>
+    for TestDialect
 where
-    __CallSemI: ::kirin_interpreter::Interpreter,
+    __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
-    Arith<ArithType>: ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect>,
+    Arith<ArithType>: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, TestDialect>,
     ControlFlow<ArithType>: ::kirin_interpreter::CallSemantics<
         __CallSemI,
         TestDialect,
         Result = <Arith<ArithType> as ::kirin_interpreter::CallSemantics<
+            '__ir,
             __CallSemI,
             TestDialect,
         >>::Result,
@@ -20,13 +22,17 @@ where
         __CallSemI,
         TestDialect,
         Result = <Arith<ArithType> as ::kirin_interpreter::CallSemantics<
+            '__ir,
             __CallSemI,
             TestDialect,
         >>::Result,
     >,
 {
-    type Result =
-        <Arith<ArithType> as ::kirin_interpreter::CallSemantics<__CallSemI, TestDialect>>::Result;
+    type Result = <Arith<ArithType> as ::kirin_interpreter::CallSemantics<
+        '__ir,
+        __CallSemI,
+        TestDialect,
+    >>::Result;
     fn call_semantics(
         &self,
         interpreter: &mut __CallSemI,

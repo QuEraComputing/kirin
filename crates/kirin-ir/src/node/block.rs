@@ -132,9 +132,41 @@ impl Block {
         }
     }
 
-    pub fn terminator<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> Option<Statement> {
+    pub fn terminator<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<Statement> {
         let info = self.expect_info(stage);
         info.terminator
+    }
+
+    /// Returns the first statement in this block.
+    ///
+    /// This is the head of the statements linked list, or the terminator
+    /// if the linked list is empty (i.e. the block contains only a
+    /// terminator).
+    pub fn first_statement<L: Dialect>(
+        &self,
+        stage: &crate::StageInfo<L>,
+    ) -> Option<Statement> {
+        let info = self.expect_info(stage);
+        if let Some(&head) = info.statements.head() {
+            Some(head)
+        } else {
+            info.terminator
+        }
+    }
+
+    /// Returns the last statement in this block.
+    ///
+    /// The terminator *is* the last statement — the `terminator` field in
+    /// [`BlockInfo`] is a cached pointer to it, not a separate statement.
+    /// [`Block::statements`] iterates only the non-terminator prefix of
+    /// the linked list. This method returns the terminator if present,
+    /// otherwise the tail of the statements linked list.
+    pub fn last_statement<L: Dialect>(
+        &self,
+        stage: &crate::StageInfo<L>,
+    ) -> Option<Statement> {
+        let info = self.expect_info(stage);
+        info.terminator.or_else(|| info.statements.tail().copied())
     }
 }
 

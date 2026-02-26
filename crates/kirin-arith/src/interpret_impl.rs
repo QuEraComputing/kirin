@@ -5,9 +5,9 @@ use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterErr
 
 use crate::Arith;
 
-impl<I, L, T> Interpretable<I, L> for Arith<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Arith<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: Clone
         + Add<Output = I::Value>
         + Sub<Output = I::Value>

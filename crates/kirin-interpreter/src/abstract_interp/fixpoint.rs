@@ -5,8 +5,8 @@ use kirin_ir::{
 use super::FixpointState;
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractContinuation, AbstractValue, CallSemantics, Continuation, Frame, Interpretable,
-    Interpreter, InterpreterError,
+    AbstractContinuation, AbstractValue, BlockExecutor, CallSemantics, Continuation, Frame,
+    Interpretable, Interpreter, InterpreterError,
 };
 
 use super::interp::AbstractInterpreter;
@@ -15,9 +15,10 @@ use super::interp::AbstractInterpreter;
 
 impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
-    V: AbstractValue + Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo,
+    V: AbstractValue + Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: CompileStageInfo + 'ir,
+    G: 'ir,
 {
     /// Analyze a function, returning its [`AnalysisResult`].
     ///
@@ -39,8 +40,8 @@ where
     where
         S: HasStageInfo<L>,
         L: Dialect
-            + Interpretable<Self, L>
-            + CallSemantics<Self, L, Result = AnalysisResult<V>>
+            + Interpretable<'ir, Self, L>
+            + CallSemantics<'ir, Self, L, Result = AnalysisResult<V>>
             + 'ir,
     {
         // 1. UserFixed summaries are always returned as-is
@@ -77,11 +78,11 @@ where
             }
         }
 
-        // 5. Install call handler so interpret_block can dispatch nested calls
+        // 5. Install call handler so eval_block can dispatch nested calls
         self.call_handler = Some(Self::analyze::<L>);
 
         // 6. Delegate to CallSemantics
-        let stage = self.resolve_stage::<L>();
+        let stage = self.active_stage_info::<L>();
         let spec = callee.expect_info(stage);
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
@@ -100,11 +101,12 @@ where
     ) -> Result<AnalysisResult<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L> + 'ir,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
+        let stage = self.active_stage_info::<L>();
+
         // 1. Seed entry block
         {
-            let stage = self.resolve_stage::<L>();
             let block_info = entry.expect_info(stage);
             let arg_ssas: Vec<SSAValue> = block_info
                 .arguments
@@ -150,8 +152,8 @@ where
                 return Err(InterpreterError::FuelExhausted.into());
             }
 
-            let control = self.interpret_block::<L>(block)?;
-            self.propagate_control::<L>(&control, false, &mut return_value)?;
+            let control = BlockExecutor::<'ir, L>::eval_block(self, stage, block)?;
+            self.propagate_control::<L>(stage, &control, false, &mut return_value)?;
         }
 
         // 3. Narrowing phase
@@ -168,8 +170,9 @@ where
             for _ in 0..self.narrowing_iterations {
                 let mut changed = false;
                 for &block in &blocks {
-                    let control = self.interpret_block::<L>(block)?;
-                    changed |= self.propagate_control::<L>(&control, true, &mut return_value)?;
+                    let control = BlockExecutor::<'ir, L>::eval_block(self, stage, block)?;
+                    changed |=
+                        self.propagate_control::<L>(stage, &control, true, &mut return_value)?;
                 }
                 if !changed {
                     break;
@@ -189,22 +192,6 @@ where
     }
 
     // -- Internal helpers ---------------------------------------------------
-
-    /// Resolve the [`StageInfo`] for dialect `L` from the active stage.
-    ///
-    /// This inherent method shadows [`Interpreter::resolve_stage`] to return
-    /// a reference with the pipeline lifetime `'ir` instead of `&self`,
-    /// allowing subsequent mutable borrows of `self`.
-    pub(crate) fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect + 'ir,
-    {
-        self.pipeline
-            .stage(self.active_stage)
-            .and_then(|s| s.try_stage_info())
-            .expect("active stage does not contain StageInfo for this dialect")
-    }
 
     /// Push a new analysis frame for `callee`.
     pub(crate) fn push_analysis_frame(&mut self, callee: SpecializedFunction) {
@@ -264,6 +251,7 @@ where
     /// the worklist. Returns whether any edge changed.
     fn propagate_control<L>(
         &mut self,
+        stage: &'ir kirin_ir::StageInfo<L>,
         control: &AbstractContinuation<V>,
         narrowing: bool,
         return_value: &mut Option<V>,
@@ -275,11 +263,11 @@ where
         let mut changed = false;
         match control {
             Continuation::Jump(succ, args) => {
-                changed |= self.propagate_edge::<L>(succ.target(), args, narrowing)?;
+                changed |= self.propagate_edge::<L>(stage, succ.target(), args, narrowing)?;
             }
             Continuation::Fork(targets) => {
                 for (succ, args) in targets {
-                    changed |= self.propagate_edge::<L>(succ.target(), args, narrowing)?;
+                    changed |= self.propagate_edge::<L>(stage, succ.target(), args, narrowing)?;
                 }
             }
             Continuation::Return(v) | Continuation::Yield(v) => {
@@ -301,12 +289,18 @@ where
     }
 
     /// Propagate a single control flow edge and enqueue the target if changed.
-    fn propagate_edge<L>(&mut self, target: Block, args: &[V], narrowing: bool) -> Result<bool, E>
+    fn propagate_edge<L>(
+        &mut self,
+        stage: &'ir kirin_ir::StageInfo<L>,
+        target: Block,
+        args: &[V],
+        narrowing: bool,
+    ) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
         L: Dialect + 'ir,
     {
-        if self.propagate_block_args::<L>(target, args, narrowing)? {
+        if self.propagate_block_args::<L>(stage, target, args, narrowing)? {
             if !narrowing {
                 let fp = self
                     .frames
@@ -323,60 +317,6 @@ where
         }
     }
 
-    /// Interpret all statements in a block sequentially, returning the
-    /// final control action from the terminator.
-    fn interpret_block<L>(&mut self, block: Block) -> Result<AbstractContinuation<V>, E>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L> + 'ir,
-    {
-        // Collect statement IDs and terminator up front (cheap Copy)
-        // to avoid holding a borrow on stage across interpret calls.
-        let (stmts, terminator) = {
-            let stage = self.resolve_stage::<L>();
-            let stmts: Vec<_> = block.statements(stage).collect();
-            let terminator = block.terminator(stage);
-            (stmts, terminator)
-        };
-
-        // Interpret each statement
-        for stmt in stmts {
-            let control = {
-                let stage = self.resolve_stage::<L>();
-                let def: &L = stmt.definition(stage);
-                def.interpret(self)?
-            };
-            match control {
-                Continuation::Continue => {}
-                Continuation::Call {
-                    callee,
-                    args,
-                    result,
-                } => {
-                    let handler = self
-                        .call_handler
-                        .expect("call_handler not set: analyze() must be used as entry point");
-                    let analysis = handler(self, callee, &args)?;
-                    let return_val = analysis.return_value().cloned().unwrap_or_else(V::bottom);
-                    self.write(result, return_val)?;
-                }
-                other => return Ok(other),
-            }
-        }
-
-        // Interpret the terminator
-        if let Some(term) = terminator {
-            let control = {
-                let stage = self.resolve_stage::<L>();
-                let def: &L = term.definition(stage);
-                def.interpret(self)?
-            };
-            Ok(control)
-        } else {
-            Err(InterpreterError::MissingEntry.into())
-        }
-    }
-
     /// Propagate block argument values to the target block. Only block
     /// argument SSA values are joined/widened — all other SSA values in
     /// the frame are write-once and shared across all paths.
@@ -384,6 +324,7 @@ where
     /// Returns `true` if the target's block arg state changed (or first visit).
     fn propagate_block_args<L>(
         &mut self,
+        stage: &'ir kirin_ir::StageInfo<L>,
         target: Block,
         args: &[V],
         narrowing: bool,
@@ -393,7 +334,6 @@ where
         L: Dialect + 'ir,
     {
         let target_arg_ssas: Vec<SSAValue> = {
-            let stage = self.resolve_stage::<L>();
             let block_info = target.expect_info(stage);
             block_info
                 .arguments

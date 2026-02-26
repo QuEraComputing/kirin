@@ -19,16 +19,16 @@ where
     }
 }
 
-impl<I, L, T> Interpretable<I, L> for FunctionBody<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for FunctionBody<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
-    L: Dialect,
+    L: Dialect + 'ir,
     T: kirin::prelude::CompileTimeValue + Default,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
-        let stage = interp.resolve_stage::<L>();
+        let stage = interp.active_stage_info::<L>();
         let entry = self
             .body
             .blocks(stage)
@@ -41,9 +41,9 @@ where
     }
 }
 
-impl<I, L, T> Interpretable<I, L> for Return<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Return<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: Clone,
     L: Dialect,
     T: kirin::prelude::CompileTimeValue + Default,

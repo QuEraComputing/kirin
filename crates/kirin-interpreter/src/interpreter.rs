@@ -15,7 +15,7 @@ use kirin_ir::{
 /// Call semantics are inherent on each interpreter type
 /// (e.g. [`crate::StackInterpreter::call`],
 /// [`crate::AbstractInterpreter::analyze`]).
-pub trait Interpreter: Sized {
+pub trait Interpreter<'ir>: Sized + 'ir {
     type Value;
     type Error;
     type Ext: fmt::Debug;
@@ -35,8 +35,11 @@ pub trait Interpreter: Sized {
     /// Bind a result to a value.
     fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;
 
+    /// Bind an SSA value directly (e.g. block arguments).
+    fn write_ssa(&mut self, ssa: SSAValue, value: Self::Value) -> Result<(), Self::Error>;
+
     /// Reference to the IR pipeline.
-    fn pipeline(&self) -> &Pipeline<Self::StageInfo>;
+    fn pipeline(&self) -> &'ir Pipeline<Self::StageInfo>;
 
     /// The currently active compilation stage.
     fn active_stage(&self) -> CompileStage;
@@ -46,7 +49,7 @@ pub trait Interpreter: Sized {
     /// # Panics
     ///
     /// Panics if the active stage does not contain a `StageInfo<L>`.
-    fn resolve_stage<L>(&self) -> &StageInfo<L>
+    fn active_stage_info<L>(&self) -> &'ir StageInfo<L>
     where
         Self::StageInfo: HasStageInfo<L>,
         L: Dialect,

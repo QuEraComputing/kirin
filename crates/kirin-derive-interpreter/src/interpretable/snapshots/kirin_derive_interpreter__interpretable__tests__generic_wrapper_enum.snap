@@ -3,13 +3,13 @@ source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
 expression: "case!\n{\n    #[kirin(type = T)] #[wraps] enum TestDialect<T>\n    { Arith(Arith<T>), ControlFlow(ControlFlow<T>), }\n}"
 ---
 #[automatically_derived]
-impl<T, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<__InterpI, __InterpL>
+impl<'__ir, T, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>
     for TestDialect<T>
 where
-    __InterpI: ::kirin_interpreter::Interpreter,
+    __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
     __InterpL: ::kirin_ir::Dialect,
-    Arith<T>: ::kirin_interpreter::Interpretable<__InterpI, __InterpL>,
-    ControlFlow<T>: ::kirin_interpreter::Interpretable<__InterpI, __InterpL>,
+    Arith<T>: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    ControlFlow<T>: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
 {
     fn interpret(
         &self,

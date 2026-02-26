@@ -3,11 +3,12 @@ source: crates/kirin-derive-interpreter/src/interpretable/tests.rs
 expression: "case!\n{ #[kirin(type = TestType)] struct Wrapper { #[wraps] inner: InnerType, } }"
 ---
 #[automatically_derived]
-impl<__InterpI, __InterpL> ::kirin_interpreter::Interpretable<__InterpI, __InterpL> for Wrapper
+impl<'__ir, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>
+    for Wrapper
 where
-    __InterpI: ::kirin_interpreter::Interpreter,
+    __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
     __InterpL: ::kirin_ir::Dialect,
-    InnerType: ::kirin_interpreter::Interpretable<__InterpI, __InterpL>,
+    InnerType: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
 {
     fn interpret(
         &self,

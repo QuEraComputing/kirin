@@ -37,9 +37,9 @@ impl CompareValue for i64 {
     }
 }
 
-impl<I, L, T> Interpretable<I, L> for Cmp<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Cmp<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: CompareValue,
     I::Error: From<InterpreterError>,
     L: Dialect,

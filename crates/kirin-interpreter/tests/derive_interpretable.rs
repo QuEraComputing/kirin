@@ -24,9 +24,9 @@ pub enum DerivedDialect {
 }
 
 // CallSemantics impl (needed by StackInterpreter::call)
-impl<I> CallSemantics<I, DerivedDialect> for DerivedDialect
+impl<'ir, I> CallSemantics<'ir, I, DerivedDialect> for DerivedDialect
 where
-    I: Interpreter<Error = InterpreterError>,
+    I: Interpreter<'ir, Error = InterpreterError>,
     I::StageInfo: HasStageInfo<DerivedDialect>,
     I::Value: std::ops::Add<Output = I::Value>
         + std::ops::Sub<Output = I::Value>
@@ -36,9 +36,9 @@ where
         + std::ops::Neg<Output = I::Value>
         + From<ArithValue>
         + BranchCondition,
-    FunctionBody<ArithType>: CallSemantics<I, DerivedDialect>,
+    FunctionBody<ArithType>: CallSemantics<'ir, I, DerivedDialect>,
 {
-    type Result = <FunctionBody<ArithType> as CallSemantics<I, DerivedDialect>>::Result;
+    type Result = <FunctionBody<ArithType> as CallSemantics<'ir, I, DerivedDialect>>::Result;
 
     fn call_semantics(
         &self,

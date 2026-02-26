@@ -5,9 +5,9 @@ use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterErr
 
 use crate::Bitwise;
 
-impl<I, L, T> Interpretable<I, L> for Bitwise<T>
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Bitwise<T>
 where
-    I: Interpreter,
+    I: Interpreter<'ir>,
     I::Value: Clone
         + BitAnd<Output = I::Value>
         + BitOr<Output = I::Value>

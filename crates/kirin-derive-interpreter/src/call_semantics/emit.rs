@@ -23,15 +23,15 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
 
             Ok(quote! {
                 #[automatically_derived]
-                impl #impl_generics #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>
+                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
-                    __CallSemI: #interp_crate::Interpreter,
+                    __CallSemI: #interp_crate::Interpreter<'__ir>,
                     __CallSemI::Error: From<#interp_crate::InterpreterError>,
-                    #wrapper_ty: #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>,
+                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
                     #where_clause
                 {
-                    type Result = <#wrapper_ty as #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>>::Result;
+                    type Result = <#wrapper_ty as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result;
 
                     fn call_semantics(
                         &self,
@@ -47,10 +47,10 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
         } else {
             Ok(quote! {
                 #[automatically_derived]
-                impl #impl_generics #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>
+                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
-                    __CallSemI: #interp_crate::Interpreter,
+                    __CallSemI: #interp_crate::Interpreter<'__ir>,
                     __CallSemI::Error: From<#interp_crate::InterpreterError>,
                     #where_clause
                 {
@@ -122,7 +122,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
         }
 
         let result_type = if let Some(first_wrapper) = wrapper_types.first() {
-            quote! { <#first_wrapper as #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>>::Result }
+            quote! { <#first_wrapper as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result }
         } else {
             quote! { __CallSemI::Value }
         };
@@ -133,7 +133,7 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
             .map(|(i, ty)| {
                 if i == 0 {
                     quote! {
-                        #ty: #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>,
+                        #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
                     }
                 } else {
                     quote! {
@@ -145,10 +145,10 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
 
         Ok(quote! {
             #[automatically_derived]
-            impl #impl_generics #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics>
+            impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
                 for #type_name #ty_generics
             where
-                __CallSemI: #interp_crate::Interpreter,
+                __CallSemI: #interp_crate::Interpreter<'__ir>,
                 __CallSemI::Error: From<#interp_crate::InterpreterError>,
                 #(#where_bounds)*
                 #where_clause
@@ -172,7 +172,11 @@ impl<'ir> Emit<'ir, CallSemanticsLayout> for DeriveCallSemantics {
 
 fn add_interpreter_param(base: &syn::Generics) -> syn::Generics {
     let mut generics = base.clone();
+    let lt_param: syn::LifetimeParam = syn::parse_quote! { '__ir };
     let param: syn::TypeParam = syn::parse_quote! { __CallSemI };
+    generics
+        .params
+        .insert(0, syn::GenericParam::Lifetime(lt_param));
     generics.params.push(syn::GenericParam::Type(param));
     generics
 }

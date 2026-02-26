@@ -184,11 +184,12 @@ where
 
 // -- Interpreter trait impl -------------------------------------------------
 
-impl<'ir, V, S, E, G> Interpreter for StackInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G> Interpreter<'ir> for StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo,
+    V: Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: CompileStageInfo + 'ir,
+    G: 'ir,
 {
     type Value = V;
     type Error = E;
@@ -206,6 +207,11 @@ where
         Ok(())
     }
 
+    fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
+        self.current_frame_mut()?.write_ssa(ssa, value);
+        Ok(())
+    }
+
     fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline
     }
@@ -219,17 +225,18 @@ where
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo,
+    V: Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: CompileStageInfo + 'ir,
+    G: 'ir,
 {
     /// Call a specialized function and return its result value.
     pub fn call<L>(&mut self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: Dialect + Interpretable<Self, L> + CallSemantics<Self, L, Result = V>,
+        L: Dialect + Interpretable<'ir, Self, L> + CallSemantics<'ir, Self, L, Result = V>,
         S: HasStageInfo<L>,
     {
-        let stage = self.resolve_stage::<L>();
+        let stage = self.active_stage_info::<L>();
         let spec = callee.expect_info(stage);
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
@@ -241,16 +248,17 @@ where
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone,
-    E: From<InterpreterError>,
-    S: CompileStageInfo,
+    V: Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: CompileStageInfo + 'ir,
+    G: 'ir,
 {
     /// Execute the current statement's dialect semantics.
     /// Returns the raw [`ConcreteContinuation`] without advancing the cursor.
     pub fn step<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
         if let Some(ref mut fuel) = self.fuel {
             if *fuel == 0 {
@@ -258,7 +266,7 @@ where
             }
             *fuel -= 1;
         }
-        let stage = self.resolve_stage::<L>();
+        let stage = self.active_stage_info::<L>();
         let cursor = self
             .current_frame()?
             .cursor()
@@ -271,15 +279,16 @@ where
     pub fn advance<L>(&mut self, control: &ConcreteContinuation<V>) -> Result<(), E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
         match control {
             Continuation::Continue => {
                 self.advance_cursor::<L>()?;
             }
             Continuation::Jump(succ, args) => {
-                self.bind_block_args::<L>(succ.target(), args)?;
-                let first = self.first_stmt_in_block::<L>(succ.target());
+                let stage = self.active_stage_info::<L>();
+                crate::BlockExecutor::bind_block_args(self, stage, succ.target(), args)?;
+                let first = succ.target().first_statement(stage);
                 self.current_frame_mut()?.set_cursor(first);
             }
             Continuation::Fork(_) => {
@@ -296,7 +305,7 @@ where
                 self.pop_call_frame()?;
             }
             Continuation::Yield(_) => {
-                // No cursor change — the parent op (e.g. execute_block) handles this
+                // No cursor change — the parent op (e.g. eval_block) handles this
             }
             Continuation::Ext(ConcreteExt::Break | ConcreteExt::Halt) => {
                 // No cursor change
@@ -310,7 +319,7 @@ where
     pub fn run<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
         loop {
             let control = self.step::<L>()?;
@@ -330,7 +339,7 @@ where
     pub fn run_until_break<L>(&mut self) -> Result<ConcreteContinuation<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
         loop {
             if let Some(cursor) = self.current_frame()?.cursor() {
@@ -350,29 +359,13 @@ where
 
     // -- Internal helpers ---------------------------------------------------
 
-    /// Resolve the [`StageInfo`] for dialect `L` from the active stage.
-    ///
-    /// This inherent method shadows [`Interpreter::resolve_stage`] to return
-    /// a reference with the pipeline lifetime `'ir` instead of `&self`,
-    /// allowing subsequent mutable borrows of `self`.
-    pub(crate) fn resolve_stage<L>(&self) -> &'ir kirin_ir::StageInfo<L>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect,
-    {
-        self.pipeline
-            .stage(self.active_stage)
-            .and_then(|s| s.try_stage_info())
-            .expect("active stage does not contain StageInfo for this dialect")
-    }
-
     /// Advance the current frame's cursor past the current statement.
     fn advance_cursor<L>(&mut self) -> Result<(), E>
     where
         S: HasStageInfo<L>,
         L: Dialect,
     {
-        let stage = self.resolve_stage::<L>();
+        let stage = self.active_stage_info::<L>();
         let cursor = self
             .current_frame()?
             .cursor()
@@ -404,41 +397,6 @@ where
         self.frames.len()
     }
 
-    pub(crate) fn first_stmt_in_block<L>(&self, block: Block) -> Option<Statement>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect,
-    {
-        let stage = self.resolve_stage::<L>();
-        let block_info = block.expect_info(stage);
-        if let Some(&head) = block_info.statements.head() {
-            Some(head)
-        } else {
-            block_info.terminator
-        }
-    }
-
-    pub(crate) fn bind_block_args<L>(&mut self, block: Block, args: &[V]) -> Result<(), E>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect,
-    {
-        let stage = self.resolve_stage::<L>();
-        let block_info = block.expect_info(stage);
-        if block_info.arguments.len() != args.len() {
-            return Err(InterpreterError::ArityMismatch {
-                expected: block_info.arguments.len(),
-                got: args.len(),
-            }
-            .into());
-        }
-        for (ba, val) in block_info.arguments.iter().zip(args.iter()) {
-            self.current_frame_mut()?
-                .write_ssa(SSAValue::from(*ba), val.clone());
-        }
-        Ok(())
-    }
-
     /// Create a new frame for `callee`, bind arguments, and push it.
     ///
     /// Entry block resolution is delegated to the body statement's
@@ -450,39 +408,25 @@ where
     ) -> Result<(), E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<Self, L>,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
         // Delegate entry resolution to the body statement's Interpretable impl
-        let entry = {
-            let stage = self.resolve_stage::<L>();
+        let entry_block = {
+            let stage = self.active_stage_info::<L>();
             let spec = callee.expect_info(stage);
             let body_stmt = *spec.body();
             let def: &L = body_stmt.definition(stage);
             match def.interpret(self)? {
-                Continuation::Jump(succ, _) => self.first_stmt_in_block::<L>(succ.target()),
+                Continuation::Jump(succ, _) => Some(succ.target()),
                 _ => None,
             }
         };
-        let mut frame = Frame::new(callee, entry);
-        if let Some(entry_stmt) = entry {
-            let stage = self.resolve_stage::<L>();
-            let parent_block = *entry_stmt.parent::<L>(stage);
-            if let Some(block) = parent_block {
-                let block_info = block.expect_info(stage);
-                if block_info.arguments.len() != args.len() {
-                    return Err(InterpreterError::ArityMismatch {
-                        expected: block_info.arguments.len(),
-                        got: args.len(),
-                    }
-                    .into());
-                }
-                for (ba, val) in block_info.arguments.iter().zip(args.iter()) {
-                    frame.write_ssa(SSAValue::from(*ba), val.clone());
-                }
-            }
+        let stage = self.active_stage_info::<L>();
+        let first = entry_block.and_then(|b| b.first_statement(stage));
+        self.push_call_frame(Frame::new(callee, first))?;
+        if let Some(block) = entry_block {
+            crate::BlockExecutor::bind_block_args(self, stage, block, args)?;
         }
-        self.push_call_frame(frame)?;
         Ok(())
     }
 }
-
