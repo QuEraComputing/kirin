@@ -1,4 +1,6 @@
-use kirin_ir::{Block, Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta};
+use kirin_ir::{
+    Block, Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta, SupportsStageDispatch,
+};
 
 use crate::{Interpreter, InterpreterError};
 
@@ -40,6 +42,13 @@ where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
+    S: SupportsStageDispatch<
+            crate::stack::FrameDispatchAction<'ir, V, S, E, G>,
+            crate::stack::DynFrameDispatch<'ir, V, S, E, G>,
+            E,
+        >,
+    for<'a> S:
+        SupportsStageDispatch<crate::stack::PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
     G: 'ir,
     L: Dialect + crate::Interpretable<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
@@ -56,14 +65,15 @@ where
 
         // Push frame and bind entry block args
         let first = entry.first_statement(stage);
-        interp.push_call_frame(crate::Frame::new(callee, first))?;
+        let frame_stage = stage.stage_id().unwrap_or_else(|| interp.active_stage());
+        interp.push_frame(crate::Frame::new(callee, frame_stage, first))?;
         crate::EvalBlock::bind_block_args(interp, stage, entry, args)?;
 
-        let initial_depth = interp.frames_len();
+        let initial_depth = interp.frame_depth();
         let mut pending_results: Vec<kirin_ir::ResultValue> = Vec::new();
 
         loop {
-            let control = interp.run::<L>()?;
+            let control = interp.run()?;
             match &control {
                 crate::Continuation::Call { result, .. } => pending_results.push(*result),
                 crate::Continuation::Ext(crate::ConcreteExt::Halt) => {
@@ -85,10 +95,10 @@ where
                 _ => None,
             };
 
-            interp.advance::<L>(&control)?;
+            interp.advance(&control)?;
 
             if let Some(v) = v {
-                if interp.frames_len() < initial_depth {
+                if interp.frame_depth() < initial_depth {
                     return Ok(v);
                 }
                 let result = pending_results
@@ -125,9 +135,10 @@ where
         args: &[V],
     ) -> Result<crate::AnalysisResult<V>, E> {
         let entry = self.entry_block::<L>(stage)?;
+        let stage_id = stage.stage_id().unwrap_or_else(|| interp.active_stage());
 
         // Insert tentative summary before pushing frame
-        interp.set_tentative(callee, args, crate::AnalysisResult::bottom());
+        interp.set_tentative(stage_id, callee, args, crate::AnalysisResult::bottom());
 
         // Outer fixpoint loop for inter-procedural convergence
         let max_iters = interp.max_summary_iterations();
@@ -139,17 +150,21 @@ where
             }
 
             // Push frame and run forward analysis
-            interp.push_analysis_frame(callee);
-            let result = interp.run_forward::<L>(entry, args);
-            interp.pop_analysis_frame();
+            interp.push_frame(crate::Frame::new(
+                callee,
+                stage_id,
+                crate::FixpointState::default(),
+            ))?;
+            let result = interp.run_forward::<L>(stage_id, entry, args);
+            let _ = interp.pop_frame()?;
 
             let result = result?;
 
             // Check convergence against old tentative result
-            let old_result = interp.tentative_result(callee).cloned();
+            let old_result = interp.tentative_result(stage_id, callee).cloned();
 
             // Update tentative summary
-            interp.set_tentative(callee, args, result.clone());
+            interp.set_tentative(stage_id, callee, args, result.clone());
 
             // Converged if all block argument states and return value stabilized
             let converged = match old_result {
@@ -163,7 +178,7 @@ where
         };
 
         // Promote tentative to computed entry
-        interp.promote_tentative(callee, args, final_result.clone());
+        interp.promote_tentative(stage_id, callee, args, final_result.clone());
 
         Ok(final_result)
     }

@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use kirin_ir::{ResultValue, SpecializedFunction, Successor};
+use kirin_ir::{CompileStage, ResultValue, SpecializedFunction, Successor};
 use smallvec::SmallVec;
 
 /// Inline argument list for continuation variants.
@@ -35,6 +35,7 @@ pub enum Continuation<V, Ext = Infallible> {
     /// to `result` in the caller's frame.
     Call {
         callee: SpecializedFunction,
+        stage: CompileStage,
         args: Args<V>,
         /// Where to write the return value in the caller's frame.
         result: ResultValue,

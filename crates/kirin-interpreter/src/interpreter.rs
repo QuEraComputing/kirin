@@ -1,8 +1,11 @@
 use std::fmt;
 
 use kirin_ir::{
-    CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue, StageInfo, StageMeta,
+    CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue, StageDispatchMiss,
+    StageInfo, StageMeta, SupportsStageDispatch,
 };
+
+use crate::InterpreterError;
 
 /// Minimal state contract for interpreter implementations.
 ///
@@ -57,5 +60,58 @@ pub trait Interpreter<'ir>: Sized + 'ir {
             .stage(self.active_stage())
             .and_then(|s| s.try_stage_info())
             .expect("active stage does not contain StageInfo for this dialect")
+    }
+
+    /// Resolve a stage-specific dialect view for `stage_id` with explicit
+    /// errors instead of panicking.
+    fn resolve_stage_info<L>(
+        &self,
+        stage_id: CompileStage,
+    ) -> Result<&'ir StageInfo<L>, Self::Error>
+    where
+        Self::StageInfo: HasStageInfo<L>,
+        L: Dialect,
+        Self::Error: From<InterpreterError>,
+    {
+        let stage = self
+            .pipeline()
+            .stage(stage_id)
+            .ok_or_else(|| InterpreterError::MissingStage { stage: stage_id })?;
+        <Self::StageInfo as HasStageInfo<L>>::try_stage_info(stage).ok_or_else(|| {
+            InterpreterError::TypedStageMismatch {
+                frame_stage: stage_id,
+            }
+            .into()
+        })
+    }
+
+    /// Convert a stage-dispatch miss into the framework error model.
+    fn map_dispatch_miss(stage_id: CompileStage, miss: StageDispatchMiss) -> Self::Error
+    where
+        Self::Error: From<InterpreterError>,
+    {
+        match miss {
+            StageDispatchMiss::MissingStage => InterpreterError::MissingStage { stage: stage_id },
+            StageDispatchMiss::MissingDialect => {
+                InterpreterError::MissingStageDialect { stage: stage_id }
+            }
+        }
+        .into()
+    }
+
+    /// Dispatch a runtime action against `stage_id` using `pipeline`, mapping
+    /// dispatch misses to [`InterpreterError`] variants.
+    fn dispatch_in_pipeline<A, R>(
+        pipeline: &'ir Pipeline<Self::StageInfo>,
+        stage_id: CompileStage,
+        action: &mut A,
+    ) -> Result<R, Self::Error>
+    where
+        Self::StageInfo: SupportsStageDispatch<A, R, Self::Error>,
+        Self::Error: From<InterpreterError>,
+    {
+        pipeline.dispatch_stage_or_else(stage_id, action, |miss| {
+            Self::map_dispatch_miss(stage_id, miss)
+        })
     }
 }

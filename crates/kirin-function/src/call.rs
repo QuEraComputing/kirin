@@ -11,3 +11,17 @@ pub struct Call<T: CompileTimeValue + Default> {
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
+
+impl<T: CompileTimeValue + Default> Call<T> {
+    pub fn target(&self) -> Symbol {
+        self.target
+    }
+
+    pub fn args(&self) -> &[SSAValue] {
+        &self.args
+    }
+
+    pub fn result(&self) -> ResultValue {
+        self.res
+    }
+}

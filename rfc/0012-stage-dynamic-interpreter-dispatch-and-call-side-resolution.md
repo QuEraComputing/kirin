@@ -1,11 +1,11 @@
 +++
 rfc = "0012"
 title = "stage-dynamic interpreter dispatch and call-side resolution"
-status = "Draft"
+status = "Implemented"
 agents = ["codex"]
 authors = ["Roger-luo <code@rogerluo.dev>"]
 created = "2026-02-27T03:34:09.8553Z"
-last_updated = "2026-02-27T03:34:09.8553Z"
+last_updated = "2026-02-27T05:20:31.40364Z"
 +++
 
 # RFC 0012: stage-dynamic interpreter dispatch and call-side resolution
@@ -83,21 +83,21 @@ only:
 
 Typed APIs remain valid when users know the active language/stage pair:
 
-- `step::<L>`
-- `advance::<L>`
-- `run::<L>`
-- `run_until_break::<L>`
+- `step_in_stage::<L>`
+- `advance_in_stage::<L>`
+- `run_in_stage::<L>`
+- `run_until_break_in_stage::<L>`
 
 These typed APIs become strict: if the current frame stage does not contain
 `StageInfo<L>`, they return an explicit error. Dynamic APIs are introduced for
 mixed-stage flows:
 
-- `step_dyn`
-- `advance_dyn`
-- `run_dyn`
-- `run_until_break_dyn`
-- `call_dyn`
-- `analyze_dyn`
+- `step`
+- `advance`
+- `run`
+- `run_until_break`
+- `call`
+- `analyze`
 
 ## Reference-level Explanation
 
@@ -223,7 +223,7 @@ Resolution invariant (`unique-or-error`, initial policy):
   2. Update all `Continuation::Call` pattern matches to destructure `stage`.
   3. Move abstract-function-to-specialized-function resolution logic into
      call-op `Interpretable` implementations.
-  4. Route mixed-stage execution flows to dynamic APIs (`*_dyn`).
+  4. Route mixed-stage execution flows to dynamic APIs (no `_dyn` suffix).
 - Compatibility strategy:
   - typed APIs remain available and are strict by design.
   - dynamic APIs are additive and used for cross-stage chains.

@@ -110,6 +110,6 @@ fn test_derived_interpretable() {
     let mut interp: StackInterpreter<'_, i64, StageInfo<DerivedDialect>> =
         StackInterpreter::new(&pipeline, stage_id);
 
-    let result = interp.call::<DerivedDialect>(sf, &[10i64]);
+    let result = interp.call_in_stage::<DerivedDialect>(sf, &[10i64]);
     assert_eq!(result.unwrap(), 11);
 }

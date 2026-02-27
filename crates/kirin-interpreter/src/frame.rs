@@ -1,4 +1,4 @@
-use kirin_ir::{ResultValue, SSAValue, SpecializedFunction, Statement};
+use kirin_ir::{CompileStage, ResultValue, SSAValue, SpecializedFunction, Statement};
 use rustc_hash::FxHashMap;
 
 /// A call frame for one [`SpecializedFunction`] invocation.
@@ -13,6 +13,7 @@ use rustc_hash::FxHashMap;
 #[derive(Debug)]
 pub struct Frame<V, X> {
     callee: SpecializedFunction,
+    stage: CompileStage,
     values: FxHashMap<SSAValue, V>,
     extra: X,
 }
@@ -20,9 +21,10 @@ pub struct Frame<V, X> {
 // -- Common methods ---------------------------------------------------------
 
 impl<V, X> Frame<V, X> {
-    pub fn new(callee: SpecializedFunction, extra: X) -> Self {
+    pub fn new(callee: SpecializedFunction, stage: CompileStage, extra: X) -> Self {
         Self {
             callee,
+            stage,
             values: FxHashMap::default(),
             extra,
         }
@@ -30,11 +32,13 @@ impl<V, X> Frame<V, X> {
 
     pub fn with_values(
         callee: SpecializedFunction,
+        stage: CompileStage,
         values: FxHashMap<SSAValue, V>,
         extra: X,
     ) -> Self {
         Self {
             callee,
+            stage,
             values,
             extra,
         }
@@ -42,6 +46,10 @@ impl<V, X> Frame<V, X> {
 
     pub fn callee(&self) -> SpecializedFunction {
         self.callee
+    }
+
+    pub fn stage(&self) -> CompileStage {
+        self.stage
     }
 
     pub fn extra(&self) -> &X {
@@ -75,8 +83,8 @@ impl<V, X> Frame<V, X> {
     }
 
     /// Consume the frame, returning its constituent parts.
-    pub fn into_parts(self) -> (SpecializedFunction, FxHashMap<SSAValue, V>, X) {
-        (self.callee, self.values, self.extra)
+    pub fn into_parts(self) -> (SpecializedFunction, CompileStage, FxHashMap<SSAValue, V>, X) {
+        (self.callee, self.stage, self.values, self.extra)
     }
 }
 

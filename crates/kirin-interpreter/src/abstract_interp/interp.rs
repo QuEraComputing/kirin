@@ -8,6 +8,12 @@ use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
 use crate::{AbstractValue, Frame, Interpreter, InterpreterError};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct SummaryKey {
+    pub(crate) stage: CompileStage,
+    pub(crate) callee: SpecializedFunction,
+}
+
 /// Worklist-based abstract interpreter for fixpoint computation.
 ///
 /// Unlike [`crate::StackInterpreter`] which follows a single concrete execution
@@ -21,13 +27,13 @@ where
     S: StageMeta,
 {
     pub(crate) pipeline: &'ir Pipeline<S>,
-    pub(crate) active_stage: CompileStage,
+    pub(crate) root_stage: CompileStage,
     pub(crate) global: G,
     pub(crate) frames: Vec<Frame<V, FixpointState>>,
     pub(crate) widening_strategy: WideningStrategy,
     pub(crate) max_iterations: usize,
     pub(crate) narrowing_iterations: usize,
-    pub(crate) summaries: FxHashMap<SpecializedFunction, SummaryCache<V>>,
+    pub(crate) summaries: FxHashMap<SummaryKey, SummaryCache<V>>,
     pub(crate) max_depth: Option<usize>,
     pub(crate) max_summary_iterations: usize,
     /// Type-erased call handler installed by [`analyze`](Self::analyze) so that
@@ -37,6 +43,7 @@ where
         fn(
             &mut AbstractInterpreter<'ir, V, S, E, G>,
             SpecializedFunction,
+            CompileStage,
             &[V],
         ) -> Result<AnalysisResult<V>, E>,
     >,
@@ -45,13 +52,14 @@ where
 
 /// Builder for inserting function summaries into an [`AbstractInterpreter`].
 ///
-/// Obtained via [`AbstractInterpreter::insert_summary`].
+/// Obtained via [`AbstractInterpreter::insert_summary`] or
+/// [`AbstractInterpreter::insert_summary_in_stage`].
 pub struct SummaryInserter<'a, 'ir, V, S, E, G>
 where
     S: StageMeta,
 {
     interp: &'a mut AbstractInterpreter<'ir, V, S, E, G>,
-    callee: SpecializedFunction,
+    key: SummaryKey,
 }
 
 impl<V: Clone, S: StageMeta, E, G> SummaryInserter<'_, '_, V, S, E, G> {
@@ -59,7 +67,7 @@ impl<V: Clone, S: StageMeta, E, G> SummaryInserter<'_, '_, V, S, E, G> {
     pub fn fixed(self, result: AnalysisResult<V>) {
         self.interp
             .summaries
-            .entry(self.callee)
+            .entry(self.key)
             .or_default()
             .set_fixed(result);
     }
@@ -68,7 +76,7 @@ impl<V: Clone, S: StageMeta, E, G> SummaryInserter<'_, '_, V, S, E, G> {
     pub fn seed(self, args: Vec<V>, result: AnalysisResult<V>) {
         self.interp
             .summaries
-            .entry(self.callee)
+            .entry(self.key)
             .or_default()
             .push_entry(args, result);
     }
@@ -80,11 +88,26 @@ impl<'ir, V, S, E> AbstractInterpreter<'ir, V, S, E, ()>
 where
     S: StageMeta,
 {
-    pub fn new(pipeline: &'ir Pipeline<S>, active_stage: CompileStage) -> Self {
+    /// Create an abstract interpreter with unit global state.
+    ///
+    /// The interpreter is rooted at `stage` when no frame is active.
+    pub fn new(pipeline: &'ir Pipeline<S>, stage: CompileStage) -> Self {
+        Self::new_with_global(pipeline, stage, ())
+    }
+}
+
+impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
+where
+    S: StageMeta,
+{
+    /// Create an abstract interpreter with explicit global state.
+    ///
+    /// The interpreter is rooted at `stage` when no frame is active.
+    pub fn new_with_global(pipeline: &'ir Pipeline<S>, stage: CompileStage, global: G) -> Self {
         Self {
             pipeline,
-            active_stage,
-            global: (),
+            root_stage: stage,
+            global,
             widening_strategy: WideningStrategy::AllJoins,
             max_iterations: 1000,
             narrowing_iterations: 3,
@@ -92,24 +115,6 @@ where
             summaries: FxHashMap::default(),
             max_depth: None,
             max_summary_iterations: 100,
-            call_handler: None,
-            _error: PhantomData,
-        }
-    }
-
-    /// Attach global state, transforming `G` from `()` to the provided type.
-    pub fn with_global<G>(self, global: G) -> AbstractInterpreter<'ir, V, S, E, G> {
-        AbstractInterpreter {
-            pipeline: self.pipeline,
-            active_stage: self.active_stage,
-            global,
-            widening_strategy: self.widening_strategy,
-            max_iterations: self.max_iterations,
-            narrowing_iterations: self.narrowing_iterations,
-            frames: self.frames,
-            summaries: self.summaries,
-            max_depth: self.max_depth,
-            max_summary_iterations: self.max_summary_iterations,
             call_handler: None,
             _error: PhantomData,
         }
@@ -122,26 +127,31 @@ impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
     S: StageMeta,
 {
+    /// Configure widening behavior used at fixpoint join points.
     pub fn with_widening(mut self, strategy: WideningStrategy) -> Self {
         self.widening_strategy = strategy;
         self
     }
 
+    /// Configure the maximum worklist iterations in one `run_forward` pass.
     pub fn with_max_iterations(mut self, max: usize) -> Self {
         self.max_iterations = max;
         self
     }
 
+    /// Configure post-fixpoint narrowing iterations.
     pub fn with_narrowing_iterations(mut self, n: usize) -> Self {
         self.narrowing_iterations = n;
         self
     }
 
+    /// Configure maximum frame depth for recursive analysis.
     pub fn with_max_depth(mut self, depth: usize) -> Self {
         self.max_depth = Some(depth);
         self
     }
 
+    /// Configure maximum outer summary refinement iterations per function.
     pub fn with_max_summary_iterations(mut self, n: usize) -> Self {
         self.max_summary_iterations = n;
         self
@@ -154,51 +164,97 @@ impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
 where
     S: StageMeta,
 {
+    /// Borrow immutable interpreter-global state.
     pub fn global(&self) -> &G {
         &self.global
     }
 
+    /// Borrow mutable interpreter-global state.
     pub fn global_mut(&mut self) -> &mut G {
         &mut self.global
     }
 
-    /// Look up the best cached summary for `callee` given `args`.
-    ///
-    /// Returns the fixed summary if one exists, otherwise finds the tightest
-    /// non-invalidated entry whose cached args subsume the query.
+    pub(crate) fn summary_key(stage: CompileStage, callee: SpecializedFunction) -> SummaryKey {
+        SummaryKey { stage, callee }
+    }
+
+    fn current_summary_stage(&self) -> CompileStage {
+        self.frames
+            .last()
+            .map(Frame::stage)
+            .unwrap_or(self.root_stage)
+    }
+
+    /// Look up the best cached summary for `callee` in the interpreter's
+    /// current active stage.
     pub fn summary(&self, callee: SpecializedFunction, args: &[V]) -> Option<&AnalysisResult<V>>
     where
         V: AbstractValue + Clone,
     {
-        self.summaries.get(&callee)?.lookup(args)
+        self.summary_in_stage(self.current_summary_stage(), callee, args)
     }
 
-    /// Look up the full summary cache for `callee`.
+    /// Look up the best cached summary for `(stage, callee)` given `args`.
+    pub fn summary_in_stage(
+        &self,
+        stage: CompileStage,
+        callee: SpecializedFunction,
+        args: &[V],
+    ) -> Option<&AnalysisResult<V>>
+    where
+        V: AbstractValue + Clone,
+    {
+        self.summaries
+            .get(&Self::summary_key(stage, callee))?
+            .lookup(args)
+    }
+
+    /// Look up the full summary cache for `callee` in the active stage.
     pub fn summary_cache(&self, callee: SpecializedFunction) -> Option<&SummaryCache<V>> {
-        self.summaries.get(&callee)
+        self.summary_cache_in_stage(self.current_summary_stage(), callee)
     }
 
-    /// Return a builder for inserting a function summary.
+    /// Look up the full summary cache for `(stage, callee)`.
+    pub fn summary_cache_in_stage(
+        &self,
+        stage: CompileStage,
+        callee: SpecializedFunction,
+    ) -> Option<&SummaryCache<V>> {
+        self.summaries.get(&Self::summary_key(stage, callee))
+    }
+
+    /// Return a builder for inserting a function summary in the active stage.
     pub fn insert_summary(
         &mut self,
         callee: SpecializedFunction,
     ) -> SummaryInserter<'_, 'ir, V, S, E, G> {
+        self.insert_summary_in_stage(self.current_summary_stage(), callee)
+    }
+
+    /// Return a builder for inserting a function summary in `stage`.
+    pub fn insert_summary_in_stage(
+        &mut self,
+        stage: CompileStage,
+        callee: SpecializedFunction,
+    ) -> SummaryInserter<'_, 'ir, V, S, E, G> {
         SummaryInserter {
             interp: self,
-            callee,
+            key: Self::summary_key(stage, callee),
         }
     }
 
-    /// Mark all computed entries for `callee` as invalidated so the next
-    /// [`analyze`](Self::analyze) call re-runs the analysis. Invalidated
-    /// entries are retained (for inspection) until
-    /// [`gc_summaries`](Self::gc_summaries) is called.
-    ///
-    /// User-fixed summaries are **not** affected.
-    ///
-    /// Returns the number of entries invalidated.
+    /// Mark all computed entries for `callee` in the active stage as invalidated.
     pub fn invalidate_summary(&mut self, callee: SpecializedFunction) -> usize {
-        let Some(cache) = self.summaries.get_mut(&callee) else {
+        self.invalidate_summary_in_stage(self.current_summary_stage(), callee)
+    }
+
+    /// Mark all computed entries for `(stage, callee)` as invalidated.
+    pub fn invalidate_summary_in_stage(
+        &mut self,
+        stage: CompileStage,
+        callee: SpecializedFunction,
+    ) -> usize {
+        let Some(cache) = self.summaries.get_mut(&Self::summary_key(stage, callee)) else {
             return 0;
         };
         cache.invalidate()
@@ -212,11 +268,82 @@ where
         self.summaries.retain(|_, cache| !cache.is_empty());
     }
 
-    /// Unconditionally remove all summaries (including user-fixed) for `callee`.
-    ///
-    /// Returns `true` if a cache entry was present.
+    /// Unconditionally remove all summaries (including user-fixed) for
+    /// `callee` in the active stage.
     pub fn remove_summary(&mut self, callee: SpecializedFunction) -> bool {
-        self.summaries.remove(&callee).is_some()
+        self.remove_summary_in_stage(self.current_summary_stage(), callee)
+    }
+
+    /// Unconditionally remove all summaries (including user-fixed) for
+    /// `(stage, callee)`.
+    pub fn remove_summary_in_stage(
+        &mut self,
+        stage: CompileStage,
+        callee: SpecializedFunction,
+    ) -> bool {
+        self.summaries
+            .remove(&Self::summary_key(stage, callee))
+            .is_some()
+    }
+}
+
+impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
+where
+    V: AbstractValue + Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: StageMeta + 'ir,
+    G: 'ir,
+{
+    pub(crate) fn current_frame_ref(&self) -> Result<&Frame<V, FixpointState>, E> {
+        self.frames
+            .last()
+            .ok_or_else(|| InterpreterError::NoFrame.into())
+    }
+
+    pub(crate) fn current_frame_mut_ref(&mut self) -> Result<&mut Frame<V, FixpointState>, E> {
+        self.frames
+            .last_mut()
+            .ok_or_else(|| InterpreterError::NoFrame.into())
+    }
+
+    pub(crate) fn push_frame(&mut self, frame: Frame<V, FixpointState>) -> Result<(), E> {
+        if let Some(max) = self.max_depth {
+            if self.frames.len() >= max {
+                return Err(InterpreterError::MaxDepthExceeded.into());
+            }
+        }
+        self.frames.push(frame);
+        Ok(())
+    }
+
+    pub(crate) fn pop_frame(&mut self) -> Result<Frame<V, FixpointState>, E> {
+        self.frames
+            .pop()
+            .ok_or_else(|| InterpreterError::NoFrame.into())
+    }
+
+    fn active_stage_from_frames(&self) -> CompileStage {
+        self.frames
+            .last()
+            .map(Frame::stage)
+            .unwrap_or(self.root_stage)
+    }
+
+    fn read_ref_from_current_frame(&self, value: SSAValue) -> Result<&V, E> {
+        let frame = self.current_frame_ref()?;
+        frame
+            .read(value)
+            .ok_or_else(|| InterpreterError::UnboundValue(value).into())
+    }
+
+    fn write_to_current_frame(&mut self, result: ResultValue, value: V) -> Result<(), E> {
+        self.current_frame_mut_ref()?.write(result, value);
+        Ok(())
+    }
+
+    fn write_ssa_to_current_frame(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
+        self.current_frame_mut_ref()?.write_ssa(ssa, value);
+        Ok(())
     }
 }
 
@@ -235,26 +362,15 @@ where
     type StageInfo = S;
 
     fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
-        self.frames
-            .last()
-            .and_then(|f| f.read(value))
-            .ok_or_else(|| InterpreterError::UnboundValue(value).into())
+        self.read_ref_from_current_frame(value)
     }
 
     fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.frames
-            .last_mut()
-            .ok_or_else(|| InterpreterError::NoFrame.into())?
-            .write(result, value);
-        Ok(())
+        self.write_to_current_frame(result, value)
     }
 
     fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.frames
-            .last_mut()
-            .ok_or_else(|| InterpreterError::NoFrame.into())?
-            .write_ssa(ssa, value);
-        Ok(())
+        self.write_ssa_to_current_frame(ssa, value)
     }
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
@@ -262,6 +378,6 @@ where
     }
 
     fn active_stage(&self) -> CompileStage {
-        self.active_stage
+        self.active_stage_from_frames()
     }
 }

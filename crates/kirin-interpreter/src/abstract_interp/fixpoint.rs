@@ -1,9 +1,11 @@
-use kirin_ir::{Block, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction, StageMeta};
+use kirin_ir::{
+    Block, CompileStage, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction,
+    StageAction, StageInfo, StageMeta, SupportsStageDispatch,
+};
 
-use super::FixpointState;
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractContinuation, AbstractValue, Continuation, EvalBlock, EvalCall, Frame, Interpretable,
+    AbstractContinuation, AbstractValue, Continuation, EvalBlock, EvalCall, Interpretable,
     Interpreter, InterpreterError,
 };
 
@@ -18,21 +20,52 @@ where
     S: StageMeta + 'ir,
     G: 'ir,
 {
-    /// Analyze a function, returning its [`AnalysisResult`].
-    ///
-    /// Results are cached per `(callee, args)`: a cached entry is reused only
-    /// when every new argument is subsumed by the corresponding cached argument
-    /// (`new_arg ⊑ cached_arg`). This ensures context-sensitive soundness —
-    /// calls with more precise arguments trigger a fresh analysis.
-    ///
-    /// Recursive calls are handled via tentative summaries and an
-    /// inter-procedural fixpoint loop. When a callee is already on the frame
-    /// stack, its current tentative summary (or `bottom` if none) is returned
-    /// immediately. The outermost call drives re-analysis until all summaries
-    /// stabilize.
-    pub fn analyze<L>(
+    /// Analyze a function, returning its [`AnalysisResult`], with strict typed
+    /// stage checking against the current active stage.
+    pub fn analyze_in_stage<L>(
         &mut self,
         callee: SpecializedFunction,
+        args: &[V],
+    ) -> Result<AnalysisResult<V>, E>
+    where
+        S: HasStageInfo<L>,
+        for<'a> S:
+            SupportsStageDispatch<AnalyzeDynAction<'a, 'ir, V, S, E, G>, AnalysisResult<V>, E>,
+        L: Dialect
+            + Interpretable<'ir, Self, L>
+            + EvalCall<'ir, Self, L, Result = AnalysisResult<V>>
+            + 'ir,
+    {
+        let stage_id = self.active_stage();
+        self.call_handler = Some(Self::analyze);
+        self.analyze_with_stage_id::<L>(callee, stage_id, args)
+    }
+
+    /// Runtime-dispatched analysis entrypoint.
+    pub fn analyze(
+        &mut self,
+        callee: SpecializedFunction,
+        stage: CompileStage,
+        args: &[V],
+    ) -> Result<AnalysisResult<V>, E>
+    where
+        for<'a> S:
+            SupportsStageDispatch<AnalyzeDynAction<'a, 'ir, V, S, E, G>, AnalysisResult<V>, E>,
+    {
+        self.call_handler = Some(Self::analyze);
+        let pipeline = self.pipeline;
+        let mut action = AnalyzeDynAction {
+            interp: self,
+            callee,
+            args,
+        };
+        Self::dispatch_in_pipeline(pipeline, stage, &mut action)
+    }
+
+    fn analyze_with_stage_id<L>(
+        &mut self,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
         args: &[V],
     ) -> Result<AnalysisResult<V>, E>
     where
@@ -42,46 +75,58 @@ where
             + EvalCall<'ir, Self, L, Result = AnalysisResult<V>>
             + 'ir,
     {
-        // 1. UserFixed summaries are always returned as-is
-        if let Some(cache) = self.summaries.get(&callee) {
+        let stage = self.resolve_stage_info::<L>(stage_id)?;
+        self.analyze_in_resolved_stage::<L>(callee, stage_id, stage, args)
+    }
+
+    fn analyze_in_resolved_stage<L>(
+        &mut self,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+        stage: &'ir StageInfo<L>,
+        args: &[V],
+    ) -> Result<AnalysisResult<V>, E>
+    where
+        L: Dialect
+            + Interpretable<'ir, Self, L>
+            + EvalCall<'ir, Self, L, Result = AnalysisResult<V>>
+            + 'ir,
+    {
+        let key = Self::summary_key(stage_id, callee);
+
+        if let Some(cache) = self.summaries.get(&key) {
             if let Some(ref fixed) = cache.fixed() {
                 return Ok((*fixed).clone());
             }
         }
 
-        // 2. Check computed/seed cache — find tightest non-invalidated match
-        if let Some(cache) = self.summaries.get(&callee) {
+        if let Some(cache) = self.summaries.get(&key) {
             if let Some(entry) = cache.find_best_match(args) {
                 return Ok(entry.result.clone());
             }
         }
 
-        // 3. Check for recursion (callee already on frame stack)
-        let is_recursive = self.frames.iter().any(|f| f.callee() == callee);
+        let is_recursive = self
+            .frames
+            .iter()
+            .any(|f| f.callee() == callee && f.stage() == stage_id);
         if is_recursive {
-            // Return tentative summary (bottom if none exists yet)
             let result = self
                 .summaries
-                .get(&callee)
+                .get(&key)
                 .and_then(|c| c.tentative_result())
                 .cloned()
                 .unwrap_or_else(AnalysisResult::bottom);
             return Ok(result);
         }
 
-        // 4. Depth check
-        if let Some(max) = self.max_depth {
-            if self.frames.len() >= max {
-                return Err(InterpreterError::MaxDepthExceeded.into());
-            }
-        }
-
-        // 5. Install call handler so eval_block can dispatch nested calls
-        self.call_handler = Some(Self::analyze::<L>);
-
-        // 6. Delegate to EvalCall
-        let stage = self.active_stage_info::<L>();
-        let spec = callee.expect_info(stage);
+        let spec =
+            callee
+                .get_info(stage)
+                .ok_or_else(|| InterpreterError::MissingCalleeAtStage {
+                    callee,
+                    stage: stage_id,
+                })?;
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
         def.eval_call(self, stage, callee, args)
@@ -94,6 +139,7 @@ where
     /// return value.
     pub fn run_forward<L>(
         &mut self,
+        stage_id: CompileStage,
         entry: Block,
         initial_args: &[V],
     ) -> Result<AnalysisResult<V>, E>
@@ -101,9 +147,8 @@ where
         S: HasStageInfo<L>,
         L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
-        let stage = self.active_stage_info::<L>();
+        let stage = self.resolve_stage_info::<L>(stage_id)?;
 
-        // 1. Seed entry block
         {
             let block_info = entry.expect_info(stage);
             let arg_ssas: Vec<SSAValue> = block_info
@@ -133,7 +178,6 @@ where
         let mut return_value: Option<V> = None;
         let mut iterations = 0;
 
-        // 2. Widening fixpoint loop
         loop {
             let block = {
                 let fp = self
@@ -154,7 +198,6 @@ where
             self.propagate_control::<L>(stage, &control, false, &mut return_value)?;
         }
 
-        // 3. Narrowing phase
         if self.narrowing_iterations > 0 {
             let blocks: Vec<Block> = self
                 .frames
@@ -191,49 +234,41 @@ where
 
     // -- Internal helpers ---------------------------------------------------
 
-    /// Push a new analysis frame for `callee`.
-    pub(crate) fn push_analysis_frame(&mut self, callee: SpecializedFunction) {
-        self.frames
-            .push(Frame::new(callee, FixpointState::default()));
-    }
-
-    /// Pop the current analysis frame. Panics if no frame exists.
-    pub(crate) fn pop_analysis_frame(&mut self) {
-        self.frames.pop().expect("frame stack underflow");
-    }
-
-    /// Set the tentative summary for `callee`.
+    /// Set the tentative summary for `(stage, callee)`.
     pub(crate) fn set_tentative(
         &mut self,
+        stage: CompileStage,
         callee: SpecializedFunction,
         args: &[V],
         result: AnalysisResult<V>,
     ) {
         self.summaries
-            .entry(callee)
+            .entry(Self::summary_key(stage, callee))
             .or_default()
             .set_tentative(args.to_vec(), result);
     }
 
-    /// Get the full tentative analysis result for `callee`.
+    /// Get the full tentative analysis result for `(stage, callee)`.
     pub(crate) fn tentative_result(
         &self,
+        stage: CompileStage,
         callee: SpecializedFunction,
     ) -> Option<&AnalysisResult<V>> {
         self.summaries
-            .get(&callee)
+            .get(&Self::summary_key(stage, callee))
             .and_then(|c| c.tentative_result())
     }
 
     /// Promote the tentative summary to a computed entry.
     pub(crate) fn promote_tentative(
         &mut self,
+        stage: CompileStage,
         callee: SpecializedFunction,
         args: &[V],
         result: AnalysisResult<V>,
     ) {
         self.summaries
-            .entry(callee)
+            .entry(Self::summary_key(stage, callee))
             .or_default()
             .promote_tentative(args.to_vec(), result);
     }
@@ -249,7 +284,7 @@ where
     /// the worklist. Returns whether any edge changed.
     fn propagate_control<L>(
         &mut self,
-        stage: &'ir kirin_ir::StageInfo<L>,
+        stage: &'ir StageInfo<L>,
         control: &AbstractContinuation<V>,
         narrowing: bool,
         return_value: &mut Option<V>,
@@ -289,7 +324,7 @@ where
     /// Propagate a single control flow edge and enqueue the target if changed.
     fn propagate_edge<L>(
         &mut self,
-        stage: &'ir kirin_ir::StageInfo<L>,
+        stage: &'ir StageInfo<L>,
         target: Block,
         args: &[V],
         narrowing: bool,
@@ -322,7 +357,7 @@ where
     /// Returns `true` if the target's block arg state changed (or first visit).
     fn propagate_block_args<L>(
         &mut self,
-        stage: &'ir kirin_ir::StageInfo<L>,
+        stage: &'ir StageInfo<L>,
         target: Block,
         args: &[V],
         narrowing: bool,
@@ -390,5 +425,39 @@ where
             }
             Ok(changed)
         }
+    }
+}
+
+#[doc(hidden)]
+pub struct AnalyzeDynAction<'a, 'ir, V, S, E, G>
+where
+    S: StageMeta,
+{
+    interp: &'a mut AbstractInterpreter<'ir, V, S, E, G>,
+    callee: SpecializedFunction,
+    args: &'a [V],
+}
+
+impl<'a, 'ir, V, S, E, G, L> StageAction<S, L> for AnalyzeDynAction<'a, 'ir, V, S, E, G>
+where
+    V: AbstractValue + Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: StageMeta + HasStageInfo<L> + 'ir,
+    G: 'ir,
+    L: Dialect
+        + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>, L>
+        + EvalCall<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
+        + 'ir,
+{
+    type Output = AnalysisResult<V>;
+    type Error = E;
+
+    fn run(
+        &mut self,
+        stage_id: CompileStage,
+        _stage: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        self.interp
+            .analyze_with_stage_id::<L>(self.callee, stage_id, self.args)
     }
 }

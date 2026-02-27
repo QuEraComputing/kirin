@@ -1,5 +1,6 @@
 use kirin_ir::{
     Block, Dialect, GetInfo, HasStageInfo, ResultValue, SSAValue, StageInfo, StageMeta,
+    SupportsStageDispatch,
 };
 
 use crate::{
@@ -65,6 +66,13 @@ where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
+    S: SupportsStageDispatch<
+            crate::stack::FrameDispatchAction<'ir, V, S, E, G>,
+            crate::stack::DynFrameDispatch<'ir, V, S, E, G>,
+            E,
+        >,
+    for<'a> S:
+        SupportsStageDispatch<crate::stack::PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
     G: 'ir,
     L: Dialect + Interpretable<'ir, Self, L>,
 {
@@ -82,30 +90,30 @@ where
         block: Block,
     ) -> Result<Continuation<V, crate::ConcreteExt>, E> {
         // Save current cursor so we can restore it after the block completes
-        let saved_cursor = self.current_frame()?.cursor();
+        let saved_cursor = self.current_cursor()?;
 
         // Set cursor to the block's first statement
         let first = block.first_statement(stage);
-        self.current_frame_mut()?.set_cursor(first);
+        self.set_current_cursor(first)?;
 
         // Run body, handling nested Call/Return pairs (same pattern as EvalCall)
         let mut pending_results: Vec<ResultValue> = Vec::new();
         loop {
-            let control = self.run::<L>()?;
+            let control = self.run()?;
             match &control {
                 Continuation::Call { result, .. } => {
                     pending_results.push(*result);
-                    self.advance::<L>(&control)?;
+                    self.advance(&control)?;
                 }
                 Continuation::Yield(v) => {
                     let v = v.clone();
-                    self.current_frame_mut()?.set_cursor(saved_cursor);
+                    self.set_current_cursor(saved_cursor)?;
                     return Ok(Continuation::Yield(v));
                 }
                 Continuation::Return(v) => {
                     // Return from a nested call — pop the callee frame
                     let v = v.clone();
-                    self.advance::<L>(&control)?;
+                    self.advance(&control)?;
                     let result = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
                     Interpreter::write(self, result, v)?;
                 }
@@ -146,13 +154,14 @@ where
                 Continuation::Continue => {}
                 Continuation::Call {
                     callee,
+                    stage: callee_stage,
                     args,
                     result,
                 } => {
                     let handler = self
                         .call_handler
                         .expect("call_handler not set: analyze() must be used as entry point");
-                    let analysis = handler(self, callee, &args)?;
+                    let analysis = handler(self, callee, callee_stage, &args)?;
                     let return_val = analysis.return_value().cloned().unwrap_or_else(V::bottom);
                     self.write(result, return_val)?;
                 }

@@ -145,14 +145,20 @@ fn test_concrete_select() {
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
 
     // select(7) → 7+1 = 8 (truthy: nonzero)
-    let result = interp.call::<CompositeLanguage>(spec_func, &[7]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_func, &[7])
+        .unwrap();
     assert_eq!(result, 8);
 
     // select(-3) → -3+1 = -2 (truthy: nonzero)
-    let result = interp.call::<CompositeLanguage>(spec_func, &[-3]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_func, &[-3])
+        .unwrap();
     assert_eq!(result, -2);
 
     // select(0) → 42 (falsy: zero)
-    let result = interp.call::<CompositeLanguage>(spec_func, &[0]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_func, &[0])
+        .unwrap();
     assert_eq!(result, 42);
 }

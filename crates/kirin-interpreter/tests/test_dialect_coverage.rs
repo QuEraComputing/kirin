@@ -181,6 +181,23 @@ fn build_add_one(
     stage.specialize().f(sf).body(func_body).new().unwrap()
 }
 
+fn first_statement_of_specialization(
+    pipeline: &Pipeline<StageInfo<CompositeLanguage>>,
+    stage_id: CompileStage,
+    spec_fn: SpecializedFunction,
+) -> Option<Statement> {
+    let stage_info = pipeline.stage(stage_id).unwrap();
+    let spec_info = spec_fn.expect_info(stage_info);
+    let body_stmt = *spec_info.body();
+    let region = body_stmt
+        .regions::<CompositeLanguage>(stage_info)
+        .next()
+        .unwrap();
+    let entry = region.blocks(stage_info).next().unwrap();
+    let block_info = entry.expect_info(stage_info);
+    block_info.statements.head().copied()
+}
+
 /// Build a loop with block args for the loop variable:
 ///   entry(x): br header(x)
 ///   header(i): cond_br i loop_body(i) loop_exit(i)
@@ -411,7 +428,7 @@ fn test_concrete_fuel_exhaustion() {
     let mut interp: StackInterpreter<i64, _> =
         StackInterpreter::new(&pipeline, stage_id).with_fuel(20);
 
-    let result = interp.call::<CompositeLanguage>(spec_fn, &[42]);
+    let result = interp.call_in_stage::<CompositeLanguage>(spec_fn, &[42]);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
@@ -438,14 +455,16 @@ fn test_concrete_breakpoints() {
     let block_info = blocks[0].expect_info(stage_info);
     let first_stmt = block_info.statements.head().copied();
 
-    let frame = kirin_interpreter::Frame::new(spec_fn, first_stmt);
-    interp.push_call_frame(frame).unwrap();
+    let frame = kirin_interpreter::Frame::new(spec_fn, stage_id, first_stmt);
+    interp.push_frame(frame).unwrap();
 
     // Set breakpoint at the add statement
     interp.set_breakpoints(HashSet::from([add_stmt]));
 
     // Run until break — should stop before executing add
-    let control = interp.run_until_break::<CompositeLanguage>().unwrap();
+    let control = interp
+        .run_until_break_in_stage::<CompositeLanguage>()
+        .unwrap();
     assert!(
         matches!(control, Continuation::Ext(ConcreteExt::Break)),
         "expected Break, got: {control:?}"
@@ -453,7 +472,70 @@ fn test_concrete_breakpoints() {
 
     // Clear breakpoints and continue to completion
     interp.clear_breakpoints();
-    let control = interp.run::<CompositeLanguage>().unwrap();
+    let control = interp.run_in_stage::<CompositeLanguage>().unwrap();
+    match control {
+        Continuation::Return(v) => assert_eq!(v, 15, "expected 5 + 10 = 15"),
+        other => panic!("expected Return, got: {other:?}"),
+    }
+}
+
+#[test]
+fn test_concrete_push_frame_missing_stage_fails_atomically() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let (spec_fn, _) = build_linear_program(&mut pipeline, stage_id);
+    let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+
+    // Build a stage ID that does not exist in this interpreter's pipeline.
+    let mut other_pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let _ = other_pipeline.add_stage().stage(StageInfo::default()).new();
+    let missing_stage = other_pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let frame = kirin_interpreter::Frame::new(spec_fn, missing_stage, first_stmt);
+    let err = interp.push_frame(frame).unwrap_err();
+    assert!(
+        matches!(err, InterpreterError::MissingStage { stage } if stage == missing_stage),
+        "expected MissingStage for pushed frame, got: {err:?}"
+    );
+
+    // Failed push must not leave partial frame state behind.
+    assert!(
+        matches!(interp.pop_frame(), Err(InterpreterError::NoFrame)),
+        "failed push should keep stack empty"
+    );
+}
+
+#[test]
+fn test_concrete_push_pop_frame_public_shape() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let (spec_fn, _) = build_linear_program(&mut pipeline, stage_id);
+    let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+    let frame = kirin_interpreter::Frame::new(spec_fn, stage_id, first_stmt);
+    interp.push_frame(frame).unwrap();
+
+    let popped = interp.pop_frame().unwrap();
+    assert_eq!(popped.callee(), spec_fn);
+    assert_eq!(popped.stage(), stage_id);
+    assert_eq!(popped.cursor(), first_stmt);
+}
+
+#[test]
+fn test_concrete_manual_push_then_run_dynamic() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let (spec_fn, _) = build_linear_program(&mut pipeline, stage_id);
+    let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+    let frame = kirin_interpreter::Frame::new(spec_fn, stage_id, first_stmt);
+    interp.push_frame(frame).unwrap();
+
+    let control = interp.run().unwrap();
     match control {
         Continuation::Return(v) => assert_eq!(v, 15, "expected 5 + 10 = 15"),
         other => panic!("expected Return, got: {other:?}"),
@@ -470,15 +552,21 @@ fn test_concrete_sequential_calls() {
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
 
     // Call f(5) -> 6
-    let result = interp.call::<CompositeLanguage>(spec_fn, &[5]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_fn, &[5])
+        .unwrap();
     assert_eq!(result, 6);
 
     // Call f(10) -> 11 — interpreter resets between calls
-    let result = interp.call::<CompositeLanguage>(spec_fn, &[10]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_fn, &[10])
+        .unwrap();
     assert_eq!(result, 11);
 
     // Call f(-1) -> 0
-    let result = interp.call::<CompositeLanguage>(spec_fn, &[-1]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_fn, &[-1])
+        .unwrap();
     assert_eq!(result, 0);
 }
 
@@ -493,7 +581,9 @@ fn test_concrete_fuel_sufficient() {
     let mut interp: StackInterpreter<i64, _> =
         StackInterpreter::new(&pipeline, stage_id).with_fuel(100);
 
-    let result = interp.call::<CompositeLanguage>(spec_fn, &[5]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_fn, &[5])
+        .unwrap();
     assert_eq!(result, 6);
 }
 
@@ -516,7 +606,7 @@ fn test_abstract_widening_never() {
             .with_widening(WideningStrategy::Never)
             .with_max_iterations(50);
 
-    let result = interp.analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)]);
+    let result = interp.analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)]);
 
     assert!(
         matches!(result, Err(InterpreterError::FuelExhausted)),
@@ -538,7 +628,7 @@ fn test_abstract_widening_delayed() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     let ret = result.return_value().unwrap();
@@ -562,7 +652,7 @@ fn test_abstract_widening_all_joins() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     let ret = result.return_value().unwrap();
@@ -592,13 +682,13 @@ fn test_abstract_fixed_summary() {
 
     // Analyze should return the fixed summary without computing
     let result = interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(100, 200)));
 
     // Even with different args, the fixed summary is returned
     let result2 = interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::top()])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::top()])
         .unwrap();
     assert_eq!(result2.return_value(), Some(&Interval::new(100, 200)));
 }
@@ -615,7 +705,7 @@ fn test_abstract_summary_invalidation_and_gc() {
 
     // Analyze to populate the cache
     let result = interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
 
@@ -634,7 +724,7 @@ fn test_abstract_summary_invalidation_and_gc() {
 
     // Re-analyze should work fresh
     let result = interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
 }
@@ -651,7 +741,7 @@ fn test_abstract_remove_summary() {
 
     // Analyze to populate cache
     interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::constant(5)])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::constant(5)])
         .unwrap();
     assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_some());
 
@@ -677,7 +767,7 @@ fn test_abstract_analysis_result_queries() {
 
     // Analyze with interval spanning zero -> fork at cond_br
     let result = interp
-        .analyze::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     // Should have visited multiple blocks (entry + then + else = 3)
@@ -723,7 +813,9 @@ fn test_abstract_analysis_result_ssa_values() {
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
 
-    let result = interp.analyze::<CompositeLanguage>(spec_fn, &[]).unwrap();
+    let result = interp
+        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[])
+        .unwrap();
 
     // Query individual SSA values
     assert_eq!(

@@ -36,7 +36,9 @@ fn test_session_abstract_interp_constants() {
 
     let mut interp: StackInterpreter<Interval, _> = StackInterpreter::new(&pipeline, stage_id);
 
-    let result = interp.call::<CompositeLanguage>(spec_fn, &[]).unwrap();
+    let result = interp
+        .call_in_stage::<CompositeLanguage>(spec_fn, &[])
+        .unwrap();
     assert_eq!(result, Interval::constant(42));
 }
 
@@ -77,13 +79,13 @@ fn test_session_abstract_interp_with_args() {
 
     let call_with = |input: Interval| -> Interval {
         let mut interp: StackInterpreter<Interval, _> = StackInterpreter::new(&pipeline, stage_id);
-        let mut frame = Frame::new(spec_fn, first_stmt);
+        let mut frame = Frame::new(spec_fn, stage_id, first_stmt);
         frame.write_ssa(SSAValue::from(block_args[0]), input);
-        interp.push_call_frame(frame).unwrap();
+        interp.push_frame(frame).unwrap();
         loop {
-            match interp.run::<CompositeLanguage>().unwrap() {
+            match interp.run_in_stage::<CompositeLanguage>().unwrap() {
                 Continuation::Return(v) => {
-                    interp.pop_call_frame().unwrap();
+                    interp.pop_frame().unwrap();
                     return v;
                 }
                 _ => panic!("expected Return"),
