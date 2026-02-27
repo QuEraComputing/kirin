@@ -36,7 +36,10 @@ pub use pipeline::{HasStageInfo, Pipeline, StageMeta};
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
-pub use stage_dispatch::{StageAction, StageActionMut, StageDispatch, StageDispatchMut};
+pub use stage_dispatch::{
+    StageAction, StageActionMut, StageDispatch, StageDispatchMiss, StageDispatchMut,
+    StageDispatchRequiredError, SupportsStageDispatch, SupportsStageDispatchMut,
+};
 
 #[cfg(feature = "derive")]
 pub use kirin_derive::{

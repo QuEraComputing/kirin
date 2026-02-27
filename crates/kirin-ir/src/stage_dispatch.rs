@@ -1,5 +1,23 @@
 use crate::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo, StageMeta};
 
+/// Why stage dispatch returned no action result.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StageDispatchMiss {
+    /// The requested stage ID is not present in the pipeline.
+    MissingStage,
+    /// The stage exists but no dialect in `S::Languages` matched it.
+    MissingDialect,
+}
+
+/// Error for required dispatch helpers.
+#[derive(Debug, PartialEq, Eq)]
+pub enum StageDispatchRequiredError<E> {
+    /// Action-specific failure produced by `StageAction`/`StageActionMut`.
+    Action(E),
+    /// Dispatch miss describing why no stage action could run.
+    Miss(StageDispatchMiss),
+}
+
 /// Immutable stage action executed after resolving a concrete stage dialect.
 ///
 /// Implement this trait for each dialect in your stage container's
@@ -84,6 +102,52 @@ where
     fn dispatch(stage: &mut S, stage_id: CompileStage, action: &mut A) -> Result<Option<R>, E>;
 }
 
+/// Marker trait for stage containers that support immutable dispatch of `A`.
+pub trait SupportsStageDispatch<A, R, E>: StageMeta {
+    fn dispatch_stage_action(
+        stage: &Self,
+        stage_id: CompileStage,
+        action: &mut A,
+    ) -> Result<Option<R>, E>;
+}
+
+impl<S, A, R, E> SupportsStageDispatch<A, R, E> for S
+where
+    S: StageMeta,
+    S::Languages: StageDispatch<S, A, R, E>,
+{
+    fn dispatch_stage_action(
+        stage: &Self,
+        stage_id: CompileStage,
+        action: &mut A,
+    ) -> Result<Option<R>, E> {
+        <S::Languages as StageDispatch<S, A, R, E>>::dispatch(stage, stage_id, action)
+    }
+}
+
+/// Marker trait for stage containers that support mutable dispatch of `A`.
+pub trait SupportsStageDispatchMut<A, R, E>: StageMeta {
+    fn dispatch_stage_action_mut(
+        stage: &mut Self,
+        stage_id: CompileStage,
+        action: &mut A,
+    ) -> Result<Option<R>, E>;
+}
+
+impl<S, A, R, E> SupportsStageDispatchMut<A, R, E> for S
+where
+    S: StageMeta,
+    S::Languages: StageDispatchMut<S, A, R, E>,
+{
+    fn dispatch_stage_action_mut(
+        stage: &mut Self,
+        stage_id: CompileStage,
+        action: &mut A,
+    ) -> Result<Option<R>, E> {
+        <S::Languages as StageDispatchMut<S, A, R, E>>::dispatch(stage, stage_id, action)
+    }
+}
+
 impl<S, A, R, E> StageDispatchMut<S, A, R, E> for ()
 where
     S: StageMeta,
@@ -108,6 +172,58 @@ where
     }
 }
 
+fn dispatch_optional_with<StageRef, A, R, E, F>(
+    stage: Option<StageRef>,
+    stage_id: CompileStage,
+    action: &mut A,
+    dispatch: F,
+) -> Result<Option<R>, E>
+where
+    F: FnOnce(StageRef, CompileStage, &mut A) -> Result<Option<R>, E>,
+{
+    let Some(stage) = stage else {
+        return Ok(None);
+    };
+    dispatch(stage, stage_id, action)
+}
+
+fn dispatch_required_with<StageRef, A, R, E, F>(
+    stage: Option<StageRef>,
+    stage_id: CompileStage,
+    action: &mut A,
+    dispatch: F,
+) -> Result<R, StageDispatchRequiredError<E>>
+where
+    F: FnOnce(StageRef, CompileStage, &mut A) -> Result<Option<R>, E>,
+{
+    let Some(stage) = stage else {
+        return Err(StageDispatchRequiredError::Miss(
+            StageDispatchMiss::MissingStage,
+        ));
+    };
+    let Some(result) =
+        dispatch(stage, stage_id, action).map_err(StageDispatchRequiredError::Action)?
+    else {
+        return Err(StageDispatchRequiredError::Miss(
+            StageDispatchMiss::MissingDialect,
+        ));
+    };
+    Ok(result)
+}
+
+fn map_required_miss_or_else<R, E, F>(
+    result: Result<R, StageDispatchRequiredError<E>>,
+    mut on_miss: F,
+) -> Result<R, E>
+where
+    F: FnMut(StageDispatchMiss) -> E,
+{
+    result.map_err(|error| match error {
+        StageDispatchRequiredError::Action(error) => error,
+        StageDispatchRequiredError::Miss(miss) => on_miss(miss),
+    })
+}
+
 impl<S> Pipeline<S>
 where
     S: StageMeta,
@@ -123,12 +239,55 @@ where
         action: &mut A,
     ) -> Result<Option<R>, E>
     where
-        S::Languages: StageDispatch<S, A, R, E>,
+        S: SupportsStageDispatch<A, R, E>,
     {
-        let Some(stage) = self.stage(stage_id) else {
-            return Ok(None);
-        };
-        <S::Languages as StageDispatch<S, A, R, E>>::dispatch(stage, stage_id, action)
+        dispatch_optional_with(
+            self.stage(stage_id),
+            stage_id,
+            action,
+            |stage, stage_id, action| {
+                <S as SupportsStageDispatch<A, R, E>>::dispatch_stage_action(
+                    stage, stage_id, action,
+                )
+            },
+        )
+    }
+
+    /// Like [`Self::dispatch_stage`], but maps dispatch misses into `Err`
+    /// using `on_miss`.
+    pub fn dispatch_stage_or_else<A, R, E, F>(
+        &self,
+        stage_id: CompileStage,
+        action: &mut A,
+        on_miss: F,
+    ) -> Result<R, E>
+    where
+        S: SupportsStageDispatch<A, R, E>,
+        F: FnMut(StageDispatchMiss) -> E,
+    {
+        map_required_miss_or_else(self.dispatch_stage_required(stage_id, action), on_miss)
+    }
+
+    /// Like [`Self::dispatch_stage`], but converts dispatch misses into
+    /// [`StageDispatchRequiredError::Miss`].
+    pub fn dispatch_stage_required<A, R, E>(
+        &self,
+        stage_id: CompileStage,
+        action: &mut A,
+    ) -> Result<R, StageDispatchRequiredError<E>>
+    where
+        S: SupportsStageDispatch<A, R, E>,
+    {
+        dispatch_required_with(
+            self.stage(stage_id),
+            stage_id,
+            action,
+            |stage, stage_id, action| {
+                <S as SupportsStageDispatch<A, R, E>>::dispatch_stage_action(
+                    stage, stage_id, action,
+                )
+            },
+        )
     }
 
     /// Mutable variant of [`Self::dispatch_stage`].
@@ -141,12 +300,55 @@ where
         action: &mut A,
     ) -> Result<Option<R>, E>
     where
-        S::Languages: StageDispatchMut<S, A, R, E>,
+        S: SupportsStageDispatchMut<A, R, E>,
     {
-        let Some(stage) = self.stage_mut(stage_id) else {
-            return Ok(None);
-        };
-        <S::Languages as StageDispatchMut<S, A, R, E>>::dispatch(stage, stage_id, action)
+        dispatch_optional_with(
+            self.stage_mut(stage_id),
+            stage_id,
+            action,
+            |stage, stage_id, action| {
+                <S as SupportsStageDispatchMut<A, R, E>>::dispatch_stage_action_mut(
+                    stage, stage_id, action,
+                )
+            },
+        )
+    }
+
+    /// Like [`Self::dispatch_stage_mut`], but maps dispatch misses into `Err`
+    /// using `on_miss`.
+    pub fn dispatch_stage_mut_or_else<A, R, E, F>(
+        &mut self,
+        stage_id: CompileStage,
+        action: &mut A,
+        on_miss: F,
+    ) -> Result<R, E>
+    where
+        S: SupportsStageDispatchMut<A, R, E>,
+        F: FnMut(StageDispatchMiss) -> E,
+    {
+        map_required_miss_or_else(self.dispatch_stage_mut_required(stage_id, action), on_miss)
+    }
+
+    /// Like [`Self::dispatch_stage_mut`], but converts dispatch misses into
+    /// [`StageDispatchRequiredError::Miss`].
+    pub fn dispatch_stage_mut_required<A, R, E>(
+        &mut self,
+        stage_id: CompileStage,
+        action: &mut A,
+    ) -> Result<R, StageDispatchRequiredError<E>>
+    where
+        S: SupportsStageDispatchMut<A, R, E>,
+    {
+        dispatch_required_with(
+            self.stage_mut(stage_id),
+            stage_id,
+            action,
+            |stage, stage_id, action| {
+                <S as SupportsStageDispatchMut<A, R, E>>::dispatch_stage_action_mut(
+                    stage, stage_id, action,
+                )
+            },
+        )
     }
 }
 
@@ -296,6 +498,12 @@ mod tests {
         B(StageInfo<LangB>),
     }
 
+    #[derive(Debug)]
+    enum AOnlyStage {
+        A(StageInfo<LangA>),
+        B(StageInfo<LangB>),
+    }
+
     impl HasStageInfo<LangA> for TestStage {
         fn try_stage_info(&self) -> Option<&StageInfo<LangA>> {
             match self {
@@ -312,6 +520,22 @@ mod tests {
         }
     }
 
+    impl HasStageInfo<LangA> for AOnlyStage {
+        fn try_stage_info(&self) -> Option<&StageInfo<LangA>> {
+            match self {
+                AOnlyStage::A(stage) => Some(stage),
+                AOnlyStage::B(_) => None,
+            }
+        }
+
+        fn try_stage_info_mut(&mut self) -> Option<&mut StageInfo<LangA>> {
+            match self {
+                AOnlyStage::A(stage) => Some(stage),
+                AOnlyStage::B(_) => None,
+            }
+        }
+    }
+
     impl HasStageInfo<LangB> for TestStage {
         fn try_stage_info(&self) -> Option<&StageInfo<LangB>> {
             match self {
@@ -324,6 +548,22 @@ mod tests {
             match self {
                 TestStage::A(_) => None,
                 TestStage::B(stage) => Some(stage),
+            }
+        }
+    }
+
+    impl HasStageInfo<LangB> for AOnlyStage {
+        fn try_stage_info(&self) -> Option<&StageInfo<LangB>> {
+            match self {
+                AOnlyStage::A(_) => None,
+                AOnlyStage::B(stage) => Some(stage),
+            }
+        }
+
+        fn try_stage_info_mut(&mut self) -> Option<&mut StageInfo<LangB>> {
+            match self {
+                AOnlyStage::A(_) => None,
+                AOnlyStage::B(stage) => Some(stage),
             }
         }
     }
@@ -363,6 +603,50 @@ mod tests {
             match stage_name {
                 "a" => Ok(TestStage::A(StageInfo::<LangA>::default())),
                 "b" => Ok(TestStage::B(StageInfo::<LangB>::default())),
+                _ => Err(format!("unknown stage '{stage_name}'")),
+            }
+        }
+
+        fn declared_stage_names() -> &'static [&'static str] {
+            &["a", "b"]
+        }
+    }
+
+    impl StageMeta for AOnlyStage {
+        type Languages = (LangA, ());
+
+        fn stage_name(&self) -> Option<GlobalSymbol> {
+            match self {
+                AOnlyStage::A(stage) => stage.name(),
+                AOnlyStage::B(stage) => stage.name(),
+            }
+        }
+
+        fn set_stage_name(&mut self, name: Option<GlobalSymbol>) {
+            match self {
+                AOnlyStage::A(stage) => stage.set_name(name),
+                AOnlyStage::B(stage) => stage.set_name(name),
+            }
+        }
+
+        fn stage_id(&self) -> Option<CompileStage> {
+            match self {
+                AOnlyStage::A(stage) => stage.stage_id(),
+                AOnlyStage::B(stage) => stage.stage_id(),
+            }
+        }
+
+        fn set_stage_id(&mut self, id: Option<CompileStage>) {
+            match self {
+                AOnlyStage::A(stage) => stage.set_stage_id(id),
+                AOnlyStage::B(stage) => stage.set_stage_id(id),
+            }
+        }
+
+        fn from_stage_name(stage_name: &str) -> Result<Self, String> {
+            match stage_name {
+                "a" => Ok(AOnlyStage::A(StageInfo::<LangA>::default())),
+                "b" => Ok(AOnlyStage::B(StageInfo::<LangB>::default())),
                 _ => Err(format!("unknown stage '{stage_name}'")),
             }
         }
@@ -434,6 +718,39 @@ mod tests {
         }
     }
 
+    struct IdentifyAOnly;
+
+    impl StageAction<AOnlyStage, LangA> for IdentifyAOnly {
+        type Output = &'static str;
+        type Error = StageDispatchMiss;
+
+        fn run(
+            &mut self,
+            stage_id: CompileStage,
+            stage: &StageInfo<LangA>,
+        ) -> Result<Self::Output, Self::Error> {
+            assert_eq!(stage.stage_id(), Some(stage_id));
+            Ok("A")
+        }
+    }
+
+    struct SetPolicyAOnly;
+
+    impl StageActionMut<AOnlyStage, LangA> for SetPolicyAOnly {
+        type Output = &'static str;
+        type Error = StageDispatchMiss;
+
+        fn run(
+            &mut self,
+            stage_id: CompileStage,
+            stage: &mut StageInfo<LangA>,
+        ) -> Result<Self::Output, Self::Error> {
+            assert_eq!(stage.stage_id(), Some(stage_id));
+            stage.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
+            Ok("A")
+        }
+    }
+
     #[test]
     fn dispatch_stage_runs_matching_language_action() {
         let mut pipeline: Pipeline<TestStage> = Pipeline::new();
@@ -497,5 +814,134 @@ mod tests {
             pipeline.dispatch_stage_mut(missing, &mut action).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn dispatch_stage_or_else_reports_miss_kind() {
+        let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
+        let a = pipeline
+            .add_stage()
+            .stage(AOnlyStage::A(StageInfo::default()))
+            .name("a")
+            .new();
+        let b = pipeline
+            .add_stage()
+            .stage(AOnlyStage::B(StageInfo::default()))
+            .name("b")
+            .new();
+
+        let mut action = IdentifyAOnly;
+        assert_eq!(
+            pipeline.dispatch_stage_or_else(a, &mut action, |miss| miss),
+            Ok("A")
+        );
+        assert_eq!(
+            pipeline.dispatch_stage_or_else(b, &mut action, |miss| miss),
+            Err(StageDispatchMiss::MissingDialect)
+        );
+
+        let missing = CompileStage::new(Id(999));
+        assert_eq!(
+            pipeline.dispatch_stage_or_else(missing, &mut action, |miss| miss),
+            Err(StageDispatchMiss::MissingStage)
+        );
+    }
+
+    #[test]
+    fn dispatch_stage_mut_or_else_reports_miss_kind() {
+        let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
+        let a = pipeline
+            .add_stage()
+            .stage(AOnlyStage::A(StageInfo::default()))
+            .name("a")
+            .new();
+        let b = pipeline
+            .add_stage()
+            .stage(AOnlyStage::B(StageInfo::default()))
+            .name("b")
+            .new();
+
+        let mut action = SetPolicyAOnly;
+        assert_eq!(
+            pipeline.dispatch_stage_mut_or_else(a, &mut action, |miss| miss),
+            Ok("A")
+        );
+        assert_eq!(
+            pipeline.dispatch_stage_mut_or_else(b, &mut action, |miss| miss),
+            Err(StageDispatchMiss::MissingDialect)
+        );
+
+        let missing = CompileStage::new(Id(999));
+        assert_eq!(
+            pipeline.dispatch_stage_mut_or_else(missing, &mut action, |miss| miss),
+            Err(StageDispatchMiss::MissingStage)
+        );
+    }
+
+    #[test]
+    fn dispatch_stage_required_reports_miss_kind() {
+        let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
+        let a = pipeline
+            .add_stage()
+            .stage(AOnlyStage::A(StageInfo::default()))
+            .name("a")
+            .new();
+        let b = pipeline
+            .add_stage()
+            .stage(AOnlyStage::B(StageInfo::default()))
+            .name("b")
+            .new();
+
+        let mut action = IdentifyAOnly;
+        assert_eq!(pipeline.dispatch_stage_required(a, &mut action), Ok("A"));
+        assert!(matches!(
+            pipeline.dispatch_stage_required(b, &mut action),
+            Err(StageDispatchRequiredError::Miss(
+                StageDispatchMiss::MissingDialect
+            ))
+        ));
+
+        let missing = CompileStage::new(Id(999));
+        assert!(matches!(
+            pipeline.dispatch_stage_required(missing, &mut action),
+            Err(StageDispatchRequiredError::Miss(
+                StageDispatchMiss::MissingStage
+            ))
+        ));
+    }
+
+    #[test]
+    fn dispatch_stage_mut_required_reports_miss_kind() {
+        let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
+        let a = pipeline
+            .add_stage()
+            .stage(AOnlyStage::A(StageInfo::default()))
+            .name("a")
+            .new();
+        let b = pipeline
+            .add_stage()
+            .stage(AOnlyStage::B(StageInfo::default()))
+            .name("b")
+            .new();
+
+        let mut action = SetPolicyAOnly;
+        assert_eq!(
+            pipeline.dispatch_stage_mut_required(a, &mut action),
+            Ok("A")
+        );
+        assert!(matches!(
+            pipeline.dispatch_stage_mut_required(b, &mut action),
+            Err(StageDispatchRequiredError::Miss(
+                StageDispatchMiss::MissingDialect
+            ))
+        ));
+
+        let missing = CompileStage::new(Id(999));
+        assert!(matches!(
+            pipeline.dispatch_stage_mut_required(missing, &mut action),
+            Err(StageDispatchRequiredError::Miss(
+                StageDispatchMiss::MissingStage
+            ))
+        ));
     }
 }
