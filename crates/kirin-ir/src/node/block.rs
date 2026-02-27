@@ -142,10 +142,7 @@ impl Block {
     /// This is the head of the statements linked list, or the terminator
     /// if the linked list is empty (i.e. the block contains only a
     /// terminator).
-    pub fn first_statement<L: Dialect>(
-        &self,
-        stage: &crate::StageInfo<L>,
-    ) -> Option<Statement> {
+    pub fn first_statement<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<Statement> {
         let info = self.expect_info(stage);
         if let Some(&head) = info.statements.head() {
             Some(head)
@@ -161,10 +158,7 @@ impl Block {
     /// [`Block::statements`] iterates only the non-terminator prefix of
     /// the linked list. This method returns the terminator if present,
     /// otherwise the tail of the statements linked list.
-    pub fn last_statement<L: Dialect>(
-        &self,
-        stage: &crate::StageInfo<L>,
-    ) -> Option<Statement> {
+    pub fn last_statement<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<Statement> {
         let info = self.expect_info(stage);
         info.terminator.or_else(|| info.statements.tail().copied())
     }

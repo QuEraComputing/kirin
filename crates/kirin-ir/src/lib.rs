@@ -9,6 +9,7 @@ mod lattice;
 mod node;
 mod pipeline;
 mod signature;
+mod stage_dispatch;
 
 /// Queries from the IRContext.
 pub mod query;
@@ -35,6 +36,7 @@ pub use pipeline::{HasStageInfo, Pipeline, StageMeta};
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
+pub use stage_dispatch::{StageAction, StageActionMut, StageDispatch, StageDispatchMut};
 
 #[cfg(feature = "derive")]
 pub use kirin_derive::{

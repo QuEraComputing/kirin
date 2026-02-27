@@ -1,5 +1,5 @@
 use kirin_ir::{
-    Block, StageMeta, Dialect, GetInfo, HasStageInfo, ResultValue, SSAValue, StageInfo,
+    Block, Dialect, GetInfo, HasStageInfo, ResultValue, SSAValue, StageInfo, StageMeta,
 };
 
 use crate::{

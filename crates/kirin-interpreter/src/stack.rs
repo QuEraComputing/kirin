@@ -2,13 +2,13 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    CompileStage, StageMeta, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue,
-    SSAValue, SpecializedFunction, Statement,
+    CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue, SSAValue,
+    SpecializedFunction, StageMeta, Statement,
 };
 
 use crate::{
-    EvalCall, ConcreteContinuation, ConcreteExt, Continuation, Frame, Interpretable,
-    Interpreter, InterpreterError,
+    ConcreteContinuation, ConcreteExt, Continuation, EvalCall, Frame, Interpretable, Interpreter,
+    InterpreterError,
 };
 
 type StackFrame<V> = Frame<V, Option<Statement>>;

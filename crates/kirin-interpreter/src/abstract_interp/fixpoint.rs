@@ -1,12 +1,10 @@
-use kirin_ir::{
-    Block, StageMeta, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction,
-};
+use kirin_ir::{Block, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction, StageMeta};
 
 use super::FixpointState;
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractContinuation, AbstractValue, EvalBlock, EvalCall, Continuation, Frame,
-    Interpretable, Interpreter, InterpreterError,
+    AbstractContinuation, AbstractValue, Continuation, EvalBlock, EvalCall, Frame, Interpretable,
+    Interpreter, InterpreterError,
 };
 
 use super::interp::AbstractInterpreter;

@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
-    CompileStage, StageMeta, Dialect, Function, GetInfo, HasStageInfo, Id, Pipeline,
+    CompileStage, Dialect, Function, GetInfo, HasStageInfo, Id, Pipeline, StageMeta,
     StagedFunction, Statement,
 };
 use kirin_lexer::Token;

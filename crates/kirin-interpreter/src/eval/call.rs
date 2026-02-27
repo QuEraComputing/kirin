@@ -1,4 +1,4 @@
-use kirin_ir::{Block, StageMeta, Dialect, HasStageInfo, SpecializedFunction, StageInfo};
+use kirin_ir::{Block, Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta};
 
 use crate::{Interpreter, InterpreterError};
 

@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{
-    CompileStage, StageMeta, Pipeline, ResultValue, SSAValue, SpecializedFunction,
-};
+use kirin_ir::{CompileStage, Pipeline, ResultValue, SSAValue, SpecializedFunction, StageMeta};
 use rustc_hash::FxHashMap;
 
 use super::{FixpointState, SummaryCache};

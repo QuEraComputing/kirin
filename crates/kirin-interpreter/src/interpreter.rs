@@ -1,8 +1,7 @@
 use std::fmt;
 
 use kirin_ir::{
-    CompileStage, StageMeta, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue,
-    StageInfo,
+    CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue, StageInfo, StageMeta,
 };
 
 /// Minimal state contract for interpreter implementations.
