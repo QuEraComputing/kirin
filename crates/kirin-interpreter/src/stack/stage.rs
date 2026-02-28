@@ -61,7 +61,7 @@ where
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     fn resolve_current_frame_stage_info(&self) -> Result<&'ir StageInfo<L>, E> {
-        let stage_id = self.interp.current_frame_stage()?;
+        let stage_id = self.interp.call_stack.current()?.stage();
         self.interp.resolve_stage_info::<L>(stage_id)
     }
 

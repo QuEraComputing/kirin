@@ -1136,6 +1136,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "smallvec",
 ]
 
 [[package]]
@@ -1270,6 +1271,7 @@ dependencies = [
  "kirin-interpreter",
  "kirin-test-languages",
  "kirin-test-utils",
+ "smallvec",
 ]
 
 [[package]]
@@ -1354,6 +1356,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "smallvec",
 ]
 
 [[package]]

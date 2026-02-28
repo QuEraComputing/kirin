@@ -280,7 +280,7 @@ fn test_abstract_interp_constants() {
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::constant(42)));
 }
@@ -302,7 +302,7 @@ fn test_abstract_interp_branch_fork() {
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-10, 10)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-10, 10)])
         .unwrap();
 
     // The return value is the join of:
@@ -334,7 +334,7 @@ fn test_abstract_interp_loop_convergence() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     // The analysis should converge and produce a non-empty return value.
@@ -380,7 +380,7 @@ fn test_abstract_interp_call_caches_summary() {
 
     // First call — runs the analysis
     let result1 = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[])
         .unwrap();
     assert_eq!(result1.return_value(), Some(&Interval::constant(10)));
 
@@ -393,7 +393,42 @@ fn test_abstract_interp_call_caches_summary() {
 
     // Second call with same args — returns cached summary
     let result2 = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[])
         .unwrap();
     assert_eq!(result2.return_value(), Some(&Interval::constant(10)));
+}
+
+#[test]
+fn test_abstract_interp_in_stage_chain() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(-10, 10)])
+        .unwrap();
+
+    assert_eq!(result.return_value(), Some(&Interval::new(-10, 10)));
+}
+
+#[test]
+fn test_abstract_interp_with_stage_chain() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
+    let stage = pipeline.stage(stage_id).unwrap();
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    let result = interp
+        .with_stage(stage)
+        .analyze(spec_fn, &[Interval::new(-10, 10)])
+        .unwrap();
+
+    assert_eq!(result.return_value(), Some(&Interval::new(-10, 10)));
 }

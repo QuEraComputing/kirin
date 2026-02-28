@@ -150,13 +150,13 @@ where
             }
 
             // Push frame and run forward analysis
-            interp.push_frame(crate::Frame::new(
+            interp.frames.push(crate::Frame::new(
                 callee,
                 stage_id,
                 crate::FixpointState::default(),
             ))?;
             let result = interp.run_forward::<L>(stage_id, entry, args);
-            let _ = interp.pop_frame()?;
+            let _ = interp.frames.pop()?;
 
             let result = result?;
 

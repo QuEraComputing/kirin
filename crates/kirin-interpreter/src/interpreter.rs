@@ -18,21 +18,17 @@ use crate::InterpreterError;
 /// (e.g. [`crate::StackInterpreter::call`],
 /// [`crate::AbstractInterpreter::analyze`]).
 pub trait Interpreter<'ir>: Sized + 'ir {
-    type Value;
+    /// The value type manipulated by this interpreter.
+    ///
+    /// Values should be cheap to clone — typically pointer-sized handles,
+    /// small enums, or wrappers around `Arc`/`Rc` for heavier data.
+    type Value: Clone;
     type Error;
     type Ext: fmt::Debug;
     type StageInfo: StageMeta;
 
-    /// Returns a reference to the bound value without cloning.
-    fn read_ref(&self, value: SSAValue) -> Result<&Self::Value, Self::Error>;
-
     /// Returns a cloned copy of the bound value.
-    fn read(&self, value: SSAValue) -> Result<Self::Value, Self::Error>
-    where
-        Self::Value: Clone,
-    {
-        self.read_ref(value).cloned()
-    }
+    fn read(&self, value: SSAValue) -> Result<Self::Value, Self::Error>;
 
     /// Bind a result to a value.
     fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;

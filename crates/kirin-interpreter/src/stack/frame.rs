@@ -37,61 +37,17 @@ where
         StageDispatchTable { by_stage }
     }
 
-    fn current_frame_ref(&self) -> Result<&StackFrame<'ir, V, S, E, G>, E> {
-        self.call_stack
-            .last()
-            .ok_or_else(|| InterpreterError::NoFrame.into())
-    }
-
-    fn current_frame_mut_ref(&mut self) -> Result<&mut StackFrame<'ir, V, S, E, G>, E> {
-        self.call_stack
-            .last_mut()
-            .ok_or_else(|| InterpreterError::NoFrame.into())
-    }
-
     pub(crate) fn current_cursor(&self) -> Result<Option<Statement>, E> {
-        Ok(self.current_frame_ref()?.extra().cursor)
+        Ok(self.call_stack.current()?.extra().cursor)
     }
 
     pub(crate) fn set_current_cursor(&mut self, cursor: Option<Statement>) -> Result<(), E> {
-        self.current_frame_mut_ref()?.extra_mut().cursor = cursor;
-        Ok(())
-    }
-
-    fn active_stage_from_frames(&self) -> CompileStage {
-        self.call_stack
-            .last()
-            .map(Frame::stage)
-            .unwrap_or(self.root_stage)
-    }
-
-    fn read_ref_from_current_frame(&self, value: SSAValue) -> Result<&V, E> {
-        let frame = self.current_frame_ref()?;
-        frame
-            .read(value)
-            .ok_or_else(|| InterpreterError::UnboundValue(value).into())
-    }
-
-    fn write_to_current_frame(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.current_frame_mut_ref()?.write(result, value);
-        Ok(())
-    }
-
-    fn write_ssa_to_current_frame(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.current_frame_mut_ref()?.write_ssa(ssa, value);
+        self.call_stack.current_mut()?.extra_mut().cursor = cursor;
         Ok(())
     }
 
     pub(crate) fn frame_depth(&self) -> usize {
-        self.call_stack.len()
-    }
-
-    pub(super) fn current_frame_stage(&self) -> Result<CompileStage, E> {
-        Ok(self.current_frame_ref()?.stage())
-    }
-
-    pub(super) fn current_frame_dispatch(&self) -> Result<DynFrameDispatch<'ir, V, S, E, G>, E> {
-        Ok(self.current_frame_ref()?.extra().dispatch)
+        self.call_stack.depth()
     }
 
     fn public_frame_to_internal(
@@ -121,14 +77,9 @@ where
             >,
         G: 'ir,
     {
-        if let Some(max) = self.max_depth {
-            if self.call_stack.len() >= max {
-                return Err(InterpreterError::MaxDepthExceeded.into());
-            }
-        }
         let dispatch = self.resolve_dispatch_for_stage(frame.stage())?;
         let internal = Self::public_frame_to_internal(frame, dispatch);
-        self.call_stack.push(internal);
+        self.call_stack.push(internal)?;
         Ok(())
     }
 }
@@ -140,17 +91,14 @@ where
 {
     /// Pop the current call frame and its paired dynamic dispatch entry.
     pub fn pop_frame(&mut self) -> Result<Frame<V, Option<Statement>>, E> {
-        let frame = self
-            .call_stack
-            .pop()
-            .ok_or_else(|| InterpreterError::NoFrame.into())?;
+        let frame = self.call_stack.pop()?;
         Ok(Self::internal_frame_to_public(frame))
     }
 }
 
 impl<'ir, V, S, E, G> Interpreter<'ir> for StackInterpreter<'ir, V, S, E, G>
 where
-    V: 'ir,
+    V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,
@@ -160,16 +108,16 @@ where
     type Ext = ConcreteExt;
     type StageInfo = S;
 
-    fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
-        self.read_ref_from_current_frame(value)
+    fn read(&self, value: SSAValue) -> Result<V, E> {
+        self.call_stack.read(value).cloned()
     }
 
     fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.write_to_current_frame(result, value)
+        self.call_stack.write(result, value)
     }
 
     fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.write_ssa_to_current_frame(ssa, value)
+        self.call_stack.write_ssa(ssa, value)
     }
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
@@ -177,6 +125,6 @@ where
     }
 
     fn active_stage(&self) -> CompileStage {
-        self.active_stage_from_frames()
+        self.call_stack.active_stage_or(self.root_stage)
     }
 }

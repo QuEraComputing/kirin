@@ -1,5 +1,6 @@
 mod fixpoint;
 mod interp;
+mod stage;
 mod summary;
 
 pub use interp::AbstractInterpreter;
@@ -7,10 +8,10 @@ pub use interp::AbstractInterpreter;
 // SummaryInserter is accessible via type inference from `AbstractInterpreter::insert_summary()`
 pub use summary::{SummaryCache, SummaryEntry};
 
-use std::collections::VecDeque;
-
 use kirin_ir::{Block, SSAValue};
 use rustc_hash::FxHashMap;
+
+use crate::DedupScheduler;
 
 /// Per-function fixpoint state stored as frame extra data.
 ///
@@ -18,7 +19,7 @@ use rustc_hash::FxHashMap;
 /// (both block args and statement results) live in [`Frame::values`].
 #[derive(Debug, Default)]
 pub struct FixpointState {
-    pub(crate) worklist: VecDeque<Block>,
+    pub(crate) worklist: DedupScheduler<Block>,
     /// Per-block argument SSA value IDs. Key presence = block visited.
     pub(crate) block_args: FxHashMap<Block, Vec<SSAValue>>,
     /// Per-block visit counts for [`WideningStrategy::Delayed`].

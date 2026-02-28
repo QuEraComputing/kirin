@@ -14,7 +14,7 @@ where
 {
     /// Stage-dynamic entrypoint.
     pub fn step(&mut self) -> Result<ConcreteContinuation<V>, E> {
-        let dispatch = self.current_frame_dispatch()?;
+        let dispatch = self.call_stack.current()?.extra().dispatch;
         (dispatch.step)(self)
     }
 
@@ -28,7 +28,7 @@ where
             >,
         for<'a> S: SupportsStageDispatch<PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
     {
-        let dispatch = self.current_frame_dispatch()?;
+        let dispatch = self.call_stack.current()?.extra().dispatch;
         (dispatch.advance)(self, control)?;
         if let Continuation::Call {
             callee,

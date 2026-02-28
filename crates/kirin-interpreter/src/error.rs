@@ -66,6 +66,9 @@ pub enum InterpreterError {
     /// An unexpected control flow action was encountered.
     #[error("unexpected control flow: {0}")]
     UnexpectedControl(String),
+    /// The runtime strategy requested a fork action unsupported by this engine.
+    #[error("unsupported fork action: {action}")]
+    UnsupportedForkAction { action: &'static str },
     /// Argument count does not match block/function parameter count.
     #[error("arity mismatch: expected {expected} arguments, got {got}")]
     ArityMismatch { expected: usize, got: usize },

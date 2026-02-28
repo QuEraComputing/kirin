@@ -5,8 +5,33 @@ use kirin_ir::{
     SupportsStageDispatch,
 };
 
-use super::{DynFrameDispatch, StackInterpreter};
+use super::StackInterpreter;
 use crate::{ConcreteContinuation, EvalCall, Interpretable, Interpreter, InterpreterError};
+
+pub(super) type DynStepFn<'ir, V, S, E, G> =
+    fn(&mut StackInterpreter<'ir, V, S, E, G>) -> Result<ConcreteContinuation<V>, E>;
+pub(super) type DynAdvanceFn<'ir, V, S, E, G> =
+    fn(&mut StackInterpreter<'ir, V, S, E, G>, &ConcreteContinuation<V>) -> Result<(), E>;
+
+#[doc(hidden)]
+pub struct DynFrameDispatch<'ir, V, S, E, G>
+where
+    S: StageMeta,
+{
+    pub(super) step: DynStepFn<'ir, V, S, E, G>,
+    pub(super) advance: DynAdvanceFn<'ir, V, S, E, G>,
+}
+
+impl<'ir, V, S, E, G> Copy for DynFrameDispatch<'ir, V, S, E, G> where S: StageMeta {}
+
+impl<'ir, V, S, E, G> Clone for DynFrameDispatch<'ir, V, S, E, G>
+where
+    S: StageMeta,
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
 
 #[doc(hidden)]
 pub struct CallDynAction<'a, 'ir, V, S, E, G>
@@ -66,7 +91,7 @@ where
     G: 'ir,
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
-    let stage_id = interp.current_frame_stage()?;
+    let stage_id = interp.call_stack.current()?.stage();
     let stage = interp.resolve_stage_info::<L>(stage_id)?;
     interp.advance_frame_with_stage::<L>(stage, control)
 }

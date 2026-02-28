@@ -611,7 +611,7 @@ fn test_abstract_widening_never() {
             .with_widening(WideningStrategy::Never)
             .with_max_iterations(50);
 
-    let result = interp.analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)]);
+    let result = interp.in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-5, 5)]);
 
     assert!(
         matches!(result, Err(InterpreterError::FuelExhausted)),
@@ -633,7 +633,7 @@ fn test_abstract_widening_delayed() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     let ret = result.return_value().unwrap();
@@ -657,7 +657,7 @@ fn test_abstract_widening_all_joins() {
             .with_max_iterations(100);
 
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     let ret = result.return_value().unwrap();
@@ -687,13 +687,13 @@ fn test_abstract_fixed_summary() {
 
     // Analyze should return the fixed summary without computing
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(100, 200)));
 
     // Even with different args, the fixed summary is returned
     let result2 = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::top()])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::top()])
         .unwrap();
     assert_eq!(result2.return_value(), Some(&Interval::new(100, 200)));
 }
@@ -710,7 +710,7 @@ fn test_abstract_summary_invalidation_and_gc() {
 
     // Analyze to populate the cache
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
 
@@ -729,7 +729,7 @@ fn test_abstract_summary_invalidation_and_gc() {
 
     // Re-analyze should work fresh
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(0, 10)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(0, 10)])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
 }
@@ -746,7 +746,7 @@ fn test_abstract_remove_summary() {
 
     // Analyze to populate cache
     interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::constant(5)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::constant(5)])
         .unwrap();
     assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_some());
 
@@ -772,7 +772,7 @@ fn test_abstract_analysis_result_queries() {
 
     // Analyze with interval spanning zero -> fork at cond_br
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[Interval::new(-5, 5)])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     // Should have visited multiple blocks (entry + then + else = 3)
@@ -819,7 +819,7 @@ fn test_abstract_analysis_result_ssa_values() {
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp
-        .analyze_in_stage::<CompositeLanguage>(spec_fn, &[])
+        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[])
         .unwrap();
 
     // Query individual SSA values

@@ -1,9 +1,63 @@
 use std::collections::HashSet;
+use std::marker::PhantomData;
 
 use kirin_ir::{CompileStage, Pipeline, StageMeta, Statement, SupportsStageDispatch};
 
-use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
-use crate::InterpreterError;
+use super::dispatch::DynFrameDispatch;
+use crate::{Frame, FrameStack, InterpreterError};
+
+pub(super) struct StackFrameExtra<'ir, V, S, E, G>
+where
+    S: StageMeta,
+{
+    pub(super) cursor: Option<Statement>,
+    pub(super) dispatch: DynFrameDispatch<'ir, V, S, E, G>,
+}
+
+pub(super) type StackFrame<'ir, V, S, E, G> = Frame<V, StackFrameExtra<'ir, V, S, E, G>>;
+
+pub(super) struct StageDispatchTable<'ir, V, S, E, G>
+where
+    S: StageMeta,
+{
+    pub(super) by_stage: Vec<Option<DynFrameDispatch<'ir, V, S, E, G>>>,
+}
+
+/// Stack-based interpreter that owns execution state and drives evaluation.
+///
+/// Combines value storage (frames), pipeline reference, and execution logic
+/// (step/advance/run/call) in one type. Different interpreter implementations
+/// (e.g. [`crate::AbstractInterpreter`]) provide different walking strategies.
+///
+/// # Error type
+///
+/// Defaults to [`InterpreterError`]. Users who need additional error variants
+/// can define their own error type with `#[from] InterpreterError`:
+///
+/// ```ignore
+/// #[derive(Debug, thiserror::Error)]
+/// enum MyError {
+///     #[error(transparent)]
+///     Interp(#[from] InterpreterError),
+///     #[error("division by zero")]
+///     DivisionByZero,
+/// }
+///
+/// let mut interp = StackInterpreter::<i64, _, MyError>::new(&pipeline, stage);
+/// ```
+pub struct StackInterpreter<'ir, V, S, E = InterpreterError, G = ()>
+where
+    S: StageMeta,
+{
+    pub(super) call_stack: FrameStack<V, StackFrameExtra<'ir, V, S, E, G>>,
+    pub(super) dispatch_table: StageDispatchTable<'ir, V, S, E, G>,
+    pub(super) global: G,
+    pub(super) pipeline: &'ir Pipeline<S>,
+    pub(super) root_stage: CompileStage,
+    pub(super) breakpoints: HashSet<Statement>,
+    pub(super) fuel: Option<u64>,
+    pub(super) _error: PhantomData<E>,
+}
 
 // -- Constructors -----------------------------------------------------------
 
@@ -13,7 +67,7 @@ where
     S: StageMeta,
     E: From<InterpreterError> + 'ir,
     S: SupportsStageDispatch<
-            FrameDispatchAction<'ir, V, S, E, ()>,
+            super::FrameDispatchAction<'ir, V, S, E, ()>,
             DynFrameDispatch<'ir, V, S, E, ()>,
             E,
         >,
@@ -33,7 +87,7 @@ where
     S: StageMeta,
     E: From<InterpreterError> + 'ir,
     S: SupportsStageDispatch<
-            FrameDispatchAction<'ir, V, S, E, G>,
+            super::FrameDispatchAction<'ir, V, S, E, G>,
             DynFrameDispatch<'ir, V, S, E, G>,
             E,
         >,
@@ -46,15 +100,14 @@ where
     pub fn new_with_global(pipeline: &'ir Pipeline<S>, stage: CompileStage, global: G) -> Self {
         let dispatch_table = Self::build_dispatch_table(pipeline);
         Self {
-            call_stack: Vec::new(),
+            call_stack: FrameStack::new(),
             dispatch_table,
             global,
             pipeline,
             root_stage: stage,
             breakpoints: HashSet::default(),
             fuel: None,
-            max_depth: None,
-            _error: std::marker::PhantomData,
+            _error: PhantomData,
         }
     }
 }
@@ -78,7 +131,7 @@ where
     ///
     /// Pushing beyond this limit returns [`InterpreterError::MaxDepthExceeded`].
     pub fn with_max_depth(mut self, depth: usize) -> Self {
-        self.max_depth = Some(depth);
+        self.call_stack = self.call_stack.with_max_depth(depth);
         self
     }
 }

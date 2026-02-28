@@ -20,27 +20,6 @@ where
     S: StageMeta + 'ir,
     G: 'ir,
 {
-    /// Analyze a function, returning its [`AnalysisResult`], with strict typed
-    /// stage checking against the current active stage.
-    pub fn analyze_in_stage<L>(
-        &mut self,
-        callee: SpecializedFunction,
-        args: &[V],
-    ) -> Result<AnalysisResult<V>, E>
-    where
-        S: HasStageInfo<L>,
-        for<'a> S:
-            SupportsStageDispatch<AnalyzeDynAction<'a, 'ir, V, S, E, G>, AnalysisResult<V>, E>,
-        L: Dialect
-            + Interpretable<'ir, Self, L>
-            + EvalCall<'ir, Self, L, Result = AnalysisResult<V>>
-            + 'ir,
-    {
-        let stage_id = self.active_stage();
-        self.call_handler = Some(Self::analyze);
-        self.analyze_with_stage_id::<L>(callee, stage_id, args)
-    }
-
     /// Runtime-dispatched analysis entrypoint.
     pub fn analyze(
         &mut self,
@@ -62,7 +41,7 @@ where
         Self::dispatch_in_pipeline(pipeline, stage, &mut action)
     }
 
-    fn analyze_with_stage_id<L>(
+    pub(crate) fn analyze_with_stage_id<L>(
         &mut self,
         callee: SpecializedFunction,
         stage_id: CompileStage,
@@ -165,14 +144,13 @@ where
             }
             let frame = self
                 .frames
-                .last_mut()
-                .ok_or_else(|| InterpreterError::NoFrame.into())?;
+                .current_mut()?;
             let (values, fp) = frame.values_and_extra_mut();
             for (ssa, val) in arg_ssas.iter().zip(initial_args.iter()) {
                 values.insert(*ssa, val.clone());
             }
             fp.block_args.insert(entry, arg_ssas);
-            fp.worklist.push_back(entry);
+            fp.worklist.push_unique(entry);
         }
 
         let mut return_value: Option<V> = None;
@@ -182,10 +160,9 @@ where
             let block = {
                 let fp = self
                     .frames
-                    .last_mut()
-                    .ok_or_else(|| InterpreterError::NoFrame.into())?
+                    .current_mut()?
                     .extra_mut();
-                fp.worklist.pop_front()
+                fp.worklist.pop()
             };
             let Some(block) = block else { break };
 
@@ -201,8 +178,7 @@ where
         if self.narrowing_iterations > 0 {
             let blocks: Vec<Block> = self
                 .frames
-                .last()
-                .ok_or_else(|| InterpreterError::NoFrame.into())?
+                .current()?
                 .extra()
                 .block_args
                 .keys()
@@ -223,8 +199,7 @@ where
 
         let frame = self
             .frames
-            .last()
-            .ok_or_else(|| InterpreterError::NoFrame.into())?;
+            .current()?;
         Ok(AnalysisResult::new(
             frame.values().clone(),
             frame.extra().block_args.clone(),
@@ -337,12 +312,9 @@ where
             if !narrowing {
                 let fp = self
                     .frames
-                    .last_mut()
-                    .ok_or_else(|| InterpreterError::NoFrame.into())?
+                    .current_mut()?
                     .extra_mut();
-                if !fp.worklist.contains(&target) {
-                    fp.worklist.push_back(target);
-                }
+                fp.worklist.push_unique(target);
             }
             Ok(true)
         } else {
@@ -386,8 +358,7 @@ where
         let widening_strategy = self.widening_strategy;
         let frame = self
             .frames
-            .last_mut()
-            .ok_or_else(|| InterpreterError::NoFrame.into())?;
+            .current_mut()?;
         let (values, fp) = frame.values_and_extra_mut();
 
         let first_visit = !fp.block_args.contains_key(&target);

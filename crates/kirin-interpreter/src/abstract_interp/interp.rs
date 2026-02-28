@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use super::{FixpointState, SummaryCache};
 use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
-use crate::{AbstractValue, Frame, Interpreter, InterpreterError};
+use crate::{AbstractValue, FrameStack, Interpreter, InterpreterError};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct SummaryKey {
@@ -29,12 +29,11 @@ where
     pub(crate) pipeline: &'ir Pipeline<S>,
     pub(crate) root_stage: CompileStage,
     pub(crate) global: G,
-    pub(crate) frames: Vec<Frame<V, FixpointState>>,
+    pub(crate) frames: FrameStack<V, FixpointState>,
     pub(crate) widening_strategy: WideningStrategy,
     pub(crate) max_iterations: usize,
     pub(crate) narrowing_iterations: usize,
     pub(crate) summaries: FxHashMap<SummaryKey, SummaryCache<V>>,
-    pub(crate) max_depth: Option<usize>,
     pub(crate) max_summary_iterations: usize,
     /// Type-erased call handler installed by [`analyze`](Self::analyze) so that
     /// [`interpret_block`] can dispatch nested calls through [`EvalCall`]
@@ -111,9 +110,8 @@ where
             widening_strategy: WideningStrategy::AllJoins,
             max_iterations: 1000,
             narrowing_iterations: 3,
-            frames: Vec::new(),
+            frames: FrameStack::new(),
             summaries: FxHashMap::default(),
-            max_depth: None,
             max_summary_iterations: 100,
             call_handler: None,
             _error: PhantomData,
@@ -147,7 +145,7 @@ where
 
     /// Configure maximum frame depth for recursive analysis.
     pub fn with_max_depth(mut self, depth: usize) -> Self {
-        self.max_depth = Some(depth);
+        self.frames = self.frames.with_max_depth(depth);
         self
     }
 
@@ -179,10 +177,7 @@ where
     }
 
     fn current_summary_stage(&self) -> CompileStage {
-        self.frames
-            .last()
-            .map(Frame::stage)
-            .unwrap_or(self.root_stage)
+        self.frames.active_stage_or(self.root_stage)
     }
 
     /// Look up the best cached summary for `callee` in the interpreter's
@@ -287,66 +282,6 @@ where
     }
 }
 
-impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
-where
-    V: AbstractValue + Clone + 'ir,
-    E: From<InterpreterError> + 'ir,
-    S: StageMeta + 'ir,
-    G: 'ir,
-{
-    pub(crate) fn current_frame_ref(&self) -> Result<&Frame<V, FixpointState>, E> {
-        self.frames
-            .last()
-            .ok_or_else(|| InterpreterError::NoFrame.into())
-    }
-
-    pub(crate) fn current_frame_mut_ref(&mut self) -> Result<&mut Frame<V, FixpointState>, E> {
-        self.frames
-            .last_mut()
-            .ok_or_else(|| InterpreterError::NoFrame.into())
-    }
-
-    pub(crate) fn push_frame(&mut self, frame: Frame<V, FixpointState>) -> Result<(), E> {
-        if let Some(max) = self.max_depth {
-            if self.frames.len() >= max {
-                return Err(InterpreterError::MaxDepthExceeded.into());
-            }
-        }
-        self.frames.push(frame);
-        Ok(())
-    }
-
-    pub(crate) fn pop_frame(&mut self) -> Result<Frame<V, FixpointState>, E> {
-        self.frames
-            .pop()
-            .ok_or_else(|| InterpreterError::NoFrame.into())
-    }
-
-    fn active_stage_from_frames(&self) -> CompileStage {
-        self.frames
-            .last()
-            .map(Frame::stage)
-            .unwrap_or(self.root_stage)
-    }
-
-    fn read_ref_from_current_frame(&self, value: SSAValue) -> Result<&V, E> {
-        let frame = self.current_frame_ref()?;
-        frame
-            .read(value)
-            .ok_or_else(|| InterpreterError::UnboundValue(value).into())
-    }
-
-    fn write_to_current_frame(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.current_frame_mut_ref()?.write(result, value);
-        Ok(())
-    }
-
-    fn write_ssa_to_current_frame(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.current_frame_mut_ref()?.write_ssa(ssa, value);
-        Ok(())
-    }
-}
-
 // -- Interpreter trait impl -------------------------------------------------
 
 impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
@@ -361,16 +296,16 @@ where
     type Ext = std::convert::Infallible;
     type StageInfo = S;
 
-    fn read_ref(&self, value: SSAValue) -> Result<&V, E> {
-        self.read_ref_from_current_frame(value)
+    fn read(&self, value: SSAValue) -> Result<V, E> {
+        self.frames.read(value).cloned()
     }
 
     fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.write_to_current_frame(result, value)
+        self.frames.write(result, value)
     }
 
     fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.write_ssa_to_current_frame(ssa, value)
+        self.frames.write_ssa(ssa, value)
     }
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
@@ -378,6 +313,6 @@ where
     }
 
     fn active_stage(&self) -> CompileStage {
-        self.active_stage_from_frames()
+        self.frames.active_stage_or(self.root_stage)
     }
 }

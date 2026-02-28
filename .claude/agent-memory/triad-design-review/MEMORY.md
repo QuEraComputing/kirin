@@ -83,9 +83,33 @@
 - Derive: `#[callable]` shifts CallSemantics default behavior (presence-dependent)
 - **RED**: Convergence check (call_semantics.rs:174) only checks return value, not block args
 - **YELLOW**: FxHashMap for frame values -- dense Vec recommended
-- **YELLOW**: worklist.contains() O(n), needs FxHashSet side-set
 - **YELLOW**: Duplicate arg binding in 3 places
 - Good: InterpreterError variants clear, SummaryInserter API discoverable, Args SmallVec well-sized
+
+## Runtime Module Review (2026-02-27, full triad review)
+### Core issue: FrameStack doesn't eliminate real duplication
+- `FrameStack` returns `Option`; both interpreters convert to `Result` identically
+- Duplicated glue: stack/frame.rs:61-85 === abstract_interp/interp.rs:310-334
+- FIX: Add `read_or_err<E>`, `write_or_err<E>`, `write_ssa_or_err<E>`, `push_checked<E>` to FrameStack
+- Also `active_stage_or_err<E>` to collapse `active_stage_from_frames`
+- `push_frame` with max_depth check also duplicated -- `push_checked` eliminates it
+
+### DedupScheduler issues:
+- `push` doesn't dedup but `push_unique` does -- incoherent on same type
+- Uses `std::HashSet` instead of `FxHashSet`; Block IDs are dense ints (BitVec ideal)
+- FIX: Make push always dedup, drop UniqueScheduler subtrait
+
+### Dead code (~150 lines, zero production consumers):
+- `BranchBatch`, `Driver`, `VecDequeScheduler`, `ForkAction::Spawn`
+- `WorkExecutor`, `WorkLoopRuntime`, `ForkStrategy` -- only used by MockRuntime in tests
+- `RuntimeObserver`/`RuntimeEvent` defined but never emitted by real interpreters
+
+### Design principles confirmed:
+- Extract abstractions with 2+ real consumers, not speculatively
+- External strategy traits needing `&mut` host access hit borrow-checker walls
+- Observer hooks should be type params on interpreter, not standalone hierarchy
+- Stack (cursor-walk) vs abstract (worklist-drain) loops are too different to unify
+- FrameStack should bridge Option->Result gap to truly eliminate Interpreter impl duplication
 
 ## Parser/Printer Architecture
 - Two-phase parsing: AST (with spans) -> EmitIR -> IR; `ASTSelf` coinductive wrapper for self-ref types

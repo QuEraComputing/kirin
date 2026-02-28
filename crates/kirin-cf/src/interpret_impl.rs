@@ -1,5 +1,5 @@
 use kirin::prelude::{Dialect, SSAValue};
-use kirin_interpreter::smallvec::smallvec;
+use smallvec::smallvec;
 use kirin_interpreter::{BranchCondition, Continuation, Interpretable, Interpreter};
 
 use crate::ControlFlow;

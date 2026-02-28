@@ -66,7 +66,7 @@ where
 
     pub(super) fn bind_block_args_in_stage<L>(
         &mut self,
-        stage: &StageInfo<L>,
+        stage: &'ir StageInfo<L>,
         block: Block,
         args: &[V],
     ) -> Result<(), E>
