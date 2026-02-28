@@ -1,5 +1,5 @@
 use kirin_ir::{
-    CompileStage, Dialect, GetInfo, HasStageInfo, SpecializedFunction, StageInfo, StageMeta,
+    CompileStage, Dialect, GetInfo, SpecializedFunction, StageInfo, StageMeta,
     SupportsStageDispatch,
 };
 
@@ -16,17 +16,6 @@ where
     S: StageMeta + 'ir,
     G: 'ir,
 {
-    /// Call a specialized function and return its result value using strict
-    /// typed-stage checking.
-    pub fn call_in_stage<L>(&mut self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V> + 'ir,
-    {
-        let stage_id = self.active_stage();
-        self.call_with_stage_id::<L>(callee, stage_id, args)
-    }
-
     /// Stage-dynamic call entrypoint. The target dialect is resolved at
     /// runtime from stage metadata.
     pub fn call(
@@ -47,30 +36,16 @@ where
         Self::dispatch_in_pipeline(pipeline, stage, &mut action)
     }
 
-    pub(super) fn call_with_stage_id<L>(
+    pub(super) fn call_with_stage<L>(
         &mut self,
         callee: SpecializedFunction,
-        stage_id: CompileStage,
-        args: &[V],
-    ) -> Result<V, E>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V> + 'ir,
-    {
-        let stage = self.resolve_stage_info::<L>(stage_id)?;
-        self.call_in_resolved_stage::<L>(callee, stage_id, stage, args)
-    }
-
-    fn call_in_resolved_stage<L>(
-        &mut self,
-        callee: SpecializedFunction,
-        stage_id: CompileStage,
         stage: &'ir StageInfo<L>,
         args: &[V],
     ) -> Result<V, E>
     where
         L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V> + 'ir,
     {
+        let stage_id = Self::expect_stage_id(stage);
         let spec =
             callee
                 .get_info(stage)
@@ -83,29 +58,18 @@ where
         def.eval_call(self, stage, callee, args)
     }
 
-    pub(super) fn push_call_frame_with_args(
-        &mut self,
-        callee: SpecializedFunction,
-        stage_id: CompileStage,
-        args: &[V],
-    ) -> Result<(), E>
+    fn expect_stage_id<L2>(stage: &StageInfo<L2>) -> CompileStage
     where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'a> S: SupportsStageDispatch<PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
+        L2: Dialect,
     {
-        let pipeline = self.pipeline;
-        let mut action = PushCallFrameDynAction::new(self, callee, args);
-        Self::dispatch_in_pipeline(pipeline, stage_id, &mut action)
+        stage
+            .stage_id()
+            .expect("stage info must be attached to a pipeline stage")
     }
 
-    pub(super) fn push_call_frame_in_resolved_stage<L>(
+    pub(super) fn push_call_frame_with_stage<L>(
         &mut self,
         callee: SpecializedFunction,
-        stage_id: CompileStage,
         stage: &'ir StageInfo<L>,
         args: &[V],
     ) -> Result<(), E>
@@ -117,6 +81,7 @@ where
             >,
         L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
+        let stage_id = Self::expect_stage_id(stage);
         let spec =
             callee
                 .get_info(stage)
@@ -150,5 +115,24 @@ where
             return Err(err);
         }
         Ok(())
+    }
+
+    pub(super) fn push_call_frame_with_args(
+        &mut self,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+        args: &[V],
+    ) -> Result<(), E>
+    where
+        S: SupportsStageDispatch<
+                FrameDispatchAction<'ir, V, S, E, G>,
+                DynFrameDispatch<'ir, V, S, E, G>,
+                E,
+            >,
+        for<'a> S: SupportsStageDispatch<PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
+    {
+        let pipeline = self.pipeline;
+        let mut action = PushCallFrameDynAction::new(self, callee, args);
+        Self::dispatch_in_pipeline(pipeline, stage_id, &mut action)
     }
 }

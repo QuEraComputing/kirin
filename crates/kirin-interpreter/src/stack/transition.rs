@@ -1,5 +1,5 @@
 use kirin_ir::{
-    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, SSAValue, StageInfo, StageMeta,
+    Block, CompileStage, Dialect, GetInfo, Pipeline, SSAValue, StageInfo, StageMeta,
     SupportsStageDispatch,
 };
 
@@ -92,21 +92,8 @@ where
         Ok(())
     }
 
-    pub(super) fn step_with_stage_id<L>(
+    pub(super) fn step_with_stage<L>(
         &mut self,
-        stage_id: CompileStage,
-    ) -> Result<ConcreteContinuation<V>, E>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
-    {
-        let stage = self.resolve_stage_info::<L>(stage_id)?;
-        self.step_in_resolved_stage::<L>(stage_id, stage)
-    }
-
-    fn step_in_resolved_stage<L>(
-        &mut self,
-        _stage_id: CompileStage,
         stage: &'ir StageInfo<L>,
     ) -> Result<ConcreteContinuation<V>, E>
     where
@@ -120,22 +107,8 @@ where
         def.interpret(self)
     }
 
-    pub(super) fn advance_frame_with_stage_id<L>(
+    pub(super) fn advance_frame_with_stage<L>(
         &mut self,
-        stage_id: CompileStage,
-        control: &ConcreteContinuation<V>,
-    ) -> Result<(), E>
-    where
-        S: HasStageInfo<L>,
-        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
-    {
-        let stage = self.resolve_stage_info::<L>(stage_id)?;
-        self.advance_frame_in_resolved_stage::<L>(stage_id, stage, control)
-    }
-
-    fn advance_frame_in_resolved_stage<L>(
-        &mut self,
-        _stage_id: CompileStage,
         stage: &'ir StageInfo<L>,
         control: &ConcreteContinuation<V>,
     ) -> Result<(), E>

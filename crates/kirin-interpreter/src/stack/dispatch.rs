@@ -37,8 +37,8 @@ where
         stage_id: CompileStage,
         _stage: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
-        self.interp
-            .call_with_stage_id::<L>(self.callee, stage_id, self.args)
+        let stage = self.interp.resolve_stage_info::<L>(stage_id)?;
+        self.interp.with_stage(stage).call(self.callee, self.args)
     }
 }
 
@@ -52,8 +52,7 @@ where
     G: 'ir,
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
-    let stage_id = interp.current_frame_stage()?;
-    interp.step_with_stage_id::<L>(stage_id)
+    interp.in_stage::<L>().step()
 }
 
 fn dyn_advance_for_lang<'ir, V, S, E, G, L>(
@@ -68,7 +67,8 @@ where
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     let stage_id = interp.current_frame_stage()?;
-    interp.advance_frame_with_stage_id::<L>(stage_id, control)
+    let stage = interp.resolve_stage_info::<L>(stage_id)?;
+    interp.advance_frame_with_stage::<L>(stage, control)
 }
 
 #[doc(hidden)]
@@ -135,7 +135,8 @@ where
     ) -> Result<Self::Output, Self::Error> {
         let stage = self.interp.resolve_stage_info::<L>(stage_id)?;
         self.interp
-            .push_call_frame_in_resolved_stage::<L>(self.callee, stage_id, stage, self.args)
+            .with_stage(stage)
+            .push_call_frame(self.callee, self.args)
     }
 }
 

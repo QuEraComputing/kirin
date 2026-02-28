@@ -623,7 +623,8 @@ fn test_typed_call_reports_stage_mismatch() {
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, dummy_stage);
     let err = interp
-        .call_in_stage::<StageDynLang>(spec, &[2])
+        .in_stage::<StageDynLang>()
+        .call(spec, &[2])
         .unwrap_err();
     assert!(
         matches!(

@@ -428,7 +428,7 @@ fn test_concrete_fuel_exhaustion() {
     let mut interp: StackInterpreter<i64, _> =
         StackInterpreter::new(&pipeline, stage_id).with_fuel(20);
 
-    let result = interp.call_in_stage::<CompositeLanguage>(spec_fn, &[42]);
+    let result = interp.in_stage::<CompositeLanguage>().call(spec_fn, &[42]);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
@@ -463,7 +463,8 @@ fn test_concrete_breakpoints() {
 
     // Run until break — should stop before executing add
     let control = interp
-        .run_until_break_in_stage::<CompositeLanguage>()
+        .in_stage::<CompositeLanguage>()
+        .run_until_break()
         .unwrap();
     assert!(
         matches!(control, Continuation::Ext(ConcreteExt::Break)),
@@ -472,7 +473,7 @@ fn test_concrete_breakpoints() {
 
     // Clear breakpoints and continue to completion
     interp.clear_breakpoints();
-    let control = interp.run_in_stage::<CompositeLanguage>().unwrap();
+    let control = interp.in_stage::<CompositeLanguage>().run().unwrap();
     match control {
         Continuation::Return(v) => assert_eq!(v, 15, "expected 5 + 10 = 15"),
         other => panic!("expected Return, got: {other:?}"),
@@ -553,19 +554,22 @@ fn test_concrete_sequential_calls() {
 
     // Call f(5) -> 6
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_fn, &[5])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_fn, &[5])
         .unwrap();
     assert_eq!(result, 6);
 
     // Call f(10) -> 11 — interpreter resets between calls
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_fn, &[10])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_fn, &[10])
         .unwrap();
     assert_eq!(result, 11);
 
     // Call f(-1) -> 0
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_fn, &[-1])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_fn, &[-1])
         .unwrap();
     assert_eq!(result, 0);
 }
@@ -582,7 +586,8 @@ fn test_concrete_fuel_sufficient() {
         StackInterpreter::new(&pipeline, stage_id).with_fuel(100);
 
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_fn, &[5])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_fn, &[5])
         .unwrap();
     assert_eq!(result, 6);
 }

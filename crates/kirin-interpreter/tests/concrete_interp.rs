@@ -146,19 +146,22 @@ fn test_concrete_select() {
 
     // select(7) → 7+1 = 8 (truthy: nonzero)
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_func, &[7])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_func, &[7])
         .unwrap();
     assert_eq!(result, 8);
 
     // select(-3) → -3+1 = -2 (truthy: nonzero)
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_func, &[-3])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_func, &[-3])
         .unwrap();
     assert_eq!(result, -2);
 
     // select(0) → 42 (falsy: zero)
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_func, &[0])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_func, &[0])
         .unwrap();
     assert_eq!(result, 42);
 }

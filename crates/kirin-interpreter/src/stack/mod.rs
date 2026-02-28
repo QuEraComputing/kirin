@@ -3,6 +3,7 @@ mod dispatch;
 mod exec;
 mod frame;
 mod interp;
+mod stage;
 mod transition;
 
 use std::collections::HashSet;
@@ -13,6 +14,7 @@ use kirin_ir::{CompileStage, Pipeline, StageMeta, Statement};
 use crate::{ConcreteContinuation, Frame, InterpreterError};
 
 pub use dispatch::{FrameDispatchAction, PushCallFrameDynAction};
+pub use stage::{InStage, WithStage};
 
 struct StackFrameExtra<'ir, V, S, E, G>
 where

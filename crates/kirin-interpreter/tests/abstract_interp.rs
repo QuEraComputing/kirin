@@ -37,7 +37,8 @@ fn test_session_abstract_interp_constants() {
     let mut interp: StackInterpreter<Interval, _> = StackInterpreter::new(&pipeline, stage_id);
 
     let result = interp
-        .call_in_stage::<CompositeLanguage>(spec_fn, &[])
+        .in_stage::<CompositeLanguage>()
+        .call(spec_fn, &[])
         .unwrap();
     assert_eq!(result, Interval::constant(42));
 }
@@ -83,7 +84,7 @@ fn test_session_abstract_interp_with_args() {
         frame.write_ssa(SSAValue::from(block_args[0]), input);
         interp.push_frame(frame).unwrap();
         loop {
-            match interp.run_in_stage::<CompositeLanguage>().unwrap() {
+            match interp.in_stage::<CompositeLanguage>().run().unwrap() {
                 Continuation::Return(v) => {
                     interp.pop_frame().unwrap();
                     return v;
