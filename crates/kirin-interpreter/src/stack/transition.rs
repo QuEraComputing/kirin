@@ -1,0 +1,199 @@
+use kirin_ir::{
+    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, SSAValue, StageInfo, StageMeta,
+    SupportsStageDispatch,
+};
+
+use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
+use crate::{
+    ConcreteContinuation, ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError,
+};
+
+impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
+where
+    V: Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: StageMeta + 'ir,
+    G: 'ir,
+{
+    pub(super) fn resolve_dispatch_for_stage_in_pipeline(
+        pipeline: &'ir Pipeline<S>,
+        stage_id: CompileStage,
+    ) -> Result<DynFrameDispatch<'ir, V, S, E, G>, E>
+    where
+        S: SupportsStageDispatch<
+                FrameDispatchAction<'ir, V, S, E, G>,
+                DynFrameDispatch<'ir, V, S, E, G>,
+                E,
+            >,
+    {
+        let mut action = FrameDispatchAction::new();
+        Self::dispatch_in_pipeline(pipeline, stage_id, &mut action)
+    }
+
+    pub(super) fn resolve_dispatch_for_stage(
+        &self,
+        stage_id: CompileStage,
+    ) -> Result<DynFrameDispatch<'ir, V, S, E, G>, E>
+    where
+        S: SupportsStageDispatch<
+                FrameDispatchAction<'ir, V, S, E, G>,
+                DynFrameDispatch<'ir, V, S, E, G>,
+                E,
+            >,
+    {
+        let idx = kirin_ir::Id::from(stage_id).raw();
+        match self.dispatch_table.by_stage.get(idx).copied().flatten() {
+            Some(dispatch) => Ok(dispatch),
+            None => {
+                if self.pipeline.stage(stage_id).is_none() {
+                    Err(InterpreterError::MissingStage { stage: stage_id }.into())
+                } else {
+                    Err(InterpreterError::MissingStageDialect { stage: stage_id }.into())
+                }
+            }
+        }
+    }
+
+    fn spend_fuel(&mut self) -> Result<(), E> {
+        if let Some(ref mut fuel) = self.fuel {
+            if *fuel == 0 {
+                return Err(InterpreterError::FuelExhausted.into());
+            }
+            *fuel -= 1;
+        }
+        Ok(())
+    }
+
+    pub(super) fn bind_block_args_in_stage<L>(
+        &mut self,
+        stage: &StageInfo<L>,
+        block: Block,
+        args: &[V],
+    ) -> Result<(), E>
+    where
+        L: Dialect,
+    {
+        let block_info = block.expect_info(stage);
+        if block_info.arguments.len() != args.len() {
+            return Err(InterpreterError::ArityMismatch {
+                expected: block_info.arguments.len(),
+                got: args.len(),
+            }
+            .into());
+        }
+        let arg_ssas: Vec<SSAValue> = block_info
+            .arguments
+            .iter()
+            .map(|ba| SSAValue::from(*ba))
+            .collect();
+        for (ssa, val) in arg_ssas.iter().zip(args.iter()) {
+            self.write_ssa(*ssa, val.clone())?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn step_with_stage_id<L>(
+        &mut self,
+        stage_id: CompileStage,
+    ) -> Result<ConcreteContinuation<V>, E>
+    where
+        S: HasStageInfo<L>,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+    {
+        let stage = self.resolve_stage_info::<L>(stage_id)?;
+        self.step_in_resolved_stage::<L>(stage_id, stage)
+    }
+
+    fn step_in_resolved_stage<L>(
+        &mut self,
+        _stage_id: CompileStage,
+        stage: &'ir StageInfo<L>,
+    ) -> Result<ConcreteContinuation<V>, E>
+    where
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+    {
+        self.spend_fuel()?;
+        let cursor = self
+            .current_cursor()?
+            .ok_or_else(|| InterpreterError::NoFrame.into())?;
+        let def: &L = cursor.definition(stage);
+        def.interpret(self)
+    }
+
+    pub(super) fn advance_frame_with_stage_id<L>(
+        &mut self,
+        stage_id: CompileStage,
+        control: &ConcreteContinuation<V>,
+    ) -> Result<(), E>
+    where
+        S: HasStageInfo<L>,
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+    {
+        let stage = self.resolve_stage_info::<L>(stage_id)?;
+        self.advance_frame_in_resolved_stage::<L>(stage_id, stage, control)
+    }
+
+    fn advance_frame_in_resolved_stage<L>(
+        &mut self,
+        _stage_id: CompileStage,
+        stage: &'ir StageInfo<L>,
+        control: &ConcreteContinuation<V>,
+    ) -> Result<(), E>
+    where
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+    {
+        match control {
+            Continuation::Continue => {
+                self.advance_cursor_in_stage::<L>(stage)?;
+            }
+            Continuation::Jump(succ, args) => {
+                self.bind_block_args_in_stage::<L>(stage, succ.target(), args)?;
+                let first = succ.target().first_statement(stage);
+                self.set_current_cursor(first)?;
+            }
+            Continuation::Fork(_) => {
+                return Err(InterpreterError::UnexpectedControl(
+                    "Fork is not supported by concrete interpreters".to_owned(),
+                )
+                .into());
+            }
+            Continuation::Call { .. } => {
+                self.advance_cursor_in_stage::<L>(stage)?;
+            }
+            Continuation::Return(_) => {
+                self.pop_frame()?;
+            }
+            Continuation::Yield(_) => {}
+            Continuation::Ext(ConcreteExt::Break | ConcreteExt::Halt) => {}
+        }
+        Ok(())
+    }
+
+    fn advance_cursor_in_stage<L>(&mut self, stage: &StageInfo<L>) -> Result<(), E>
+    where
+        L: Dialect,
+    {
+        let cursor = self
+            .current_cursor()?
+            .ok_or_else(|| InterpreterError::NoFrame.into())?;
+        let next = *cursor.next::<L>(stage);
+        if let Some(next_stmt) = next {
+            self.set_current_cursor(Some(next_stmt))?;
+        } else {
+            let parent_block = *cursor.parent::<L>(stage);
+            if let Some(block) = parent_block {
+                let term = block.terminator::<L>(stage);
+                if term == Some(cursor) {
+                    self.set_current_cursor(None)?;
+                } else if let Some(t) = term {
+                    self.set_current_cursor(Some(t))?;
+                } else {
+                    self.set_current_cursor(None)?;
+                }
+            } else {
+                self.set_current_cursor(None)?;
+            }
+        }
+        Ok(())
+    }
+}
