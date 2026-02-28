@@ -12,9 +12,10 @@
 
 ```bash
 cargo build --workspace          # Build all crates
-cargo test --workspace           # Run all tests
-cargo test -p kirin-chumsky      # Test a single crate
-cargo test -p kirin-chumsky-derive test_parse_add  # Run a single test
+cargo nextest run --workspace    # Run all tests (preferred, parallelizes test binaries)
+cargo nextest run -p kirin-chumsky  # Test a single crate
+cargo nextest run -p kirin-chumsky-derive -E 'test(test_parse_add)'  # Run a single test
+cargo test --doc --workspace     # Run doctests (nextest does not support doctests)
 cargo fmt --all                  # Format code
 cargo insta review               # Review snapshot test changes
 cargo xtask quick-validate .agents/skills/<skill-name>  # Validate a skill's SKILL.md frontmatter/rules
