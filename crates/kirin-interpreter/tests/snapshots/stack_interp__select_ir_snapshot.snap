@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-interpreter/tests/concrete_interp.rs
+source: crates/kirin-interpreter/tests/stack_interp.rs
 expression: ir
 ---
 specialize @0 fn @unnamed() -> i64 {

@@ -3,6 +3,9 @@ mod rustfmt;
 mod ssa;
 mod unit_type;
 
+#[cfg(feature = "interpreter")]
+pub mod ir_fixtures;
+
 #[cfg(feature = "parser")]
 pub mod parser;
 

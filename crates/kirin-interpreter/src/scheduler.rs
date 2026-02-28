@@ -61,3 +61,22 @@ where
         Some(item)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dedup_scheduler() {
+        let mut scheduler = DedupScheduler::new();
+        assert!(scheduler.push_unique(1usize));
+        assert!(!scheduler.push_unique(1usize));
+        assert!(scheduler.push_unique(2usize));
+
+        let mut popped = Vec::new();
+        while let Some(v) = scheduler.pop() {
+            popped.push(v);
+        }
+        assert_eq!(popped, vec![1, 2]);
+    }
+}

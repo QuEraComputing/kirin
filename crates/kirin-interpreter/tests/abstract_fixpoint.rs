@@ -2,226 +2,14 @@ use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
-use kirin_interpreter::{AbstractInterpreter, WideningStrategy};
+use kirin_interpreter::{AbstractInterpreter, AnalysisResult, InterpreterError, WideningStrategy};
 use kirin_interval::Interval;
-use kirin_ir::{query::ParentInfo, *};
+use kirin_ir::*;
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::dump_function;
-
-// ---------------------------------------------------------------------------
-// IR builders
-// ---------------------------------------------------------------------------
-
-/// Build: entry(x): neg_x = neg x; cond_br x then=neg_block(neg_x) else=pos_block(x)
-///        neg_block(val): ret val
-///        pos_block(val): ret val
-fn build_branch_fork_program(
-    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
-    stage_id: CompileStage,
-) -> SpecializedFunction {
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let sf = stage.staged_function().new().unwrap();
-
-    let entry_block_node = stage.block().argument(ArithType::I64).new();
-
-    let x: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        let bi = entry_block_node.expect_info(si);
-        bi.arguments[0].into()
-    };
-
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-
-    // neg_block(val): receives neg_x via block arg, returns val
-    let neg_block = stage.block().argument(ArithType::I64).new();
-    let neg_val: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        neg_block.expect_info(si).arguments[0].into()
-    };
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_neg = ControlFlow::<ArithType>::op_return(stage, neg_val);
-    {
-        let neg_info: &mut Item<BlockInfo<CompositeLanguage>> =
-            neg_block.get_info_mut(stage).unwrap();
-        neg_info.terminator = Some(ret_neg.into());
-    }
-
-    // pos_block(val): receives x via block arg, returns val
-    let pos_block = stage.block().argument(ArithType::I64).new();
-    let pos_val: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        pos_block.expect_info(si).arguments[0].into()
-    };
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_pos = ControlFlow::<ArithType>::op_return(stage, pos_val);
-    {
-        let pos_info: &mut Item<BlockInfo<CompositeLanguage>> =
-            pos_block.get_info_mut(stage).unwrap();
-        pos_info.terminator = Some(ret_pos.into());
-    }
-
-    // Entry block: neg_x = neg x; cond_br x then=neg_block(neg_x) else=pos_block(x)
-    let neg_result = kirin_arith::Arith::<ArithType>::op_neg(stage, x);
-
-    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
-        stage,
-        x,
-        Successor::from_block(neg_block),
-        vec![neg_result.result.into()],
-        Successor::from_block(pos_block),
-        vec![x],
-    );
-
-    {
-        let stmts: Vec<Statement> = vec![neg_result.into()];
-        for &s in &stmts {
-            let info = s.expect_info_mut(stage);
-            *info.get_parent_mut() = Some(entry_block_node);
-        }
-        let linked = stage.link_statements(&stmts);
-
-        let cond_br_stmt: Statement = cond_br.into();
-        let info = cond_br_stmt.expect_info_mut(stage);
-        *info.get_parent_mut() = Some(entry_block_node);
-
-        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
-            entry_block_node.get_info_mut(stage).unwrap();
-        entry_info.statements = linked;
-        entry_info.terminator = Some(cond_br_stmt);
-    }
-
-    let region = stage
-        .region()
-        .add_block(entry_block_node)
-        .add_block(neg_block)
-        .add_block(pos_block)
-        .new();
-
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().f(sf).body(body).new().unwrap()
-}
-
-/// Build a loop where the loop variable flows via block arguments:
-///   entry(x): br header(x)
-///   header(i): cond_br i then=loop_body(i) else=loop_exit(i)
-///   loop_body(val): c1 = const 1; sum = add val, c1; br header(sum)
-///   loop_exit(result): ret result
-fn build_loop_program(
-    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
-    stage_id: CompileStage,
-) -> SpecializedFunction {
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let sf = stage.staged_function().new().unwrap();
-
-    let entry = stage.block().argument(ArithType::I64).new();
-
-    let x: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        entry.expect_info(si).arguments[0].into()
-    };
-
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let header = stage.block().argument(ArithType::I64).new();
-    let i: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        header.expect_info(si).arguments[0].into()
-    };
-
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-
-    // loop_exit(result): ret result
-    let loop_exit = stage.block().argument(ArithType::I64).new();
-    let exit_val: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        loop_exit.expect_info(si).arguments[0].into()
-    };
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
-    {
-        let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
-            loop_exit.get_info_mut(stage).unwrap();
-        exit_info.terminator = Some(ret_exit.into());
-    }
-
-    // loop_body(val): c1 = const 1; sum = add val, c1; br header(sum)
-    let loop_body = stage.block().argument(ArithType::I64).new();
-    let body_val: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        loop_body.expect_info(si).arguments[0].into()
-    };
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
-    let sum = kirin_arith::Arith::<ArithType>::op_add(stage, body_val, c1.result);
-    let br_back = ControlFlow::<ArithType>::op_branch(
-        stage,
-        Successor::from_block(header),
-        vec![sum.result.into()],
-    );
-    {
-        let stmts: Vec<Statement> = vec![c1.into(), sum.into()];
-        for &s in &stmts {
-            let info = s.expect_info_mut(stage);
-            *info.get_parent_mut() = Some(loop_body);
-        }
-        let linked = stage.link_statements(&stmts);
-
-        let br_stmt: Statement = br_back.into();
-        br_stmt
-            .expect_info_mut(stage)
-            .get_parent_mut()
-            .replace(loop_body);
-
-        let body_info: &mut Item<BlockInfo<CompositeLanguage>> =
-            loop_body.get_info_mut(stage).unwrap();
-        body_info.statements = linked;
-        body_info.terminator = Some(br_stmt);
-    }
-
-    // entry: br header(x)
-    let br_header =
-        ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(header), vec![x]);
-    {
-        let br_stmt: Statement = br_header.into();
-        br_stmt
-            .expect_info_mut(stage)
-            .get_parent_mut()
-            .replace(entry);
-        let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
-            entry.get_info_mut(stage).unwrap();
-        entry_info.terminator = Some(br_stmt);
-    }
-
-    // header: cond_br i then=loop_body(i) else=loop_exit(i)
-    let cond_br = ControlFlow::<ArithType>::op_conditional_branch(
-        stage,
-        i,
-        Successor::from_block(loop_body),
-        vec![i],
-        Successor::from_block(loop_exit),
-        vec![i],
-    );
-    {
-        let cond_stmt: Statement = cond_br.into();
-        cond_stmt
-            .expect_info_mut(stage)
-            .get_parent_mut()
-            .replace(header);
-        let header_info: &mut Item<BlockInfo<CompositeLanguage>> =
-            header.get_info_mut(stage).unwrap();
-        header_info.terminator = Some(cond_stmt);
-    }
-
-    let region = stage
-        .region()
-        .add_block(entry)
-        .add_block(header)
-        .add_block(loop_body)
-        .add_block(loop_exit)
-        .new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().f(sf).body(body).new().unwrap()
-}
+use kirin_test_utils::ir_fixtures::{
+    build_add_one, build_branch_fork_program, build_loop_program, build_select_program,
+};
 
 // ---------------------------------------------------------------------------
 // IR snapshot tests
@@ -248,7 +36,7 @@ fn test_loop_convergence_ir_snapshot() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Straight-line constant propagation
+// Test: Straight-line constant propagation
 // ---------------------------------------------------------------------------
 
 /// Build `c1 = constant 10; c2 = constant 32; y = add c1, c2; return y`
@@ -280,13 +68,14 @@ fn test_abstract_interp_constants() {
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp
-        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[])
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[])
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::constant(42)));
 }
 
 // ---------------------------------------------------------------------------
-// Test 2: Branching with Fork (undecidable condition)
+// Test: Branching with Fork (undecidable condition)
 // ---------------------------------------------------------------------------
 
 /// Pass Interval(-10, 10) which spans zero — is_truthy returns None → Fork.
@@ -302,7 +91,8 @@ fn test_abstract_interp_branch_fork() {
         AbstractInterpreter::new(&pipeline, stage_id);
 
     let result = interp
-        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-10, 10)])
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(-10, 10)])
         .unwrap();
 
     // The return value is the join of:
@@ -314,7 +104,7 @@ fn test_abstract_interp_branch_fork() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 3: Loop with back-edge, block args, and worklist convergence
+// Test: Loop with back-edge, block args, and worklist convergence
 // ---------------------------------------------------------------------------
 
 /// This tests that:
@@ -334,7 +124,8 @@ fn test_abstract_interp_loop_convergence() {
             .with_max_iterations(100);
 
     let result = interp
-        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[Interval::new(-5, 5)])
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(-5, 5)])
         .unwrap();
 
     // The analysis should converge and produce a non-empty return value.
@@ -347,7 +138,7 @@ fn test_abstract_interp_loop_convergence() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 4: Summary caching via call()
+// Test: Summary caching via call()
 // ---------------------------------------------------------------------------
 
 /// Call the same function twice and verify the summary cache is populated
@@ -380,7 +171,8 @@ fn test_abstract_interp_call_caches_summary() {
 
     // First call — runs the analysis
     let result1 = interp
-        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[])
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[])
         .unwrap();
     assert_eq!(result1.return_value(), Some(&Interval::constant(10)));
 
@@ -393,7 +185,8 @@ fn test_abstract_interp_call_caches_summary() {
 
     // Second call with same args — returns cached summary
     let result2 = interp
-        .in_stage::<CompositeLanguage>().analyze(spec_fn, &[])
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[])
         .unwrap();
     assert_eq!(result2.return_value(), Some(&Interval::constant(10)));
 }
@@ -431,4 +224,236 @@ fn test_abstract_interp_with_stage_chain() {
         .unwrap();
 
     assert_eq!(result.return_value(), Some(&Interval::new(-10, 10)));
+}
+
+// ---------------------------------------------------------------------------
+// Widening strategy tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_abstract_widening_never() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_loop_program(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id)
+            .with_widening(WideningStrategy::Never)
+            .with_max_iterations(50);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(-5, 5)]);
+    assert!(
+        matches!(result, Err(InterpreterError::FuelExhausted)),
+        "expected FuelExhausted without widening, got: {result:?}"
+    );
+}
+
+#[test]
+fn test_abstract_widening_delayed() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_loop_program(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id)
+            .with_widening(WideningStrategy::Delayed(3))
+            .with_max_iterations(100);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(-5, 5)])
+        .unwrap();
+
+    let ret = result.return_value().unwrap();
+    assert!(
+        !ret.is_empty(),
+        "return value should not be bottom after delayed widening"
+    );
+}
+
+#[test]
+fn test_abstract_widening_all_joins() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_loop_program(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id)
+            .with_widening(WideningStrategy::AllJoins)
+            .with_max_iterations(100);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(-5, 5)])
+        .unwrap();
+
+    let ret = result.return_value().unwrap();
+    assert!(
+        !ret.is_empty(),
+        "return value should not be bottom with AllJoins widening"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Summary management tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_abstract_fixed_summary() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    let fixed_result = AnalysisResult::new(
+        Default::default(),
+        Default::default(),
+        Some(Interval::new(100, 200)),
+    );
+    interp.insert_summary(spec_fn).fixed(fixed_result);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(0, 10)])
+        .unwrap();
+    assert_eq!(result.return_value(), Some(&Interval::new(100, 200)));
+
+    let result2 = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::top()])
+        .unwrap();
+    assert_eq!(result2.return_value(), Some(&Interval::new(100, 200)));
+}
+
+#[test]
+fn test_abstract_summary_invalidation_and_gc() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(0, 10)])
+        .unwrap();
+    assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
+
+    assert!(interp.summary(spec_fn, &[Interval::new(0, 10)]).is_some());
+
+    let count = interp.invalidate_summary(spec_fn);
+    assert!(count > 0, "expected at least one invalidated entry");
+    assert!(interp.summary(spec_fn, &[Interval::new(0, 10)]).is_none());
+
+    interp.gc_summaries();
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(0, 10)])
+        .unwrap();
+    assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
+}
+
+#[test]
+fn test_abstract_remove_summary() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::constant(5)])
+        .unwrap();
+    assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_some());
+
+    assert!(interp.remove_summary(spec_fn));
+    assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_none());
+    assert!(!interp.remove_summary(spec_fn));
+}
+
+// ---------------------------------------------------------------------------
+// Analysis result query tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_abstract_analysis_result_queries() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_select_program(&mut pipeline, stage_id);
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[Interval::new(-5, 5)])
+        .unwrap();
+
+    let visited: Vec<_> = result.visited_blocks().collect();
+    assert!(
+        visited.len() >= 3,
+        "expected at least 3 visited blocks, got {}",
+        visited.len()
+    );
+
+    let ret = result.return_value().unwrap();
+    assert!(!ret.is_empty(), "return value should not be bottom");
+}
+
+#[test]
+fn test_abstract_analysis_result_ssa_values() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+
+    // Inline builder: c1 = const 7; c2 = const 3; sum = add c1, c2; ret sum
+    let sf = stage.staged_function().new().unwrap();
+    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(7));
+    let c1_result = c1.result;
+    let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(3));
+    let c2_result = c2.result;
+    let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
+    let add_result = add.result;
+    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+
+    let block = stage
+        .block()
+        .stmt(c1)
+        .stmt(c2)
+        .stmt(add)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let func_body = FunctionBody::<ArithType>::new(stage, region);
+    let spec_fn = stage.specialize().f(sf).body(func_body).new().unwrap();
+
+    let mut interp: AbstractInterpreter<Interval, _> =
+        AbstractInterpreter::new(&pipeline, stage_id);
+
+    let result = interp
+        .in_stage::<CompositeLanguage>()
+        .analyze(spec_fn, &[])
+        .unwrap();
+
+    assert_eq!(
+        result.ssa_value(c1_result.into()),
+        Some(&Interval::constant(7))
+    );
+    assert_eq!(
+        result.ssa_value(c2_result.into()),
+        Some(&Interval::constant(3))
+    );
+    assert_eq!(
+        result.ssa_value(add_result.into()),
+        Some(&Interval::constant(10))
+    );
+    assert_eq!(result.return_value(), Some(&Interval::constant(10)));
 }
