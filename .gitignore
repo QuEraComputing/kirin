@@ -1,1 +1,4 @@
 /target
+.agents
+.claude
+skills-lock.json
