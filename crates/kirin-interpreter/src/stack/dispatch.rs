@@ -12,6 +12,12 @@ pub(super) type DynStepFn<'ir, V, S, E, G> =
     fn(&mut StackInterpreter<'ir, V, S, E, G>) -> Result<ConcreteContinuation<V>, E>;
 pub(super) type DynAdvanceFn<'ir, V, S, E, G> =
     fn(&mut StackInterpreter<'ir, V, S, E, G>, &ConcreteContinuation<V>) -> Result<(), E>;
+pub(super) type DynPushCallFrameFn<'ir, V, S, E, G> = fn(
+    &mut StackInterpreter<'ir, V, S, E, G>,
+    CompileStage,
+    SpecializedFunction,
+    &[V],
+) -> Result<(), E>;
 
 #[doc(hidden)]
 pub struct DynFrameDispatch<'ir, V, S, E, G>
@@ -20,6 +26,7 @@ where
 {
     pub(super) step: DynStepFn<'ir, V, S, E, G>,
     pub(super) advance: DynAdvanceFn<'ir, V, S, E, G>,
+    pub(super) push_call_frame: DynPushCallFrameFn<'ir, V, S, E, G>,
 }
 
 impl<'ir, V, S, E, G> Copy for DynFrameDispatch<'ir, V, S, E, G> where S: StageMeta {}
@@ -80,6 +87,23 @@ where
     interp.in_stage::<L>().step()
 }
 
+fn dyn_push_call_frame_for_lang<'ir, V, S, E, G, L>(
+    interp: &mut StackInterpreter<'ir, V, S, E, G>,
+    stage_id: CompileStage,
+    callee: SpecializedFunction,
+    args: &[V],
+) -> Result<(), E>
+where
+    V: Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: StageMeta + HasStageInfo<L> + 'ir,
+    G: 'ir,
+    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
+{
+    let stage = interp.resolve_stage_info::<L>(stage_id)?;
+    interp.push_call_frame_with_stage_cached::<L>(callee, stage, args)
+}
+
 fn dyn_advance_for_lang<'ir, V, S, E, G, L>(
     interp: &mut StackInterpreter<'ir, V, S, E, G>,
     control: &ConcreteContinuation<V>,
@@ -123,6 +147,7 @@ where
         Ok(DynFrameDispatch {
             step: dyn_step_for_lang::<V, S, E, G, L>,
             advance: dyn_advance_for_lang::<V, S, E, G, L>,
+            push_call_frame: dyn_push_call_frame_for_lang::<V, S, E, G, L>,
         })
     }
 }

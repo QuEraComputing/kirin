@@ -16,7 +16,7 @@ mod widening;
 pub use abstract_interp::{AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry};
 pub use control::{AbstractContinuation, Args, ConcreteContinuation, ConcreteExt, Continuation};
 pub use error::InterpreterError;
-pub use eval::{CallSemantics, EvalBlock, SSACFGRegion};
+pub use eval::{CallSemantics, SSACFGRegion};
 pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use interpretable::Interpretable;

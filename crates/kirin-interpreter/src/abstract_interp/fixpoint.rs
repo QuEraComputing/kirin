@@ -5,8 +5,8 @@ use kirin_ir::{
 
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractContinuation, AbstractValue, CallSemantics, Continuation, EvalBlock, Interpretable,
-    Interpreter, InterpreterError,
+    AbstractContinuation, AbstractValue, CallSemantics, Continuation, Interpretable, Interpreter,
+    InterpreterError,
 };
 
 use super::interp::AbstractInterpreter;
@@ -158,7 +158,7 @@ where
                 return Err(InterpreterError::FuelExhausted.into());
             }
 
-            let control = EvalBlock::<'ir, L>::eval_block(self, stage, block)?;
+            let control = self.eval_block(stage, block)?;
             self.propagate_control::<L>(stage, &control, false, &mut return_value)?;
         }
 
@@ -174,7 +174,7 @@ where
             for _ in 0..self.narrowing_iterations {
                 let mut changed = false;
                 for &block in &blocks {
-                    let control = EvalBlock::<'ir, L>::eval_block(self, stage, block)?;
+                    let control = self.eval_block(stage, block)?;
                     changed |=
                         self.propagate_control::<L>(stage, &control, true, &mut return_value)?;
                 }

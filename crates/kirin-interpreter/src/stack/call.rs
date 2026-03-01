@@ -109,6 +109,62 @@ where
         Ok(())
     }
 
+    /// Like `push_call_frame_with_stage` but uses the pre-built dispatch table
+    /// instead of requiring `SupportsStageDispatch` bounds.
+    pub(super) fn push_call_frame_with_stage_cached<L>(
+        &mut self,
+        callee: SpecializedFunction,
+        stage: &'ir StageInfo<L>,
+        args: &[V],
+    ) -> Result<(), E>
+    where
+        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+    {
+        let stage_id = expect_stage_id(stage);
+        let spec =
+            callee
+                .get_info(stage)
+                .ok_or_else(|| InterpreterError::MissingCalleeAtStage {
+                    callee,
+                    stage: stage_id,
+                })?;
+        let body_stmt = *spec.body();
+        let def: &L = body_stmt.definition(stage);
+
+        self.push_frame_cached(Frame::new(callee, stage_id, None))?;
+        let entry_block = match def.interpret(self) {
+            Ok(Continuation::Jump(succ, _)) => succ.target(),
+            Ok(_) => {
+                let _ = self.pop_frame();
+                return Err(InterpreterError::MissingEntry.into());
+            }
+            Err(err) => {
+                let _ = self.pop_frame();
+                return Err(err);
+            }
+        };
+
+        let first = entry_block.first_statement(stage);
+        self.set_current_cursor(first)?;
+        if let Err(err) = self.bind_block_args(stage, entry_block, args) {
+            let _ = self.pop_frame();
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    /// Push a call frame dynamically using the pre-built dispatch table
+    /// (no `SupportsStageDispatch` bounds needed).
+    pub(super) fn push_call_frame_with_args_cached(
+        &mut self,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+        args: &[V],
+    ) -> Result<(), E> {
+        let dispatch = self.lookup_dispatch_cached(stage_id)?;
+        (dispatch.push_call_frame)(self, stage_id, callee, args)
+    }
+
     pub(super) fn push_call_frame_with_args(
         &mut self,
         callee: SpecializedFunction,

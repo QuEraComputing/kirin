@@ -1,12 +1,13 @@
 use kirin_ir::{
-    CompileStage, Pipeline, ResultValue, SSAValue, StageMeta, Statement, SupportsStageDispatch,
+    Block, CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue, StageInfo,
+    StageMeta, Statement, SupportsStageDispatch,
 };
 
 use super::{
     DynFrameDispatch, FrameDispatchAction, StackFrame, StackFrameExtra, StackInterpreter,
     StageDispatchTable,
 };
-use crate::{ConcreteExt, Frame, Interpreter, InterpreterError};
+use crate::{ConcreteExt, Continuation, Frame, Interpretable, Interpreter, InterpreterError};
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
@@ -50,7 +51,7 @@ where
         self.frames.depth()
     }
 
-    fn public_frame_to_internal(
+    pub(super) fn public_frame_to_internal(
         frame: Frame<V, Option<Statement>>,
         dispatch: DynFrameDispatch<'ir, V, S, E, G>,
     ) -> StackFrame<'ir, V, S, E, G> {
@@ -126,5 +127,22 @@ where
 
     fn active_stage(&self) -> CompileStage {
         self.frames.active_stage_or(self.root_stage)
+    }
+
+    fn eval_block<L: Dialect>(
+        &mut self,
+        stage: &'ir StageInfo<L>,
+        block: Block,
+    ) -> Result<Continuation<V, ConcreteExt>, E>
+    where
+        S: HasStageInfo<L>,
+        L: Interpretable<'ir, Self, L>,
+    {
+        let saved_cursor = self.current_cursor()?;
+        let first = block.first_statement(stage);
+        self.set_current_cursor(first)?;
+        let v = self.run_nested_calls_cached(|_interp, is_yield| is_yield)?;
+        self.set_current_cursor(saved_cursor)?;
+        Ok(Continuation::Yield(v))
     }
 }

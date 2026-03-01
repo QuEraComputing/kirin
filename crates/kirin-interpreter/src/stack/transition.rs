@@ -51,6 +51,37 @@ where
         }
     }
 
+    /// Look up the cached dispatch entry for `stage_id` without requiring
+    /// `SupportsStageDispatch` bounds.
+    pub(super) fn lookup_dispatch_cached(
+        &self,
+        stage_id: CompileStage,
+    ) -> Result<DynFrameDispatch<'ir, V, S, E, G>, E> {
+        let idx = kirin_ir::Id::from(stage_id).raw();
+        match self.dispatch_table.by_stage.get(idx).copied().flatten() {
+            Some(dispatch) => Ok(dispatch),
+            None => {
+                if self.pipeline.stage(stage_id).is_none() {
+                    Err(InterpreterError::MissingStage { stage: stage_id }.into())
+                } else {
+                    Err(InterpreterError::MissingStageDialect { stage: stage_id }.into())
+                }
+            }
+        }
+    }
+
+    /// Push a call frame using only the pre-built dispatch table (no
+    /// `SupportsStageDispatch` bounds needed).
+    pub(super) fn push_frame_cached(
+        &mut self,
+        frame: crate::Frame<V, Option<kirin_ir::Statement>>,
+    ) -> Result<(), E> {
+        let dispatch = self.lookup_dispatch_cached(frame.stage())?;
+        let internal = Self::public_frame_to_internal(frame, dispatch);
+        self.frames.push(internal)?;
+        Ok(())
+    }
+
     fn spend_fuel(&mut self) -> Result<(), E> {
         if let Some(ref mut fuel) = self.fuel {
             if *fuel == 0 {

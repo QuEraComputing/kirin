@@ -6,6 +6,7 @@ use kirin_ir::{
     StageDispatchMiss, StageInfo, StageMeta, SupportsStageDispatch,
 };
 
+use crate::Continuation;
 use crate::InterpreterError;
 use crate::stage::{InStage, WithStage};
 
@@ -151,6 +152,20 @@ pub trait Interpreter<'ir>: Sized + 'ir {
         }
         Ok(())
     }
+
+    /// Execute a body block whose arguments have already been bound.
+    ///
+    /// Returns the [`Continuation`] produced by the block's terminator.
+    /// The caller must call [`bind_block_args`](Self::bind_block_args) first
+    /// to write values into the block's argument SSA slots.
+    fn eval_block<L: Dialect>(
+        &mut self,
+        stage: &'ir StageInfo<L>,
+        block: Block,
+    ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
+    where
+        Self::StageInfo: HasStageInfo<L>,
+        L: crate::Interpretable<'ir, Self, L>;
 
     /// Resolve typed-stage APIs from the current active stage.
     fn in_stage<L>(&mut self) -> InStage<'_, Self, L> {

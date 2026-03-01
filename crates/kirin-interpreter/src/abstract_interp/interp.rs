@@ -1,12 +1,17 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{CompileStage, Pipeline, ResultValue, SSAValue, SpecializedFunction, StageMeta};
+use kirin_ir::{
+    Block, CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue,
+    SpecializedFunction, StageInfo, StageMeta,
+};
 use rustc_hash::FxHashMap;
 
 use super::{FixpointState, SummaryCache};
 use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
-use crate::{AbstractValue, FrameStack, Interpreter, InterpreterError};
+use crate::{
+    AbstractValue, Continuation, FrameStack, Interpretable, Interpreter, InterpreterError,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct SummaryKey {
@@ -321,5 +326,44 @@ where
 
     fn active_stage(&self) -> CompileStage {
         self.frames.active_stage_or(self.root_stage)
+    }
+
+    fn eval_block<L: Dialect>(
+        &mut self,
+        stage: &'ir StageInfo<L>,
+        block: Block,
+    ) -> Result<Continuation<V, std::convert::Infallible>, E>
+    where
+        S: HasStageInfo<L>,
+        L: Interpretable<'ir, Self, L>,
+    {
+        for stmt in block.statements(stage) {
+            let def: &L = stmt.definition(stage);
+            let control = def.interpret(self)?;
+            match control {
+                Continuation::Continue => {}
+                Continuation::Call {
+                    callee,
+                    stage: callee_stage,
+                    args,
+                    result,
+                } => {
+                    let handler = self
+                        .call_handler
+                        .expect("call_handler not set: analyze() must be used as entry point");
+                    let analysis = handler(self, callee, callee_stage, &args)?;
+                    let return_val = analysis.return_value().cloned().unwrap_or_else(V::bottom);
+                    self.write(result, return_val)?;
+                }
+                other => return Ok(other),
+            }
+        }
+        if let Some(term) = block.terminator(stage) {
+            let def: &L = term.definition(stage);
+            let control = def.interpret(self)?;
+            Ok(control)
+        } else {
+            Err(InterpreterError::MissingEntry.into())
+        }
     }
 }
