@@ -124,7 +124,12 @@ pub trait Interpreter<'ir>: Sized + 'ir {
 
     /// Execute a body block whose arguments have already been bound.
     ///
-    /// Returns the [`Continuation`] produced by the block's terminator.
+    /// Returns a [`Continuation`] representing the block's result. The
+    /// concrete variant depends on the interpreter: `StackInterpreter`
+    /// always returns `Continuation::Yield(values)` (using cursor-based
+    /// execution internally), while other implementations may propagate
+    /// the terminator's continuation directly.
+    ///
     /// The caller must call [`bind_block_args`](Self::bind_block_args) first
     /// to write values into the block's argument SSA slots.
     fn eval_block<L: Dialect>(
