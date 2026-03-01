@@ -58,7 +58,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 **Interpreter:**
 - `kirin-interpreter` — Interpreter traits, `StackInterpreter`, `AbstractInterpreter`
-- `kirin-derive-interpreter` — `#[derive(Interpretable, EvalCall)]`
+- `kirin-derive-interpreter` — `#[derive(Interpretable, CallSemantics)]`
 
 **Dialects:**
 - `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-function`
@@ -88,7 +88,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 ## Interpreter Conventions
 
-- **`Interpreter<'ir>` lifetime pattern**: The `Interpreter` trait is parameterized by `'ir` so that `pipeline()` and `active_stage_info::<L>()` return `&'ir`-lived references. This requires `Self: 'ir` on the trait, which cascades: all type parameters on implementing structs (`V`, `S`, `E`, `G`) need `'ir` bounds in every impl block. The `'ir` lifetime is also threaded through `Interpretable<'ir, I, L>`, `EvalBlock<'ir, L>`, and `EvalCall<'ir, I, L>`.
+- **`Interpreter<'ir>` lifetime pattern**: The `Interpreter` trait is parameterized by `'ir` so that `pipeline()` and `active_stage_info::<L>()` return `&'ir`-lived references. This requires `Self: 'ir` on the trait, which cascades: all type parameters on implementing structs (`V`, `S`, `E`, `G`) need `'ir` bounds in every impl block. The `'ir` lifetime is also threaded through `Interpretable<'ir, I, L>` and `CallSemantics<'ir, I, L>`. `eval_block` and `bind_block_args` are methods on the `Interpreter` trait itself. Stage-scoped operations use the `Staged<'a, 'ir, I, L>` builder (constructed via `interp.in_stage::<L>()` or `interp.with_stage(stage)`).
 
 - **Stage accessor naming**: `active_stage()` returns `CompileStage` (the stage key), `active_stage_info::<L>()` returns `&'ir StageInfo<L>` (the resolved dialect-specific stage info). Resolve once at the top of a method and pass through to avoid repeated lookups.
 

@@ -10,7 +10,7 @@ use kirin_interpreter::{
 use kirin_ir::*;
 
 // ---------------------------------------------------------------------------
-// Dialect with derived Interpretable + derived EvalCall using #[callable].
+// Dialect with derived Interpretable + derived CallSemantics using #[callable].
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
@@ -26,7 +26,7 @@ pub enum DerivedEvalCallDialect {
 }
 
 // ---------------------------------------------------------------------------
-// Dialect with derived Interpretable (all variants #[wraps]), manual EvalCall.
+// Dialect with derived Interpretable (all variants #[wraps]), manual CallSemantics.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable)]
