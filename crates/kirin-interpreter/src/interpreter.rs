@@ -1,5 +1,4 @@
 use std::fmt;
-use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue, SSAValue,
@@ -8,7 +7,7 @@ use kirin_ir::{
 
 use crate::Continuation;
 use crate::InterpreterError;
-use crate::stage::{InStage, WithStage};
+use crate::stage::Staged;
 
 /// Minimal state contract for interpreter implementations.
 ///
@@ -168,16 +167,21 @@ pub trait Interpreter<'ir>: Sized + 'ir {
         L: crate::Interpretable<'ir, Self, L>;
 
     /// Resolve typed-stage APIs from the current active stage.
-    fn in_stage<L>(&mut self) -> InStage<'_, Self, L> {
-        InStage {
+    fn in_stage<L>(&mut self) -> Staged<'_, 'ir, Self, L>
+    where
+        Self::StageInfo: HasStageInfo<L>,
+        L: Dialect,
+    {
+        let stage = self.active_stage_info::<L>();
+        Staged {
             interp: self,
-            marker: PhantomData,
+            stage,
         }
     }
 
     /// Bind APIs to an explicit stage reference.
-    fn with_stage<L: Dialect>(&mut self, stage: &'ir StageInfo<L>) -> WithStage<'_, 'ir, Self, L> {
-        WithStage {
+    fn with_stage<L: Dialect>(&mut self, stage: &'ir StageInfo<L>) -> Staged<'_, 'ir, Self, L> {
+        Staged {
             interp: self,
             stage,
         }

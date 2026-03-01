@@ -24,7 +24,7 @@ pub use interpreter::Interpreter;
 pub use result::AnalysisResult;
 pub use scheduler::DedupScheduler;
 pub use stack::StackInterpreter;
-pub use stage::{InStage, WithStage};
+pub use stage::Staged;
 pub use value::{AbstractValue, BranchCondition};
 pub use widening::WideningStrategy;
 
