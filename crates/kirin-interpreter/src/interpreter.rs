@@ -1,4 +1,5 @@
 use std::fmt;
+use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue, SSAValue,
@@ -6,6 +7,7 @@ use kirin_ir::{
 };
 
 use crate::InterpreterError;
+use crate::stage::{InStage, WithStage};
 
 /// Minimal state contract for interpreter implementations.
 ///
@@ -142,5 +144,21 @@ pub trait Interpreter<'ir>: Sized + 'ir {
             self.write_ssa(*ssa, val.clone())?;
         }
         Ok(())
+    }
+
+    /// Resolve typed-stage APIs from the current active stage.
+    fn in_stage<L>(&mut self) -> InStage<'_, Self, L> {
+        InStage {
+            interp: self,
+            marker: PhantomData,
+        }
+    }
+
+    /// Bind APIs to an explicit stage reference.
+    fn with_stage<L: Dialect>(&mut self, stage: &'ir StageInfo<L>) -> WithStage<'_, 'ir, Self, L> {
+        WithStage {
+            interp: self,
+            stage,
+        }
     }
 }

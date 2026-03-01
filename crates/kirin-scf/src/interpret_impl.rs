@@ -1,8 +1,8 @@
 use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo, Successor};
-use smallvec::smallvec;
 use kirin_interpreter::{
     BranchCondition, Continuation, EvalBlock, Interpretable, Interpreter, InterpreterError,
 };
+use smallvec::smallvec;
 
 use crate::{For, If, StructuredControlFlow, Yield};
 

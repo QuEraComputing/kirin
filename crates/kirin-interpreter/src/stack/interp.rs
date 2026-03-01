@@ -49,7 +49,7 @@ pub struct StackInterpreter<'ir, V, S, E = InterpreterError, G = ()>
 where
     S: StageMeta,
 {
-    pub(super) call_stack: FrameStack<V, StackFrameExtra<'ir, V, S, E, G>>,
+    pub(super) frames: FrameStack<V, StackFrameExtra<'ir, V, S, E, G>>,
     pub(super) dispatch_table: StageDispatchTable<'ir, V, S, E, G>,
     pub(super) global: G,
     pub(super) pipeline: &'ir Pipeline<S>,
@@ -100,7 +100,7 @@ where
     pub fn new_with_global(pipeline: &'ir Pipeline<S>, stage: CompileStage, global: G) -> Self {
         let dispatch_table = Self::build_dispatch_table(pipeline);
         Self {
-            call_stack: FrameStack::new(),
+            frames: FrameStack::new(),
             dispatch_table,
             global,
             pipeline,
@@ -131,7 +131,7 @@ where
     ///
     /// Pushing beyond this limit returns [`InterpreterError::MaxDepthExceeded`].
     pub fn with_max_depth(mut self, depth: usize) -> Self {
-        self.call_stack = self.call_stack.with_max_depth(depth);
+        self.frames = self.frames.with_max_depth(depth);
         self
     }
 }

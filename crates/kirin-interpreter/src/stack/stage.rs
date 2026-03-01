@@ -1,58 +1,14 @@
-use std::marker::PhantomData;
-
 use kirin_ir::{
     Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta, SupportsStageDispatch,
 };
 
 use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
 use crate::{
-    ConcreteContinuation, Continuation, EvalCall, Interpretable, Interpreter, InterpreterError,
+    ConcreteContinuation, Continuation, EvalCall, InStage, Interpretable, Interpreter,
+    InterpreterError, WithStage,
 };
 
-/// Typed-stage API builder resolved from the current frame stage.
-pub struct InStage<'a, 'ir, V, S, E, G, L>
-where
-    S: StageMeta,
-{
-    interp: &'a mut StackInterpreter<'ir, V, S, E, G>,
-    marker: PhantomData<L>,
-}
-
-/// API builder for an explicitly resolved [`StageInfo`].
-pub struct WithStage<'a, 'ir, V, S, E, G, L>
-where
-    S: StageMeta,
-    L: Dialect,
-{
-    interp: &'a mut StackInterpreter<'ir, V, S, E, G>,
-    stage: &'ir StageInfo<L>,
-}
-
-impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
-where
-    S: StageMeta + 'ir,
-{
-    /// Resolve typed-stage APIs from the current frame stage.
-    pub fn in_stage<L>(&mut self) -> InStage<'_, 'ir, V, S, E, G, L> {
-        InStage {
-            interp: self,
-            marker: PhantomData,
-        }
-    }
-
-    /// Bind APIs to an explicit stage reference.
-    pub fn with_stage<L>(&mut self, stage: &'ir StageInfo<L>) -> WithStage<'_, 'ir, V, S, E, G, L>
-    where
-        L: Dialect,
-    {
-        WithStage {
-            interp: self,
-            stage,
-        }
-    }
-}
-
-impl<'a, 'ir, V, S, E, G, L> InStage<'a, 'ir, V, S, E, G, L>
+impl<'a, 'ir, V, S, E, G, L> InStage<'a, StackInterpreter<'ir, V, S, E, G>, L>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -61,12 +17,7 @@ where
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     fn resolve_current_frame_stage_info(&self) -> Result<&'ir StageInfo<L>, E> {
-        let stage_id = self.interp.call_stack.current()?.stage();
-        self.interp.resolve_stage_info::<L>(stage_id)
-    }
-
-    fn resolve_active_stage_info(&self) -> Result<&'ir StageInfo<L>, E> {
-        let stage_id = self.interp.active_stage();
+        let stage_id = self.interp.frames.current()?.stage();
         self.interp.resolve_stage_info::<L>(stage_id)
     }
 
@@ -144,7 +95,7 @@ where
     }
 }
 
-impl<'a, 'ir, V, S, E, G, L> WithStage<'a, 'ir, V, S, E, G, L>
+impl<'a, 'ir, V, S, E, G, L> WithStage<'a, 'ir, StackInterpreter<'ir, V, S, E, G>, L>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -190,7 +141,7 @@ where
         self.interp.call_with_stage::<L>(callee, self.stage, args)
     }
 
-    pub(super) fn push_call_frame(self, callee: SpecializedFunction, args: &[V]) -> Result<(), E>
+    pub(crate) fn push_call_frame(self, callee: SpecializedFunction, args: &[V]) -> Result<(), E>
     where
         S: SupportsStageDispatch<
                 FrameDispatchAction<'ir, V, S, E, G>,

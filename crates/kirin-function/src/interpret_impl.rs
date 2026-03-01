@@ -1,6 +1,6 @@
 use kirin::prelude::{Dialect, GetInfo, HasStageInfo};
-use smallvec::smallvec;
 use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion};
+use smallvec::smallvec;
 
 use crate::{Call, FunctionBody, Return};
 

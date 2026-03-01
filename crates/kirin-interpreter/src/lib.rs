@@ -9,6 +9,7 @@ mod interpreter;
 mod result;
 mod scheduler;
 mod stack;
+mod stage;
 mod value;
 mod widening;
 
@@ -22,7 +23,8 @@ pub use interpretable::Interpretable;
 pub use interpreter::Interpreter;
 pub use result::AnalysisResult;
 pub use scheduler::DedupScheduler;
-pub use stack::{InStage, StackInterpreter, WithStage};
+pub use stack::StackInterpreter;
+pub use stage::{InStage, WithStage};
 pub use value::{AbstractValue, BranchCondition};
 pub use widening::WideningStrategy;
 

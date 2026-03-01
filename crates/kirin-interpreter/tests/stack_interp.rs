@@ -7,7 +7,9 @@ use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
-use kirin_interpreter::{ConcreteExt, Continuation, Frame, InterpreterError, StackInterpreter};
+use kirin_interpreter::{
+    ConcreteExt, Continuation, Frame, Interpreter, InterpreterError, StackInterpreter,
+};
 use kirin_interval::Interval;
 use kirin_ir::*;
 use kirin_test_languages::CompositeLanguage;

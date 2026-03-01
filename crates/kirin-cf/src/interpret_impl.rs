@@ -1,6 +1,6 @@
 use kirin::prelude::{Dialect, SSAValue};
-use smallvec::smallvec;
 use kirin_interpreter::{BranchCondition, Continuation, Interpretable, Interpreter};
+use smallvec::smallvec;
 
 use crate::ControlFlow;
 

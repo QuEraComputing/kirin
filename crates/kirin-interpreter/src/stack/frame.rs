@@ -38,16 +38,16 @@ where
     }
 
     pub(crate) fn current_cursor(&self) -> Result<Option<Statement>, E> {
-        Ok(self.call_stack.current()?.extra().cursor)
+        Ok(self.frames.current()?.extra().cursor)
     }
 
     pub(crate) fn set_current_cursor(&mut self, cursor: Option<Statement>) -> Result<(), E> {
-        self.call_stack.current_mut()?.extra_mut().cursor = cursor;
+        self.frames.current_mut()?.extra_mut().cursor = cursor;
         Ok(())
     }
 
     pub(crate) fn frame_depth(&self) -> usize {
-        self.call_stack.depth()
+        self.frames.depth()
     }
 
     fn public_frame_to_internal(
@@ -79,7 +79,7 @@ where
     {
         let dispatch = self.resolve_dispatch_for_stage(frame.stage())?;
         let internal = Self::public_frame_to_internal(frame, dispatch);
-        self.call_stack.push(internal)?;
+        self.frames.push(internal)?;
         Ok(())
     }
 }
@@ -91,7 +91,7 @@ where
 {
     /// Pop the current call frame and its paired dynamic dispatch entry.
     pub fn pop_frame(&mut self) -> Result<Frame<V, Option<Statement>>, E> {
-        let frame = self.call_stack.pop()?;
+        let frame = self.frames.pop()?;
         Ok(Self::internal_frame_to_public(frame))
     }
 }
@@ -109,15 +109,15 @@ where
     type StageInfo = S;
 
     fn read(&self, value: SSAValue) -> Result<V, E> {
-        self.call_stack.read(value).cloned()
+        self.frames.read(value).cloned()
     }
 
     fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.call_stack.write(result, value)
+        self.frames.write(result, value)
     }
 
     fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.call_stack.write_ssa(ssa, value)
+        self.frames.write_ssa(ssa, value)
     }
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
@@ -125,6 +125,6 @@ where
     }
 
     fn active_stage(&self) -> CompileStage {
-        self.call_stack.active_stage_or(self.root_stage)
+        self.frames.active_stage_or(self.root_stage)
     }
 }

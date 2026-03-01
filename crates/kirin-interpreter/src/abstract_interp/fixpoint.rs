@@ -142,9 +142,7 @@ where
                 }
                 .into());
             }
-            let frame = self
-                .frames
-                .current_mut()?;
+            let frame = self.frames.current_mut()?;
             let (values, fp) = frame.values_and_extra_mut();
             for (ssa, val) in arg_ssas.iter().zip(initial_args.iter()) {
                 values.insert(*ssa, val.clone());
@@ -158,10 +156,7 @@ where
 
         loop {
             let block = {
-                let fp = self
-                    .frames
-                    .current_mut()?
-                    .extra_mut();
+                let fp = self.frames.current_mut()?.extra_mut();
                 fp.worklist.pop()
             };
             let Some(block) = block else { break };
@@ -197,9 +192,7 @@ where
             }
         }
 
-        let frame = self
-            .frames
-            .current()?;
+        let frame = self.frames.current()?;
         Ok(AnalysisResult::new(
             frame.values().clone(),
             frame.extra().block_args.clone(),
@@ -310,10 +303,7 @@ where
     {
         if self.propagate_block_args::<L>(stage, target, args, narrowing)? {
             if !narrowing {
-                let fp = self
-                    .frames
-                    .current_mut()?
-                    .extra_mut();
+                let fp = self.frames.current_mut()?.extra_mut();
                 fp.worklist.push_unique(target);
             }
             Ok(true)
@@ -356,9 +346,7 @@ where
         }
 
         let widening_strategy = self.widening_strategy;
-        let frame = self
-            .frames
-            .current_mut()?;
+        let frame = self.frames.current_mut()?;
         let (values, fp) = frame.values_and_extra_mut();
 
         let first_visit = !fp.block_args.contains_key(&target);

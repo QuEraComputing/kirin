@@ -3,7 +3,7 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_derive_interpreter::{EvalCall, Interpretable};
 use kirin_function::FunctionBody;
-use kirin_interpreter::{Continuation, InterpreterError, StackInterpreter};
+use kirin_interpreter::{Continuation, Interpreter, InterpreterError, StackInterpreter};
 use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]

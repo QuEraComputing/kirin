@@ -91,7 +91,7 @@ where
     G: 'ir,
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
-    let stage_id = interp.call_stack.current()?.stage();
+    let stage_id = interp.frames.current()?.stage();
     let stage = interp.resolve_stage_info::<L>(stage_id)?;
     interp.advance_frame_with_stage::<L>(stage, control)
 }
