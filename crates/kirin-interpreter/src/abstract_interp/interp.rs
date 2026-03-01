@@ -36,8 +36,8 @@ where
     pub(crate) summaries: FxHashMap<SummaryKey, SummaryCache<V>>,
     pub(crate) max_summary_iterations: usize,
     /// Type-erased call handler installed by [`analyze`](Self::analyze) so that
-    /// [`interpret_block`] can dispatch nested calls through [`EvalCall`]
-    /// without requiring `L: EvalCall` in its own bounds.
+    /// [`interpret_block`] can dispatch nested calls through [`CallSemantics`]
+    /// without requiring `L: CallSemantics` in its own bounds.
     pub(crate) call_handler: Option<
         fn(
             &mut AbstractInterpreter<'ir, V, S, E, G>,

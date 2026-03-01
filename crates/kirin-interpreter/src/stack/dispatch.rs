@@ -6,7 +6,7 @@ use kirin_ir::{
 };
 
 use super::StackInterpreter;
-use crate::{ConcreteContinuation, EvalCall, Interpretable, Interpreter, InterpreterError};
+use crate::{CallSemantics, ConcreteContinuation, Interpretable, Interpreter, InterpreterError};
 
 pub(super) type DynStepFn<'ir, V, S, E, G> =
     fn(&mut StackInterpreter<'ir, V, S, E, G>) -> Result<ConcreteContinuation<V>, E>;
@@ -51,7 +51,7 @@ where
     G: 'ir,
     L: Dialect
         + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L>
-        + EvalCall<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>
+        + CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>
         + 'ir,
 {
     type Output = V;

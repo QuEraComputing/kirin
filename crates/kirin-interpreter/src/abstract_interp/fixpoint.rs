@@ -5,7 +5,7 @@ use kirin_ir::{
 
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractContinuation, AbstractValue, Continuation, EvalBlock, EvalCall, Interpretable,
+    AbstractContinuation, AbstractValue, CallSemantics, Continuation, EvalBlock, Interpretable,
     Interpreter, InterpreterError,
 };
 
@@ -51,7 +51,7 @@ where
         S: HasStageInfo<L>,
         L: Dialect
             + Interpretable<'ir, Self, L>
-            + EvalCall<'ir, Self, L, Result = AnalysisResult<V>>
+            + CallSemantics<'ir, Self, L, Result = AnalysisResult<V>>
             + 'ir,
     {
         let stage = self.resolve_stage_info::<L>(stage_id)?;
@@ -68,7 +68,7 @@ where
     where
         L: Dialect
             + Interpretable<'ir, Self, L>
-            + EvalCall<'ir, Self, L, Result = AnalysisResult<V>>
+            + CallSemantics<'ir, Self, L, Result = AnalysisResult<V>>
             + 'ir,
     {
         let key = Self::summary_key(stage_id, callee);
@@ -393,7 +393,7 @@ where
     G: 'ir,
     L: Dialect
         + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>, L>
-        + EvalCall<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
+        + CallSemantics<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
         + 'ir,
 {
     type Output = AnalysisResult<V>;

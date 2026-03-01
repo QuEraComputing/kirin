@@ -16,7 +16,7 @@ mod widening;
 pub use abstract_interp::{AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry};
 pub use control::{AbstractContinuation, Args, ConcreteContinuation, ConcreteExt, Continuation};
 pub use error::InterpreterError;
-pub use eval::{EvalBlock, EvalCall, SSACFGRegion};
+pub use eval::{CallSemantics, EvalBlock, SSACFGRegion};
 pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use interpretable::Interpretable;
@@ -29,4 +29,4 @@ pub use value::{AbstractValue, BranchCondition};
 pub use widening::WideningStrategy;
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::EvalCall;
+pub use kirin_derive_interpreter::EvalCall as CallSemantics;

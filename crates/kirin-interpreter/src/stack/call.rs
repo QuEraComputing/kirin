@@ -6,7 +6,7 @@ use kirin_ir::{
 use super::dispatch::{CallDynAction, PushCallFrameDynAction};
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
 use crate::stage::expect_stage_id;
-use crate::{Continuation, EvalCall, Frame, Interpretable, Interpreter, InterpreterError};
+use crate::{CallSemantics, Continuation, Frame, Interpretable, Interpreter, InterpreterError};
 
 // -- Call (inherent, not on the trait) --------------------------------------
 
@@ -44,7 +44,7 @@ where
         args: &[V],
     ) -> Result<V, E>
     where
-        L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V> + 'ir,
+        L: Dialect + Interpretable<'ir, Self, L> + CallSemantics<'ir, Self, L, Result = V> + 'ir,
     {
         let stage_id = expect_stage_id(stage);
         let spec =

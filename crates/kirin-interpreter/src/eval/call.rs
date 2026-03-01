@@ -11,7 +11,7 @@ use crate::{Interpreter, InterpreterError};
 /// - Non-SSA bodies (e.g. circuit graphs) can implement this directly
 ///
 /// `L` is the composed dialect enum that this body is part of.
-pub trait EvalCall<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
+pub trait CallSemantics<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
     type Result;
 
     fn eval_call(
@@ -25,7 +25,7 @@ pub trait EvalCall<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
 
 /// Marker trait for body types that represent SSA CFG regions.
 ///
-/// Implementing this trait provides blanket [`EvalCall`] impls for both
+/// Implementing this trait provides blanket [`CallSemantics`] impls for both
 /// [`crate::StackInterpreter`] and [`crate::AbstractInterpreter`], using the
 /// standard CFG traversal / fixpoint computation logic.
 pub trait SSACFGRegion: Dialect {
@@ -33,10 +33,10 @@ pub trait SSACFGRegion: Dialect {
 }
 
 // ---------------------------------------------------------------------------
-// Blanket impl: SSACFGRegion → EvalCall<StackInterpreter>
+// Blanket impl: SSACFGRegion → CallSemantics<StackInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> EvalCall<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> for T
 where
     T: SSACFGRegion,
     V: Clone + 'ir,
@@ -72,10 +72,10 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Blanket impl: SSACFGRegion → EvalCall<AbstractInterpreter>
+// Blanket impl: SSACFGRegion → CallSemantics<AbstractInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> EvalCall<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
 where
     T: SSACFGRegion,
     V: crate::AbstractValue + Clone + 'ir,

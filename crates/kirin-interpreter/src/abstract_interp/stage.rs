@@ -2,7 +2,7 @@ use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta, SupportsSt
 
 use super::{AbstractInterpreter, fixpoint::AnalyzeDynAction};
 use crate::{
-    AbstractValue, EvalCall, InStage, Interpretable, Interpreter, InterpreterError, WithStage,
+    AbstractValue, CallSemantics, InStage, Interpretable, Interpreter, InterpreterError, WithStage,
     result::AnalysisResult, stage::expect_stage_id,
 };
 
@@ -14,7 +14,7 @@ where
     G: 'ir,
     L: Dialect
         + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>, L>
-        + EvalCall<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
+        + CallSemantics<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
         + 'ir,
     for<'x> S: SupportsStageDispatch<AnalyzeDynAction<'x, 'ir, V, S, E, G>, AnalysisResult<V>, E>,
 {
@@ -33,7 +33,7 @@ where
     G: 'ir,
     L: Dialect
         + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>, L>
-        + EvalCall<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
+        + CallSemantics<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
         + 'ir,
     for<'x> S: SupportsStageDispatch<AnalyzeDynAction<'x, 'ir, V, S, E, G>, AnalysisResult<V>, E>,
 {

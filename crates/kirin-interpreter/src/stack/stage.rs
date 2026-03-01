@@ -4,7 +4,7 @@ use kirin_ir::{
 
 use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
 use crate::{
-    ConcreteContinuation, Continuation, EvalCall, InStage, Interpretable, Interpreter,
+    CallSemantics, ConcreteContinuation, Continuation, InStage, Interpretable, Interpreter,
     InterpreterError, WithStage,
 };
 
@@ -47,7 +47,7 @@ where
     /// typed-stage checking.
     pub fn call(self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: EvalCall<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>,
+        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>,
     {
         let stage = self.resolve_active_stage_info()?;
         self.interp.with_stage(stage).call(callee, args)
@@ -136,7 +136,7 @@ where
     /// Call a specialized function and return its result value for this stage.
     pub fn call(self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: EvalCall<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>,
+        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>,
     {
         self.interp.call_with_stage::<L>(callee, self.stage, args)
     }
