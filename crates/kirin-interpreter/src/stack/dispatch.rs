@@ -6,12 +6,14 @@ use kirin_ir::{
 };
 
 use super::StackInterpreter;
-use crate::{CallSemantics, ConcreteContinuation, Interpretable, Interpreter, InterpreterError};
+use crate::{
+    CallSemantics, ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError,
+};
 
 pub(super) type DynStepFn<'ir, V, S, E, G> =
-    fn(&mut StackInterpreter<'ir, V, S, E, G>) -> Result<ConcreteContinuation<V>, E>;
+    fn(&mut StackInterpreter<'ir, V, S, E, G>) -> Result<Continuation<V, ConcreteExt>, E>;
 pub(super) type DynAdvanceFn<'ir, V, S, E, G> =
-    fn(&mut StackInterpreter<'ir, V, S, E, G>, &ConcreteContinuation<V>) -> Result<(), E>;
+    fn(&mut StackInterpreter<'ir, V, S, E, G>, &Continuation<V, ConcreteExt>) -> Result<(), E>;
 pub(super) type DynPushCallFrameFn<'ir, V, S, E, G> = fn(
     &mut StackInterpreter<'ir, V, S, E, G>,
     CompileStage,
@@ -76,7 +78,7 @@ where
 
 fn dyn_step_for_lang<'ir, V, S, E, G, L>(
     interp: &mut StackInterpreter<'ir, V, S, E, G>,
-) -> Result<ConcreteContinuation<V>, E>
+) -> Result<Continuation<V, ConcreteExt>, E>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -106,7 +108,7 @@ where
 
 fn dyn_advance_for_lang<'ir, V, S, E, G, L>(
     interp: &mut StackInterpreter<'ir, V, S, E, G>,
-    control: &ConcreteContinuation<V>,
+    control: &Continuation<V, ConcreteExt>,
 ) -> Result<(), E>
 where
     V: Clone + 'ir,

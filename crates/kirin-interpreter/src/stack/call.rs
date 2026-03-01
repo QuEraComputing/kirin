@@ -34,7 +34,7 @@ where
             callee,
             args,
         };
-        Self::dispatch_in_pipeline(pipeline, stage, &mut action)
+        crate::dispatch::dispatch_in_pipeline(pipeline, stage, &mut action)
     }
 
     pub(super) fn call_with_stage<L>(
@@ -181,6 +181,6 @@ where
     {
         let pipeline = self.pipeline;
         let mut action = PushCallFrameDynAction::new(self, callee, args);
-        Self::dispatch_in_pipeline(pipeline, stage_id, &mut action)
+        crate::dispatch::dispatch_in_pipeline(pipeline, stage_id, &mut action)
     }
 }

@@ -1,9 +1,7 @@
 use kirin_ir::{CompileStage, Dialect, Pipeline, StageInfo, StageMeta, SupportsStageDispatch};
 
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
-use crate::{
-    ConcreteContinuation, ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError,
-};
+use crate::{ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError};
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
@@ -24,7 +22,7 @@ where
             >,
     {
         let mut action = FrameDispatchAction::new();
-        Self::dispatch_in_pipeline(pipeline, stage_id, &mut action)
+        crate::dispatch::dispatch_in_pipeline(pipeline, stage_id, &mut action)
     }
 
     pub(super) fn resolve_dispatch_for_stage(
@@ -95,7 +93,7 @@ where
     pub(super) fn step_with_stage<L>(
         &mut self,
         stage: &'ir StageInfo<L>,
-    ) -> Result<ConcreteContinuation<V>, E>
+    ) -> Result<Continuation<V, ConcreteExt>, E>
     where
         L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
@@ -110,7 +108,7 @@ where
     pub(super) fn advance_frame_with_stage<L>(
         &mut self,
         stage: &'ir StageInfo<L>,
-        control: &ConcreteContinuation<V>,
+        control: &Continuation<V, ConcreteExt>,
     ) -> Result<(), E>
     where
         L: Dialect + Interpretable<'ir, Self, L> + 'ir,

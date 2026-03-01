@@ -57,9 +57,3 @@ pub enum ConcreteExt {
     /// Terminate the session.
     Halt,
 }
-
-/// Continuation type for concrete interpreters.
-pub type ConcreteContinuation<V> = Continuation<V, ConcreteExt>;
-
-/// Continuation type for abstract interpreters (no extension variants).
-pub type AbstractContinuation<V> = Continuation<V>;

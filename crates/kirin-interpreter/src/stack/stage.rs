@@ -2,8 +2,7 @@ use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta, SupportsSt
 
 use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
 use crate::{
-    CallSemantics, ConcreteContinuation, Continuation, Interpretable, Interpreter,
-    InterpreterError, Staged,
+    CallSemantics, ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError, Staged,
 };
 
 impl<'a, 'ir, V, S, E, G, L> Staged<'a, 'ir, StackInterpreter<'ir, V, S, E, G>, L>
@@ -15,13 +14,13 @@ where
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     /// Execute the current statement's dialect semantics.
-    /// Returns the raw [`ConcreteContinuation`] without advancing the cursor.
-    pub fn step(self) -> Result<ConcreteContinuation<V>, E> {
+    /// Returns the raw continuation without advancing the cursor.
+    pub fn step(self) -> Result<Continuation<V, ConcreteExt>, E> {
         self.interp.step_with_stage::<L>(self.stage)
     }
 
     /// Apply cursor mutations for a continuation.
-    pub fn advance(self, control: &ConcreteContinuation<V>) -> Result<(), E>
+    pub fn advance(self, control: &Continuation<V, ConcreteExt>) -> Result<(), E>
     where
         S: SupportsStageDispatch<
                 FrameDispatchAction<'ir, V, S, E, G>,
@@ -55,7 +54,7 @@ where
 
     /// Run statements until Return, Halt, or Call.
     /// Ignores breakpoints and Break from dialect intrinsics.
-    pub fn run(self) -> Result<ConcreteContinuation<V>, E>
+    pub fn run(self) -> Result<Continuation<V, ConcreteExt>, E>
     where
         S: HasStageInfo<L>
             + SupportsStageDispatch<
@@ -76,7 +75,7 @@ where
     }
 
     /// Run statements until a breakpoint, Return, Halt, or Call.
-    pub fn run_until_break(self) -> Result<ConcreteContinuation<V>, E>
+    pub fn run_until_break(self) -> Result<Continuation<V, ConcreteExt>, E>
     where
         S: HasStageInfo<L>
             + SupportsStageDispatch<

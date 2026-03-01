@@ -5,8 +5,7 @@ use kirin_ir::{
 
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractContinuation, AbstractValue, CallSemantics, Continuation, Interpretable, Interpreter,
-    InterpreterError,
+    AbstractValue, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
 };
 
 use super::interp::AbstractInterpreter;
@@ -38,7 +37,7 @@ where
             callee,
             args,
         };
-        Self::dispatch_in_pipeline(pipeline, stage, &mut action)
+        crate::dispatch::dispatch_in_pipeline(pipeline, stage, &mut action)
     }
 
     pub(crate) fn analyze_with_stage_id<L>(
@@ -241,7 +240,7 @@ where
     fn propagate_control<L>(
         &mut self,
         stage: &'ir StageInfo<L>,
-        control: &AbstractContinuation<V>,
+        control: &Continuation<V>,
         narrowing: bool,
         return_value: &mut Option<V>,
     ) -> Result<bool, E>

@@ -1,5 +1,6 @@
 mod abstract_interp;
 mod control;
+mod dispatch;
 mod error;
 mod eval;
 mod frame;
@@ -14,7 +15,7 @@ mod value;
 mod widening;
 
 pub use abstract_interp::{AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry};
-pub use control::{AbstractContinuation, Args, ConcreteContinuation, ConcreteExt, Continuation};
+pub use control::{Args, ConcreteExt, Continuation};
 pub use error::InterpreterError;
 pub use eval::{CallSemantics, SSACFGRegion};
 pub use frame::Frame;

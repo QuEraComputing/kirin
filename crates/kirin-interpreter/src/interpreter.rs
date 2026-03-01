@@ -2,7 +2,7 @@ use std::fmt;
 
 use kirin_ir::{
     Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue, SSAValue,
-    StageDispatchMiss, StageInfo, StageMeta, SupportsStageDispatch,
+    StageInfo, StageMeta,
 };
 
 use crate::Continuation;
@@ -86,36 +86,6 @@ pub trait Interpreter<'ir>: Sized + 'ir {
                 frame_stage: stage_id,
             }
             .into()
-        })
-    }
-
-    /// Convert a stage-dispatch miss into the framework error model.
-    fn map_dispatch_miss(stage_id: CompileStage, miss: StageDispatchMiss) -> Self::Error
-    where
-        Self::Error: From<InterpreterError>,
-    {
-        match miss {
-            StageDispatchMiss::MissingStage => InterpreterError::MissingStage { stage: stage_id },
-            StageDispatchMiss::MissingDialect => {
-                InterpreterError::MissingStageDialect { stage: stage_id }
-            }
-        }
-        .into()
-    }
-
-    /// Dispatch a runtime action against `stage_id` using `pipeline`, mapping
-    /// dispatch misses to [`InterpreterError`] variants.
-    fn dispatch_in_pipeline<A, R>(
-        pipeline: &'ir Pipeline<Self::StageInfo>,
-        stage_id: CompileStage,
-        action: &mut A,
-    ) -> Result<R, Self::Error>
-    where
-        Self::StageInfo: SupportsStageDispatch<A, R, Self::Error>,
-        Self::Error: From<InterpreterError>,
-    {
-        pipeline.dispatch_stage_or_else(stage_id, action, |miss| {
-            Self::map_dispatch_miss(stage_id, miss)
         })
     }
 

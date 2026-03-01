@@ -1,7 +1,7 @@
 use kirin_ir::{ResultValue, StageMeta, SupportsStageDispatch};
 
 use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
-use crate::{ConcreteContinuation, ConcreteExt, Continuation, Interpreter, InterpreterError};
+use crate::{ConcreteExt, Continuation, Interpreter, InterpreterError};
 
 // -- Execution engine -------------------------------------------------------
 
@@ -13,13 +13,13 @@ where
     G: 'ir,
 {
     /// Stage-dynamic entrypoint.
-    pub fn step(&mut self) -> Result<ConcreteContinuation<V>, E> {
+    pub fn step(&mut self) -> Result<Continuation<V, ConcreteExt>, E> {
         let dispatch = self.frames.current()?.extra().dispatch;
         (dispatch.step)(self)
     }
 
     /// Stage-dynamic entrypoint.
-    pub fn advance(&mut self, control: &ConcreteContinuation<V>) -> Result<(), E>
+    pub fn advance(&mut self, control: &Continuation<V, ConcreteExt>) -> Result<(), E>
     where
         S: SupportsStageDispatch<
                 FrameDispatchAction<'ir, V, S, E, G>,
@@ -43,7 +43,7 @@ where
     }
 
     /// Stage-dynamic entrypoint.
-    pub fn run(&mut self) -> Result<ConcreteContinuation<V>, E>
+    pub fn run(&mut self) -> Result<Continuation<V, ConcreteExt>, E>
     where
         S: SupportsStageDispatch<
                 FrameDispatchAction<'ir, V, S, E, G>,
@@ -61,7 +61,7 @@ where
     }
 
     /// Stage-dynamic entrypoint.
-    pub fn run_until_break(&mut self) -> Result<ConcreteContinuation<V>, E>
+    pub fn run_until_break(&mut self) -> Result<Continuation<V, ConcreteExt>, E>
     where
         S: SupportsStageDispatch<
                 FrameDispatchAction<'ir, V, S, E, G>,
@@ -84,10 +84,10 @@ where
         swallow_break: bool,
         mut step_fn: Step,
         mut advance_fn: Advance,
-    ) -> Result<ConcreteContinuation<V>, E>
+    ) -> Result<Continuation<V, ConcreteExt>, E>
     where
-        Step: FnMut(&mut Self) -> Result<ConcreteContinuation<V>, E>,
-        Advance: FnMut(&mut Self, &ConcreteContinuation<V>) -> Result<(), E>,
+        Step: FnMut(&mut Self) -> Result<Continuation<V, ConcreteExt>, E>,
+        Advance: FnMut(&mut Self, &Continuation<V, ConcreteExt>) -> Result<(), E>,
     {
         loop {
             if stop_on_breakpoint {
@@ -111,7 +111,7 @@ where
 
     /// Like [`advance`](Self::advance) but uses the pre-built dispatch table
     /// for call-frame pushes, avoiding `SupportsStageDispatch` bounds.
-    fn advance_cached(&mut self, control: &ConcreteContinuation<V>) -> Result<(), E> {
+    fn advance_cached(&mut self, control: &Continuation<V, ConcreteExt>) -> Result<(), E> {
         let dispatch = self.frames.current()?.extra().dispatch;
         (dispatch.advance)(self, control)?;
         if let Continuation::Call {
@@ -128,7 +128,7 @@ where
 
     /// Like [`run`](Self::run) but uses cached dispatch (no
     /// `SupportsStageDispatch` bounds).
-    fn run_cached(&mut self) -> Result<ConcreteContinuation<V>, E> {
+    fn run_cached(&mut self) -> Result<Continuation<V, ConcreteExt>, E> {
         self.drive_loop(
             false,
             true,
