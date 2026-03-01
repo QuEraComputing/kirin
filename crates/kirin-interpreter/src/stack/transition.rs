@@ -1,7 +1,4 @@
-use kirin_ir::{
-    Block, CompileStage, Dialect, GetInfo, Pipeline, SSAValue, StageInfo, StageMeta,
-    SupportsStageDispatch,
-};
+use kirin_ir::{CompileStage, Dialect, Pipeline, StageInfo, StageMeta, SupportsStageDispatch};
 
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
 use crate::{
@@ -64,34 +61,6 @@ where
         Ok(())
     }
 
-    pub(super) fn bind_block_args_in_stage<L>(
-        &mut self,
-        stage: &'ir StageInfo<L>,
-        block: Block,
-        args: &[V],
-    ) -> Result<(), E>
-    where
-        L: Dialect,
-    {
-        let block_info = block.expect_info(stage);
-        if block_info.arguments.len() != args.len() {
-            return Err(InterpreterError::ArityMismatch {
-                expected: block_info.arguments.len(),
-                got: args.len(),
-            }
-            .into());
-        }
-        let arg_ssas: Vec<SSAValue> = block_info
-            .arguments
-            .iter()
-            .map(|ba| SSAValue::from(*ba))
-            .collect();
-        for (ssa, val) in arg_ssas.iter().zip(args.iter()) {
-            self.write_ssa(*ssa, val.clone())?;
-        }
-        Ok(())
-    }
-
     pub(super) fn step_with_stage<L>(
         &mut self,
         stage: &'ir StageInfo<L>,
@@ -120,7 +89,7 @@ where
                 self.advance_cursor_in_stage::<L>(stage)?;
             }
             Continuation::Jump(succ, args) => {
-                self.bind_block_args_in_stage::<L>(stage, succ.target(), args)?;
+                self.bind_block_args(stage, succ.target(), args)?;
                 let first = succ.target().first_statement(stage);
                 self.set_current_cursor(first)?;
             }

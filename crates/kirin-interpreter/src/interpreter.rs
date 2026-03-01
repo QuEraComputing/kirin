@@ -1,8 +1,8 @@
 use std::fmt;
 
 use kirin_ir::{
-    CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue, StageDispatchMiss,
-    StageInfo, StageMeta, SupportsStageDispatch,
+    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue, SSAValue,
+    StageDispatchMiss, StageInfo, StageMeta, SupportsStageDispatch,
 };
 
 use crate::InterpreterError;
@@ -109,5 +109,38 @@ pub trait Interpreter<'ir>: Sized + 'ir {
         pipeline.dispatch_stage_or_else(stage_id, action, |miss| {
             Self::map_dispatch_miss(stage_id, miss)
         })
+    }
+
+    /// Bind values to a block's arguments in the current frame.
+    ///
+    /// Resolves the block's argument SSA values from stage info and writes
+    /// each provided value. Returns `ArityMismatch` if `args.len()` differs
+    /// from the block's declared argument count.
+    fn bind_block_args<L: Dialect>(
+        &mut self,
+        stage: &'ir StageInfo<L>,
+        block: Block,
+        args: &[Self::Value],
+    ) -> Result<(), Self::Error>
+    where
+        Self::Error: From<InterpreterError>,
+    {
+        let block_info = block.expect_info(stage);
+        if block_info.arguments.len() != args.len() {
+            return Err(InterpreterError::ArityMismatch {
+                expected: block_info.arguments.len(),
+                got: args.len(),
+            }
+            .into());
+        }
+        let arg_ssas: Vec<SSAValue> = block_info
+            .arguments
+            .iter()
+            .map(|ba| SSAValue::from(*ba))
+            .collect();
+        for (ssa, val) in arg_ssas.iter().zip(args.iter()) {
+            self.write_ssa(*ssa, val.clone())?;
+        }
+        Ok(())
     }
 }

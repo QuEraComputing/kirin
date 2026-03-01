@@ -62,53 +62,12 @@ where
         args: &[V],
     ) -> Result<V, E> {
         let entry = self.entry_block::<L>(stage)?;
-
-        // Push frame and bind entry block args
         let first = entry.first_statement(stage);
         let frame_stage = stage.stage_id().unwrap_or_else(|| interp.active_stage());
         interp.push_frame(crate::Frame::new(callee, frame_stage, first))?;
-        crate::EvalBlock::bind_block_args(interp, stage, entry, args)?;
-
+        interp.bind_block_args(stage, entry, args)?;
         let initial_depth = interp.frame_depth();
-        let mut pending_results: Vec<kirin_ir::ResultValue> = Vec::new();
-
-        loop {
-            let control = interp.run()?;
-            match &control {
-                crate::Continuation::Call { result, .. } => pending_results.push(*result),
-                crate::Continuation::Ext(crate::ConcreteExt::Halt) => {
-                    return Err(
-                        InterpreterError::UnexpectedControl("halt during call".to_owned()).into(),
-                    );
-                }
-                crate::Continuation::Return(_) | crate::Continuation::Yield(_) => {}
-                _ => {
-                    return Err(InterpreterError::UnexpectedControl(
-                        "unexpected variant during call".to_owned(),
-                    )
-                    .into());
-                }
-            }
-
-            let v = match &control {
-                crate::Continuation::Return(v) | crate::Continuation::Yield(v) => Some(v.clone()),
-                _ => None,
-            };
-
-            interp.advance(&control)?;
-
-            if let Some(v) = v {
-                if interp.frame_depth() < initial_depth {
-                    return Ok(v);
-                }
-                let result = pending_results
-                    .pop()
-                    .ok_or_else(|| InterpreterError::NoFrame.into())?;
-                <crate::StackInterpreter<'ir, V, S, E, G> as Interpreter<'ir>>::write(
-                    interp, result, v,
-                )?;
-            }
-        }
+        interp.run_nested_calls(|interp, _is_yield| interp.frame_depth() < initial_depth)
     }
 }
 

@@ -110,7 +110,7 @@ where
 
         let first = entry_block.first_statement(stage);
         self.set_current_cursor(first)?;
-        if let Err(err) = self.bind_block_args_in_stage::<L>(stage, entry_block, args) {
+        if let Err(err) = self.bind_block_args(stage, entry_block, args) {
             let _ = self.pop_frame();
             return Err(err);
         }

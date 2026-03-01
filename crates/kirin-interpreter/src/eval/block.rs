@@ -1,7 +1,4 @@
-use kirin_ir::{
-    Block, Dialect, GetInfo, HasStageInfo, ResultValue, SSAValue, StageInfo, StageMeta,
-    SupportsStageDispatch,
-};
+use kirin_ir::{Block, Dialect, HasStageInfo, StageInfo, StageMeta, SupportsStageDispatch};
 
 use crate::{
     AbstractInterpreter, AbstractValue, Continuation, Interpretable, Interpreter, InterpreterError,
@@ -12,53 +9,19 @@ use crate::{
 /// resulting [`Continuation`].
 ///
 /// Callers are responsible for binding block arguments via
-/// [`bind_block_args`](Self::bind_block_args) before calling
+/// [`Interpreter::bind_block_args`] before calling
 /// [`eval_block`](Self::eval_block).
 pub trait EvalBlock<'ir, L: Dialect>: Interpreter<'ir> {
     /// Execute a body block whose arguments have already been bound.
     ///
     /// Returns the [`Continuation`] produced by the block's terminator.
-    /// The caller must call [`bind_block_args`](Self::bind_block_args) first
+    /// The caller must call [`Interpreter::bind_block_args`] first
     /// to write values into the block's argument SSA slots.
     fn eval_block(
         &mut self,
         stage: &'ir StageInfo<L>,
         block: Block,
     ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>;
-
-    /// Bind values to a block's arguments in the current frame.
-    ///
-    /// Resolves the block's argument SSA values from stage info and writes
-    /// each provided value. Returns `ArityMismatch` if `args.len()` differs
-    /// from the block's declared argument count.
-    fn bind_block_args(
-        &mut self,
-        stage: &'ir StageInfo<L>,
-        block: Block,
-        args: &[Self::Value],
-    ) -> Result<(), Self::Error>
-    where
-        Self::Value: Clone,
-        Self::Error: From<InterpreterError>,
-    {
-        let block_info = block.expect_info(stage);
-        if block_info.arguments.len() != args.len() {
-            return Err(InterpreterError::ArityMismatch {
-                expected: block_info.arguments.len(),
-                got: args.len(),
-            }
-            .into());
-        }
-        let arg_ssas: Vec<SSAValue> = block_info
-            .arguments
-            .iter()
-            .map(|ba| SSAValue::from(*ba))
-            .collect();
-        for (ssa, val) in arg_ssas.iter().zip(args.iter()) {
-            self.write_ssa(*ssa, val.clone())?;
-        }
-        Ok(())
-    }
 }
 
 impl<'ir, V, S, E, G, L> EvalBlock<'ir, L> for StackInterpreter<'ir, V, S, E, G>
@@ -79,52 +42,17 @@ where
     /// Execute a body block inline within the current frame, handling nested
     /// calls. Returns `Continuation::Yield(v)` with the value produced by the
     /// block's yield terminator.
-    ///
-    /// This mirrors the call-semantics loop in [`EvalCall`] but operates
-    /// within the current frame rather than pushing a new one. Used by
-    /// structured control flow operations like `scf.for` that need to
-    /// repeatedly execute a body block.
     fn eval_block(
         &mut self,
         stage: &'ir StageInfo<L>,
         block: Block,
     ) -> Result<Continuation<V, crate::ConcreteExt>, E> {
-        // Save current cursor so we can restore it after the block completes
         let saved_cursor = self.current_cursor()?;
-
-        // Set cursor to the block's first statement
         let first = block.first_statement(stage);
         self.set_current_cursor(first)?;
-
-        // Run body, handling nested Call/Return pairs (same pattern as EvalCall)
-        let mut pending_results: Vec<ResultValue> = Vec::new();
-        loop {
-            let control = self.run()?;
-            match &control {
-                Continuation::Call { result, .. } => {
-                    pending_results.push(*result);
-                    self.advance(&control)?;
-                }
-                Continuation::Yield(v) => {
-                    let v = v.clone();
-                    self.set_current_cursor(saved_cursor)?;
-                    return Ok(Continuation::Yield(v));
-                }
-                Continuation::Return(v) => {
-                    // Return from a nested call — pop the callee frame
-                    let v = v.clone();
-                    self.advance(&control)?;
-                    let result = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                    Interpreter::write(self, result, v)?;
-                }
-                _ => {
-                    return Err(InterpreterError::UnexpectedControl(
-                        "unexpected continuation in SCF body block".to_owned(),
-                    )
-                    .into());
-                }
-            }
-        }
+        let v = self.run_nested_calls(|_interp, is_yield| is_yield)?;
+        self.set_current_cursor(saved_cursor)?;
+        Ok(Continuation::Yield(v))
     }
 }
 
