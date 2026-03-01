@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-interpreter/src/eval_call/tests.rs
-assertion_line: 21
 expression: "case!\n{\n    #[kirin(type = ArithType)] #[wraps] enum TestDialect\n    {\n        Arith(Arith<ArithType>), ControlFlow(ControlFlow<ArithType>),\n        Constant(Constant<ArithValue, ArithType>),\n    }\n}"
 ---
 #[automatically_derived]
@@ -11,6 +10,7 @@ where
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
     Arith<ArithType>: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, TestDialect>,
     ControlFlow<ArithType>: ::kirin_interpreter::CallSemantics<
+        '__ir,
         __CallSemI,
         TestDialect,
         Result = <Arith<ArithType> as ::kirin_interpreter::CallSemantics<
@@ -20,6 +20,7 @@ where
         >>::Result,
     >,
     Constant<ArithValue, ArithType>: ::kirin_interpreter::CallSemantics<
+        '__ir,
         __CallSemI,
         TestDialect,
         Result = <Arith<ArithType> as ::kirin_interpreter::CallSemantics<

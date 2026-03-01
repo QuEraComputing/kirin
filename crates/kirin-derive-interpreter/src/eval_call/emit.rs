@@ -139,7 +139,7 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
                     }
                 } else {
                     quote! {
-                        #ty: #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics, Result = #result_type>,
+                        #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics, Result = #result_type>,
                     }
                 }
             })
