@@ -14,7 +14,9 @@ mod stage;
 mod value;
 mod widening;
 
-pub use abstract_interp::{AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry};
+pub use abstract_interp::{
+    AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry, SummaryInserter,
+};
 pub use control::{Args, ConcreteExt, Continuation};
 pub use error::InterpreterError;
 pub use eval::{CallSemantics, SSACFGRegion};
@@ -29,5 +31,21 @@ pub use stage::Staged;
 pub use value::{AbstractValue, BranchCondition};
 pub use widening::WideningStrategy;
 
+/// Essentials for dialect authors implementing operational semantics.
+pub mod prelude {
+    pub use crate::{
+        Args, BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter,
+        InterpreterError, SSACFGRegion,
+    };
+}
+
+/// Types for abstract interpretation and fixpoint analysis.
+pub mod analysis {
+    pub use crate::{
+        AbstractValue, AnalysisResult, DedupScheduler, FixpointState, SummaryCache, SummaryEntry,
+        WideningStrategy,
+    };
+}
+
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::EvalCall as CallSemantics;
+pub use kirin_derive_interpreter::CallSemantics;

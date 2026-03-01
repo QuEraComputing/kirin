@@ -6,8 +6,8 @@ mod interpretable;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
-#[proc_macro_derive(EvalCall, attributes(wraps, callable, kirin))]
-pub fn derive_eval_call(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(CallSemantics, attributes(wraps, callable, kirin))]
+pub fn derive_call_semantics(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match eval_call::DeriveEvalCall::default().emit(&ast) {
         Ok(tokens) => tokens.into(),

@@ -3,9 +3,7 @@ mod interp;
 mod stage;
 mod summary;
 
-pub use interp::AbstractInterpreter;
-
-// SummaryInserter is accessible via type inference from `AbstractInterpreter::insert_summary()`
+pub use interp::{AbstractInterpreter, SummaryInserter};
 pub use summary::{SummaryCache, SummaryEntry};
 
 use kirin_ir::{Block, SSAValue};

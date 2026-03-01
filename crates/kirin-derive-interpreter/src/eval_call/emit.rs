@@ -23,15 +23,15 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
 
             Ok(quote! {
                 #[automatically_derived]
-                impl #impl_generics #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>
+                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
                     __CallSemI: #interp_crate::Interpreter<'__ir>,
                     __CallSemI::Error: From<#interp_crate::InterpreterError>,
-                    #wrapper_ty: #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>,
+                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
                     #where_clause
                 {
-                    type Result = <#wrapper_ty as #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>>::Result;
+                    type Result = <#wrapper_ty as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result;
 
                     fn eval_call(
                         &self,
@@ -48,7 +48,7 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
         } else {
             Ok(quote! {
                 #[automatically_derived]
-                impl #impl_generics #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>
+                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
                     for #type_name #ty_generics
                 where
                     __CallSemI: #interp_crate::Interpreter<'__ir>,
@@ -124,7 +124,7 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
         }
 
         let result_type = if let Some(first_wrapper) = wrapper_types.first() {
-            quote! { <#first_wrapper as #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>>::Result }
+            quote! { <#first_wrapper as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result }
         } else {
             quote! { __CallSemI::Value }
         };
@@ -135,11 +135,11 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
             .map(|(i, ty)| {
                 if i == 0 {
                     quote! {
-                        #ty: #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>,
+                        #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
                     }
                 } else {
                     quote! {
-                        #ty: #interp_crate::EvalCall<__CallSemI, #type_name #ty_generics, Result = #result_type>,
+                        #ty: #interp_crate::CallSemantics<__CallSemI, #type_name #ty_generics, Result = #result_type>,
                     }
                 }
             })
@@ -147,7 +147,7 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
 
         Ok(quote! {
             #[automatically_derived]
-            impl #impl_generics #interp_crate::EvalCall<'__ir, __CallSemI, #type_name #ty_generics>
+            impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
                 for #type_name #ty_generics
             where
                 __CallSemI: #interp_crate::Interpreter<'__ir>,

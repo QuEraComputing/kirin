@@ -56,8 +56,7 @@ where
 
 /// Builder for inserting function summaries into an [`AbstractInterpreter`].
 ///
-/// Obtained via [`AbstractInterpreter::insert_summary`] or
-/// [`AbstractInterpreter::insert_summary_in_stage`].
+/// Obtained via [`Staged::insert_summary`](crate::Staged::insert_summary).
 pub struct SummaryInserter<'a, 'ir, V, S, E, G>
 where
     S: StageMeta,
@@ -191,18 +190,8 @@ where
             .or_default()
     }
 
-    /// Look up the best cached summary for `callee` in the interpreter's
-    /// current active stage.
-    pub fn summary(&self, callee: SpecializedFunction, args: &[V]) -> Option<&AnalysisResult<V>>
-    where
-        V: AbstractValue + Clone,
-    {
-        let stage = self.frames.active_stage_or(self.root_stage);
-        self.summary_in_stage(stage, callee, args)
-    }
-
     /// Look up the best cached summary for `(stage, callee)` given `args`.
-    pub fn summary_in_stage(
+    pub(crate) fn summary_in_stage(
         &self,
         stage: CompileStage,
         callee: SpecializedFunction,
@@ -216,13 +205,8 @@ where
             .lookup(args)
     }
 
-    /// Look up the full summary cache for `callee` in the active stage.
-    pub fn summary_cache(&self, callee: SpecializedFunction) -> Option<&SummaryCache<V>> {
-        self.summary_cache_in_stage(self.frames.active_stage_or(self.root_stage), callee)
-    }
-
     /// Look up the full summary cache for `(stage, callee)`.
-    pub fn summary_cache_in_stage(
+    pub(crate) fn summary_cache_in_stage(
         &self,
         stage: CompileStage,
         callee: SpecializedFunction,
@@ -230,16 +214,8 @@ where
         self.summaries.get(&Self::summary_key(stage, callee))
     }
 
-    /// Return a builder for inserting a function summary in the active stage.
-    pub fn insert_summary(
-        &mut self,
-        callee: SpecializedFunction,
-    ) -> SummaryInserter<'_, 'ir, V, S, E, G> {
-        self.insert_summary_in_stage(self.frames.active_stage_or(self.root_stage), callee)
-    }
-
     /// Return a builder for inserting a function summary in `stage`.
-    pub fn insert_summary_in_stage(
+    pub(crate) fn insert_summary_in_stage(
         &mut self,
         stage: CompileStage,
         callee: SpecializedFunction,
@@ -250,13 +226,8 @@ where
         }
     }
 
-    /// Mark all computed entries for `callee` in the active stage as invalidated.
-    pub fn invalidate_summary(&mut self, callee: SpecializedFunction) -> usize {
-        self.invalidate_summary_in_stage(self.frames.active_stage_or(self.root_stage), callee)
-    }
-
     /// Mark all computed entries for `(stage, callee)` as invalidated.
-    pub fn invalidate_summary_in_stage(
+    pub(crate) fn invalidate_summary_in_stage(
         &mut self,
         stage: CompileStage,
         callee: SpecializedFunction,
@@ -276,14 +247,8 @@ where
     }
 
     /// Unconditionally remove all summaries (including user-fixed) for
-    /// `callee` in the active stage.
-    pub fn remove_summary(&mut self, callee: SpecializedFunction) -> bool {
-        self.remove_summary_in_stage(self.frames.active_stage_or(self.root_stage), callee)
-    }
-
-    /// Unconditionally remove all summaries (including user-fixed) for
     /// `(stage, callee)`.
-    pub fn remove_summary_in_stage(
+    pub(crate) fn remove_summary_in_stage(
         &mut self,
         stage: CompileStage,
         callee: SpecializedFunction,
