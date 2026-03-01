@@ -179,9 +179,18 @@ fn test_abstract_interp_call_caches_summary() {
     assert_eq!(result1.return_value(), Some(&Interval::constant(10)));
 
     // Summary should be cached (args subsumed)
-    assert!(interp.summary(spec_fn, &[]).is_some());
+    assert!(
+        interp
+            .in_stage::<CompositeLanguage>()
+            .summary(spec_fn, &[])
+            .is_some()
+    );
     assert_eq!(
-        interp.summary(spec_fn, &[]).unwrap().return_value(),
+        interp
+            .in_stage::<CompositeLanguage>()
+            .summary(spec_fn, &[])
+            .unwrap()
+            .return_value(),
         Some(&Interval::constant(10))
     );
 
@@ -316,7 +325,10 @@ fn test_abstract_fixed_summary() {
         Default::default(),
         Some(Interval::new(100, 200)),
     );
-    interp.insert_summary(spec_fn).fixed(fixed_result);
+    interp
+        .in_stage::<CompositeLanguage>()
+        .insert_summary(spec_fn)
+        .fixed(fixed_result);
 
     let result = interp
         .in_stage::<CompositeLanguage>()
@@ -346,11 +358,23 @@ fn test_abstract_summary_invalidation_and_gc() {
         .unwrap();
     assert_eq!(result.return_value(), Some(&Interval::new(1, 11)));
 
-    assert!(interp.summary(spec_fn, &[Interval::new(0, 10)]).is_some());
+    assert!(
+        interp
+            .in_stage::<CompositeLanguage>()
+            .summary(spec_fn, &[Interval::new(0, 10)])
+            .is_some()
+    );
 
-    let count = interp.invalidate_summary(spec_fn);
+    let count = interp
+        .in_stage::<CompositeLanguage>()
+        .invalidate_summary(spec_fn);
     assert!(count > 0, "expected at least one invalidated entry");
-    assert!(interp.summary(spec_fn, &[Interval::new(0, 10)]).is_none());
+    assert!(
+        interp
+            .in_stage::<CompositeLanguage>()
+            .summary(spec_fn, &[Interval::new(0, 10)])
+            .is_none()
+    );
 
     interp.gc_summaries();
 
@@ -374,11 +398,29 @@ fn test_abstract_remove_summary() {
         .in_stage::<CompositeLanguage>()
         .analyze(spec_fn, &[Interval::constant(5)])
         .unwrap();
-    assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_some());
+    assert!(
+        interp
+            .in_stage::<CompositeLanguage>()
+            .summary(spec_fn, &[Interval::constant(5)])
+            .is_some()
+    );
 
-    assert!(interp.remove_summary(spec_fn));
-    assert!(interp.summary(spec_fn, &[Interval::constant(5)]).is_none());
-    assert!(!interp.remove_summary(spec_fn));
+    assert!(
+        interp
+            .in_stage::<CompositeLanguage>()
+            .remove_summary(spec_fn)
+    );
+    assert!(
+        interp
+            .in_stage::<CompositeLanguage>()
+            .summary(spec_fn, &[Interval::constant(5)])
+            .is_none()
+    );
+    assert!(
+        !interp
+            .in_stage::<CompositeLanguage>()
+            .remove_summary(spec_fn)
+    );
 }
 
 // ---------------------------------------------------------------------------

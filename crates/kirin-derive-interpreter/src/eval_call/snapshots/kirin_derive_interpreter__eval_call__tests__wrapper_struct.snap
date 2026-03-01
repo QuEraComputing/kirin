@@ -1,15 +1,17 @@
 ---
 source: crates/kirin-derive-interpreter/src/eval_call/tests.rs
+assertion_line: 60
 expression: "case!\n{ #[kirin(type = TestType)] struct Wrapper { #[wraps] inner: InnerType, } }"
 ---
 #[automatically_derived]
-impl<'__ir, __CallSemI> ::kirin_interpreter::EvalCall<'__ir, __CallSemI, Wrapper> for Wrapper
+impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, Wrapper> for Wrapper
 where
     __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
-    InnerType: ::kirin_interpreter::EvalCall<'__ir, __CallSemI, Wrapper>,
+    InnerType: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, Wrapper>,
 {
-    type Result = <InnerType as ::kirin_interpreter::EvalCall<'__ir, __CallSemI, Wrapper>>::Result;
+    type Result =
+        <InnerType as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, Wrapper>>::Result;
     fn eval_call(
         &self,
         interpreter: &mut __CallSemI,

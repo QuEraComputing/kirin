@@ -1,10 +1,11 @@
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_derive_interpreter::{EvalCall, Interpretable};
+use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    BranchCondition, EvalCall as EvalCallTrait, Interpreter, InterpreterError, StackInterpreter,
+    BranchCondition, CallSemantics as CallSemanticsTrait, Interpreter, InterpreterError,
+    StackInterpreter,
 };
 use kirin_ir::*;
 
@@ -12,7 +13,7 @@ use kirin_ir::*;
 // Dialect with derived Interpretable + derived EvalCall using #[callable].
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, EvalCall)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
 #[kirin(fn, type = ArithType, crate = kirin_ir)]
 pub enum DerivedEvalCallDialect {
@@ -39,7 +40,7 @@ pub enum DerivedInterpretableDialect {
     FunctionBody(FunctionBody<ArithType>),
 }
 
-impl<'ir, I> EvalCallTrait<'ir, I, DerivedInterpretableDialect> for DerivedInterpretableDialect
+impl<'ir, I> CallSemanticsTrait<'ir, I, DerivedInterpretableDialect> for DerivedInterpretableDialect
 where
     I: Interpreter<'ir, Error = InterpreterError>,
     I::StageInfo: HasStageInfo<DerivedInterpretableDialect>,
@@ -51,10 +52,13 @@ where
         + std::ops::Neg<Output = I::Value>
         + From<ArithValue>
         + BranchCondition,
-    FunctionBody<ArithType>: EvalCallTrait<'ir, I, DerivedInterpretableDialect>,
+    FunctionBody<ArithType>: CallSemanticsTrait<'ir, I, DerivedInterpretableDialect>,
 {
-    type Result =
-        <FunctionBody<ArithType> as EvalCallTrait<'ir, I, DerivedInterpretableDialect>>::Result;
+    type Result = <FunctionBody<ArithType> as CallSemanticsTrait<
+        'ir,
+        I,
+        DerivedInterpretableDialect,
+    >>::Result;
 
     fn eval_call(
         &self,

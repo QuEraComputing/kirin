@@ -1,7 +1,7 @@
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_derive_interpreter::{EvalCall, Interpretable};
+use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::FunctionBody;
 use kirin_interpreter::{Continuation, Interpreter, InterpreterError, StackInterpreter};
 use kirin_ir::*;
@@ -129,7 +129,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, EvalCall)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
 #[kirin(fn, type = ArithType, crate = kirin_ir)]
 enum StageDynLang {
@@ -142,7 +142,7 @@ enum StageDynLang {
     FunctionBody(FunctionBody<ArithType>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, EvalCall)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
 #[kirin(fn, type = ArithType, crate = kirin_ir)]
 enum FunctionCallLang {
@@ -503,7 +503,7 @@ fn test_function_call_unique_specialization_success() {
     assert_eq!(result, 11);
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, EvalCall)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
 #[kirin(fn, type = ArithType, crate = kirin_ir)]
 enum DummyLang {
@@ -594,6 +594,7 @@ impl HasStageInfo<DummyLang> for MixedStage {
 }
 
 #[test]
+#[should_panic(expected = "active stage does not contain StageInfo for this dialect")]
 fn test_typed_call_reports_stage_mismatch() {
     let mut pipeline: Pipeline<MixedStage> = Pipeline::new();
     let dyn_stage = pipeline
@@ -622,15 +623,6 @@ fn test_typed_call_reports_stage_mismatch() {
     };
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, dummy_stage);
-    let err = interp
-        .in_stage::<StageDynLang>()
-        .call(spec, &[2])
-        .unwrap_err();
-    assert!(
-        matches!(
-            err,
-            InterpreterError::TypedStageMismatch { frame_stage } if frame_stage == dummy_stage
-        ),
-        "unexpected error: {err:?}"
-    );
+    // `in_stage` panics when the active stage does not contain the requested dialect's StageInfo.
+    let _ = interp.in_stage::<StageDynLang>().call(spec, &[2]);
 }
