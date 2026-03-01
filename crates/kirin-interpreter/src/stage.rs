@@ -1,8 +1,16 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Dialect, HasStageInfo, StageInfo};
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, StageInfo};
 
 use crate::{Interpreter, InterpreterError};
+
+/// Extract the stage ID from a `StageInfo`, panicking if it is not attached
+/// to a pipeline stage.
+pub(crate) fn expect_stage_id<L: Dialect>(stage: &StageInfo<L>) -> CompileStage {
+    stage
+        .stage_id()
+        .expect("stage info must be attached to a pipeline stage")
+}
 
 /// Typed-stage API builder resolved from the interpreter's active stage.
 pub struct InStage<'a, I, L> {

@@ -60,6 +60,12 @@ pub trait Interpreter<'ir>: Sized + 'ir {
             .expect("active stage does not contain StageInfo for this dialect")
     }
 
+    /// Returns the stage ID from `stage`, falling back to the active stage
+    /// if the stage info is not attached to a pipeline stage.
+    fn resolve_stage_id<L: Dialect>(&self, stage: &StageInfo<L>) -> CompileStage {
+        stage.stage_id().unwrap_or_else(|| self.active_stage())
+    }
+
     /// Resolve a stage-specific dialect view for `stage_id` with explicit
     /// errors instead of panicking.
     fn resolve_stage_info<L>(

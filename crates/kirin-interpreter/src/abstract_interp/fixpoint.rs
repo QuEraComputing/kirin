@@ -73,16 +73,8 @@ where
     {
         let key = Self::summary_key(stage_id, callee);
 
-        if let Some(cache) = self.summaries.get(&key) {
-            if let Some(ref fixed) = cache.fixed() {
-                return Ok((*fixed).clone());
-            }
-        }
-
-        if let Some(cache) = self.summaries.get(&key) {
-            if let Some(entry) = cache.find_best_match(args) {
-                return Ok(entry.result.clone());
-            }
+        if let Some(result) = self.summaries.get(&key).and_then(|c| c.lookup(args)) {
+            return Ok(result.clone());
         }
 
         let is_recursive = self
@@ -210,9 +202,7 @@ where
         args: &[V],
         result: AnalysisResult<V>,
     ) {
-        self.summaries
-            .entry(Self::summary_key(stage, callee))
-            .or_default()
+        self.cache_mut(stage, callee)
             .set_tentative(args.to_vec(), result);
     }
 
@@ -235,9 +225,7 @@ where
         args: &[V],
         result: AnalysisResult<V>,
     ) {
-        self.summaries
-            .entry(Self::summary_key(stage, callee))
-            .or_default()
+        self.cache_mut(stage, callee)
             .promote_tentative(args.to_vec(), result);
     }
 

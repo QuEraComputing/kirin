@@ -5,6 +5,7 @@ use kirin_ir::{
 
 use super::dispatch::{CallDynAction, PushCallFrameDynAction};
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
+use crate::stage::expect_stage_id;
 use crate::{Continuation, EvalCall, Frame, Interpretable, Interpreter, InterpreterError};
 
 // -- Call (inherent, not on the trait) --------------------------------------
@@ -45,7 +46,7 @@ where
     where
         L: Dialect + Interpretable<'ir, Self, L> + EvalCall<'ir, Self, L, Result = V> + 'ir,
     {
-        let stage_id = Self::expect_stage_id(stage);
+        let stage_id = expect_stage_id(stage);
         let spec =
             callee
                 .get_info(stage)
@@ -56,15 +57,6 @@ where
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
         def.eval_call(self, stage, callee, args)
-    }
-
-    fn expect_stage_id<L2>(stage: &StageInfo<L2>) -> CompileStage
-    where
-        L2: Dialect,
-    {
-        stage
-            .stage_id()
-            .expect("stage info must be attached to a pipeline stage")
     }
 
     pub(super) fn push_call_frame_with_stage<L>(
@@ -81,7 +73,7 @@ where
             >,
         L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
-        let stage_id = Self::expect_stage_id(stage);
+        let stage_id = expect_stage_id(stage);
         let spec =
             callee
                 .get_info(stage)

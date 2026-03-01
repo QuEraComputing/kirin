@@ -63,7 +63,7 @@ where
     ) -> Result<V, E> {
         let entry = self.entry_block::<L>(stage)?;
         let first = entry.first_statement(stage);
-        let frame_stage = stage.stage_id().unwrap_or_else(|| interp.active_stage());
+        let frame_stage = interp.resolve_stage_id(stage);
         interp.push_frame(crate::Frame::new(callee, frame_stage, first))?;
         interp.bind_block_args(stage, entry, args)?;
         let initial_depth = interp.frame_depth();
@@ -94,7 +94,7 @@ where
         args: &[V],
     ) -> Result<crate::AnalysisResult<V>, E> {
         let entry = self.entry_block::<L>(stage)?;
-        let stage_id = stage.stage_id().unwrap_or_else(|| interp.active_stage());
+        let stage_id = interp.resolve_stage_id(stage);
 
         // Insert tentative summary before pushing frame
         interp.set_tentative(stage_id, callee, args, crate::AnalysisResult::bottom());

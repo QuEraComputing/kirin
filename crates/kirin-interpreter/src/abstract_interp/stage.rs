@@ -3,7 +3,7 @@ use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta, SupportsSt
 use super::{AbstractInterpreter, fixpoint::AnalyzeDynAction};
 use crate::{
     AbstractValue, EvalCall, InStage, Interpretable, Interpreter, InterpreterError, WithStage,
-    result::AnalysisResult,
+    result::AnalysisResult, stage::expect_stage_id,
 };
 
 impl<'a, 'ir, V, S, E, G, L> InStage<'a, AbstractInterpreter<'ir, V, S, E, G>, L>
@@ -39,10 +39,7 @@ where
 {
     /// Analyze a specialized function in an explicit stage.
     pub fn analyze(self, callee: SpecializedFunction, args: &[V]) -> Result<AnalysisResult<V>, E> {
-        let stage_id = self
-            .stage
-            .stage_id()
-            .expect("stage info must be attached to a pipeline stage");
+        let stage_id = expect_stage_id(self.stage);
         self.interp.call_handler = Some(AbstractInterpreter::analyze);
         self.interp
             .analyze_with_stage_id::<L>(callee, stage_id, args)

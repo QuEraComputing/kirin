@@ -14,6 +14,17 @@ pub struct SummaryEntry<V> {
     pub invalidated: bool,
 }
 
+impl<V> SummaryEntry<V> {
+    /// Create a new non-invalidated summary entry.
+    pub fn new(args: Vec<V>, result: AnalysisResult<V>) -> Self {
+        Self {
+            args,
+            result,
+            invalidated: false,
+        }
+    }
+}
+
 /// Per-function summary cache supporting multiple call contexts.
 ///
 /// Each function may have:
@@ -57,30 +68,18 @@ impl<V> SummaryCache<V> {
 
     /// Push a new computed entry.
     pub fn push_entry(&mut self, args: Vec<V>, result: AnalysisResult<V>) {
-        self.entries.push(SummaryEntry {
-            args,
-            result,
-            invalidated: false,
-        });
+        self.entries.push(SummaryEntry::new(args, result));
     }
 
     /// Set the tentative summary for recursive fixpoint.
     pub fn set_tentative(&mut self, args: Vec<V>, result: AnalysisResult<V>) {
-        self.tentative = Some(SummaryEntry {
-            args,
-            result,
-            invalidated: false,
-        });
+        self.tentative = Some(SummaryEntry::new(args, result));
     }
 
     /// Promote the tentative summary to a computed entry.
     pub fn promote_tentative(&mut self, args: Vec<V>, result: AnalysisResult<V>) {
         self.tentative = None;
-        self.entries.push(SummaryEntry {
-            args,
-            result,
-            invalidated: false,
-        });
+        self.push_entry(args, result);
     }
 
     /// Invalidate all computed entries. Returns the number invalidated.

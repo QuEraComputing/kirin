@@ -176,8 +176,14 @@ where
         SummaryKey { stage, callee }
     }
 
-    fn current_summary_stage(&self) -> CompileStage {
-        self.frames.active_stage_or(self.root_stage)
+    pub(super) fn cache_mut(
+        &mut self,
+        stage: CompileStage,
+        callee: SpecializedFunction,
+    ) -> &mut SummaryCache<V> {
+        self.summaries
+            .entry(Self::summary_key(stage, callee))
+            .or_default()
     }
 
     /// Look up the best cached summary for `callee` in the interpreter's
@@ -186,7 +192,8 @@ where
     where
         V: AbstractValue + Clone,
     {
-        self.summary_in_stage(self.current_summary_stage(), callee, args)
+        let stage = self.frames.active_stage_or(self.root_stage);
+        self.summary_in_stage(stage, callee, args)
     }
 
     /// Look up the best cached summary for `(stage, callee)` given `args`.
@@ -206,7 +213,7 @@ where
 
     /// Look up the full summary cache for `callee` in the active stage.
     pub fn summary_cache(&self, callee: SpecializedFunction) -> Option<&SummaryCache<V>> {
-        self.summary_cache_in_stage(self.current_summary_stage(), callee)
+        self.summary_cache_in_stage(self.frames.active_stage_or(self.root_stage), callee)
     }
 
     /// Look up the full summary cache for `(stage, callee)`.
@@ -223,7 +230,7 @@ where
         &mut self,
         callee: SpecializedFunction,
     ) -> SummaryInserter<'_, 'ir, V, S, E, G> {
-        self.insert_summary_in_stage(self.current_summary_stage(), callee)
+        self.insert_summary_in_stage(self.frames.active_stage_or(self.root_stage), callee)
     }
 
     /// Return a builder for inserting a function summary in `stage`.
@@ -240,7 +247,7 @@ where
 
     /// Mark all computed entries for `callee` in the active stage as invalidated.
     pub fn invalidate_summary(&mut self, callee: SpecializedFunction) -> usize {
-        self.invalidate_summary_in_stage(self.current_summary_stage(), callee)
+        self.invalidate_summary_in_stage(self.frames.active_stage_or(self.root_stage), callee)
     }
 
     /// Mark all computed entries for `(stage, callee)` as invalidated.
@@ -266,7 +273,7 @@ where
     /// Unconditionally remove all summaries (including user-fixed) for
     /// `callee` in the active stage.
     pub fn remove_summary(&mut self, callee: SpecializedFunction) -> bool {
-        self.remove_summary_in_stage(self.current_summary_stage(), callee)
+        self.remove_summary_in_stage(self.frames.active_stage_or(self.root_stage), callee)
     }
 
     /// Unconditionally remove all summaries (including user-fixed) for
