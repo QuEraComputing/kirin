@@ -30,11 +30,21 @@
 - Builder APIs (BlockBuilder, RegionBuilder, bon builders) are ergonomic
 - `CompileTimeValue` blanket impl is maximally permissive (any Clone+Debug+Hash+PartialEq)
 
+## kirin-prettyless Architecture (Reviewed 2026-03-01)
+- `PrettyPrint` trait: catamorphism over IR, generic over `L: Dialect + PrettyPrint`
+- Sub-traits: `PrettyPrintName`, `PrettyPrintType` for format specifier projections
+- `ScanResultWidth<L>` pre-pass mutates `Document` for alignment; `PrettyPrintExt` requires both
+- `RenderStage`: type-erased per-stage rendering; blanket on `StageInfo<L>`
+- **Dead code**: `Config.line_numbers` never read by renderer
+- **API gap**: `sprint()` vs `sprint_with_globals()` confusing for users
+- **Unused**: `lex()` function in kirin-lexer; duplicated tokenize pattern
+
 ## kirin-lexer
 - Single-file Logos-based tokenizer, clean and self-contained
 - MLIR-style syntax: %ssa, ^block, @symbol, #attr
 - Token::Error variant mapped to Err(String) in lex() function
 - Has `quote` feature for proc-macro token generation (ToTokens impl)
+- `EscapedLBrace`/`EscapedRBrace` only used by format string DSL
 
 ## Derive Infrastructure Architecture
 - Three-layer: `kirin-derive-core` -> `kirin-derive-dialect` -> `kirin-derive` (proc-macro)
@@ -52,23 +62,26 @@
 - `error_unknown_attribute` doesn't handle `callable` -- no breadcrumb for discoverability
 - Property lattice partially validated: speculatable->pure checked, constant->pure not
 
-## Dialect Crate Patterns
+## Dialect Crate Patterns (Full Review 2026-03-01)
 - All dialects parameterized by `T: CompileTimeValue + Default` with `PhantomData<T>` markers
 - `#[kirin(pure)]`, `#[kirin(speculatable)]`, `#[kirin(terminator)]`, `#[kirin(constant)]` property annotations
-- `#[wraps]` enables dialect composition via enum delegation
+- `#[wraps]` enables dialect composition via enum delegation (coproduct/tagged-union)
 - `interpret` feature flag pattern: optional dep on `kirin-interpreter`, `interpret_impl.rs` behind cfg
-- **Branch ops lack block arguments** -- highest priority structural gap
-- **Duplicate Return** in kirin-cf and kirin-function, potential parser conflict
-- **E0275** on Region-containing types with `#[wraps]` + `HasParser` (Lambda)
-- **No comparison ops** -- ConditionalBranch unusable without user-defined comparisons
-- **Div/Rem panic** -- Arith interpreter does unchecked division
-- `kirin-bitwise` and `kirin-scf` lack interpreter impls
-- **SCF uses Block instead of Region** -- non-nestable structured control flow
-- kirin-arith and kirin-bitwise have excellent module docs; kirin-cf, kirin-scf, kirin-constant, kirin-function lack them
-- `Constant<T, Ty>` two-param API is confusing (value-first, type-second)
-- kirin-interval: Div/Rem top-approximation is sound but imprecise; enhancement not bug
-- `Function { body: Region }` pattern is undocumented folklore required for pipeline parsing
+- SmallVec used correctly in cf/scf interpret impls for branch args
+- kirin-constant: ideal minimal teaching example (19 + 21 lines)
+- kirin-arith and kirin-bitwise have excellent module docs; kirin-cf, kirin-scf, kirin-constant lack them
 - Lexical<T> vs Lifted<T> in kirin-function cleanly models two calling conventions
+- ArithValue manual Hash/PartialEq uses to_bits() for floats -- correct NaN handling
+- **RED**: Call linear scan O(N) in interpret_impl.rs:97-115 -- needs Pipeline::function_by_name index
+- **YELLOW**: Duplicate Return in kirin-cf and kirin-function (document, don't refactor)
+- **YELLOW**: E0275 on Region-containing types with `#[wraps]` + `HasParser` (Lambda) -- workaround: inline fields
+- **YELLOW**: No comparison ops -- ConditionalBranch unusable with built-in dialects only
+- **YELLOW**: Div/Rem panic -- Arith interpreter does unchecked division (non-speculatable signals can-fail)
+- **YELLOW**: Stage-resolution boilerplate (8 lines) repeated in kirin-function and kirin-scf -- needs helper
+- **YELLOW**: `#[kirin(type = T::default())]` undocumented -- used when result type unknown at parse time
+- **GREEN**: `Constant<T, Ty>` two-param API confusing (value-first, type-second)
+- **GREEN**: SCF uses Block instead of Region -- correct per MLIR SingleBlock convention
+- `Function { body: Region }` pattern is undocumented folklore required for pipeline parsing
 
 ## Interpreter Architecture
 - `Continuation<V, Ext>` with `Infallible` for abstract, `ConcreteExt` for concrete
@@ -119,20 +132,25 @@
 - Key issues: EmitContext string allocs, two-pass re-parsing, 3 attribute namespaces, AST type leakage
 - `generate/ast.rs` ~1000 lines manual Clone/Debug/PartialEq for wrapper enums
 
-## Parser Framework Deep Dive (Full Review 2026-02-24)
+## Parser Framework Deep Dive (Full Review 2026-03-01)
 - `HasParser` (non-recursive) vs `HasDialectParser` (recursive, GAT-based) -- core duality
 - `HasDialectParser::Output<TypeOutput, LanguageOutput>` avoids GAT projection infinite compilation
 - `ASTSelf` coinductive wrapper for self-referential parsing -- undocumented fragile trick
 - `EmitIR<L>` is a catamorphism; `DirectlyParsable` provides identity morphism
-- `ParseStatementText<L, Ctx=()>` + `ParseStatementTextExt` erases unit arg
-- `EmitContext` uses std::HashMap -- should switch to FxHashMap
-- `tokens.to_vec()` in parse_one_declaration (syntax.rs:136) -- O(n) alloc per declaration
+- `ParseStatementText<L, Ctx=()>` + `ParseStatementTextExt` erases unit arg (good ergonomics)
 - Format string `{field:option}` drives both parser + printer (bidirectional)
 - `FormatVisitor` trait for unified format-driven traversal
 - Derive generates ~6 impls: AST, ASTSelf, HasDialectParser, HasParser, EmitIR x2
-- Generated names (FooAST, FooASTSelf) leak into errors -- rename to __Foo...
-- `HasDialectParser` should be #[doc(hidden)]
-- No systematic roundtrip test (parse-print-parse equality)
-- `Config.line_numbers` appears unused in kirin-prettyless
-- `ScanResultWidth` pre-pass computes widths; `PipelineDocument` enables cross-stage printing
-- Levenshtein suggestions for stage names but not format string field names
+- Two-pass pipeline parser correctly handles forward refs + mixed-dialect dispatch
+- **RED**: Block forward-ref bug: Region::emit registers blocks AFTER body emission (ast.rs:388)
+- **RED**: EmitContext panics on undefined SSA/block names (ast.rs:223, ast.rs:278)
+- **YELLOW**: EmitContext uses std::HashMap -- should switch to FxHashMap
+- **YELLOW**: `tokens.to_vec()` in parse_one_declaration (syntax.rs:136) -- O(n^2) for N declarations
+- **YELLOW**: Generated names (FooAST, FooASTSelf) leak into errors -- rename to __Foo...
+- **YELLOW**: No systematic roundtrip tests (only one trivial test in function_text/tests.rs)
+- **YELLOW**: `for<'src> HasParser<'src, 'src>` HRTB not discoverable -- need ParseDialect helper trait
+- **YELLOW**: No Levenshtein suggestions for format string field names (unlike stage names)
+- **GREEN**: `BoundsBuilder::new` takes `_ir_path` but ignores it -- dead param
+- **GREEN**: `input_requires_ir_type` duplicated for ChumskyLayout/PrettyPrintLayout (should be generic)
+- **GREEN**: `DirectlyParsable` coherence restriction undocumented
+- **GREEN**: `collect_existing_ssas` scans entire arena per parse_statement call

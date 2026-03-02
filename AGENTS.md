@@ -61,14 +61,19 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - `kirin-derive-interpreter` — `#[derive(Interpretable, CallSemantics)]`
 
 **Dialects:**
-- `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-function`
+- `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-bitwise`, `kirin-cmp`, `kirin-function`
 
 **Derive Infrastructure:**
 - `kirin-derive-core` — Shared derive utilities
 - `kirin-derive`, `kirin-derive-dialect` — `#[derive(Dialect)]`
+- `kirin-prettyless-derive` — `#[derive(PrettyPrint)]` code generation (internal)
+
+**Analysis:**
+- `kirin-interval` — Interval domain for abstract interpretation
 
 **Testing:**
-- `kirin-test-utils` — Shared test utilities (test dialects, `rustfmt` helper, interval domain)
+- `kirin-test-utils` — Shared test utilities (test dialects, `rustfmt` helper)
+- `kirin-test-languages` — Test language definitions
 
 ## Derive Infrastructure Conventions
 
