@@ -1,9 +1,9 @@
 mod abstract_interp;
 mod block_eval;
+mod call;
 mod control;
 pub mod dispatch;
 mod error;
-mod call;
 mod frame;
 mod frame_stack;
 mod interpretable;
@@ -21,9 +21,9 @@ pub use abstract_interp::{
     AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry, SummaryInserter,
 };
 pub use block_eval::BlockEvaluator;
+pub use call::{CallSemantics, SSACFGRegion};
 pub use control::{Args, ConcreteExt, Continuation};
 pub use error::{InterpreterError, StageResolutionError};
-pub use call::{CallSemantics, SSACFGRegion};
 pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use interpretable::Interpretable;
@@ -40,8 +40,8 @@ pub use widening::WideningStrategy;
 /// Essentials for dialect authors implementing operational semantics.
 pub mod prelude {
     pub use crate::{
-        BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter,
-        InterpreterError, SSACFGRegion,
+        BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
+        SSACFGRegion,
     };
 }
 
