@@ -1,5 +1,7 @@
 use kirin::prelude::{Dialect, GetInfo, HasStageInfo};
-use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion};
+use kirin_interpreter::{
+    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageResolutionError,
+};
 use smallvec::smallvec;
 
 use crate::{Call, FunctionBody, Return};
@@ -29,13 +31,18 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let stage_id = interp.active_stage();
-        let stage_meta = interp
-            .pipeline()
-            .stage(stage_id)
-            .ok_or(InterpreterError::MissingStage { stage: stage_id })?;
+        let stage_meta =
+            interp
+                .pipeline()
+                .stage(stage_id)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: StageResolutionError::MissingStage,
+                })?;
         let stage = <I::StageInfo as HasStageInfo<L>>::try_stage_info(stage_meta).ok_or(
-            InterpreterError::TypedStageMismatch {
-                frame_stage: stage_id,
+            InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: StageResolutionError::TypeMismatch,
             },
         )?;
         let entry = self
@@ -61,13 +68,18 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let stage_id = interp.active_stage();
-        let stage_meta = interp
-            .pipeline()
-            .stage(stage_id)
-            .ok_or(InterpreterError::MissingStage { stage: stage_id })?;
+        let stage_meta =
+            interp
+                .pipeline()
+                .stage(stage_id)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: StageResolutionError::MissingStage,
+                })?;
         let stage = <I::StageInfo as HasStageInfo<L>>::try_stage_info(stage_meta).ok_or(
-            InterpreterError::TypedStageMismatch {
-                frame_stage: stage_id,
+            InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: StageResolutionError::TypeMismatch,
             },
         )?;
 
@@ -75,9 +87,11 @@ where
             .symbol_table()
             .resolve(self.target())
             .cloned()
-            .ok_or_else(|| InterpreterError::UnknownFunctionTarget {
-                name: format!("{:?}", self.target()),
+            .ok_or_else(|| InterpreterError::StageResolution {
                 stage: stage_id,
+                kind: StageResolutionError::UnknownTarget {
+                    name: format!("{:?}", self.target()),
+                },
             })?;
 
         let function = interp
@@ -93,31 +107,36 @@ where
                     None
                 }
             })
-            .ok_or_else(|| InterpreterError::UnknownFunctionTarget {
-                name: target_name.clone(),
+            .ok_or_else(|| InterpreterError::StageResolution {
                 stage: stage_id,
+                kind: StageResolutionError::UnknownTarget {
+                    name: target_name.clone(),
+                },
             })?;
 
-        let function_info = interp.pipeline().function_info(function).ok_or(
-            InterpreterError::MissingFunctionStageMapping {
-                function,
-                stage: stage_id,
-            },
-        )?;
+        let function_info =
+            interp
+                .pipeline()
+                .function_info(function)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: StageResolutionError::MissingFunction { function },
+                })?;
         let staged_function = function_info
             .staged_functions()
             .get(&stage_id)
             .copied()
-            .ok_or(InterpreterError::MissingFunctionStageMapping {
-                function,
+            .ok_or(InterpreterError::StageResolution {
                 stage: stage_id,
+                kind: StageResolutionError::MissingFunction { function },
             })?;
-        let staged_info = staged_function.get_info(stage).ok_or(
-            InterpreterError::MissingFunctionStageMapping {
-                function,
-                stage: stage_id,
-            },
-        )?;
+        let staged_info =
+            staged_function
+                .get_info(stage)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: StageResolutionError::MissingFunction { function },
+                })?;
 
         let mut live_specializations = staged_info
             .specializations()
@@ -126,9 +145,9 @@ where
             .map(|spec| spec.id());
         let callee = match (live_specializations.next(), live_specializations.next()) {
             (None, _) => {
-                return Err(InterpreterError::NoSpecializationAtStage {
-                    staged_function,
+                return Err(InterpreterError::StageResolution {
                     stage: stage_id,
+                    kind: StageResolutionError::NoSpecialization { staged_function },
                 }
                 .into());
             }
@@ -139,10 +158,12 @@ where
                     .iter()
                     .filter(|spec| !spec.is_invalidated())
                     .count();
-                return Err(InterpreterError::AmbiguousSpecializationAtStage {
-                    staged_function,
+                return Err(InterpreterError::StageResolution {
                     stage: stage_id,
-                    count,
+                    kind: StageResolutionError::AmbiguousSpecialization {
+                        staged_function,
+                        count,
+                    },
                 }
                 .into());
             }

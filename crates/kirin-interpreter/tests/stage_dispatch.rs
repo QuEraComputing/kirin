@@ -3,7 +3,9 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::FunctionBody;
-use kirin_interpreter::{Continuation, Interpreter, InterpreterError, StackInterpreter};
+use kirin_interpreter::{
+    Continuation, Interpreter, InterpreterError, StackInterpreter, StageResolutionError,
+};
 use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
@@ -55,35 +57,44 @@ where
             interp
                 .pipeline()
                 .stage(target_stage)
-                .ok_or(InterpreterError::MissingStage {
+                .ok_or(InterpreterError::StageResolution {
                     stage: target_stage,
+                    kind: StageResolutionError::MissingStage,
                 })?;
         let stage = <I::StageInfo as HasStageInfo<L>>::try_stage_info(stage_meta).ok_or(
-            InterpreterError::MissingStageDialect {
+            InterpreterError::StageResolution {
                 stage: target_stage,
+                kind: StageResolutionError::MissingDialect,
             },
         )?;
 
         let function_info = interp.pipeline().function_info(self.target()).ok_or(
-            InterpreterError::MissingFunctionStageMapping {
-                function: self.target(),
+            InterpreterError::StageResolution {
                 stage: target_stage,
+                kind: StageResolutionError::MissingFunction {
+                    function: self.target(),
+                },
             },
         )?;
         let staged_function = function_info
             .staged_functions()
             .get(&target_stage)
             .copied()
-            .ok_or(InterpreterError::MissingFunctionStageMapping {
-                function: self.target(),
+            .ok_or(InterpreterError::StageResolution {
                 stage: target_stage,
+                kind: StageResolutionError::MissingFunction {
+                    function: self.target(),
+                },
             })?;
-        let staged_info = staged_function.get_info(stage).ok_or(
-            InterpreterError::MissingFunctionStageMapping {
-                function: self.target(),
-                stage: target_stage,
-            },
-        )?;
+        let staged_info =
+            staged_function
+                .get_info(stage)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: target_stage,
+                    kind: StageResolutionError::MissingFunction {
+                        function: self.target(),
+                    },
+                })?;
 
         let mut live = staged_info
             .specializations()
@@ -92,9 +103,9 @@ where
             .map(|spec| spec.id());
         let callee = match (live.next(), live.next()) {
             (None, _) => {
-                return Err(InterpreterError::NoSpecializationAtStage {
-                    staged_function,
+                return Err(InterpreterError::StageResolution {
                     stage: target_stage,
+                    kind: StageResolutionError::NoSpecialization { staged_function },
                 }
                 .into());
             }
@@ -105,10 +116,12 @@ where
                     .iter()
                     .filter(|spec| !spec.is_invalidated())
                     .count();
-                return Err(InterpreterError::AmbiguousSpecializationAtStage {
-                    staged_function,
+                return Err(InterpreterError::StageResolution {
                     stage: target_stage,
-                    count,
+                    kind: StageResolutionError::AmbiguousSpecialization {
+                        staged_function,
+                        count,
+                    },
                 }
                 .into());
             }
@@ -353,9 +366,9 @@ fn test_function_call_missing_stage_mapping_error() {
     assert!(
         matches!(
             err,
-            InterpreterError::MissingFunctionStageMapping {
-                function,
-                stage
+            InterpreterError::StageResolution {
+                stage,
+                kind: StageResolutionError::MissingFunction { function },
             } if function == callee_func && stage == stage_b
         ),
         "unexpected error: {err:?}"
@@ -399,9 +412,9 @@ fn test_function_call_no_specialization_error() {
     assert!(
         matches!(
             err,
-            InterpreterError::NoSpecializationAtStage {
+            InterpreterError::StageResolution {
                 stage: err_stage,
-                ..
+                kind: StageResolutionError::NoSpecialization { .. },
             } if err_stage == stage
         ),
         "unexpected error: {err:?}"
@@ -451,10 +464,9 @@ fn test_function_call_ambiguous_specialization_error() {
     assert!(
         matches!(
             err,
-            InterpreterError::AmbiguousSpecializationAtStage {
+            InterpreterError::StageResolution {
                 stage: err_stage,
-                count,
-                ..
+                kind: StageResolutionError::AmbiguousSpecialization { count, .. },
             } if err_stage == stage && count == 2
         ),
         "unexpected error: {err:?}"

@@ -47,13 +47,12 @@ where
         L: Dialect + Interpretable<'ir, Self, L> + CallSemantics<'ir, Self, L, Result = V> + 'ir,
     {
         let stage_id = expect_stage_id(stage);
-        let spec =
-            callee
-                .get_info(stage)
-                .ok_or_else(|| InterpreterError::MissingCalleeAtStage {
-                    callee,
-                    stage: stage_id,
-                })?;
+        let spec = callee
+            .get_info(stage)
+            .ok_or_else(|| InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: crate::StageResolutionError::MissingCallee { callee },
+            })?;
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
         def.eval_call(self, stage, callee, args)
@@ -74,13 +73,12 @@ where
         L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
         let stage_id = expect_stage_id(stage);
-        let spec =
-            callee
-                .get_info(stage)
-                .ok_or_else(|| InterpreterError::MissingCalleeAtStage {
-                    callee,
-                    stage: stage_id,
-                })?;
+        let spec = callee
+            .get_info(stage)
+            .ok_or_else(|| InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: crate::StageResolutionError::MissingCallee { callee },
+            })?;
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
 
@@ -121,13 +119,12 @@ where
         L: Dialect + Interpretable<'ir, Self, L> + 'ir,
     {
         let stage_id = expect_stage_id(stage);
-        let spec =
-            callee
-                .get_info(stage)
-                .ok_or_else(|| InterpreterError::MissingCalleeAtStage {
-                    callee,
-                    stage: stage_id,
-                })?;
+        let spec = callee
+            .get_info(stage)
+            .ok_or_else(|| InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: crate::StageResolutionError::MissingCallee { callee },
+            })?;
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
 

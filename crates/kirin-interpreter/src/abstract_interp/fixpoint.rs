@@ -90,13 +90,12 @@ where
             return Ok(result);
         }
 
-        let spec =
-            callee
-                .get_info(stage)
-                .ok_or_else(|| InterpreterError::MissingCalleeAtStage {
-                    callee,
-                    stage: stage_id,
-                })?;
+        let spec = callee
+            .get_info(stage)
+            .ok_or_else(|| InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: crate::StageResolutionError::MissingCallee { callee },
+            })?;
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
         def.eval_call(self, stage, callee, args)

@@ -147,7 +147,7 @@ fn test_concrete_push_frame_missing_stage_fails_atomically() {
     let frame = Frame::new(spec_fn, missing_stage, first_stmt);
     let err = interp.push_frame(frame).unwrap_err();
     assert!(
-        matches!(err, InterpreterError::MissingStage { stage } if stage == missing_stage),
+        matches!(err, InterpreterError::StageResolution { stage, .. } if stage == missing_stage),
         "expected MissingStage for pushed frame, got: {err:?}"
     );
 

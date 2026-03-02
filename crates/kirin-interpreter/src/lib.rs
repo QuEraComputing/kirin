@@ -18,7 +18,7 @@ pub use abstract_interp::{
     AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry, SummaryInserter,
 };
 pub use control::{Args, ConcreteExt, Continuation};
-pub use error::InterpreterError;
+pub use error::{InterpreterError, StageResolutionError};
 pub use eval::{CallSemantics, SSACFGRegion};
 pub use frame::Frame;
 pub use frame_stack::FrameStack;

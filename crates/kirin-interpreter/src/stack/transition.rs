@@ -41,9 +41,17 @@ where
             Some(dispatch) => Ok(dispatch),
             None => {
                 if self.pipeline.stage(stage_id).is_none() {
-                    Err(InterpreterError::MissingStage { stage: stage_id }.into())
+                    Err(InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: crate::StageResolutionError::MissingStage,
+                    }
+                    .into())
                 } else {
-                    Err(InterpreterError::MissingStageDialect { stage: stage_id }.into())
+                    Err(InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: crate::StageResolutionError::MissingDialect,
+                    }
+                    .into())
                 }
             }
         }
@@ -60,9 +68,17 @@ where
             Some(dispatch) => Ok(dispatch),
             None => {
                 if self.pipeline.stage(stage_id).is_none() {
-                    Err(InterpreterError::MissingStage { stage: stage_id }.into())
+                    Err(InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: crate::StageResolutionError::MissingStage,
+                    }
+                    .into())
                 } else {
-                    Err(InterpreterError::MissingStageDialect { stage: stage_id }.into())
+                    Err(InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: crate::StageResolutionError::MissingDialect,
+                    }
+                    .into())
                 }
             }
         }

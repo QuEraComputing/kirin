@@ -8,10 +8,14 @@ pub(crate) fn map_dispatch_miss<E: From<InterpreterError>>(
     miss: StageDispatchMiss,
 ) -> E {
     match miss {
-        StageDispatchMiss::MissingStage => InterpreterError::MissingStage { stage: stage_id },
-        StageDispatchMiss::MissingDialect => {
-            InterpreterError::MissingStageDialect { stage: stage_id }
-        }
+        StageDispatchMiss::MissingStage => InterpreterError::StageResolution {
+            stage: stage_id,
+            kind: crate::StageResolutionError::MissingStage,
+        },
+        StageDispatchMiss::MissingDialect => InterpreterError::StageResolution {
+            stage: stage_id,
+            kind: crate::StageResolutionError::MissingDialect,
+        },
     }
     .into()
 }

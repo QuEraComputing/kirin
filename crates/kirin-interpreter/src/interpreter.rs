@@ -77,13 +77,17 @@ pub trait Interpreter<'ir>: Sized + 'ir {
         L: Dialect,
         Self::Error: From<InterpreterError>,
     {
-        let stage = self
-            .pipeline()
-            .stage(stage_id)
-            .ok_or_else(|| InterpreterError::MissingStage { stage: stage_id })?;
+        let stage =
+            self.pipeline()
+                .stage(stage_id)
+                .ok_or_else(|| InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: crate::StageResolutionError::MissingStage,
+                })?;
         <Self::StageInfo as HasStageInfo<L>>::try_stage_info(stage).ok_or_else(|| {
-            InterpreterError::TypedStageMismatch {
-                frame_stage: stage_id,
+            InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: crate::StageResolutionError::TypeMismatch,
             }
             .into()
         })
