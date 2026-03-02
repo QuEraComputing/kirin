@@ -1,7 +1,7 @@
 use kirin_ir::{ResultValue, StageMeta, SupportsStageDispatch};
 
 use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
-use crate::{ConcreteExt, Continuation, Interpreter, InterpreterError};
+use crate::{ConcreteExt, Continuation, InterpreterError, ValueStore};
 
 // -- Execution engine -------------------------------------------------------
 
@@ -178,7 +178,7 @@ where
                     return Ok(v);
                 }
                 let result = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                Interpreter::write(self, result, v)?;
+                ValueStore::write(self, result, v)?;
             }
         }
     }
@@ -236,7 +236,7 @@ where
                     return Ok(v);
                 }
                 let result = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                Interpreter::write(self, result, v)?;
+                ValueStore::write(self, result, v)?;
             }
         }
     }

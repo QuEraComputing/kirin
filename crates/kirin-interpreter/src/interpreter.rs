@@ -1,17 +1,17 @@
 use std::fmt;
 
 use kirin_ir::{
-    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue, SSAValue,
-    StageInfo, StageMeta,
+    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, SSAValue, StageInfo, StageMeta,
 };
 
 use crate::Continuation;
 use crate::InterpreterError;
+use crate::ValueStore;
 use crate::stage::Staged;
 
 /// Minimal state contract for interpreter implementations.
 ///
-/// Provides SSA value read/write only. The associated `Ext` type
+/// Requires [`ValueStore`] for SSA value read/write. The associated `Ext` type
 /// determines which extra continuation variants are available — concrete
 /// interpreters use [`crate::ConcreteExt`] while abstract interpreters
 /// use [`std::convert::Infallible`].
@@ -19,24 +19,9 @@ use crate::stage::Staged;
 /// Call semantics are inherent on each interpreter type
 /// (e.g. [`crate::StackInterpreter::call`],
 /// [`crate::AbstractInterpreter::analyze`]).
-pub trait Interpreter<'ir>: Sized + 'ir {
-    /// The value type manipulated by this interpreter.
-    ///
-    /// Values should be cheap to clone — typically pointer-sized handles,
-    /// small enums, or wrappers around `Arc`/`Rc` for heavier data.
-    type Value: Clone;
-    type Error;
+pub trait Interpreter<'ir>: ValueStore + Sized + 'ir {
     type Ext: fmt::Debug;
     type StageInfo: StageMeta;
-
-    /// Returns a cloned copy of the bound value.
-    fn read(&self, value: SSAValue) -> Result<Self::Value, Self::Error>;
-
-    /// Bind a result to a value.
-    fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;
-
-    /// Bind an SSA value directly (e.g. block arguments).
-    fn write_ssa(&mut self, ssa: SSAValue, value: Self::Value) -> Result<(), Self::Error>;
 
     /// Reference to the IR pipeline.
     fn pipeline(&self) -> &'ir Pipeline<Self::StageInfo>;

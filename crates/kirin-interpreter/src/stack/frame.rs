@@ -7,7 +7,9 @@ use super::{
     DynFrameDispatch, FrameDispatchAction, StackFrame, StackFrameExtra, StackInterpreter,
     StageDispatchTable,
 };
-use crate::{ConcreteExt, Continuation, Frame, Interpretable, Interpreter, InterpreterError};
+use crate::{
+    ConcreteExt, Continuation, Frame, Interpretable, Interpreter, InterpreterError, ValueStore,
+};
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
@@ -97,7 +99,7 @@ where
     }
 }
 
-impl<'ir, V, S, E, G> Interpreter<'ir> for StackInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G> ValueStore for StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -106,8 +108,6 @@ where
 {
     type Value = V;
     type Error = E;
-    type Ext = ConcreteExt;
-    type StageInfo = S;
 
     fn read(&self, value: SSAValue) -> Result<V, E> {
         self.frames.read(value).cloned()
@@ -120,6 +120,17 @@ where
     fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
         self.frames.write_ssa(ssa, value)
     }
+}
+
+impl<'ir, V, S, E, G> Interpreter<'ir> for StackInterpreter<'ir, V, S, E, G>
+where
+    V: Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: StageMeta + 'ir,
+    G: 'ir,
+{
+    type Ext = ConcreteExt;
+    type StageInfo = S;
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline

@@ -11,6 +11,7 @@ use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
 use crate::{
     AbstractValue, Continuation, FrameStack, Interpretable, Interpreter, InterpreterError,
+    ValueStore,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -261,7 +262,7 @@ where
 
 // -- Interpreter trait impl -------------------------------------------------
 
-impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G> ValueStore for AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -270,8 +271,6 @@ where
 {
     type Value = V;
     type Error = E;
-    type Ext = std::convert::Infallible;
-    type StageInfo = S;
 
     fn read(&self, value: SSAValue) -> Result<V, E> {
         self.frames.read(value).cloned()
@@ -284,6 +283,17 @@ where
     fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
         self.frames.write_ssa(ssa, value)
     }
+}
+
+impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
+where
+    V: AbstractValue + Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: StageMeta + 'ir,
+    G: 'ir,
+{
+    type Ext = std::convert::Infallible;
+    type StageInfo = S;
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline

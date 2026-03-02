@@ -12,6 +12,7 @@ mod scheduler;
 mod stack;
 mod stage;
 mod value;
+mod value_store;
 mod widening;
 
 pub use abstract_interp::{
@@ -29,6 +30,7 @@ pub use scheduler::DedupScheduler;
 pub use stack::StackInterpreter;
 pub use stage::Staged;
 pub use value::{AbstractValue, BranchCondition};
+pub use value_store::ValueStore;
 pub use widening::WideningStrategy;
 
 /// Essentials for dialect authors implementing operational semantics.
