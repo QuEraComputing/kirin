@@ -48,7 +48,7 @@ where
     pub(super) global: G,
     pub(super) pipeline: &'ir Pipeline<S>,
     pub(super) root_stage: CompileStage,
-    pub(super) breakpoints: FxFxHashSet<Statement>,
+    pub(super) breakpoints: FxHashSet<Statement>,
     pub(super) fuel: Option<u64>,
     pub(super) _error: PhantomData<E>,
 }
@@ -99,7 +99,7 @@ where
             global,
             pipeline,
             root_stage: stage,
-            breakpoints: FxFxHashSet::default(),
+            breakpoints: FxHashSet::default(),
             fuel: None,
             _error: PhantomData,
         }
@@ -149,7 +149,7 @@ where
     /// Replace the current breakpoint set.
     ///
     /// Breakpoints are only observed by `run_until_break*` entrypoints.
-    pub fn set_breakpoints(&mut self, stmts: FxFxHashSet<Statement>) {
+    pub fn set_breakpoints(&mut self, stmts: FxHashSet<Statement>) {
         self.breakpoints = stmts;
     }
 

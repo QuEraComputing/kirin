@@ -91,17 +91,6 @@ pub trait StageAccess<'ir>: Sized + 'ir {
         self.resolve_stage_info(self.active_stage())
     }
 
-    /// Convenience: resolve typed [`StageInfo`] for the current active stage.
-    ///
-    /// Equivalent to `self.resolve_stage_info(self.active_stage())`.
-    fn resolve_stage<L>(&self) -> Result<&'ir StageInfo<L>, InterpreterError>
-    where
-        Self::StageInfo: HasStageInfo<L>,
-        L: Dialect,
-    {
-        self.resolve_stage_info(self.active_stage())
-    }
-
     /// Bind APIs to an explicit stage reference.
     fn with_stage<L: Dialect>(&mut self, stage: &'ir StageInfo<L>) -> Staged<'_, 'ir, Self, L> {
         Staged {
