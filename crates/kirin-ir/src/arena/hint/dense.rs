@@ -9,10 +9,10 @@ pub struct DenseHint<I: Identifier, T> {
     marker: std::marker::PhantomData<I>,
 }
 
-impl<T: Clone, I: Identifier> DenseHint<I, T> {
+impl<I: Identifier, T> DenseHint<I, T> {
     pub(crate) fn from_arena<U>(arena: &crate::arena::Arena<I, U>) -> Self {
         Self {
-            data: vec![None; arena.len()],
+            data: std::iter::repeat_with(|| None).take(arena.len()).collect(),
             marker: std::marker::PhantomData,
         }
     }
@@ -56,7 +56,6 @@ impl<T: Clone, I: Identifier> DenseHint<I, T> {
 impl<I, T> std::ops::Index<I> for DenseHint<I, T>
 where
     I: Identifier,
-    T: Clone,
 {
     type Output = T;
 
@@ -69,7 +68,6 @@ where
 impl<I, T> std::ops::IndexMut<I> for DenseHint<I, T>
 where
     I: Identifier,
-    T: Clone,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.get_mut(index)

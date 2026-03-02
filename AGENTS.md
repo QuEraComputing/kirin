@@ -65,7 +65,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 **Derive Infrastructure:**
 - `kirin-derive-core` — Shared derive utilities
-- `kirin-derive`, `kirin-derive-dialect` — `#[derive(Dialect)]`
+- `kirin-derive` — `#[derive(Dialect)]`
 - `kirin-prettyless-derive` — `#[derive(PrettyPrint)]` code generation (internal)
 
 **Analysis:**
