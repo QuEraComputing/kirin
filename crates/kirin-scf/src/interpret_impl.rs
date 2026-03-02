@@ -1,6 +1,6 @@
 use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo, Successor};
 use kirin_interpreter::{
-    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
+    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError, StageAccess,
 };
 use smallvec::smallvec;
 

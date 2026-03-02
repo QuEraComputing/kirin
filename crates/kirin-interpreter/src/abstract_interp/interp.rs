@@ -11,7 +11,7 @@ use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
 use crate::{
     AbstractValue, Continuation, FrameStack, Interpretable, Interpreter, InterpreterError,
-    ValueStore,
+    StageAccess, ValueStore,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -285,14 +285,13 @@ where
     }
 }
 
-impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G> StageAccess<'ir> for AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,
 {
-    type Ext = std::convert::Infallible;
     type StageInfo = S;
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
@@ -302,6 +301,16 @@ where
     fn active_stage(&self) -> CompileStage {
         self.frames.active_stage_or(self.root_stage)
     }
+}
+
+impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
+where
+    V: AbstractValue + Clone + 'ir,
+    E: From<InterpreterError> + 'ir,
+    S: StageMeta + 'ir,
+    G: 'ir,
+{
+    type Ext = std::convert::Infallible;
 
     fn eval_block<L: Dialect>(
         &mut self,

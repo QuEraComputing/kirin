@@ -7,7 +7,7 @@ use kirin_ir::{
 
 use super::StackInterpreter;
 use crate::{
-    CallSemantics, ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError,
+    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, StageAccess,
 };
 
 pub(super) type DynStepFn<'ir, V, S, E, G> =

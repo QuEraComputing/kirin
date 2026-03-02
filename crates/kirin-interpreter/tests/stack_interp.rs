@@ -8,7 +8,7 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    ConcreteExt, Continuation, Frame, Interpreter, InterpreterError, StackInterpreter,
+    ConcreteExt, Continuation, Frame, InterpreterError, StageAccess, StackInterpreter,
 };
 use kirin_interval::Interval;
 use kirin_ir::*;

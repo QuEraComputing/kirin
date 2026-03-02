@@ -6,6 +6,7 @@ use kirin_ir::{
 use crate::result::AnalysisResult;
 use crate::{
     AbstractValue, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
+    StageAccess,
 };
 
 use super::interp::AbstractInterpreter;

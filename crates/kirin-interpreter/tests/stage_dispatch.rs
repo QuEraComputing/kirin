@@ -4,7 +4,7 @@ use kirin_constant::Constant;
 use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    Continuation, Interpreter, InterpreterError, StackInterpreter, StageResolutionError,
+    Continuation, InterpreterError, StageAccess, StackInterpreter, StageResolutionError,
 };
 use kirin_ir::*;
 

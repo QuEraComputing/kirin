@@ -2,7 +2,7 @@ use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta, SupportsSt
 
 use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
 use crate::{
-    CallSemantics, ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError, Staged,
+    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, StageAccess, Staged,
 };
 
 impl<'a, 'ir, V, S, E, G, L> Staged<'a, 'ir, StackInterpreter<'ir, V, S, E, G>, L>

@@ -3,7 +3,7 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    AbstractInterpreter, AnalysisResult, Interpreter, InterpreterError, WideningStrategy,
+    AbstractInterpreter, AnalysisResult, InterpreterError, StageAccess, WideningStrategy,
 };
 use kirin_interval::Interval;
 use kirin_ir::*;
