@@ -1,5 +1,6 @@
 use super::{DeriveInterpretable, InputContext, StatementInfo};
 use crate::pattern::build_pattern;
+use crate::pattern::build_pattern;
 use kirin_derive_core::derive::InputMeta;
 use kirin_derive_core::prelude::*;
 use quote::quote;
