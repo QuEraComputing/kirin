@@ -4,7 +4,6 @@
 use rustc_hash::FxHashSet;
 
 use kirin_arith::{ArithType, ArithValue};
-use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::{

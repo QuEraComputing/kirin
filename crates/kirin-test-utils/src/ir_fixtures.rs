@@ -5,7 +5,7 @@
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_function::FunctionBody;
+use kirin_function::{FunctionBody, Return};
 use kirin_ir::{query::ParentInfo, *};
 use kirin_test_languages::CompositeLanguage;
 
@@ -20,7 +20,7 @@ pub fn build_constants(
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(10));
     let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(32));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let ret = Return::<ArithType>::new(stage, add.result);
 
     let block = stage
         .block()
@@ -45,7 +45,7 @@ pub fn build_add_one(
     let ba_x = stage.block_argument(0);
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, SSAValue::from(ba_x), c1.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let ret = Return::<ArithType>::new(stage, add.result);
 
     let block = stage
         .block()
@@ -73,7 +73,7 @@ pub fn build_linear_program(
     let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(10));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
     let add_stmt: Statement = add.id;
-    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let ret = Return::<ArithType>::new(stage, add.result);
 
     let block = stage
         .block()
@@ -119,7 +119,7 @@ pub fn build_select_program(
         truthy_block.expect_info(si).arguments[0].into()
     };
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_truthy = ControlFlow::<ArithType>::op_return(stage, truthy_val);
+    let ret_truthy = Return::<ArithType>::new(stage, truthy_val);
     {
         let truthy_info: &mut Item<BlockInfo<CompositeLanguage>> =
             truthy_block.get_info_mut(stage).unwrap();
@@ -133,7 +133,7 @@ pub fn build_select_program(
         falsy_block.expect_info(si).arguments[0].into()
     };
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_falsy = ControlFlow::<ArithType>::op_return(stage, falsy_val);
+    let ret_falsy = Return::<ArithType>::new(stage, falsy_val);
     {
         let falsy_info: &mut Item<BlockInfo<CompositeLanguage>> =
             falsy_block.get_info_mut(stage).unwrap();
@@ -209,7 +209,7 @@ pub fn build_branch_fork_program(
         neg_block.expect_info(si).arguments[0].into()
     };
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_neg = ControlFlow::<ArithType>::op_return(stage, neg_val);
+    let ret_neg = Return::<ArithType>::new(stage, neg_val);
     {
         let neg_info: &mut Item<BlockInfo<CompositeLanguage>> =
             neg_block.get_info_mut(stage).unwrap();
@@ -223,7 +223,7 @@ pub fn build_branch_fork_program(
         pos_block.expect_info(si).arguments[0].into()
     };
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_pos = ControlFlow::<ArithType>::op_return(stage, pos_val);
+    let ret_pos = Return::<ArithType>::new(stage, pos_val);
     {
         let pos_info: &mut Item<BlockInfo<CompositeLanguage>> =
             pos_block.get_info_mut(stage).unwrap();
@@ -305,7 +305,7 @@ pub fn build_loop_program(
         loop_exit.expect_info(si).arguments[0].into()
     };
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
+    let ret_exit = Return::<ArithType>::new(stage, exit_val);
     {
         let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
             loop_exit.get_info_mut(stage).unwrap();
@@ -430,7 +430,7 @@ pub fn build_infinite_loop(
         exit.expect_info(si).arguments[0].into()
     };
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let ret_exit = ControlFlow::<ArithType>::op_return(stage, exit_val);
+    let ret_exit = Return::<ArithType>::new(stage, exit_val);
     {
         let exit_info: &mut Item<BlockInfo<CompositeLanguage>> = exit.get_info_mut(stage).unwrap();
         exit_info.terminator = Some(ret_exit.into());

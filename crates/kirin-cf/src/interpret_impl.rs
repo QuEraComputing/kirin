@@ -20,10 +20,6 @@ where
                     .collect::<Result<_, _>>()?;
                 Ok(Continuation::Jump(*target, values))
             }
-            ControlFlow::Return(value) => {
-                let v = interp.read(*value)?;
-                Ok(Continuation::Return(v))
-            }
             ControlFlow::ConditionalBranch {
                 condition,
                 true_target,

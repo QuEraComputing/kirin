@@ -1,3 +1,19 @@
+//! Function dialect for Kirin.
+//!
+//! This dialect provides operations for defining, calling, and returning from
+//! functions. It supports two composition styles:
+//!
+//! - **[`Lexical`]**: Inline lambdas with captures. Functions are defined
+//!   lexically inside a parent scope and can capture SSA values from that
+//!   scope. Suited for source-level representations.
+//!
+//! - **[`Lifted`]**: Top-level function bindings. Lambdas are "lifted" to
+//!   standalone functions and references are created via `bind`. Suited for
+//!   lowered representations closer to a call graph.
+//!
+//! Both enums share `FunctionBody`, `Call`, and `Return` — they differ only
+//! in how functions are *introduced* (inline `Lambda` vs top-level `Bind`).
+
 use kirin::prelude::*;
 
 pub mod bind;

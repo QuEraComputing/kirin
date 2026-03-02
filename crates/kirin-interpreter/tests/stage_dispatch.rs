@@ -2,7 +2,7 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_derive_interpreter::{CallSemantics, Interpretable};
-use kirin_function::FunctionBody;
+use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::{
     Continuation, InterpreterError, StackInterpreter, StageAccess, StageResolutionError,
 };
@@ -136,6 +136,8 @@ enum StageDynLang {
     StageCall(StageCall<ArithType>),
     #[callable]
     FunctionBody(FunctionBody<ArithType>),
+    #[kirin(terminator)]
+    Return(Return<ArithType>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
@@ -149,6 +151,8 @@ enum FunctionCallLang {
     Call(kirin_function::Call<ArithType>),
     #[callable]
     FunctionBody(FunctionBody<ArithType>),
+    #[kirin(terminator)]
+    Return(Return<ArithType>),
 }
 
 fn specialize_return_const(
@@ -158,7 +162,7 @@ fn specialize_return_const(
     with_arg: bool,
 ) -> SpecializedFunction {
     let c = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(value));
-    let ret = ControlFlow::<ArithType>::op_return(stage, c.result);
+    let ret = Return::<ArithType>::new(stage, c.result);
     let block = stage.block().stmt(c).terminator(ret).new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
@@ -199,7 +203,7 @@ fn build_cross_stage_recursive_body(
     let call_arg: SSAValue = call_block.expect_info(stage).arguments[0].into();
 
     let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
-    let ret0 = ControlFlow::<ArithType>::op_return(stage, c0.result);
+    let ret0 = Return::<ArithType>::new(stage, c0.result);
     {
         let stmts: Vec<Statement> = vec![c0.into()];
         for stmt in &stmts {
@@ -214,7 +218,7 @@ fn build_cross_stage_recursive_body(
     }
 
     let call = StageCall::<ArithType>::new(stage, target_func, target_stage, vec![call_arg]);
-    let ret = ControlFlow::<ArithType>::op_return(stage, call.result);
+    let ret = Return::<ArithType>::new(stage, call.result);
     {
         let call_stmt: Statement = call.into();
         *call_stmt.expect_info_mut(stage).get_parent_mut() = Some(call_block);
@@ -300,7 +304,7 @@ fn build_caller_with_function_call(
 ) -> Statement {
     let target_symbol = stage.symbol_table_mut().intern(target.to_string());
     let call = kirin_function::Call::<ArithType>::new(stage, target_symbol, vec![]);
-    let ret = ControlFlow::<ArithType>::op_return(stage, call.res);
+    let ret = Return::<ArithType>::new(stage, call.res);
     let block = stage.block().stmt(call).terminator(ret).new();
     let region = stage.region().add_block(block).new();
     FunctionBody::<ArithType>::new(stage, region).into()

@@ -2,6 +2,7 @@ use kirin::ir::{Dialect, Region};
 use kirin::parsers::{HasParser, PrettyPrint};
 use kirin_arith::{Arith, ArithType};
 use kirin_cf::ControlFlow;
+use kirin_function::Return;
 use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
@@ -14,6 +15,8 @@ enum ArithmeticFunctionLanguage {
     Arith(Arith<ArithType>),
     #[wraps]
     ControlFlow(ControlFlow<ArithType>),
+    #[wraps]
+    Return(Return<ArithType>),
 }
 
 #[test]

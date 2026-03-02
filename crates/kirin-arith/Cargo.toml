@@ -12,5 +12,6 @@ interpret = ["kirin-interpreter"]
 
 [dev-dependencies]
 kirin-cf.workspace = true
+kirin-function.workspace = true
 kirin-constant.workspace = true
 kirin-test-utils = { workspace = true, features = ["roundtrip"] }

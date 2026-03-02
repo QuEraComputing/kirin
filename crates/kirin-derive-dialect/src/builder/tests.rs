@@ -192,8 +192,6 @@ fn test_cf() {
                 #[kirin(default = std::marker::PhantomData)]
                 marker: std::marker::PhantomData<T>,
             },
-            #[kirin(format = "ret {0}")]
-            Return(SSAValue),
         }
     });
 }

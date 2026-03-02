@@ -115,9 +115,8 @@ mod tests {
     use super::*;
     use crate::Frame;
     use kirin_arith::{ArithType, ArithValue};
-    use kirin_cf::ControlFlow;
     use kirin_constant::Constant;
-    use kirin_function::FunctionBody;
+    use kirin_function::{FunctionBody, Return};
     use kirin_ir::{Pipeline, StageInfo};
     use kirin_test_languages::CompositeLanguage;
 
@@ -135,7 +134,7 @@ mod tests {
         let sf = stage.staged_function().new().unwrap();
         let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
         let c0_result = c0.result;
-        let ret = ControlFlow::<ArithType>::op_return(stage, c0_result);
+        let ret = Return::<ArithType>::new(stage, c0_result);
         let block = stage.block().stmt(c0).terminator(ret).new();
         let region = stage.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(stage, region);

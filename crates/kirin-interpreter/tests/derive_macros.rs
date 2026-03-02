@@ -2,7 +2,7 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_derive_interpreter::{CallSemantics, Interpretable};
-use kirin_function::FunctionBody;
+use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::{
     BranchCondition, CallSemantics as CallSemanticsTrait, Interpreter, InterpreterError,
     StackInterpreter, StageAccess,
@@ -23,6 +23,8 @@ pub enum DerivedEvalCallDialect {
     #[kirin(terminator)]
     ControlFlow(ControlFlow<ArithType>),
     Constant(Constant<ArithValue, ArithType>),
+    #[kirin(terminator)]
+    Return(Return<ArithType>),
 }
 
 // ---------------------------------------------------------------------------
@@ -38,6 +40,8 @@ pub enum DerivedInterpretableDialect {
     ControlFlow(ControlFlow<ArithType>),
     Constant(Constant<ArithValue, ArithType>),
     FunctionBody(FunctionBody<ArithType>),
+    #[kirin(terminator)]
+    Return(Return<ArithType>),
 }
 
 impl<'ir, I> CallSemanticsTrait<'ir, I, DerivedInterpretableDialect> for DerivedInterpretableDialect
@@ -47,8 +51,8 @@ where
     I::Value: std::ops::Add<Output = I::Value>
         + std::ops::Sub<Output = I::Value>
         + std::ops::Mul<Output = I::Value>
-        + std::ops::Div<Output = I::Value>
-        + std::ops::Rem<Output = I::Value>
+        + kirin_arith::CheckedDiv
+        + kirin_arith::CheckedRem
         + std::ops::Neg<Output = I::Value>
         + From<ArithValue>
         + BranchCondition,
@@ -97,7 +101,7 @@ fn build_add_one_eval_call(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let sum = Arith::<ArithType>::op_add(stage, x, c1.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, sum.result);
+    let ret = Return::<ArithType>::new(stage, sum.result);
     let code_block = stage.block().stmt(c1).stmt(sum).terminator(ret).new();
 
     let br = ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(code_block), vec![]);
@@ -131,7 +135,7 @@ fn build_add_one_interpretable(
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let sum = Arith::<ArithType>::op_add(stage, x, c1.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, sum.result);
+    let ret = Return::<ArithType>::new(stage, sum.result);
     let code_block = stage.block().stmt(c1).stmt(sum).terminator(ret).new();
 
     let br = ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(code_block), vec![]);

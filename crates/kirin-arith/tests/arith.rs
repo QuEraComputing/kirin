@@ -2,6 +2,7 @@ use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
+use kirin_function::Return;
 use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
@@ -10,7 +11,10 @@ use kirin_test_utils::roundtrip;
 enum NumericLanguage {
     Arith(Arith<ArithType>),
     Constant(Constant<ArithValue, ArithType>),
+    #[kirin(terminator)]
     ControlFlow(ControlFlow<ArithType>),
+    #[kirin(terminator)]
+    Return(Return<ArithType>),
 }
 
 fn assert_roundtrip(input: &str, operands: &[(&str, ArithType)], speculatable: bool) {
@@ -98,7 +102,7 @@ fn test_composes_with_constant_and_control_flow() {
     let const_a = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(1));
     let const_b = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(2));
     let add_stmt = Arith::<ArithType>::op_add(&mut stage, const_a.result, const_b.result);
-    let ret_stmt = ControlFlow::<ArithType>::op_return(&mut stage, add_stmt.result);
+    let ret_stmt = Return::<ArithType>::new(&mut stage, add_stmt.result);
 
     let const_a_def = const_a
         .id
@@ -141,11 +145,8 @@ fn test_composes_with_constant_and_control_flow() {
         .expect("statement should exist")
         .definition();
     assert!(
-        matches!(
-            ret_def,
-            NumericLanguage::ControlFlow(ControlFlow::Return(_))
-        ),
-        "expected wrapped cf::ret statement"
+        matches!(ret_def, NumericLanguage::Return(_)),
+        "expected wrapped Return statement"
     );
     assert!(
         ret_def.is_terminator(),

@@ -1,9 +1,20 @@
-use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
+use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::{CompileTimeValue, Dialect};
 use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
 
-use crate::Arith;
+use crate::{Arith, CheckedDiv, CheckedRem};
+
+#[derive(Debug)]
+struct DivisionByZero;
+
+impl std::fmt::Display for DivisionByZero {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "division by zero")
+    }
+}
+
+impl std::error::Error for DivisionByZero {}
 
 impl<'ir, I, L, T> Interpretable<'ir, I, L> for Arith<T>
 where
@@ -12,8 +23,8 @@ where
         + Add<Output = I::Value>
         + Sub<Output = I::Value>
         + Mul<Output = I::Value>
-        + Div<Output = I::Value>
-        + Rem<Output = I::Value>
+        + CheckedDiv
+        + CheckedRem
         + Neg<Output = I::Value>,
     I::Error: From<InterpreterError>,
     L: Dialect,
@@ -50,7 +61,10 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a / b)?;
+                let v = a
+                    .checked_div(b)
+                    .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
+                interp.write(*result, v)?;
                 Ok(Continuation::Continue)
             }
             Arith::Rem {
@@ -58,7 +72,10 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a % b)?;
+                let v = a
+                    .checked_rem(b)
+                    .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
+                interp.write(*result, v)?;
                 Ok(Continuation::Continue)
             }
             Arith::Neg {

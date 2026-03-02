@@ -59,6 +59,8 @@ enum LowLevel {
     Bind(Bind<ArithType>),
     #[wraps]
     Call(Call<ArithType>),
+    #[wraps]
+    Return(Return<ArithType>),
 }
 
 // ---------------------------------------------------------------------------

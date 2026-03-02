@@ -3,6 +3,7 @@ use kirin::parsers::{HasParser, PrettyPrint};
 use kirin_arith::ArithType;
 use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
+use kirin_function::Return;
 use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
@@ -15,6 +16,8 @@ enum BitwiseFunctionLanguage {
     Bitwise(Bitwise<ArithType>),
     #[wraps]
     ControlFlow(ControlFlow<ArithType>),
+    #[wraps]
+    Return(Return<ArithType>),
 }
 
 #[test]

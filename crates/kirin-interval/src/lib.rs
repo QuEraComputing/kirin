@@ -408,6 +408,20 @@ impl kirin_cmp::CompareValue for Interval {
 }
 
 #[cfg(feature = "arith")]
+impl kirin_arith::CheckedDiv for Interval {
+    fn checked_div(self, _rhs: Self) -> Option<Self> {
+        Some(Interval::top())
+    }
+}
+
+#[cfg(feature = "arith")]
+impl kirin_arith::CheckedRem for Interval {
+    fn checked_rem(self, _rhs: Self) -> Option<Self> {
+        Some(Interval::top())
+    }
+}
+
+#[cfg(feature = "arith")]
 impl From<kirin_arith::ArithValue> for Interval {
     fn from(v: kirin_arith::ArithValue) -> Self {
         use kirin_arith::ArithValue;

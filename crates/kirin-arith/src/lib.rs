@@ -42,6 +42,7 @@
 //! big integers, decimal-first arithmetic, or domain-specific units), prefer
 //! defining your own type/value pair and instantiate `Arith<YourType>`.
 
+mod checked_ops;
 #[cfg(feature = "interpret")]
 mod interpret_impl;
 
@@ -49,6 +50,7 @@ mod types;
 
 use kirin::prelude::*;
 
+pub use checked_ops::{CheckedDiv, CheckedRem};
 pub use types::{ArithType, ArithValue};
 
 /// Generic arithmetic statements parameterized by a compile-time type lattice.

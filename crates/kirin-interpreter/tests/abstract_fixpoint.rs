@@ -1,7 +1,6 @@
 use kirin_arith::{ArithType, ArithValue};
-use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_function::FunctionBody;
+use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::{
     AbstractInterpreter, AnalysisResult, InterpreterError, StageAccess, WideningStrategy,
 };
@@ -53,7 +52,7 @@ fn test_abstract_interp_constants() {
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(10));
     let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(32));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let ret = Return::<ArithType>::new(stage, add.result);
 
     let block = stage
         .block()
@@ -155,7 +154,7 @@ fn test_abstract_interp_call_caches_summary() {
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(7));
     let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(3));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let ret = Return::<ArithType>::new(stage, add.result);
 
     let block = stage
         .block()
@@ -466,7 +465,7 @@ fn test_abstract_analysis_result_ssa_values() {
     let c2_result = c2.result;
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
     let add_result = add.result;
-    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let ret = Return::<ArithType>::new(stage, add.result);
 
     let block = stage
         .block()
