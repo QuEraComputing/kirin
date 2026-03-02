@@ -510,7 +510,8 @@ pub fn build_div_program(
 
     let ba_x = stage.block_argument(0);
     let ba_y = stage.block_argument(1);
-    let div = kirin_arith::Arith::<ArithType>::op_div(stage, SSAValue::from(ba_x), SSAValue::from(ba_y));
+    let div =
+        kirin_arith::Arith::<ArithType>::op_div(stage, SSAValue::from(ba_x), SSAValue::from(ba_y));
     let ret = Return::<ArithType>::new(stage, div.result);
 
     let block = stage
@@ -535,7 +536,8 @@ pub fn build_rem_program(
 
     let ba_x = stage.block_argument(0);
     let ba_y = stage.block_argument(1);
-    let rem = kirin_arith::Arith::<ArithType>::op_rem(stage, SSAValue::from(ba_x), SSAValue::from(ba_y));
+    let rem =
+        kirin_arith::Arith::<ArithType>::op_rem(stage, SSAValue::from(ba_x), SSAValue::from(ba_y));
     let ret = Return::<ArithType>::new(stage, rem.result);
 
     let block = stage

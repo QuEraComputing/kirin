@@ -33,7 +33,6 @@ impl InputMeta {
             default_crate_path,
         }
     }
-
 }
 
 /// Builder for generating fully qualified paths.
@@ -63,4 +62,3 @@ impl PathBuilder<'_> {
         path
     }
 }
-

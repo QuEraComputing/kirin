@@ -1,6 +1,6 @@
+use crate::derive::InputMeta as CoreInputMeta;
 use crate::generators::property::context::{DeriveProperty, InputContext, PropertyKind};
 use crate::generators::property::statement::{StatementBuilder, StatementInfo};
-use crate::derive::InputMeta as CoreInputMeta;
 use crate::prelude::*;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveProperty {

@@ -201,9 +201,7 @@ fn test_constant_requires_pure_on_variant() {
 
     let error = derive_constant(&input).expect_err("constant should require pure");
     assert!(
-        error
-            .to_string()
-            .contains("effectively #[kirin(constant)]"),
+        error.to_string().contains("effectively #[kirin(constant)]"),
         "expected pure/constant invariant error, got: {}",
         error
     );
@@ -218,8 +216,7 @@ fn test_constant_works_with_global_pure() {
         }
     };
 
-    let generated =
-        derive_constant(&input).expect("global pure should allow constant");
+    let generated = derive_constant(&input).expect("global pure should allow constant");
     assert!(
         generated.contains("impl ::kirin::ir::IsConstant for MyStruct"),
         "expected IsConstant impl generation:\n{}",

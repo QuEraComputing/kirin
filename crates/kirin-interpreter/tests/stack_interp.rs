@@ -14,8 +14,8 @@ use kirin_ir::*;
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::dump_function;
 use kirin_test_utils::ir_fixtures::{
-    build_add_one, build_div_program, build_infinite_loop, build_linear_program,
-    build_rem_program, build_select_program, first_statement_of_specialization,
+    build_add_one, build_div_program, build_infinite_loop, build_linear_program, build_rem_program,
+    build_select_program, first_statement_of_specialization,
 };
 
 // ===========================================================================
@@ -327,7 +327,10 @@ fn test_concrete_div_by_zero_returns_error() {
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[10, 0]);
-    assert!(result.is_err(), "division by zero should return Err, not panic");
+    assert!(
+        result.is_err(),
+        "division by zero should return Err, not panic"
+    );
     let err = result.unwrap_err();
     assert!(
         matches!(err, InterpreterError::Custom(_)),
@@ -354,7 +357,10 @@ fn test_concrete_rem_by_zero_returns_error() {
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[10, 0]);
-    assert!(result.is_err(), "remainder by zero should return Err, not panic");
+    assert!(
+        result.is_err(),
+        "remainder by zero should return Err, not panic"
+    );
     let err = result.unwrap_err();
     assert!(
         matches!(err, InterpreterError::Custom(_)),

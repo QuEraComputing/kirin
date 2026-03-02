@@ -4,7 +4,7 @@
 //! stage, and [`PipelineDocument`] for printing a specific function across all
 //! stages in a pipeline.
 
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 use kirin_ir::{Dialect, Function, GlobalSymbol, InternTable, Pipeline, StageInfo, StagedFunction};
 
@@ -208,7 +208,7 @@ impl<'a, S: RenderStage> PipelineRenderBuilder<'a, S> {
 pub trait PrintExt {
     /// Create a builder for rendering this function across all stages.
     fn render<'a, S: RenderStage>(&self, pipeline: &'a Pipeline<S>)
-        -> FunctionRenderBuilder<'a, S>;
+    -> FunctionRenderBuilder<'a, S>;
 
     /// Convenience shorthand: render to string with default config.
     fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String {

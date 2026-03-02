@@ -1,5 +1,5 @@
-use crate::generators::builder::statement::StatementInfo;
 use crate::derive::InputMeta;
+use crate::generators::builder::statement::StatementInfo;
 use crate::ir::BuilderOptions;
 use crate::ir::fields::{Collection, FieldCategory};
 use crate::misc::{is_type, to_snake_case};

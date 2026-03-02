@@ -85,8 +85,8 @@ fn field_name_tokens(field: &ir::fields::FieldIndex) -> proc_macro2::TokenStream
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::generators::property::context::{DeriveProperty, InputContext, PropertyKind};
     use crate::derive::InputMeta as CoreInputMeta;
+    use crate::generators::property::context::{DeriveProperty, InputContext, PropertyKind};
 
     #[test]
     fn test_statement_pattern_unnamed() {

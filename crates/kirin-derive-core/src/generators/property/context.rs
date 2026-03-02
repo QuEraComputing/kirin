@@ -1,6 +1,6 @@
+use crate::derive::InputMeta as CoreInputMeta;
 use crate::generators::common;
 use crate::generators::property::statement::StatementInfo;
-use crate::derive::InputMeta as CoreInputMeta;
 use crate::misc::from_str;
 use crate::prelude::*;
 use std::collections::HashMap;

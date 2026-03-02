@@ -1,6 +1,6 @@
 //! Core traits for pretty printing.
 
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 use crate::{ArenaDoc, Config, Document};
 use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};

@@ -1,7 +1,7 @@
+use crate::derive::InputMeta;
 use crate::generators::builder::context::DeriveBuilder;
 use crate::generators::builder::helpers::build_fn_name;
 use crate::generators::builder::statement::StatementInfo;
-use crate::derive::InputMeta;
 use crate::prelude::*;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveBuilder {

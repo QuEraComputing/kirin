@@ -1,7 +1,6 @@
 use kirin::prelude::{Dialect, GetInfo, HasStageInfo};
 use kirin_interpreter::{
-    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion,
-    StageResolutionError,
+    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageResolutionError,
 };
 use smallvec::smallvec;
 
@@ -68,23 +67,23 @@ where
                 },
             })?;
 
-        let global_sym = interp.pipeline().lookup_symbol(&target_name).ok_or_else(|| {
-            InterpreterError::StageResolution {
+        let global_sym = interp
+            .pipeline()
+            .lookup_symbol(&target_name)
+            .ok_or_else(|| InterpreterError::StageResolution {
                 stage: stage_id,
                 kind: StageResolutionError::UnknownTarget {
                     name: target_name.clone(),
                 },
-            }
-        })?;
+            })?;
 
-        let function =
-            interp
-                .pipeline()
-                .function_by_name(global_sym)
-                .ok_or_else(|| InterpreterError::StageResolution {
-                    stage: stage_id,
-                    kind: StageResolutionError::UnknownTarget { name: target_name },
-                })?;
+        let function = interp
+            .pipeline()
+            .function_by_name(global_sym)
+            .ok_or_else(|| InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: StageResolutionError::UnknownTarget { name: target_name },
+            })?;
 
         let function_info =
             interp

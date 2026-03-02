@@ -4,15 +4,15 @@
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::fields::{FieldCategory, FieldInfo};
 use kirin_derive_core::ir::Layout;
+use kirin_derive_core::ir::fields::{FieldCategory, FieldInfo};
 use kirin_derive_core::misc::is_type_in_generic;
 use kirin_derive_core::scan::Scan;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::format::{Format, FormatElement, FormatOption};
 use crate::ChumskyLayout;
+use crate::format::{Format, FormatElement, FormatOption};
 
 /// The kind of a field in code generation context.
 ///
