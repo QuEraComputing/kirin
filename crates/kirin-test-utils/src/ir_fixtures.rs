@@ -500,6 +500,56 @@ pub fn build_infinite_loop(
     stage.specialize().f(sf).body(func_body).new().unwrap()
 }
 
+/// Build `f(x, y) = q = div x, y; ret q`.
+pub fn build_div_program(
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    let ba_x = stage.block_argument(0);
+    let ba_y = stage.block_argument(1);
+    let div = kirin_arith::Arith::<ArithType>::op_div(stage, SSAValue::from(ba_x), SSAValue::from(ba_y));
+    let ret = Return::<ArithType>::new(stage, div.result);
+
+    let block = stage
+        .block()
+        .argument(ArithType::I64)
+        .argument(ArithType::I64)
+        .stmt(div)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(body).new().unwrap()
+}
+
+/// Build `f(x, y) = r = rem x, y; ret r`.
+pub fn build_rem_program(
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let sf = stage.staged_function().new().unwrap();
+
+    let ba_x = stage.block_argument(0);
+    let ba_y = stage.block_argument(1);
+    let rem = kirin_arith::Arith::<ArithType>::op_rem(stage, SSAValue::from(ba_x), SSAValue::from(ba_y));
+    let ret = Return::<ArithType>::new(stage, rem.result);
+
+    let block = stage
+        .block()
+        .argument(ArithType::I64)
+        .argument(ArithType::I64)
+        .stmt(rem)
+        .terminator(ret)
+        .new();
+    let region = stage.region().add_block(block).new();
+    let body = FunctionBody::<ArithType>::new(stage, region);
+    stage.specialize().f(sf).body(body).new().unwrap()
+}
+
 /// Resolve the first statement in a specialized function's entry block.
 pub fn first_statement_of_specialization(
     pipeline: &Pipeline<StageInfo<CompositeLanguage>>,
