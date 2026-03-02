@@ -1,6 +1,7 @@
 mod abstract_interp;
+mod block_eval;
 mod control;
-mod dispatch;
+pub mod dispatch;
 mod error;
 mod eval;
 mod frame;
@@ -19,6 +20,7 @@ mod widening;
 pub use abstract_interp::{
     AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry, SummaryInserter,
 };
+pub use block_eval::BlockEvaluator;
 pub use control::{Args, ConcreteExt, Continuation};
 pub use error::{InterpreterError, StageResolutionError};
 pub use eval::{CallSemantics, SSACFGRegion};

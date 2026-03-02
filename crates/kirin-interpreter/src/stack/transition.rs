@@ -1,7 +1,7 @@
 use kirin_ir::{CompileStage, Dialect, Pipeline, StageInfo, StageMeta, SupportsStageDispatch};
 
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
-use crate::{ConcreteExt, Continuation, Interpretable, Interpreter, InterpreterError};
+use crate::{BlockEvaluator, ConcreteExt, Continuation, Interpretable, InterpreterError};
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
@@ -36,8 +36,7 @@ where
                 E,
             >,
     {
-        let idx = kirin_ir::Id::from(stage_id).raw();
-        match self.dispatch_table.by_stage.get(idx).copied().flatten() {
+        match self.dispatch_table.get(stage_id).copied() {
             Some(dispatch) => Ok(dispatch),
             None => {
                 if self.pipeline.stage(stage_id).is_none() {
@@ -63,8 +62,7 @@ where
         &self,
         stage_id: CompileStage,
     ) -> Result<DynFrameDispatch<'ir, V, S, E, G>, E> {
-        let idx = kirin_ir::Id::from(stage_id).raw();
-        match self.dispatch_table.by_stage.get(idx).copied().flatten() {
+        match self.dispatch_table.get(stage_id).copied() {
             Some(dispatch) => Ok(dispatch),
             None => {
                 if self.pipeline.stage(stage_id).is_none() {

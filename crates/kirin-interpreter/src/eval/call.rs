@@ -2,7 +2,7 @@ use kirin_ir::{
     Block, Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta, SupportsStageDispatch,
 };
 
-use crate::{Interpreter, InterpreterError, StageAccess};
+use crate::{BlockEvaluator, Interpreter, InterpreterError, StageAccess};
 
 /// Trait for customizing how a function body is executed.
 ///

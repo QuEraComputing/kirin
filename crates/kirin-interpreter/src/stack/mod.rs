@@ -9,4 +9,4 @@ mod transition;
 pub use dispatch::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction};
 pub use interp::StackInterpreter;
 
-use interp::{StackFrame, StackFrameExtra, StageDispatchTable};
+use interp::{StackFrame, StackFrameExtra};

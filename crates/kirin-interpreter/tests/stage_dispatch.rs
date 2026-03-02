@@ -4,7 +4,7 @@ use kirin_constant::Constant;
 use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
-    Continuation, InterpreterError, StageAccess, StackInterpreter, StageResolutionError,
+    Continuation, InterpreterError, StackInterpreter, StageAccess, StageResolutionError,
 };
 use kirin_ir::*;
 
@@ -47,11 +47,7 @@ where
     L: Dialect + 'ir,
     T: CompileTimeValue + Default,
 {
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
-    {
+    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let target_stage = self.target_stage();
         let stage_meta =
             interp

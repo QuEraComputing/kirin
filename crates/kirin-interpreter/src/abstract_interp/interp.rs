@@ -10,7 +10,7 @@ use super::{FixpointState, SummaryCache};
 use crate::result::AnalysisResult;
 use crate::widening::WideningStrategy;
 use crate::{
-    AbstractValue, Continuation, FrameStack, Interpretable, Interpreter, InterpreterError,
+    AbstractValue, BlockEvaluator, Continuation, FrameStack, Interpretable, InterpreterError,
     StageAccess, ValueStore,
 };
 
@@ -303,7 +303,7 @@ where
     }
 }
 
-impl<'ir, V, S, E, G> Interpreter<'ir> for AbstractInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G> BlockEvaluator<'ir> for AbstractInterpreter<'ir, V, S, E, G>
 where
     V: AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,

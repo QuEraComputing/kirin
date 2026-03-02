@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use kirin_ir::{CompileStage, Pipeline, StageMeta, Statement, SupportsStageDispatch};
 
 use super::dispatch::DynFrameDispatch;
+use crate::dispatch::DispatchCache;
 use crate::{Frame, FrameStack, InterpreterError};
 
 pub(super) struct StackFrameExtra<'ir, V, S, E, G>
@@ -15,13 +16,6 @@ where
 }
 
 pub(super) type StackFrame<'ir, V, S, E, G> = Frame<V, StackFrameExtra<'ir, V, S, E, G>>;
-
-pub(super) struct StageDispatchTable<'ir, V, S, E, G>
-where
-    S: StageMeta,
-{
-    pub(super) by_stage: Vec<Option<DynFrameDispatch<'ir, V, S, E, G>>>,
-}
 
 /// Stack-based interpreter that owns execution state and drives evaluation.
 ///
@@ -50,7 +44,7 @@ where
     S: StageMeta,
 {
     pub(super) frames: FrameStack<V, StackFrameExtra<'ir, V, S, E, G>>,
-    pub(super) dispatch_table: StageDispatchTable<'ir, V, S, E, G>,
+    pub(super) dispatch_table: DispatchCache<DynFrameDispatch<'ir, V, S, E, G>>,
     pub(super) global: G,
     pub(super) pipeline: &'ir Pipeline<S>,
     pub(super) root_stage: CompileStage,

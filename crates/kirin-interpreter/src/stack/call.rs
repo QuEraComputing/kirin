@@ -6,7 +6,7 @@ use kirin_ir::{
 use super::dispatch::{CallDynAction, PushCallFrameDynAction};
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
 use crate::stage::expect_stage_id;
-use crate::{CallSemantics, Continuation, Frame, Interpretable, Interpreter, InterpreterError};
+use crate::{BlockEvaluator, CallSemantics, Continuation, Frame, Interpretable, InterpreterError};
 
 // -- Call (inherent, not on the trait) --------------------------------------
 

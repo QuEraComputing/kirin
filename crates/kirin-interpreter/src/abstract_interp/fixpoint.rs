@@ -5,7 +5,7 @@ use kirin_ir::{
 
 use crate::result::AnalysisResult;
 use crate::{
-    AbstractValue, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
+    AbstractValue, BlockEvaluator, CallSemantics, Continuation, Interpretable, InterpreterError,
     StageAccess,
 };
 

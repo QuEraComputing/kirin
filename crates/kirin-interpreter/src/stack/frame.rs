@@ -3,12 +3,10 @@ use kirin_ir::{
     StageMeta, Statement, SupportsStageDispatch,
 };
 
-use super::{
-    DynFrameDispatch, FrameDispatchAction, StackFrame, StackFrameExtra, StackInterpreter,
-    StageDispatchTable,
-};
+use super::{DynFrameDispatch, FrameDispatchAction, StackFrame, StackFrameExtra, StackInterpreter};
+use crate::dispatch::DispatchCache;
 use crate::{
-    ConcreteExt, Continuation, Frame, Interpretable, Interpreter, InterpreterError, StageAccess,
+    BlockEvaluator, ConcreteExt, Continuation, Frame, Interpretable, InterpreterError, StageAccess,
     ValueStore,
 };
 
@@ -19,7 +17,7 @@ where
 {
     pub(super) fn build_dispatch_table(
         pipeline: &'ir Pipeline<S>,
-    ) -> StageDispatchTable<'ir, V, S, E, G>
+    ) -> DispatchCache<DynFrameDispatch<'ir, V, S, E, G>>
     where
         V: Clone + 'ir,
         E: 'ir,
@@ -31,14 +29,9 @@ where
             >,
         G: 'ir,
     {
-        let mut by_stage = Vec::with_capacity(pipeline.stages().len());
-        for stage in pipeline.stages() {
-            let dispatch = stage.stage_id().and_then(|stage_id| {
-                Self::resolve_dispatch_for_stage_in_pipeline(pipeline, stage_id).ok()
-            });
-            by_stage.push(dispatch);
-        }
-        StageDispatchTable { by_stage }
+        DispatchCache::build(pipeline, |_pipeline, stage_id| {
+            Self::resolve_dispatch_for_stage_in_pipeline(pipeline, stage_id)
+        })
     }
 
     pub(crate) fn current_cursor(&self) -> Result<Option<Statement>, E> {
@@ -141,7 +134,7 @@ where
     }
 }
 
-impl<'ir, V, S, E, G> Interpreter<'ir> for StackInterpreter<'ir, V, S, E, G>
+impl<'ir, V, S, E, G> BlockEvaluator<'ir> for StackInterpreter<'ir, V, S, E, G>
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,

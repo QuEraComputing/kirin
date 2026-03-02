@@ -5,7 +5,7 @@ use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::FunctionBody;
 use kirin_interpreter::{
     BranchCondition, CallSemantics as CallSemanticsTrait, Interpreter, InterpreterError,
-    StageAccess, StackInterpreter,
+    StackInterpreter, StageAccess,
 };
 use kirin_ir::*;
 
