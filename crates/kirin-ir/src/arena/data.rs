@@ -60,17 +60,13 @@ impl<I: Identifier, T> Arena<I, T> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Item<T>> {
-        self.items
-            .iter()
-            .filter(|arena_item| !arena_item.deleted)
-            .map(|arena_item| arena_item)
+        self.items.iter().filter(|arena_item| !arena_item.deleted)
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Item<T>> {
         self.items
             .iter_mut()
             .filter(|arena_item| !arena_item.deleted)
-            .map(|arena_item| arena_item)
     }
 }
 

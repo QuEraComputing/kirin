@@ -14,6 +14,19 @@ impl<I: Identifier> IdMap<I> {
 }
 
 impl<I: Identifier, T> Arena<I, T> {
+    /// Compact the arena by removing deleted items and remapping IDs.
+    ///
+    /// Returns an [`IdMap`] that maps old IDs to their new positions.
+    ///
+    /// # Safety Hazard
+    ///
+    /// After calling `gc()`, **all previously obtained IDs become stale**.
+    /// Any `I` values stored externally (in other arenas, caches, IR nodes, etc.)
+    /// must be remapped through the returned [`IdMap`] before use. Accessing the
+    /// arena with a stale ID will return incorrect data or panic.
+    ///
+    /// Callers are responsible for updating all external references. There is
+    /// currently no runtime detection of stale IDs.
     pub fn gc(&mut self) -> IdMap<I> {
         let mut counter = 0;
         let raw = self

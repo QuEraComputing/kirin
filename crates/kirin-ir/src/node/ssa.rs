@@ -1,7 +1,7 @@
 use crate::arena::{GetInfo, Id, Identifier};
 use crate::identifier;
 use crate::{Dialect, Symbol};
-use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use super::{block::Block, stmt::Statement};
 
@@ -59,7 +59,7 @@ pub struct SSAInfo<L: Dialect> {
     pub(crate) name: Option<Symbol>,
     pub(crate) ty: L::Type,
     pub(crate) kind: SSAKind,
-    pub(crate) uses: FxHashSet<Use>,
+    pub(crate) uses: SmallVec<[Use; 2]>,
 }
 
 impl<L: Dialect> SSAInfo<L> {
@@ -69,7 +69,7 @@ impl<L: Dialect> SSAInfo<L> {
             name,
             ty,
             kind,
-            uses: FxHashSet::default(),
+            uses: SmallVec::new(),
         }
     }
 
@@ -93,11 +93,11 @@ impl<L: Dialect> SSAInfo<L> {
         &self.kind
     }
 
-    pub fn uses(&self) -> &FxHashSet<Use> {
+    pub fn uses(&self) -> &SmallVec<[Use; 2]> {
         &self.uses
     }
 
-    pub fn uses_mut(&mut self) -> &mut FxHashSet<Use> {
+    pub fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
         &mut self.uses
     }
 }

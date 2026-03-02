@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 use crate::arena::{Arena, Id, Item};
 use crate::builder::error::StagedFunctionError;
 use crate::context::StageInfo;
@@ -128,6 +130,7 @@ pub struct Pipeline<S> {
     stages: Vec<S>,
     functions: Arena<Function, FunctionInfo>,
     global_symbols: InternTable<String, GlobalSymbol>,
+    name_index: FxHashMap<GlobalSymbol, Function>,
 }
 
 impl<S> Default for Pipeline<S> {
@@ -142,6 +145,7 @@ impl<S> Pipeline<S> {
             stages: Vec::new(),
             functions: Arena::default(),
             global_symbols: InternTable::default(),
+            name_index: FxHashMap::default(),
         }
     }
 
@@ -188,6 +192,14 @@ impl<S> Pipeline<S> {
     /// Get a reference to the function arena.
     pub fn function_arena(&self) -> &Arena<Function, FunctionInfo> {
         &self.functions
+    }
+
+    /// Look up a function by its interned name in O(1) time.
+    ///
+    /// Returns `None` if no function with the given [`GlobalSymbol`] has been
+    /// allocated via [`Pipeline::function`].
+    pub fn function_by_name(&self, name: GlobalSymbol) -> Option<Function> {
+        self.name_index.get(&name).copied()
     }
 
     /// Intern a string into the global symbol table, returning a [`GlobalSymbol`].
@@ -272,8 +284,13 @@ impl<S> Pipeline<S> {
     #[builder(finish_fn = new)]
     pub fn function(&mut self, #[builder(into)] name: Option<String>) -> Function {
         let sym = name.map(|n| self.global_symbols.intern(n));
-        self.functions
-            .alloc_with_id(|id| FunctionInfo::new(id, sym))
+        let func = self
+            .functions
+            .alloc_with_id(|id| FunctionInfo::new(id, sym));
+        if let Some(s) = sym {
+            self.name_index.insert(s, func);
+        }
+        func
     }
 
     /// Create a staged function for an abstract [`Function`] at the given stage.

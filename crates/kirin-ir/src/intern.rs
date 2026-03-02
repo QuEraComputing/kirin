@@ -8,7 +8,7 @@ impl InternKey for usize {}
 #[derive(Clone, Debug)]
 pub struct InternTable<T: Clone + Eq + std::hash::Hash, Key: InternKey = usize> {
     items: Vec<T>,
-    item_map: std::collections::HashMap<T, Key>,
+    item_map: rustc_hash::FxHashMap<T, Key>,
 }
 
 impl<T, K> Default for InternTable<T, K>
@@ -19,7 +19,7 @@ where
     fn default() -> Self {
         Self {
             items: Vec::new(),
-            item_map: std::collections::HashMap::new(),
+            item_map: rustc_hash::FxHashMap::default(),
         }
     }
 }
@@ -28,7 +28,7 @@ impl<T: Clone + Eq + std::hash::Hash, Key: InternKey> InternTable<T, Key> {
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
-            item_map: std::collections::HashMap::new(),
+            item_map: rustc_hash::FxHashMap::default(),
         }
     }
 
