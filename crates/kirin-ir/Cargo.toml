@@ -5,11 +5,10 @@ edition = "2024"
 
 [dependencies]
 bon = "3.8"
-eyre = "0.6"
 indexmap = "2.13.0"
 kirin-derive = { workspace = true, optional = true }
 rustc-hash = "2.1.1"
-smallvec = "1"
+smallvec = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [features]

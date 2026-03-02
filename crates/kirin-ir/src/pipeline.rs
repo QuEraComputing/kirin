@@ -196,8 +196,11 @@ impl<S> Pipeline<S> {
 
     /// Look up a function by its interned name in O(1) time.
     ///
-    /// Returns `None` if no function with the given [`GlobalSymbol`] has been
-    /// allocated via [`Pipeline::function`].
+    /// The `name` parameter is a [`GlobalSymbol`] — callers that have a string
+    /// should intern it first via [`Pipeline::intern`].
+    ///
+    /// Returns `None` if no function with the given name has been allocated
+    /// via [`Pipeline::function`].
     pub fn function_by_name(&self, name: GlobalSymbol) -> Option<Function> {
         self.name_index.get(&name).copied()
     }
