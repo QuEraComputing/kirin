@@ -40,7 +40,7 @@ pub use widening::WideningStrategy;
 /// Essentials for dialect authors implementing operational semantics.
 pub mod prelude {
     pub use crate::{
-        Args, BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter,
+        BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter,
         InterpreterError, SSACFGRegion,
     };
 }
