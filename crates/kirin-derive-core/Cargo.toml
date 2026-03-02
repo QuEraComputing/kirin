@@ -12,3 +12,4 @@ syn.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+kirin-test-utils.workspace = true

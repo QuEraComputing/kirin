@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 kirin-derive-core.workspace = true
-kirin-derive-dialect.workspace = true
 paste = "1.0"
 proc-macro2.workspace = true
 quote.workspace = true

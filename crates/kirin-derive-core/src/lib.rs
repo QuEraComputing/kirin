@@ -1,6 +1,7 @@
 pub mod codegen;
 pub mod derive;
 pub mod emit;
+pub mod generators;
 pub mod ir;
 pub mod misc;
 pub mod scan;
@@ -25,8 +26,4 @@ pub mod prelude {
     };
     pub use darling;
     pub use proc_macro2;
-
-    // Deprecated re-exports for backwards compatibility
-    #[allow(deprecated)]
-    pub use crate::derive::{InputBuilder, InputContext};
 }

@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-core/src/kirin/builder/mod.rs
+expression: "Builder::default().print(&input)"
+---
+

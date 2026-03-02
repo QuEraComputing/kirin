@@ -34,11 +34,6 @@ impl InputMeta {
         }
     }
 
-    /// Alias for `path_builder` for backwards compatibility.
-    #[deprecated(since = "0.2.0", note = "Use `path_builder` instead")]
-    pub fn builder<'a>(&'a self, default_crate_path: &'a syn::Path) -> PathBuilder<'a> {
-        self.path_builder(default_crate_path)
-    }
 }
 
 /// Builder for generating fully qualified paths.
@@ -69,9 +64,3 @@ impl PathBuilder<'_> {
     }
 }
 
-// Type aliases for backwards compatibility
-#[deprecated(since = "0.2.0", note = "Use `InputMeta` instead")]
-pub type InputContext = InputMeta;
-
-#[deprecated(since = "0.2.0", note = "Use `PathBuilder` instead")]
-pub type InputBuilder<'a> = PathBuilder<'a>;

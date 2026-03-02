@@ -130,6 +130,10 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
             "the '{}' attribute is only allowed on the type level #[kirin(...)]",
             meta.path.get_ident().unwrap()
         ));
+    } else if meta.path.is_ident("callable") {
+        return meta.error(
+            "the 'callable' attribute is not part of #[kirin(...)]; use #[callable] with #[derive(CallSemantics)]",
+        );
     } else if [
         "constant",
         "pure",

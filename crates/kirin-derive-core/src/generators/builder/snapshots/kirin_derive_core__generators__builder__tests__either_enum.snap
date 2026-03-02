@@ -1,0 +1,58 @@
+---
+source: crates/kirin-derive-core/src/generators/builder/tests.rs
+expression: "case!\n{\n    #[kirin(fn, type = SomeType)] enum EitherEnum\n    {\n        #[kirin(fn = op_abc)] A\n        {\n            #[kirin(into)] value: u32, #[kirin(type = u32_type)] result:\n            ResultValue,\n        }, #[wraps] B(InnerB),\n    }\n}"
+---
+#[automatically_derived]
+impl EitherEnum {
+    pub fn op_abc<Lang>(
+        stage: &mut ::kirin::ir::StageInfo<Lang>,
+        value: impl Into<u32>,
+    ) -> either_enum_build_result::A
+    where
+        Lang: ::kirin::ir::Dialect + From<EitherEnum>,
+        Lang::Type: From<SomeType>,
+    {
+        let a_statement_id = stage.statement_arena().next_id();
+        let value: u32 = value.into();
+        let result: ResultValue = stage
+            .ssa()
+            .kind(SSAKind::Result(a_statement_id, 0usize))
+            .ty(Lang::Type::from(u32_type))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(Self::A {
+                value: value,
+                result: result,
+            })
+            .new();
+        either_enum_build_result::A {
+            id: a_statement_id,
+            result,
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub mod either_enum_build_result {
+    use kirin::ir::{ResultValue, Statement};
+    #[automatically_derived]
+    #[doc(hidden)]
+    pub struct A {
+        pub id: Statement,
+        pub result: ResultValue,
+    }
+    #[automatically_derived]
+    impl From<A> for Statement {
+        fn from(value: A) -> Self {
+            value.id
+        }
+    }
+}
+#[automatically_derived]
+impl From<InnerB> for EitherEnum {
+    fn from(value: InnerB) -> Self {
+        Self::B(value)
+    }
+}

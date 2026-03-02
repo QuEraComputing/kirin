@@ -11,7 +11,7 @@ enum PropertyLang {
     Add(SSAValue, SSAValue, ResultValue),
     #[kirin(terminator)]
     Return(SSAValue),
-    #[kirin(constant)]
+    #[kirin(constant, pure)]
     Const(i64, ResultValue),
     Other(SSAValue),
 }
@@ -41,7 +41,7 @@ fn test_terminator_property() {
 #[test]
 fn test_constant_property() {
     let c = PropertyLang::Const(42, TestSSAValue(3).into());
-    assert!(!c.is_pure());
+    assert!(c.is_pure());
     assert!(!c.is_speculatable());
     assert!(!c.is_terminator());
     assert!(c.is_constant());

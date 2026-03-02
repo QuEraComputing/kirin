@@ -1,0 +1,16 @@
+---
+source: crates/kirin-derive-core/src/generators/builder/tests.rs
+expression: "case!\n{\n    #[wraps] #[kirin(fn, type = SomeType)] enum WrapperEnum\n    { A(InnerA), B(InnerB), }\n}"
+---
+#[automatically_derived]
+impl From<InnerA> for WrapperEnum {
+    fn from(value: InnerA) -> Self {
+        Self::A(value)
+    }
+}
+#[automatically_derived]
+impl From<InnerB> for WrapperEnum {
+    fn from(value: InnerB) -> Self {
+        Self::B(value)
+    }
+}

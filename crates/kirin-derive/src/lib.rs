@@ -5,7 +5,7 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::parse_macro_input;
 
-use kirin_derive_dialect::{
+use kirin_derive_core::generators::{
     builder::DeriveBuilder,
     field::{DeriveFieldIter, FieldIterKind},
     marker,
@@ -307,7 +307,7 @@ derive_property_macro!(derive_is_speculatable, IsSpeculatable, IS_SPECULATABLE);
 #[proc_macro_derive(StageMeta, attributes(stage))]
 pub fn derive_stage_meta(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match kirin_derive_dialect::stage_info::generate(&ast) {
+    match kirin_derive_core::generators::stage_info::generate(&ast) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }

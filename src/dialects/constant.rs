@@ -1,7 +1,7 @@
 use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Statement)]
-#[kirin(constant)]
+#[kirin(constant, pure)]
 pub struct Constant<T: CompileTimeValue>(pub T, ResultValue);
 
 #[cfg(test)]
