@@ -449,10 +449,9 @@ where
 
         // Swap real block data into stub arena slots so that all existing
         // Successor handles (which point to stub IDs) see the real data.
+        // This also remaps statement parents and block-arg ownership to stub IDs.
         for (&stub, &real) in stub_blocks.iter().zip(real_blocks.iter()) {
-            let real_info = real.expect_info(ctx.stage).clone();
-            *stub.expect_info_mut(ctx.stage) = real_info;
-            ctx.stage.block_arena_mut().delete(real);
+            ctx.stage.remap_block_identity(stub, real);
         }
 
         // Build the region using the stub IDs (now containing real data).

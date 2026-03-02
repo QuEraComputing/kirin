@@ -1,4 +1,4 @@
-use crate::arena::Arena;
+use crate::arena::{Arena, GetInfo};
 use crate::node::function::CompileStage;
 use crate::node::region::RegionInfo;
 use crate::{Dialect, InternTable, node::*};
@@ -139,8 +139,40 @@ impl<L: Dialect> StageInfo<L> {
         &self.blocks
     }
 
-    /// Get a mutable reference to the blocks arena.
-    pub fn block_arena_mut(&mut self) -> &mut Arena<Block, BlockInfo<L>> {
-        &mut self.blocks
+    /// Move `real` block payload into `stub`, preserving external block IDs.
+    ///
+    /// This is used by parser two-pass emit flows that must pre-register block
+    /// IDs for forward references, then replace stub block contents with fully
+    /// emitted blocks.
+    ///
+    /// The remap updates all statement parents and block-argument owners from
+    /// `real` to `stub`, then marks `real` deleted.
+    pub fn remap_block_identity(&mut self, stub: Block, real: Block) {
+        let mut real_info = real.expect_info(self).clone();
+        let statements: Vec<_> = real.statements(self).collect();
+        let terminator = real.terminator(self);
+
+        for stmt in statements {
+            stmt.expect_info_mut(self).parent = Some(stub);
+        }
+        if let Some(term) = terminator {
+            term.expect_info_mut(self).parent = Some(stub);
+        }
+
+        for (idx, arg) in real_info.arguments.iter().copied().enumerate() {
+            let arg_info = arg.expect_info_mut(self);
+            if let SSAKind::BlockArgument(owner, _) = arg_info.kind {
+                debug_assert_eq!(
+                    owner, real,
+                    "unexpected block-arg owner while remapping block identity"
+                );
+                arg_info.kind = SSAKind::BlockArgument(stub, idx);
+            }
+        }
+
+        // Keep list-node identity coherent with the arena slot ID.
+        real_info.node.ptr = stub;
+        *stub.expect_info_mut(self) = real_info;
+        self.blocks.delete(real);
     }
 }

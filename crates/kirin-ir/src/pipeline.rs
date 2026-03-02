@@ -285,6 +285,10 @@ impl<S> Pipeline<S> {
     /// Returns the [`Function`] identifier. If a name is provided it is
     /// interned into the global symbol table and stored on the [`FunctionInfo`].
     ///
+    /// # Panics
+    ///
+    /// Panics if a function with the same name already exists.
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -293,7 +297,14 @@ impl<S> Pipeline<S> {
     /// ```
     #[builder(finish_fn = new)]
     pub fn function(&mut self, #[builder(into)] name: Option<String>) -> Function {
-        let sym = name.map(|n| self.global_symbols.intern(n));
+        let sym = name.map(|n| {
+            if let Some(existing) = self.global_symbols.lookup(&n) {
+                if self.name_index.contains_key(&existing) {
+                    panic!("duplicate abstract function name: {n}");
+                }
+            }
+            self.global_symbols.intern(n)
+        });
         let func = self
             .functions
             .alloc_with_id(|id| FunctionInfo::new(id, sym));
@@ -364,5 +375,28 @@ impl<S> Pipeline<S> {
             .add_staged_function(stage, sf);
 
         Ok(sf)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Pipeline;
+
+    #[test]
+    #[should_panic(expected = "duplicate abstract function name")]
+    fn duplicate_function_names_are_forbidden() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let _ = pipeline.function().name("foo").new();
+        let _ = pipeline.function().name("foo").new();
+    }
+
+    #[test]
+    fn function_by_name_is_stable_for_unique_names() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let foo = pipeline.function().name("foo").new();
+        let sym = pipeline
+            .lookup_symbol("foo")
+            .expect("foo symbol should exist");
+        assert_eq!(pipeline.function_by_name(sym), Some(foo));
     }
 }

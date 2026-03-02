@@ -4,7 +4,7 @@
 //! defined later in the same region would panic because the block had not yet
 //! been registered in the EmitContext.
 
-use kirin::ir::{Dialect, GetInfo, ResultValue, SSAValue, StageInfo, Successor};
+use kirin::ir::{Dialect, GetInfo, ResultValue, SSAKind, SSAValue, StageInfo, Successor};
 use kirin_chumsky::{EmitContext, EmitIR, HasParser, PrettyPrint, parse_ast};
 use kirin_test_languages::SimpleType;
 use kirin_test_utils::new_test_ssa;
@@ -26,6 +26,39 @@ pub enum BranchLang {
     #[kirin(terminator)]
     #[chumsky(format = "ret {0}")]
     Ret(SSAValue),
+}
+
+fn assert_region_identity(stage: &StageInfo<BranchLang>, body: kirin::ir::Region) {
+    for block in body.blocks(stage) {
+        let block_info = block.expect_info(stage);
+        assert!(!block_info.deleted(), "region block should be live");
+
+        for (idx, arg) in block_info.arguments.iter().enumerate() {
+            match arg.expect_info(stage).kind() {
+                SSAKind::BlockArgument(owner, owner_idx) => {
+                    assert_eq!(*owner, block, "block argument owner mismatch");
+                    assert_eq!(*owner_idx, idx, "block argument index mismatch");
+                }
+                other => panic!("expected SSAKind::BlockArgument, got {other:?}"),
+            }
+        }
+
+        for stmt in block.statements(stage) {
+            assert_eq!(
+                *stmt.parent(stage),
+                Some(block),
+                "statement parent mismatch"
+            );
+        }
+
+        if let Some(term) = block.terminator(stage) {
+            assert_eq!(
+                *term.parent(stage),
+                Some(block),
+                "terminator parent mismatch"
+            );
+        }
+    }
 }
 
 /// Forward reference: ^entry branches to ^exit which is defined after ^entry.
@@ -59,6 +92,7 @@ fn test_region_forward_block_reference() {
         BranchLang::Scope { body, .. } => {
             let block_count = body.blocks(&stage).count();
             assert_eq!(block_count, 2, "region should contain 2 blocks");
+            assert_region_identity(&stage, *body);
         }
         _ => panic!("Expected Scope variant, got {:?}", stmt_info.definition()),
     }
@@ -92,6 +126,7 @@ fn test_region_backward_block_reference() {
         BranchLang::Scope { body, .. } => {
             let block_count = body.blocks(&stage).count();
             assert_eq!(block_count, 2, "region should contain 2 blocks");
+            assert_region_identity(&stage, *body);
         }
         _ => panic!("Expected Scope variant"),
     }
@@ -128,6 +163,7 @@ fn test_region_mixed_references() {
         BranchLang::Scope { body, .. } => {
             let block_count = body.blocks(&stage).count();
             assert_eq!(block_count, 3, "region should contain 3 blocks");
+            assert_region_identity(&stage, *body);
         }
         _ => panic!("Expected Scope variant"),
     }
