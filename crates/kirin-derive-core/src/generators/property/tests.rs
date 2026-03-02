@@ -14,8 +14,8 @@ fn derive_property(
     Ok(rustfmt(tokens.to_string()))
 }
 
-fn derive_constant(input: &syn::DeriveInput) -> String {
-    derive_property(input, PropertyKind::Constant, "IsConstant", "is_constant").unwrap()
+fn derive_constant(input: &syn::DeriveInput) -> darling::Result<String> {
+    derive_property(input, PropertyKind::Constant, "IsConstant", "is_constant")
 }
 
 fn derive_speculatable(input: &syn::DeriveInput) -> darling::Result<String> {
@@ -32,14 +32,14 @@ macro_rules! case {
         let input: syn::DeriveInput = syn::parse_quote! {
             $($tt)*
         };
-        derive_constant(&input)
+        derive_constant(&input).unwrap()
     }};
 }
 
 #[test]
 fn test_struct_regular() {
     insta::assert_snapshot!(case! {
-        #[kirin(constant, type = TestType)]
+        #[kirin(constant, pure, type = TestType)]
         struct MyStruct {
             a: i32,
             b: i32,
@@ -50,7 +50,7 @@ fn test_struct_regular() {
 #[test]
 fn test_struct_uses_crate_trait_path() {
     let generated = case! {
-        #[kirin(constant, type = TestType)]
+        #[kirin(constant, pure, type = TestType)]
         struct MyStruct {
             a: i32,
         }
@@ -79,7 +79,7 @@ fn test_enum_regular() {
         #[kirin(type = TestType)]
         enum MyEnum<T> {
             VariantA { a: i32, b: T },
-            #[kirin(constant)]
+            #[kirin(constant, pure)]
             VariantB(i32, T),
         }
     });
@@ -88,7 +88,7 @@ fn test_enum_regular() {
 #[test]
 fn test_enum_wrapper() {
     insta::assert_snapshot!(case! {
-        #[kirin(type = TestType, constant)]
+        #[kirin(type = TestType, constant, pure)]
         #[wraps]
         enum MyEnum<T> {
             VariantA { inner: InnerStructA<T> },
@@ -100,7 +100,7 @@ fn test_enum_wrapper() {
 #[test]
 fn test_enum_wrapper_uses_crate_trait_path() {
     let generated = case! {
-        #[kirin(type = TestType, constant)]
+        #[kirin(type = TestType, constant, pure)]
         #[wraps]
         enum MyEnum<T> {
             VariantA { inner: InnerStructA<T> },
@@ -123,7 +123,7 @@ fn test_enum_mixed() {
             #[wraps]
             VariantB(InnerStructB),
             VariantC { a: i32, b: T },
-            #[kirin(constant)]
+            #[kirin(constant, pure)]
             VariantD(i32, T),
         }
     });
@@ -166,6 +166,64 @@ fn test_speculatable_requires_pure_on_variant() {
             .contains("effectively #[kirin(speculatable)]"),
         "expected pure/speculatable invariant error, got: {}",
         error
+    );
+}
+
+#[test]
+fn test_constant_requires_pure_on_struct() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(constant, type = TestType)]
+        struct MyStruct {
+            a: i32,
+        }
+    };
+
+    let error = derive_constant(&input).expect_err("constant should require pure");
+    assert!(
+        error
+            .to_string()
+            .contains("effective #[kirin(constant)] requires #[kirin(pure)]"),
+        "expected pure/constant invariant error, got: {}",
+        error
+    );
+}
+
+#[test]
+fn test_constant_requires_pure_on_variant() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = TestType)]
+        enum MyEnum {
+            #[kirin(constant)]
+            VariantA,
+            VariantB,
+        }
+    };
+
+    let error = derive_constant(&input).expect_err("constant should require pure");
+    assert!(
+        error
+            .to_string()
+            .contains("effectively #[kirin(constant)]"),
+        "expected pure/constant invariant error, got: {}",
+        error
+    );
+}
+
+#[test]
+fn test_constant_works_with_global_pure() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(pure, constant, type = TestType)]
+        struct MyStruct {
+            a: i32,
+        }
+    };
+
+    let generated =
+        derive_constant(&input).expect("global pure should allow constant");
+    assert!(
+        generated.contains("impl ::kirin::ir::IsConstant for MyStruct"),
+        "expected IsConstant impl generation:\n{}",
+        generated
     );
 }
 

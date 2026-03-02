@@ -10,6 +10,7 @@ impl<'ir> Scan<'ir, StandardLayout> for DeriveProperty {
             global_value: self.kind.global_value(input),
         });
         self.statements.clear();
+        self.validate_constant_pure_invariant(input)?;
         self.validate_speculatable_pure_invariant(input)?;
         scan::scan_input(self, input)
     }
@@ -37,6 +38,52 @@ impl<'ir> Scan<'ir, StandardLayout> for DeriveProperty {
 }
 
 impl DeriveProperty {
+    fn validate_constant_pure_invariant(
+        &self,
+        input: &ir::Input<StandardLayout>,
+    ) -> darling::Result<()> {
+        if !matches!(self.kind, PropertyKind::Constant) {
+            return Ok(());
+        }
+
+        let mut errors = darling::Error::accumulator();
+        let global_constant = input.attrs.constant;
+        let global_pure = input.attrs.pure;
+
+        match &input.data {
+            ir::Data::Struct(statement) => {
+                if statement.wraps.is_none() && global_constant && !global_pure {
+                    errors.push(
+                        darling::Error::custom(
+                            "effective #[kirin(constant)] requires #[kirin(pure)]",
+                        )
+                        .with_span(&input.name),
+                    );
+                }
+            }
+            ir::Data::Enum(data) => {
+                for statement in data.iter() {
+                    if statement.wraps.is_some() {
+                        continue;
+                    }
+                    let effective_constant = global_constant || statement.attrs.constant;
+                    let effective_pure = global_pure || statement.attrs.pure;
+                    if effective_constant && !effective_pure {
+                        errors.push(
+                            darling::Error::custom(format!(
+                                "variant '{}' is effectively #[kirin(constant)] but not #[kirin(pure)]",
+                                statement.name
+                            ))
+                            .with_span(&statement.name),
+                        );
+                    }
+                }
+            }
+        }
+
+        errors.finish()
+    }
+
     fn validate_speculatable_pure_invariant(
         &self,
         input: &ir::Input<StandardLayout>,
