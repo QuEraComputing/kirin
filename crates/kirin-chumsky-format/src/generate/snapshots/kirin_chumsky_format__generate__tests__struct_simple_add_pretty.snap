@@ -17,12 +17,12 @@ impl ::kirin::pretty::PrettyPrint for Add {
             rhs: f_rhs,
             res: f_res,
         } = self;
-        ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
+        ::kirin::pretty::PrettyPrint::pretty_print_name(f_res, doc)
             + doc.text(" = add ")
             + ::kirin::pretty::PrettyPrint::pretty_print(f_lhs, doc)
             + doc.text(", ")
             + ::kirin::pretty::PrettyPrint::pretty_print(f_rhs, doc)
             + doc.text(" -> ")
-            + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
+            + ::kirin::pretty::PrettyPrint::pretty_print_type(f_res, doc)
     }
 }

@@ -4,15 +4,15 @@
 
 use std::collections::HashSet;
 
-use kirin_derive_core::ir::Layout;
 use kirin_derive_core::ir::fields::{FieldCategory, FieldInfo};
+use kirin_derive_core::ir::Layout;
 use kirin_derive_core::misc::is_type_in_generic;
 use kirin_derive_core::scan::Scan;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::ChumskyLayout;
 use crate::format::{Format, FormatElement, FormatOption};
+use crate::ChumskyLayout;
 
 /// The kind of a field in code generation context.
 ///
@@ -254,10 +254,10 @@ impl FieldKind {
         match self {
             FieldKind::SSAValue | FieldKind::ResultValue => match opt {
                 FormatOption::Name => quote! {
-                    #prettyless_path::PrettyPrintName::pretty_print_name(#field_ref, doc)
+                    #prettyless_path::PrettyPrint::pretty_print_name(#field_ref, doc)
                 },
                 FormatOption::Type => quote! {
-                    #prettyless_path::PrettyPrintType::pretty_print_type(#field_ref, doc)
+                    #prettyless_path::PrettyPrint::pretty_print_type(#field_ref, doc)
                 },
                 FormatOption::Default => quote! {
                     #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)

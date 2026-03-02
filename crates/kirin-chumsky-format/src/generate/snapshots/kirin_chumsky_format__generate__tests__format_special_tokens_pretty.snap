@@ -16,10 +16,10 @@ impl ::kirin::pretty::PrettyPrint for Load {
             addr: f_addr,
             res: f_res,
         } = self;
-        ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
+        ::kirin::pretty::PrettyPrint::pretty_print_name(f_res, doc)
             + doc.text(" = load [")
             + ::kirin::pretty::PrettyPrint::pretty_print(f_addr, doc)
             + doc.text("] -> ")
-            + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
+            + ::kirin::pretty::PrettyPrint::pretty_print_type(f_res, doc)
     }
 }

@@ -56,9 +56,7 @@ impl std::fmt::Display for Value {
 mod pretty_impl {
     use super::Value;
     use kirin_ir::Dialect;
-    use kirin_prettyless::{
-        ArenaDoc, DocAllocator, Document, PrettyPrint, PrettyPrintName, PrettyPrintType,
-    };
+    use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
     impl PrettyPrint for Value {
         fn pretty_print<'a, L: Dialect + PrettyPrint>(
@@ -70,16 +68,21 @@ mod pretty_impl {
         {
             doc.text(self.to_string())
         }
-    }
 
-    impl PrettyPrintName for Value {
-        fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
+        fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
+            &self,
+            doc: &'a Document<'a, L>,
+        ) -> ArenaDoc<'a>
+        where
+            L::Type: std::fmt::Display,
+        {
             doc.text(self.to_string())
         }
-    }
 
-    impl PrettyPrintType for Value {
-        fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+        fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
+            &self,
+            doc: &'a Document<'a, L>,
+        ) -> ArenaDoc<'a>
         where
             L::Type: std::fmt::Display,
         {

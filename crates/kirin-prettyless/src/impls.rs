@@ -6,7 +6,7 @@ use kirin_ir::{
 };
 use prettyless::DocAllocator;
 
-use crate::{ArenaDoc, Document, PrettyPrint, PrettyPrintName, PrettyPrintType};
+use crate::{ArenaDoc, Document, PrettyPrint};
 
 impl PrettyPrint for ResultValue {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
@@ -20,6 +20,33 @@ impl PrettyPrint for ResultValue {
             }
         }
         doc.text(self.to_string())
+    }
+
+    fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
+        if let Some(name) = info.name() {
+            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
+                return doc.text(format!("%{}", resolved_name));
+            }
+        }
+        doc.text(self.to_string())
+    }
+
+    fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
+        doc.text(format!("{}", info.ty()))
     }
 }
 
@@ -35,6 +62,33 @@ impl PrettyPrint for SSAValue {
             }
         }
         doc.text(self.to_string())
+    }
+
+    fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        let info = self.expect_info(doc.stage());
+        if let Some(name) = info.name() {
+            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
+                return doc.text(format!("%{}", resolved_name));
+            }
+        }
+        doc.text(self.to_string())
+    }
+
+    fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        let info = self.expect_info(doc.stage());
+        doc.text(format!("{}", info.ty()))
     }
 }
 
@@ -94,50 +148,6 @@ impl<T: PrettyPrint> PrettyPrint for Option<T> {
             Some(value) => value.pretty_print(doc),
             None => doc.nil(),
         }
-    }
-}
-
-impl PrettyPrintName for SSAValue {
-    fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
-        let info = self.expect_info(doc.stage());
-        if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
-                return doc.text(format!("%{}", resolved_name));
-            }
-        }
-        doc.text(self.to_string())
-    }
-}
-
-impl PrettyPrintName for ResultValue {
-    fn pretty_print_name<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a> {
-        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
-        if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
-                return doc.text(format!("%{}", resolved_name));
-            }
-        }
-        doc.text(self.to_string())
-    }
-}
-
-impl PrettyPrintType for SSAValue {
-    fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        let info = self.expect_info(doc.stage());
-        doc.text(format!("{}", info.ty()))
-    }
-}
-
-impl PrettyPrintType for ResultValue {
-    fn pretty_print_type<'a, L: Dialect>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
-        doc.text(format!("{}", info.ty()))
     }
 }
 

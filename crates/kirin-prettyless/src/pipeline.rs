@@ -4,7 +4,7 @@
 //! stage, and [`PipelineDocument`] for printing a specific function across all
 //! stages in a pipeline.
 
-use std::io::{Write, stdout};
+use std::io::{stdout, Write};
 
 use kirin_ir::{Dialect, Function, GlobalSymbol, InternTable, Pipeline, StageInfo, StagedFunction};
 
@@ -119,119 +119,64 @@ impl<'a, S: RenderStage> PipelineDocument<'a, S> {
     }
 }
 
-/// Extension trait for cross-stage printing on [`Function`] IDs.
-///
-/// Provides convenience methods to render a function across all stages in a
-/// pipeline without manually constructing a [`PipelineDocument`].
-///
-/// ```ignore
-/// let output = func.sprint(&pipeline);
-/// func.print(&pipeline);
-/// ```
-pub trait PrintExt {
-    /// Render a function across all stages to a string with default config.
-    fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String;
-
-    /// Render a function across all stages to a string with custom config.
-    fn sprint_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>) -> String;
-
-    /// Print a function across all stages to stdout with default config.
-    fn print<S: RenderStage>(&self, pipeline: &Pipeline<S>);
-
-    /// Print a function across all stages to stdout with custom config.
-    fn print_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>);
-
-    /// Write a function across all stages to a writer with default config.
-    fn write<S: RenderStage>(&self, writer: &mut impl Write, pipeline: &Pipeline<S>);
-
-    /// Display a function across all stages with bat pager with default config.
-    #[cfg(feature = "bat")]
-    fn bat<S: RenderStage>(&self, pipeline: &Pipeline<S>);
-
-    /// Display a function across all stages with bat pager with custom config.
-    #[cfg(feature = "bat")]
-    fn bat_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>);
+/// Builder for rendering a specific [`Function`] across pipeline stages.
+pub struct FunctionRenderBuilder<'a, S> {
+    function: Function,
+    pipeline: &'a Pipeline<S>,
+    config: Config,
 }
 
-impl PrintExt for Function {
-    fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String {
-        PipelineDocument::new(Config::default(), pipeline)
-            .render_function(*self)
+impl<'a, S: RenderStage> FunctionRenderBuilder<'a, S> {
+    /// Set custom rendering configuration.
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Render to a string.
+    pub fn to_string(self) -> String {
+        PipelineDocument::new(self.config, self.pipeline)
+            .render_function(self.function)
             .expect("render failed")
     }
 
-    fn sprint_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>) -> String {
-        PipelineDocument::new(config, pipeline)
-            .render_function(*self)
-            .expect("render failed")
-    }
-
-    fn print<S: RenderStage>(&self, pipeline: &Pipeline<S>) {
-        let output = self.sprint(pipeline);
-        stdout().write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn print_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>) {
-        let output = self.sprint_with_config(config, pipeline);
-        stdout().write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn write<S: RenderStage>(&self, writer: &mut impl Write, pipeline: &Pipeline<S>) {
-        let output = self.sprint(pipeline);
+    /// Write to a writer.
+    pub fn write_to(self, writer: &mut impl Write) {
+        let output = self.to_string();
         writer.write_all(output.as_bytes()).expect("write failed");
     }
 
-    #[cfg(feature = "bat")]
-    fn bat<S: RenderStage>(&self, pipeline: &Pipeline<S>) {
-        crate::bat::print_str(&self.sprint(pipeline));
+    /// Print to stdout.
+    pub fn print(self) {
+        let output = self.to_string();
+        stdout().write_all(output.as_bytes()).expect("write failed");
     }
 
+    /// Display with bat pager.
     #[cfg(feature = "bat")]
-    fn bat_with_config<S: RenderStage>(&self, config: Config, pipeline: &Pipeline<S>) {
-        crate::bat::print_str(&self.sprint_with_config(config, pipeline));
+    pub fn bat(self) {
+        crate::bat::print_str(&self.to_string());
     }
 }
 
-/// Extension trait for printing all functions in a [`Pipeline`].
-///
-/// ```ignore
-/// let output = pipeline.sprint();
-/// pipeline.print();
-/// ```
-pub trait PipelinePrintExt {
-    /// Render all functions in the pipeline to a string with default config.
-    fn sprint(&self) -> String;
-
-    /// Render all functions in the pipeline to a string with custom config.
-    fn sprint_with_config(&self, config: Config) -> String;
-
-    /// Print all functions in the pipeline to stdout with default config.
-    fn print(&self);
-
-    /// Print all functions in the pipeline to stdout with custom config.
-    fn print_with_config(&self, config: Config);
-
-    /// Write all functions in the pipeline to a writer with default config.
-    fn write(&self, writer: &mut impl Write);
-
-    /// Display all functions in the pipeline with bat pager with default config.
-    #[cfg(feature = "bat")]
-    fn bat(&self);
-
-    /// Display all functions in the pipeline with bat pager with custom config.
-    #[cfg(feature = "bat")]
-    fn bat_with_config(&self, config: Config);
+/// Builder for rendering all functions in a [`Pipeline`].
+pub struct PipelineRenderBuilder<'a, S> {
+    pipeline: &'a Pipeline<S>,
+    config: Config,
 }
 
-impl<S: RenderStage> PipelinePrintExt for Pipeline<S> {
-    fn sprint(&self) -> String {
-        self.sprint_with_config(Config::default())
+impl<'a, S: RenderStage> PipelineRenderBuilder<'a, S> {
+    /// Set custom rendering configuration.
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = config;
+        self
     }
 
-    fn sprint_with_config(&self, config: Config) -> String {
-        let doc = PipelineDocument::new(config, self);
+    /// Render to a string.
+    pub fn to_string(self) -> String {
+        let doc = PipelineDocument::new(self.config, self.pipeline);
         let mut parts = Vec::new();
-        for func_info in self.function_arena().iter() {
+        for func_info in self.pipeline.function_arena().iter() {
             let rendered = doc.render_function(func_info.id()).expect("render failed");
             if !rendered.is_empty() {
                 parts.push(rendered);
@@ -240,28 +185,70 @@ impl<S: RenderStage> PipelinePrintExt for Pipeline<S> {
         parts.join("\n")
     }
 
-    fn print(&self) {
-        let output = self.sprint();
-        stdout().write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn print_with_config(&self, config: Config) {
-        let output = self.sprint_with_config(config);
-        stdout().write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn write(&self, writer: &mut impl Write) {
-        let output = self.sprint();
+    /// Write to a writer.
+    pub fn write_to(self, writer: &mut impl Write) {
+        let output = self.to_string();
         writer.write_all(output.as_bytes()).expect("write failed");
     }
 
-    #[cfg(feature = "bat")]
-    fn bat(&self) {
-        crate::bat::print_str(&self.sprint());
+    /// Print to stdout.
+    pub fn print(self) {
+        let output = self.to_string();
+        stdout().write_all(output.as_bytes()).expect("write failed");
     }
 
+    /// Display with bat pager.
     #[cfg(feature = "bat")]
-    fn bat_with_config(&self, config: Config) {
-        crate::bat::print_str(&self.sprint_with_config(config));
+    pub fn bat(self) {
+        crate::bat::print_str(&self.to_string());
+    }
+}
+
+/// Extension trait for cross-stage printing on [`Function`] IDs.
+pub trait PrintExt {
+    /// Create a builder for rendering this function across all stages.
+    fn render<'a, S: RenderStage>(&self, pipeline: &'a Pipeline<S>)
+        -> FunctionRenderBuilder<'a, S>;
+
+    /// Convenience shorthand: render to string with default config.
+    fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String {
+        self.render(pipeline).to_string()
+    }
+}
+
+impl PrintExt for Function {
+    fn render<'a, S: RenderStage>(
+        &self,
+        pipeline: &'a Pipeline<S>,
+    ) -> FunctionRenderBuilder<'a, S> {
+        FunctionRenderBuilder {
+            function: *self,
+            pipeline,
+            config: Config::default(),
+        }
+    }
+}
+
+/// Extension trait for printing all functions in a [`Pipeline`].
+pub trait PipelinePrintExt {
+    type Stage: RenderStage;
+
+    /// Create a builder for rendering every function in the pipeline.
+    fn render(&self) -> PipelineRenderBuilder<'_, Self::Stage>;
+
+    /// Convenience shorthand: render to string with default config.
+    fn sprint(&self) -> String {
+        self.render().to_string()
+    }
+}
+
+impl<S: RenderStage> PipelinePrintExt for Pipeline<S> {
+    type Stage = S;
+
+    fn render(&self) -> PipelineRenderBuilder<'_, Self::Stage> {
+        PipelineRenderBuilder {
+            pipeline: self,
+            config: Config::default(),
+        }
     }
 }

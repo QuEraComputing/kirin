@@ -16,10 +16,10 @@ impl ::kirin::pretty::PrettyPrint for Function {
             body: f_body,
             res: f_res,
         } = self;
-        ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
+        ::kirin::pretty::PrettyPrint::pretty_print_name(f_res, doc)
             + doc.text(" = function ")
             + doc.print_region(f_body)
             + doc.text(" -> ")
-            + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
+            + ::kirin::pretty::PrettyPrint::pretty_print_type(f_res, doc)
     }
 }

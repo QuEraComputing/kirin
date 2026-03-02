@@ -18,13 +18,13 @@ impl ::kirin::pretty::PrettyPrint for SimpleLang {
                 rhs: f_rhs,
                 res: f_res,
             } => {
-                ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
+                ::kirin::pretty::PrettyPrint::pretty_print_name(f_res, doc)
                     + doc.text(" = add ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f_lhs, doc)
                     + doc.text(", ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f_rhs, doc)
                     + doc.text(" -> ")
-                    + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
+                    + ::kirin::pretty::PrettyPrint::pretty_print_type(f_res, doc)
             }
             SimpleLang::Return { arg: f_arg } => {
                 doc.text("return ") + ::kirin::pretty::PrettyPrint::pretty_print(f_arg, doc)

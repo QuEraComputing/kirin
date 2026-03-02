@@ -17,11 +17,11 @@ impl ::kirin::pretty::PrettyPrint for TupleLang {
                 doc.text("return ") + ::kirin::pretty::PrettyPrint::pretty_print(f0, doc)
             }
             TupleLang::Neg(f0, f1) => {
-                ::kirin::pretty::PrettyPrintName::pretty_print_name(f1, doc)
+                ::kirin::pretty::PrettyPrint::pretty_print_name(f1, doc)
                     + doc.text(" = neg ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f0, doc)
                     + doc.text(" -> ")
-                    + ::kirin::pretty::PrettyPrintType::pretty_print_type(f1, doc)
+                    + ::kirin::pretty::PrettyPrint::pretty_print_type(f1, doc)
             }
         }
     }

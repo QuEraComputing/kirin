@@ -18,11 +18,11 @@ impl ::kirin::pretty::PrettyPrint for MixedLang {
                 arg: f_arg,
                 res: f_res,
             } => {
-                ::kirin::pretty::PrettyPrintName::pretty_print_name(f_res, doc)
+                ::kirin::pretty::PrettyPrint::pretty_print_name(f_res, doc)
                     + doc.text(" = custom ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f_arg, doc)
                     + doc.text(" -> ")
-                    + ::kirin::pretty::PrettyPrintType::pretty_print_type(f_res, doc)
+                    + ::kirin::pretty::PrettyPrint::pretty_print_type(f_res, doc)
             }
             MixedLang::Control(inner) => ::kirin::pretty::PrettyPrint::pretty_print(inner, doc),
         }

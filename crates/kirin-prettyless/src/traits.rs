@@ -1,11 +1,9 @@
 //! Core traits for pretty printing.
 
-use std::io::{Write, stdout};
-
-use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};
-use prettyless::DocBuilder;
+use std::io::{stdout, Write};
 
 use crate::{ArenaDoc, Config, Document};
+use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};
 
 /// Core trait for pretty printing values to a document.
 ///
@@ -42,6 +40,32 @@ pub trait PrettyPrint {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display;
+
+    /// Pretty print only the "name" view of a value.
+    ///
+    /// For most types this is identical to [`PrettyPrint::pretty_print`].
+    fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        self.pretty_print(doc)
+    }
+
+    /// Pretty print only the "type" view of a value.
+    ///
+    /// For most types this is identical to [`PrettyPrint::pretty_print`].
+    fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        self.pretty_print(doc)
+    }
 }
 
 /// Builder for rendering pretty-printed IR nodes.
@@ -178,53 +202,31 @@ where
     }
 }
 
-/// Trait for types that can print their name (e.g., SSA values).
-pub trait PrettyPrintName {
-    /// Pretty print just the name part (e.g., `%x` for an SSA value).
-    fn pretty_print_name<'a, L: Dialect>(
-        &self,
-        doc: &'a Document<'a, L>,
-    ) -> DocBuilder<'a, prettyless::Arena<'a>>;
-}
-
-/// Trait for types that can print their type annotation.
-pub trait PrettyPrintType {
-    /// Pretty print just the type part (e.g., `i32` for a typed value).
-    fn pretty_print_type<'a, L: Dialect>(
-        &self,
-        doc: &'a Document<'a, L>,
-    ) -> DocBuilder<'a, prettyless::Arena<'a>>
-    where
-        L::Type: std::fmt::Display;
-}
-
-// Blanket impls for references - allows calling on &T when the impl is on T
-impl<T: PrettyPrintName> PrettyPrintName for &T {
-    fn pretty_print_name<'a, L: Dialect>(
-        &self,
-        doc: &'a Document<'a, L>,
-    ) -> DocBuilder<'a, prettyless::Arena<'a>> {
-        (*self).pretty_print_name(doc)
-    }
-}
-
-impl<T: PrettyPrintType> PrettyPrintType for &T {
-    fn pretty_print_type<'a, L: Dialect>(
-        &self,
-        doc: &'a Document<'a, L>,
-    ) -> DocBuilder<'a, prettyless::Arena<'a>>
-    where
-        L::Type: std::fmt::Display,
-    {
-        (*self).pretty_print_type(doc)
-    }
-}
-
 impl<T: PrettyPrint> PrettyPrint for &T {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
         (*self).pretty_print(doc)
+    }
+
+    fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        (*self).pretty_print_name(doc)
+    }
+
+    fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        (*self).pretty_print_type(doc)
     }
 }
