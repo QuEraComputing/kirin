@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-core/src/generators/builder/tests.rs
-expression: "case!\n{\n    #[kirin(terminator, fn, type = T)] pub enum ControlFlow<T: TypeLattice>\n    {\n        #[kirin(format = \"br {target}\")] Branch { target: Successor },\n        #[kirin(format =\n        \"cond_br {condition} then={true_target} else={false_target}\")]\n        ConditionalBranch\n        {\n            condition: SSAValue, true_target: Successor, false_target:\n            Successor, #[kirin(default = std::marker::PhantomData)] marker:\n            std::marker::PhantomData<T>,\n        }, #[kirin(format = \"ret {0}\")] Return(SSAValue),\n    }\n}"
+expression: "case!\n{\n    #[kirin(terminator, fn, type = T)] pub enum ControlFlow<T: TypeLattice>\n    {\n        #[kirin(format = \"br {target}\")] Branch { target: Successor },\n        #[kirin(format =\n        \"cond_br {condition} then={true_target} else={false_target}\")]\n        ConditionalBranch\n        {\n            condition: SSAValue, true_target: Successor, false_target:\n            Successor, #[kirin(default = std::marker::PhantomData)] marker:\n            std::marker::PhantomData<T>,\n        },\n    }\n}"
 ---
 #[automatically_derived]
 impl<T: TypeLattice> ControlFlow<T> {
@@ -50,21 +50,6 @@ impl<T: TypeLattice> ControlFlow<T> {
             id: conditionalbranch_statement_id,
         }
     }
-    pub fn op_return<Lang>(
-        stage: &mut ::kirin::ir::StageInfo<Lang>,
-        field_0: impl Into<SSAValue>,
-    ) -> control_flow_build_result::Return
-    where
-        Lang: ::kirin::ir::Dialect + From<ControlFlow<T>>,
-        Lang::Type: From<T>,
-    {
-        let return_statement_id = stage.statement_arena().next_id();
-        let field_0: SSAValue = field_0.into();
-        stage.statement().definition(Self::Return(field_0)).new();
-        control_flow_build_result::Return {
-            id: return_statement_id,
-        }
-    }
 }
 #[automatically_derived]
 #[doc(hidden)]
@@ -89,17 +74,6 @@ pub mod control_flow_build_result {
     #[automatically_derived]
     impl From<ConditionalBranch> for Statement {
         fn from(value: ConditionalBranch) -> Self {
-            value.id
-        }
-    }
-    #[automatically_derived]
-    #[doc(hidden)]
-    pub struct Return {
-        pub id: Statement,
-    }
-    #[automatically_derived]
-    impl From<Return> for Statement {
-        fn from(value: Return) -> Self {
             value.id
         }
     }

@@ -49,20 +49,7 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let target_stage = self.target_stage();
-        let stage_meta =
-            interp
-                .pipeline()
-                .stage(target_stage)
-                .ok_or(InterpreterError::StageResolution {
-                    stage: target_stage,
-                    kind: StageResolutionError::MissingStage,
-                })?;
-        let stage = <I::StageInfo as HasStageInfo<L>>::try_stage_info(stage_meta).ok_or(
-            InterpreterError::StageResolution {
-                stage: target_stage,
-                kind: StageResolutionError::MissingDialect,
-            },
-        )?;
+        let stage = interp.resolve_stage_info::<L>(target_stage)?;
 
         let function_info = interp.pipeline().function_info(self.target()).ok_or(
             InterpreterError::StageResolution {

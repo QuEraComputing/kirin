@@ -1,6 +1,7 @@
 use kirin::prelude::{Dialect, GetInfo, HasStageInfo};
 use kirin_interpreter::{
-    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageResolutionError,
+    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageAccess,
+    StageResolutionError,
 };
 use smallvec::smallvec;
 
@@ -30,21 +31,7 @@ where
     T: kirin::prelude::CompileTimeValue + Default,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
-        let stage_id = interp.active_stage();
-        let stage_meta =
-            interp
-                .pipeline()
-                .stage(stage_id)
-                .ok_or(InterpreterError::StageResolution {
-                    stage: stage_id,
-                    kind: StageResolutionError::MissingStage,
-                })?;
-        let stage = <I::StageInfo as HasStageInfo<L>>::try_stage_info(stage_meta).ok_or(
-            InterpreterError::StageResolution {
-                stage: stage_id,
-                kind: StageResolutionError::TypeMismatch,
-            },
-        )?;
+        let stage = interp.resolve_stage::<L>()?;
         let entry = self
             .body
             .blocks(stage)
@@ -68,20 +55,7 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let stage_id = interp.active_stage();
-        let stage_meta =
-            interp
-                .pipeline()
-                .stage(stage_id)
-                .ok_or(InterpreterError::StageResolution {
-                    stage: stage_id,
-                    kind: StageResolutionError::MissingStage,
-                })?;
-        let stage = <I::StageInfo as HasStageInfo<L>>::try_stage_info(stage_meta).ok_or(
-            InterpreterError::StageResolution {
-                stage: stage_id,
-                kind: StageResolutionError::TypeMismatch,
-            },
-        )?;
+        let stage = interp.resolve_stage::<L>()?;
 
         let target_name = stage
             .symbol_table()
@@ -94,25 +68,23 @@ where
                 },
             })?;
 
-        let function = interp
-            .pipeline()
-            .function_arena()
-            .iter()
-            .find_map(|info| {
-                let symbol = info.name()?;
-                let name = interp.pipeline().resolve(symbol)?;
-                if name == target_name {
-                    Some(info.id())
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| InterpreterError::StageResolution {
+        let global_sym = interp.pipeline().lookup_symbol(&target_name).ok_or_else(|| {
+            InterpreterError::StageResolution {
                 stage: stage_id,
                 kind: StageResolutionError::UnknownTarget {
                     name: target_name.clone(),
                 },
-            })?;
+            }
+        })?;
+
+        let function =
+            interp
+                .pipeline()
+                .function_by_name(global_sym)
+                .ok_or_else(|| InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: StageResolutionError::UnknownTarget { name: target_name },
+                })?;
 
         let function_info =
             interp

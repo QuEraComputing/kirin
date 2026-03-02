@@ -1201,7 +1201,6 @@ name = "kirin-derive"
 version = "0.1.0"
 dependencies = [
  "kirin-derive-core",
- "kirin-derive-dialect",
  "kirin-ir",
  "kirin-test-languages",
  "paste",
@@ -1216,19 +1215,8 @@ version = "0.1.0"
 dependencies = [
  "darling 0.23.0",
  "insta",
- "manyhow",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "kirin-derive-dialect"
-version = "0.1.0"
-dependencies = [
- "insta",
- "kirin-derive-core",
  "kirin-test-utils",
+ "manyhow",
  "proc-macro2",
  "quote",
  "syn",

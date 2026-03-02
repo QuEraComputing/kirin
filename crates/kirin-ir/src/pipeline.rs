@@ -217,6 +217,13 @@ impl<S> Pipeline<S> {
         self.global_symbols.resolve(sym).map(|s| s.as_str())
     }
 
+    /// Look up a [`GlobalSymbol`] by its string without interning.
+    ///
+    /// Returns `None` if the name has never been interned.
+    pub fn lookup_symbol(&self, name: &str) -> Option<GlobalSymbol> {
+        self.global_symbols.lookup(&name.to_string())
+    }
+
     /// Get a reference to the global symbol table.
     pub fn global_symbols(&self) -> &InternTable<String, GlobalSymbol> {
         &self.global_symbols

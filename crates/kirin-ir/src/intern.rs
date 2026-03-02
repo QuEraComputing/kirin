@@ -46,4 +46,11 @@ impl<T: Clone + Eq + std::hash::Hash, Key: InternKey> InternTable<T, Key> {
         let idx: usize = idx.into().into();
         self.items.get(idx)
     }
+
+    /// Look up a previously interned item without inserting.
+    ///
+    /// Returns `None` if the item has never been interned.
+    pub fn lookup(&self, item: &T) -> Option<Key> {
+        self.item_map.get(item).copied()
+    }
 }
