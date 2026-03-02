@@ -88,7 +88,9 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 ## Interpreter Conventions
 
-- **`Interpreter<'ir>` lifetime pattern**: The `Interpreter` trait is parameterized by `'ir` so that `pipeline()` and `active_stage_info::<L>()` return `&'ir`-lived references. This requires `Self: 'ir` on the trait, which cascades: all type parameters on implementing structs (`V`, `S`, `E`, `G`) need `'ir` bounds in every impl block. The `'ir` lifetime is also threaded through `Interpretable<'ir, I, L>` and `CallSemantics<'ir, I, L>`. `eval_block` and `bind_block_args` are methods on the `Interpreter` trait itself. Stage-scoped operations use the `Staged<'a, 'ir, I, L>` builder (constructed via `interp.in_stage::<L>()` or `interp.with_stage(stage)`).
+- **Trait decomposition**: The interpreter framework uses three composable sub-traits: `ValueStore` (read/write/write_ssa), `StageAccess<'ir>` (pipeline/active_stage + stage resolution), `BlockEvaluator<'ir>` (eval_block/bind_block_args). `Interpreter<'ir>` is a blanket supertrait auto-implemented for anything implementing `BlockEvaluator<'ir>`. Dialect authors use `I: Interpreter<'ir>`. Custom interpreter developers implement sub-traits individually.
+
+- **`'ir` lifetime pattern**: `StageAccess<'ir>` and `BlockEvaluator<'ir>` are parameterized by `'ir` so that `pipeline()` and `active_stage_info::<L>()` return `&'ir`-lived references. This requires `Self: 'ir` on the traits, which cascades: all type parameters on implementing structs need `'ir` bounds. The `'ir` lifetime is also threaded through `Interpretable<'ir, I, L>` and `CallSemantics<'ir, I, L>`. Stage-scoped operations use the `Staged<'a, 'ir, I, L>` builder (constructed via `interp.in_stage::<L>()` or `interp.with_stage(stage)`).
 
 - **Stage accessor naming**: `active_stage()` returns `CompileStage` (the stage key), `active_stage_info::<L>()` returns `&'ir StageInfo<L>` (the resolved dialect-specific stage info). Resolve once at the top of a method and pass through to avoid repeated lookups.
 
