@@ -9,7 +9,7 @@ mod lattice;
 mod node;
 mod pipeline;
 mod signature;
-mod stage_dispatch;
+mod stage;
 
 /// Queries from the IRContext.
 pub mod query;
@@ -32,13 +32,14 @@ pub use node::{
     SpecializedFunction, SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo,
     StagedNamePolicy, Statement, StatementInfo, Successor, Symbol, TestSSAValue,
 };
-pub use pipeline::{HasStageInfo, Pipeline, StageMeta};
+pub use pipeline::Pipeline;
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
-pub use stage_dispatch::{
-    StageAction, StageActionMut, StageDispatch, StageDispatchMiss, StageDispatchMut,
-    StageDispatchRequiredError, SupportsStageDispatch, SupportsStageDispatchMut,
+pub use stage::{
+    HasStageInfo, StageAction, StageActionMut, StageDispatch, StageDispatchMiss,
+    StageDispatchMut, StageDispatchRequiredError, StageMeta, SupportsStageDispatch,
+    SupportsStageDispatchMut,
 };
 
 #[cfg(feature = "derive")]
