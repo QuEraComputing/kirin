@@ -3,7 +3,7 @@ mod block_eval;
 mod control;
 pub mod dispatch;
 mod error;
-mod eval;
+mod call;
 mod frame;
 mod frame_stack;
 mod interpretable;
@@ -23,7 +23,7 @@ pub use abstract_interp::{
 pub use block_eval::BlockEvaluator;
 pub use control::{Args, ConcreteExt, Continuation};
 pub use error::{InterpreterError, StageResolutionError};
-pub use eval::{CallSemantics, SSACFGRegion};
+pub use call::{CallSemantics, SSACFGRegion};
 pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use interpretable::Interpretable;
