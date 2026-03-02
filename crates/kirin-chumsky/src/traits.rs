@@ -5,7 +5,7 @@ use chumsky::prelude::*;
 use chumsky::recursive::{Direct, Recursive};
 use kirin_ir::{Dialect, Pipeline, StageInfo};
 use kirin_lexer::{Logos, Token};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::fmt::Debug;
 
 /// An alias for token input types used in Kirin Chumsky parsers.
@@ -257,16 +257,16 @@ where
 /// Context for emitting IR from parsed AST, tracking name mappings.
 pub struct EmitContext<'a, L: Dialect> {
     pub stage: &'a mut StageInfo<L>,
-    ssa_names: HashMap<String, kirin_ir::SSAValue>,
-    block_names: HashMap<String, kirin_ir::Block>,
+    ssa_names: FxHashMap<String, kirin_ir::SSAValue>,
+    block_names: FxHashMap<String, kirin_ir::Block>,
 }
 
 impl<'a, L: Dialect> EmitContext<'a, L> {
     pub fn new(stage: &'a mut StageInfo<L>) -> Self {
         Self {
             stage,
-            ssa_names: HashMap::new(),
-            block_names: HashMap::new(),
+            ssa_names: FxHashMap::default(),
+            block_names: FxHashMap::default(),
         }
     }
 

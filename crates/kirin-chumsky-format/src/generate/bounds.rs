@@ -14,7 +14,7 @@ pub struct BoundsBuilder<'a> {
 
 impl<'a> BoundsBuilder<'a> {
     /// Creates a new bounds builder.
-    pub fn new(crate_path: &'a syn::Path, _ir_path: &'a syn::Path) -> Self {
+    pub fn new(crate_path: &'a syn::Path) -> Self {
         Self { crate_path }
     }
 

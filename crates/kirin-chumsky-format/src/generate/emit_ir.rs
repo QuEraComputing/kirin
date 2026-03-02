@@ -209,7 +209,7 @@ impl GenerateEmitIR {
         let ir_path = &self.config.ir_path;
 
         // Use BoundsBuilder to generate EmitIR bounds
-        let bounds = BoundsBuilder::new(crate_path, ir_path);
+        let bounds = BoundsBuilder::new(crate_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.emit_ir_bounds(&value_types);
 
@@ -365,7 +365,7 @@ impl GenerateEmitIR {
         };
 
         // Use BoundsBuilder to generate EmitIR bounds
-        let bounds = BoundsBuilder::new(crate_path, ir_path);
+        let bounds = BoundsBuilder::new(crate_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.emit_ir_bounds(&value_types);
 

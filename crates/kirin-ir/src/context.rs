@@ -138,4 +138,9 @@ impl<L: Dialect> StageInfo<L> {
     pub fn block_arena(&self) -> &Arena<Block, BlockInfo<L>> {
         &self.blocks
     }
+
+    /// Get a mutable reference to the blocks arena.
+    pub fn block_arena_mut(&mut self) -> &mut Arena<Block, BlockInfo<L>> {
+        &mut self.blocks
+    }
 }

@@ -1137,6 +1137,7 @@ dependencies = [
  "kirin-prettyless",
  "kirin-test-utils",
  "num-traits",
+ "rustc-hash",
  "strsim",
 ]
 

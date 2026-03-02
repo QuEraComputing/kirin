@@ -77,7 +77,9 @@
 //! - `pending_specializations`: source offsets to re-dispatch specialize bodies.
 //! - `ParseState`: deduplicated set of touched abstract functions returned to caller.
 //!
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use rustc_hash::FxHashMap;
 
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
@@ -156,7 +158,7 @@ struct FirstPassAction<'a, 'src> {
     start_index: usize,
     function: Option<Function>,
     function_symbol: Option<GlobalSymbol>,
-    staged_lookup: &'a mut HashMap<StagedKey, StagedFunction>,
+    staged_lookup: &'a mut FxHashMap<StagedKey, StagedFunction>,
     state: &'a mut ParseState,
 }
 
@@ -223,8 +225,8 @@ where
 struct SecondPassSpecializeAction<'a, 'src> {
     tokens: &'a [(Token<'src>, SimpleSpan)],
     start_index: usize,
-    function_lookup: &'a HashMap<String, Function>,
-    staged_lookup: &'a HashMap<StagedKey, StagedFunction>,
+    function_lookup: &'a FxHashMap<String, Function>,
+    staged_lookup: &'a FxHashMap<StagedKey, StagedFunction>,
     state: &'a mut ParseState,
 }
 
@@ -476,7 +478,7 @@ fn apply_stage_declaration<'src, L>(
     function: Function,
     function_symbol: GlobalSymbol,
     header: &Header<'src, L::Type>,
-    staged_lookup: &mut HashMap<StagedKey, StagedFunction>,
+    staged_lookup: &mut FxHashMap<StagedKey, StagedFunction>,
     state: &mut ParseState,
 ) -> Result<Option<StagedFunction>, FunctionParseError>
 where
@@ -516,8 +518,8 @@ fn apply_specialize_declaration<'src, L>(
     header: &Header<'src, L::Type>,
     body: &<L as HasParser<'src, 'src>>::Output,
     span: SimpleSpan,
-    function_lookup: &HashMap<String, Function>,
-    staged_lookup: &HashMap<StagedKey, StagedFunction>,
+    function_lookup: &FxHashMap<String, Function>,
+    staged_lookup: &FxHashMap<StagedKey, StagedFunction>,
     state: &mut ParseState,
 ) -> Result<(), FunctionParseError>
 where
@@ -555,8 +557,8 @@ fn resolve_specialize_target<'src, L>(
     stage_id: CompileStage,
     header: &Header<'src, L::Type>,
     span: SimpleSpan,
-    function_lookup: &HashMap<String, Function>,
-    staged_lookup: &HashMap<StagedKey, StagedFunction>,
+    function_lookup: &FxHashMap<String, Function>,
+    staged_lookup: &FxHashMap<StagedKey, StagedFunction>,
 ) -> Result<(Function, StagedFunction), FunctionParseError>
 where
     L: Dialect,
@@ -616,8 +618,8 @@ fn parse_error_from_chumsky(errors: Vec<ChumskyError<'_>>) -> FunctionParseError
 }
 
 /// Build a `function-name -> function` lookup from existing pipeline state.
-fn collect_function_lookup<S>(pipeline: &Pipeline<S>) -> HashMap<String, Function> {
-    let mut lookup = HashMap::new();
+fn collect_function_lookup<S>(pipeline: &Pipeline<S>) -> FxHashMap<String, Function> {
+    let mut lookup = FxHashMap::default();
     for info in pipeline.function_arena().iter() {
         let function = Function::from(info.clone().unwrap());
         let Some(symbol) = info.name() else {
@@ -634,7 +636,7 @@ fn collect_function_lookup<S>(pipeline: &Pipeline<S>) -> HashMap<String, Functio
 /// Resolve an abstract function by name, creating it if it does not exist.
 fn get_or_create_function_by_name<S>(
     pipeline: &mut Pipeline<S>,
-    function_lookup: &mut HashMap<String, Function>,
+    function_lookup: &mut FxHashMap<String, Function>,
     name: &str,
 ) -> Function {
     if let Some(existing) = function_lookup.get(name).copied() {
@@ -653,8 +655,8 @@ fn function_symbol<S>(pipeline: &Pipeline<S>, function: Function) -> GlobalSymbo
 }
 
 /// Build a `(stage, function) -> staged function` lookup from existing pipeline state.
-fn collect_staged_lookup<S>(pipeline: &Pipeline<S>) -> HashMap<StagedKey, StagedFunction> {
-    let mut lookup = HashMap::new();
+fn collect_staged_lookup<S>(pipeline: &Pipeline<S>) -> FxHashMap<StagedKey, StagedFunction> {
+    let mut lookup = FxHashMap::default();
     for info in pipeline.function_arena().iter() {
         let function = Function::from(info.clone().unwrap());
         for (&stage, &staged_function) in info.staged_functions() {

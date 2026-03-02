@@ -306,6 +306,89 @@ impl<'src> PrettyPrint for SymbolName<'src> {
     }
 }
 
+/// Emit a single block AST node into the IR, reusing an existing block ID if
+/// the name was already registered (e.g. by a two-pass Region emit).
+fn emit_block<'src, TypeOutput, StmtOutput, IR>(
+    block_ast: &Block<'src, TypeOutput, StmtOutput>,
+    ctx: &mut EmitContext<'_, IR>,
+) -> kirin_ir::Block
+where
+    IR: Dialect,
+    TypeOutput: EmitIR<IR, Output = IR::Type>,
+    StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
+{
+    // Collect argument info for registration
+    // Convert TypeOutput to Dialect::Type using EmitIR
+    let arg_info: Vec<_> = block_ast
+        .header
+        .value
+        .arguments
+        .iter()
+        .enumerate()
+        .map(|(idx, arg)| {
+            let name = arg.value.name.value.to_string();
+            let ty: IR::Type = arg.value.ty.value.emit(ctx);
+            (name, ty, idx)
+        })
+        .collect();
+
+    // Create placeholder SSAs for block arguments so they can be referenced
+    // in statement emission. These use BuilderBlockArgument kind.
+    for (name, ty, idx) in &arg_info {
+        let ssa = ctx
+            .stage
+            .ssa()
+            .name(name.clone())
+            .ty(ty.clone())
+            .kind(SSAKind::BuilderBlockArgument(*idx))
+            .new();
+        ctx.register_ssa(name.clone(), ssa);
+    }
+
+    // Emit all statements in the block and check which are terminators
+    let statements: Vec<_> = block_ast
+        .statements
+        .iter()
+        .map(|stmt_ast| {
+            let stmt = stmt_ast.value.emit(ctx);
+            let is_terminator = stmt
+                .get_info(ctx.stage)
+                .expect("statement should exist")
+                .definition()
+                .is_terminator();
+            (stmt, is_terminator)
+        })
+        .collect();
+
+    // Build the block with arguments and statements
+    let block_name = block_ast.header.value.label.name.value.to_string();
+    let mut builder = ctx.stage.block().name(block_name);
+
+    for (name, ty, _) in arg_info {
+        builder = builder.argument_with_name(name, ty);
+    }
+
+    // Add statements, handling terminators specially
+    for (stmt, is_terminator) in statements {
+        if is_terminator {
+            builder = builder.terminator(stmt);
+        } else {
+            builder = builder.stmt(stmt);
+        }
+    }
+
+    let block = builder.new();
+
+    // Register the block only if not already registered (two-pass Region
+    // creates stubs first, so the name may already be present).
+    let block_label = block_ast.header.value.label.name.value;
+    if ctx.lookup_block(block_label).is_none() {
+        ctx.register_block(block_label.to_string(), block);
+    }
+
+    block
+}
+
 /// Implementation of EmitIR for Block AST nodes.
 ///
 /// This builds an IR block with the parsed label, arguments, and statements.
@@ -322,78 +405,15 @@ where
     type Output = kirin_ir::Block;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
-        // Collect argument info for registration
-        // Convert TypeOutput to Dialect::Type using EmitIR
-        let arg_info: Vec<_> = self
-            .header
-            .value
-            .arguments
-            .iter()
-            .enumerate()
-            .map(|(idx, arg)| {
-                let name = arg.value.name.value.to_string();
-                let ty: IR::Type = arg.value.ty.value.emit(ctx);
-                (name, ty, idx)
-            })
-            .collect();
-
-        // Create placeholder SSAs for block arguments so they can be referenced
-        // in statement emission. These use BuilderBlockArgument kind.
-        for (name, ty, idx) in &arg_info {
-            let ssa = ctx
-                .stage
-                .ssa()
-                .name(name.clone())
-                .ty(ty.clone())
-                .kind(SSAKind::BuilderBlockArgument(*idx))
-                .new();
-            ctx.register_ssa(name.clone(), ssa);
-        }
-
-        // Emit all statements in the block and check which are terminators
-        let statements: Vec<_> = self
-            .statements
-            .iter()
-            .map(|stmt_ast| {
-                let stmt = stmt_ast.value.emit(ctx);
-                let is_terminator = stmt
-                    .get_info(ctx.stage)
-                    .expect("statement should exist")
-                    .definition()
-                    .is_terminator();
-                (stmt, is_terminator)
-            })
-            .collect();
-
-        // Build the block with arguments and statements
-        let block_name = self.header.value.label.name.value.to_string();
-        let mut builder = ctx.stage.block().name(block_name);
-
-        for (name, ty, _) in arg_info {
-            builder = builder.argument_with_name(name, ty);
-        }
-
-        // Add statements, handling terminators specially
-        for (stmt, is_terminator) in statements {
-            if is_terminator {
-                builder = builder.terminator(stmt);
-            } else {
-                builder = builder.stmt(stmt);
-            }
-        }
-
-        let block = builder.new();
-
-        // Register the block in the symbol table for successor resolution
-        ctx.register_block(self.header.value.label.name.value.to_string(), block);
-
-        block
+        emit_block(self, ctx)
     }
 }
 
 /// Implementation of EmitIR for Region AST nodes.
 ///
 /// This builds an IR region containing all the parsed blocks.
+/// Uses two-pass emit to support forward block references (e.g. `br ^exit`
+/// before `^exit` is defined).
 ///
 /// The `TypeOutput: EmitIR<IR, Output = IR::Type>` bound allows proper type
 /// conversion for block arguments within the region via the EmitIR trait.
@@ -406,20 +426,40 @@ where
     type Output = kirin_ir::Region;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
-        // Emit all blocks first (this registers them in the symbol table)
-        let blocks: Vec<_> = self
+        // Pass 1: Create stub blocks and register their names so that forward
+        // references (e.g. `br ^exit` before ^exit is defined) can resolve.
+        let stub_blocks: Vec<_> = self
             .blocks
             .iter()
-            .map(|block_ast| block_ast.value.emit(ctx))
+            .map(|block_ast| {
+                let name = block_ast.value.header.value.label.name.value.to_string();
+                let stub = ctx.stage.block().name(name.clone()).new();
+                ctx.register_block(name, stub);
+                stub
+            })
             .collect();
 
-        // Build the region with the emitted blocks
-        let mut builder = ctx.stage.region();
-        for block in blocks {
-            builder = builder.add_block(block);
+        // Pass 2: Emit full block bodies. Successor references inside these
+        // blocks resolve to the stubs created above.
+        let real_blocks: Vec<_> = self
+            .blocks
+            .iter()
+            .map(|block_ast| emit_block(&block_ast.value, ctx))
+            .collect();
+
+        // Swap real block data into stub arena slots so that all existing
+        // Successor handles (which point to stub IDs) see the real data.
+        for (&stub, &real) in stub_blocks.iter().zip(real_blocks.iter()) {
+            let real_info = real.expect_info(ctx.stage).clone();
+            *stub.expect_info_mut(ctx.stage) = real_info;
+            ctx.stage.block_arena_mut().delete(real);
         }
 
-        // Finalize the region
+        // Build the region using the stub IDs (now containing real data).
+        let mut builder = ctx.stage.region();
+        for block in stub_blocks {
+            builder = builder.add_block(block);
+        }
         builder.new()
     }
 }

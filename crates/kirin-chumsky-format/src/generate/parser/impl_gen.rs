@@ -42,7 +42,7 @@ impl GenerateHasDialectParser {
         let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         // Use BoundsBuilder to generate bounds
-        let bounds = BoundsBuilder::new(crate_path, &self.config.ir_path);
+        let bounds = BoundsBuilder::new(crate_path);
         let ir_type_bound = bounds.ir_type_has_parser_bound(ir_type);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
@@ -181,7 +181,7 @@ impl GenerateHasDialectParser {
         let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         // Use BoundsBuilder to generate bounds
-        let bounds = BoundsBuilder::new(crate_path, &self.config.ir_path);
+        let bounds = BoundsBuilder::new(crate_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.has_parser_bounds(&value_types);
         let ir_type_bound = bounds.ir_type_has_parser_bound(ir_type);
