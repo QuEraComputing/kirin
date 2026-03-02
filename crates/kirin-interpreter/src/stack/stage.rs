@@ -1,6 +1,6 @@
-use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta, SupportsStageDispatch};
+use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta};
 
-use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
+use super::StackInterpreter;
 use crate::{
     CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, StageAccess, Staged,
 };
@@ -20,15 +20,7 @@ where
     }
 
     /// Apply cursor mutations for a continuation.
-    pub fn advance(self, control: &Continuation<V, ConcreteExt>) -> Result<(), E>
-    where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'b> S: SupportsStageDispatch<PushCallFrameDynAction<'b, 'ir, V, S, E, G>, (), E>,
-    {
+    pub fn advance(self, control: &Continuation<V, ConcreteExt>) -> Result<(), E> {
         self.interp
             .advance_frame_with_stage::<L>(self.stage, control)?;
         if let Continuation::Call {
@@ -56,13 +48,7 @@ where
     /// Ignores breakpoints and Break from dialect intrinsics.
     pub fn run(self) -> Result<Continuation<V, ConcreteExt>, E>
     where
-        S: HasStageInfo<L>
-            + SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'b> S: SupportsStageDispatch<PushCallFrameDynAction<'b, 'ir, V, S, E, G>, (), E>,
+        S: HasStageInfo<L>,
     {
         self.interp.drive_loop(
             false,
@@ -77,13 +63,7 @@ where
     /// Run statements until a breakpoint, Return, Halt, or Call.
     pub fn run_until_break(self) -> Result<Continuation<V, ConcreteExt>, E>
     where
-        S: HasStageInfo<L>
-            + SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'b> S: SupportsStageDispatch<PushCallFrameDynAction<'b, 'ir, V, S, E, G>, (), E>,
+        S: HasStageInfo<L>,
     {
         self.interp.drive_loop(
             true,
@@ -93,17 +73,5 @@ where
                 interp.in_stage::<L>().advance(control)
             },
         )
-    }
-
-    pub(crate) fn push_call_frame(self, callee: SpecializedFunction, args: &[V]) -> Result<(), E>
-    where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-    {
-        self.interp
-            .push_call_frame_with_stage::<L>(callee, self.stage, args)
     }
 }

@@ -2,6 +2,7 @@ extern crate proc_macro;
 
 mod eval_call;
 mod interpretable;
+mod pattern;
 
 use proc_macro::TokenStream;
 use syn::parse_macro_input;

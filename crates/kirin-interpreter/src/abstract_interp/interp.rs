@@ -332,9 +332,11 @@ where
                     args,
                     result,
                 } => {
-                    let handler = self
-                        .call_handler
-                        .expect("call_handler not set: analyze() must be used as entry point");
+                    let handler = self.call_handler.ok_or_else(|| {
+                        InterpreterError::UnexpectedControl(
+                            "call_handler not set: analyze() must be used as entry point".into(),
+                        )
+                    })?;
                     let analysis = handler(self, callee, callee_stage, &args)?;
                     let return_val = analysis.return_value().cloned().unwrap_or_else(V::bottom);
                     self.write(result, return_val)?;

@@ -1,6 +1,4 @@
-use kirin_ir::{
-    Block, Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta, SupportsStageDispatch,
-};
+use kirin_ir::{Block, Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta};
 
 use crate::{BlockEvaluator, Interpreter, InterpreterError, StageAccess};
 
@@ -33,7 +31,7 @@ pub trait SSACFGRegion: Dialect {
 }
 
 // ---------------------------------------------------------------------------
-// Blanket impl: SSACFGRegion → CallSemantics<StackInterpreter>
+// Blanket impl: SSACFGRegion -> CallSemantics<StackInterpreter>
 // ---------------------------------------------------------------------------
 
 impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> for T
@@ -42,13 +40,6 @@ where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
-    S: SupportsStageDispatch<
-            crate::stack::FrameDispatchAction<'ir, V, S, E, G>,
-            crate::stack::DynFrameDispatch<'ir, V, S, E, G>,
-            E,
-        >,
-    for<'a> S:
-        SupportsStageDispatch<crate::stack::PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
     G: 'ir,
     L: Dialect + crate::Interpretable<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
@@ -72,7 +63,7 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Blanket impl: SSACFGRegion → CallSemantics<AbstractInterpreter>
+// Blanket impl: SSACFGRegion -> CallSemantics<AbstractInterpreter>
 // ---------------------------------------------------------------------------
 
 impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T

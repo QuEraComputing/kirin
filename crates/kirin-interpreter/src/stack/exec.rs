@@ -1,6 +1,6 @@
-use kirin_ir::{ResultValue, StageMeta, SupportsStageDispatch};
+use kirin_ir::{ResultValue, StageMeta};
 
-use super::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction, StackInterpreter};
+use super::StackInterpreter;
 use crate::{ConcreteExt, Continuation, InterpreterError, ValueStore};
 
 // -- Execution engine -------------------------------------------------------
@@ -19,15 +19,7 @@ where
     }
 
     /// Stage-dynamic entrypoint.
-    pub fn advance(&mut self, control: &Continuation<V, ConcreteExt>) -> Result<(), E>
-    where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'a> S: SupportsStageDispatch<PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
-    {
+    pub fn advance(&mut self, control: &Continuation<V, ConcreteExt>) -> Result<(), E> {
         let dispatch = self.frames.current()?.extra().dispatch;
         (dispatch.advance)(self, control)?;
         if let Continuation::Call {
@@ -43,15 +35,7 @@ where
     }
 
     /// Stage-dynamic entrypoint.
-    pub fn run(&mut self) -> Result<Continuation<V, ConcreteExt>, E>
-    where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'a> S: SupportsStageDispatch<PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
-    {
+    pub fn run(&mut self) -> Result<Continuation<V, ConcreteExt>, E> {
         self.drive_loop(
             false,
             true,
@@ -61,15 +45,7 @@ where
     }
 
     /// Stage-dynamic entrypoint.
-    pub fn run_until_break(&mut self) -> Result<Continuation<V, ConcreteExt>, E>
-    where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'a> S: SupportsStageDispatch<PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
-    {
+    pub fn run_until_break(&mut self) -> Result<Continuation<V, ConcreteExt>, E> {
         self.drive_loop(
             true,
             false,
@@ -109,80 +85,6 @@ where
         }
     }
 
-    /// Like [`advance`](Self::advance) but uses the pre-built dispatch table
-    /// for call-frame pushes, avoiding `SupportsStageDispatch` bounds.
-    fn advance_cached(&mut self, control: &Continuation<V, ConcreteExt>) -> Result<(), E> {
-        let dispatch = self.frames.current()?.extra().dispatch;
-        (dispatch.advance)(self, control)?;
-        if let Continuation::Call {
-            callee,
-            stage: callee_stage,
-            args,
-            ..
-        } = control
-        {
-            self.push_call_frame_with_args_cached(*callee, *callee_stage, args)?;
-        }
-        Ok(())
-    }
-
-    /// Like [`run`](Self::run) but uses cached dispatch (no
-    /// `SupportsStageDispatch` bounds).
-    fn run_cached(&mut self) -> Result<Continuation<V, ConcreteExt>, E> {
-        self.drive_loop(
-            false,
-            true,
-            |interp| interp.step(),
-            |interp, control| interp.advance_cached(control),
-        )
-    }
-
-    /// Like [`run_nested_calls`](Self::run_nested_calls) but uses cached
-    /// dispatch (no `SupportsStageDispatch` bounds).
-    pub(crate) fn run_nested_calls_cached<F>(&mut self, mut should_exit: F) -> Result<V, E>
-    where
-        F: FnMut(&Self, bool) -> bool,
-    {
-        let mut pending_results: Vec<ResultValue> = Vec::new();
-        loop {
-            let control = self.run_cached()?;
-            match &control {
-                Continuation::Call { result, .. } => {
-                    pending_results.push(*result);
-                }
-                Continuation::Return(_) | Continuation::Yield(_) => {}
-                Continuation::Ext(ConcreteExt::Halt) => {
-                    return Err(InterpreterError::UnexpectedControl(
-                        "halt during nested call".to_owned(),
-                    )
-                    .into());
-                }
-                _ => {
-                    return Err(InterpreterError::UnexpectedControl(
-                        "unexpected continuation in nested call loop".to_owned(),
-                    )
-                    .into());
-                }
-            }
-
-            let v = match &control {
-                Continuation::Return(v) | Continuation::Yield(v) => Some(v.clone()),
-                _ => None,
-            };
-
-            let is_yield = matches!(&control, Continuation::Yield(_));
-            self.advance_cached(&control)?;
-
-            if let Some(v) = v {
-                if should_exit(self, is_yield) {
-                    return Ok(v);
-                }
-                let result = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                ValueStore::write(self, result, v)?;
-            }
-        }
-    }
-
     /// Drive execution handling nested Call/Return pairs.
     ///
     /// Runs until a `Return` or `Yield` continuation triggers exit (determined
@@ -193,12 +95,6 @@ where
     /// `Return`/`Yield`. Return `true` to exit the loop with the value.
     pub(crate) fn run_nested_calls<F>(&mut self, mut should_exit: F) -> Result<V, E>
     where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-        for<'a> S: SupportsStageDispatch<PushCallFrameDynAction<'a, 'ir, V, S, E, G>, (), E>,
         F: FnMut(&Self, bool) -> bool,
     {
         let mut pending_results: Vec<ResultValue> = Vec::new();

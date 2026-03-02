@@ -25,40 +25,8 @@ where
         crate::dispatch::dispatch_in_pipeline(pipeline, stage_id, &mut action)
     }
 
-    pub(super) fn resolve_dispatch_for_stage(
-        &self,
-        stage_id: CompileStage,
-    ) -> Result<DynFrameDispatch<'ir, V, S, E, G>, E>
-    where
-        S: SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
-    {
-        match self.dispatch_table.get(stage_id).copied() {
-            Some(dispatch) => Ok(dispatch),
-            None => {
-                if self.pipeline.stage(stage_id).is_none() {
-                    Err(InterpreterError::StageResolution {
-                        stage: stage_id,
-                        kind: crate::StageResolutionError::MissingStage,
-                    }
-                    .into())
-                } else {
-                    Err(InterpreterError::StageResolution {
-                        stage: stage_id,
-                        kind: crate::StageResolutionError::MissingDialect,
-                    }
-                    .into())
-                }
-            }
-        }
-    }
-
-    /// Look up the cached dispatch entry for `stage_id` without requiring
-    /// `SupportsStageDispatch` bounds.
-    pub(super) fn lookup_dispatch_cached(
+    /// Look up the cached dispatch entry for `stage_id`.
+    pub(super) fn lookup_dispatch(
         &self,
         stage_id: CompileStage,
     ) -> Result<DynFrameDispatch<'ir, V, S, E, G>, E> {
@@ -80,18 +48,6 @@ where
                 }
             }
         }
-    }
-
-    /// Push a call frame using only the pre-built dispatch table (no
-    /// `SupportsStageDispatch` bounds needed).
-    pub(super) fn push_frame_cached(
-        &mut self,
-        frame: crate::Frame<V, Option<kirin_ir::Statement>>,
-    ) -> Result<(), E> {
-        let dispatch = self.lookup_dispatch_cached(frame.stage())?;
-        let internal = Self::public_frame_to_internal(frame, dispatch);
-        self.frames.push(internal)?;
-        Ok(())
     }
 
     fn spend_fuel(&mut self) -> Result<(), E> {

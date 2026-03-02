@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use kirin_ir::{
     CompileStage, Dialect, HasStageInfo, SpecializedFunction, StageAction, StageInfo, StageMeta,
-    SupportsStageDispatch,
 };
 
 use super::StackInterpreter;
@@ -103,7 +102,7 @@ where
     L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     let stage = interp.resolve_stage_info::<L>(stage_id)?;
-    interp.push_call_frame_with_stage_cached::<L>(callee, stage, args)
+    interp.push_call_frame_with_stage::<L>(callee, stage, args)
 }
 
 fn dyn_advance_for_lang<'ir, V, S, E, G, L>(
@@ -151,61 +150,6 @@ where
             advance: dyn_advance_for_lang::<V, S, E, G, L>,
             push_call_frame: dyn_push_call_frame_for_lang::<V, S, E, G, L>,
         })
-    }
-}
-
-#[doc(hidden)]
-pub struct PushCallFrameDynAction<'a, 'ir, V, S, E, G>
-where
-    S: StageMeta,
-{
-    interp: &'a mut StackInterpreter<'ir, V, S, E, G>,
-    callee: SpecializedFunction,
-    args: &'a [V],
-}
-
-impl<'a, 'ir, V, S, E, G, L> StageAction<S, L> for PushCallFrameDynAction<'a, 'ir, V, S, E, G>
-where
-    V: Clone + 'ir,
-    E: From<InterpreterError> + 'ir,
-    S: StageMeta + HasStageInfo<L> + 'ir,
-    S: SupportsStageDispatch<
-            FrameDispatchAction<'ir, V, S, E, G>,
-            DynFrameDispatch<'ir, V, S, E, G>,
-            E,
-        >,
-    G: 'ir,
-    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
-{
-    type Output = ();
-    type Error = E;
-
-    fn run(
-        &mut self,
-        stage_id: CompileStage,
-        _stage: &StageInfo<L>,
-    ) -> Result<Self::Output, Self::Error> {
-        let stage = self.interp.resolve_stage_info::<L>(stage_id)?;
-        self.interp
-            .with_stage(stage)
-            .push_call_frame(self.callee, self.args)
-    }
-}
-
-impl<'a, 'ir, V, S, E, G> PushCallFrameDynAction<'a, 'ir, V, S, E, G>
-where
-    S: StageMeta,
-{
-    pub(super) fn new(
-        interp: &'a mut StackInterpreter<'ir, V, S, E, G>,
-        callee: SpecializedFunction,
-        args: &'a [V],
-    ) -> Self {
-        Self {
-            interp,
-            callee,
-            args,
-        }
     }
 }
 

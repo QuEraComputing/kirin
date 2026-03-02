@@ -6,7 +6,7 @@ mod interp;
 mod stage;
 mod transition;
 
-pub use dispatch::{DynFrameDispatch, FrameDispatchAction, PushCallFrameDynAction};
+pub use dispatch::{DynFrameDispatch, FrameDispatchAction};
 pub use interp::StackInterpreter;
 
 use interp::{StackFrame, StackFrameExtra};

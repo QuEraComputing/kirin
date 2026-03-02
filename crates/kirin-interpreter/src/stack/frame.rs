@@ -66,15 +66,10 @@ where
     where
         V: Clone + 'ir,
         E: 'ir,
-        S: 'ir
-            + SupportsStageDispatch<
-                FrameDispatchAction<'ir, V, S, E, G>,
-                DynFrameDispatch<'ir, V, S, E, G>,
-                E,
-            >,
+        S: 'ir,
         G: 'ir,
     {
-        let dispatch = self.resolve_dispatch_for_stage(frame.stage())?;
+        let dispatch = self.lookup_dispatch(frame.stage())?;
         let internal = Self::public_frame_to_internal(frame, dispatch);
         self.frames.push(internal)?;
         Ok(())
@@ -155,7 +150,7 @@ where
         let saved_cursor = self.current_cursor()?;
         let first = block.first_statement(stage);
         self.set_current_cursor(first)?;
-        let v = self.run_nested_calls_cached(|_interp, is_yield| is_yield)?;
+        let v = self.run_nested_calls(|_interp, is_yield| is_yield)?;
         self.set_current_cursor(saved_cursor)?;
         Ok(Continuation::Yield(v))
     }
