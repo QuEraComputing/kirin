@@ -1,26 +1,36 @@
 //! Document builder for pretty printing.
+//!
+//! The [`Document`] type is the main entry point for manual pretty printing.
+//! It wraps a `prettyless::Arena` allocator and provides methods for building
+//! document trees from IR nodes.
 
 use std::{borrow::Cow, ops::Deref};
 
 use kirin_ir::{
-    Block, DenseHint, Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, Region, SSAInfo,
-    Signature, SpecializedFunction, StageInfo, StagedFunction, Statement,
+    Block, Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, Region, SSAInfo, Signature,
+    SpecializedFunction, StageInfo, StagedFunction, Statement,
 };
 use prettyless::{Arena, DocAllocator};
 
-use crate::{ArenaDoc, Config, PrettyPrint, ScanResultWidth};
+use crate::{ArenaDoc, Config, PrettyPrint};
 
 /// A document builder for pretty printing IR.
 ///
-/// The `Document` struct holds configuration, an arena allocator, and context
-/// needed for building pretty-printed output from IR nodes.
+/// `Document` holds a configuration, an arena allocator, a stage reference,
+/// and an optional global symbol table. It provides two categories of API:
+///
+/// - **Arena methods** (via `Deref<Target = Arena>`): `text()`, `nil()`,
+///   `line_()`, etc. for building document fragments.
+/// - **IR printing methods**: `print_statement()`, `print_block()`,
+///   `print_region()`, etc. for rendering structured IR nodes.
+///
+/// For most use cases, prefer [`PrettyPrintExt::render`] or
+/// [`PrettyPrintExt::sprint`] which construct and use a `Document` internally.
 pub struct Document<'a, L: Dialect> {
     config: Config,
     arena: Arena<'a>,
     stage: &'a StageInfo<L>,
     global_symbols: Option<&'a InternTable<String, GlobalSymbol>>,
-    result_width: DenseHint<Statement, usize>,
-    max_result_width: usize,
 }
 
 impl<'a, L: Dialect> Document<'a, L> {
@@ -36,8 +46,6 @@ impl<'a, L: Dialect> Document<'a, L> {
             arena,
             stage,
             global_symbols: None,
-            result_width: stage.statement_arena().hint().dense(),
-            max_result_width: 0,
         }
     }
 
@@ -56,8 +64,6 @@ impl<'a, L: Dialect> Document<'a, L> {
             arena,
             stage,
             global_symbols: Some(global_symbols),
-            result_width: stage.statement_arena().hint().dense(),
-            max_result_width: 0,
         }
     }
 
@@ -86,26 +92,6 @@ impl<'a, L: Dialect> Document<'a, L> {
         self.stage
     }
 
-    /// Set the result width for a statement.
-    pub(crate) fn set_result_width(&mut self, stmt: Statement, width: usize) {
-        self.result_width.insert(stmt, width);
-        if width > self.max_result_width {
-            self.max_result_width = width;
-        }
-    }
-
-    /// Get the maximum result width.
-    #[allow(dead_code)]
-    pub fn max_result_width(&self) -> usize {
-        self.max_result_width
-    }
-
-    /// Get the result width for a statement.
-    #[allow(dead_code)]
-    pub fn result_width(&self, stmt: &Statement) -> Option<usize> {
-        self.result_width.get(*stmt).copied()
-    }
-
     /// Build a list of items with a separator.
     pub fn list<I, U: Clone + Into<Cow<'a, str>>>(
         &'a self,
@@ -125,25 +111,15 @@ impl<'a, L: Dialect> Document<'a, L> {
         doc
     }
 
-    fn build<N>(&'a mut self, node: &N) -> ArenaDoc<'a>
-    where
-        N: ScanResultWidth<L> + PrettyPrint,
-        L: PrettyPrint,
-        L::Type: std::fmt::Display,
-    {
-        node.scan_result_width(self);
-        node.pretty_print(self)
-    }
-
     /// Render a node to a string.
     pub fn render<N>(&'a mut self, node: &N) -> Result<String, std::fmt::Error>
     where
-        N: ScanResultWidth<L> + PrettyPrint,
+        N: PrettyPrint,
         L: PrettyPrint,
         L::Type: std::fmt::Display,
     {
         let max_width = self.config.max_width;
-        let arena_doc = self.build(node);
+        let arena_doc = node.pretty_print(self);
         let mut buf = String::new();
         arena_doc.render_fmt(max_width, &mut buf)?;
         Ok(strip_trailing_whitespace(&buf))

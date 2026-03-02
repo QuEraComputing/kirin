@@ -16,16 +16,16 @@
 //! // Render an IR node to string with default config
 //! let output = statement.sprint(&context);
 //!
-//! // Render with custom config
-//! let config = Config::default().with_width(80);
-//! let output = statement.sprint_with_config(config, &context);
+//! // Render with custom config via builder
+//! let output = statement.render(&context)
+//!     .config(Config::default().with_width(80))
+//!     .to_string();
 //! ```
 
 mod config;
 mod document;
 mod impls;
 mod pipeline;
-mod scan;
 mod traits;
 
 // Re-export main types
@@ -35,8 +35,7 @@ pub use pipeline::{PipelineDocument, PipelinePrintExt, PrintExt, RenderStage};
 
 #[cfg(feature = "derive")]
 pub use kirin_prettyless_derive::RenderStage;
-pub use scan::ScanResultWidth;
-pub use traits::{PrettyPrint, PrettyPrintExt, PrettyPrintName, PrettyPrintType};
+pub use traits::{PrettyPrint, PrettyPrintExt, PrettyPrintName, PrettyPrintType, RenderBuilder};
 
 // Re-export from prettyless for convenience
 pub use prettyless::{Arena, DocAllocator};

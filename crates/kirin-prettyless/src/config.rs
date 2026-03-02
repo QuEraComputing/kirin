@@ -9,8 +9,6 @@ pub struct Config {
     pub tab_spaces: usize,
     /// Maximum width of each line.
     pub max_width: usize,
-    /// Whether to include line numbers in the output.
-    pub line_numbers: bool,
 }
 
 impl Default for Config {
@@ -18,7 +16,6 @@ impl Default for Config {
         Self {
             tab_spaces: 2,
             max_width: 120,
-            line_numbers: true,
         }
     }
 }
@@ -40,12 +37,6 @@ impl Config {
         self.tab_spaces = spaces;
         self
     }
-
-    /// Set whether to include line numbers.
-    pub fn with_line_numbers(mut self, line_numbers: bool) -> Self {
-        self.line_numbers = line_numbers;
-        self
-    }
 }
 
 #[cfg(test)]
@@ -57,19 +48,14 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.tab_spaces, 2);
         assert_eq!(config.max_width, 120);
-        assert!(config.line_numbers);
     }
 
     #[test]
     fn test_config_builder() {
-        let config = Config::new()
-            .with_width(80)
-            .with_tab_spaces(4)
-            .with_line_numbers(false);
+        let config = Config::new().with_width(80).with_tab_spaces(4);
 
         assert_eq!(config.max_width, 80);
         assert_eq!(config.tab_spaces, 4);
-        assert!(!config.line_numbers);
     }
 
     #[test]

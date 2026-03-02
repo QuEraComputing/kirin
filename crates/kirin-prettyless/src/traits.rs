@@ -5,13 +5,16 @@ use std::io::{Write, stdout};
 use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};
 use prettyless::DocBuilder;
 
-use crate::{ArenaDoc, Config, Document, ScanResultWidth};
+use crate::{ArenaDoc, Config, Document};
 
 /// Core trait for pretty printing values to a document.
 ///
 /// This trait defines how a type should be rendered to a document representation.
 /// The method is generic over the dialect type `L`, allowing the same implementation
 /// to work with any `Document<L>`.
+///
+/// The target invariant is that `parse(sprint(ir)) == ir` — pretty-printing
+/// should produce output that roundtrips through the parser.
 ///
 /// The bounds on `L` (`PrettyPrint` and `Type: Display`) are required because:
 /// - `L: PrettyPrint` is needed to print nested Block/Region structures
@@ -41,156 +44,137 @@ pub trait PrettyPrint {
         L::Type: std::fmt::Display;
 }
 
-/// Extension trait providing convenience methods for pretty printing IR nodes.
+/// Builder for rendering pretty-printed IR nodes.
 ///
-/// This trait is automatically implemented for any type that implements both
-/// `PrettyPrint` and `ScanResultWidth<L>`. All methods require a `&StageInfo<L>`
-/// parameter since IR nodes (like `Statement`, `Block`, `Region`, etc.) need to
-/// look up their data from the context.
+/// Created via [`PrettyPrintExt::render`]. Allows optional configuration
+/// and global symbol resolution before producing output.
 ///
 /// # Example
 ///
 /// ```ignore
-/// use kirin_prettyless::{Config, PrettyPrintExt};
+/// // Simple usage
+/// let output = node.sprint(&stage);
 ///
-/// // Render to string with custom config
-/// let output = statement.sprint_with_config(config, &context);
+/// // Builder usage with options
+/// let output = node.render(&stage)
+///     .config(Config::default().with_width(80))
+///     .globals(&global_symbols)
+///     .to_string();
 ///
-/// // Render to string with default config
-/// let output = statement.sprint(&context);
+/// // Print to stdout
+/// node.render(&stage).print();
+///
+/// // Display with bat pager
+/// node.render(&stage).bat();
 /// ```
-pub trait PrettyPrintExt<L: Dialect + PrettyPrint>: PrettyPrint + ScanResultWidth<L>
-where
-    L::Type: std::fmt::Display,
-{
-    /// Render to string with custom config.
-    fn sprint_with_config(&self, config: Config, stage: &StageInfo<L>) -> String;
-
-    /// Render to string with default config.
-    fn sprint(&self, stage: &StageInfo<L>) -> String;
-
-    /// Write to writer with custom config.
-    fn write_with_config(&self, writer: &mut impl Write, config: Config, stage: &StageInfo<L>);
-
-    /// Write to writer with default config.
-    fn write(&self, writer: &mut impl Write, stage: &StageInfo<L>);
-
-    /// Print to stdout with custom config.
-    fn print_with_config(&self, config: Config, stage: &StageInfo<L>);
-
-    /// Print to stdout with default config.
-    fn print(&self, stage: &StageInfo<L>);
-
-    /// Render to string with default config and global symbol resolution.
-    fn sprint_with_globals(
-        &self,
-        stage: &StageInfo<L>,
-        global_symbols: &InternTable<String, GlobalSymbol>,
-    ) -> String;
-
-    /// Render to string with custom config and global symbol resolution.
-    fn sprint_with_globals_config(
-        &self,
-        config: Config,
-        stage: &StageInfo<L>,
-        global_symbols: &InternTable<String, GlobalSymbol>,
-    ) -> String;
-
-    /// Print to stdout with default config and global symbol resolution.
-    fn print_with_globals(
-        &self,
-        stage: &StageInfo<L>,
-        global_symbols: &InternTable<String, GlobalSymbol>,
-    );
-
-    /// Display with bat pager with custom config.
-    #[cfg(feature = "bat")]
-    fn bat_with_config(&self, config: Config, stage: &StageInfo<L>);
-
-    /// Display with bat pager with default config.
-    #[cfg(feature = "bat")]
-    fn bat(&self, stage: &StageInfo<L>);
+pub struct RenderBuilder<'n, 's, N, L: Dialect> {
+    node: &'n N,
+    stage: &'s StageInfo<L>,
+    config: Config,
+    global_symbols: Option<&'s InternTable<String, GlobalSymbol>>,
 }
 
-// Blanket implementation: any type that implements PrettyPrint + ScanResultWidth<L>
-// automatically gets the context-aware convenience methods.
-impl<L: Dialect + PrettyPrint, T: PrettyPrint + ScanResultWidth<L>> PrettyPrintExt<L> for T
+impl<'n, 's, N: PrettyPrint, L: Dialect + PrettyPrint> RenderBuilder<'n, 's, N, L>
 where
     L::Type: std::fmt::Display,
 {
-    fn sprint_with_config(&self, config: Config, stage: &StageInfo<L>) -> String {
-        let mut doc = Document::new(config, stage);
-        doc.render(self).expect("render failed")
+    /// Set custom configuration for rendering.
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Set global symbol table for resolving function names.
+    pub fn globals(mut self, global_symbols: &'s InternTable<String, GlobalSymbol>) -> Self {
+        self.global_symbols = Some(global_symbols);
+        self
+    }
+
+    /// Render to a string.
+    pub fn to_string(self) -> String {
+        let node = self.node;
+        let mut doc = self.into_document();
+        doc.render(node).expect("render failed")
+    }
+
+    /// Write to a writer.
+    pub fn write_to(self, writer: &mut impl Write) {
+        let output = self.to_string();
+        writer.write_all(output.as_bytes()).expect("write failed");
+    }
+
+    /// Print to stdout.
+    pub fn print(self) {
+        let output = self.to_string();
+        stdout().write_all(output.as_bytes()).expect("write failed");
+    }
+
+    /// Display with bat pager.
+    #[cfg(feature = "bat")]
+    pub fn bat(self) {
+        let node = self.node;
+        let mut doc = self.into_document();
+        doc.pager(node).expect("pager failed");
+    }
+
+    fn into_document(self) -> Document<'s, L> {
+        match self.global_symbols {
+            Some(gs) => Document::with_global_symbols(self.config, self.stage, gs),
+            None => Document::new(self.config, self.stage),
+        }
+    }
+}
+
+/// Extension trait providing convenience methods for pretty printing IR nodes.
+///
+/// This trait is automatically implemented for any type that implements
+/// `PrettyPrint`. Use [`render`](PrettyPrintExt::render) for the builder API,
+/// or [`sprint`](PrettyPrintExt::sprint) as a shorthand for rendering to string.
+///
+/// # Example
+///
+/// ```ignore
+/// use kirin_prettyless::PrettyPrintExt;
+///
+/// // Shorthand
+/// let output = statement.sprint(&stage);
+///
+/// // Builder
+/// let output = statement.render(&stage)
+///     .config(Config::default().with_width(80))
+///     .globals(&gs)
+///     .to_string();
+/// ```
+pub trait PrettyPrintExt<L: Dialect + PrettyPrint>: PrettyPrint
+where
+    L::Type: std::fmt::Display,
+{
+    /// Create a render builder for this node.
+    fn render<'n, 's>(&'n self, stage: &'s StageInfo<L>) -> RenderBuilder<'n, 's, Self, L>
+    where
+        Self: Sized;
+
+    /// Convenience shorthand: render to string with default config.
+    fn sprint(&self, stage: &StageInfo<L>) -> String;
+}
+
+// Blanket implementation: any type that implements PrettyPrint
+// automatically gets the context-aware convenience methods.
+impl<L: Dialect + PrettyPrint, T: PrettyPrint> PrettyPrintExt<L> for T
+where
+    L::Type: std::fmt::Display,
+{
+    fn render<'n, 's>(&'n self, stage: &'s StageInfo<L>) -> RenderBuilder<'n, 's, Self, L> {
+        RenderBuilder {
+            node: self,
+            stage,
+            config: Config::default(),
+            global_symbols: None,
+        }
     }
 
     fn sprint(&self, stage: &StageInfo<L>) -> String {
-        let mut doc = Document::new(Config::default(), stage);
-        doc.render(self).expect("render failed")
-    }
-
-    fn write_with_config(&self, writer: &mut impl Write, config: Config, stage: &StageInfo<L>) {
-        let mut doc = Document::new(config, stage);
-        let output = doc.render(self).expect("render failed");
-        writer.write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn write(&self, writer: &mut impl Write, stage: &StageInfo<L>) {
-        let mut doc = Document::new(Config::default(), stage);
-        let output = doc.render(self).expect("render failed");
-        writer.write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn print_with_config(&self, config: Config, stage: &StageInfo<L>) {
-        let mut doc = Document::new(config, stage);
-        let output = doc.render(self).expect("render failed");
-        stdout().write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn print(&self, stage: &StageInfo<L>) {
-        let mut doc = Document::new(Config::default(), stage);
-        let output = doc.render(self).expect("render failed");
-        stdout().write_all(output.as_bytes()).expect("write failed");
-    }
-
-    fn sprint_with_globals(
-        &self,
-        stage: &StageInfo<L>,
-        global_symbols: &InternTable<String, GlobalSymbol>,
-    ) -> String {
-        let mut doc = Document::with_global_symbols(Config::default(), stage, global_symbols);
-        doc.render(self).expect("render failed")
-    }
-
-    fn sprint_with_globals_config(
-        &self,
-        config: Config,
-        stage: &StageInfo<L>,
-        global_symbols: &InternTable<String, GlobalSymbol>,
-    ) -> String {
-        let mut doc = Document::with_global_symbols(config, stage, global_symbols);
-        doc.render(self).expect("render failed")
-    }
-
-    fn print_with_globals(
-        &self,
-        stage: &StageInfo<L>,
-        global_symbols: &InternTable<String, GlobalSymbol>,
-    ) {
-        let mut doc = Document::with_global_symbols(Config::default(), stage, global_symbols);
-        let output = doc.render(self).expect("render failed");
-        stdout().write_all(output.as_bytes()).expect("write failed");
-    }
-
-    #[cfg(feature = "bat")]
-    fn bat_with_config(&self, config: Config, stage: &StageInfo<L>) {
-        let mut doc = Document::new(config, stage);
-        doc.pager(self).expect("pager failed");
-    }
-
-    #[cfg(feature = "bat")]
-    fn bat(&self, stage: &StageInfo<L>) {
-        let mut doc = Document::new(Config::default(), stage);
-        doc.pager(self).expect("pager failed");
+        self.render(stage).to_string()
     }
 }
 

@@ -1,6 +1,6 @@
-use crate::{Document, PrettyPrint, ScanResultWidth};
+use crate::{Document, PrettyPrint};
 use bat::PrettyPrinter;
-use kirin_ir::*;
+use kirin_ir::Dialect;
 
 /// Print a string through the bat pager with shared config (language, line numbers, etc.).
 pub(crate) fn print_str(s: &str) {
@@ -20,7 +20,7 @@ where
 {
     pub fn pager<N>(&'a mut self, node: &N) -> Result<(), std::fmt::Error>
     where
-        N: ScanResultWidth<L> + PrettyPrint,
+        N: PrettyPrint,
     {
         let rendered = self.render(node)?;
         print_str(&rendered);

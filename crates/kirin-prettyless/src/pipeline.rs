@@ -8,7 +8,7 @@ use std::io::{Write, stdout};
 
 use kirin_ir::{Dialect, Function, GlobalSymbol, InternTable, Pipeline, StageInfo, StagedFunction};
 
-use crate::{Config, Document, PrettyPrint, ScanResultWidth};
+use crate::{Config, Document, PrettyPrint};
 
 /// Trait for rendering a specific staged function within a compilation stage.
 ///
@@ -57,7 +57,6 @@ impl<L> RenderStage for StageInfo<L>
 where
     L: Dialect + PrettyPrint,
     L::Type: std::fmt::Display,
-    for<'a> StagedFunction: ScanResultWidth<L>,
 {
     fn render_staged_function(
         &self,

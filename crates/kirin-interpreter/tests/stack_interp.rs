@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_function::FunctionBody;
+use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::{
     ConcreteExt, Continuation, Frame, InterpreterError, StackInterpreter, StageAccess,
 };
@@ -256,7 +256,7 @@ fn test_session_abstract_interp_with_args() {
     let ba_x = stage.block_argument(0);
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, SSAValue::from(ba_x), c1.result);
-    let ret = ControlFlow::<ArithType>::op_return(stage, add.result);
+    let ret = Return::<ArithType>::new(stage, add.result);
 
     let block = stage
         .block()
