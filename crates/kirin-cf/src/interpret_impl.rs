@@ -18,7 +18,7 @@ where
                     .iter()
                     .map(|v| interp.read(*v))
                     .collect::<Result<_, _>>()?;
-                Ok(Continuation::Jump(*target, values))
+                Ok(Continuation::Jump(target.target(), values))
             }
             ControlFlow::ConditionalBranch {
                 condition,
@@ -37,18 +37,18 @@ where
                 match cond.is_truthy() {
                     Some(true) => {
                         let values = read_args(interp, true_args)?;
-                        Ok(Continuation::Jump(*true_target, values))
+                        Ok(Continuation::Jump(true_target.target(), values))
                     }
                     Some(false) => {
                         let values = read_args(interp, false_args)?;
-                        Ok(Continuation::Jump(*false_target, values))
+                        Ok(Continuation::Jump(false_target.target(), values))
                     }
                     None => {
                         let t_values = read_args(interp, true_args)?;
                         let f_values = read_args(interp, false_args)?;
                         Ok(Continuation::Fork(smallvec![
-                            (*true_target, t_values),
-                            (*false_target, f_values),
+                            (true_target.target(), t_values),
+                            (false_target.target(), f_values),
                         ]))
                     }
                 }

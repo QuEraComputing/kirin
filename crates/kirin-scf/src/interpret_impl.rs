@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo, Successor};
+use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo};
 use kirin_interpreter::{
     BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError, StageAccess,
 };
@@ -33,14 +33,12 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let cond = interp.read(self.condition)?;
-        let then_target = Successor::from_block(self.then_body);
-        let else_target = Successor::from_block(self.else_body);
         match cond.is_truthy() {
-            Some(true) => Ok(Continuation::Jump(then_target, smallvec![])),
-            Some(false) => Ok(Continuation::Jump(else_target, smallvec![])),
+            Some(true) => Ok(Continuation::Jump(self.then_body, smallvec![])),
+            Some(false) => Ok(Continuation::Jump(self.else_body, smallvec![])),
             None => Ok(Continuation::Fork(smallvec![
-                (then_target, smallvec![]),
-                (else_target, smallvec![]),
+                (self.then_body, smallvec![]),
+                (self.else_body, smallvec![]),
             ])),
         }
     }

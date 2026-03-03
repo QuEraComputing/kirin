@@ -1,5 +1,5 @@
 use kirin_interpreter::AbstractValue;
-use kirin_ir::Lattice;
+use kirin_ir::{HasTop, Lattice};
 
 use super::*;
 

@@ -36,10 +36,7 @@ where
             .blocks(stage)
             .next()
             .ok_or(InterpreterError::MissingEntry)?;
-        Ok(Continuation::Jump(
-            kirin::prelude::Successor::from_block(entry),
-            smallvec![],
-        ))
+        Ok(Continuation::Jump(entry, smallvec![]))
     }
 }
 

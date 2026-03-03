@@ -82,7 +82,7 @@ where
         // interpreter state.
         self.push_frame(Frame::new(callee, stage_id, None))?;
         let entry_block = match def.interpret(self) {
-            Ok(Continuation::Jump(succ, _)) => succ.target(),
+            Ok(Continuation::Jump(entry, _)) => entry,
             Ok(_) => {
                 let _ = self.pop_frame();
                 return Err(InterpreterError::MissingEntry.into());

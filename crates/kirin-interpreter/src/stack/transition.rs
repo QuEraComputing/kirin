@@ -87,9 +87,9 @@ where
             Continuation::Continue => {
                 self.advance_cursor_in_stage::<L>(stage)?;
             }
-            Continuation::Jump(succ, args) => {
-                self.bind_block_args(stage, succ.target(), args)?;
-                let first = succ.target().first_statement(stage);
+            Continuation::Jump(block, args) => {
+                self.bind_block_args(stage, *block, args)?;
+                let first = block.first_statement(stage);
                 self.set_current_cursor(first)?;
             }
             Continuation::Fork(_) => {
