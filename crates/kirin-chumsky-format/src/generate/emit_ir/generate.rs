@@ -161,7 +161,11 @@ impl GenerateEmitIR {
         })
     }
 
-    pub(super) fn is_ir_type_a_type_param(&self, ir_type: &syn::Path, generics: &syn::Generics) -> bool {
+    pub(super) fn is_ir_type_a_type_param(
+        &self,
+        ir_type: &syn::Path,
+        generics: &syn::Generics,
+    ) -> bool {
         // Type parameter must be a single segment path (e.g., `T`, not `foo::T`)
         if ir_type.segments.len() != 1 {
             return false;

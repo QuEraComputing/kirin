@@ -4,9 +4,7 @@ use quote::quote;
 use crate::ChumskyLayout;
 use crate::field_kind::collect_fields;
 
-use crate::generate::{
-    collect_wrapper_types, filter_ast_fields, get_fields_in_format,
-};
+use crate::generate::{collect_wrapper_types, filter_ast_fields, get_fields_in_format};
 
 use super::GenerateAST;
 

@@ -3,9 +3,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 
-use crate::generate::{
-    BoundsBuilder, collect_all_value_types_needing_bounds,
-};
+use crate::generate::{BoundsBuilder, collect_all_value_types_needing_bounds};
 
 use super::GenerateEmitIR;
 

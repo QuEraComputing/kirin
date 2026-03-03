@@ -7,9 +7,7 @@ use crate::ChumskyLayout;
 
 use kirin_derive_core::codegen::deduplicate_types;
 
-use crate::generate::{
-    GeneratorConfig, collect_all_value_types_needing_bounds,
-};
+use crate::generate::{GeneratorConfig, collect_all_value_types_needing_bounds};
 
 /// Generator for AST type definitions.
 ///

@@ -10,8 +10,8 @@ use crate::format::{Format, FormatElement};
 
 use crate::generate::generate_enum_match;
 
-use super::helpers::{build_field_map, tokens_to_string_with_spacing};
 use super::GeneratePrettyPrint;
+use super::helpers::{build_field_map, tokens_to_string_with_spacing};
 
 impl GeneratePrettyPrint {
     /// Generates `impl PrettyPrint for Self`.
@@ -137,8 +137,8 @@ impl GeneratePrettyPrint {
         variant_name: Option<&syn::Ident>,
     ) -> (TokenStream, TokenStream) {
         // Use the shared helper that checks both #[chumsky(format = ...)] and #[kirin(format = ...)]
-        let format_str =
-            crate::generate::format_for_statement(ir_input, stmt).expect("Statement must have format string");
+        let format_str = crate::generate::format_for_statement(ir_input, stmt)
+            .expect("Statement must have format string");
 
         let format = Format::parse(&format_str, None).expect("Format string should be valid");
 

@@ -1,7 +1,7 @@
+use crate::Statement;
 use crate::arena::GetInfo;
 use crate::language::Dialect;
 use crate::signature::Signature;
-use crate::Statement;
 
 use super::staged::StagedFunction;
 

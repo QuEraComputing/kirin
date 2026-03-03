@@ -37,9 +37,8 @@ pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
 pub use stage::{
-    HasStageInfo, StageAction, StageActionMut, StageDispatch, StageDispatchMiss,
-    StageDispatchMut, StageDispatchRequiredError, StageMeta, SupportsStageDispatch,
-    SupportsStageDispatchMut,
+    HasStageInfo, StageAction, StageActionMut, StageDispatch, StageDispatchMiss, StageDispatchMut,
+    StageDispatchRequiredError, StageMeta, SupportsStageDispatch, SupportsStageDispatchMut,
 };
 
 #[cfg(feature = "derive")]

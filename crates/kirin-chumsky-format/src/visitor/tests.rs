@@ -2,8 +2,8 @@ use super::*;
 use crate::ChumskyLayout;
 use crate::field_kind::collect_fields;
 use crate::format::{Format, FormatOption};
-use kirin_derive_core::ir::{Input, Statement};
 use kirin_derive_core::ir::fields::FieldInfo;
+use kirin_derive_core::ir::{Input, Statement};
 use kirin_lexer::Token;
 
 /// Test visitor that records all calls for verification.
