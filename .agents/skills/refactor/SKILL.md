@@ -57,21 +57,21 @@ Output format:
 
 ### Available Roles
 
-Read persona files from `./team/` directory. Each file defines a role's background, perspective, and responsibility.
+Read persona files from `../../team/` directory (shared across skills). Each file defines a role's background, perspective, and responsibility.
 
 | Role | File | Staff When |
 |------|------|-----------|
-| Guardian | `./team/guardian.md` | Any cross-crate refactor or visibility change |
-| Implementer | `./team/implementer.md` | Always |
-| Migrator | `./team/migrator.md` | When downstream crates are affected |
-| PL Theorist | `./team/pl-theorist.md` | API/trait redesigns, new abstractions |
-| Compiler Engineer | `./team/compiler-engineer.md` | Performance-sensitive changes, derive macro work |
-| Physicist | `./team/physicist.md` | Public API changes, prelude changes |
-| Documenter | `./team/documenter.md` | When conventions or public API surface change |
+| Guardian | `../../team/guardian.md` | Any cross-crate refactor or visibility change |
+| Implementer | `../../team/implementer.md` | Always |
+| Migrator | `../../team/migrator.md` | When downstream crates are affected |
+| PL Theorist | `../../team/pl-theorist.md` | API/trait redesigns, new abstractions |
+| Compiler Engineer | `../../team/compiler-engineer.md` | Performance-sensitive changes, derive macro work |
+| Physicist | `../../team/physicist.md` | Public API changes, prelude changes |
+| Documenter | `../../team/documenter.md` | When conventions or public API surface change |
 
 ### Staffing Process
 
-1. Check `./team/templates/` for similar past refactors
+1. Check `../../team/templates/` for similar past refactors
 2. Ask user about refactor scope using AskUserQuestion:
    - What's changing? (traits, modules, types, renames)
    - Which crates are affected?
@@ -141,7 +141,7 @@ Map staffed roles to subagent prompts by reading the persona file and prepending
 
 After successful refactor, ask: "Save this team configuration as a template?"
 
-If yes, save to `./team/templates/<name>.md`:
+If yes, save to `../../team/templates/<name>.md`:
 ```markdown
 # Template: [name]
 
