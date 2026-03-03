@@ -1,9 +1,3 @@
-//! Code generation for the `PrettyPrint` derive macro.
-//!
-//! This generates `PrettyPrint` implementations for dialect types based on their
-//! `chumsky(format = "...")` attributes. The generated printer mirrors the parser,
-//! ensuring roundtrip compatibility.
-
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -13,86 +7,15 @@ use kirin_derive_core::ir::fields::FieldInfo;
 
 use crate::field_kind::{FieldKind, collect_fields};
 use crate::format::{Format, FormatElement};
-use kirin_lexer::Token;
 
-use super::generate_enum_match;
+use crate::generate::generate_enum_match;
 
-/// Generator for the `PrettyPrint` trait implementation.
-pub struct GeneratePrettyPrint {
-    /// Path to the kirin_prettyless crate
-    prettyless_path: syn::Path,
-}
+use super::helpers::{build_field_map, tokens_to_string_with_spacing};
+use super::GeneratePrettyPrint;
 
 impl GeneratePrettyPrint {
-    /// Creates a new generator.
-    ///
-    /// Resolution order for the prettyless crate path:
-    /// 1. `#[pretty(crate = ...)]` — explicit prettyless path
-    /// 2. `#[kirin(crate = ...)]` — derive from kirin crate path
-    /// 3. Default: `::kirin::pretty`
-    pub fn new(ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>) -> Self {
-        // If #[pretty(crate = ...)] is specified, use it directly
-        if let Some(path) = &ir_input.extra_attrs.crate_path {
-            return Self {
-                prettyless_path: path.clone(),
-            };
-        }
-
-        // Fall back to deriving from #[kirin(crate = ...)]
-        let prettyless_path = ir_input
-            .attrs
-            .crate_path
-            .as_ref()
-            .map(|p| {
-                // If user specified a kirin crate re-export path, derive prettyless as sibling
-                // e.g., `kirin::parsers` -> `kirin::pretty`
-                let mut segments = p.segments.clone();
-                if let Some(last) = segments.last_mut() {
-                    if last.ident == "parsers" {
-                        last.ident = syn::Ident::new("pretty", last.ident.span());
-                        return syn::Path {
-                            leading_colon: p.leading_colon,
-                            segments,
-                        };
-                    }
-                }
-                // Otherwise fall back to default
-                syn::parse_quote!(::kirin::pretty)
-            })
-            .unwrap_or_else(|| syn::parse_quote!(::kirin::pretty));
-        Self { prettyless_path }
-    }
-
-    /// Generates the `PrettyPrint` implementation.
-    ///
-    /// Generates `impl PrettyPrint for Self` with a method generic over `L: Dialect`.
-    /// This avoids the trait resolution overflow that occurred with the old
-    /// `impl<L: Dialect + PrettyPrint<L>> PrettyPrint<L> for Block` pattern.
-    pub fn generate(
-        &self,
-        ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
-    ) -> TokenStream {
-        // For wrapper structs, forward to the wrapped type's PrettyPrint
-        if let kirin_derive_core::ir::Data::Struct(data) = &ir_input.data {
-            if let Some(wrapper) = &data.0.wraps {
-                return self.generate_wrapper_struct_pretty_print(ir_input, wrapper);
-            }
-        }
-
-        self.generate_pretty_print(ir_input)
-    }
-
-    /// Resolves the IR crate path from `#[kirin(crate = ...)]` or default.
-    fn ir_path(ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>) -> syn::Path {
-        ir_input
-            .attrs
-            .crate_path
-            .clone()
-            .unwrap_or_else(|| syn::parse_quote!(::kirin::ir))
-    }
-
     /// Generates `impl PrettyPrint for Self`.
-    fn generate_pretty_print(
+    pub(super) fn generate_pretty_print(
         &self,
         ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
     ) -> TokenStream {
@@ -138,7 +61,7 @@ impl GeneratePrettyPrint {
     /// Generates the `PrettyPrint` impl for wrapper structs.
     ///
     /// For wrapper structs, we delegate to the wrapped type's PrettyPrint implementation.
-    fn generate_wrapper_struct_pretty_print(
+    pub(super) fn generate_wrapper_struct_pretty_print(
         &self,
         ir_input: &kirin_derive_core::ir::Input<PrettyPrintLayout>,
         wrapper: &kirin_derive_core::ir::fields::Wrapper,
@@ -215,7 +138,7 @@ impl GeneratePrettyPrint {
     ) -> (TokenStream, TokenStream) {
         // Use the shared helper that checks both #[chumsky(format = ...)] and #[kirin(format = ...)]
         let format_str =
-            super::format_for_statement(ir_input, stmt).expect("Statement must have format string");
+            crate::generate::format_for_statement(ir_input, stmt).expect("Statement must have format string");
 
         let format = Format::parse(&format_str, None).expect("Format string should be valid");
 
@@ -299,9 +222,9 @@ impl GeneratePrettyPrint {
         }
     }
 
-    fn generate_format_print(
+    pub(super) fn generate_format_print(
         &self,
-        format: &Format,
+        format: &Format<'_>,
         field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
         _collected: &[FieldInfo<PrettyPrintLayout>],
         field_vars: &[syn::Ident],
@@ -356,74 +279,4 @@ impl GeneratePrettyPrint {
             }
         }
     }
-}
-
-/// Build a map from field name/index (string) to (index, FieldInfo)
-///
-/// For named fields, both the field name and its index are added as keys.
-/// This allows format strings to use either `{field_name}` or `{0}` syntax.
-fn build_field_map(
-    collected: &[FieldInfo<PrettyPrintLayout>],
-) -> IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)> {
-    let mut map = IndexMap::new();
-    for (idx, field) in collected.iter().enumerate() {
-        // Always add the index as a key (for {0}, {1}, etc. syntax)
-        map.insert(field.index.to_string(), (idx, field));
-
-        // Also add the name if it's a named field (for {field_name} syntax)
-        if let Some(ident) = &field.ident {
-            map.insert(ident.to_string(), (idx, field));
-        }
-    }
-    map
-}
-
-/// Convert a sequence of tokens to a string for printing with proper spacing.
-///
-/// - `add_leading_space`: Add a space before the first token
-/// - `add_trailing_space`: Add a space after the last token
-fn tokens_to_string_with_spacing(
-    tokens: &[Token],
-    add_leading_space: bool,
-    add_trailing_space: bool,
-) -> String {
-    let mut result = String::new();
-
-    // Add leading space if preceded by a field
-    if add_leading_space && !tokens.is_empty() {
-        // Check if the first token is a punctuation that typically doesn't want leading space
-        let needs_leading_space = !matches!(
-            tokens.first(),
-            Some(Token::Comma) | Some(Token::RBrace) | Some(Token::RParen) | Some(Token::RBracket)
-        );
-        if needs_leading_space {
-            result.push(' ');
-        }
-    }
-
-    for (i, token) in tokens.iter().enumerate() {
-        if i > 0 {
-            result.push(' ');
-        }
-        // Use Display impl for most tokens, special-case escaped braces
-        match token {
-            Token::EscapedLBrace => result.push('{'),
-            Token::EscapedRBrace => result.push('}'),
-            other => result.push_str(&other.to_string()),
-        }
-    }
-
-    // Add trailing space if followed by a field
-    if add_trailing_space && !tokens.is_empty() {
-        // Check if the last token is a punctuation that typically doesn't want trailing space
-        let needs_trailing_space = !matches!(
-            tokens.last(),
-            Some(Token::LBrace) | Some(Token::LParen) | Some(Token::LBracket)
-        );
-        if needs_trailing_space {
-            result.push(' ');
-        }
-    }
-
-    result
 }
