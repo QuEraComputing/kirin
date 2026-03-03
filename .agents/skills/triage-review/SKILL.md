@@ -1,21 +1,21 @@
 ---
-name: review
+name: triage-review
 description: Use when wanting a comprehensive codebase review with multiple expert perspectives, after completing a refactor, or when significant work has accumulated on a feature branch
 ---
 
-# Review
+# Triage Review
 
 ## Overview
 
 Comprehensive codebase review with selectable expert reviewer personas. Two phases: generate a review plan (scope + reviewers + themes), then dispatch parallel reviewer subagents and synthesize a themed report.
 
-**Announce at start:** "I'm using the review skill to orchestrate this codebase review."
+**Announce at start:** "I'm using the triage-review skill to orchestrate this codebase review."
 
 **Read-only:** This skill produces review reports. It does NOT modify code.
 
 ## When to Use
 
-- Explicit: user invokes `/review <scope>`
+- Explicit: user invokes `/triage-review <scope>`
 - Auto-suggest after `/refactor` completes Phase 4
 - Auto-suggest when 10+ commits accumulate on a feature branch since last review
 
@@ -198,8 +198,8 @@ After all reviewers return, synthesize into themed report:
 - Persona files from `../../team/` — reviewer role definitions
 
 **Skills that call this skill:**
-- `/refactor` Phase 4 — auto-suggests `/review` after refactor completes
-- `/finishing-a-development-branch` — could auto-suggest `/review recent` before merge
+- `/refactor` Phase 4 — auto-suggests `/triage-review` after refactor completes
+- `/finishing-a-development-branch` — could auto-suggest `/triage-review recent` before merge
 
 **Related but distinct:**
 - `requesting-code-review` — PR-level review (not codebase-wide)
