@@ -7,7 +7,7 @@ description: Use when wanting a comprehensive codebase review with multiple expe
 
 ## Overview
 
-Comprehensive codebase review with selectable expert reviewer personas. Two phases: generate a review plan (scope + reviewers + themes), then dispatch parallel reviewer subagents and synthesize a themed report.
+Comprehensive codebase review with selectable expert reviewer personas. Three phases: generate a review plan (scope + reviewers + themes), dispatch parallel reviewer subagents and synthesize a themed report, then verify findings and walk through them with the user for confirmation.
 
 **Announce at start:** "I'm using the triage-review skill to orchestrate this codebase review."
 
@@ -106,7 +106,7 @@ digraph phase2 {
     "Collect findings" -> "Synthesize themed report";
     "Synthesize themed report" -> "Identify cross-cutting themes";
     "Identify cross-cutting themes" -> "Write report";
-    "Write report" -> "Commit report";
+    "Write report" -> "Phase 3";
 }
 ```
 
@@ -237,6 +237,98 @@ Confirmed: N | Likely: N | Uncertain: N
 </details>
 ```
 
+## Phase 3: Verify & Confirm
+
+After the report is written to `docs/reviews/`, verify the findings and walk through them with the user.
+
+```dot
+digraph phase3 {
+    "Report written" -> "Dispatch verification agent";
+    "Dispatch verification agent" -> "Agent reads report + source code";
+    "Agent reads report + source code" -> "Agent checks each finding against actual code";
+    "Agent checks each finding against actual code" -> "Agent returns verified/disputed list";
+    "Agent returns verified/disputed list" -> "Update report with verification notes";
+    "Update report with verification notes" -> "Walk through findings with user";
+    "Walk through findings with user" -> "User confirms/rejects each group";
+    "User confirms/rejects each group" -> "Update report with user decisions";
+    "User confirms/rejects each group" -> "Commit final report";
+}
+```
+
+### Step 1: Verification Agent
+
+Dispatch a background agent to double-check the review. The agent must:
+
+1. Read the synthesized report from `docs/reviews/YYYY-MM-DD-<scope>-review.md`
+2. For each finding, read the actual source code at the cited `file:line`
+3. Verify:
+   - Does the code at the cited location actually match what the finding describes?
+   - Is the finding technically accurate (not based on a misreading of the code)?
+   - Is the severity appropriate given the confidence level?
+   - Does the finding duplicate or contradict another finding in the same report?
+4. Return a list of findings with verification status:
+   - **verified**: Code matches description, finding is technically accurate
+   - **disputed**: Code does not match description, or finding is technically incorrect (include explanation)
+   - **downgrade**: Finding is accurate but severity is too high (suggest new severity)
+
+Any finding marked **disputed** is removed from the report and moved to **Filtered Findings** with the verification agent's explanation.
+
+Any finding marked **downgrade** has its severity adjusted.
+
+#### Verification agent prompt
+
+```
+You are a verification agent. Your job is to fact-check a code review report.
+
+Read the review report at [report path]. For each finding:
+1. Read the source file at the cited location
+2. Check: does the code actually exhibit the described issue?
+3. Check: is the severity appropriate?
+
+Output for each finding:
+- [finding identifier] — verified | disputed | downgrade
+- If disputed: explain what the code actually does vs what the finding claims
+- If downgrade: suggest new severity and explain why
+
+Be precise. Only dispute findings where the code clearly contradicts the claim.
+Do NOT dispute findings based on design opinions — only factual errors.
+```
+
+### Step 2: User Walkthrough
+
+After verification, present findings to the user in batches using `AskUserQuestion`. Group findings by severity tier to keep the walkthrough efficient.
+
+#### Walkthrough procedure
+
+1. **P0/P1 findings** (if any): Present each individually. These are high-impact and need per-finding confirmation.
+
+2. **P2 findings**: Present as a batch with one question. List all P2 findings and let the user multi-select which ones to accept.
+
+3. **P3 findings**: Present as a batch with one question. Let the user multi-select which ones to keep vs discard.
+
+#### Question format
+
+For P0/P1 (one per finding):
+```
+"[P0] [confirmed] <finding summary> — <file:line>\n\nDo you agree this should be addressed?"
+Options: Accept | Won't Fix (with rationale prompt) | Needs Discussion
+```
+
+For P2/P3 (batched):
+```
+"Which of these findings do you want to keep in the report?"
+Options: list of findings as multi-select
+```
+
+#### After walkthrough
+
+1. Update the report: mark user-rejected findings with `[Won't Fix]` and the user's rationale
+2. Move fully rejected findings to the **Filtered Findings** section
+3. Update the **Summary** counts to reflect final accepted findings
+4. Commit the final report
+
+**The report is not considered complete until the user has walked through all findings.**
+
 ## Red Flags — STOP
 
 - Modifying any code (this skill is read-only)
@@ -247,6 +339,8 @@ Confirmed: N | Likely: N | Uncertain: N
 - Assigning P0/P1 to a finding with "uncertain" confidence
 - Omitting design context from reviewer prompts (causes false positives on intentional patterns)
 - Skipping the pre-filter step (causes findings that contradict documented decisions)
+- Skipping Phase 3 verification (unverified findings waste the user's time)
+- Committing the report before user walkthrough is complete
 
 ## Integration
 
