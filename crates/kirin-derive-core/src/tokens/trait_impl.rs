@@ -116,19 +116,35 @@ impl TraitImplTokensBuilder {
     }
 
     pub fn build(self) -> TraitImplTokens {
-        let generics = self.generics.expect("generics is required");
+        let generics = self
+            .generics
+            .expect("TraitImplTokensBuilder: generics is required");
         TraitImplTokens {
             impl_generics: generics.impl_generics,
-            trait_path: self.trait_path.expect("trait_path is required"),
+            trait_path: self
+                .trait_path
+                .expect("TraitImplTokensBuilder: trait_path is required"),
             trait_generics: self.trait_generics.unwrap_or_default(),
-            type_name: self.type_name.expect("type_name is required"),
+            type_name: self
+                .type_name
+                .expect("TraitImplTokensBuilder: type_name is required"),
             type_generics: generics.type_generics,
             where_clause: generics.where_clause,
-            assoc_type_ident: self.assoc_type_ident.expect("assoc_type_ident is required"),
-            assoc_type: self.assoc_type.expect("assoc_type is required"),
-            method_name: self.method_name.expect("method_name is required"),
-            self_arg: self.self_arg.expect("self_arg is required"),
-            body: self.body.expect("body is required"),
+            assoc_type_ident: self
+                .assoc_type_ident
+                .expect("TraitImplTokensBuilder: assoc_type_ident is required"),
+            assoc_type: self
+                .assoc_type
+                .expect("TraitImplTokensBuilder: assoc_type is required"),
+            method_name: self
+                .method_name
+                .expect("TraitImplTokensBuilder: method_name is required"),
+            self_arg: self
+                .self_arg
+                .expect("TraitImplTokensBuilder: self_arg is required"),
+            body: self
+                .body
+                .expect("TraitImplTokensBuilder: body is required"),
         }
     }
 }
@@ -266,18 +282,32 @@ impl TraitMethodImplTokensBuilder {
     }
 
     pub fn build(self) -> TraitMethodImplTokens {
-        let generics = self.generics.expect("generics is required");
+        let generics = self
+            .generics
+            .expect("TraitMethodImplTokensBuilder: generics is required");
         TraitMethodImplTokens {
             impl_generics: generics.impl_generics,
-            trait_path: self.trait_path.expect("trait_path is required"),
+            trait_path: self
+                .trait_path
+                .expect("TraitMethodImplTokensBuilder: trait_path is required"),
             trait_generics: self.trait_generics.unwrap_or_default(),
-            type_name: self.type_name.expect("type_name is required"),
+            type_name: self
+                .type_name
+                .expect("TraitMethodImplTokensBuilder: type_name is required"),
             type_generics: generics.type_generics,
             where_clause: generics.where_clause,
-            method_name: self.method_name.expect("method_name is required"),
-            self_arg: self.self_arg.expect("self_arg is required"),
-            output_type: self.output_type.expect("output_type is required"),
-            body: self.body.expect("body is required"),
+            method_name: self
+                .method_name
+                .expect("TraitMethodImplTokensBuilder: method_name is required"),
+            self_arg: self
+                .self_arg
+                .expect("TraitMethodImplTokensBuilder: self_arg is required"),
+            output_type: self
+                .output_type
+                .expect("TraitMethodImplTokensBuilder: output_type is required"),
+            body: self
+                .body
+                .expect("TraitMethodImplTokensBuilder: body is required"),
         }
     }
 }
@@ -397,16 +427,26 @@ impl TraitAssocTypeImplTokensBuilder {
     }
 
     pub fn build(self) -> TraitAssocTypeImplTokens {
-        let generics = self.generics.expect("generics is required");
+        let generics = self
+            .generics
+            .expect("TraitAssocTypeImplTokensBuilder: generics is required");
         TraitAssocTypeImplTokens {
             impl_generics: generics.impl_generics,
-            trait_path: self.trait_path.expect("trait_path is required"),
+            trait_path: self
+                .trait_path
+                .expect("TraitAssocTypeImplTokensBuilder: trait_path is required"),
             trait_generics: self.trait_generics.unwrap_or_default(),
-            type_name: self.type_name.expect("type_name is required"),
+            type_name: self
+                .type_name
+                .expect("TraitAssocTypeImplTokensBuilder: type_name is required"),
             type_generics: generics.type_generics,
             where_clause: generics.where_clause,
-            assoc_type_ident: self.assoc_type_ident.expect("assoc_type_ident is required"),
-            assoc_type: self.assoc_type.expect("assoc_type is required"),
+            assoc_type_ident: self
+                .assoc_type_ident
+                .expect("TraitAssocTypeImplTokensBuilder: assoc_type_ident is required"),
+            assoc_type: self
+                .assoc_type
+                .expect("TraitAssocTypeImplTokensBuilder: assoc_type is required"),
         }
     }
 }

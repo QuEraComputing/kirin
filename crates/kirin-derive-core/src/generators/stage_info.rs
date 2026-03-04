@@ -28,7 +28,7 @@
 //! - `StageMeta` with stage identity delegation, `from_stage_name()`
 //!   dispatch, and the `Languages` associated type for dialect tuple dispatch.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::stage::{self, StageVariantInfo};
 use proc_macro2::TokenStream;
@@ -57,13 +57,12 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     }
 
     // Deduplicated dialect types (preserving first-seen order for tuple construction).
-    let mut seen_dialect_keys: Vec<String> = Vec::new();
+    let mut seen_dialect_keys: HashSet<String> = HashSet::new();
     let mut unique_dialects: Vec<&Type> = Vec::new();
     for v in &variants {
         let ty = &v.dialect_ty;
         let key = quote!(#ty).to_string();
-        if !seen_dialect_keys.contains(&key) {
-            seen_dialect_keys.push(key);
+        if seen_dialect_keys.insert(key) {
             unique_dialects.push(&v.dialect_ty);
         }
     }

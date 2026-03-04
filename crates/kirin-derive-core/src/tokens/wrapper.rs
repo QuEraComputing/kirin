@@ -1,6 +1,12 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
+/// Token generator for UFCS wrapper delegation calls of the form
+/// `<Wrapper as Trait>::method(field)`.
+///
+/// The generated calls hardcode `&self` receiver semantics — `&mut self`
+/// delegation or passing extra arguments beyond the receiver is not
+/// currently supported.
 pub struct WrapperCallTokens {
     pub wrapper_ty: TokenStream,
     pub trait_path: TokenStream,
@@ -59,10 +65,18 @@ impl WrapperCallTokensBuilder {
 
     pub fn build(self) -> WrapperCallTokens {
         WrapperCallTokens {
-            wrapper_ty: self.wrapper_ty.expect("wrapper_ty is required"),
-            trait_path: self.trait_path.expect("trait_path is required"),
-            trait_method: self.trait_method.expect("trait_method is required"),
-            field: self.field.expect("field is required"),
+            wrapper_ty: self
+                .wrapper_ty
+                .expect("WrapperCallTokensBuilder: wrapper_ty is required"),
+            trait_path: self
+                .trait_path
+                .expect("WrapperCallTokensBuilder: trait_path is required"),
+            trait_method: self
+                .trait_method
+                .expect("WrapperCallTokensBuilder: trait_method is required"),
+            field: self
+                .field
+                .expect("WrapperCallTokensBuilder: field is required"),
         }
     }
 }
@@ -121,10 +135,16 @@ impl WrapperIterTypeTokensBuilder {
 
     pub fn build(self) -> WrapperIterTypeTokens {
         WrapperIterTypeTokens {
-            wrapper_ty: self.wrapper_ty.expect("wrapper_ty is required"),
-            trait_path: self.trait_path.expect("trait_path is required"),
+            wrapper_ty: self
+                .wrapper_ty
+                .expect("WrapperIterTypeTokensBuilder: wrapper_ty is required"),
+            trait_path: self
+                .trait_path
+                .expect("WrapperIterTypeTokensBuilder: trait_path is required"),
             trait_generics: self.trait_generics.unwrap_or_default(),
-            assoc_type_ident: self.assoc_type_ident.expect("assoc_type_ident is required"),
+            assoc_type_ident: self
+                .assoc_type_ident
+                .expect("WrapperIterTypeTokensBuilder: assoc_type_ident is required"),
         }
     }
 }
