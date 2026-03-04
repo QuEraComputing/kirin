@@ -306,19 +306,85 @@ After verification, present findings to the user in batches using `AskUserQuesti
 
 3. **P3 findings**: Present as a batch with one question. Let the user multi-select which ones to keep vs discard.
 
+#### Illustration requirement
+
+Every option presented to the user **MUST** include a `markdown` preview using `AskUserQuestion`'s two-column layout (option list on left, preview on right). The preview should contain one of:
+
+- **Improvement example**: A before/after code snippet showing what the fix would look like. Prefer this when the fix is concrete and small.
+- **Source reference**: The actual source code at the cited location with an annotation showing the issue. Use this when the finding is observational or the fix is ambiguous.
+
+The user should be able to understand the finding entirely from the preview without needing to go read the source file themselves.
+
+**Example of a good preview (improvement example):**
+````markdown
+```rust
+// Current (builder/block.rs:53)
+pub fn arg_name<S: Into<String>>(mut self, name: S) -> Self {
+    if let Some(last) = self.arguments.last_mut() {
+        last.1 = Some(name.into());
+    }
+    self
+}
+
+// Suggested — add debug_assert
+pub fn arg_name<S: Into<String>>(mut self, name: S) -> Self {
+    debug_assert!(!self.arguments.is_empty(),
+        "arg_name() called without preceding argument()");
+    if let Some(last) = self.arguments.last_mut() {
+        last.1 = Some(name.into());
+    }
+    self
+}
+```
+````
+
+**Example of a good preview (source reference):**
+````markdown
+```rust
+// signature/semantics.rs:92-102
+impl<T: Lattice + Clone> SignatureSemantics<T> for LatticeSemantics {
+    fn applicable(call: &Signature<T>, cand: &Signature<T>) -> Option<()> {
+        // ⚠ checks params but NOT ret or constraints
+        // ExactSemantics checks both at line 61
+        (call.params.len() == cand.params.len())
+            .then(|| ...)?;
+        for (call_param, cand_param) in ... {
+            call_param.is_subseteq(cand_param).then(|| ())?;
+        }
+        Some(())
+    }
+}
+```
+````
+
 #### Question format
 
-For P0/P1 (one per finding):
+For P0/P1 (one per finding, single-select with preview):
 ```
-"[P0] [confirmed] <finding summary> — <file:line>\n\nDo you agree this should be addressed?"
-Options: Accept | Won't Fix (with rationale prompt) | Needs Discussion
+question: "[P0] [confirmed] <finding summary> — <file:line>"
+options:
+  - label: "Accept"
+    markdown: <improvement example or source reference>
+  - label: "Won't Fix"
+    description: "Provide rationale"
+  - label: "Needs Discussion"
+    description: "Want to discuss before deciding"
 ```
 
-For P2/P3 (batched):
+For P2/P3 (batched, one question per finding with preview since previews require single-select):
+
+When there are N findings in a tier, present them as N sequential single-select questions, each with a preview. This is preferred over multi-select because previews are only supported for single-select.
+
 ```
-"Which of these findings do you want to keep in the report?"
-Options: list of findings as multi-select
+question: "[P2] <finding summary> — <file:line>"
+options:
+  - label: "Accept"
+    markdown: <improvement example or source reference>
+  - label: "Won't Fix"
+    description: "Not worth addressing"
 ```
+
+To keep the walkthrough efficient, batch up to 4 findings per `AskUserQuestion` call (the tool supports 1-4 questions per call). Each question gets its own preview.
 
 #### After walkthrough
 
