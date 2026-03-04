@@ -315,44 +315,42 @@ Every option presented to the user **MUST** include a `markdown` preview using `
 
 The user should be able to understand the finding entirely from the preview without needing to go read the source file themselves.
 
-**Example of a good preview (improvement example):**
+##### Conciseness constraint (IMPORTANT)
+
+The right-hand preview panel has limited vertical space. **Keep previews to 15 lines or fewer.** To achieve this:
+
+1. **Show only the relevant lines** — not the entire function. Use `...` to elide context above/below the change.
+2. **For before/after**: Show only the changed lines with 1-2 lines of surrounding context. Use a single code block with a `// before:` / `// after:` separator instead of two full function bodies.
+3. **For source references**: Show only the lines that exhibit the issue (3-8 lines), with a `⚠` annotation on the key line.
+4. **Omit boilerplate**: Drop `pub fn` signatures, `impl` blocks, and other framing unless they are the point of the finding.
+5. **Use ellipsis for elided code**: `// ...` for omitted lines within a block.
+
+If you cannot convey the finding in 15 lines, split it: put a 1-sentence plain text summary above the code block.
+
+**Example of a good preview (improvement example, 8 lines):**
 ````markdown
 ```rust
-// Current (builder/block.rs:53)
-pub fn arg_name<S: Into<String>>(mut self, name: S) -> Self {
+// builder/block.rs:53 — add guard for misuse
+// before:
     if let Some(last) = self.arguments.last_mut() {
-        last.1 = Some(name.into());
-    }
-    self
-}
-
-// Suggested — add debug_assert
-pub fn arg_name<S: Into<String>>(mut self, name: S) -> Self {
+// after:
     debug_assert!(!self.arguments.is_empty(),
         "arg_name() called without preceding argument()");
     if let Some(last) = self.arguments.last_mut() {
-        last.1 = Some(name.into());
-    }
-    self
-}
 ```
 ````
 
-**Example of a good preview (source reference):**
+**Example of a good preview (source reference, 9 lines):**
 ````markdown
 ```rust
 // signature/semantics.rs:92-102
-impl<T: Lattice + Clone> SignatureSemantics<T> for LatticeSemantics {
-    fn applicable(call: &Signature<T>, cand: &Signature<T>) -> Option<()> {
-        // ⚠ checks params but NOT ret or constraints
-        // ExactSemantics checks both at line 61
-        (call.params.len() == cand.params.len())
-            .then(|| ...)?;
-        for (call_param, cand_param) in ... {
-            call_param.is_subseteq(cand_param).then(|| ())?;
-        }
-        Some(())
-    }
+fn applicable(call: &Signature<T>, cand: &Signature<T>) -> Option<()> {
+    // ⚠ checks params but NOT ret or constraints
+    // ExactSemantics checks both at line 61
+    (call.params.len() == cand.params.len())
+        .then(|| ...)?;
+    for (call_param, cand_param) in ... { /* subtype check */ }
+    Some(())
 }
 ```
 ````
