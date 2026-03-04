@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-core/src/ir/mod.rs
-assertion_line: 75
 expression: ast
 ---
 Input {
@@ -91,6 +90,7 @@ Input {
                     wraps: None,
                     extra: (),
                     extra_attrs: (),
+                    raw_attrs: [],
                 },
                 Statement {
                     name: Ident(
@@ -135,8 +135,58 @@ Input {
                     wraps: None,
                     extra: (),
                     extra_attrs: (),
+                    raw_attrs: [],
                 },
             ],
         },
     ),
+    raw_attrs: [
+        Attribute {
+            pound_token: Pound,
+            style: AttrStyle::Outer,
+            bracket_token: Bracket,
+            meta: Meta::List {
+                path: Path {
+                    leading_colon: None,
+                    segments: [
+                        PathSegment {
+                            ident: Ident(
+                                kirin,
+                            ),
+                            arguments: PathArguments::None,
+                        },
+                    ],
+                },
+                delimiter: MacroDelimiter::Paren(
+                    Paren,
+                ),
+                tokens: TokenStream [
+                    Ident {
+                        sym: crate,
+                    },
+                    Punct {
+                        char: '=',
+                        spacing: Alone,
+                    },
+                    Literal {
+                        lit: "my_crate",
+                    },
+                    Punct {
+                        char: ',',
+                        spacing: Alone,
+                    },
+                    Ident {
+                        sym: type,
+                    },
+                    Punct {
+                        char: '=',
+                        spacing: Alone,
+                    },
+                    Ident {
+                        sym: MyLattice,
+                    },
+                ],
+            },
+        },
+    ],
 }

@@ -11,6 +11,10 @@ pub struct Input<L: Layout> {
     pub attrs: GlobalOptions,
     pub extra_attrs: L::ExtraGlobalAttrs,
     pub data: Data<L>,
+    /// Raw `syn::Attribute` list from the original derive input.
+    /// Allows downstream property derives to read custom bare attributes
+    /// (e.g., `#[quantum]`) without modifying the core attribute schema.
+    pub raw_attrs: Vec<syn::Attribute>,
 }
 
 impl<L: Layout> Input<L> {
@@ -22,6 +26,7 @@ impl<L: Layout> Input<L> {
                 attrs: GlobalOptions::from_derive_input(input)?,
                 extra_attrs: L::ExtraGlobalAttrs::from_derive_input(input)?,
                 data: Data::Struct(DataStruct(Statement::from_derive_input(input)?)),
+                raw_attrs: input.attrs.clone(),
             }),
             syn::Data::Enum(data) => Ok(Self {
                 name: input.ident.clone(),
@@ -40,6 +45,7 @@ impl<L: Layout> Input<L> {
                         })
                         .collect::<darling::Result<Vec<_>>>()?,
                 }),
+                raw_attrs: input.attrs.clone(),
             }),
             syn::Data::Union(_) => Err(darling::Error::custom(
                 "Kirin ASTs can only be derived for structs or enums",

@@ -48,7 +48,7 @@ impl StatementBuilder {
 
         let glob = input.global_value;
         if input.core.is_enum {
-            let stmt = derive.kind.statement_value(statement);
+            let stmt = derive.reader.statement_value(statement);
             quote! { #glob || #stmt }
         } else {
             quote! { #glob }

@@ -14,6 +14,9 @@ pub struct Statement<L: Layout> {
     pub wraps: Option<Wrapper>,
     pub extra: L::StatementExtra,
     pub extra_attrs: L::ExtraStatementAttrs,
+    /// Raw `syn::Attribute` list from the original struct/variant.
+    /// Allows downstream property derives to read custom bare attributes.
+    pub raw_attrs: Vec<syn::Attribute>,
 }
 
 impl<L: Layout> Statement<L> {
@@ -22,6 +25,7 @@ impl<L: Layout> Statement<L> {
         attrs: StatementOptions,
         extra: L::StatementExtra,
         extra_attrs: L::ExtraStatementAttrs,
+        raw_attrs: Vec<syn::Attribute>,
     ) -> Self {
         Self {
             name,
@@ -30,6 +34,7 @@ impl<L: Layout> Statement<L> {
             wraps: None,
             extra,
             extra_attrs,
+            raw_attrs,
         }
     }
 
@@ -43,7 +48,14 @@ impl<L: Layout> Statement<L> {
         let attrs = StatementOptions::from_derive_input(input)?;
         let extra = L::StatementExtra::from_derive_input(input)?;
         let extra_attrs = L::ExtraStatementAttrs::from_derive_input(input)?;
-        Statement::new(input.ident.clone(), attrs, extra, extra_attrs).update_fields(
+        Statement::new(
+            input.ident.clone(),
+            attrs,
+            extra,
+            extra_attrs,
+            input.attrs.clone(),
+        )
+        .update_fields(
             input.attrs.iter().any(|attr| attr.path().is_ident("wraps")),
             &data.fields,
         )
@@ -53,7 +65,14 @@ impl<L: Layout> Statement<L> {
         let attrs = StatementOptions::from_variant(variant)?;
         let extra = L::StatementExtra::from_variant(variant)?;
         let extra_attrs = L::ExtraStatementAttrs::from_variant(variant)?;
-        Statement::new(variant.ident.clone(), attrs, extra, extra_attrs).update_fields(
+        Statement::new(
+            variant.ident.clone(),
+            attrs,
+            extra,
+            extra_attrs,
+            variant.attrs.clone(),
+        )
+        .update_fields(
             wraps
                 || variant
                     .attrs

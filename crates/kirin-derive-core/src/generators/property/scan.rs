@@ -1,5 +1,5 @@
 use crate::derive::InputMeta as CoreInputMeta;
-use crate::generators::property::context::{DeriveProperty, InputContext, PropertyKind};
+use crate::generators::property::context::{DeriveProperty, InputContext};
 use crate::generators::property::statement::{StatementBuilder, StatementInfo};
 use crate::prelude::*;
 
@@ -7,11 +7,10 @@ impl<'ir> Scan<'ir, StandardLayout> for DeriveProperty {
     fn scan_input(&mut self, input: &'ir ir::Input<StandardLayout>) -> darling::Result<()> {
         self.input = Some(InputContext {
             core: CoreInputMeta::from_input(input),
-            global_value: self.kind.global_value(input),
+            global_value: self.reader.global_value(input),
         });
         self.statements.clear();
-        self.validate_constant_pure_invariant(input)?;
-        self.validate_speculatable_pure_invariant(input)?;
+        self.reader.validate(input)?;
         scan::scan_input(self, input)
     }
 
@@ -34,100 +33,5 @@ impl<'ir> Scan<'ir, StandardLayout> for DeriveProperty {
         };
         self.statements.insert(statement.name.to_string(), info);
         Ok(())
-    }
-}
-
-impl DeriveProperty {
-    fn validate_constant_pure_invariant(
-        &self,
-        input: &ir::Input<StandardLayout>,
-    ) -> darling::Result<()> {
-        if !matches!(self.kind, PropertyKind::Constant) {
-            return Ok(());
-        }
-
-        let mut errors = darling::Error::accumulator();
-        let global_constant = input.attrs.constant;
-        let global_pure = input.attrs.pure;
-
-        match &input.data {
-            ir::Data::Struct(statement) => {
-                if statement.wraps.is_none() && global_constant && !global_pure {
-                    errors.push(
-                        darling::Error::custom(
-                            "effective #[kirin(constant)] requires #[kirin(pure)]",
-                        )
-                        .with_span(&input.name),
-                    );
-                }
-            }
-            ir::Data::Enum(data) => {
-                for statement in data.iter() {
-                    if statement.wraps.is_some() {
-                        continue;
-                    }
-                    let effective_constant = global_constant || statement.attrs.constant;
-                    let effective_pure = global_pure || statement.attrs.pure;
-                    if effective_constant && !effective_pure {
-                        errors.push(
-                            darling::Error::custom(format!(
-                                "variant '{}' is effectively #[kirin(constant)] but not #[kirin(pure)]",
-                                statement.name
-                            ))
-                            .with_span(&statement.name),
-                        );
-                    }
-                }
-            }
-        }
-
-        errors.finish()
-    }
-
-    fn validate_speculatable_pure_invariant(
-        &self,
-        input: &ir::Input<StandardLayout>,
-    ) -> darling::Result<()> {
-        if !matches!(self.kind, PropertyKind::Speculatable) {
-            return Ok(());
-        }
-
-        let mut errors = darling::Error::accumulator();
-        let global_speculatable = input.attrs.speculatable;
-        let global_pure = input.attrs.pure;
-
-        match &input.data {
-            ir::Data::Struct(statement) => {
-                if statement.wraps.is_none() && global_speculatable && !global_pure {
-                    errors.push(
-                        darling::Error::custom(
-                            "effective #[kirin(speculatable)] requires #[kirin(pure)]",
-                        )
-                        .with_span(&input.name),
-                    );
-                }
-            }
-            ir::Data::Enum(data) => {
-                for statement in data.iter() {
-                    if statement.wraps.is_some() {
-                        continue;
-                    }
-                    let effective_speculatable =
-                        global_speculatable || statement.attrs.speculatable;
-                    let effective_pure = global_pure || statement.attrs.pure;
-                    if effective_speculatable && !effective_pure {
-                        errors.push(
-                            darling::Error::custom(format!(
-                                "variant '{}' is effectively #[kirin(speculatable)] but not #[kirin(pure)]",
-                                statement.name
-                            ))
-                            .with_span(&statement.name),
-                        );
-                    }
-                }
-            }
-        }
-
-        errors.finish()
     }
 }
