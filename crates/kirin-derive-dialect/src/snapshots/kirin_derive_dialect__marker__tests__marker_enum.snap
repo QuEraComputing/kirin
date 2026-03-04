@@ -1,5 +1,0 @@
----
-source: crates/kirin-derive-dialect/src/marker.rs
-expression: tokens.to_string()
----
-# [automatically_derived] impl MarkerTrait for MyEnum { type Type = T ; }

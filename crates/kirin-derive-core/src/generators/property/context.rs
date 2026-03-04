@@ -126,6 +126,40 @@ impl DeriveProperty {
         }
     }
 
+    /// Create a property derive that reads from a bare attribute (e.g., `#[quantum]`).
+    ///
+    /// This is the simplest way to define a custom boolean property derive
+    /// without modifying kirin-derive-core's attribute schema.
+    pub fn bare_attr(
+        attr_name: &'static str,
+        default_crate_path: impl Into<String>,
+        trait_path: impl Into<String>,
+        trait_method: impl Into<String>,
+        value_type: impl Into<String>,
+    ) -> Self {
+        Self::new(
+            BareAttrReader::new(attr_name),
+            default_crate_path,
+            trait_path,
+            trait_method,
+            value_type,
+        )
+    }
+
+    /// Create a property derive with a custom [`PropertyValueReader`].
+    ///
+    /// Use this when you need more control than [`bare_attr`](Self::bare_attr)
+    /// provides (e.g., custom validation or reading from nested attributes).
+    pub fn with_reader(
+        reader: impl PropertyValueReader + 'static,
+        default_crate_path: impl Into<String>,
+        trait_path: impl Into<String>,
+        trait_method: impl Into<String>,
+        value_type: impl Into<String>,
+    ) -> Self {
+        Self::new(reader, default_crate_path, trait_path, trait_method, value_type)
+    }
+
     pub fn emit(&mut self, input: &syn::DeriveInput) -> darling::Result<proc_macro2::TokenStream> {
         common::emit_from_derive_input(self, input)
     }
