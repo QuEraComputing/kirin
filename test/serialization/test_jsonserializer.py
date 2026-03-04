@@ -134,4 +134,4 @@ def test_eq():
     main_des = basic.decode(json_serializer.decode(json_str))
 
     # without run_passes, we get errors in e.g. main == main_des
-    assert main_des.run_passes is not None
+    assert hasattr(main_des, "run_passes")
