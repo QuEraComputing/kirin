@@ -122,7 +122,7 @@ class ResultList(MutableSequenceView[list[ResultValue], "Statement", ResultValue
         return [result.type for result in self.field]
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Statement(IRNode["Block"]):
     """The Statment is an instruction in the IR
 
