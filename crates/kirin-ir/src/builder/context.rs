@@ -230,12 +230,12 @@ impl<L: Dialect> StageInfo<L> {
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,
-        f: StagedFunction,
+        func: StagedFunction,
         signature: Option<Signature<L::Type>>,
         #[builder(into)] body: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Result<SpecializedFunction, SpecializeError<L>> {
-        let staged_function_info = f.expect_info_mut(self);
+        let staged_function_info = func.expect_info_mut(self);
 
         let signature = signature.unwrap_or(staged_function_info.signature.clone());
 
@@ -249,7 +249,7 @@ impl<L: Dialect> StageInfo<L> {
 
         if !conflicting.is_empty() {
             return Err(SpecializeError {
-                staged_function: f,
+                staged_function: func,
                 signature,
                 conflicting,
                 body,
@@ -257,7 +257,7 @@ impl<L: Dialect> StageInfo<L> {
             });
         }
 
-        let id = SpecializedFunction(f, staged_function_info.specializations.len());
+        let id = SpecializedFunction(func, staged_function_info.specializations.len());
 
         let specialized_function = SpecializedFunctionInfo::builder()
             .id(id)

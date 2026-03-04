@@ -6,13 +6,11 @@ pub struct Item<T> {
     pub(super) data: T,
 }
 
-#[bon::bon]
 impl<T> Item<T> {
-    #[builder]
-    pub fn new(data: T, deleted: Option<bool>) -> Self {
+    pub(super) fn new(data: T) -> Self {
         Self {
             data,
-            deleted: deleted.unwrap_or(false),
+            deleted: false,
         }
     }
 }

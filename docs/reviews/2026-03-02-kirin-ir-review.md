@@ -10,39 +10,39 @@
 
 [P0] `IdMap::get` panics on out-of-range IDs instead of returning `Option` — after `gc()`, any stale ID causes an unrecoverable panic. — `arena/gc.rs:9-13` [Rust Engineer]
 
-[P0] `Arena::Index` can access deleted items without indication — `arena[id]` returns `&Item<T>` even if `item.deleted == true`. At minimum, add `debug_assert!(!self.items[...].deleted)` in `Index`/`IndexMut`. — `arena/data.rs:73-85` [Rust Engineer]
+[P0] [Won't Fix] `Arena::Index` can access deleted items without indication — `arena[id]` returns `&Item<T>` even if `item.deleted == true`. At minimum, add `debug_assert!(!self.items[...].deleted)` in `Index`/`IndexMut`. — `arena/data.rs:73-85` [Rust Engineer] — *Intentional: the deleted flag is needed for the rewrite framework which must access deleted items during rewrite passes.*
 
-[P1] `LatticeSemantics::applicable` checks `call_param.is_subseteq(cand_param)` (covariant), but sound subtype dispatch requires contravariance for input positions. Verify the intended variance direction; variable naming and docs say "subtypes" but the code does supertypes. — `signature/semantics.rs:96-102` [PL Theorist]
+[P1] [Won't Fix] `LatticeSemantics::applicable` checks `call_param.is_subseteq(cand_param)` (covariant), but sound subtype dispatch requires contravariance for input positions. Verify the intended variance direction; variable naming and docs say "subtypes" but the code does supertypes. — `signature/semantics.rs:96-102` [PL Theorist] — *Incorrect: covariant check is correct for dispatch — the call site's type must be a subtype of the candidate's type to be applicable.*
 
 ## Abstractions & Type Design
 
-[P1] `Successor` and `Block` share the same `Id` with free bidirectional conversion, collapsing a meaningful semantic distinction (control-flow edge vs. structural container) into a representational isomorphism. The newtype gives zero static safety. — `node/block.rs:27-37` [PL Theorist]
+[P1] [Won't Fix] `Successor` and `Block` share the same `Id` with free bidirectional conversion, collapsing a meaningful semantic distinction (control-flow edge vs. structural container) into a representational isomorphism. The newtype gives zero static safety. — `node/block.rs:27-37` [PL Theorist] — *Intentional: Successor and Block are separate newtypes with explicit conversion; the distinction is semantic and enforced at the API level.*
 
 [P1] `SSAKind::Test`, `SSAKind::BuilderBlockArgument`, `SSAKind::BuilderResult`, and `TestSSAValue` are internal/transient states exposed in the public enum. These break the algebraic interpretation of `SSAKind` as `Result | BlockArgument`. Builder placeholders should be a separate type or behind `#[doc(hidden)]`. — `node/ssa.rs:113-125` [PL Theorist, Rust Engineer]
 
-[P1] `TypeLattice` bundles `FiniteLattice + CompileTimeValue + Default` but has no inherent methods or blanket impl. It is a naked alias-trait with no laws beyond its components. Either give it algebraic content or replace with a where-clause bundle. — `lattice.rs:59` [PL Theorist]
+[P1] [Won't Fix] `TypeLattice` bundles `FiniteLattice + CompileTimeValue + Default` but has no inherent methods or blanket impl. It is a naked alias-trait with no laws beyond its components. Either give it algebraic content or replace with a where-clause bundle. — `lattice.rs:59` [PL Theorist] — *Intentional: TypeLattice is a semantic marker trait, not just an alias — it signals that the type participates in the lattice-based type system.*
 
-[P2] `Dialect` is a god-trait (14 supertraits + 3 auto-trait bounds). Prevents implementing `Dialect` for types that structurally lack some capabilities. Derive macro mitigation is pragmatically adequate but limits compositionality. — `language.rs:79-99` [PL Theorist]
+[P2] [Won't Fix] `Dialect` is a god-trait (14 supertraits + 3 auto-trait bounds). Prevents implementing `Dialect` for types that structurally lack some capabilities. Derive macro mitigation is pragmatically adequate but limits compositionality. — `language.rs:79-99` [PL Theorist] — *Intentional: derive macro mitigates the boilerplate; all dialects use derive in practice.*
 
-[P2] `SpecializedFunction` is `(StagedFunction, usize)` — a raw index, not an arena ID. Becomes invalid if specializations are reordered or removed. Lacks `Identifier` trait and cannot participate in arena GC. — `node/function/specialized.rs:10` [PL Theorist]
+[P2] [Won't Fix] `SpecializedFunction` is `(StagedFunction, usize)` — a raw index, not an arena ID. Becomes invalid if specializations are reordered or removed. Lacks `Identifier` trait and cannot participate in arena GC. — `node/function/specialized.rs:10` [PL Theorist] — *Intentional: SpecializedFunction is always part of a StagedFunction; invalidation handles reordering.*
 
-[P2] `BlockInfo<L>` carries `PhantomData<L>` but has no `L`-dependent fields. The phantom exists solely for `GetInfo<L>` dispatch — a type-level indirection without semantic content. — `node/block.rs:51-61` [PL Theorist]
+[P2] [Won't Fix] `BlockInfo<L>` carries `PhantomData<L>` but has no `L`-dependent fields. The phantom exists solely for `GetInfo<L>` dispatch — a type-level indirection without semantic content. — `node/block.rs:51-61` [PL Theorist] — *Intentional: PhantomData needed for GetInfo<L> dispatch.*
 
 ## Performance & Scalability
 
 [P1] `Pipeline::lookup_symbol` allocates a `String` on every call via `name.to_string()` for `FxHashMap` lookup. For a hot path (symbol resolution), this is unnecessary. Fix: add `InternTable::lookup_by_ref` using `HashMap::get` with `Borrow` trait. — `pipeline.rs:114` [Compiler Engineer, Rust Engineer]
 
-[P1] `Item<T>` has `deleted: bool` adjacent to `data: T` — for small `T`, this burns 7 bytes of padding per item. With thousands of SSA values, that's real cache pressure. Consider: move deleted bitset to a separate `BitVec` on `Arena`. — `arena/item.rs:5` [Compiler Engineer]
+[P1] [Won't Fix] `Item<T>` has `deleted: bool` adjacent to `data: T` — for small `T`, this burns 7 bytes of padding per item. With thousands of SSA values, that's real cache pressure. Consider: move deleted bitset to a separate `BitVec` on `Arena`. — `arena/item.rs:5` [Compiler Engineer] — *Intentional: keep per-item deleted flag for rewrite framework which needs item-level deletion tracking.*
 
 [P1] `all_matching` has O(n²) complexity — filters applicable candidates, then for each checks all specializations again. Re-computes `S::applicable` for the same candidates in the inner loop. — `node/function/staged.rs:102-136` [PL Theorist, Rust Engineer]
 
 [P2] `Arena::alloc` uses `bon` builder for `Item::new` on hot allocation path. Verify it optimizes away, or use a plain struct literal. — `arena/data.rs:31-32` [Compiler Engineer]
 
-[P2] `InternTable::intern` clones `T` unconditionally before insert — for `String` interning, every new symbol is cloned once for `Vec` and once for `HashMap`. Use `Rc<str>` or `HashMap::entry` to avoid double allocation. — `intern.rs:40` [Compiler Engineer]
+[P2] [Won't Fix] `InternTable::intern` clones `T` unconditionally before insert — for `String` interning, every new symbol is cloned once for `Vec` and once for `HashMap`. Use `Rc<str>` or `HashMap::entry` to avoid double allocation. — `intern.rs:40` [Compiler Engineer] — *Not actionable: clone unavoidable without a data structure change (e.g., Rc<str>); current approach is simple and correct.*
 
-[P2] `DenseHint` uses `Vec<Option<T>>` — for general `T`, every slot pays `size_of::<T>() + 1` with padding. A parallel `Vec<T>` with separate `BitVec` occupancy mask would be more cache-friendly. — `arena/hint/dense.rs:8` [Compiler Engineer]
+[P2] [Won't Fix] `DenseHint` uses `Vec<Option<T>>` — for general `T`, every slot pays `size_of::<T>() + 1` with padding. A parallel `Vec<T>` with separate `BitVec` occupancy mask would be more cache-friendly. — `arena/hint/dense.rs:8` [Compiler Engineer] — *Accept trade-off: Vec<Option<T>> is simpler and the performance impact is minimal for current use cases.*
 
-[P2] `StatementIter` chases linked-list pointers through the arena — poor spatial locality when statements aren't allocated in block order. Known trade-off; worth noting for future optimization. — `node/block.rs:174-196` [Compiler Engineer]
+[P2] [Won't Fix] `StatementIter` chases linked-list pointers through the arena — poor spatial locality when statements aren't allocated in block order. Known trade-off; worth noting for future optimization. — `node/block.rs:174-196` [Compiler Engineer] — *Informational: known trade-off.*
 
 [P3] `StageDispatch` does linear scan over the HList — O(N) with N dialects. For typical N (2-5), this is fine. No action needed. — `stage/dispatch.rs:33-38` [Compiler Engineer]
 
@@ -60,7 +60,7 @@
 
 [P2] `Pipeline::link()` panics on unknown Function but `Pipeline::staged_function()` auto-links — creates "which do I use?" confusion. — `pipeline.rs:135-140` [Physicist]
 
-[P3] The test in `context.rs` manually implements all 14 Dialect supertraits for a trivial TestDialect — exactly the boilerplate wall a new user hits without `#[derive(Dialect)]`. A doc comment pointing to the derive macro would help. — `builder/context.rs:346-472` [Physicist]
+[P3] [Won't Fix] The test in `context.rs` manually implements all 14 Dialect supertraits for a trivial TestDialect — exactly the boilerplate wall a new user hits without `#[derive(Dialect)]`. A doc comment pointing to the derive macro would help. — `builder/context.rs:346-472` [Physicist] — *Intentional: tests avoid derive dependency to test bare-minimum logic.*
 
 [P3] `SpecializedFunction::id()` returns `(StagedFunction, usize)` — a raw tuple. Named accessors (`.staged()`, `.index()`) would be more self-documenting. — `node/function/specialized.rs:13-15` [Physicist]
 
@@ -68,7 +68,7 @@
 
 [P1] `detach.rs` uses `.and_then(|prev| { ...; Some(()) })` for side effects — should be `if let Some(prev) = prev { ... }`. Also uses `if let None = prev` instead of `prev.is_none()`. — `detach.rs:24-28,38,47` [Rust Engineer]
 
-[P1] `link_statements`/`link_blocks` panic on doubly-linked nodes with `Debug` output of IR nodes. Library code should return `Result` instead. — `builder/context.rs:27,34,55,62` [Rust Engineer]
+[P1] [Won't Fix] `link_statements`/`link_blocks` panic on doubly-linked nodes with `Debug` output of IR nodes. Library code should return `Result` instead. — `builder/context.rs:27,34,55,62` [Rust Engineer] — *Intentional: panics catch IR corruption during building stage; these indicate programming errors, not runtime conditions.*
 
 [P2] `Arena` has `len()` but no `is_empty()` — clippy `len_without_is_empty`. — `arena/data.rs:24-26` [Rust Engineer]
 

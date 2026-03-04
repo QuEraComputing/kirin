@@ -169,7 +169,7 @@ fn specialize_return_const(
     if with_arg {
         stage
             .specialize()
-            .f(staged_function)
+            .func(staged_function)
             .signature(Signature {
                 params: vec![ArithType::I64],
                 ret: ArithType::I64,
@@ -181,7 +181,7 @@ fn specialize_return_const(
     } else {
         stage
             .specialize()
-            .f(staged_function)
+            .func(staged_function)
             .body(body)
             .new()
             .unwrap()
@@ -285,12 +285,12 @@ fn test_cross_stage_recursive_call() {
     let spec_a = {
         let stage = pipeline.stage_mut(stage_a).unwrap();
         let body = build_cross_stage_recursive_body(stage, func, stage_b);
-        stage.specialize().f(staged_a).body(body).new().unwrap()
+        stage.specialize().func(staged_a).body(body).new().unwrap()
     };
     {
         let stage = pipeline.stage_mut(stage_b).unwrap();
         let body = build_cross_stage_recursive_body(stage, func, stage_a);
-        stage.specialize().f(staged_b).body(body).new().unwrap();
+        stage.specialize().func(staged_b).body(body).new().unwrap();
     }
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_a);
@@ -342,7 +342,7 @@ fn test_function_call_missing_stage_mapping_error() {
         let body = build_caller_with_function_call(stage, "callee");
         stage
             .specialize()
-            .f(caller_staged_b)
+            .func(caller_staged_b)
             .body(body)
             .new()
             .unwrap()
@@ -388,7 +388,7 @@ fn test_function_call_no_specialization_error() {
         let body = build_caller_with_function_call(stage_info, "callee");
         stage_info
             .specialize()
-            .f(caller_staged)
+            .func(caller_staged)
             .body(body)
             .new()
             .unwrap()
@@ -440,7 +440,7 @@ fn test_function_call_ambiguous_specialization_error() {
         let body = build_caller_with_function_call(stage_info, "callee");
         stage_info
             .specialize()
-            .f(caller_staged)
+            .func(caller_staged)
             .body(body)
             .new()
             .unwrap()
@@ -491,7 +491,7 @@ fn test_function_call_unique_specialization_success() {
         let body = build_caller_with_function_call(stage_info, "callee");
         stage_info
             .specialize()
-            .f(caller_staged)
+            .func(caller_staged)
             .body(body)
             .new()
             .unwrap()
@@ -618,7 +618,7 @@ fn test_typed_call_reports_stage_mismatch() {
             unreachable!();
         };
         let body = build_cross_stage_recursive_body(stage, func, dyn_stage);
-        stage.specialize().f(staged).body(body).new().unwrap()
+        stage.specialize().func(staged).body(body).new().unwrap()
     };
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, dummy_stage);

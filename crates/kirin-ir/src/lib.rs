@@ -41,6 +41,15 @@ pub use stage::{
     StageDispatchRequiredError, StageMeta, SupportsStageDispatch, SupportsStageDispatchMut,
 };
 
+/// Re-exports of the most commonly used types for dialect authors.
+pub mod prelude {
+    pub use crate::{
+        Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, Region, ResultValue,
+        SSAValue, StageInfo, StageMeta, Statement,
+    };
+    pub use crate::{CompileTimeValue, Typeof};
+}
+
 #[cfg(feature = "derive")]
 pub use kirin_derive::{
     Dialect, HasArguments, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,

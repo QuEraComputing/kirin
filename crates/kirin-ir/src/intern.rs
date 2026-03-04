@@ -50,7 +50,14 @@ impl<T: Clone + Eq + std::hash::Hash, Key: InternKey> InternTable<T, Key> {
     /// Look up a previously interned item without inserting.
     ///
     /// Returns `None` if the item has never been interned.
-    pub fn lookup(&self, item: &T) -> Option<Key> {
+    ///
+    /// Accepts any type that `T` borrows as (e.g., `&str` for `String` keys),
+    /// avoiding unnecessary allocation on lookup.
+    pub fn lookup<Q>(&self, item: &Q) -> Option<Key>
+    where
+        T: std::borrow::Borrow<Q>,
+        Q: Eq + std::hash::Hash + ?Sized,
+    {
         self.item_map.get(item).copied()
     }
 }

@@ -155,7 +155,7 @@ where
     let mut builder = ctx.stage.block().name(block_name);
 
     for (name, ty, _) in arg_info {
-        builder = builder.argument_with_name(name, ty);
+        builder = builder.argument(ty).arg_name(name);
     }
 
     // Add statements, handling terminators specially

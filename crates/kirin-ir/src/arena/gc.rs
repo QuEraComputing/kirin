@@ -6,10 +6,7 @@ pub struct IdMap<I: Identifier>(Vec<Option<I>>);
 
 impl<I: Identifier> IdMap<I> {
     pub fn get(&self, old: I) -> Option<I> {
-        if old.into().raw() >= self.0.len() {
-            panic!("unexpected Id")
-        }
-        self.0[old.into().raw()]
+        self.0.get(old.into().raw()).copied().flatten()
     }
 }
 
@@ -42,6 +39,6 @@ impl<I: Identifier, T> Arena<I, T> {
             })
             .collect::<Vec<_>>();
         self.items.retain(|item| !item.deleted());
-        return IdMap(raw);
+        IdMap(raw)
     }
 }

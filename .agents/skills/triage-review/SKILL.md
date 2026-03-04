@@ -95,6 +95,7 @@ Plan contents:
 2. **Reviewer roster**: which reviewers and why
 3. **Themes**: which themes apply, assigned primary + optional secondary reviewer
 4. **File assignments**: which files each reviewer should focus on
+5. **Design context**: which AGENTS.md convention sections are relevant to this scope (will be included in reviewer prompts to prevent false positives on intentional design decisions)
 
 ## Phase 2: Execute Review
 
@@ -117,15 +118,46 @@ For each reviewer, dispatch a subagent with:
 1. The reviewer's persona file content (read from `../../team/<persona>.md`)
 2. Their assigned themes
 3. The files to review (from the plan)
-4. Output format instructions:
+4. **Design context** (see below)
+5. Output format instructions (see below)
+
+#### Design context block
+
+Before dispatching, read the project's `AGENTS.md` (specifically the conventions sections relevant to the scope — e.g., "IR Design Conventions", "Interpreter Conventions", "Derive Infrastructure Conventions"). Include the relevant sections verbatim in each reviewer's prompt as a **Design Context** block. This gives reviewers visibility into documented design decisions so they don't flag intentional patterns as issues.
+
+#### Output format instructions
 
 ```
 You are reviewing the following files as the [Reviewer Name].
 
 Your assigned themes: [theme list]
 
-For each finding, output in this format:
-[severity] finding description — file:line
+## Design Context
+
+The following design decisions are documented in AGENTS.md. Do NOT flag
+these as issues — they are intentional:
+
+[paste relevant AGENTS.md convention sections here]
+
+## Confidence Requirement
+
+For each finding, you MUST classify your confidence:
+
+- **confirmed**: You are certain this is an issue (e.g., demonstrable bug,
+  clear violation of Rust idioms, provably incorrect logic). Use for P0/P1.
+- **likely**: You believe this is an issue but there may be a design reason
+  you're not aware of. Use for P1/P2.
+- **uncertain**: This looks unusual but could be intentional. You cannot
+  rule out a valid design reason. Use for P2/P3 only.
+
+Do NOT assign P0 or P1 severity to findings with "uncertain" confidence.
+When uncertain, phrase the finding as a question (e.g., "Is X intentional?
+If not, consider Y.").
+
+## Output Format
+
+For each finding:
+[severity] [confidence] finding description — file:line
 
 Severity levels:
 - P0: Must fix (bugs, unsoundness, correctness issues)
@@ -138,13 +170,24 @@ Keep your review to 200-400 words. Focus on your assigned themes.
 
 ### Report Synthesis
 
-After all reviewers return, synthesize into themed report:
+After all reviewers return, synthesize into themed report.
+
+#### Pre-filter step
+
+Before writing the report, cross-reference every finding against:
+1. `AGENTS.md` design conventions — drop findings that contradict documented decisions
+2. `CLAUDE.md` project instructions — drop findings that conflict with stated conventions
+3. Previous review reports in `docs/reviews/` — drop findings already marked `[Won't Fix]` in prior reviews
+
+For each dropped finding, note it in a `## Filtered Findings` section at the end of the report (collapsed by default) so the user can audit what was removed and why.
+
+#### Synthesis steps
 
 1. Group findings by theme (not by reviewer)
 2. Within each theme, sort by severity (P0 first)
-3. Include reviewer attribution inline: `[P1] finding — file:line [PL Theorist]`
+3. Include reviewer attribution and confidence inline: `[P1] [confirmed] finding — file:line [PL Theorist]`
 4. Identify cross-cutting themes (patterns across 2+ reviewers/themes)
-5. Write summary counts
+5. Write summary counts (separately for confirmed vs uncertain findings)
 
 **Output:** `docs/reviews/YYYY-MM-DD-<scope>-review.md`
 
@@ -158,8 +201,8 @@ After all reviewers return, synthesize into themed report:
 **Plan:** docs/plans/YYYY-MM-DD-<scope>-review-plan.md
 
 ## Correctness & Safety
-[P0] <finding> — <file:line> [Reviewer]
-[P1] <finding> — <file:line> [Reviewer]
+[P0] [confirmed] <finding> — <file:line> [Reviewer]
+[P1] [likely] <finding> — <file:line> [Reviewer]
 
 ## Abstractions & Type Design
 ...
@@ -181,6 +224,17 @@ After all reviewers return, synthesize into themed report:
 - P1: N issues (should fix)
 - P2: N improvements (nice to have)
 - P3: N notes (informational)
+
+Confirmed: N | Likely: N | Uncertain: N
+
+## Filtered Findings
+
+<details>
+<summary>N findings filtered (click to expand)</summary>
+
+- <finding> — filtered because: <reason (e.g., "contradicts AGENTS.md IR Design Conventions: deleted flag needed for rewrite framework")>
+- ...
+</details>
 ```
 
 ## Red Flags — STOP
@@ -190,6 +244,9 @@ After all reviewers return, synthesize into themed report:
 - Dispatching reviewers sequentially instead of in parallel
 - Writing findings without file:line references
 - Proceeding with review after user rejects the plan
+- Assigning P0/P1 to a finding with "uncertain" confidence
+- Omitting design context from reviewer prompts (causes false positives on intentional patterns)
+- Skipping the pre-filter step (causes findings that contradict documented decisions)
 
 ## Integration
 

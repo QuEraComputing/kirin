@@ -67,7 +67,7 @@ impl<L: Dialect> StagedFunctionInfo<L> {
         &self.signature.ret
     }
 
-    pub fn backedges(&self) -> &Vec<StagedFunction> {
+    pub fn backedges(&self) -> &[StagedFunction] {
         &self.backedges
     }
 
@@ -83,7 +83,7 @@ impl<L: Dialect> StagedFunctionInfo<L> {
 
     /// Get the specializations of this staged function.
     /// The specialized function signature are strictly subset of the staged function signature
-    pub fn specializations(&self) -> &Vec<SpecializedFunctionInfo<L>> {
+    pub fn specializations(&self) -> &[SpecializedFunctionInfo<L>] {
         &self.specializations
     }
 
@@ -113,25 +113,26 @@ impl<L: Dialect> StagedFunctionInfo<L> {
 
         // Reduce to the most specific candidates: keep only those where
         // no other applicable candidate is strictly more specific.
-        applicable
-            .into_iter()
-            .filter(|(spec, env)| {
-                !self
-                    .specializations
+        let dominated: Vec<bool> = applicable
+            .iter()
+            .enumerate()
+            .map(|(i, (spec, env))| {
+                applicable
                     .iter()
-                    .filter(|other| !other.is_invalidated())
-                    .any(|other| {
-                        if std::ptr::eq(*spec, other) {
-                            return false;
-                        }
-                        if let Some(other_env) = S::applicable(call, other.signature()) {
-                            S::cmp_candidate(other.signature(), &other_env, spec.signature(), env)
+                    .enumerate()
+                    .any(|(j, (other, other_env))| {
+                        i != j
+                            && S::cmp_candidate(other.signature(), other_env, spec.signature(), env)
                                 == SignatureCmp::More
-                        } else {
-                            false
-                        }
                     })
             })
+            .collect();
+
+        applicable
+            .into_iter()
+            .zip(dominated)
+            .filter(|(_, d)| !*d)
+            .map(|(item, _)| item)
             .collect()
     }
 }

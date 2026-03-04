@@ -41,7 +41,24 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         self
     }
 
+    /// Name the most recently added argument.
+    ///
+    /// Must be called immediately after [`argument`](Self::argument).
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// builder.argument(F64).arg_name("y")
+    /// ```
+    pub fn arg_name<S: Into<String>>(mut self, name: S) -> Self {
+        if let Some(last) = self.arguments.last_mut() {
+            last.1 = Some(name.into());
+        }
+        self
+    }
+
     /// Add an argument with a name to the block.
+    #[deprecated(note = "use `.argument(ty).arg_name(name)` instead")]
     pub fn argument_with_name<T: Into<L::Type>, S: Into<String>>(mut self, name: S, ty: T) -> Self {
         self.arguments.push((ty.into(), Some(name.into())));
         self

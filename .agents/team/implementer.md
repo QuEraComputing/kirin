@@ -19,6 +19,15 @@ Best practices for IR design, pass infrastructure, trait-based dispatch, and lay
 - NEVER place new types/traits without checking CLAUDE.md crate ownership conventions
 - If `cargo check` fails 3 times on the same error, STOP and report the issue
 
+## Review Confidence (when acting as reviewer)
+
+When reviewing code (not implementing), classify each finding's confidence:
+- **confirmed**: Demonstrable bug, clear Rust anti-pattern, provably incorrect logic
+- **likely**: Probable issue but a design reason could exist
+- **uncertain**: Looks unusual but could be intentional (e.g., panics that guard invariants, deleted flags accessible by design)
+
+Do not assign P0/P1 to "uncertain" findings. When a panic exists in builder/linking code, consider whether it guards against IR corruption before flagging it.
+
 ## What to Consider While Implementing
 - Does this change respect the darling re-export rule? (Use `kirin_derive_core::prelude::darling`, never import darling directly)
 - Does this change affect derive macro codegen? Check `kirin-chumsky-format` and `kirin-prettyless-derive`

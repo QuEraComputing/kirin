@@ -5,8 +5,10 @@ use crate::builder::error::StagedFunctionError;
 use crate::intern::InternTable;
 use crate::language::Dialect;
 use crate::node::function::{
-    CompileStage, Function, FunctionInfo, SpecializedFunctionInfo, StagedFunction,
+    CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
+    StagedFunction,
 };
+use crate::node::stmt::Statement;
 use crate::node::symbol::GlobalSymbol;
 use crate::signature::Signature;
 use crate::stage::{HasStageInfo, StageMeta};
@@ -111,7 +113,7 @@ impl<S> Pipeline<S> {
     ///
     /// Returns `None` if the name has never been interned.
     pub fn lookup_symbol(&self, name: &str) -> Option<GlobalSymbol> {
-        self.global_symbols.lookup(&name.to_string())
+        self.global_symbols.lookup(name)
     }
 
     /// Get a reference to the global symbol table.
@@ -126,7 +128,11 @@ impl<S> Pipeline<S> {
 
     /// Link a [`StagedFunction`] to an abstract [`Function`] at the given stage.
     ///
-    /// This is a convenience shorthand for
+    /// This is a low-level method for manually linking a staged function that was
+    /// created directly on a [`StageInfo`] (via [`StageInfo::staged_function`]).
+    /// Prefer [`Pipeline::staged_function`] which creates and links in one step.
+    ///
+    /// Equivalent to
     /// `pipeline.function_info_mut(func).unwrap().add_staged_function(stage, sf)`.
     ///
     /// # Panics
@@ -188,7 +194,7 @@ impl<S> Pipeline<S> {
     #[builder(finish_fn = new)]
     pub fn function(&mut self, #[builder(into)] name: Option<String>) -> Function {
         let sym = name.map(|n| {
-            if let Some(existing) = self.global_symbols.lookup(&n) {
+            if let Some(existing) = self.global_symbols.lookup(n.as_str()) {
                 if self.name_index.contains_key(&existing) {
                     panic!("duplicate abstract function name: {n}");
                 }
@@ -265,6 +271,65 @@ impl<S> Pipeline<S> {
             .add_staged_function(stage, sf);
 
         Ok(sf)
+    }
+
+    /// Create a function with a single staged function and specialization in one call.
+    ///
+    /// This is a convenience shorthand for the common case of creating the full
+    /// three-level function hierarchy (Function → StagedFunction → SpecializedFunction)
+    /// with a single body.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the stage does not contain a `StageInfo` for the given dialect,
+    /// or if a function with the same name already exists.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let (func, sf, spec) = pipeline.define_function::<MyDialect>()
+    ///     .stage(stage_id)
+    ///     .body(body_stmt)
+    ///     .name("my_func")
+    ///     .signature(sig)
+    ///     .new()
+    ///     .unwrap();
+    /// ```
+    #[builder(finish_fn = new)]
+    pub fn define_function<L: Dialect>(
+        &mut self,
+        #[builder(into)] name: Option<String>,
+        stage: CompileStage,
+        signature: Option<Signature<L::Type>>,
+        #[builder(into)] body: Statement,
+    ) -> Result<(Function, StagedFunction, SpecializedFunction), StagedFunctionError<L>>
+    where
+        S: HasStageInfo<L>,
+    {
+        let func = self.function().maybe_name(name).new();
+
+        let sf = self
+            .staged_function::<L>()
+            .func(func)
+            .stage(stage)
+            .maybe_signature(signature.clone())
+            .new()?;
+
+        let stage_info = self
+            .stages
+            .get_mut(Id::from(stage).raw())
+            .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
+            .expect("invalid stage or stage does not contain a StageInfo for this dialect");
+
+        let spec = stage_info
+            .specialize()
+            .func(sf)
+            .maybe_signature(signature)
+            .body(body)
+            .new()
+            .expect("specialization conflict on newly created staged function");
+
+        Ok((func, sf, spec))
     }
 }
 

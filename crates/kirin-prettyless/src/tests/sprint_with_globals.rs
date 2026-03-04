@@ -22,7 +22,7 @@ fn test_sprint_with_globals() {
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let _ = stage
         .specialize()
-        .f(staged_function)
+        .func(staged_function)
         .body(fdef)
         .new()
         .unwrap();

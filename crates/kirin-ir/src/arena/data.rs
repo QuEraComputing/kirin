@@ -25,19 +25,21 @@ impl<I: Identifier, T> Arena<I, T> {
         self.items.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
     /// Allocate a new item in the arena and return its identifier.
     pub fn alloc(&mut self, item: T) -> I {
         let id = self.next_id();
-        self.items
-            .push(Item::builder().data(item).deleted(false).build());
+        self.items.push(Item::new(item));
         id
     }
 
     pub fn alloc_with_id(&mut self, f: impl FnOnce(I) -> T) -> I {
         let id = self.next_id();
         let item = f(id);
-        self.items
-            .push(Item::builder().data(item).deleted(false).build());
+        self.items.push(Item::new(item));
         id
     }
 

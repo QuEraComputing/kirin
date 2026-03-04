@@ -63,7 +63,7 @@ fn test_abstract_interp_constants() {
         .new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
+    let spec_fn = stage.specialize().func(sf).body(body).new().unwrap();
 
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
@@ -165,7 +165,7 @@ fn test_abstract_interp_call_caches_summary() {
         .new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
+    let spec_fn = stage.specialize().func(sf).body(body).new().unwrap();
 
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
@@ -476,7 +476,7 @@ fn test_abstract_analysis_result_ssa_values() {
         .new();
     let region = stage.region().add_block(block).new();
     let func_body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().f(sf).body(func_body).new().unwrap();
+    let spec_fn = stage.specialize().func(sf).body(func_body).new().unwrap();
 
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);

@@ -28,7 +28,8 @@ fn test_block() {
     let block_a: Block = stage
         .block()
         .argument(SimpleType::I64)
-        .argument_with_name("y", SimpleType::F64)
+        .argument(SimpleType::F64)
+        .arg_name("y")
         .stmt(a)
         .stmt(b)
         .stmt(c)
@@ -47,7 +48,7 @@ fn test_block() {
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let f = stage
         .specialize()
-        .f(staged_function)
+        .func(staged_function)
         .body(fdef)
         .new()
         .unwrap();

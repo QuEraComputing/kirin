@@ -48,6 +48,7 @@ impl_ssa_display!(DeletedSSAValue);
 
 /// Represents a test SSA value. Used in tests only.
 /// This SSAValue may not exist in the SSA database.
+#[doc(hidden)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct TestSSAValue(pub usize);
 
@@ -116,11 +117,14 @@ pub enum SSAKind {
     // should not appear in final SSA IR
     /// A placeholder for builders to update the Block information later.
     /// It holds the index of the argument in the block's argument list.
+    #[doc(hidden)]
     BuilderBlockArgument(usize),
     /// A placeholder for builders to update the Result information later when building the statement.
     /// It holds the index of the result in the statement's result list.
+    #[doc(hidden)]
     BuilderResult(usize),
     /// A placeholder for tests to create SSA values that do not exist in the SSA database.
+    #[doc(hidden)]
     Test,
 }
 

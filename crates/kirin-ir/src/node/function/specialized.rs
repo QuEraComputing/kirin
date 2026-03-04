@@ -84,7 +84,7 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         &self.signature
     }
 
-    pub fn backedges(&self) -> &Vec<SpecializedFunction> {
+    pub fn backedges(&self) -> &[SpecializedFunction] {
         &self.backedges
     }
 

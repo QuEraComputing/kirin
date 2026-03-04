@@ -266,7 +266,7 @@ fn test_session_abstract_interp_with_args() {
         .new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().f(sf).body(body).new().unwrap();
+    let spec_fn = stage.specialize().func(sf).body(body).new().unwrap();
 
     // Resolve entry info for manual frame setup
     let stage_info = pipeline.stage(stage_id).unwrap();

@@ -537,7 +537,7 @@ where
 
     stage
         .specialize()
-        .f(staged_function)
+        .func(staged_function)
         .signature(header.signature.clone())
         .body(body_statement)
         .new()
