@@ -32,9 +32,11 @@ impl<I: Identifier, T> DenseHint<I, T> {
     }
 
     pub fn insert(&mut self, id: I, value: T) {
-        if let Some(slot) = self.data.get_mut(id.into().raw()) {
-            *slot = Some(value);
+        let idx = id.into().raw();
+        if idx >= self.data.len() {
+            self.data.resize_with(idx + 1, || None);
         }
+        self.data[idx] = Some(value);
     }
 
     pub fn insert_or_combine(&mut self, id: I, value: T, combine: impl FnOnce(&T, T) -> T) {

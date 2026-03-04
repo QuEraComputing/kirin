@@ -51,6 +51,10 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     /// builder.argument(F64).arg_name("y")
     /// ```
     pub fn arg_name<S: Into<String>>(mut self, name: S) -> Self {
+        debug_assert!(
+            !self.arguments.is_empty(),
+            "arg_name called without a preceding argument()"
+        );
         if let Some(last) = self.arguments.last_mut() {
             last.1 = Some(name.into());
         }
@@ -69,12 +73,11 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         let stmt = stmt.into();
         let info = stmt.expect_info(self.stage);
 
-        info.definition.is_terminator().then(|| {
-            panic!(
-                "Cannot add terminator statement {:?} as a regular statement in block",
-                info.definition
-            )
-        });
+        assert!(
+            !info.definition.is_terminator(),
+            "Cannot add terminator statement {:?} as a regular statement in block",
+            info.definition
+        );
         self.statements.push(stmt);
         self
     }
@@ -84,12 +87,11 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         let term = term.into();
         let info = term.expect_info(self.stage);
 
-        let _ = info.definition.is_terminator() || {
-            panic!(
-                "Statement {:?} is not a terminator and cannot be set as block terminator",
-                info.definition
-            )
-        };
+        assert!(
+            info.definition.is_terminator(),
+            "Statement {:?} is not a terminator and cannot be set as block terminator",
+            info.definition
+        );
         self.terminator = Some(term.into());
         self
     }

@@ -101,7 +101,11 @@ impl<S> Pipeline<S> {
     ///
     /// If the string has already been interned, the existing [`GlobalSymbol`] is returned.
     pub fn intern(&mut self, name: impl Into<String>) -> GlobalSymbol {
-        self.global_symbols.intern(name.into())
+        let name = name.into();
+        if let Some(existing) = self.global_symbols.lookup(name.as_str()) {
+            return existing;
+        }
+        self.global_symbols.intern(name)
     }
 
     /// Resolve a [`GlobalSymbol`] back to its string representation.
@@ -312,7 +316,7 @@ impl<S> Pipeline<S> {
             .staged_function::<L>()
             .func(func)
             .stage(stage)
-            .maybe_signature(signature.clone())
+            .maybe_signature(signature)
             .new()?;
 
         let stage_info = self
@@ -321,10 +325,10 @@ impl<S> Pipeline<S> {
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
             .expect("invalid stage or stage does not contain a StageInfo for this dialect");
 
+        // Omit signature — specialize defaults to the staged function's signature.
         let spec = stage_info
             .specialize()
-            .func(sf)
-            .maybe_signature(signature)
+            .staged_func(sf)
             .body(body)
             .new()
             .expect("specialization conflict on newly created staged function");

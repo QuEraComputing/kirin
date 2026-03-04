@@ -32,11 +32,15 @@ impl<I: Identifier, T> SparseHint<I, T> {
     }
 
     pub fn insert_or_combine(&mut self, id: I, value: T, combine: impl FnOnce(&T, T) -> T) {
-        if let Some(existing) = self.data.get_mut(&id) {
-            let new_value = combine(existing, value);
-            *existing = new_value;
-        } else {
-            self.data.insert(id, value);
+        use std::collections::hash_map::Entry;
+        match self.data.entry(id) {
+            Entry::Occupied(mut entry) => {
+                let new_value = combine(entry.get(), value);
+                *entry.get_mut() = new_value;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(value);
+            }
         }
     }
 }

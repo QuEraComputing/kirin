@@ -21,6 +21,8 @@ impl<I: Identifier, T> Arena<I, T> {
         I::from(Id(self.items.len()))
     }
 
+    /// Returns the total number of slots (including deleted tombstones).
+    /// Use `iter()` to get only live items.
     pub fn len(&self) -> usize {
         self.items.len()
     }

@@ -230,7 +230,7 @@ impl<L: Dialect> StageInfo<L> {
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,
-        func: StagedFunction,
+        #[builder(name = staged_func)] func: StagedFunction,
         signature: Option<Signature<L::Type>>,
         #[builder(into)] body: Statement,
         backedges: Option<Vec<SpecializedFunction>>,

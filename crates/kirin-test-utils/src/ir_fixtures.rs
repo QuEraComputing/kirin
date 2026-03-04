@@ -31,7 +31,7 @@ pub fn build_constants(
         .new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 /// Build `f(x) = c1 = const 1; sum = add(x, c1); ret sum`.
@@ -56,7 +56,7 @@ pub fn build_add_one(
         .new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 /// Build `f() = c1 = const 5; c2 = const 10; sum = add(c1, c2); ret sum`.
@@ -84,7 +84,7 @@ pub fn build_linear_program(
         .new();
     let region = stage.region().add_block(block).new();
     let func_body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().func(sf).body(func_body).new().unwrap();
+    let spec_fn = stage.specialize().staged_func(sf).body(func_body).new().unwrap();
     (spec_fn, add_stmt)
 }
 
@@ -177,7 +177,7 @@ pub fn build_select_program(
         .add_block(falsy_block)
         .new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 /// Build a branching program with neg/pos paths:
@@ -265,7 +265,7 @@ pub fn build_branch_fork_program(
         .add_block(pos_block)
         .new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 /// Build a loop where the loop variable flows via block arguments:
@@ -389,7 +389,7 @@ pub fn build_loop_program(
         .add_block(loop_exit)
         .new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 /// Build an infinite loop (no increment in body):
@@ -497,7 +497,7 @@ pub fn build_infinite_loop(
         .add_block(exit)
         .new();
     let func_body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(func_body).new().unwrap()
+    stage.specialize().staged_func(sf).body(func_body).new().unwrap()
 }
 
 /// Build `f(x, y) = q = div x, y; ret q`.
@@ -523,7 +523,7 @@ pub fn build_div_program(
         .new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 /// Build `f(x, y) = r = rem x, y; ret r`.
@@ -549,7 +549,7 @@ pub fn build_rem_program(
         .new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 /// Resolve the first statement in a specialized function's entry block.

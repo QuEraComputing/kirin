@@ -44,8 +44,8 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, Region, ResultValue,
-        SSAValue, StageInfo, StageMeta, Statement,
+        Block, CompileStage, Dialect, Function, GetInfo, HasStageInfo, Pipeline, Region,
+        ResultValue, SSAValue, Signature, SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{CompileTimeValue, Typeof};
 }

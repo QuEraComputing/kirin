@@ -138,7 +138,7 @@ mod tests {
         let block = stage.block().stmt(c0).terminator(ret).new();
         let region = stage.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(stage, region);
-        let spec = stage.specialize().func(sf).body(body).new().unwrap();
+        let spec = stage.specialize().staged_func(sf).body(body).new().unwrap();
         (pipeline, stage_id, spec, block, c0_result)
     }
 

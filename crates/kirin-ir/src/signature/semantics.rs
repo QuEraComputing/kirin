@@ -93,6 +93,13 @@ impl<T: TypeLattice> SignatureSemantics<T> for LatticeSemantics<T> {
         if call.params.len() != cand.params.len() {
             return None;
         }
+        if call.constraints != cand.constraints {
+            return None;
+        }
+        // Call return type must match candidate return type if specified
+        if call.ret != cand.ret {
+            return None;
+        }
         // Call params must be subtypes (more specific or equal) of candidate params
         let all_applicable = call
             .params

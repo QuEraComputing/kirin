@@ -48,7 +48,7 @@ fn test_block() {
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let f = stage
         .specialize()
-        .func(staged_function)
+        .staged_func(staged_function)
         .body(fdef)
         .new()
         .unwrap();

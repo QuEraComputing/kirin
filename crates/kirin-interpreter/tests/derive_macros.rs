@@ -115,7 +115,7 @@ fn build_add_one_eval_call(
 
     let region = stage.region().add_block(entry).add_block(code_block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 fn build_add_one_interpretable(
@@ -149,7 +149,7 @@ fn build_add_one_interpretable(
 
     let region = stage.region().add_block(entry).add_block(code_block).new();
     let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().func(sf).body(body).new().unwrap()
+    stage.specialize().staged_func(sf).body(body).new().unwrap()
 }
 
 // ---------------------------------------------------------------------------

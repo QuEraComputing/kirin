@@ -282,7 +282,7 @@ fn test_pipeline_roundtrip_print_parse_print() {
     let body = FunctionBody::new(stage, region);
     stage
         .specialize()
-        .func(staged_function)
+        .staged_func(staged_function)
         .signature(unit_sig())
         .body(body)
         .new()
