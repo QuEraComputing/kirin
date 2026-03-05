@@ -34,7 +34,8 @@ impl BuilderTemplate {
     }
 
     fn full_crate_path(&self, meta: &InputMeta) -> syn::Path {
-        meta.path_builder(&self.default_crate_path).full_crate_path()
+        meta.path_builder(&self.default_crate_path)
+            .full_crate_path()
     }
 
     fn build_statement_info(

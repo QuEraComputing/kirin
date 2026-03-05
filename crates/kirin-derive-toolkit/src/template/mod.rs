@@ -37,8 +37,8 @@ pub use trait_impl::{BoolPropertyConfig, FieldIterConfig, MarkerTemplate, TraitI
 pub use type_def::TypeDefTemplate;
 
 use crate::context::DeriveContext;
-use crate::generator::debug_dump;
 use crate::ir::{Input, Layout};
+use crate::misc::debug_dump;
 use proc_macro2::TokenStream;
 
 /// A composable code generation building block.

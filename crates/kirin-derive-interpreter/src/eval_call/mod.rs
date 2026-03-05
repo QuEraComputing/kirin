@@ -140,8 +140,7 @@ fn is_call_forwarding(
     stmt_ctx: &StatementContext<'_, EvalCallLayout>,
 ) -> bool {
     let callable_all = ctx.input.extra_attrs.callable;
-    let any_callable =
-        callable_all || ctx.statements.values().any(|s| s.stmt.extra_attrs.callable);
+    let any_callable = callable_all || ctx.statements.values().any(|s| s.stmt.extra_attrs.callable);
 
     let is_callable = callable_all || stmt_ctx.stmt.extra_attrs.callable;
 

@@ -1,5 +1,12 @@
 //! Miscellaneous utilities: case conversion, type inspection, attribute parsing.
 
+/// Dumps token stream to stderr when `KIRIN_EXPAND_DEBUG` is set.
+pub fn debug_dump(tokens: &proc_macro2::TokenStream) {
+    if std::env::var("KIRIN_EXPAND_DEBUG").is_ok() {
+        eprintln!("{}", tokens);
+    }
+}
+
 /// Extracts the last segment of a path as an `Ident`.
 pub fn strip_path(path: &syn::Path) -> syn::Ident {
     path.segments

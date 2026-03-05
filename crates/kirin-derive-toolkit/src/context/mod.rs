@@ -3,15 +3,17 @@ mod input_meta;
 pub use input_meta::{InputMeta, PathBuilder};
 
 use indexmap::IndexMap;
+use proc_macro2::TokenStream;
+use quote::ToTokens;
 
 use crate::ir::{Input, Layout, Statement, fields::Wrapper};
 use crate::tokens::Pattern;
 
-/// Pre-computed context shared across generators during code emission.
+/// Pre-computed context shared across templates during code emission.
 ///
 /// Built once from an [`Input`] and passed to each
-/// [`Generator`](crate::generator::Generator). Contains pre-built patterns,
-/// wrapper detection, and per-statement contexts to avoid repeated scanning.
+/// [`Template`](crate::template::Template). Contains pre-built patterns,
+/// wrapper detection, and per-statement contexts.
 pub struct DeriveContext<'ir, L: Layout> {
     pub input: &'ir Input<L>,
     pub meta: InputMeta,
@@ -104,4 +106,8 @@ fn build_statement_context<'ir, L: Layout>(stmt: &'ir Statement<L>) -> Statement
         wrapper_type,
         wrapper_binding,
     }
+}
+
+impl<L: Layout> ToTokens for DeriveContext<'_, L> {
+    fn to_tokens(&self, _tokens: &mut TokenStream) {}
 }

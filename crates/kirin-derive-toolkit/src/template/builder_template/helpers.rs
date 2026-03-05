@@ -150,10 +150,12 @@ fn result_names(info: &StatementInfo) -> Vec<syn::Ident> {
         .collect();
     if results.len() == 1 {
         let field = results[0];
-        return vec![field
-            .ident
-            .clone()
-            .unwrap_or_else(|| format_ident!("result", span = info.name.span()))];
+        return vec![
+            field
+                .ident
+                .clone()
+                .unwrap_or_else(|| format_ident!("result", span = info.name.span())),
+        ];
     }
 
     results
@@ -461,10 +463,7 @@ where
     })
 }
 
-pub(super) fn from_impl(
-    input: &InputMeta,
-    info: &StatementInfo,
-) -> proc_macro2::TokenStream {
+pub(super) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2::TokenStream {
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let name = &input.name;
     let wrapper_ty = info

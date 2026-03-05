@@ -21,10 +21,7 @@ impl Hygiene {
 
     /// Generate a lifetime: `'__{prefix}_{name}`
     pub fn lifetime(&self, name: &str) -> syn::Lifetime {
-        syn::Lifetime::new(
-            &format!("'__{}_{}", self.prefix, name),
-            Span::call_site(),
-        )
+        syn::Lifetime::new(&format!("'__{}_{}", self.prefix, name), Span::call_site())
     }
 
     /// Generate a CamelCase type identifier: `__{Prefix}{Name}`

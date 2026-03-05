@@ -18,7 +18,6 @@
 //! | **Templates** | [`template`] | Composable code generation: `TraitImplTemplate`, `MethodPattern`, factory methods |
 //! | **Tokens** | [`tokens`], [`codegen`] | Typed code-block builders (`TraitImpl`, `MatchExpr`, etc.) and utilities |
 //! | **Support** | [`context`], [`stage`], [`misc`] | Pre-computed state, metadata extraction, stage parsing |
-//! | **Legacy** | [`scan`], [`emit`], [`generators`] | Two-pass visitor pattern (used by kirin-derive-chumsky) |
 //!
 //! ## Quick Start
 //!
@@ -41,15 +40,11 @@
 
 pub mod codegen;
 pub mod context;
-pub mod derive;
-pub mod emit;
-pub mod generator;
-pub mod generators;
 pub mod hygiene;
 pub mod ir;
 pub mod misc;
-pub mod scan;
 pub mod stage;
+pub mod stage_info;
 pub mod template;
 pub mod test_util;
 pub mod tokens;
@@ -59,8 +54,8 @@ pub mod prelude {
         self, ConstructorBuilder, FieldBindings, GenericsBuilder, combine_where_clauses,
         deduplicate_types,
     };
-    pub use crate::context::{DeriveContext, StatementContext};
-    pub use crate::context::{InputMeta, PathBuilder};
+    pub use crate::context::{DeriveContext, InputMeta, PathBuilder, StatementContext};
+    pub use crate::hygiene::Hygiene;
     pub use crate::ir::fields::{FieldCategory, FieldData, FieldInfo};
     pub use crate::ir::{self, Layout, StandardLayout};
     pub use crate::template::{
@@ -72,8 +67,4 @@ pub mod prelude {
     pub use crate::tokens;
     pub use darling;
     pub use proc_macro2;
-
-    // Legacy re-exports for kirin-derive-chumsky compatibility
-    pub use crate::emit::{self, Emit};
-    pub use crate::scan::{self, Scan};
 }
