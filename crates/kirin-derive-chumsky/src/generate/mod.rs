@@ -17,7 +17,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 use crate::ChumskyStatementAttrs;
-use crate::field_kind::{ValueTypeScanner, collect_fields, fields_in_format};
+use crate::field_kind::{collect_fields, collect_value_types_needing_bounds, fields_in_format};
 use crate::format::Format;
 
 pub use self::ast::GenerateAST;
@@ -189,9 +189,7 @@ pub(crate) fn get_fields_in_format(
 pub(crate) fn collect_all_value_types_needing_bounds(
     ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
 ) -> Vec<syn::Type> {
-    ValueTypeScanner::new(&ir_input.generics)
-        .scan(ir_input)
-        .unwrap_or_default()
+    collect_value_types_needing_bounds(ir_input, &ir_input.generics)
 }
 
 /// Collects all wrapper types from structs and enum variants.

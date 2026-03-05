@@ -1,90 +1,66 @@
 use std::collections::HashSet;
 
 use kirin_derive_toolkit::ir::Layout;
-use kirin_derive_toolkit::misc::is_type_in_generic;
-use kirin_derive_toolkit::scan::Scan;
+use kirin_derive_toolkit::ir::fields::FieldCategory;
+use kirin_derive_toolkit::misc::{is_type, is_type_in_generic};
 use quote::quote;
 
 use crate::ChumskyLayout;
 use crate::format::{Format, FormatElement};
 
-/// Scanner that collects Value field types containing type parameters.
-pub struct ValueTypeScanner<'a> {
-    /// Type parameter names to check against
-    type_param_names: Vec<String>,
-    /// Collected types that need bounds
-    types: Vec<syn::Type>,
-    /// Set for deduplication
-    seen: HashSet<String>,
-    /// Reference to generics for lifetime
-    _generics: &'a syn::Generics,
-}
+/// Collects Value field types that contain type parameters.
+pub fn collect_value_types_needing_bounds(
+    input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+    generics: &syn::Generics,
+) -> Vec<syn::Type> {
+    let type_param_names: Vec<String> = generics
+        .params
+        .iter()
+        .filter_map(|p| {
+            if let syn::GenericParam::Type(tp) = p {
+                Some(tp.ident.to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
 
-impl<'a> ValueTypeScanner<'a> {
-    /// Creates a new scanner for the given generics.
-    pub fn new(generics: &'a syn::Generics) -> Self {
-        let type_param_names = generics
-            .params
-            .iter()
-            .filter_map(|p| {
-                if let syn::GenericParam::Type(tp) = p {
-                    Some(tp.ident.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        Self {
-            type_param_names,
-            types: Vec::new(),
-            seen: HashSet::new(),
-            _generics: generics,
-        }
+    if type_param_names.is_empty() {
+        return Vec::new();
     }
 
-    /// Scans the input and returns collected types.
-    pub fn scan(
-        mut self,
-        input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
-    ) -> darling::Result<Vec<syn::Type>> {
-        kirin_derive_toolkit::scan::scan_input(&mut self, input)?;
-        Ok(self.types)
-    }
+    let mut types = Vec::new();
+    let mut seen = HashSet::new();
 
-    /// Checks if a type contains any of our type parameters and adds it if so.
-    fn maybe_add_type(&mut self, ty: &syn::Type, has_default: bool) {
-        // Skip fields with defaults - they're not parsed
-        if has_default {
-            return;
-        }
+    let statements: Vec<&kirin_derive_toolkit::ir::Statement<ChumskyLayout>> = match &input.data {
+        kirin_derive_toolkit::ir::Data::Struct(data) => vec![&data.0],
+        kirin_derive_toolkit::ir::Data::Enum(data) => data.variants.iter().collect(),
+    };
 
-        // Check if any type parameter appears in this type
-        for param_name in &self.type_param_names {
-            if kirin_derive_toolkit::misc::is_type(ty, param_name.as_str())
-                || is_type_in_generic(ty, param_name.as_str())
-            {
-                // Deduplicate
-                let key = quote!(#ty).to_string();
-                if self.seen.insert(key) {
-                    self.types.push(ty.clone());
+    for stmt in statements {
+        let fields = stmt.collect_fields();
+        for field in &fields {
+            if field.category() != FieldCategory::Value {
+                continue;
+            }
+            if let Some(ty) = field.value_type() {
+                if field.has_default() {
+                    continue;
                 }
-                break;
+                for param_name in &type_param_names {
+                    if is_type(ty, param_name) || is_type_in_generic(ty, param_name) {
+                        let key = quote!(#ty).to_string();
+                        if seen.insert(key) {
+                            types.push(ty.clone());
+                        }
+                        break;
+                    }
+                }
             }
         }
     }
-}
 
-impl<'ir> Scan<'ir, ChumskyLayout> for ValueTypeScanner<'_> {
-    fn scan_value(
-        &mut self,
-        field: &'ir kirin_derive_toolkit::ir::fields::FieldInfo<ChumskyLayout>,
-    ) -> darling::Result<()> {
-        if let Some(ty) = field.value_type() {
-            self.maybe_add_type(ty, field.has_default());
-        }
-        Ok(())
-    }
+    types
 }
 
 /// Returns the set of field indices that are mentioned in the format string.
