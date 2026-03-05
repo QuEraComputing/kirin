@@ -54,6 +54,7 @@ members = [
     "crates/kirin-test-languages",
     "crates/kirin-interval",
     "crates/kirin-cmp",
+    "crates/kirin-derive-toolkit",
 ]
 
 [workspace.dependencies]

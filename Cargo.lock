@@ -1238,6 +1238,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-derive-toolkit"
+version = "0.1.0"
+dependencies = [
+ "darling 0.23.0",
+ "indexmap",
+ "insta",
+ "kirin-test-utils",
+ "manyhow",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "kirin-function"
 version = "0.1.0"
 dependencies = [
