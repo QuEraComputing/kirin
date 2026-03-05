@@ -3,6 +3,11 @@ use quote::quote;
 
 use crate::misc::{is_type, is_type_in};
 
+/// How a field's base type is wrapped in a collection.
+///
+/// A field typed `Vec<SSAValue>` is classified as `Argument` with
+/// `Collection::Vec`. The collection affects generated parser and
+/// constructor code.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Collection {
     #[default]
@@ -12,6 +17,7 @@ pub enum Collection {
 }
 
 impl Collection {
+    /// Detects collection wrapping from a `syn::Type`.
     pub fn from_type<I>(ty: &syn::Type, name: &I) -> Option<Self>
     where
         I: ?Sized,
@@ -28,6 +34,7 @@ impl Collection {
         }
     }
 
+    /// Wraps a base type token in the collection (e.g., `Vec<base>`).
     pub fn wrap_type(&self, base: TokenStream) -> TokenStream {
         match self {
             Collection::Single => base,
@@ -36,6 +43,7 @@ impl Collection {
         }
     }
 
+    /// Wraps a parser expression for this collection kind.
     pub fn wrap_parser(&self, parser: TokenStream) -> TokenStream {
         match self {
             Collection::Single => parser,

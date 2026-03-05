@@ -1,3 +1,19 @@
+//! Field classification algebra for IR statements.
+//!
+//! Every field in a Kirin statement is automatically classified by its Rust type:
+//!
+//! | Rust Type | Category | Meaning |
+//! |-----------|----------|---------|
+//! | `SSAValue` / `SSAValue<T>` | [`Argument`](FieldCategory::Argument) | SSA input value |
+//! | `ResultValue` / `ResultValue<T>` | [`Result`](FieldCategory::Result) | SSA output value |
+//! | `Block` | [`Block`](FieldCategory::Block) | Basic block reference |
+//! | `Successor` | [`Successor`](FieldCategory::Successor) | Control-flow successor |
+//! | `Region` / `Region<T>` | [`Region`](FieldCategory::Region) | Nested region |
+//! | `Symbol` | [`Symbol`](FieldCategory::Symbol) | Symbol reference |
+//! | anything else | [`Value`](FieldCategory::Value) | Plain Rust value |
+//!
+//! Each field also tracks its [`Collection`] wrapping: `Single`, `Vec`, or `Option`.
+
 mod collection;
 mod index;
 mod wrapper;
@@ -9,6 +25,9 @@ pub use wrapper::Wrapper;
 use crate::ir::{DefaultValue, Layout};
 use proc_macro2::Span;
 
+/// Classification of a field's semantic role in an IR statement.
+///
+/// Determined automatically from the field's Rust type during parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FieldCategory {
     Argument,
@@ -20,6 +39,10 @@ pub enum FieldCategory {
     Value,
 }
 
+/// Semantic data associated with a field, varying by [`FieldCategory`].
+///
+/// `Argument` and `Result` variants carry an `ssa_type` expression.
+/// `Value` carries the original Rust type and optional default/into metadata.
 #[derive(Debug)]
 pub enum FieldData<L: Layout> {
     Argument { ssa_type: syn::Expr },
@@ -64,6 +87,19 @@ impl<L: Layout> Clone for FieldData<L> {
     }
 }
 
+/// Complete metadata about a single field in a [`Statement`](super::Statement).
+///
+/// Combines positional info (`index`, `ident`), collection wrapping, and
+/// category-specific data. Use [`category()`](Self::category) to branch on
+/// the field's role.
+///
+/// ```ignore
+/// match field.category() {
+///     FieldCategory::Argument => { /* field.ssa_type() is Some */ }
+///     FieldCategory::Value => { /* field.value_type() is Some */ }
+///     _ => {}
+/// }
+/// ```
 #[derive(Debug)]
 pub struct FieldInfo<L: Layout> {
     pub index: usize,

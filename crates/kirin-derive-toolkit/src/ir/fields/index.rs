@@ -1,5 +1,6 @@
 use quote::{ToTokens, format_ident};
 
+/// Positional identity of a field — either named (`foo`) or positional (`0`).
 #[derive(Debug, Clone)]
 pub struct FieldIndex {
     pub ident: Option<syn::Ident>,
@@ -16,6 +17,8 @@ impl FieldIndex {
     }
 }
 
+/// Display-ready field reference: named fields emit their ident, positional
+/// fields emit their index.
 pub struct FieldName<'a> {
     parent: &'a FieldIndex,
 }
