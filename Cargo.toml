@@ -55,6 +55,10 @@ members = [
     "crates/kirin-interval",
     "crates/kirin-cmp",
     "crates/kirin-derive-toolkit",
+    "crates/kirin-derive-ir",
+    "crates/kirin-derive-prettyless",
+    "crates/kirin-derive-interpreter-2",
+    "crates/kirin-derive-chumsky",
 ]
 
 [workspace.dependencies]
@@ -103,4 +107,7 @@ kirin-prettyless-derive = { version = "0.1.0", path = "crates/kirin-prettyless-d
 kirin-interpreter = { version = "0.1.0", path = "crates/kirin-interpreter" }
 kirin-derive-interpreter = { version = "0.1.0", path = "crates/kirin-derive-interpreter" }
 kirin-cmp = { version = "0.1.0", path = "crates/kirin-cmp" }
+kirin-derive-ir = { version = "0.1.0", path = "crates/kirin-derive-ir" }
+kirin-derive-prettyless = { version = "0.1.0", path = "crates/kirin-derive-prettyless" }
+kirin-derive-interpreter-2 = { version = "0.1.0", path = "crates/kirin-derive-interpreter-2" }
 smallvec = "1.13"

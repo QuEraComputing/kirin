@@ -1212,6 +1212,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-derive-chumsky"
+version = "0.1.0"
+dependencies = [
+ "chumsky",
+ "darling 0.23.0",
+ "indexmap",
+ "insta",
+ "kirin-derive-toolkit",
+ "kirin-lexer",
+ "kirin-test-utils",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "kirin-derive-core"
 version = "0.1.0"
 dependencies = [
@@ -1232,6 +1248,36 @@ dependencies = [
  "kirin-derive-core",
  "kirin-test-utils",
  "manyhow",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "kirin-derive-interpreter-2"
+version = "0.1.0"
+dependencies = [
+ "kirin-derive-toolkit",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "kirin-derive-ir"
+version = "0.1.0"
+dependencies = [
+ "kirin-derive-toolkit",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "kirin-derive-prettyless"
+version = "0.1.0"
+dependencies = [
+ "kirin-derive-toolkit",
  "proc-macro2",
  "quote",
  "syn",
