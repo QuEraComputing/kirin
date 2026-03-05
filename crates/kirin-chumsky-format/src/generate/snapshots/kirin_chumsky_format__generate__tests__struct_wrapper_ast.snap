@@ -1,5 +1,0 @@
----
-source: crates/kirin-chumsky-format/src/generate/tests.rs
-expression: ast
----
-

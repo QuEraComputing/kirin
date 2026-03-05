@@ -1,11 +1,16 @@
 use super::{DeriveInterpretable, InputContext, StatementInfo};
 use crate::pattern::build_pattern;
-use kirin_derive_core::derive::InputMeta;
-use kirin_derive_core::prelude::*;
+use kirin_derive_toolkit::derive::InputMeta;
+use kirin_derive_toolkit::ir::StandardLayout;
+use kirin_derive_toolkit::prelude::darling;
+use kirin_derive_toolkit::scan::{self, Scan};
 use quote::quote;
 
 impl<'ir> Scan<'ir, StandardLayout> for DeriveInterpretable {
-    fn scan_input(&mut self, input: &'ir ir::Input<StandardLayout>) -> darling::Result<()> {
+    fn scan_input(
+        &mut self,
+        input: &'ir kirin_derive_toolkit::ir::Input<StandardLayout>,
+    ) -> darling::Result<()> {
         self.input = Some(InputContext {
             core: InputMeta::from_input(input),
         });
@@ -15,7 +20,7 @@ impl<'ir> Scan<'ir, StandardLayout> for DeriveInterpretable {
 
     fn scan_statement(
         &mut self,
-        statement: &'ir ir::Statement<StandardLayout>,
+        statement: &'ir kirin_derive_toolkit::ir::Statement<StandardLayout>,
     ) -> darling::Result<()> {
         let is_wrapper = statement.wraps.is_some();
         let wrapper_ty = statement.wraps.as_ref().map(|w| w.ty.clone());

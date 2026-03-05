@@ -7,12 +7,7 @@ edition = "2024"
 proc-macro = true
 
 [dependencies]
-kirin-derive-core.workspace = true
+kirin-derive-toolkit = { version = "0.1.0", path = "../kirin-derive-toolkit" }
 proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true
-manyhow.workspace = true
-
-[dev-dependencies]
-insta.workspace = true
-kirin-test-utils.workspace = true

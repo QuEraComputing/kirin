@@ -1,11 +1,15 @@
 use super::{DeriveEvalCall, EvalCallLayout, InputContext, StatementInfo};
 use crate::pattern::build_pattern;
-use kirin_derive_core::derive::InputMeta;
-use kirin_derive_core::prelude::*;
+use kirin_derive_toolkit::derive::InputMeta;
+use kirin_derive_toolkit::prelude::darling;
+use kirin_derive_toolkit::scan::{self, Scan};
 use quote::quote;
 
 impl<'ir> Scan<'ir, EvalCallLayout> for DeriveEvalCall {
-    fn scan_input(&mut self, input: &'ir ir::Input<EvalCallLayout>) -> darling::Result<()> {
+    fn scan_input(
+        &mut self,
+        input: &'ir kirin_derive_toolkit::ir::Input<EvalCallLayout>,
+    ) -> darling::Result<()> {
         self.input = Some(InputContext {
             core: InputMeta::from_input(input),
             callable_all: input.extra_attrs.callable,
@@ -16,7 +20,7 @@ impl<'ir> Scan<'ir, EvalCallLayout> for DeriveEvalCall {
 
     fn scan_statement(
         &mut self,
-        statement: &'ir ir::Statement<EvalCallLayout>,
+        statement: &'ir kirin_derive_toolkit::ir::Statement<EvalCallLayout>,
     ) -> darling::Result<()> {
         let is_wrapper = statement.wraps.is_some();
         let wrapper_ty = statement.wraps.as_ref().map(|w| w.ty.clone());

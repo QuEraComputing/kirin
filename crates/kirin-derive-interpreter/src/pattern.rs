@@ -1,11 +1,11 @@
-use kirin_derive_core::prelude::*;
-use kirin_derive_core::tokens::FieldPatternTokens;
+use kirin_derive_toolkit::ir::{self, Layout};
+use kirin_derive_toolkit::tokens::Pattern;
 use quote::quote;
 
 /// Build field destructuring pattern tokens for a statement.
 ///
 /// Shared between `Interpretable` and `CallSemantics` derive macros.
-pub(crate) fn build_pattern<L: ir::Layout>(statement: &ir::Statement<L>) -> FieldPatternTokens {
+pub(crate) fn build_pattern<L: Layout>(statement: &ir::Statement<L>) -> Pattern {
     let mut fields = Vec::new();
     if let Some(wrapper) = &statement.wraps {
         fields.push(wrapper.field.clone());
@@ -16,7 +16,7 @@ pub(crate) fn build_pattern<L: ir::Layout>(statement: &ir::Statement<L>) -> Fiel
     fields.sort_by_key(|field| field.index);
 
     if fields.is_empty() {
-        return FieldPatternTokens::new(false, Vec::new());
+        return Pattern::new(false, Vec::new());
     }
     let named = fields.iter().any(|f| f.ident.is_some());
     let names: Vec<proc_macro2::TokenStream> = fields
@@ -26,5 +26,5 @@ pub(crate) fn build_pattern<L: ir::Layout>(statement: &ir::Statement<L>) -> Fiel
             quote! { #name }
         })
         .collect();
-    FieldPatternTokens::new(named, names)
+    Pattern::new(named, names)
 }

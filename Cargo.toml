@@ -34,30 +34,24 @@ resolver = "2"
 members = [
     "crates/kirin-cf",
     "crates/kirin-constant",
-    "crates/kirin-derive",
     "crates/kirin-ir",
     "crates/kirin-prettyless",
     "crates/kirin-scf",
     "crates/kirin-test-utils",
     "crates/kirin-lexer",
-    "crates/kirin-derive-core",
     "crates/kirin-chumsky",
-    "crates/kirin-chumsky-format",
-    "crates/kirin-chumsky-derive",
     "crates/kirin-function",
     "xtask",
     "crates/kirin-arith",
     "crates/kirin-bitwise",
-    "crates/kirin-prettyless-derive",
     "crates/kirin-interpreter",
-    "crates/kirin-derive-interpreter",
     "crates/kirin-test-languages",
     "crates/kirin-interval",
     "crates/kirin-cmp",
     "crates/kirin-derive-toolkit",
     "crates/kirin-derive-ir",
     "crates/kirin-derive-prettyless",
-    "crates/kirin-derive-interpreter-2",
+    "crates/kirin-derive-interpreter",
     "crates/kirin-derive-chumsky",
 ]
 
@@ -89,13 +83,9 @@ kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
 kirin-lexer = { version = "0.1.0", path = "crates/kirin-lexer" }
 kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless" }
 kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky" }
-kirin-derive-core = { version = "0.1.0", path = "crates/kirin-derive-core" }
-kirin-derive = { version = "0.1.0", path = "crates/kirin-derive" }
 kirin-test-utils = { version = "0.1.0", path = "crates/kirin-test-utils" }
 kirin-test-languages = { version = "0.1.0", path = "crates/kirin-test-languages" }
 kirin-interval = { version = "0.1.0", path = "crates/kirin-interval" }
-kirin-chumsky-format = { version = "0.1.0", path = "crates/kirin-chumsky-format" }
-kirin-chumsky-derive = { version = "0.1.0", path = "crates/kirin-chumsky-derive" }
 kirin = { version = "0.1.0", path = "." }
 kirin-cf = { version = "0.1.0", path = "crates/kirin-cf" }
 kirin-constant = { version = "0.1.0", path = "crates/kirin-constant" }
@@ -103,11 +93,11 @@ kirin-scf = { version = "0.1.0", path = "crates/kirin-scf" }
 kirin-function = { version = "0.1.0", path = "crates/kirin-function" }
 kirin-arith = { version = "0.1.0", path = "crates/kirin-arith" }
 kirin-bitwise = { version = "0.1.0", path = "crates/kirin-bitwise" }
-kirin-prettyless-derive = { version = "0.1.0", path = "crates/kirin-prettyless-derive" }
 kirin-interpreter = { version = "0.1.0", path = "crates/kirin-interpreter" }
-kirin-derive-interpreter = { version = "0.1.0", path = "crates/kirin-derive-interpreter" }
 kirin-cmp = { version = "0.1.0", path = "crates/kirin-cmp" }
+kirin-derive-toolkit = { version = "0.1.0", path = "crates/kirin-derive-toolkit" }
 kirin-derive-ir = { version = "0.1.0", path = "crates/kirin-derive-ir" }
 kirin-derive-prettyless = { version = "0.1.0", path = "crates/kirin-derive-prettyless" }
-kirin-derive-interpreter-2 = { version = "0.1.0", path = "crates/kirin-derive-interpreter-2" }
+kirin-derive-interpreter = { version = "0.1.0", path = "crates/kirin-derive-interpreter" }
+kirin-derive-chumsky = { version = "0.1.0", path = "crates/kirin-derive-chumsky" }
 smallvec = "1.13"

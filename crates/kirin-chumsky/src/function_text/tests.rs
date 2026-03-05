@@ -9,8 +9,8 @@ use kirin_prettyless::PrintExt;
 
 use crate::{BoxedParser, DirectlyParsable, ParsePipelineText, Token, TokenInput};
 
-use kirin_chumsky_derive::{HasParser, PrettyPrint};
-use kirin_derive::StageMeta;
+use kirin_derive_chumsky::{HasParser, PrettyPrint};
+use kirin_derive_ir::StageMeta;
 
 // ---------------------------------------------------------------------------
 // Test type lattices

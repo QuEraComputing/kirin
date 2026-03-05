@@ -37,7 +37,7 @@ pub use pipeline::{
 };
 
 #[cfg(feature = "derive")]
-pub use kirin_prettyless_derive::RenderStage;
+pub use kirin_derive_prettyless::RenderStage;
 pub use traits::{PrettyPrint, PrettyPrintExt, RenderBuilder};
 
 // Re-export from prettyless for convenience

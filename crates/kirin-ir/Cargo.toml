@@ -6,12 +6,12 @@ edition = "2024"
 [dependencies]
 bon = "3.8"
 indexmap = "2.13.0"
-kirin-derive = { workspace = true, optional = true }
+kirin-derive-ir = { workspace = true, optional = true }
 rustc-hash = "2.1.1"
 smallvec = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [features]
 default = ["derive"]
-derive = ["dep:kirin-derive"]
+derive = ["dep:kirin-derive-ir"]
 serde = ["dep:serde"]

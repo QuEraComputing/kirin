@@ -3,7 +3,7 @@ use kirin_ir::{Dialect, Region, ResultValue, SSAKind, SSAValue};
 
 #[derive(Clone, Debug, PartialEq, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
-#[cfg_attr(feature = "pretty", derive(kirin_chumsky_derive::PrettyPrint))]
+#[cfg_attr(feature = "pretty", derive(kirin_derive_chumsky::PrettyPrint))]
 #[kirin(fn, type = SimpleType, crate = kirin_ir)]
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]

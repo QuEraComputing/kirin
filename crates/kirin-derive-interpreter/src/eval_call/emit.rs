@@ -1,6 +1,10 @@
 use super::{DeriveEvalCall, EvalCallLayout};
-use kirin_derive_core::prelude::*;
-use quote::quote;
+use kirin_derive_toolkit::codegen::combine_where_clauses;
+use kirin_derive_toolkit::emit::Emit;
+use kirin_derive_toolkit::ir;
+use kirin_derive_toolkit::prelude::darling;
+use kirin_derive_toolkit::tokens::{MatchArm, MatchExpr, Method, TraitImpl};
+use quote::{ToTokens, format_ident, quote};
 
 impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
     fn emit_struct(
@@ -12,62 +16,79 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
         let interp_crate = self.interpreter_crate_path();
         let ir_crate = self.ir_crate_path(input);
         let type_name = &input.core.name;
+        let (_, ty_generics_raw, orig_where) = input.core.generics.split_for_impl();
+        let ty_generics = ty_generics_raw.to_token_stream();
+
         let generics = add_interpreter_param(&input.core.generics);
-        let (impl_generics, _, _) = generics.split_for_impl();
-        let (_, ty_generics, where_clause) = input.core.generics.split_for_impl();
+
+        let trait_path = quote! { #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics> };
+
+        let eval_call_params = vec![
+            quote! { interpreter: &mut __CallSemI },
+            quote! { stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics> },
+            quote! { callee: #ir_crate::SpecializedFunction },
+            quote! { args: &[__CallSemI::Value] },
+        ];
 
         if info.is_wrapper {
             let wrapper_ty = info.wrapper_ty.as_ref().unwrap();
             let pattern = &info.pattern;
             let binding = info.wrapper_binding.as_ref().unwrap();
 
-            Ok(quote! {
-                #[automatically_derived]
-                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
-                    for #type_name #ty_generics
+            let extra_where: syn::WhereClause = syn::parse_quote! {
                 where
                     __CallSemI: #interp_crate::Interpreter<'__ir>,
                     __CallSemI::Error: From<#interp_crate::InterpreterError>,
-                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
-                    #where_clause
-                {
-                    type Result = <#wrapper_ty as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result;
+                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
+            };
 
-                    fn eval_call(
-                        &self,
-                        interpreter: &mut __CallSemI,
-                        stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics>,
-                        callee: #ir_crate::SpecializedFunction,
-                        args: &[__CallSemI::Value],
-                    ) -> Result<Self::Result, __CallSemI::Error> {
+            let result_type = quote! {
+                <#wrapper_ty as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result
+            };
+
+            let trait_impl = TraitImpl::new(generics, &trait_path, type_name)
+                .type_generics(ty_generics)
+                .where_clause(combine_where_clauses(Some(&extra_where), orig_where))
+                .assoc_type(format_ident!("Result"), &result_type)
+                .method(Method {
+                    name: format_ident!("eval_call"),
+                    self_arg: quote! { &self },
+                    params: eval_call_params,
+                    return_type: Some(quote! { Result<Self::Result, __CallSemI::Error> }),
+                    body: quote! {
                         let Self #pattern = self;
                         #binding.eval_call(interpreter, stage, callee, args)
-                    }
-                }
-            })
+                    },
+                });
+
+            Ok(quote! { #trait_impl })
         } else {
-            Ok(quote! {
-                #[automatically_derived]
-                impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
-                    for #type_name #ty_generics
+            let extra_where: syn::WhereClause = syn::parse_quote! {
                 where
                     __CallSemI: #interp_crate::Interpreter<'__ir>,
-                    __CallSemI::Error: From<#interp_crate::InterpreterError>,
-                    #where_clause
-                {
-                    type Result = __CallSemI::Value;
+                    __CallSemI::Error: From<#interp_crate::InterpreterError>
+            };
 
-                    fn eval_call(
-                        &self,
-                        _interpreter: &mut __CallSemI,
-                        _stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics>,
-                        _callee: #ir_crate::SpecializedFunction,
-                        _args: &[__CallSemI::Value],
-                    ) -> Result<Self::Result, __CallSemI::Error> {
+            let trait_impl = TraitImpl::new(generics, &trait_path, type_name)
+                .type_generics(ty_generics.clone())
+                .where_clause(combine_where_clauses(Some(&extra_where), orig_where))
+                .assoc_type(format_ident!("Result"), quote! { __CallSemI::Value })
+                .method(Method {
+                    name: format_ident!("eval_call"),
+                    self_arg: quote! { &self },
+                    params: vec![
+                        quote! { _interpreter: &mut __CallSemI },
+                        quote! { _stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics> },
+                        quote! { _callee: #ir_crate::SpecializedFunction },
+                        quote! { _args: &[__CallSemI::Value] },
+                    ],
+                    return_type: Some(quote! { Result<Self::Result, __CallSemI::Error> }),
+                    body: quote! {
                         Err(#interp_crate::InterpreterError::MissingEntry.into())
-                    }
-                }
-            })
+                    },
+                });
+
+            Ok(quote! { #trait_impl })
         }
     }
 
@@ -79,9 +100,10 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
         let interp_crate = self.interpreter_crate_path();
         let ir_crate = self.ir_crate_path(input);
         let type_name = &input.core.name;
+        let (_, ty_generics_raw, orig_where) = input.core.generics.split_for_impl();
+        let ty_generics = ty_generics_raw.to_token_stream();
+
         let generics = add_interpreter_param(&input.core.generics);
-        let (impl_generics, _, _) = generics.split_for_impl();
-        let (_, ty_generics, where_clause) = input.core.generics.split_for_impl();
 
         // Determine if #[callable] is used anywhere (enum-level or any variant).
         let any_callable =
@@ -109,16 +131,22 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
                 wrapper_types.push(wrapper_ty);
                 let binding = info.wrapper_binding.as_ref().unwrap();
 
-                match_arms.push(quote! {
-                    Self::#variant_name #pattern => #binding.eval_call(interpreter, stage, callee, args)
+                match_arms.push(MatchArm {
+                    pattern: quote! { Self::#variant_name #pattern },
+                    guard: None,
+                    body: quote! { #binding.eval_call(interpreter, stage, callee, args) },
                 });
             } else if info.pattern.is_empty() {
-                match_arms.push(quote! {
-                    Self::#variant_name => Err(#interp_crate::InterpreterError::MissingEntry.into())
+                match_arms.push(MatchArm {
+                    pattern: quote! { Self::#variant_name },
+                    guard: None,
+                    body: quote! { Err(#interp_crate::InterpreterError::MissingEntry.into()) },
                 });
             } else {
-                match_arms.push(quote! {
-                    Self::#variant_name #pattern => Err(#interp_crate::InterpreterError::MissingEntry.into())
+                match_arms.push(MatchArm {
+                    pattern: quote! { Self::#variant_name #pattern },
+                    guard: None,
+                    body: quote! { Err(#interp_crate::InterpreterError::MissingEntry.into()) },
                 });
             }
         }
@@ -134,42 +162,45 @@ impl<'ir> Emit<'ir, EvalCallLayout> for DeriveEvalCall {
             .enumerate()
             .map(|(i, ty)| {
                 if i == 0 {
-                    quote! {
-                        #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>,
-                    }
+                    quote! { #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics> }
                 } else {
-                    quote! {
-                        #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics, Result = #result_type>,
-                    }
+                    quote! { #ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics, Result = #result_type> }
                 }
             })
             .collect();
 
-        Ok(quote! {
-            #[automatically_derived]
-            impl #impl_generics #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
-                for #type_name #ty_generics
+        let extra_where: syn::WhereClause = syn::parse_quote! {
             where
                 __CallSemI: #interp_crate::Interpreter<'__ir>,
                 __CallSemI::Error: From<#interp_crate::InterpreterError>,
-                #(#where_bounds)*
-                #where_clause
-            {
-                type Result = #result_type;
+                #(#where_bounds),*
+        };
 
-                fn eval_call(
-                    &self,
-                    interpreter: &mut __CallSemI,
-                    stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics>,
-                    callee: #ir_crate::SpecializedFunction,
-                    args: &[__CallSemI::Value],
-                ) -> Result<Self::Result, __CallSemI::Error> {
-                    match self {
-                        #(#match_arms,)*
-                    }
-                }
-            }
-        })
+        let trait_path = quote! { #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics> };
+
+        let match_expr = MatchExpr {
+            subject: quote! { self },
+            arms: match_arms,
+        };
+
+        let trait_impl = TraitImpl::new(generics, &trait_path, type_name)
+            .type_generics(ty_generics.clone())
+            .where_clause(combine_where_clauses(Some(&extra_where), orig_where))
+            .assoc_type(format_ident!("Result"), &result_type)
+            .method(Method {
+                name: format_ident!("eval_call"),
+                self_arg: quote! { &self },
+                params: vec![
+                    quote! { interpreter: &mut __CallSemI },
+                    quote! { stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics> },
+                    quote! { callee: #ir_crate::SpecializedFunction },
+                    quote! { args: &[__CallSemI::Value] },
+                ],
+                return_type: Some(quote! { Result<Self::Result, __CallSemI::Error> }),
+                body: quote! { #match_expr },
+            });
+
+        Ok(quote! { #trait_impl })
     }
 }
 

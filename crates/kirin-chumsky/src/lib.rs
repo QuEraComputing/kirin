@@ -64,10 +64,10 @@ pub use kirin_prettyless::PrettyPrint;
 // When derive feature is enabled, also export derive macros with the same names as traits
 // This allows `use kirin::parsers::HasParser` to import both trait AND derive
 #[cfg(feature = "derive")]
-pub use kirin_chumsky_derive::HasParser;
+pub use kirin_derive_chumsky::HasParser;
 
 #[cfg(feature = "derive")]
-pub use kirin_chumsky_derive::PrettyPrint;
+pub use kirin_derive_chumsky::PrettyPrint;
 
 /// Prelude module for convenient imports
 pub mod prelude {
@@ -84,7 +84,7 @@ pub mod prelude {
     pub use kirin_prettyless::prelude::*;
 
     #[cfg(feature = "derive")]
-    pub use kirin_chumsky_derive::{HasParser, PrettyPrint};
+    pub use kirin_derive_chumsky::{HasParser, PrettyPrint};
 }
 
 #[cfg(test)]

@@ -1,6 +1,10 @@
 use super::DeriveInterpretable;
-use kirin_derive_core::prelude::*;
-use quote::quote;
+use kirin_derive_toolkit::codegen::combine_where_clauses;
+use kirin_derive_toolkit::emit::Emit;
+use kirin_derive_toolkit::ir::{self, StandardLayout};
+use kirin_derive_toolkit::prelude::darling;
+use kirin_derive_toolkit::tokens::{MatchArm, MatchExpr, Method, TraitImpl};
+use quote::{ToTokens, quote};
 
 impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
     fn emit_struct(
@@ -11,42 +15,51 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
         let info = self.statement_info(&data.0)?;
         let interp_crate = self.interpreter_crate_path();
         let type_name = &input.core.name;
-        let generics = add_interpreter_params(&input.core.generics);
-        let (impl_generics, _, _) = generics.split_for_impl();
-        let (_, ty_generics, where_clause) = input.core.generics.split_for_impl();
 
-        if info.is_wrapper {
-            let wrapper_ty = info.wrapper_ty.as_ref().unwrap();
-            let pattern = &info.pattern;
-            let binding = info.wrapper_binding.as_ref().unwrap();
-
-            Ok(quote! {
-                #[automatically_derived]
-                impl #impl_generics #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>
-                    for #type_name #ty_generics
-                where
-                    __InterpI: #interp_crate::Interpreter<'__ir>,
-                    __InterpL: ::kirin_ir::Dialect,
-                    #wrapper_ty: #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>,
-                    #where_clause
-                {
-                    fn interpret(
-                        &self,
-                        interpreter: &mut __InterpI,
-                    ) -> Result<#interp_crate::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error> {
-                        let Self #pattern = self;
-                        #binding.interpret(interpreter)
-                    }
-                }
-            })
-        } else {
-            Err(darling::Error::custom(format!(
+        if !info.is_wrapper {
+            return Err(darling::Error::custom(format!(
                 "Cannot derive `Interpretable` for struct `{}` without `#[wraps]`. \
                  Either implement `Interpretable` manually, or wrap an inner type with `#[wraps]`.",
                 type_name
             ))
-            .with_span(&data.0.name))
+            .with_span(&data.0.name));
         }
+
+        let wrapper_ty = info.wrapper_ty.as_ref().unwrap();
+        let pattern = &info.pattern;
+        let binding = info.wrapper_binding.as_ref().unwrap();
+
+        let impl_generics = add_interpreter_params(&input.core.generics);
+        let (_, ty_generics_raw, orig_where) = input.core.generics.split_for_impl();
+        let ty_generics = ty_generics_raw.to_token_stream();
+        let extra_where: syn::WhereClause = syn::parse_quote! {
+            where
+                __InterpI: #interp_crate::Interpreter<'__ir>,
+                __InterpL: ::kirin_ir::Dialect,
+                #wrapper_ty: #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>
+        };
+
+        let trait_impl = TraitImpl::new(
+            impl_generics,
+            quote! { #interp_crate::Interpretable<'__ir, __InterpI, __InterpL> },
+            type_name,
+        )
+        .type_generics(ty_generics)
+        .where_clause(combine_where_clauses(Some(&extra_where), orig_where))
+        .method(Method {
+            name: syn::parse_quote! { interpret },
+            self_arg: quote! { &self },
+            params: vec![quote! { interpreter: &mut __InterpI }],
+            return_type: Some(
+                quote! { Result<#interp_crate::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error> },
+            ),
+            body: quote! {
+                let Self #pattern = self;
+                #binding.interpret(interpreter)
+            },
+        });
+
+        Ok(quote! { #trait_impl })
     }
 
     fn emit_enum(
@@ -56,9 +69,6 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
         let input = self.input_ctx()?;
         let interp_crate = self.interpreter_crate_path();
         let type_name = &input.core.name;
-        let generics = add_interpreter_params(&input.core.generics);
-        let (impl_generics, _, _) = generics.split_for_impl();
-        let (_, ty_generics, where_clause) = input.core.generics.split_for_impl();
 
         // Check that ALL variants are wrappers
         let mut non_wrapper_variants = Vec::new();
@@ -92,40 +102,53 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveInterpretable {
             wrapper_types.push(wrapper_ty);
             let binding = info.wrapper_binding.as_ref().unwrap();
 
-            match_arms.push(quote! {
-                Self::#variant_name #pattern => #binding.interpret(interpreter)
+            match_arms.push(MatchArm {
+                pattern: quote! { Self::#variant_name #pattern },
+                guard: None,
+                body: quote! { #binding.interpret(interpreter) },
             });
         }
 
         let where_bounds: Vec<proc_macro2::TokenStream> = wrapper_types
             .iter()
             .map(|ty| {
-                quote! {
-                    #ty: #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>,
-                }
+                quote! { #ty: #interp_crate::Interpretable<'__ir, __InterpI, __InterpL> }
             })
             .collect();
 
-        Ok(quote! {
-            #[automatically_derived]
-            impl #impl_generics #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>
-                for #type_name #ty_generics
+        let impl_generics = add_interpreter_params(&input.core.generics);
+        let (_, ty_generics_raw, orig_where) = input.core.generics.split_for_impl();
+        let ty_generics = ty_generics_raw.to_token_stream();
+        let extra_where: syn::WhereClause = syn::parse_quote! {
             where
                 __InterpI: #interp_crate::Interpreter<'__ir>,
                 __InterpL: ::kirin_ir::Dialect,
-                #(#where_bounds)*
-                #where_clause
-            {
-                fn interpret(
-                    &self,
-                    interpreter: &mut __InterpI,
-                ) -> Result<#interp_crate::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error> {
-                    match self {
-                        #(#match_arms,)*
-                    }
-                }
-            }
-        })
+                #(#where_bounds),*
+        };
+
+        let match_expr = MatchExpr {
+            subject: quote! { self },
+            arms: match_arms,
+        };
+
+        let trait_impl = TraitImpl::new(
+            impl_generics,
+            quote! { #interp_crate::Interpretable<'__ir, __InterpI, __InterpL> },
+            type_name,
+        )
+        .type_generics(ty_generics)
+        .where_clause(combine_where_clauses(Some(&extra_where), orig_where))
+        .method(Method {
+            name: syn::parse_quote! { interpret },
+            self_arg: quote! { &self },
+            params: vec![quote! { interpreter: &mut __InterpI }],
+            return_type: Some(
+                quote! { Result<#interp_crate::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error> },
+            ),
+            body: quote! { #match_expr },
+        });
+
+        Ok(quote! { #trait_impl })
     }
 }
 

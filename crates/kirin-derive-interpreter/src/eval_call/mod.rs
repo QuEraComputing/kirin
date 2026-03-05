@@ -4,14 +4,13 @@ mod scan;
 
 pub use layout::EvalCallLayout;
 
-use kirin_derive_core::derive::InputMeta;
-use kirin_derive_core::misc::from_str;
-use kirin_derive_core::prelude::*;
-use kirin_derive_core::tokens::FieldPatternTokens;
+use kirin_derive_toolkit::derive::InputMeta;
+use kirin_derive_toolkit::emit::Emit;
+use kirin_derive_toolkit::misc::from_str;
+use kirin_derive_toolkit::prelude::darling;
+use kirin_derive_toolkit::scan::Scan;
+use kirin_derive_toolkit::tokens::Pattern;
 use std::collections::HashMap;
-
-#[cfg(test)]
-mod tests;
 
 pub struct DeriveEvalCall {
     pub(crate) default_interpreter_crate: syn::Path,
@@ -33,7 +32,7 @@ pub(crate) struct StatementInfo {
     pub(crate) is_callable: bool,
     pub(crate) wrapper_ty: Option<syn::Type>,
     pub(crate) wrapper_binding: Option<proc_macro2::TokenStream>,
-    pub(crate) pattern: FieldPatternTokens,
+    pub(crate) pattern: Pattern,
 }
 
 impl Default for DeriveEvalCall {
@@ -49,7 +48,8 @@ impl Default for DeriveEvalCall {
 
 impl DeriveEvalCall {
     pub fn emit(&mut self, input: &syn::DeriveInput) -> darling::Result<proc_macro2::TokenStream> {
-        let input = ir::Input::<EvalCallLayout>::from_derive_input(input)?;
+        let input =
+            kirin_derive_toolkit::ir::Input::<EvalCallLayout>::from_derive_input(input)?;
         self.scan_input(&input)?;
         self.emit_input(&input)
     }
@@ -62,7 +62,7 @@ impl DeriveEvalCall {
 
     pub(crate) fn statement_info(
         &self,
-        statement: &ir::Statement<EvalCallLayout>,
+        statement: &kirin_derive_toolkit::ir::Statement<EvalCallLayout>,
     ) -> darling::Result<&StatementInfo> {
         let key = statement.name.to_string();
         self.statements.get(&key).ok_or_else(|| {

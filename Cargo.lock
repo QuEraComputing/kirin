@@ -1132,8 +1132,8 @@ dependencies = [
  "chumsky",
  "insta",
  "kirin",
- "kirin-chumsky-derive",
- "kirin-derive",
+ "kirin-derive-chumsky",
+ "kirin-derive-ir",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
@@ -1141,42 +1141,6 @@ dependencies = [
  "num-traits",
  "rustc-hash",
  "strsim",
-]
-
-[[package]]
-name = "kirin-chumsky-derive"
-version = "0.1.0"
-dependencies = [
- "chumsky",
- "insta",
- "kirin",
- "kirin-chumsky",
- "kirin-chumsky-format",
- "kirin-derive-core",
- "kirin-ir",
- "kirin-lexer",
- "kirin-prettyless",
- "kirin-test-languages",
- "kirin-test-utils",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "kirin-chumsky-format"
-version = "0.1.0"
-dependencies = [
- "chumsky",
- "darling 0.23.0",
- "indexmap",
- "insta",
- "kirin-derive-core",
- "kirin-lexer",
- "kirin-test-utils",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1199,19 +1163,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kirin-derive"
-version = "0.1.0"
-dependencies = [
- "kirin-derive-core",
- "kirin-ir",
- "kirin-test-languages",
- "paste",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "kirin-derive-chumsky"
 version = "0.1.0"
 dependencies = [
@@ -1228,33 +1179,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kirin-derive-core"
-version = "0.1.0"
-dependencies = [
- "darling 0.23.0",
- "insta",
- "kirin-test-utils",
- "manyhow",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "kirin-derive-interpreter"
-version = "0.1.0"
-dependencies = [
- "insta",
- "kirin-derive-core",
- "kirin-test-utils",
- "manyhow",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "kirin-derive-interpreter-2"
 version = "0.1.0"
 dependencies = [
  "kirin-derive-toolkit",
@@ -1317,8 +1242,8 @@ dependencies = [
  "kirin-arith",
  "kirin-cf",
  "kirin-constant",
- "kirin-derive",
  "kirin-derive-interpreter",
+ "kirin-derive-ir",
  "kirin-function",
  "kirin-interval",
  "kirin-ir",
@@ -1346,7 +1271,7 @@ version = "0.1.0"
 dependencies = [
  "bon",
  "indexmap",
- "kirin-derive",
+ "kirin-derive-ir",
  "rustc-hash",
  "serde",
  "smallvec",
@@ -1368,21 +1293,11 @@ dependencies = [
  "bat",
  "bon",
  "insta",
+ "kirin-derive-prettyless",
  "kirin-ir",
- "kirin-prettyless-derive",
  "kirin-test-languages",
  "prettyless",
  "serde",
-]
-
-[[package]]
-name = "kirin-prettyless-derive"
-version = "0.1.0"
-dependencies = [
- "kirin-derive-core",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1401,10 +1316,10 @@ dependencies = [
  "kirin-arith",
  "kirin-cf",
  "kirin-chumsky",
- "kirin-chumsky-derive",
  "kirin-constant",
- "kirin-derive",
+ "kirin-derive-chumsky",
  "kirin-derive-interpreter",
+ "kirin-derive-ir",
  "kirin-function",
  "kirin-interpreter",
  "kirin-ir",
@@ -1724,12 +1639,6 @@ checksum = "1f2a05b18d44e2957b88f96ba460715e295bc1d7510468a2f3d3b44535d26c24"
 dependencies = [
  "regex",
 ]
-
-[[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "path_abs"

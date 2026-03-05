@@ -8,18 +8,18 @@ chumsky.workspace = true
 kirin-ir.workspace = true
 kirin-lexer.workspace = true
 kirin-prettyless.workspace = true
-kirin-chumsky-derive = { workspace = true, optional = true }
+kirin-derive-chumsky = { workspace = true, optional = true }
 num-traits.workspace = true
 rustc-hash = "2.1.1"
 strsim.workspace = true
 
 [features]
 default = []
-derive = ["kirin-chumsky-derive"]
+derive = ["kirin-derive-chumsky"]
 
 [dev-dependencies]
 insta.workspace = true
 kirin.workspace = true
-kirin-derive.workspace = true
-kirin-chumsky-derive.workspace = true
+kirin-derive-ir.workspace = true
+kirin-derive-chumsky.workspace = true
 kirin-test-utils = { workspace = true, features = ["parser", "pretty"] }
