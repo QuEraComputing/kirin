@@ -5,6 +5,11 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DeriveInput, Type};
 
+/// Generates `StageMeta` and `HasStageInfo` impls for a stage enum.
+///
+/// Parses `#[stage(name = "...", StageInfo<Dialect>)]` attributes on each
+/// variant and emits the stage dispatch, name/ID accessors, and dialect
+/// resolution methods.
 pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let variants = stage::parse_stage_variants(input)?;
 

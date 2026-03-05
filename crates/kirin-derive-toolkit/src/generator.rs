@@ -1,13 +1,34 @@
+//! Composable code generator framework.
+//!
+//! The [`Generator`] trait and [`GenerateBuilder`] let you compose multiple
+//! code generators and run them over an [`Input`](crate::ir::Input) in one pass.
+//!
+//! ```ignore
+//! let tokens = input.generate()
+//!     .with(DeriveBuilder::new(ir_path))
+//!     .with(DeriveProperty::new(PropertyKind::Pure, "IsPure", "is_pure"))
+//!     .emit()?;
+//! ```
+
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 
 use crate::context::DeriveContext;
 use crate::ir::Layout;
 
+/// A composable code generator that produces `TokenStream` from a [`DeriveContext`].
+///
+/// Implement this trait for custom generators, or use closures
+/// (blanket impl provided for `Fn(&DeriveContext<L>) -> Result<Vec<TokenStream>>`).
 pub trait Generator<L: Layout> {
     fn generate(&self, ctx: &DeriveContext<'_, L>) -> darling::Result<Vec<TokenStream>>;
 }
 
+/// Fluent builder for composing and executing [`Generator`]s.
+///
+/// Created via [`Input::generate()`](crate::ir::Input::generate). Chain
+/// generators with [`.with()`](Self::with), then call [`.emit()`](Self::emit)
+/// to run them all and concatenate output.
 pub struct GenerateBuilder<'ir, L: Layout> {
     ctx: DeriveContext<'ir, L>,
     generators: Vec<Box<dyn Generator<L> + 'ir>>,
