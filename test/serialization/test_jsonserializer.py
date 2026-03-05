@@ -119,3 +119,19 @@ def test_deterministic():
     json_serializer2 = JSONSerializer()
     json_s2 = json_serializer2.encode(s2)
     assert json_s1 == json_s2
+
+
+def test_eq():
+    @basic
+    def main():
+        x = 0
+        return x
+
+    json_serializer = JSONSerializer()
+    json_str = json_serializer.encode(basic.encode(main))
+
+    json_serializer = JSONSerializer()
+    main_des = basic.decode(json_serializer.decode(json_str))
+
+    # without run_passes, we get errors in e.g. main == main_des
+    assert hasattr(main_des, "run_passes")
