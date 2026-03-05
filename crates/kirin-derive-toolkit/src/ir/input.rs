@@ -4,6 +4,20 @@ use darling::FromDeriveInput;
 
 use super::{attrs::GlobalOptions, fields::Wrapper, layout::Layout, statement::Statement};
 
+/// Top-level parsed representation of a derive macro input.
+///
+/// Wraps a `syn::DeriveInput` with Kirin-specific attribute parsing and
+/// field classification. Access the parsed statements via [`data`](Self::data).
+///
+/// # Parsing
+///
+/// ```ignore
+/// let input = Input::<StandardLayout>::from_derive_input(&ast)?;
+/// match &input.data {
+///     Data::Struct(s) => { /* single statement */ }
+///     Data::Enum(e) => { /* multiple variants */ }
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Input<L: Layout> {
     pub name: syn::Ident,
@@ -52,12 +66,16 @@ impl<L: Layout> Input<L> {
     }
 }
 
+/// The body of the derive input — either a single struct or an enum with variants.
 #[derive(Debug, Clone)]
 pub enum Data<L: Layout> {
     Struct(DataStruct<L>),
     Enum(DataEnum<L>),
 }
 
+/// A struct-style input, containing a single [`Statement`].
+///
+/// Derefs to the inner `Statement<L>` for convenience.
 #[derive(Debug, Clone)]
 pub struct DataStruct<L: Layout>(pub Statement<L>);
 
@@ -75,6 +93,10 @@ impl<L: Layout> DerefMut for DataStruct<L> {
     }
 }
 
+/// An enum-style input, containing one [`Statement`] per variant.
+///
+/// Use [`iter_variants`](Self::iter_variants) for iteration that distinguishes
+/// wrapper variants (marked with `#[wraps]`) from regular ones.
 #[derive(Debug, Clone)]
 pub struct DataEnum<L: Layout> {
     pub variants: Vec<Statement<L>>,
@@ -113,6 +135,10 @@ impl<L: Layout> DerefMut for DataEnum<L> {
     }
 }
 
+/// Reference to an enum variant, distinguishing wrappers from regular variants.
+///
+/// Wrapper variants delegate to an inner type via `#[wraps]`; regular variants
+/// have their own fields.
 #[derive(Debug, Clone, Copy)]
 pub enum VariantRef<'a, L: Layout> {
     Wrapper {

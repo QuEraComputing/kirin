@@ -5,6 +5,25 @@ use super::super::{
 };
 use darling::{FromDeriveInput, FromField, FromVariant};
 
+/// A single IR operation — either a struct body or one enum variant.
+///
+/// Each statement has a name, parsed `#[kirin(...)]` options, and a list of
+/// classified [`FieldInfo`] entries. If the variant uses `#[wraps]`, the
+/// [`wraps`](Self::wraps) field contains the delegation target.
+///
+/// # Field Access
+///
+/// ```ignore
+/// for field in stmt.arguments() {
+///     // SSAValue fields
+/// }
+/// for field in stmt.results() {
+///     // ResultValue fields
+/// }
+/// for field in stmt.values() {
+///     // Plain Rust-type fields
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Statement<L: Layout> {
     pub name: syn::Ident,
