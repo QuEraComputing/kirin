@@ -1,5 +1,6 @@
-//! Metadata extraction and path construction helpers for derive macros.
+//! Deprecated: Use [`crate::context`] instead.
+//!
+//! This module re-exports [`InputMeta`] and [`PathBuilder`] from their new
+//! location in the context module for backwards compatibility.
 
-mod input;
-
-pub use input::{InputMeta, PathBuilder};
+pub use crate::context::{InputMeta, PathBuilder};

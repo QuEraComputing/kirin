@@ -1,6 +1,9 @@
+mod input_meta;
+
+pub use input_meta::{InputMeta, PathBuilder};
+
 use indexmap::IndexMap;
 
-use crate::derive::InputMeta;
 use crate::ir::{Input, Layout, Statement, fields::Wrapper};
 use crate::tokens::Pattern;
 

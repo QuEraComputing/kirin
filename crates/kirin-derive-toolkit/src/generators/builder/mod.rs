@@ -1,8 +1,8 @@
 mod context;
 mod emit;
-mod helpers;
+pub(crate) mod helpers;
 mod scan;
-mod statement;
+pub(crate) mod statement;
 
 /// Generates constructor functions for IR statements.
 ///

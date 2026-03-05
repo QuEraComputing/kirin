@@ -17,7 +17,7 @@
 //! | **IR** | [`ir`], [`ir::fields`] | Parsed representation of derive input — types, fields, attributes |
 //! | **Templates** | [`template`] | Composable code generation: `TraitImplTemplate`, `MethodPattern`, factory methods |
 //! | **Tokens** | [`tokens`], [`codegen`] | Typed code-block builders (`TraitImpl`, `MatchExpr`, etc.) and utilities |
-//! | **Support** | [`context`], [`mod@derive`], [`stage`], [`misc`] | Pre-computed state, metadata extraction, stage parsing |
+//! | **Support** | [`context`], [`stage`], [`misc`] | Pre-computed state, metadata extraction, stage parsing |
 //! | **Legacy** | [`scan`], [`emit`], [`generators`] | Two-pass visitor pattern (used by kirin-derive-chumsky) |
 //!
 //! ## Quick Start
@@ -60,7 +60,7 @@ pub mod prelude {
         deduplicate_types,
     };
     pub use crate::context::{DeriveContext, StatementContext};
-    pub use crate::derive::{self, InputMeta, PathBuilder};
+    pub use crate::context::{InputMeta, PathBuilder};
     pub use crate::ir::fields::{FieldCategory, FieldData, FieldInfo};
     pub use crate::ir::{self, Layout, StandardLayout};
     pub use crate::template::{

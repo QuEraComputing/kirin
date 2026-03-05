@@ -1,4 +1,4 @@
-use crate::derive::InputMeta as CoreInputMeta;
+use crate::context::InputMeta as CoreInputMeta;
 use crate::generators::common;
 use crate::generators::property::statement::StatementInfo;
 use crate::misc::from_str;

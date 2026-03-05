@@ -1,4 +1,4 @@
-use crate::derive::InputMeta;
+use crate::context::InputMeta;
 use crate::generators::builder::statement::StatementInfo;
 use crate::ir::BuilderOptions;
 use crate::ir::fields::{Collection, FieldCategory};
