@@ -17,14 +17,19 @@ use quote::{ToTokens, quote};
 /// // m implements ToTokens → `match self { Self::Add { .. } => { true } }`
 /// ```
 pub struct MatchExpr {
+    /// The expression being matched on.
     pub subject: TokenStream,
+    /// Match arms.
     pub arms: Vec<MatchArm>,
 }
 
 /// A single arm in a [`MatchExpr`].
 pub struct MatchArm {
+    /// The pattern to match against.
     pub pattern: TokenStream,
+    /// Optional `if` guard expression.
     pub guard: Option<TokenStream>,
+    /// The arm body expression.
     pub body: TokenStream,
 }
 

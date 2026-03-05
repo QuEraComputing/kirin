@@ -3,11 +3,23 @@ use quote::format_ident;
 
 /// Generates prefixed identifiers for derive macro output to avoid
 /// name collisions with user code.
+///
+/// All generated names start with `__` to stay out of the user's namespace.
+///
+/// # Examples
+///
+/// ```ignore
+/// let h = Hygiene::new("kirin");
+/// let id = h.ident("state");      // => `__kirin_state`
+/// let lt = h.lifetime("ir");       // => `'__kirin_ir`
+/// let ty = h.type_ident("helper"); // => `__KirinHelper`
+/// ```
 pub struct Hygiene {
     prefix: String,
 }
 
 impl Hygiene {
+    /// Create a new hygiene context with the given prefix.
     pub fn new(prefix: &str) -> Self {
         Self {
             prefix: prefix.to_string(),

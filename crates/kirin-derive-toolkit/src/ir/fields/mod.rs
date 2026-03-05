@@ -30,12 +30,19 @@ use proc_macro2::Span;
 /// Determined automatically from the field's Rust type during parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FieldCategory {
+    /// SSA input value (`SSAValue` / `SSAValue<T>`).
     Argument,
+    /// SSA output value (`ResultValue` / `ResultValue<T>`).
     Result,
+    /// Basic block reference (`Block`).
     Block,
+    /// Control-flow successor (`Successor`).
     Successor,
+    /// Nested region (`Region` / `Region<T>`).
     Region,
+    /// Symbol reference (`Symbol`).
     Symbol,
+    /// Plain Rust value (anything not recognized as an IR primitive).
     Value,
 }
 
@@ -106,9 +113,13 @@ impl<L: Layout> Clone for FieldData<L> {
 /// ```
 #[derive(Debug)]
 pub struct FieldInfo<L: Layout> {
+    /// Zero-based position within the struct/variant fields.
     pub index: usize,
+    /// Field name, or `None` for tuple fields.
     pub ident: Option<syn::Ident>,
+    /// Collection wrapping (`Single`, `Vec`, or `Option`).
     pub collection: Collection,
+    /// Category-specific semantic data.
     pub data: FieldData<L>,
 }
 
@@ -124,6 +135,7 @@ impl<L: Layout> Clone for FieldInfo<L> {
 }
 
 impl<L: Layout> FieldInfo<L> {
+    /// Return the semantic category of this field.
     pub fn category(&self) -> FieldCategory {
         match &self.data {
             FieldData::Argument { .. } => FieldCategory::Argument,
@@ -136,6 +148,7 @@ impl<L: Layout> FieldInfo<L> {
         }
     }
 
+    /// Return the category as a lowercase string (e.g. `"argument"`, `"value"`).
     pub fn kind_name(&self) -> &'static str {
         match self.category() {
             FieldCategory::Argument => "argument",
@@ -148,12 +161,14 @@ impl<L: Layout> FieldInfo<L> {
         }
     }
 
+    /// Return the field's identifier, or synthesize `field_{index}` for tuple fields.
     pub fn name_ident(&self, fallback_span: Span) -> syn::Ident {
         self.ident
             .clone()
             .unwrap_or_else(|| syn::Ident::new(&format!("field_{}", self.index), fallback_span))
     }
 
+    /// Return `true` if this `Value` field has a `#[kirin(default)]` annotation.
     pub fn has_default(&self) -> bool {
         matches!(
             &self.data,
@@ -164,6 +179,7 @@ impl<L: Layout> FieldInfo<L> {
         )
     }
 
+    /// Return the default value specification, if any.
     pub fn default_value(&self) -> Option<&DefaultValue> {
         match &self.data {
             FieldData::Value { default, .. } => default.as_ref(),
@@ -171,6 +187,7 @@ impl<L: Layout> FieldInfo<L> {
         }
     }
 
+    /// Return the SSA type expression for `Argument` or `Result` fields.
     pub fn ssa_type(&self) -> Option<&syn::Expr> {
         match &self.data {
             FieldData::Argument { ssa_type } | FieldData::Result { ssa_type } => Some(ssa_type),
@@ -178,6 +195,7 @@ impl<L: Layout> FieldInfo<L> {
         }
     }
 
+    /// Return the Rust type for `Value` fields.
     pub fn value_type(&self) -> Option<&syn::Type> {
         match &self.data {
             FieldData::Value { ty, .. } => Some(ty),
@@ -185,10 +203,12 @@ impl<L: Layout> FieldInfo<L> {
         }
     }
 
+    /// Return `true` if this `Value` field has `#[kirin(into)]`, enabling `.into()` coercion.
     pub fn has_into(&self) -> bool {
         matches!(&self.data, FieldData::Value { into: true, .. })
     }
 
+    /// Return layout-specific extra attributes for `Value` fields.
     pub fn extra(&self) -> Option<&L::ExtraFieldAttrs> {
         match &self.data {
             FieldData::Value { extra, .. } => Some(extra),

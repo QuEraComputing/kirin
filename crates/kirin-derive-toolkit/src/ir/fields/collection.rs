@@ -10,14 +10,20 @@ use crate::misc::{is_type, is_type_in};
 /// constructor code.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Collection {
+    /// Bare type, no wrapping.
     #[default]
     Single,
+    /// Wrapped in `Vec<T>`.
     Vec,
+    /// Wrapped in `Option<T>`.
     Option,
 }
 
 impl Collection {
-    /// Detects collection wrapping from a `syn::Type`.
+    /// Detect collection wrapping from a `syn::Type`.
+    ///
+    /// Returns `Some(Single)` if `ty` matches `name` directly, `Some(Vec)` if
+    /// it matches `Vec<name>`, `Some(Option)` for `Option<name>`, or `None`.
     pub fn from_type<I>(ty: &syn::Type, name: &I) -> Option<Self>
     where
         I: ?Sized,

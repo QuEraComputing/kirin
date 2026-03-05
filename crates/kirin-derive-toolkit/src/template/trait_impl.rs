@@ -31,6 +31,7 @@ pub struct TraitImplTemplate<L: Layout> {
 }
 
 impl<L: Layout> TraitImplTemplate<L> {
+    /// Create a new trait impl template for the given trait and default crate path.
     pub fn new(trait_path: syn::Path, default_crate_path: syn::Path) -> Self {
         Self {
             trait_path,
@@ -44,6 +45,7 @@ impl<L: Layout> TraitImplTemplate<L> {
         }
     }
 
+    /// Set a function that transforms the impl-level generics (e.g., to add lifetime params).
     pub fn generics_modifier(
         mut self,
         f: impl Fn(&syn::Generics) -> syn::Generics + 'static,
@@ -52,6 +54,7 @@ impl<L: Layout> TraitImplTemplate<L> {
         self
     }
 
+    /// Set a function that computes trait-level generic arguments (e.g., `<'a, L>`).
     pub fn trait_generics(
         mut self,
         f: impl Fn(&DeriveContext<'_, L>) -> TokenStream + 'static,
@@ -60,6 +63,7 @@ impl<L: Layout> TraitImplTemplate<L> {
         self
     }
 
+    /// Set a function that computes an extra where clause to merge with the original.
     pub fn where_clause(
         mut self,
         f: impl Fn(&DeriveContext<'_, L>) -> Option<syn::WhereClause> + 'static,
@@ -68,16 +72,19 @@ impl<L: Layout> TraitImplTemplate<L> {
         self
     }
 
+    /// Add a method to the trait impl, defined by a [`MethodSpec`].
     pub fn method(mut self, spec: MethodSpec<L>) -> Self {
         self.methods.push(spec);
         self
     }
 
+    /// Add an associated type to the trait impl.
     pub fn assoc_type(mut self, spec: AssocTypeSpec<L>) -> Self {
         self.assoc_types.push(spec);
         self
     }
 
+    /// Set a validation function that runs before code generation.
     pub fn validate(
         mut self,
         f: impl Fn(&DeriveContext<'_, L>) -> darling::Result<()> + 'static,
@@ -197,8 +204,11 @@ impl<L: Layout> Template<L> for TraitImplTemplate<L> {
 
 /// Configuration for a boolean property trait.
 pub struct BoolPropertyConfig {
+    /// How the property value is read from attributes.
     pub kind: PropertyKind,
+    /// Fully qualified trait name (e.g., `"IsPure"`).
     pub trait_name: &'static str,
+    /// Method name on the trait (e.g., `"is_pure"`).
     pub trait_method: &'static str,
 }
 
@@ -278,11 +288,17 @@ impl Template<StandardLayout> for MarkerTemplate {
 
 /// Configuration for a field iterator trait.
 pub struct FieldIterConfig {
+    /// Which field category to iterate over (e.g., regions, blocks, successors).
     pub kind: FieldIterKind,
+    /// Whether the iterator yields mutable references.
     pub mutable: bool,
+    /// Fully qualified trait name (e.g., `"HasRegions"`).
     pub trait_name: &'static str,
+    /// The IR type that fields must match (e.g., `"Region"`).
     pub matching_type: &'static str,
+    /// Method name on the trait (e.g., `"regions"`).
     pub trait_method: &'static str,
+    /// Associated type name for the iterator (e.g., `"Iter"`).
     pub trait_type_iter: &'static str,
 }
 

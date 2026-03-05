@@ -3,11 +3,17 @@ use quote::{ToTokens, quote};
 
 use super::Method;
 
+/// Generated `impl Type { ... }` block (no trait).
 pub struct InherentImpl {
+    /// Impl-level generic parameters.
     pub generics: syn::Generics,
+    /// The type being implemented.
     pub type_name: TokenStream,
+    /// Generic arguments on the type (e.g., `<T>`).
     pub type_generics: TokenStream,
+    /// Optional where clause.
     pub where_clause: Option<syn::WhereClause>,
+    /// Methods in the impl block.
     pub items: Vec<Method>,
 }
 

@@ -21,12 +21,14 @@ pub struct BuilderTemplate {
 }
 
 impl BuilderTemplate {
+    /// Create a builder template using the default crate path (`::kirin::ir`).
     pub fn new() -> Self {
         Self {
             default_crate_path: syn::parse_quote!(::kirin::ir),
         }
     }
 
+    /// Create a builder template with a custom crate path (e.g., `"kirin_ir"`).
     pub fn with_crate_path(crate_path: impl Into<String>) -> Self {
         Self {
             default_crate_path: syn::parse_str(&crate_path.into()).unwrap(),

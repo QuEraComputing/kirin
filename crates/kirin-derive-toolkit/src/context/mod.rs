@@ -15,8 +15,11 @@ use crate::tokens::Pattern;
 /// [`Template`](crate::template::Template). Contains pre-built patterns,
 /// wrapper detection, and per-statement contexts.
 pub struct DeriveContext<'ir, L: Layout> {
+    /// The original parsed input from the derive macro invocation.
     pub input: &'ir Input<L>,
+    /// Extracted metadata (name, generics, crate path) for path construction.
     pub meta: InputMeta,
+    /// Per-statement contexts keyed by statement/variant name, in declaration order.
     pub statements: IndexMap<String, StatementContext<'ir, L>>,
 }
 
@@ -25,9 +28,13 @@ pub struct DeriveContext<'ir, L: Layout> {
 /// Includes the destructuring [`Pattern`], wrapper status,
 /// and pre-built wrapper access tokens, ready for use in match arms.
 pub struct StatementContext<'ir, L: Layout> {
+    /// Reference to the original IR statement.
     pub stmt: &'ir Statement<L>,
+    /// Destructuring pattern for match arms (named or positional).
     pub pattern: Pattern,
+    /// Whether this statement has a `#[wraps]` attribute.
     pub is_wrapper: bool,
+    /// The wrapper metadata, if `#[wraps]` is present.
     pub wrapper: Option<&'ir Wrapper>,
     /// The Rust type of the wrapped value (e.g., `InnerOp`), if `#[wraps]` is present.
     pub wrapper_type: Option<&'ir syn::Type>,
@@ -36,6 +43,10 @@ pub struct StatementContext<'ir, L: Layout> {
 }
 
 impl<'ir, L: Layout> DeriveContext<'ir, L> {
+    /// Build a derive context from the parsed input.
+    ///
+    /// Extracts [`InputMeta`] and pre-computes a [`StatementContext`] for each
+    /// statement (struct) or variant (enum) in declaration order.
     pub fn new(input: &'ir Input<L>) -> Self {
         let meta = InputMeta::from_input(input);
         let mut statements = IndexMap::new();

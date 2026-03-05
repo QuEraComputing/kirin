@@ -1,5 +1,8 @@
 use proc_macro2::TokenStream;
 
+/// Format a `TokenStream` through `rustfmt` for readable snapshot comparisons.
+///
+/// Falls back to `TokenStream::to_string()` if `rustfmt` is unavailable.
 pub fn rustfmt_tokens(tokens: &TokenStream) -> String {
     let src = tokens.to_string();
     use std::io::Write;

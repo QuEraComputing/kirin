@@ -26,16 +26,24 @@ use darling::{FromDeriveInput, FromField, FromVariant};
 /// ```
 #[derive(Debug, Clone)]
 pub struct Statement<L: Layout> {
+    /// The struct or variant identifier.
     pub name: syn::Ident,
+    /// Parsed `#[kirin(...)]` options for this statement.
     pub attrs: StatementOptions,
+    /// Classified fields (arguments, results, values, etc.).
     pub fields: Vec<FieldInfo<L>>,
+    /// Delegation target if this variant uses `#[wraps]`.
     pub wraps: Option<Wrapper>,
+    /// Layout-specific extra data computed per statement.
     pub extra: L::StatementExtra,
+    /// Layout-specific extra attributes parsed from the variant.
     pub extra_attrs: L::ExtraStatementAttrs,
+    /// Original unprocessed attributes.
     pub raw_attrs: Vec<syn::Attribute>,
 }
 
 impl<L: Layout> Statement<L> {
+    /// Create a statement with the given metadata and no fields.
     pub fn new(
         name: syn::Ident,
         attrs: StatementOptions,
@@ -54,6 +62,7 @@ impl<L: Layout> Statement<L> {
         }
     }
 
+    /// Parse a struct-shaped `DeriveInput` into a `Statement`, classifying all fields.
     pub fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
         let syn::Data::Struct(data) = &input.data else {
             return Err(
@@ -77,6 +86,9 @@ impl<L: Layout> Statement<L> {
         )
     }
 
+    /// Parse an enum variant into a `Statement`, classifying all fields.
+    ///
+    /// `wraps` indicates whether the parent enum has a top-level `#[wraps]` attribute.
     pub fn from_variant(wraps: bool, variant: &syn::Variant) -> darling::Result<Self> {
         let attrs = StatementOptions::from_variant(variant)?;
         let extra = L::StatementExtra::from_variant(variant)?;

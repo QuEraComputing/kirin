@@ -12,6 +12,7 @@ pub struct InherentImplTemplate<L: Layout> {
 }
 
 impl<L: Layout> InherentImplTemplate<L> {
+    /// Create a template from a closure that generates inherent impl items.
     pub fn new(
         f: impl Fn(&DeriveContext<'_, L>) -> darling::Result<Vec<TokenStream>> + 'static,
     ) -> Self {

@@ -8,16 +8,26 @@ use super::MethodPattern;
 
 /// Delegates a method call through the `#[wraps]` field to the wrapped type.
 ///
-/// For wrapper variants: `<WrappedType as Trait>::method(binding, args...)`
-/// Requires ALL variants to be `#[wraps]` unless `allow_non_wrapper` is set.
+/// Generates fully-qualified calls like `<WrappedType as Trait>::method(field, args...)`.
+/// By default, non-wrapper variants produce an error; call [`require_all`](Self::require_all)
+/// to make this an explicit compile-time check.
 pub struct DelegateToWrapper<L: Layout> {
+    /// Closure that resolves the fully-qualified trait path, accounting for
+    /// `#[kirin(crate = ...)]` overrides.
     trait_path: Box<dyn Fn(&DeriveContext<'_, L>) -> TokenStream>,
+    /// Trait method to call on the wrapped type.
     method_name: syn::Ident,
+    /// Extra arguments to pass after the wrapped field binding.
     args: Vec<TokenStream>,
+    /// When `true`, emit a darling error for any variant without `#[wraps]`.
     require_all: bool,
 }
 
 impl<L: Layout> DelegateToWrapper<L> {
+    /// Create a delegation pattern for the given trait method.
+    ///
+    /// `trait_path` is a closure so it can incorporate `#[kirin(crate = ...)]`
+    /// overrides from the derive context at expansion time.
     pub fn new(
         trait_path: impl Fn(&DeriveContext<'_, L>) -> TokenStream + 'static,
         method_name: syn::Ident,
@@ -30,6 +40,7 @@ impl<L: Layout> DelegateToWrapper<L> {
         }
     }
 
+    /// Set additional arguments to pass after the wrapped field binding.
     pub fn args(mut self, args: Vec<TokenStream>) -> Self {
         self.args = args;
         self
@@ -99,19 +110,31 @@ impl<L: Layout> MethodPattern<L> for DelegateToWrapper<L> {
 
 /// Delegates method calls only for variants marked with a specific attribute.
 ///
-/// Non-matching variants get a fallback body.
+/// Variants carrying the `selector_attr` (e.g., `#[callable]`) delegate through
+/// their `#[wraps]` field. All other variants emit the `fallback` body instead.
+/// For backward compatibility, if no variant in the entire enum carries the
+/// selector attribute, all wrapper variants delegate unconditionally.
 pub struct SelectiveDelegation<L: Layout> {
+    /// Closure resolving the fully-qualified trait path.
     trait_path: Box<dyn Fn(&DeriveContext<'_, L>) -> TokenStream>,
+    /// Trait method to call on the wrapped type.
     method_name: syn::Ident,
-    /// Attribute that marks a variant as forwarding (e.g., "callable").
+    /// Bare attribute name that marks a variant as forwarding (e.g., `"callable"`).
     selector_attr: &'static str,
-    /// Check if selector appears at the global (type) level.
+    /// Check whether the selector applies at the global (type) level.
     check_global: Box<dyn Fn(&DeriveContext<'_, L>) -> bool>,
-    /// Body for non-matching variants.
+    /// Token stream emitted for non-matching variants.
     fallback: TokenStream,
 }
 
 impl<L: Layout> SelectiveDelegation<L> {
+    /// Create a selective delegation pattern.
+    ///
+    /// * `trait_path` -- resolves the trait path from the derive context.
+    /// * `method_name` -- the method to call on selected wrapper types.
+    /// * `selector_attr` -- bare attribute name to match (e.g., `"callable"`).
+    /// * `check_global` -- returns `true` if the selector applies type-wide.
+    /// * `fallback` -- body emitted for variants that do not match.
     pub fn new(
         trait_path: impl Fn(&DeriveContext<'_, L>) -> TokenStream + 'static,
         method_name: syn::Ident,

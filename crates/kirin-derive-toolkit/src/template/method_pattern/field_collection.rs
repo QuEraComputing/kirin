@@ -6,45 +6,64 @@ use quote::{ToTokens, format_ident, quote};
 
 use super::MethodPattern;
 
-/// Which field category to generate iterators for.
+/// Field category to generate iterators for.
+///
+/// Each variant corresponds to a field classification on an IR statement
+/// (e.g., `Arguments` collects fields tagged as operation arguments).
 #[derive(Clone, Copy, Debug)]
 pub enum FieldIterKind {
+    /// Operand/argument fields.
     Arguments,
+    /// Result fields.
     Results,
+    /// Block body fields.
     Blocks,
+    /// Successor block references.
     Successors,
+    /// Nested region fields.
     Regions,
 }
 
-/// Method pattern that chains field iterators for a given category.
+/// Method pattern that chains field iterators for a given [`FieldIterKind`] category.
 ///
-/// For wrapper variants, delegates to the wrapped type's trait method.
-/// For non-wrapper variants, chains `iter()` / `iter_mut()` calls for
-/// each field of the matching category.
+/// For wrapper (`#[wraps]`) variants, delegates to the wrapped type's trait method.
+/// For non-wrapper variants, chains `.iter()` / `.iter_mut()` calls across all fields
+/// of the matching category, producing a single composite iterator expression.
 pub struct FieldCollection {
+    /// Which field category to iterate over.
     pub field_kind: FieldIterKind,
+    /// Whether to generate mutable iterators (`iter_mut` vs `iter`).
     pub mutable: bool,
+    /// Default crate path prefix (e.g., `::kirin::ir`).
     pub default_crate_path: syn::Path,
+    /// Trait path for delegation on wrapper variants.
     pub trait_path: syn::Path,
+    /// Lifetime parameter on the iterator trait (e.g., `'a`).
     pub trait_lifetime: syn::Lifetime,
+    /// Trait method name (e.g., `arguments`).
     pub trait_method: syn::Ident,
+    /// Associated iterator type name on the trait (e.g., `ArgumentsIter`).
     pub trait_type_iter: syn::Ident,
+    /// The element type that the iterator yields (e.g., `Value`).
     pub matching_type: syn::Path,
 }
 
 impl FieldCollection {
+    /// Resolve the trait path, applying any `#[kirin(crate = ...)]` override.
     pub fn full_trait_path(&self, ctx: &DeriveContext<'_, StandardLayout>) -> syn::Path {
         ctx.meta
             .path_builder(&self.default_crate_path)
             .full_trait_path(&self.trait_path)
     }
 
+    /// Resolve the element type path, applying any crate override.
     pub fn full_matching_type(&self, ctx: &DeriveContext<'_, StandardLayout>) -> syn::Path {
         ctx.meta
             .path_builder(&self.default_crate_path)
             .full_path(&self.matching_type)
     }
 
+    /// Build the iterator `Item` type (e.g., `&'a Value` or `&'a mut Value`).
     pub fn matching_item(&self, ctx: &DeriveContext<'_, StandardLayout>) -> TokenStream {
         let lifetime = &self.trait_lifetime;
         let matching_type = self.full_matching_type(ctx);
@@ -95,6 +114,9 @@ impl FieldCollection {
         expr.unwrap_or_else(|| quote! { std::iter::empty::<#matching_item>() })
     }
 
+    /// Compute the concrete iterator type by chaining `Chain<...>` wrappers for each field.
+    ///
+    /// Returns `Empty<Item>` when `fields` is empty.
     pub fn iter_type(
         &self,
         ctx: &DeriveContext<'_, StandardLayout>,
@@ -173,6 +195,7 @@ impl FieldCollection {
         .to_token_stream()
     }
 
+    /// Build the `Generics` containing just the trait lifetime parameter.
     pub fn trait_generics(&self) -> syn::Generics {
         let mut generics = syn::Generics::default();
         generics
@@ -229,14 +252,21 @@ impl MethodPattern<StandardLayout> for FieldCollection {
     }
 }
 
-/// Helper for accessing a single field in an iterator chain.
+/// Accessor for a single field within an iterator chain.
+///
+/// Wraps a field's binding name and its collection kind (`Single`, `Vec`, `Option`)
+/// to generate the appropriate `iter()` / `iter_mut()` / `once()` expression.
 pub struct FieldAccess<'a> {
+    /// Token stream for the field binding (named ident or positional `field_N`).
     pub name: TokenStream,
+    /// Whether the field is a single value, `Vec`, or `Option`.
     pub collection: Collection,
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a> FieldAccess<'a> {
+    /// Construct from a parsed [`FieldInfo`](ir::fields::FieldInfo), using the field's
+    /// ident (or a generated positional name like `field_0`).
     pub fn from_field_info(field: &'a ir::fields::FieldInfo<StandardLayout>) -> Self {
         let name = match &field.ident {
             Some(ident) => quote! { #ident },
@@ -252,6 +282,7 @@ impl<'a> FieldAccess<'a> {
         }
     }
 
+    /// Generate the iterator expression for this field (`once(f)`, `f.iter()`, or `f.iter_mut()`).
     pub fn iter_expr(&self, mutable: bool) -> TokenStream {
         let name = &self.name;
         match self.collection {
@@ -266,6 +297,8 @@ impl<'a> FieldAccess<'a> {
         }
     }
 
+    /// Generate the concrete iterator type for this field (e.g., `Once<&'a Value>`,
+    /// `Iter<'a, Value>`, `IterMut<'a, Value>`).
     pub fn iter_type(
         &self,
         mutable: bool,

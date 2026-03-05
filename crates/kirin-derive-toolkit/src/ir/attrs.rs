@@ -77,6 +77,9 @@ pub enum DefaultValue {
 }
 
 impl DefaultValue {
+    /// Convert to a `syn::Expr` suitable for code generation.
+    ///
+    /// `Default` produces `::core::default::Default::default()`.
     pub fn to_expr(&self) -> syn::Expr {
         match self {
             DefaultValue::Default => syn::parse_quote!(::core::default::Default::default()),
@@ -133,12 +136,19 @@ impl FromMeta for BuilderOptions {
 /// Normalized global options from `#[kirin(...)]` on the input type.
 #[derive(Debug, Clone)]
 pub struct GlobalOptions {
+    /// Override for the IR crate path (e.g. `kirin_ir`).
     pub crate_path: Option<syn::Path>,
+    /// The `#[kirin(type = ...)]` IR enum type this statement belongs to.
     pub ir_type: syn::Path,
+    /// Builder function configuration from `#[kirin(fn)]` or `#[kirin(fn = name)]`.
     pub builder: Option<BuilderOptions>,
+    /// Whether the operation is marked `#[kirin(constant)]`.
     pub constant: bool,
+    /// Whether the operation is marked `#[kirin(pure)]`.
     pub pure: bool,
+    /// Whether the operation is marked `#[kirin(speculatable)]`.
     pub speculatable: bool,
+    /// Whether the operation is a block terminator.
     pub terminator: bool,
 }
 

@@ -1,16 +1,25 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
+/// Generated struct definition, marked `#[automatically_derived]` and `#[doc(hidden)]`.
 pub struct StructDef {
+    /// Visibility qualifier (e.g., `pub`).
     pub vis: TokenStream,
+    /// Struct name.
     pub name: syn::Ident,
+    /// Generic parameters including bounds.
     pub generics: TokenStream,
+    /// Named fields.
     pub fields: Vec<StructField>,
 }
 
+/// A single named field in a [`StructDef`].
 pub struct StructField {
+    /// Visibility qualifier.
     pub vis: TokenStream,
+    /// Field name.
     pub name: syn::Ident,
+    /// Field type.
     pub ty: TokenStream,
 }
 
@@ -39,15 +48,25 @@ impl ToTokens for StructField {
     }
 }
 
+/// Generated enum definition, marked `#[automatically_derived]` and `#[doc(hidden)]`.
 pub struct EnumDef {
+    /// Visibility qualifier.
     pub vis: TokenStream,
+    /// Enum name.
     pub name: syn::Ident,
+    /// Generic parameters including bounds.
     pub generics: TokenStream,
+    /// Enum variants.
     pub variants: Vec<EnumVariant>,
 }
 
+/// A single variant in an [`EnumDef`].
+///
+/// Renders as `Name` for unit variants or `Name(Ty1, Ty2)` for tuple variants.
 pub struct EnumVariant {
+    /// Variant name.
     pub name: syn::Ident,
+    /// Tuple field types (empty for unit variants).
     pub fields: Vec<TokenStream>,
 }
 
@@ -79,9 +98,13 @@ impl ToTokens for EnumVariant {
     }
 }
 
+/// Generated module definition, marked `#[automatically_derived]` and `#[doc(hidden)]`.
 pub struct ModuleDef {
+    /// Visibility qualifier.
     pub vis: TokenStream,
+    /// Module name.
     pub name: syn::Ident,
+    /// Items inside the module body.
     pub items: Vec<TokenStream>,
 }
 

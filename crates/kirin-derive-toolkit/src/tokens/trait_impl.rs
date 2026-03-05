@@ -26,31 +26,45 @@ pub struct TraitImpl {
     pub items: Vec<ImplItem>,
 }
 
+/// An item inside a trait impl block.
 pub enum ImplItem {
+    /// A method definition.
     Method(Method),
+    /// An associated type definition.
     AssocType(AssocType),
+    /// An associated constant definition.
     AssocConst(AssocConst),
 }
 
 /// A method definition inside a trait impl.
 pub struct Method {
+    /// Method name.
     pub name: syn::Ident,
+    /// Self receiver (e.g., `&self`, `&mut self`).
     pub self_arg: TokenStream,
+    /// Additional parameters after self.
     pub params: Vec<TokenStream>,
+    /// Return type (omitted if `None`).
     pub return_type: Option<TokenStream>,
+    /// Method body tokens.
     pub body: TokenStream,
 }
 
 /// An associated type definition (`type Name = Ty;`).
 pub struct AssocType {
+    /// The associated type name.
     pub name: syn::Ident,
+    /// The concrete type it is set to.
     pub ty: TokenStream,
 }
 
 /// An associated constant definition (`const NAME: Ty = val;`).
 pub struct AssocConst {
+    /// The constant name.
     pub name: syn::Ident,
+    /// The constant type.
     pub ty: TokenStream,
+    /// The constant value expression.
     pub value: TokenStream,
 }
 

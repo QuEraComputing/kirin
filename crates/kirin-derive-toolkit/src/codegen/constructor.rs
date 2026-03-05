@@ -21,6 +21,7 @@ pub struct ConstructorBuilder<'a> {
 }
 
 impl<'a> ConstructorBuilder<'a> {
+    /// Create a builder for a struct constructor expression.
     pub fn new_struct(type_name: &'a syn::Ident, is_tuple: bool) -> Self {
         Self {
             type_name,
@@ -29,6 +30,7 @@ impl<'a> ConstructorBuilder<'a> {
         }
     }
 
+    /// Create a builder for an enum variant constructor expression.
     pub fn new_variant(
         type_name: &'a syn::Ident,
         variant_name: &'a syn::Ident,
@@ -41,6 +43,9 @@ impl<'a> ConstructorBuilder<'a> {
         }
     }
 
+    /// Emit a constructor using the concrete type name (e.g., `MyOp { ... }`).
+    ///
+    /// Calls `value_fn` for each field to produce the value expression.
     pub fn build<L, F>(&self, fields: &[FieldInfo<L>], value_fn: F) -> proc_macro2::TokenStream
     where
         L: Layout,
@@ -78,6 +83,9 @@ impl<'a> ConstructorBuilder<'a> {
         }
     }
 
+    /// Emit a constructor using `Self` (e.g., `Self::Variant { ... }`).
+    ///
+    /// Same as [`build`](Self::build) but uses `Self` instead of the type name.
     pub fn build_with_self<L, F>(
         &self,
         fields: &[FieldInfo<L>],

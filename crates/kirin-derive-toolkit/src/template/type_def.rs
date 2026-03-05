@@ -12,6 +12,7 @@ pub struct TypeDefTemplate<L: Layout> {
 }
 
 impl<L: Layout> TypeDefTemplate<L> {
+    /// Create a template from a closure that generates type definitions.
     pub fn new(
         f: impl Fn(&DeriveContext<'_, L>) -> darling::Result<Vec<TokenStream>> + 'static,
     ) -> Self {

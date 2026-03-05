@@ -2,7 +2,7 @@
 //!
 //! Templates are composable building blocks for derive macro code generation.
 //! Each template generates one or more `TokenStream` fragments from a
-//! [`DeriveContext`](crate::context::DeriveContext).
+//! [`DeriveContext`].
 //!
 //! # Layers
 //!
@@ -46,6 +46,7 @@ use proc_macro2::TokenStream;
 /// Each template receives a pre-computed [`DeriveContext`] and produces
 /// one or more `TokenStream` fragments.
 pub trait Template<L: Layout> {
+    /// Generate token stream fragments from the given derive context.
     fn emit(&self, ctx: &DeriveContext<'_, L>) -> darling::Result<Vec<TokenStream>>;
 }
 
@@ -55,12 +56,14 @@ pub struct CompositeTemplate<L: Layout> {
 }
 
 impl<L: Layout> CompositeTemplate<L> {
+    /// Create an empty composite template.
     pub fn new() -> Self {
         Self {
             templates: Vec::new(),
         }
     }
 
+    /// Append a template to the group.
     pub fn add(mut self, t: impl Template<L> + 'static) -> Self {
         self.templates.push(Box::new(t));
         self
@@ -98,6 +101,7 @@ pub struct TemplateBuilder<'ir, L: Layout> {
 }
 
 impl<L: Layout> Input<L> {
+    /// Start building a template pipeline over this input.
     pub fn compose(&self) -> TemplateBuilder<'_, L> {
         TemplateBuilder {
             ctx: DeriveContext::new(self),
@@ -107,6 +111,7 @@ impl<L: Layout> Input<L> {
 }
 
 impl<'ir, L: Layout> TemplateBuilder<'ir, L> {
+    /// Append a template to the pipeline.
     pub fn add(mut self, t: impl Template<L> + 'static) -> Self {
         self.templates.push(Box::new(t));
         self
@@ -117,6 +122,7 @@ impl<'ir, L: Layout> TemplateBuilder<'ir, L> {
         &self.ctx
     }
 
+    /// Run all templates and combine their output into a single `TokenStream`.
     pub fn build(self) -> darling::Result<TokenStream> {
         let mut combined = TokenStream::new();
         let mut errors = darling::Error::accumulator();

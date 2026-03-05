@@ -14,6 +14,7 @@ pub(super) fn renamed_field_idents(prefix: &str, fields: &[syn::Ident]) -> Vec<s
         .collect()
 }
 
+/// Merge two optional where clauses into one, concatenating their predicates.
 pub fn combine_where_clauses(
     a: Option<&syn::WhereClause>,
     b: Option<&syn::WhereClause>,
@@ -29,6 +30,7 @@ pub fn combine_where_clauses(
     }
 }
 
+/// Remove duplicate types from the list, comparing by token representation.
 pub fn deduplicate_types(types: &mut Vec<syn::Type>) {
     let mut seen = std::collections::HashSet::new();
     types.retain(|ty| {

@@ -5,6 +5,7 @@
 
 use syn::{DeriveInput, Fields, GenericArgument, PathArguments, Type};
 
+/// Default path to the IR crate used by derive macros when no `#[stage(crate = "...")]` override is present.
 pub const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 
 /// Parsed metadata from a single stage enum variant.

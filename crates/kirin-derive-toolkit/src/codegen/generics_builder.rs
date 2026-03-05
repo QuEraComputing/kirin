@@ -9,10 +9,12 @@ pub struct GenericsBuilder<'a> {
 }
 
 impl<'a> GenericsBuilder<'a> {
+    /// Create a builder that uses `ir_path` for trait bounds (e.g., `kirin_ir::Dialect`).
     pub fn new(ir_path: &'a syn::Path) -> Self {
         Self { ir_path }
     }
 
+    /// Add `'tokens` and `'src: 'tokens` lifetimes to `base` if not already present.
     pub fn with_lifetimes(&self, base: &syn::Generics) -> syn::Generics {
         let mut generics = base.clone();
 
@@ -44,6 +46,7 @@ impl<'a> GenericsBuilder<'a> {
         generics
     }
 
+    /// Add lifetimes and a `Language: Dialect` type parameter to `base`.
     pub fn with_language(&self, base: &syn::Generics) -> syn::Generics {
         let mut generics = self.with_lifetimes(base);
         let ir_path = self.ir_path;
@@ -62,6 +65,7 @@ impl<'a> GenericsBuilder<'a> {
         generics
     }
 
+    /// Add lifetimes and a bare `Language` type parameter (no trait bound).
     pub fn with_language_unbounded(&self, base: &syn::Generics) -> syn::Generics {
         let mut generics = self.with_lifetimes(base);
 

@@ -20,15 +20,24 @@ use super::{attrs::GlobalOptions, fields::Wrapper, layout::Layout, statement::St
 /// ```
 #[derive(Debug, Clone)]
 pub struct Input<L: Layout> {
+    /// Name of the derive input type.
     pub name: syn::Ident,
+    /// Generic parameters from the input type.
     pub generics: syn::Generics,
+    /// Normalized `#[kirin(...)]` options from the top-level type.
     pub attrs: GlobalOptions,
+    /// Layout-specific extra global attributes.
     pub extra_attrs: L::ExtraGlobalAttrs,
+    /// Parsed body: a single struct or enum with variants.
     pub data: Data<L>,
+    /// Original unprocessed attributes from the input.
     pub raw_attrs: Vec<syn::Attribute>,
 }
 
 impl<L: Layout> Input<L> {
+    /// Parse a `syn::DeriveInput` into a Kirin-typed `Input`.
+    ///
+    /// Supports structs and enums; unions produce an error.
     pub fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
         match &input.data {
             syn::Data::Struct(_) => Ok(Self {
@@ -99,10 +108,12 @@ impl<L: Layout> DerefMut for DataStruct<L> {
 /// wrapper variants (marked with `#[wraps]`) from regular ones.
 #[derive(Debug, Clone)]
 pub struct DataEnum<L: Layout> {
+    /// One [`Statement`] per enum variant.
     pub variants: Vec<Statement<L>>,
 }
 
 impl<L: Layout> DataEnum<L> {
+    /// Iterate variants, distinguishing `#[wraps]` wrappers from regular variants.
     pub fn iter_variants(&self) -> impl Iterator<Item = VariantRef<'_, L>> {
         self.variants.iter().map(|stmt| {
             if let Some(wrapper) = &stmt.wraps {
@@ -153,6 +164,7 @@ pub enum VariantRef<'a, L: Layout> {
 }
 
 impl<'a, L: Layout> VariantRef<'a, L> {
+    /// Return the variant's identifier.
     pub fn name(&self) -> &'a syn::Ident {
         match self {
             VariantRef::Wrapper { name, .. } => name,
@@ -160,6 +172,7 @@ impl<'a, L: Layout> VariantRef<'a, L> {
         }
     }
 
+    /// Return the underlying [`Statement`].
     pub fn stmt(&self) -> &'a Statement<L> {
         match self {
             VariantRef::Wrapper { stmt, .. } => stmt,
@@ -167,6 +180,7 @@ impl<'a, L: Layout> VariantRef<'a, L> {
         }
     }
 
+    /// Return `true` if this variant delegates via `#[wraps]`.
     pub fn is_wrapper(&self) -> bool {
         matches!(self, VariantRef::Wrapper { .. })
     }

@@ -7,13 +7,18 @@ use super::utils::{renamed_field_idents, tuple_field_idents};
 /// For tuple fields, generates `{prefix}0`, `{prefix}1`, etc.
 #[derive(Debug, Clone)]
 pub struct FieldBindings {
+    /// Whether the fields are positional (tuple) or named (struct).
     pub is_tuple: bool,
+    /// Total number of fields.
     pub field_count: usize,
+    /// Prefixed idents used in generated code bindings.
     pub field_idents: Vec<syn::Ident>,
+    /// Original field names before prefixing (empty for tuple fields).
     pub original_field_names: Vec<syn::Ident>,
 }
 
 impl FieldBindings {
+    /// Create bindings for tuple fields: `{prefix}0`, `{prefix}1`, etc.
     pub fn tuple(prefix: &str, count: usize) -> Self {
         Self {
             is_tuple: true,
@@ -23,6 +28,7 @@ impl FieldBindings {
         }
     }
 
+    /// Create bindings for named fields, prefixing each name with `{prefix}_`.
     pub fn named(prefix: &str, fields: Vec<syn::Ident>) -> Self {
         let count = fields.len();
         let prefixed = renamed_field_idents(&format!("{}_", prefix), &fields);
@@ -38,6 +44,7 @@ impl FieldBindings {
         self.field_count == 0
     }
 
+    /// Generate a new set of idents with a different prefix, preserving the field style.
     pub fn renamed(&self, prefix: &str) -> Vec<syn::Ident> {
         if self.is_tuple {
             tuple_field_idents(prefix, self.field_count)
@@ -46,6 +53,7 @@ impl FieldBindings {
         }
     }
 
+    /// Clone these bindings with a new prefix applied to all idents.
     pub fn with_prefix(&self, prefix: &str) -> Self {
         Self {
             is_tuple: self.is_tuple,
