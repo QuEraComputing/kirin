@@ -1,6 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
+/// Destructuring pattern for struct/enum fields.
+///
+/// Renders as `{ a, b, c }` for named fields or `(a, b, c)` for tuple fields.
+/// Built automatically by [`Statement::field_bindings`](crate::ir::Statement::field_bindings).
 #[derive(Clone, Debug)]
 pub struct Pattern {
     pub named: bool,

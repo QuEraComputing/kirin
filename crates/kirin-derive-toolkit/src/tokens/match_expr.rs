@@ -1,11 +1,27 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
+/// Builder for `match` expressions.
+///
+/// ```ignore
+/// let m = MatchExpr {
+///     subject: quote!(self),
+///     arms: vec![
+///         MatchArm {
+///             pattern: quote!(Self::Add { .. }),
+///             guard: None,
+///             body: quote! { true },
+///         },
+///     ],
+/// };
+/// // m implements ToTokens → `match self { Self::Add { .. } => { true } }`
+/// ```
 pub struct MatchExpr {
     pub subject: TokenStream,
     pub arms: Vec<MatchArm>,
 }
 
+/// A single arm in a [`MatchExpr`].
 pub struct MatchArm {
     pub pattern: TokenStream,
     pub guard: Option<TokenStream>,

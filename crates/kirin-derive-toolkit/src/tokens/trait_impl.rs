@@ -1,6 +1,21 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
+/// Builder for `impl Trait for Type { ... }` blocks.
+///
+/// ```ignore
+/// let imp = TraitImpl::new(generics, quote!(MyTrait), quote!(MyType))
+///     .trait_generics(quote!(<'ir, L>))
+///     .method(Method {
+///         name: format_ident!("my_method"),
+///         self_arg: quote!(&self),
+///         params: vec![quote!(x: u32)],
+///         return_type: Some(quote!(bool)),
+///         body: quote! { x > 0 },
+///     })
+///     .assoc_type(format_ident!("Output"), quote!(u32));
+/// // imp implements ToTokens
+/// ```
 pub struct TraitImpl {
     pub generics: syn::Generics,
     pub trait_path: TokenStream,
@@ -17,6 +32,7 @@ pub enum ImplItem {
     AssocConst(AssocConst),
 }
 
+/// A method definition inside a trait impl.
 pub struct Method {
     pub name: syn::Ident,
     pub self_arg: TokenStream,
@@ -25,11 +41,13 @@ pub struct Method {
     pub body: TokenStream,
 }
 
+/// An associated type definition (`type Name = Ty;`).
 pub struct AssocType {
     pub name: syn::Ident,
     pub ty: TokenStream,
 }
 
+/// An associated constant definition (`const NAME: Ty = val;`).
 pub struct AssocConst {
     pub name: syn::Ident,
     pub ty: TokenStream,

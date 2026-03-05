@@ -1,3 +1,21 @@
+//! Typed code-block builders for generating Rust syntax.
+//!
+//! Instead of assembling `TokenStream` with raw `quote!` calls, these builders
+//! provide structured, composable code generation with compile-time shape
+//! guarantees.
+//!
+//! | Builder | Generates |
+//! |---------|-----------|
+//! | [`TraitImpl`] | `impl Trait for Type { ... }` blocks |
+//! | [`InherentImpl`] | `impl Type { ... }` blocks |
+//! | [`MatchExpr`] | `match subject { arm => body, ... }` expressions |
+//! | [`Pattern`] | Destructuring patterns (`Foo { a, b }` or `Foo(a, b)`) |
+//! | [`StructDef`], [`EnumDef`] | Type definitions |
+//! | [`DelegationCall`] | Forwarding calls through `#[wraps]` fields |
+//!
+//! All builders implement `ToTokens` so they can be interpolated directly
+//! in `quote!` expressions.
+
 mod definitions;
 mod delegation;
 mod fragment;
