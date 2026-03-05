@@ -1,7 +1,7 @@
 use crate::generators::property::context::DeriveProperty;
 use crate::prelude::*;
-use crate::tokens::TraitImpl;
 use crate::tokens::Method;
+use crate::tokens::TraitImpl;
 use quote::quote;
 
 impl<'ir> Emit<'ir, StandardLayout> for DeriveProperty {

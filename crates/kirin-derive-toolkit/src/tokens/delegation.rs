@@ -31,8 +31,6 @@ impl ToTokens for DelegationAssocType {
         let trait_path = &self.trait_path;
         let trait_generics = &self.trait_generics;
         let assoc_type_ident = &self.assoc_type_ident;
-        tokens.extend(
-            quote! { <#wrapper_ty as #trait_path #trait_generics>::#assoc_type_ident },
-        );
+        tokens.extend(quote! { <#wrapper_ty as #trait_path #trait_generics>::#assoc_type_ident });
     }
 }

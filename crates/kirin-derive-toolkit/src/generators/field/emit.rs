@@ -1,9 +1,7 @@
 use crate::generators::field::context::DeriveFieldIter;
 use crate::generators::field::helpers::FieldInputBuilder;
 use crate::prelude::*;
-use crate::tokens::{
-    EnumDef, EnumVariant, StructDef, StructField, TraitImpl, Method,
-};
+use crate::tokens::{EnumDef, EnumVariant, Method, StructDef, StructField, TraitImpl};
 use quote::quote;
 
 impl<'ir> Emit<'ir, StandardLayout> for DeriveFieldIter {
@@ -58,7 +56,10 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveFieldIter {
         let trait_impl = TraitImpl::new(impl_generics, &full_trait_path, input_name)
             .trait_generics(&trait_generics)
             .type_generics(type_generics)
-            .assoc_type(trait_type_iter.clone(), quote! { #iter_name #iter_ty_generics })
+            .assoc_type(
+                trait_type_iter.clone(),
+                quote! { #iter_name #iter_ty_generics },
+            )
             .method(Method {
                 name: trait_method.clone(),
                 self_arg,
@@ -171,7 +172,10 @@ impl<'ir> Emit<'ir, StandardLayout> for DeriveFieldIter {
         let trait_impl = TraitImpl::new(impl_generics, &full_trait_path, input_name)
             .trait_generics(&trait_generics)
             .type_generics(type_generics)
-            .assoc_type(trait_type_iter.clone(), quote! { #iter_name #iter_ty_generics })
+            .assoc_type(
+                trait_type_iter.clone(),
+                quote! { #iter_name #iter_ty_generics },
+            )
             .method(Method {
                 name: trait_method.clone(),
                 self_arg,

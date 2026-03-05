@@ -199,13 +199,12 @@ pub(crate) fn collect_wrapper_types(
     ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
 ) -> Vec<syn::Type> {
     match &ir_input.data {
-        kirin_derive_toolkit::ir::Data::Struct(data) => {
-            data.0
-                .wraps
-                .as_ref()
-                .map(|w| vec![w.ty.clone()])
-                .unwrap_or_default()
-        }
+        kirin_derive_toolkit::ir::Data::Struct(data) => data
+            .0
+            .wraps
+            .as_ref()
+            .map(|w| vec![w.ty.clone()])
+            .unwrap_or_default(),
         kirin_derive_toolkit::ir::Data::Enum(data) => data
             .iter_variants()
             .filter_map(|variant| {

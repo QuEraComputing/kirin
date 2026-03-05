@@ -17,13 +17,17 @@ pub struct DeriveContext<'ir, L: Layout> {
 
 /// Pre-computed context for a single statement/variant.
 ///
-/// Includes the destructuring [`Pattern`] and
-/// wrapper status, ready for use in match arms.
+/// Includes the destructuring [`Pattern`], wrapper status,
+/// and pre-built wrapper access tokens, ready for use in match arms.
 pub struct StatementContext<'ir, L: Layout> {
     pub stmt: &'ir Statement<L>,
     pub pattern: Pattern,
     pub is_wrapper: bool,
     pub wrapper: Option<&'ir Wrapper>,
+    /// The Rust type of the wrapped value (e.g., `InnerOp`), if `#[wraps]` is present.
+    pub wrapper_type: Option<&'ir syn::Type>,
+    /// Token expression to access the wrapper field binding (e.g., `inner` or `field_0`).
+    pub wrapper_binding: Option<proc_macro2::TokenStream>,
 }
 
 impl<'ir, L: Layout> DeriveContext<'ir, L> {
@@ -53,9 +57,7 @@ impl<'ir, L: Layout> DeriveContext<'ir, L> {
     }
 }
 
-fn build_statement_context<'ir, L: Layout>(
-    stmt: &'ir Statement<L>,
-) -> StatementContext<'ir, L> {
+fn build_statement_context<'ir, L: Layout>(stmt: &'ir Statement<L>) -> StatementContext<'ir, L> {
     let is_wrapper = stmt.wraps.is_some();
     let wrapper = stmt.wraps.as_ref();
 
@@ -85,10 +87,18 @@ fn build_statement_context<'ir, L: Layout>(
         Pattern::new(named, names)
     };
 
+    let wrapper_type = stmt.wraps.as_ref().map(|w| &w.ty);
+    let wrapper_binding = stmt.wraps.as_ref().map(|w| {
+        let name = w.field.name();
+        quote::quote! { #name }
+    });
+
     StatementContext {
         stmt,
         pattern,
         is_wrapper,
         wrapper,
+        wrapper_type,
+        wrapper_binding,
     }
 }

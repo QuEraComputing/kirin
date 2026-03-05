@@ -1,10 +1,12 @@
-use crate::derive::InputMeta as CoreInputMeta;
-use crate::generators::common;
-use crate::generators::property::statement::StatementInfo;
-use crate::misc::from_str;
-use crate::prelude::*;
-use std::collections::HashMap;
+use crate::context::{DeriveContext, StatementContext};
+use crate::ir::{self, StandardLayout};
+use crate::tokens::DelegationCall;
+use proc_macro2::TokenStream;
+use quote::{ToTokens, quote};
 
+use super::MethodPattern;
+
+/// Reads a boolean property value from IR attributes.
 pub trait PropertyValueReader {
     fn global_value(&self, input: &ir::Input<StandardLayout>) -> bool;
     fn statement_value(&self, statement: &ir::Statement<StandardLayout>) -> bool;
@@ -13,6 +15,7 @@ pub trait PropertyValueReader {
     }
 }
 
+/// Built-in property kinds matching `#[kirin(...)]` attributes.
 #[derive(Clone, Copy, Debug)]
 pub enum PropertyKind {
     Constant,
@@ -49,6 +52,7 @@ impl PropertyValueReader for PropertyKind {
     }
 }
 
+/// Reads a bare attribute like `#[callable]` from raw attrs.
 pub struct BareAttrReader {
     attr_name: &'static str,
 }
@@ -75,100 +79,91 @@ impl PropertyValueReader for BareAttrReader {
     }
 }
 
-pub struct DeriveProperty {
-    pub reader: Box<dyn PropertyValueReader>,
-    pub default_crate_path: syn::Path,
-    pub trait_path: syn::Path,
-    pub trait_method: syn::Ident,
-    pub value_type: syn::Type,
-    pub(crate) input: Option<InputContext>,
-    pub(crate) statements: HashMap<String, StatementInfo>,
+/// Method pattern that returns a boolean based on `#[kirin(...)]` attributes or bare attrs.
+///
+/// For wrapper variants, delegates to the wrapped type's trait method.
+/// For non-wrapper variants, returns `global_value || statement_value`.
+pub struct BoolProperty {
+    reader: Box<dyn PropertyValueReader>,
+    trait_path: syn::Path,
+    trait_method: syn::Ident,
+    default_crate_path: syn::Path,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct InputContext {
-    pub(crate) core: CoreInputMeta,
-    pub(crate) global_value: bool,
-}
-
-impl DeriveProperty {
+impl BoolProperty {
     pub fn new(
         reader: impl PropertyValueReader + 'static,
-        default_crate_path: impl Into<String>,
-        trait_path: impl Into<String>,
-        trait_method: impl Into<String>,
-        value_type: impl Into<String>,
+        trait_path: syn::Path,
+        trait_method: syn::Ident,
+        default_crate_path: syn::Path,
     ) -> Self {
         Self {
             reader: Box::new(reader),
-            default_crate_path: from_str(default_crate_path),
-            trait_path: from_str(trait_path),
-            trait_method: from_str(trait_method),
-            value_type: from_str(value_type),
-            input: None,
-            statements: HashMap::new(),
+            trait_path,
+            trait_method,
+            default_crate_path,
         }
     }
 
-    pub fn bare_attr(
-        attr_name: &'static str,
-        default_crate_path: impl Into<String>,
-        trait_path: impl Into<String>,
-        trait_method: impl Into<String>,
-        value_type: impl Into<String>,
-    ) -> Self {
-        Self::new(
-            BareAttrReader::new(attr_name),
-            default_crate_path,
-            trait_path,
-            trait_method,
-            value_type,
-        )
-    }
-
-    pub fn with_reader(
-        reader: impl PropertyValueReader + 'static,
-        default_crate_path: impl Into<String>,
-        trait_path: impl Into<String>,
-        trait_method: impl Into<String>,
-        value_type: impl Into<String>,
-    ) -> Self {
-        Self::new(
-            reader,
-            default_crate_path,
-            trait_path,
-            trait_method,
-            value_type,
-        )
-    }
-
-    pub fn emit(&mut self, input: &syn::DeriveInput) -> darling::Result<proc_macro2::TokenStream> {
-        common::emit_from_derive_input(self, input)
-    }
-
-    pub fn emit_from_input(
-        &mut self,
-        input: &ir::Input<StandardLayout>,
-    ) -> darling::Result<proc_macro2::TokenStream> {
-        common::emit_from_ir(self, input)
-    }
-
-    pub(crate) fn input_ctx(&self) -> darling::Result<&InputContext> {
-        common::require_input_ctx(&self.input, "DeriveProperty")
-    }
-
-    pub(crate) fn statement_info(
-        &self,
-        statement: &ir::Statement<StandardLayout>,
-    ) -> darling::Result<&StatementInfo> {
-        common::statement_info(&self.statements, statement)
-    }
-
-    pub(crate) fn full_trait_path(&self, input: &InputContext) -> syn::Path {
-        input
-            .core
+    fn full_trait_path(&self, ctx: &DeriveContext<'_, StandardLayout>) -> syn::Path {
+        ctx.meta
             .path_builder(&self.default_crate_path)
             .full_trait_path(&self.trait_path)
+    }
+
+    fn value_expr(
+        &self,
+        ctx: &DeriveContext<'_, StandardLayout>,
+        stmt_ctx: &StatementContext<'_, StandardLayout>,
+    ) -> TokenStream {
+        if let (Some(wrapper_ty), Some(wrapper_field)) =
+            (stmt_ctx.wrapper_type, &stmt_ctx.wrapper_binding)
+        {
+            let trait_path = self.full_trait_path(ctx);
+            return DelegationCall {
+                wrapper_ty: quote! { #wrapper_ty },
+                trait_path: quote! { #trait_path },
+                trait_method: self.trait_method.clone(),
+                field: wrapper_field.clone(),
+            }
+            .to_token_stream();
+        }
+
+        let global = self.reader.global_value(ctx.input);
+        if ctx.meta.is_enum {
+            let stmt = self.reader.statement_value(stmt_ctx.stmt);
+            quote! { #global || #stmt }
+        } else {
+            quote! { #global }
+        }
+    }
+}
+
+impl MethodPattern<StandardLayout> for BoolProperty {
+    fn for_struct(
+        &self,
+        ctx: &DeriveContext<'_, StandardLayout>,
+        stmt_ctx: &StatementContext<'_, StandardLayout>,
+    ) -> darling::Result<TokenStream> {
+        self.reader.validate(ctx.input)?;
+        let value_expr = self.value_expr(ctx, stmt_ctx);
+        if stmt_ctx.is_wrapper {
+            let pattern = &stmt_ctx.pattern;
+            Ok(quote! {
+                let Self #pattern = self;
+                #value_expr
+            })
+        } else {
+            Ok(value_expr)
+        }
+    }
+
+    fn for_variant(
+        &self,
+        ctx: &DeriveContext<'_, StandardLayout>,
+        stmt_ctx: &StatementContext<'_, StandardLayout>,
+    ) -> darling::Result<TokenStream> {
+        Ok(self.value_expr(ctx, stmt_ctx))
     }
 }
 

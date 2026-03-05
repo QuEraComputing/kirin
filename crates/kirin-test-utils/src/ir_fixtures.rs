@@ -84,7 +84,12 @@ pub fn build_linear_program(
         .new();
     let region = stage.region().add_block(block).new();
     let func_body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(func_body).new().unwrap();
+    let spec_fn = stage
+        .specialize()
+        .staged_func(sf)
+        .body(func_body)
+        .new()
+        .unwrap();
     (spec_fn, add_stmt)
 }
 
@@ -497,7 +502,12 @@ pub fn build_infinite_loop(
         .add_block(exit)
         .new();
     let func_body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().staged_func(sf).body(func_body).new().unwrap()
+    stage
+        .specialize()
+        .staged_func(sf)
+        .body(func_body)
+        .new()
+        .unwrap()
 }
 
 /// Build `f(x, y) = q = div x, y; ret q`.

@@ -23,7 +23,10 @@ impl GenerateAST {
     }
 
     /// Generates the AST type definition with derive(Clone, Debug, PartialEq).
-    pub fn generate(&self, ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>) -> TokenStream {
+    pub fn generate(
+        &self,
+        ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+    ) -> TokenStream {
         // For wrapper structs, don't generate any AST type.
         if let kirin_derive_toolkit::ir::Data::Struct(data) = &ir_input.data {
             if data.0.wraps.is_some() {

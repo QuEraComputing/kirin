@@ -69,46 +69,42 @@ impl GenerateHasDialectParser {
 
         for (i, part) in parser_parts.iter().enumerate() {
             match part {
-                ParserPart::Token(tok_parser) => {
-                    match &parser_expr {
-                        Some(expr) => {
-                            parser_expr = Some(quote! { #expr.then_ignore(#tok_parser) });
-                        }
-                        None => {
-                            if first_field_idx.is_some() && i < first_field_idx.unwrap() {
-                                continue;
-                            } else {
-                                parser_expr = Some(quote! { #tok_parser });
-                            }
+                ParserPart::Token(tok_parser) => match &parser_expr {
+                    Some(expr) => {
+                        parser_expr = Some(quote! { #expr.then_ignore(#tok_parser) });
+                    }
+                    None => {
+                        if first_field_idx.is_some() && i < first_field_idx.unwrap() {
+                            continue;
+                        } else {
+                            parser_expr = Some(quote! { #tok_parser });
                         }
                     }
-                }
-                ParserPart::Field(field_parser) => {
-                    match &parser_expr {
-                        Some(expr) => {
-                            parser_expr = Some(quote! { #expr.then(#field_parser) });
-                        }
-                        None => {
-                            let preceding_tokens: Vec<_> = parser_parts[..i]
-                                .iter()
-                                .filter_map(|p| match p {
-                                    ParserPart::Token(t) => Some(t.clone()),
-                                    _ => None,
-                                })
-                                .collect();
+                },
+                ParserPart::Field(field_parser) => match &parser_expr {
+                    Some(expr) => {
+                        parser_expr = Some(quote! { #expr.then(#field_parser) });
+                    }
+                    None => {
+                        let preceding_tokens: Vec<_> = parser_parts[..i]
+                            .iter()
+                            .filter_map(|p| match p {
+                                ParserPart::Token(t) => Some(t.clone()),
+                                _ => None,
+                            })
+                            .collect();
 
-                            if !preceding_tokens.is_empty() {
-                                let mut combined = preceding_tokens[0].clone();
-                                for tok in &preceding_tokens[1..] {
-                                    combined = quote! { #combined.then_ignore(#tok) };
-                                }
-                                parser_expr = Some(quote! { #combined.ignore_then(#field_parser) });
-                            } else {
-                                parser_expr = Some(field_parser.clone());
+                        if !preceding_tokens.is_empty() {
+                            let mut combined = preceding_tokens[0].clone();
+                            for tok in &preceding_tokens[1..] {
+                                combined = quote! { #combined.then_ignore(#tok) };
                             }
+                            parser_expr = Some(quote! { #combined.ignore_then(#field_parser) });
+                        } else {
+                            parser_expr = Some(field_parser.clone());
                         }
                     }
-                }
+                },
             }
         }
 

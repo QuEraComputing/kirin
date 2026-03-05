@@ -50,7 +50,10 @@ macro_rules! impl_detach {
                         *parent_info.get_tail_mut() = prev;
                     }
 
-                    debug_assert!(parent_info.get_len() > 0, "Parent block length is already zero before detach");
+                    debug_assert!(
+                        parent_info.get_len() > 0,
+                        "Parent block length is already zero before detach"
+                    );
                     *parent_info.get_len_mut() -= 1;
                 }
             }

@@ -180,10 +180,7 @@ where
     Ok(())
 }
 
-pub fn scan_argument<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_argument<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,
@@ -207,10 +204,7 @@ where
     Ok(())
 }
 
-pub fn scan_successor<'ir, V, L>(
-    _visitor: &mut V,
-    _field: &'ir FieldInfo<L>,
-) -> darling::Result<()>
+pub fn scan_successor<'ir, V, L>(_visitor: &mut V, _field: &'ir FieldInfo<L>) -> darling::Result<()>
 where
     V: Scan<'ir, L> + ?Sized,
     L: Layout,

@@ -27,7 +27,10 @@ impl GenerateHasDialectParser {
     }
 
     /// Generates the `HasDialectParser` implementation.
-    pub fn generate(&self, ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>) -> TokenStream {
+    pub fn generate(
+        &self,
+        ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+    ) -> TokenStream {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let crate_path = &self.config.crate_path;
 

@@ -1,22 +1,21 @@
 extern crate proc_macro;
 
-use kirin_derive_toolkit::prelude::darling;
 use proc_macro::TokenStream;
-use quote::ToTokens;
 use syn::parse_macro_input;
 
-use kirin_derive_toolkit::generators::{
-    builder::DeriveBuilder,
-    field::{DeriveFieldIter, FieldIterKind},
-    marker,
-    property::{DeriveProperty, PropertyKind},
+use kirin_derive_toolkit::ir::{Input, StandardLayout};
+use kirin_derive_toolkit::template::{
+    BuilderTemplate, TraitImplTemplate,
+    method_pattern::bool_property::PropertyKind,
+    method_pattern::field_collection::FieldIterKind,
+    trait_impl::{BoolPropertyConfig, FieldIterConfig},
 };
 
 const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 const TRAIT_LIFETIME: &str = "'a";
 
 #[derive(Clone, Copy)]
-struct FieldIterConfig {
+struct LocalFieldIterConfig {
     kind: FieldIterKind,
     mutable: bool,
     trait_name: &'static str,
@@ -25,7 +24,7 @@ struct FieldIterConfig {
     trait_type_iter: &'static str,
 }
 
-impl FieldIterConfig {
+impl LocalFieldIterConfig {
     const fn new(
         kind: FieldIterKind,
         mutable: bool,
@@ -46,13 +45,13 @@ impl FieldIterConfig {
 }
 
 #[derive(Clone, Copy)]
-struct PropertyConfig {
+struct LocalPropertyConfig {
     kind: PropertyKind,
     trait_name: &'static str,
     trait_method: &'static str,
 }
 
-impl PropertyConfig {
+impl LocalPropertyConfig {
     const fn new(kind: PropertyKind, trait_name: &'static str, trait_method: &'static str) -> Self {
         Self {
             kind,
@@ -62,7 +61,7 @@ impl PropertyConfig {
     }
 }
 
-const HAS_ARGUMENTS: FieldIterConfig = FieldIterConfig::new(
+const HAS_ARGUMENTS: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Arguments,
     false,
     "HasArguments",
@@ -70,7 +69,7 @@ const HAS_ARGUMENTS: FieldIterConfig = FieldIterConfig::new(
     "arguments",
     "Iter",
 );
-const HAS_ARGUMENTS_MUT: FieldIterConfig = FieldIterConfig::new(
+const HAS_ARGUMENTS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Arguments,
     true,
     "HasArgumentsMut",
@@ -78,7 +77,7 @@ const HAS_ARGUMENTS_MUT: FieldIterConfig = FieldIterConfig::new(
     "arguments_mut",
     "IterMut",
 );
-const HAS_RESULTS: FieldIterConfig = FieldIterConfig::new(
+const HAS_RESULTS: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Results,
     false,
     "HasResults",
@@ -86,7 +85,7 @@ const HAS_RESULTS: FieldIterConfig = FieldIterConfig::new(
     "results",
     "Iter",
 );
-const HAS_RESULTS_MUT: FieldIterConfig = FieldIterConfig::new(
+const HAS_RESULTS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Results,
     true,
     "HasResultsMut",
@@ -94,7 +93,7 @@ const HAS_RESULTS_MUT: FieldIterConfig = FieldIterConfig::new(
     "results_mut",
     "IterMut",
 );
-const HAS_BLOCKS: FieldIterConfig = FieldIterConfig::new(
+const HAS_BLOCKS: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Blocks,
     false,
     "HasBlocks",
@@ -102,7 +101,7 @@ const HAS_BLOCKS: FieldIterConfig = FieldIterConfig::new(
     "blocks",
     "Iter",
 );
-const HAS_BLOCKS_MUT: FieldIterConfig = FieldIterConfig::new(
+const HAS_BLOCKS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Blocks,
     true,
     "HasBlocksMut",
@@ -110,7 +109,7 @@ const HAS_BLOCKS_MUT: FieldIterConfig = FieldIterConfig::new(
     "blocks_mut",
     "IterMut",
 );
-const HAS_SUCCESSORS: FieldIterConfig = FieldIterConfig::new(
+const HAS_SUCCESSORS: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Successors,
     false,
     "HasSuccessors",
@@ -118,7 +117,7 @@ const HAS_SUCCESSORS: FieldIterConfig = FieldIterConfig::new(
     "successors",
     "Iter",
 );
-const HAS_SUCCESSORS_MUT: FieldIterConfig = FieldIterConfig::new(
+const HAS_SUCCESSORS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Successors,
     true,
     "HasSuccessorsMut",
@@ -126,7 +125,7 @@ const HAS_SUCCESSORS_MUT: FieldIterConfig = FieldIterConfig::new(
     "successors_mut",
     "IterMut",
 );
-const HAS_REGIONS: FieldIterConfig = FieldIterConfig::new(
+const HAS_REGIONS: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Regions,
     false,
     "HasRegions",
@@ -134,7 +133,7 @@ const HAS_REGIONS: FieldIterConfig = FieldIterConfig::new(
     "regions",
     "Iter",
 );
-const HAS_REGIONS_MUT: FieldIterConfig = FieldIterConfig::new(
+const HAS_REGIONS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
     FieldIterKind::Regions,
     true,
     "HasRegionsMut",
@@ -143,7 +142,7 @@ const HAS_REGIONS_MUT: FieldIterConfig = FieldIterConfig::new(
     "IterMut",
 );
 
-const FIELD_ITER_CONFIGS: [FieldIterConfig; 10] = [
+const FIELD_ITER_CONFIGS: [LocalFieldIterConfig; 10] = [
     HAS_ARGUMENTS,
     HAS_ARGUMENTS_MUT,
     HAS_RESULTS,
@@ -156,109 +155,114 @@ const FIELD_ITER_CONFIGS: [FieldIterConfig; 10] = [
     HAS_REGIONS_MUT,
 ];
 
-const IS_TERMINATOR: PropertyConfig =
-    PropertyConfig::new(PropertyKind::Terminator, "IsTerminator", "is_terminator");
-const IS_CONSTANT: PropertyConfig =
-    PropertyConfig::new(PropertyKind::Constant, "IsConstant", "is_constant");
-const IS_PURE: PropertyConfig = PropertyConfig::new(PropertyKind::Pure, "IsPure", "is_pure");
-const IS_SPECULATABLE: PropertyConfig = PropertyConfig::new(
+const IS_TERMINATOR: LocalPropertyConfig =
+    LocalPropertyConfig::new(PropertyKind::Terminator, "IsTerminator", "is_terminator");
+const IS_CONSTANT: LocalPropertyConfig =
+    LocalPropertyConfig::new(PropertyKind::Constant, "IsConstant", "is_constant");
+const IS_PURE: LocalPropertyConfig =
+    LocalPropertyConfig::new(PropertyKind::Pure, "IsPure", "is_pure");
+const IS_SPECULATABLE: LocalPropertyConfig = LocalPropertyConfig::new(
     PropertyKind::Speculatable,
     "IsSpeculatable",
     "is_speculatable",
 );
 
-const PROPERTY_CONFIGS: [PropertyConfig; 4] =
+const PROPERTY_CONFIGS: [LocalPropertyConfig; 4] =
     [IS_TERMINATOR, IS_CONSTANT, IS_PURE, IS_SPECULATABLE];
 
-fn emit_field_iter(
-    ast: &syn::DeriveInput,
-    config: FieldIterConfig,
-) -> darling::Result<proc_macro2::TokenStream> {
-    new_field_iter(config).emit(ast)
+fn to_field_iter_config(config: LocalFieldIterConfig) -> FieldIterConfig {
+    FieldIterConfig {
+        kind: config.kind,
+        mutable: config.mutable,
+        trait_name: config.trait_name,
+        matching_type: config.matching_type,
+        trait_method: config.trait_method,
+        trait_type_iter: config.trait_type_iter,
+    }
 }
 
-fn emit_property(
-    ast: &syn::DeriveInput,
-    config: PropertyConfig,
-) -> darling::Result<proc_macro2::TokenStream> {
-    new_property(config).emit(ast)
-}
-
-fn new_field_iter(config: FieldIterConfig) -> DeriveFieldIter {
-    DeriveFieldIter::new(
-        config.kind,
-        config.mutable,
-        DEFAULT_IR_CRATE,
-        config.trait_name,
-        config.matching_type,
-        config.trait_method,
-        config.trait_type_iter,
-    )
-    .with_trait_lifetime(TRAIT_LIFETIME)
-}
-
-fn new_property(config: PropertyConfig) -> DeriveProperty {
-    DeriveProperty::new(
-        config.kind,
-        DEFAULT_IR_CRATE,
-        config.trait_name,
-        config.trait_method,
-        "bool",
-    )
+fn to_bool_property_config(config: LocalPropertyConfig) -> BoolPropertyConfig {
+    BoolPropertyConfig {
+        kind: config.kind,
+        trait_name: config.trait_name,
+        trait_method: config.trait_method,
+    }
 }
 
 #[proc_macro_derive(Dialect, attributes(kirin, wraps))]
 pub fn derive_statement(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
 
-    let ir_input =
-        kirin_derive_toolkit::ir::Input::<kirin_derive_toolkit::ir::StandardLayout>::from_derive_input(&ast);
-
-    let ir = match ir_input {
+    let ir = match Input::<StandardLayout>::from_derive_input(&ast) {
         Ok(ir) => ir,
         Err(e) => return e.write_errors().into(),
     };
 
-    let mut tokens = proc_macro2::TokenStream::new();
-
-    for config in FIELD_ITER_CONFIGS {
-        match new_field_iter(config).emit_from_input(&ir) {
-            Ok(t) => tokens.extend(t),
-            Err(e) => tokens.extend(e.write_errors()),
-        }
-    }
-
-    for config in PROPERTY_CONFIGS {
-        match new_property(config).emit_from_input(&ir) {
-            Ok(t) => tokens.extend(t),
-            Err(e) => tokens.extend(e.write_errors()),
-        }
-    }
-
-    match DeriveBuilder::default().emit_from_input(&ir) {
-        Ok(t) => tokens.extend(t),
-        Err(e) => tokens.extend(e.write_errors()),
-    }
-
     let default_crate: syn::Path = syn::parse_quote!(::kirin::ir);
     let crate_path = ir.attrs.crate_path.as_ref().unwrap_or(&default_crate);
     let trait_path: syn::Path = syn::parse_quote!(#crate_path::Dialect);
-    marker::derive_marker(&ir, &trait_path).to_tokens(&mut tokens);
 
-    tokens.into()
+    let mut builder = ir.compose();
+
+    for config in FIELD_ITER_CONFIGS {
+        builder = builder.add(TraitImplTemplate::field_iter(
+            to_field_iter_config(config),
+            DEFAULT_IR_CRATE,
+            TRAIT_LIFETIME,
+        ));
+    }
+
+    for config in PROPERTY_CONFIGS {
+        builder = builder.add(TraitImplTemplate::bool_property(
+            to_bool_property_config(config),
+            DEFAULT_IR_CRATE,
+        ));
+    }
+
+    builder = builder
+        .add(BuilderTemplate::new())
+        .add(TraitImplTemplate::marker(&trait_path, &ir.attrs.ir_type));
+
+    match builder.build() {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.write_errors().into(),
+    }
 }
 
-fn do_derive_field_iter(input: TokenStream, config: FieldIterConfig) -> TokenStream {
+fn do_derive_field_iter(input: TokenStream, config: LocalFieldIterConfig) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match emit_field_iter(&ast, config) {
+    let ir = match Input::<StandardLayout>::from_derive_input(&ast) {
+        Ok(ir) => ir,
+        Err(e) => return e.write_errors().into(),
+    };
+    match ir
+        .compose()
+        .add(TraitImplTemplate::field_iter(
+            to_field_iter_config(config),
+            DEFAULT_IR_CRATE,
+            TRAIT_LIFETIME,
+        ))
+        .build()
+    {
         Ok(t) => t.into(),
         Err(e) => e.write_errors().into(),
     }
 }
 
-fn do_derive_property(input: TokenStream, config: PropertyConfig) -> TokenStream {
+fn do_derive_property(input: TokenStream, config: LocalPropertyConfig) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match emit_property(&ast, config) {
+    let ir = match Input::<StandardLayout>::from_derive_input(&ast) {
+        Ok(ir) => ir,
+        Err(e) => return e.write_errors().into(),
+    };
+    match ir
+        .compose()
+        .add(TraitImplTemplate::bool_property(
+            to_bool_property_config(config),
+            DEFAULT_IR_CRATE,
+        ))
+        .build()
+    {
         Ok(t) => t.into(),
         Err(e) => e.write_errors().into(),
     }

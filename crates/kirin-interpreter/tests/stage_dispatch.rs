@@ -285,12 +285,22 @@ fn test_cross_stage_recursive_call() {
     let spec_a = {
         let stage = pipeline.stage_mut(stage_a).unwrap();
         let body = build_cross_stage_recursive_body(stage, func, stage_b);
-        stage.specialize().staged_func(staged_a).body(body).new().unwrap()
+        stage
+            .specialize()
+            .staged_func(staged_a)
+            .body(body)
+            .new()
+            .unwrap()
     };
     {
         let stage = pipeline.stage_mut(stage_b).unwrap();
         let body = build_cross_stage_recursive_body(stage, func, stage_a);
-        stage.specialize().staged_func(staged_b).body(body).new().unwrap();
+        stage
+            .specialize()
+            .staged_func(staged_b)
+            .body(body)
+            .new()
+            .unwrap();
     }
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_a);
@@ -618,7 +628,12 @@ fn test_typed_call_reports_stage_mismatch() {
             unreachable!();
         };
         let body = build_cross_stage_recursive_body(stage, func, dyn_stage);
-        stage.specialize().staged_func(staged).body(body).new().unwrap()
+        stage
+            .specialize()
+            .staged_func(staged)
+            .body(body)
+            .new()
+            .unwrap()
     };
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, dummy_stage);

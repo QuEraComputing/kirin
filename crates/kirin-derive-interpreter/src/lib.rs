@@ -2,24 +2,23 @@ extern crate proc_macro;
 
 mod eval_call;
 mod interpretable;
-mod pattern;
 
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
-#[proc_macro_derive(CallSemantics, attributes(wraps, callable, kirin))]
-pub fn derive_call_semantics(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Interpretable, attributes(wraps, kirin))]
+pub fn derive_interpretable(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match eval_call::DeriveEvalCall::default().emit(&ast) {
+    match interpretable::do_derive_interpretable(&ast) {
         Ok(tokens) => tokens.into(),
         Err(e) => e.write_errors().into(),
     }
 }
 
-#[proc_macro_derive(Interpretable, attributes(wraps, kirin))]
-pub fn derive_interpretable(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(CallSemantics, attributes(wraps, callable, kirin))]
+pub fn derive_call_semantics(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match interpretable::DeriveInterpretable::default().emit(&ast) {
+    match eval_call::do_derive_eval_call(&ast) {
         Ok(tokens) => tokens.into(),
         Err(e) => e.write_errors().into(),
     }

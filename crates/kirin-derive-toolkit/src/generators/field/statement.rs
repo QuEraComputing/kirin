@@ -26,10 +26,7 @@ impl<'a> StatementBuilder<'a> {
         Self { ctx, input }
     }
 
-    pub(crate) fn statement_pattern(
-        &self,
-        statement: &ir::Statement<StandardLayout>,
-    ) -> Pattern {
+    pub(crate) fn statement_pattern(&self, statement: &ir::Statement<StandardLayout>) -> Pattern {
         let fields = self.all_fields(statement);
         if fields.is_empty() {
             return Pattern::new(false, Vec::new());

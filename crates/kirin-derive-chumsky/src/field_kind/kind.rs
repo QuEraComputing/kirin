@@ -230,6 +230,8 @@ impl FieldKind {
 }
 
 /// Collects all fields from a statement using the method on Statement.
-pub fn collect_fields<L: Layout>(stmt: &kirin_derive_toolkit::ir::Statement<L>) -> Vec<FieldInfo<L>> {
+pub fn collect_fields<L: Layout>(
+    stmt: &kirin_derive_toolkit::ir::Statement<L>,
+) -> Vec<FieldInfo<L>> {
     stmt.collect_fields()
 }

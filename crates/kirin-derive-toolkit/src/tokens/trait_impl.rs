@@ -192,14 +192,18 @@ mod tests {
 
     #[test]
     fn trait_impl_with_method() {
-        let ti = TraitImpl::new(syn::Generics::default(), quote! { MyTrait }, quote! { MyType })
-            .method(Method {
-                name: format_ident!("do_thing"),
-                self_arg: quote! { &self },
-                params: vec![],
-                return_type: Some(quote! { bool }),
-                body: quote! { true },
-            });
+        let ti = TraitImpl::new(
+            syn::Generics::default(),
+            quote! { MyTrait },
+            quote! { MyType },
+        )
+        .method(Method {
+            name: format_ident!("do_thing"),
+            self_arg: quote! { &self },
+            params: vec![],
+            return_type: Some(quote! { bool }),
+            body: quote! { true },
+        });
 
         let output = rustfmt_tokens(&ti.to_token_stream());
         assert!(output.contains("impl MyTrait for MyType"));

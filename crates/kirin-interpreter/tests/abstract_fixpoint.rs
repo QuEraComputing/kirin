@@ -476,7 +476,12 @@ fn test_abstract_analysis_result_ssa_values() {
         .new();
     let region = stage.region().add_block(block).new();
     let func_body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(func_body).new().unwrap();
+    let spec_fn = stage
+        .specialize()
+        .staged_func(sf)
+        .body(func_body)
+        .new()
+        .unwrap();
 
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);

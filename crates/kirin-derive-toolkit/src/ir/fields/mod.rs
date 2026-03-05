@@ -45,8 +45,12 @@ pub enum FieldCategory {
 /// `Value` carries the original Rust type and optional default/into metadata.
 #[derive(Debug)]
 pub enum FieldData<L: Layout> {
-    Argument { ssa_type: syn::Expr },
-    Result { ssa_type: syn::Expr },
+    Argument {
+        ssa_type: syn::Expr,
+    },
+    Result {
+        ssa_type: syn::Expr,
+    },
     Block,
     Successor,
     Region,

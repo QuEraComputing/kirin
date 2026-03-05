@@ -35,10 +35,7 @@ pub trait Emit<'ir, L: Layout> {
         emit_input(self, input)
     }
 
-    fn emit_struct(
-        &mut self,
-        data: &'ir crate::ir::DataStruct<L>,
-    ) -> darling::Result<TokenStream> {
+    fn emit_struct(&mut self, data: &'ir crate::ir::DataStruct<L>) -> darling::Result<TokenStream> {
         emit_struct(self, data)
     }
 

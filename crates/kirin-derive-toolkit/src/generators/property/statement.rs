@@ -19,10 +19,7 @@ impl StatementBuilder {
         Self
     }
 
-    pub(crate) fn statement_pattern(
-        &self,
-        statement: &ir::Statement<StandardLayout>,
-    ) -> Pattern {
+    pub(crate) fn statement_pattern(&self, statement: &ir::Statement<StandardLayout>) -> Pattern {
         let fields = self.all_fields(statement);
         self.field_pattern(&fields)
     }
@@ -55,10 +52,7 @@ impl StatementBuilder {
         }
     }
 
-    fn all_fields(
-        &self,
-        statement: &ir::Statement<StandardLayout>,
-    ) -> Vec<ir::fields::FieldIndex> {
+    fn all_fields(&self, statement: &ir::Statement<StandardLayout>) -> Vec<ir::fields::FieldIndex> {
         let mut fields = Vec::new();
         if let Some(wrapper) = &statement.wraps {
             fields.push(wrapper.field.clone());
