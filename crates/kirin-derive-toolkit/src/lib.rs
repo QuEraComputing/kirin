@@ -45,6 +45,7 @@ pub mod derive;
 pub mod emit;
 pub mod generator;
 pub mod generators;
+pub mod hygiene;
 pub mod ir;
 pub mod misc;
 pub mod scan;
