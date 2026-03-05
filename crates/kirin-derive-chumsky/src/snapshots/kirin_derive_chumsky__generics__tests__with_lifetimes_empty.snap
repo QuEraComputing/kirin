@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-chumsky/src/generics.rs
+expression: format_generics(&result)
+---
+< 'tokens , 'src : 'tokens >

@@ -1,0 +1,42 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+expression: format
+---
+Format {
+    elements: [
+        Token(
+            [
+                Identifier(
+                    "dict",
+                ),
+            ],
+        ),
+        Token(
+            [
+                EscapedLBrace,
+            ],
+        ),
+        Field(
+            "key",
+            Default,
+        ),
+        Token(
+            [
+                EscapedRBrace,
+            ],
+        ),
+        Token(
+            [
+                Equal,
+            ],
+        ),
+        Field(
+            "value",
+            Default,
+        ),
+    ],
+    fields: {
+        "key": 0,
+        "value": 1,
+    },
+}
