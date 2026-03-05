@@ -1,5 +1,9 @@
 use proc_macro2::Span;
 
+/// Manipulates generics for generated trait impls.
+///
+/// Adds the `'ir` lifetime and optional `L: Language` type parameter
+/// required by Kirin trait impls.
 pub struct GenericsBuilder<'a> {
     ir_path: &'a syn::Path,
 }

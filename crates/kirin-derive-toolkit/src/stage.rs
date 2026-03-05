@@ -1,13 +1,20 @@
+//! Stage enum parsing utilities for `StageMeta` derives.
+//!
+//! Parses `#[stage(...)]` attributes on enum variants to extract stage names
+//! and dialect type parameters.
+
 use syn::{DeriveInput, Fields, GenericArgument, PathArguments, Type};
 
 pub const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 
+/// Parsed metadata from a single stage enum variant.
 pub struct StageVariantInfo {
     pub ident: syn::Ident,
     pub stage_name: String,
     pub dialect_ty: Type,
 }
 
+/// Extracts the `#[stage(crate = "...")]` override from attributes.
 pub fn parse_ir_crate_path(attrs: &[syn::Attribute]) -> Result<String, syn::Error> {
     for attr in attrs {
         if !attr.path().is_ident("stage") {
@@ -31,6 +38,7 @@ pub fn parse_ir_crate_path(attrs: &[syn::Attribute]) -> Result<String, syn::Erro
     Ok(DEFAULT_IR_CRATE.to_string())
 }
 
+/// Parses a single enum variant's `#[stage(...)]` attributes.
 pub fn parse_stage_variant(variant: &syn::Variant) -> Result<StageVariantInfo, syn::Error> {
     let stage_name = parse_stage_name_attr(variant)?;
 
@@ -58,6 +66,7 @@ pub fn parse_stage_variant(variant: &syn::Variant) -> Result<StageVariantInfo, s
     })
 }
 
+/// Parses all variants of a stage enum.
 pub fn parse_stage_variants(input: &DeriveInput) -> Result<Vec<StageVariantInfo>, syn::Error> {
     let enum_data = match &input.data {
         syn::Data::Enum(data) => data,

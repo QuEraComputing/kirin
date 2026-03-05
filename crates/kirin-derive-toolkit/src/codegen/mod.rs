@@ -1,3 +1,6 @@
+//! Utilities for generating constructor expressions, managing generics, and
+//! binding field variables in generated code.
+
 mod constructor;
 mod field_bindings;
 mod generics_builder;

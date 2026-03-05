@@ -1,5 +1,6 @@
 use darling::{Error, FromDeriveInput, FromField, FromMeta, FromVariant};
 
+/// Raw darling-parsed options for struct inputs.
 #[derive(Debug, Clone, FromDeriveInput)]
 #[darling(attributes(kirin), supports(struct_any))]
 pub struct KirinStructOptions {
@@ -20,6 +21,7 @@ pub struct KirinStructOptions {
     pub terminator: bool,
 }
 
+/// Raw darling-parsed options for enum inputs.
 #[derive(Debug, Clone, FromDeriveInput)]
 #[darling(attributes(kirin), supports(enum_any))]
 pub struct KirinEnumOptions {
@@ -39,6 +41,7 @@ pub struct KirinEnumOptions {
     pub terminator: bool,
 }
 
+/// Per-variant/statement options from `#[kirin(...)]`.
 #[derive(Debug, Clone, FromVariant)]
 #[darling(attributes(kirin))]
 pub struct StatementOptions {
@@ -55,6 +58,7 @@ pub struct StatementOptions {
     pub terminator: bool,
 }
 
+/// Field-level options from `#[kirin(...)]` on fields.
 #[derive(Debug, Clone, FromField)]
 #[darling(attributes(kirin))]
 pub struct KirinFieldOptions {
@@ -65,6 +69,7 @@ pub struct KirinFieldOptions {
     pub ssa_ty: Option<syn::Expr>,
 }
 
+/// Default value for a field: `Default::default()` or a custom expression.
 #[derive(Debug, Clone)]
 pub enum DefaultValue {
     Default,
@@ -90,6 +95,7 @@ impl FromMeta for DefaultValue {
     }
 }
 
+/// Builder function configuration: enabled (default name) or named.
 #[derive(Debug, Clone)]
 pub enum BuilderOptions {
     Enabled,
@@ -124,6 +130,7 @@ impl FromMeta for BuilderOptions {
     }
 }
 
+/// Normalized global options from `#[kirin(...)]` on the input type.
 #[derive(Debug, Clone)]
 pub struct GlobalOptions {
     pub crate_path: Option<syn::Path>,

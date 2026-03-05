@@ -1,3 +1,6 @@
+//! Miscellaneous utilities: case conversion, type inspection, attribute parsing.
+
+/// Extracts the last segment of a path as an `Ident`.
 pub fn strip_path(path: &syn::Path) -> syn::Ident {
     path.segments
         .last()
@@ -6,10 +9,12 @@ pub fn strip_path(path: &syn::Path) -> syn::Ident {
         .clone()
 }
 
+/// Parses a string into any `syn::Parse` type.
 pub fn from_str<T: syn::parse::Parse>(s: impl Into<String>) -> T {
     syn::parse_str(&s.into()).unwrap()
 }
 
+/// Converts a string to CamelCase.
 pub fn to_camel_case(s: impl AsRef<str>) -> String {
     let s = s.as_ref();
     let mut result = String::new();
@@ -27,6 +32,7 @@ pub fn to_camel_case(s: impl AsRef<str>) -> String {
     result
 }
 
+/// Converts a string to snake_case.
 pub fn to_snake_case(s: impl AsRef<str>) -> String {
     let s = s.as_ref();
     let mut result = String::new();
@@ -45,6 +51,7 @@ pub fn to_snake_case(s: impl AsRef<str>) -> String {
     result
 }
 
+/// Checks if a type's last path segment matches the given name.
 pub fn is_type<I>(ty: &syn::Type, name: &I) -> bool
 where
     I: ?Sized,
@@ -58,6 +65,7 @@ where
     false
 }
 
+/// Checks if a type is `Vec<T>` where `T` matches the given name.
 pub fn is_vec_type<I>(ty: &syn::Type, name: &I) -> bool
 where
     I: ?Sized,
@@ -66,6 +74,7 @@ where
     is_type_in(ty, name, |seg| seg.ident == "Vec")
 }
 
+/// Checks if a type appears as a generic argument of another type.
 pub fn is_type_in_generic<I>(ty: &syn::Type, name: &I) -> bool
 where
     I: ?Sized,
@@ -74,6 +83,7 @@ where
     is_type_in(ty, name, |_| true)
 }
 
+/// Checks if a type matches with a custom segment predicate.
 pub fn is_type_in<I, F>(ty: &syn::Type, name: &I, f: F) -> bool
 where
     I: ?Sized,
@@ -98,6 +108,7 @@ where
     false
 }
 
+/// Parses a named attribute's nested meta items.
 pub fn parse_attribute(
     name: &str,
     attrs: &[syn::Attribute],
@@ -111,6 +122,7 @@ pub fn parse_attribute(
     Ok(())
 }
 
+/// Creates an "unknown attribute" error for use in attribute parsers.
 pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error {
     if ["crate_path", "type"]
         .iter()

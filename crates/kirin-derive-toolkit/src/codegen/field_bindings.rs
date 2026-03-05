@@ -1,5 +1,10 @@
 use super::utils::{renamed_field_idents, tuple_field_idents};
 
+/// Captures field variable names for use in destructuring patterns and
+/// generated code bodies.
+///
+/// For named fields, preserves original names with an optional prefix.
+/// For tuple fields, generates `{prefix}0`, `{prefix}1`, etc.
 #[derive(Debug, Clone)]
 pub struct FieldBindings {
     pub is_tuple: bool,

@@ -2,6 +2,18 @@ use quote::quote;
 
 use crate::ir::{Layout, fields::FieldInfo};
 
+/// Builds constructor expressions for structs or enum variants.
+///
+/// Handles both named (`Foo { a, b }`) and tuple (`Foo(a, b)`) styles,
+/// mapping each field through a user-provided closure.
+///
+/// ```ignore
+/// let ctor = ConstructorBuilder::new_struct(&type_name, is_tuple);
+/// let tokens = ctor.build(&stmt.fields, |field| {
+///     let name = field.name_ident(Span::call_site());
+///     quote!(#name)
+/// });
+/// ```
 pub struct ConstructorBuilder<'a> {
     type_name: &'a syn::Ident,
     variant_name: Option<&'a syn::Ident>,

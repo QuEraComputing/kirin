@@ -1,5 +1,10 @@
 use crate::ir::{self, BuilderOptions, Layout};
 
+/// Extracted metadata from an [`Input`](crate::ir::Input): name, generics,
+/// crate path, IR type, and whether it's an enum.
+///
+/// Use [`path_builder`](Self::path_builder) to construct fully-qualified
+/// paths for generated trait references.
 #[derive(Clone, Debug)]
 pub struct InputMeta {
     pub name: syn::Ident,
@@ -30,6 +35,10 @@ impl InputMeta {
     }
 }
 
+/// Constructs fully-qualified paths relative to the user's crate configuration.
+///
+/// Respects `#[kirin(crate = ...)]` overrides, falling back to the provided
+/// default crate path.
 pub struct PathBuilder<'a> {
     input: &'a InputMeta,
     default_crate_path: &'a syn::Path,

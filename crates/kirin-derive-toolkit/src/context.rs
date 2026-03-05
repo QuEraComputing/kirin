@@ -4,12 +4,21 @@ use crate::derive::InputMeta;
 use crate::ir::{Input, Layout, Statement, fields::Wrapper};
 use crate::tokens::Pattern;
 
+/// Pre-computed context shared across generators during code emission.
+///
+/// Built once from an [`Input`] and passed to each
+/// [`Generator`](crate::generator::Generator). Contains pre-built patterns,
+/// wrapper detection, and per-statement contexts to avoid repeated scanning.
 pub struct DeriveContext<'ir, L: Layout> {
     pub input: &'ir Input<L>,
     pub meta: InputMeta,
     pub statements: IndexMap<String, StatementContext<'ir, L>>,
 }
 
+/// Pre-computed context for a single statement/variant.
+///
+/// Includes the destructuring [`Pattern`] and
+/// wrapper status, ready for use in match arms.
 pub struct StatementContext<'ir, L: Layout> {
     pub stmt: &'ir Statement<L>,
     pub pattern: Pattern,
