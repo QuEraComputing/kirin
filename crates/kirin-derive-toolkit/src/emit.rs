@@ -1,6 +1,35 @@
+//! Code generation visitor for producing `TokenStream` output from IR.
+//!
+//! [`Emit`] mirrors [`Scan`](crate::scan::Scan) but returns `TokenStream`
+//! instead of `()`. Override hooks at each level to generate code; the
+//! default implementations concatenate children's output.
+//!
+//! Typically used after a [`Scan`](crate::scan::Scan) pass that collected
+//! the metadata needed for code generation.
+//!
+//! # Example: Generating Match Arms
+//!
+//! ```ignore
+//! impl<'ir> Emit<'ir, StandardLayout> for MyEmitter {
+//!     fn emit_statement(
+//!         &mut self,
+//!         stmt: &'ir Statement<StandardLayout>,
+//!     ) -> darling::Result<TokenStream> {
+//!         let name = &stmt.name;
+//!         Ok(quote! { Self::#name { .. } => todo!() })
+//!     }
+//! }
+//! ```
+
 use crate::ir::{Data, Layout, fields::FieldInfo};
 use proc_macro2::TokenStream;
 
+/// Visitor trait for generating `TokenStream` output from IR.
+///
+/// Override specific methods to emit code for nodes of interest.
+/// The default implementations concatenate children's output.
+/// Call the corresponding free function (e.g., [`emit_statement`])
+/// from your override to include children's output in yours.
 pub trait Emit<'ir, L: Layout> {
     fn emit_input(&mut self, input: &'ir crate::ir::Input<L>) -> darling::Result<TokenStream> {
         emit_input(self, input)

@@ -1,8 +1,43 @@
+//! Input traversal visitor for collecting metadata from IR.
+//!
+//! [`Scan`] walks the IR hierarchy (`Input` → `Statement` → fields) and lets
+//! you override hooks at each level. All methods have default implementations
+//! that recurse into children, so you only override what you need.
+//!
+//! The free functions (e.g., [`scan_input`], [`scan_statement`]) provide the
+//! default traversal logic — call them from your overrides to continue walking.
+//!
+//! # Example: Collecting Statement Names
+//!
+//! ```ignore
+//! struct NameCollector {
+//!     names: Vec<String>,
+//! }
+//!
+//! impl<'ir> Scan<'ir, StandardLayout> for NameCollector {
+//!     fn scan_statement(
+//!         &mut self,
+//!         stmt: &'ir Statement<StandardLayout>,
+//!     ) -> darling::Result<()> {
+//!         self.names.push(stmt.name.to_string());
+//!         scan::scan_statement(self, stmt) // continue into fields
+//!     }
+//! }
+//! ```
+
 use crate::ir::{
     Layout,
     fields::{FieldCategory, FieldInfo},
 };
 
+/// Visitor trait for traversing IR and collecting metadata.
+///
+/// Override specific methods to intercept nodes of interest. Call the
+/// corresponding free function (e.g., [`scan_statement`]) from your
+/// override to continue the default traversal into children.
+///
+/// All 13 methods have default implementations that delegate to
+/// the free functions in this module.
 pub trait Scan<'ir, L: Layout> {
     fn scan_input(&mut self, input: &'ir crate::ir::Input<L>) -> darling::Result<()> {
         scan_input(self, input)
