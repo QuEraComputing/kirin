@@ -124,7 +124,7 @@ class ResultList(MutableSequenceView[list[ResultValue], "Statement", ResultValue
 
 @dataclass(repr=False, eq=False)
 class Statement(IRNode["Block"]):
-    """The Statment is an instruction in the IR
+    """The Statement is an instruction in the IR
 
     !!! note "Pretty Printing"
         This object is pretty printable via
