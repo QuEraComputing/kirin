@@ -57,6 +57,10 @@ impl PathBuilder<'_> {
     }
 
     pub fn full_path(&self, suffix: &syn::Path) -> syn::Path {
+        // If the suffix is already absolute (has leading `::`) return it as-is.
+        if suffix.leading_colon.is_some() {
+            return suffix.clone();
+        }
         let mut path = self.full_crate_path();
         path.segments.extend(suffix.segments.clone());
         path
