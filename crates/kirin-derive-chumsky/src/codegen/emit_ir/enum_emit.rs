@@ -28,7 +28,7 @@ impl GenerateEmitIR {
         generate_enum_match(
             ast_name,
             data,
-            move |_name, _wrapper| {
+            move |_name, _wrapper, _stmt| {
                 quote! { #crate_path_for_match::EmitIR::emit(inner, ctx) }
             },
             |name, variant| {
