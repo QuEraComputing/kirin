@@ -98,7 +98,7 @@ impl GeneratePrettyPrint {
                 fn namespaced_pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
                     &self,
                     doc: &'a #prettyless_path::Document<'a, __L>,
-                    _namespace: &[&str],
+                    namespace: &[&str],
                 ) -> #prettyless_path::ArenaDoc<'a>
                 where
                     __L::Type: ::core::fmt::Display,
@@ -146,13 +146,13 @@ impl GeneratePrettyPrint {
                 fn namespaced_pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
                     &self,
                     doc: &'a #prettyless_path::Document<'a, __L>,
-                    _namespace: &[&str],
+                    namespace: &[&str],
                 ) -> #prettyless_path::ArenaDoc<'a>
                 where
                     __L::Type: ::core::fmt::Display,
                 {
                     let inner = &self.0;
-                    inner.namespaced_pretty_print(doc, _namespace)
+                    inner.namespaced_pretty_print(doc, namespace)
                 }
             }
         }
@@ -232,7 +232,7 @@ impl GeneratePrettyPrint {
             data,
             |_name, _wrapper| {
                 quote! {
-                    inner.namespaced_pretty_print(doc, _namespace)
+                    inner.namespaced_pretty_print(doc, namespace)
                 }
             },
             |name, variant| self.generate_variant_print(ir_input, variant, dialect_name, name),
@@ -272,15 +272,36 @@ impl GeneratePrettyPrint {
         for (i, elem) in elements.iter().enumerate() {
             let is_first = i == 0;
             let is_last = i == elements.len() - 1;
-            let prev_is_field = i > 0 && matches!(elements[i - 1], FormatElement::Field(_, _));
-            let next_is_field = !is_last && matches!(elements[i + 1], FormatElement::Field(_, _));
+            let prev_is_field_like = i > 0 && matches!(elements[i - 1], FormatElement::Field(_, _) | FormatElement::Keyword(_));
+            let next_is_field_like = !is_last && matches!(elements[i + 1], FormatElement::Field(_, _) | FormatElement::Keyword(_));
 
             match elem {
                 FormatElement::Token(tokens) => {
-                    let text = tokens_to_string_with_spacing(tokens, prev_is_field, next_is_field);
+                    let text = tokens_to_string_with_spacing(tokens, prev_is_field_like, next_is_field_like);
                     parts.push(quote! { doc.text(#text) });
                 }
-                FormatElement::Keyword(_) => {}
+                FormatElement::Keyword(name) => {
+                    let keyword_expr = quote! {
+                        {
+                            let __keyword_text = if namespace.is_empty() {
+                                #name.to_string()
+                            } else {
+                                let mut __s = namespace.join(".");
+                                __s.push('.');
+                                __s.push_str(#name);
+                                __s
+                            };
+                            doc.text(__keyword_text)
+                        }
+                    };
+
+                    // Add spacing like fields do
+                    if !is_first && prev_is_field_like {
+                        parts.push(quote! { doc.text(" ") });
+                    }
+
+                    parts.push(keyword_expr);
+                }
                 FormatElement::Field(name, opt) => {
                     let name_str = name.to_string();
                     if let Some((idx, field)) = field_map.get(&name_str) {
@@ -290,7 +311,7 @@ impl GeneratePrettyPrint {
                         let print_expr =
                             field_kind::print_expr(field, prettyless_path, &var_ref, opt);
 
-                        if !is_first && prev_is_field {
+                        if !is_first && prev_is_field_like {
                             parts.push(quote! { doc.text(" ") });
                         }
 
