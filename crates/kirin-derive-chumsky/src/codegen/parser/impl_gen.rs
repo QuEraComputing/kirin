@@ -189,8 +189,9 @@ impl GenerateHasDialectParser {
                     __LanguageOutput: Clone + PartialEq + 'tokens;
 
                 #[inline]
-                fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
+                fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
                     language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+                    _namespace: &[&'static str],
                 ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
@@ -339,15 +340,16 @@ impl GenerateHasDialectParser {
                     __LanguageOutput: Clone + PartialEq + 'tokens;
 
                 #[inline]
-                fn recursive_parser<I, __TypeOutput, __LanguageOutput>(
+                fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
                     language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+                    _namespace: &[&'static str],
                 ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
                     __TypeOutput: Clone + PartialEq + 'tokens,
                     __LanguageOutput: Clone + PartialEq + 'tokens,
                 {
-                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::recursive_parser::<I, __TypeOutput, __LanguageOutput>(language)
+                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language, _namespace)
                 }
             }
         }

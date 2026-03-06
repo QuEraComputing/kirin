@@ -56,8 +56,28 @@ pub trait HasDialectParser<'tokens, 'src: 'tokens>: Sized {
     ///
     /// - `TypeOutput`: The parsed type representation (e.g., from type lattice)
     /// - `LanguageOutput`: The outer language's AST type for recursive parsing
+    ///
+    /// This is a convenience method that delegates to [`namespaced_parser`](Self::namespaced_parser)
+    /// with an empty namespace.
     fn recursive_parser<I, TypeOutput, LanguageOutput>(
         language: super::RecursiveParser<'tokens, 'src, I, LanguageOutput>,
+    ) -> BoxedParser<'tokens, 'src, I, Self::Output<TypeOutput, LanguageOutput>>
+    where
+        I: TokenInput<'tokens, 'src>,
+        TypeOutput: Clone + PartialEq + 'tokens,
+        LanguageOutput: Clone + PartialEq + 'tokens,
+    {
+        Self::namespaced_parser::<I, TypeOutput, LanguageOutput>(language, &[])
+    }
+
+    /// Returns a recursive parser for this dialect, filtered by namespace.
+    ///
+    /// When `namespace` is non-empty, only statements whose keyword matches
+    /// one of the namespace prefixes are parsed. An empty namespace means
+    /// all statements are eligible (no filtering).
+    fn namespaced_parser<I, TypeOutput, LanguageOutput>(
+        language: super::RecursiveParser<'tokens, 'src, I, LanguageOutput>,
+        namespace: &[&'static str],
     ) -> BoxedParser<'tokens, 'src, I, Self::Output<TypeOutput, LanguageOutput>>
     where
         I: TokenInput<'tokens, 'src>,

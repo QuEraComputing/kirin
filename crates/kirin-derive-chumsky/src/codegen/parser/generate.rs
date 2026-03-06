@@ -185,7 +185,7 @@ impl GenerateHasDialectParser {
             self.build_ast_type_reference(ir_input, ast_name, &type_output, &language_output);
 
         Ok(quote! {
-            <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::recursive_parser::<I, __TypeOutput, __LanguageOutput>(language.clone())
+            <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), _namespace)
                 .map(|inner| -> #return_type { #constructor(inner) })
         })
     }
