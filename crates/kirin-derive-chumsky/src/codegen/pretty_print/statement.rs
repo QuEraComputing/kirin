@@ -230,9 +230,20 @@ impl GeneratePrettyPrint {
         generate_enum_match(
             dialect_name,
             data,
-            |_name, _wrapper| {
-                quote! {
-                    inner.namespaced_pretty_print(doc, namespace)
+            |_name, _wrapper, stmt| {
+                let namespace_prefix = crate::codegen::format_for_statement(ir_input, stmt);
+                if let Some(ns) = namespace_prefix {
+                    quote! {
+                        {
+                            let mut __ns: ::std::vec::Vec<&str> = namespace.to_vec();
+                            __ns.push(#ns);
+                            inner.namespaced_pretty_print(doc, &__ns)
+                        }
+                    }
+                } else {
+                    quote! {
+                        inner.namespaced_pretty_print(doc, namespace)
+                    }
                 }
             },
             |name, variant| self.generate_variant_print(ir_input, variant, dialect_name, name),
@@ -272,27 +283,36 @@ impl GeneratePrettyPrint {
         for (i, elem) in elements.iter().enumerate() {
             let is_first = i == 0;
             let is_last = i == elements.len() - 1;
-            let prev_is_field_like = i > 0 && matches!(elements[i - 1], FormatElement::Field(_, _) | FormatElement::Keyword(_));
-            let next_is_field_like = !is_last && matches!(elements[i + 1], FormatElement::Field(_, _) | FormatElement::Keyword(_));
+            let prev_is_field_like = i > 0
+                && matches!(
+                    elements[i - 1],
+                    FormatElement::Field(_, _) | FormatElement::Keyword(_)
+                );
+            let next_is_field_like = !is_last
+                && matches!(
+                    elements[i + 1],
+                    FormatElement::Field(_, _) | FormatElement::Keyword(_)
+                );
 
             match elem {
                 FormatElement::Token(tokens) => {
-                    let text = tokens_to_string_with_spacing(tokens, prev_is_field_like, next_is_field_like);
+                    let text = tokens_to_string_with_spacing(
+                        tokens,
+                        prev_is_field_like,
+                        next_is_field_like,
+                    );
                     parts.push(quote! { doc.text(#text) });
                 }
                 FormatElement::Keyword(name) => {
                     let keyword_expr = quote! {
-                        {
-                            let __keyword_text = if namespace.is_empty() {
-                                #name.to_string()
-                            } else {
-                                let mut __s = namespace.join(".");
-                                __s.push('.');
-                                __s.push_str(#name);
-                                __s
-                            };
-                            doc.text(__keyword_text)
-                        }
+                        (if namespace.is_empty() {
+                            doc.text(#name)
+                        } else {
+                            let mut __s = namespace.join(".");
+                            __s.push('.');
+                            __s.push_str(#name);
+                            doc.text(__s)
+                        })
                     };
 
                     // Add spacing like fields do

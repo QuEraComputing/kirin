@@ -86,7 +86,10 @@ where
 {
     /// Resolve the downstream derive's crate path with a default.
     pub fn extra_crate_path(&self, default: fn() -> syn::Path) -> syn::Path {
-        self.extra_attrs.crate_path().cloned().unwrap_or_else(default)
+        self.extra_attrs
+            .crate_path()
+            .cloned()
+            .unwrap_or_else(default)
     }
 }
 

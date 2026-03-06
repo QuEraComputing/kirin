@@ -1,6 +1,6 @@
+use super::helpers::{self, StatementInfo};
 use crate::context::{DeriveContext, InputMeta};
 use crate::ir::{self, StandardLayout};
-use super::helpers::{self, StatementInfo};
 use proc_macro2::TokenStream;
 use quote::quote;
 

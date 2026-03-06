@@ -111,7 +111,8 @@ impl GenerateHasDialectParser {
         crate_path: &syn::Path,
     ) -> syn::Result<TokenStream> {
         if let Some(wrapper) = &stmt.wraps {
-            return self.build_wrapper_parser(ir_input, ast_name, variant, wrapper, crate_path);
+            return self
+                .build_wrapper_parser(ir_input, stmt, ast_name, variant, wrapper, crate_path);
         }
 
         let format_str = format_for_statement(ir_input, stmt)
@@ -167,12 +168,14 @@ impl GenerateHasDialectParser {
     fn build_wrapper_parser(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+        stmt: &kirin_derive_toolkit::ir::Statement<ChumskyLayout>,
         ast_name: &syn::Ident,
         variant: Option<&syn::Ident>,
         wrapper: &kirin_derive_toolkit::ir::fields::Wrapper,
         crate_path: &syn::Path,
     ) -> syn::Result<TokenStream> {
         let wrapped_ty = &wrapper.ty;
+        let namespace_prefix = format_for_statement(ir_input, stmt);
 
         let constructor = match variant {
             Some(v) => quote! { #ast_name::#v },
@@ -184,9 +187,22 @@ impl GenerateHasDialectParser {
         let return_type =
             self.build_ast_type_reference(ir_input, ast_name, &type_output, &language_output);
 
-        Ok(quote! {
-            <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), namespace)
-                .map(|inner| -> #return_type { #constructor(inner) })
-        })
+        let namespace_expr = if let Some(ns) = namespace_prefix {
+            quote! {
+                {
+                    let mut __ns: ::std::vec::Vec<&'static str> = namespace.to_vec();
+                    __ns.push(#ns);
+                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), &__ns)
+                        .map(|inner| -> #return_type { #constructor(inner) })
+                }
+            }
+        } else {
+            quote! {
+                <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), namespace)
+                    .map(|inner| -> #return_type { #constructor(inner) })
+            }
+        };
+
+        Ok(namespace_expr)
     }
 }

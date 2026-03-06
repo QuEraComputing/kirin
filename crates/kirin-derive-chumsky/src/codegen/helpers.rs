@@ -187,14 +187,22 @@ pub(crate) fn generate_enum_match<L: Layout, F, G>(
     marker_handler: Option<TokenStream>,
 ) -> TokenStream
 where
-    F: Fn(&syn::Ident, &kirin_derive_toolkit::ir::fields::Wrapper) -> TokenStream,
+    F: Fn(
+        &syn::Ident,
+        &kirin_derive_toolkit::ir::fields::Wrapper,
+        &kirin_derive_toolkit::ir::Statement<L>,
+    ) -> TokenStream,
     G: Fn(&syn::Ident, &kirin_derive_toolkit::ir::Statement<L>) -> TokenStream,
 {
     let arms: Vec<TokenStream> = data
         .iter_variants()
         .map(|variant| match variant {
-            VariantRef::Wrapper { name, wrapper, .. } => {
-                let body = wrapper_handler(name, wrapper);
+            VariantRef::Wrapper {
+                name,
+                wrapper,
+                stmt,
+            } => {
+                let body = wrapper_handler(name, wrapper, stmt);
                 quote! { #type_name::#name(inner) => { #body } }
             }
             VariantRef::Regular { name, stmt } => regular_handler(name, stmt),

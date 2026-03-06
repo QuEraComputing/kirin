@@ -263,22 +263,23 @@ impl GenerateHasDialectParser {
         let crate_path = &self.config.crate_path;
         quote! {
             {
-                let __keyword_parser = if namespace.is_empty() {
+                let __keyword_parser: #crate_path::BoxedParser<'tokens, 'src, I, _> = if namespace.is_empty() {
                     #crate_path::chumsky::prelude::just(#crate_path::Token::Identifier(#name)).boxed()
                 } else {
                     let mut __parts: ::std::vec::Vec<&'static str> = namespace.to_vec();
                     __parts.push(#name);
-                    let mut __p = #crate_path::chumsky::prelude::just(
+                    let mut __p: #crate_path::BoxedParser<'tokens, 'src, I, _> = #crate_path::chumsky::prelude::just(
                         #crate_path::Token::Identifier(__parts[0])
-                    );
+                    ).boxed();
                     for &__part in &__parts[1..] {
                         __p = __p
                             .then_ignore(#crate_path::chumsky::prelude::just(#crate_path::Token::Dot))
                             .then_ignore(#crate_path::chumsky::prelude::just(
                                 #crate_path::Token::Identifier(__part)
-                            ));
+                            ))
+                            .boxed();
                     }
-                    __p.boxed()
+                    __p
                 };
                 __keyword_parser
             }

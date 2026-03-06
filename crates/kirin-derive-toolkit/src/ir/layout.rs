@@ -59,9 +59,7 @@ impl Layout for StandardLayout {
     type ExtraStatementAttrs = ();
     type ExtraFieldAttrs = ();
 
-    fn extra_statement_attrs_from_input(
-        _input: &syn::DeriveInput,
-    ) -> darling::Result<()> {
+    fn extra_statement_attrs_from_input(_input: &syn::DeriveInput) -> darling::Result<()> {
         Ok(())
     }
 }
