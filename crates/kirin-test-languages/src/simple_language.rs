@@ -10,7 +10,7 @@ use kirin_ir::{Dialect, Region, ResultValue, SSAKind, SSAValue};
 pub enum SimpleLanguage {
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
-        chumsky(format = "{2:name} = add {0}, {1} -> {2:type}")
+        chumsky(format = "{2:name} = {.add} {0}, {1} -> {2:type}")
     )]
     Add(
         SSAValue,
@@ -19,7 +19,7 @@ pub enum SimpleLanguage {
     ),
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
-        chumsky(format = "{1:name} = constant {0} -> {1:type}")
+        chumsky(format = "{1:name} = {.constant} {0} -> {1:type}")
     )]
     Constant(
         #[kirin(into)] Value,
@@ -28,12 +28,12 @@ pub enum SimpleLanguage {
     #[kirin(terminator)]
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
-        chumsky(format = "return {0}")
+        chumsky(format = "{.return} {0}")
     )]
     Return(SSAValue),
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
-        chumsky(format = "{1:name} = function {0}")
+        chumsky(format = "{1:name} = {.function} {0}")
     )]
     Function(Region, #[kirin(type = SimpleType::F64)] ResultValue),
 }
