@@ -1101,11 +1101,7 @@ name = "kirin-arith"
 version = "0.1.0"
 dependencies = [
  "kirin",
- "kirin-cf",
- "kirin-constant",
- "kirin-function",
  "kirin-interpreter",
- "kirin-test-utils",
 ]
 
 [[package]]
