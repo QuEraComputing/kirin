@@ -121,61 +121,6 @@ where
         .or(ir_input.extra_attrs.global_format())
 }
 
-/// Extracts a namespace prefix from a `#[chumsky(format = "...")]` on a `#[wraps]` variant.
-///
-/// Returns `Ok(Some(namespace))` if format is present and valid (single identifier),
-/// `Ok(None)` if no format attribute, or `Err` if the format string is invalid for a wraps variant.
-pub(crate) fn namespace_for_wrapper<L>(
-    ir_input: &kirin_derive_toolkit::ir::Input<L>,
-    stmt: &kirin_derive_toolkit::ir::Statement<L>,
-) -> syn::Result<Option<String>>
-where
-    L: Layout<ExtraStatementAttrs = ChumskyStatementAttrs>,
-    L::ExtraGlobalAttrs: HasGlobalFormat,
-{
-    let Some(format_str) = format_for_statement(ir_input, stmt) else {
-        return Ok(None);
-    };
-
-    // Validate: must be a single identifier (no dots, no braces, no spaces)
-    let trimmed = format_str.trim();
-    if trimmed.is_empty() {
-        return Err(syn::Error::new(
-            stmt.name.span(),
-            "format on a #[wraps] variant must be a single identifier (namespace prefix), got empty string",
-        ));
-    }
-
-    // Check it's a valid identifier: starts with XID_Start or _, continues with XID_Continue or _
-    let mut chars = trimmed.chars();
-    let first = chars.next().unwrap();
-    if !first.is_alphabetic() && first != '_' {
-        return Err(syn::Error::new(
-            stmt.name.span(),
-            format!(
-                "format on a #[wraps] variant must be a single identifier (namespace prefix), \
-                 got \"{}\"",
-                trimmed
-            ),
-        ));
-    }
-
-    for ch in chars {
-        if !ch.is_alphanumeric() && ch != '_' {
-            return Err(syn::Error::new(
-                stmt.name.span(),
-                format!(
-                    "format on a #[wraps] variant must be a single identifier (namespace prefix), \
-                     got \"{}\". Dots, braces, spaces, and other special characters are not allowed.",
-                    trimmed
-                ),
-            ));
-        }
-    }
-
-    Ok(Some(trimmed.to_string()))
-}
-
 /// Gets the set of field indices that are in the format string.
 pub(crate) fn get_fields_in_format(
     ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
@@ -242,14 +187,14 @@ pub(crate) fn generate_enum_match<L: Layout, F, G>(
     marker_handler: Option<TokenStream>,
 ) -> TokenStream
 where
-    F: Fn(&syn::Ident, &kirin_derive_toolkit::ir::fields::Wrapper, &kirin_derive_toolkit::ir::Statement<L>) -> TokenStream,
+    F: Fn(&syn::Ident, &kirin_derive_toolkit::ir::fields::Wrapper) -> TokenStream,
     G: Fn(&syn::Ident, &kirin_derive_toolkit::ir::Statement<L>) -> TokenStream,
 {
     let arms: Vec<TokenStream> = data
         .iter_variants()
         .map(|variant| match variant {
-            VariantRef::Wrapper { name, wrapper, stmt } => {
-                let body = wrapper_handler(name, wrapper, stmt);
+            VariantRef::Wrapper { name, wrapper, .. } => {
+                let body = wrapper_handler(name, wrapper);
                 quote! { #type_name::#name(inner) => { #body } }
             }
             VariantRef::Regular { name, stmt } => regular_handler(name, stmt),

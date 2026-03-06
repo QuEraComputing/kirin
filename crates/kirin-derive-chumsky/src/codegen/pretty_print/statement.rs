@@ -230,17 +230,9 @@ impl GeneratePrettyPrint {
         generate_enum_match(
             dialect_name,
             data,
-            |_name, _wrapper, stmt| {
-                let namespace = crate::codegen::namespace_for_wrapper(ir_input, stmt).ok().flatten();
-                if let Some(ns) = namespace {
-                    let prefix = format!("{}.", ns);
-                    quote! {
-                        doc.text(#prefix) + #prettyless_path::PrettyPrint::pretty_print(inner, doc)
-                    }
-                } else {
-                    quote! {
-                        #prettyless_path::PrettyPrint::pretty_print(inner, doc)
-                    }
+            |_name, _wrapper| {
+                quote! {
+                    #prettyless_path::PrettyPrint::pretty_print(inner, doc)
                 }
             },
             |name, variant| self.generate_variant_print(ir_input, variant, dialect_name, name),

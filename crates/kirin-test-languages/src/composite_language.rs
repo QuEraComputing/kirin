@@ -13,7 +13,6 @@ use kirin_ir::*;
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
 #[wraps]
 pub enum CompositeLanguage {
-    #[chumsky(format = "arith")]
     Arith(Arith<ArithType>),
     #[kirin(terminator)]
     ControlFlow(ControlFlow<ArithType>),
