@@ -13,7 +13,7 @@ use kirin::prelude::*;
 /// `example/simple.rs` for a working example.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = T)]
-#[chumsky(format = "{res:name} = lambda {name} captures({captures}) {body} -> {res:type}")]
+#[chumsky(format = "{res:name} = {.lambda} {name} captures({captures}) {body} -> {res:type}")]
 pub struct Lambda<T: CompileTimeValue + Default> {
     name: Symbol,
     captures: Vec<SSAValue>,

@@ -12,7 +12,7 @@ use kirin_test_utils::roundtrip;
 #[kirin(fn, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum LambdaLanguage {
-    #[chumsky(format = "{res:name} = lambda {name} captures({captures}) {body} -> {res:type}")]
+    #[chumsky(format = "{res:name} = {.lambda} {name} captures({captures}) {body} -> {res:type}")]
     Lambda {
         name: Symbol,
         captures: Vec<SSAValue>,

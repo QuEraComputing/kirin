@@ -51,7 +51,7 @@ use kirin::prelude::*;
 #[kirin(pure, fn, type = T)]
 pub enum Bitwise<T: CompileTimeValue + Default> {
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = and {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.and} {lhs}, {rhs} -> {result:type}")]
     And {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -60,7 +60,7 @@ pub enum Bitwise<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = or {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.or} {lhs}, {rhs} -> {result:type}")]
     Or {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -69,7 +69,7 @@ pub enum Bitwise<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = xor {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.xor} {lhs}, {rhs} -> {result:type}")]
     Xor {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -78,14 +78,14 @@ pub enum Bitwise<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = not {operand} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.not} {operand} -> {result:type}")]
     Not {
         operand: SSAValue,
         result: ResultValue,
         #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
-    #[chumsky(format = "{result:name} = shl {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.shl} {lhs}, {rhs} -> {result:type}")]
     Shl {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -93,7 +93,7 @@ pub enum Bitwise<T: CompileTimeValue + Default> {
         #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
-    #[chumsky(format = "{result:name} = shr {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.shr} {lhs}, {rhs} -> {result:type}")]
     Shr {
         lhs: SSAValue,
         rhs: SSAValue,

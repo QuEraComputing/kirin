@@ -51,7 +51,7 @@ pub enum StructuredControlFlow<T: CompileTimeValue + Default> {
 ///
 /// Corresponds to MLIR's `scf.if`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "if {condition} then {then_body} else {else_body}")]
+#[chumsky(format = "{.if} {condition} then {then_body} else {else_body}")]
 #[kirin(fn, type = T)]
 pub struct If<T: CompileTimeValue + Default> {
     condition: SSAValue,
@@ -67,7 +67,7 @@ pub struct If<T: CompileTimeValue + Default> {
 ///
 /// Corresponds to MLIR's `scf.for`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "for {induction_var} in {start}..{end} step {step} do {body}")]
+#[chumsky(format = "{.for} {induction_var} in {start}..{end} step {step} do {body}")]
 #[kirin(fn, type = T)]
 pub struct For<T: CompileTimeValue + Default> {
     induction_var: SSAValue,
@@ -82,7 +82,7 @@ pub struct For<T: CompileTimeValue + Default> {
 /// Terminates an SCF body block, yielding a value back to the parent
 /// `If` or `For` operation. Analogous to MLIR's `scf.yield`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "yield {value}")]
+#[chumsky(format = "{.yield} {value}")]
 #[kirin(terminator, type = T)]
 pub struct Yield<T: CompileTimeValue + Default> {
     value: SSAValue,

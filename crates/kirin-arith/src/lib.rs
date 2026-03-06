@@ -85,7 +85,7 @@ pub use types::{ArithType, ArithValue};
 #[kirin(pure, fn, type = T)]
 pub enum Arith<T: CompileTimeValue + Default> {
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = add {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
     Add {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -94,7 +94,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = sub {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.sub} {lhs}, {rhs} -> {result:type}")]
     Sub {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -103,7 +103,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = mul {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.mul} {lhs}, {rhs} -> {result:type}")]
     Mul {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -111,7 +111,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
-    #[chumsky(format = "{result:name} = div {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.div} {lhs}, {rhs} -> {result:type}")]
     Div {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -119,7 +119,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         #[kirin(default)]
         marker: std::marker::PhantomData<T>,
     },
-    #[chumsky(format = "{result:name} = rem {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.rem} {lhs}, {rhs} -> {result:type}")]
     Rem {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -128,7 +128,7 @@ pub enum Arith<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = neg {operand} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.neg} {operand} -> {result:type}")]
     Neg {
         operand: SSAValue,
         result: ResultValue,

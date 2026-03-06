@@ -13,7 +13,7 @@ use kirin::prelude::*;
 #[kirin(pure, fn, type = T)]
 pub enum Cmp<T: CompileTimeValue + Default> {
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = eq {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.eq} {lhs}, {rhs} -> {result:type}")]
     Eq {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -22,7 +22,7 @@ pub enum Cmp<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = ne {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.ne} {lhs}, {rhs} -> {result:type}")]
     Ne {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -31,7 +31,7 @@ pub enum Cmp<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = lt {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.lt} {lhs}, {rhs} -> {result:type}")]
     Lt {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -40,7 +40,7 @@ pub enum Cmp<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = le {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.le} {lhs}, {rhs} -> {result:type}")]
     Le {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -49,7 +49,7 @@ pub enum Cmp<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = gt {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.gt} {lhs}, {rhs} -> {result:type}")]
     Gt {
         lhs: SSAValue,
         rhs: SSAValue,
@@ -58,7 +58,7 @@ pub enum Cmp<T: CompileTimeValue + Default> {
         marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = ge {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "{result:name} = {.ge} {lhs}, {rhs} -> {result:type}")]
     Ge {
         lhs: SSAValue,
         rhs: SSAValue,
