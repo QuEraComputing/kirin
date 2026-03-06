@@ -54,6 +54,7 @@ members = [
     "crates/kirin-derive-prettyless",
     "crates/kirin-derive-interpreter",
     "crates/kirin-derive-chumsky",
+    "crates/kirin-test-types",
 ]
 
 [workspace.dependencies]
@@ -101,4 +102,5 @@ kirin-derive-ir = { version = "0.1.0", path = "crates/kirin-derive-ir" }
 kirin-derive-prettyless = { version = "0.1.0", path = "crates/kirin-derive-prettyless" }
 kirin-derive-interpreter = { version = "0.1.0", path = "crates/kirin-derive-interpreter" }
 kirin-derive-chumsky = { version = "0.1.0", path = "crates/kirin-derive-chumsky" }
+kirin-test-types = { version = "0.1.0", path = "crates/kirin-test-types" }
 smallvec = "1.13"

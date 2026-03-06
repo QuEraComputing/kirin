@@ -1329,6 +1329,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-test-types"
+version = "0.1.0"
+dependencies = [
+ "kirin-chumsky",
+ "kirin-ir",
+ "kirin-lexer",
+ "kirin-prettyless",
+]
+
+[[package]]
 name = "kirin-test-utils"
 version = "0.1.0"
 dependencies = [
