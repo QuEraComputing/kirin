@@ -1315,6 +1315,7 @@ name = "kirin-test-languages"
 version = "0.1.0"
 dependencies = [
  "kirin-arith",
+ "kirin-bitwise",
  "kirin-cf",
  "kirin-chumsky",
  "kirin-constant",

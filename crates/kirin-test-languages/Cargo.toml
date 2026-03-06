@@ -10,6 +10,7 @@ kirin-chumsky = { workspace = true, optional = true }
 kirin-lexer = { workspace = true, optional = true }
 kirin-prettyless = { workspace = true, optional = true }
 kirin-arith = { workspace = true, optional = true, features = ["interpret"] }
+kirin-bitwise = { workspace = true, optional = true }
 kirin-cf = { workspace = true, optional = true, features = ["interpret"] }
 kirin-constant = { workspace = true, optional = true, features = ["interpret"] }
 kirin-function = { workspace = true, optional = true, features = ["interpret"] }
@@ -22,5 +23,9 @@ kirin-interpreter = { workspace = true, optional = true }
 default = []
 simple-language = ["kirin-ir/derive"]
 composite-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-constant", "kirin-function", "kirin-derive-ir", "kirin-derive-interpreter", "kirin-derive-chumsky", "kirin-interpreter"]
+arith-function-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-function", "parser", "pretty"]
+bitwise-function-language = ["kirin-ir/derive", "kirin-arith", "kirin-bitwise", "kirin-cf", "kirin-function", "parser", "pretty"]
+callable-language = ["kirin-ir/derive", "kirin-arith", "kirin-function", "parser", "pretty"]
+namespaced-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-function", "parser", "pretty"]
 parser = ["kirin-chumsky/derive", "kirin-lexer"]
 pretty = ["kirin-prettyless", "kirin-derive-chumsky"]
