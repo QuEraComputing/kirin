@@ -13,6 +13,7 @@ use codegen::{GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePre
 use input::{parse_derive_input, parse_pretty_derive_input};
 
 use kirin_derive_toolkit::ir::Layout;
+use kirin_derive_toolkit::prelude::darling::{self, FromDeriveInput};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
@@ -26,6 +27,22 @@ impl Layout for ChumskyLayout {
     type ExtraGlobalAttrs = ChumskyGlobalAttrs;
     type ExtraStatementAttrs = ChumskyStatementAttrs;
     type ExtraFieldAttrs = ChumskyFieldAttrs;
+
+    fn extra_statement_attrs_from_input(
+        input: &syn::DeriveInput,
+    ) -> darling::Result<ChumskyStatementAttrs> {
+        /// Lenient version that tolerates global-only fields (e.g. `crate`)
+        /// when parsing the shared `#[chumsky(...)]` namespace at the type level.
+        #[derive(FromDeriveInput)]
+        #[darling(attributes(chumsky), allow_unknown_fields)]
+        struct Lenient {
+            format: Option<String>,
+        }
+        let lenient = Lenient::from_derive_input(input)?;
+        Ok(ChumskyStatementAttrs {
+            format: lenient.format,
+        })
+    }
 }
 
 /// The layout for the `PrettyPrint` derive macro.
@@ -40,6 +57,12 @@ impl Layout for PrettyPrintLayout {
     type ExtraGlobalAttrs = PrettyGlobalAttrs;
     type ExtraStatementAttrs = ChumskyStatementAttrs;
     type ExtraFieldAttrs = ChumskyFieldAttrs;
+
+    fn extra_statement_attrs_from_input(
+        input: &syn::DeriveInput,
+    ) -> darling::Result<ChumskyStatementAttrs> {
+        ChumskyLayout::extra_statement_attrs_from_input(input)
+    }
 }
 
 #[proc_macro_derive(HasParser, attributes(kirin, chumsky, wraps))]

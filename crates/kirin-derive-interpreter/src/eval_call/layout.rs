@@ -9,6 +9,12 @@ impl Layout for EvalCallLayout {
     type ExtraGlobalAttrs = EvalCallGlobalAttrs;
     type ExtraStatementAttrs = EvalCallStatementAttrs;
     type ExtraFieldAttrs = ();
+
+    fn extra_statement_attrs_from_input(
+        input: &syn::DeriveInput,
+    ) -> darling::Result<EvalCallStatementAttrs> {
+        EvalCallStatementAttrs::from_derive_input(input)
+    }
 }
 
 #[derive(Debug, Clone)]

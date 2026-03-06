@@ -1,6 +1,7 @@
 //! Attribute definitions for chumsky derive macros.
 
 use darling::{FromDeriveInput, FromField, FromVariant};
+use kirin_derive_toolkit::ir::HasCratePath;
 
 /// Global attributes applied to the entire derive input.
 #[derive(Debug, Clone, FromDeriveInput)]
@@ -14,8 +15,14 @@ pub struct ChumskyGlobalAttrs {
     pub format: Option<String>,
 }
 
+impl HasCratePath for ChumskyGlobalAttrs {
+    fn crate_path(&self) -> Option<&syn::Path> {
+        self.crate_path.as_ref()
+    }
+}
+
 /// Attributes applied to individual statements or enum variants.
-#[derive(Debug, Clone, FromVariant, FromDeriveInput)]
+#[derive(Debug, Clone, FromVariant)]
 #[darling(attributes(chumsky))]
 pub struct ChumskyStatementAttrs {
     /// The format string for this statement.
@@ -36,4 +43,10 @@ pub struct PrettyGlobalAttrs {
     /// The path to the kirin-prettyless crate.
     #[darling(rename = "crate")]
     pub crate_path: Option<syn::Path>,
+}
+
+impl HasCratePath for PrettyGlobalAttrs {
+    fn crate_path(&self) -> Option<&syn::Path> {
+        self.crate_path.as_ref()
+    }
 }

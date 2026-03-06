@@ -72,7 +72,7 @@ impl<L: Layout> Statement<L> {
         };
         let attrs = StatementOptions::from_derive_input(input)?;
         let extra = L::StatementExtra::from_derive_input(input)?;
-        let extra_attrs = L::ExtraStatementAttrs::from_derive_input(input)?;
+        let extra_attrs = L::extra_statement_attrs_from_input(input)?;
         Statement::new(
             input.ident.clone(),
             attrs,

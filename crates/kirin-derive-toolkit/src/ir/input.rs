@@ -2,7 +2,12 @@ use std::ops::{Deref, DerefMut};
 
 use darling::FromDeriveInput;
 
-use super::{attrs::GlobalOptions, fields::Wrapper, layout::Layout, statement::Statement};
+use super::{
+    attrs::GlobalOptions,
+    fields::Wrapper,
+    layout::{HasCratePath, Layout},
+    statement::Statement,
+};
 
 /// Top-level parsed representation of a derive macro input.
 ///
@@ -72,6 +77,16 @@ impl<L: Layout> Input<L> {
             )
             .with_span(input)),
         }
+    }
+}
+
+impl<L: Layout> Input<L>
+where
+    L::ExtraGlobalAttrs: HasCratePath,
+{
+    /// Resolve the downstream derive's crate path with a default.
+    pub fn extra_crate_path(&self, default: fn() -> syn::Path) -> syn::Path {
+        self.extra_attrs.crate_path().cloned().unwrap_or_else(default)
     }
 }
 
