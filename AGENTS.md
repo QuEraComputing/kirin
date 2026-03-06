@@ -110,3 +110,13 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - **E0275 with Region-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `FunctionBody`, SCF operations) overflow the trait solver when composed via `#[wraps]` + `HasParser`. The recursive AST types exceed the default trait recursion limit. Workaround: inline the fields directly into the parent language enum instead of using `#[wraps]` delegation. See `example/simple.rs` for a working example.
 
 - **`Ctx` default parameter for unified traits**: When the same trait method needs extra context for some implementors (e.g., `CompileStage` for `Pipeline`) but not others (e.g., `StageInfo`), use a default type parameter `Ctx = ()` on the trait. Pair with a blanket `Ext` trait that erases the `()` arg for ergonomic call sites. See `ParseStatementText<L, Ctx>` / `ParseStatementTextExt<L>`.
+
+## Test Conventions
+
+- **Roundtrip tests** (parse → emit → print → compare) go in workspace `tests/roundtrip/<dialect>.rs`
+- **Unit tests** for internal logic go inline in the crate (`#[cfg(test)]`)
+- **Codegen snapshot tests** go inline in `kirin-derive-chumsky`
+- **IR rendering snapshots** go inline in `kirin-prettyless`
+- **New test types** (type lattices, values) go in `kirin-test-types`
+- **New test dialects** (language enums, stage enums) go in `kirin-test-languages`
+- **New test helpers** (roundtrip, parse, fixture builders) go in `kirin-test-utils`
