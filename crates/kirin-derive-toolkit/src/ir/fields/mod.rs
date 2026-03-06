@@ -46,6 +46,13 @@ pub enum FieldCategory {
     Value,
 }
 
+impl FieldCategory {
+    /// Returns true for categories that represent SSA values (Argument, Result).
+    pub fn is_ssa_like(&self) -> bool {
+        matches!(self, FieldCategory::Argument | FieldCategory::Result)
+    }
+}
+
 /// Semantic data associated with a field, varying by [`FieldCategory`].
 ///
 /// `Argument` and `Result` variants carry an `ssa_type` expression.

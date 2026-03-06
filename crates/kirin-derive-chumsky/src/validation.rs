@@ -1,18 +1,42 @@
-//! ValidationVisitor implementation.
+//! Validation for format strings and field usage.
 
 use std::collections::HashSet;
 
 use kirin_derive_toolkit::ir::Statement;
+use kirin_derive_toolkit::ir::fields::FieldInfo;
 use kirin_lexer::Token;
 
 use crate::ChumskyLayout;
-use kirin_derive_toolkit::ir::fields::FieldInfo;
-
-use crate::field_kind::FieldKind;
+use crate::field_kind::FieldCategoryExt;
 use crate::format::{Format, FormatOption};
 use crate::visitor::FormatVisitor;
 
-use super::result::{FieldOccurrence, ValidationResult};
+/// Validates a format string against collected fields.
+pub fn validate_format<'ir>(
+    stmt: &'ir Statement<ChumskyLayout>,
+    format: &Format<'_>,
+    collected: &'ir [FieldInfo<ChumskyLayout>],
+) -> syn::Result<ValidationResult<'ir>> {
+    ValidationVisitor::new().validate(stmt, format, collected)
+}
+
+/// Result of validation containing field occurrences.
+#[derive(Debug)]
+pub struct ValidationResult<'a> {
+    /// Field occurrences in format string order
+    pub occurrences: Vec<FieldOccurrence<'a>>,
+}
+
+/// Represents an occurrence of a field in the format string.
+#[derive(Debug, Clone)]
+pub struct FieldOccurrence<'a> {
+    /// The collected field info.
+    pub field: &'a FieldInfo<ChumskyLayout>,
+    /// The format option for this occurrence.
+    pub option: FormatOption,
+    /// The unique variable name for this occurrence.
+    pub var_name: syn::Ident,
+}
 
 /// Visitor that validates format string usage.
 pub struct ValidationVisitor<'ir> {
@@ -65,8 +89,7 @@ impl<'ir> ValidationVisitor<'ir> {
             }
 
             // Validate SSA/Result fields have name occurrence
-            let kind = FieldKind::from_field_info(field);
-            if kind.supports_name_type_options()
+            if field.category().is_ssa_like()
                 && self.referenced_fields.contains(&field.index)
                 && !self.name_occurrences.contains(&field.index)
             {
@@ -143,9 +166,8 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
         self.referenced_fields.insert(field.index);
 
         // Validate that :name and :type options are only used on SSA/Result fields
-        let kind = FieldKind::from_field_info(field);
         if matches!(option, FormatOption::Name | FormatOption::Type)
-            && !kind.supports_name_type_options()
+            && !field.category().is_ssa_like()
         {
             let option_name = match option {
                 FormatOption::Name => ":name",
@@ -156,7 +178,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 "format option '{}' cannot be used on {} field '{}'. \
                  The :name and :type options are only valid for SSAValue and ResultValue fields.",
                 option_name,
-                kind.name(),
+                field.category().ast_kind_name(),
                 field
             ));
             return Ok(());
