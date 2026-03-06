@@ -1109,12 +1109,7 @@ name = "kirin-bitwise"
 version = "0.1.0"
 dependencies = [
  "kirin",
- "kirin-arith",
- "kirin-cf",
- "kirin-constant",
- "kirin-function",
  "kirin-interpreter",
- "kirin-test-utils",
 ]
 
 [[package]]
