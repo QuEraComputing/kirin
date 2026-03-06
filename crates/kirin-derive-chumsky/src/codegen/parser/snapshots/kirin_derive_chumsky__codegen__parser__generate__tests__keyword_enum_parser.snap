@@ -1,0 +1,55 @@
+---
+source: crates/kirin-derive-chumsky/src/codegen/parser/generate.rs
+assertion_line: 255
+expression: generate_parser_code(input)
+---
+#[automatically_derived]
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for ArithOps
+where
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    type Output<__TypeOutput, __LanguageOutput>
+        = ArithOpsAST<'tokens, 'src, __TypeOutput, __LanguageOutput>
+    where
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens;
+    #[inline]
+    fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
+        language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+        namespace: &[&'static str],
+    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
+    where
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __LanguageOutput: Clone + PartialEq + 'tokens,
+    {
+        use kirin::parsers::chumsky::prelude::*;
+        { use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal)) . then_ignore ({ let __keyword_parser : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , _ > = if namespace . is_empty () { :: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Identifier ("add")) . boxed () } else { let mut __parts : :: std :: vec :: Vec < & 'static str > = namespace . to_vec () ; __parts . push ("add") ; let mut __p : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , _ > = :: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Identifier (__parts [0])) . boxed () ; for & __part in & __parts [1 ..] { __p = __p . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Dot)) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Identifier (__part))) . boxed () ; } __p } ; __keyword_parser }) . then (< Value as :: kirin :: parsers :: HasParser < 'tokens , 'src >> :: parser ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Comma)) . then (< Value as :: kirin :: parsers :: HasParser < 'tokens , 'src >> :: parser ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| (((result_name , lhs) , rhs) , result_type) | -> ArithOpsAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { ArithOpsAST :: Add { result : :: kirin :: parsers :: SSAValue { name : :: kirin :: parsers :: Spanned { value : result_name . name , span : result_name . span } , ty : Some (result_type . ty . clone ()) , } , lhs : lhs , rhs : rhs } }) } . or ({ use :: kirin :: parsers :: Token ; :: kirin :: parsers :: nameof_ssa () . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Equal)) . then_ignore ({ let __keyword_parser : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , _ > = if namespace . is_empty () { :: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Identifier ("sub")) . boxed () } else { let mut __parts : :: std :: vec :: Vec < & 'static str > = namespace . to_vec () ; __parts . push ("sub") ; let mut __p : :: kirin :: parsers :: BoxedParser < 'tokens , 'src , I , _ > = :: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Identifier (__parts [0])) . boxed () ; for & __part in & __parts [1 ..] { __p = __p . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Dot)) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (:: kirin :: parsers :: Token :: Identifier (__part))) . boxed () ; } __p } ; __keyword_parser }) . then (< Value as :: kirin :: parsers :: HasParser < 'tokens , 'src >> :: parser ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Comma)) . then (< Value as :: kirin :: parsers :: HasParser < 'tokens , 'src >> :: parser ()) . then_ignore (:: kirin :: parsers :: chumsky :: prelude :: just (Token :: Arrow)) . then (:: kirin :: parsers :: typeof_ssa :: < _ , SimpleType > ()) . map (| (((result_name , lhs) , rhs) , result_type) | -> ArithOpsAST < 'tokens , 'src , __TypeOutput , __LanguageOutput > { ArithOpsAST :: Sub { result : :: kirin :: parsers :: SSAValue { name : :: kirin :: parsers :: Spanned { value : result_name . name , span : result_name . span } , ty : Some (result_type . ty . clone ()) , } , lhs : lhs , rhs : rhs } }) }) . boxed ()
+    }
+}
+#[automatically_derived]
+impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for ArithOps
+where
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+{
+    type Output = ArithOpsASTSelf<
+        'tokens,
+        'src,
+        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+    >;
+    fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    where
+        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+    {
+        use kirin::parsers::chumsky::prelude::*;
+        ::kirin::parsers::chumsky::recursive::recursive(|language| {
+            <ArithOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
+                I,
+                <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+                Self::Output,
+            >(language)
+            .map(|inner| ArithOpsASTSelf::new(inner))
+        })
+        .boxed()
+    }
+}

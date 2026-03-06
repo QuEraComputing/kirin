@@ -1,0 +1,26 @@
+---
+source: crates/kirin-derive-chumsky/src/codegen/pretty_print/statement.rs
+assertion_line: 416
+expression: generate_pretty_print_code(input)
+---
+#[automatically_derived]
+impl ::kirin::pretty::PrettyPrint for MyLanguage {
+    fn namespaced_pretty_print<'a, __L: ::kirin::ir::Dialect + ::kirin::pretty::PrettyPrint>(
+        &self,
+        doc: &'a ::kirin::pretty::Document<'a, __L>,
+        namespace: &[&str],
+    ) -> ::kirin::pretty::ArenaDoc<'a>
+    where
+        __L::Type: ::core::fmt::Display,
+    {
+        use kirin::pretty::DocAllocator;
+        match self {
+            MyLanguage::Arith(inner) => {
+                let mut __ns: ::std::vec::Vec<&str> = namespace.to_vec();
+                __ns.push("arith");
+                inner.namespaced_pretty_print(doc, &__ns)
+            }
+            MyLanguage::Cf(inner) => inner.namespaced_pretty_print(doc, namespace),
+        }
+    }
+}

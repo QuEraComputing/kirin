@@ -1,0 +1,64 @@
+---
+source: crates/kirin-derive-chumsky/src/codegen/pretty_print/statement.rs
+assertion_line: 401
+expression: generate_pretty_print_code(input)
+---
+#[automatically_derived]
+impl ::kirin::pretty::PrettyPrint for ArithOps {
+    fn namespaced_pretty_print<'a, __L: ::kirin::ir::Dialect + ::kirin::pretty::PrettyPrint>(
+        &self,
+        doc: &'a ::kirin::pretty::Document<'a, __L>,
+        namespace: &[&str],
+    ) -> ::kirin::pretty::ArenaDoc<'a>
+    where
+        __L::Type: ::core::fmt::Display,
+    {
+        use kirin::pretty::DocAllocator;
+        match self {
+            ArithOps::Add {
+                result: f_result,
+                lhs: f_lhs,
+                rhs: f_rhs,
+            } => {
+                ::kirin::pretty::PrettyPrint::pretty_print_name(f_result, doc)
+                    + doc.text(" = ")
+                    + (if namespace.is_empty() {
+                        doc.text("add")
+                    } else {
+                        let mut __s = namespace.join(".");
+                        __s.push('.');
+                        __s.push_str("add");
+                        doc.text(__s)
+                    })
+                    + doc.text(" ")
+                    + ::kirin::pretty::PrettyPrint::pretty_print(f_lhs, doc)
+                    + doc.text(", ")
+                    + ::kirin::pretty::PrettyPrint::pretty_print(f_rhs, doc)
+                    + doc.text(" -> ")
+                    + ::kirin::pretty::PrettyPrint::pretty_print_type(f_result, doc)
+            }
+            ArithOps::Sub {
+                result: f_result,
+                lhs: f_lhs,
+                rhs: f_rhs,
+            } => {
+                ::kirin::pretty::PrettyPrint::pretty_print_name(f_result, doc)
+                    + doc.text(" = ")
+                    + (if namespace.is_empty() {
+                        doc.text("sub")
+                    } else {
+                        let mut __s = namespace.join(".");
+                        __s.push('.');
+                        __s.push_str("sub");
+                        doc.text(__s)
+                    })
+                    + doc.text(" ")
+                    + ::kirin::pretty::PrettyPrint::pretty_print(f_lhs, doc)
+                    + doc.text(", ")
+                    + ::kirin::pretty::PrettyPrint::pretty_print(f_rhs, doc)
+                    + doc.text(" -> ")
+                    + ::kirin::pretty::PrettyPrint::pretty_print_type(f_result, doc)
+            }
+        }
+    }
+}

@@ -206,3 +206,67 @@ impl GenerateHasDialectParser {
         Ok(namespace_expr)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::parse_derive_input;
+    use kirin_test_utils::rustfmt;
+
+    /// Helper: parse DeriveInput, run parser codegen, rustfmt the output.
+    fn generate_parser_code(input: syn::DeriveInput) -> String {
+        let ir_input = parse_derive_input(&input).expect("Failed to parse derive input");
+        let generator = GenerateHasDialectParser::new(&ir_input);
+        let tokens = generator.generate(&ir_input);
+        rustfmt(tokens.to_string())
+    }
+
+    #[test]
+    fn test_keyword_struct_parser() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[chumsky(crate = kirin_chumsky, format = "{.ret} {value}")]
+            struct Return {
+                value: Value,
+            }
+        };
+        insta::assert_snapshot!(generate_parser_code(input));
+    }
+
+    #[test]
+    fn test_keyword_enum_parser() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum ArithOps {
+                #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+                Add {
+                    result: SSAValue,
+                    lhs: Value,
+                    rhs: Value,
+                },
+                #[chumsky(format = "{result:name} = {.sub} {lhs}, {rhs} -> {result:type}")]
+                Sub {
+                    result: SSAValue,
+                    lhs: Value,
+                    rhs: Value,
+                },
+            }
+        };
+        insta::assert_snapshot!(generate_parser_code(input));
+    }
+
+    #[test]
+    fn test_wrapper_namespace_parser() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum MyLanguage {
+                #[wraps]
+                #[chumsky(format = "arith")]
+                Arith(ArithOps),
+                #[wraps]
+                Cf(CfOps),
+            }
+        };
+        insta::assert_snapshot!(generate_parser_code(input));
+    }
+}

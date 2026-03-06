@@ -1,0 +1,28 @@
+---
+source: crates/kirin-derive-chumsky/src/codegen/pretty_print/statement.rs
+assertion_line: 379
+expression: generate_pretty_print_code(input)
+---
+#[automatically_derived]
+impl ::kirin::pretty::PrettyPrint for Return {
+    fn namespaced_pretty_print<'a, __L: ::kirin::ir::Dialect + ::kirin::pretty::PrettyPrint>(
+        &self,
+        doc: &'a ::kirin::pretty::Document<'a, __L>,
+        namespace: &[&str],
+    ) -> ::kirin::pretty::ArenaDoc<'a>
+    where
+        __L::Type: ::core::fmt::Display,
+    {
+        use kirin::pretty::DocAllocator;
+        let Return { value: f_value } = self;
+        (if namespace.is_empty() {
+            doc.text("ret")
+        } else {
+            let mut __s = namespace.join(".");
+            __s.push('.');
+            __s.push_str("ret");
+            doc.text(__s)
+        }) + doc.text(" ")
+            + ::kirin::pretty::PrettyPrint::pretty_print(f_value, doc)
+    }
+}
