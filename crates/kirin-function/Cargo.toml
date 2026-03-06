@@ -10,8 +10,3 @@ smallvec = { workspace = true, optional = true }
 
 [features]
 interpret = ["kirin-interpreter", "smallvec"]
-
-[dev-dependencies]
-kirin-arith.workspace = true
-kirin-test-languages = { workspace = true, features = ["parser"] }
-kirin-test-utils = { workspace = true, features = ["roundtrip"] }
