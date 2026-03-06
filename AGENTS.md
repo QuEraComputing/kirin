@@ -14,7 +14,7 @@
 cargo build --workspace          # Build all crates
 cargo nextest run --workspace    # Run all tests (preferred, parallelizes test binaries)
 cargo nextest run -p kirin-chumsky  # Test a single crate
-cargo nextest run -p kirin-chumsky-derive -E 'test(test_parse_add)'  # Run a single test
+cargo nextest run -p kirin-derive-chumsky -E 'test(test_parse_add)'  # Run a single test
 cargo test --doc --workspace     # Run doctests (nextest does not support doctests)
 cargo fmt --all                  # Format code
 cargo insta review               # Review snapshot test changes
@@ -53,8 +53,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 **Parser/Printer:**
 - `kirin-chumsky` — Parser traits (`HasParser`, `HasDialectParser`, `EmitIR`), text APIs (`ParseStatementText`, `ParsePipelineText`)
 - `kirin-prettyless` — Pretty printer (`PrettyPrint`)
-- `kirin-chumsky-derive` — `#[derive(HasParser, PrettyPrint)]`
-- `kirin-chumsky-format` — Code generation (internal)
+- `kirin-derive-chumsky` — `#[derive(HasParser, PrettyPrint)]` (proc-macro + code generation)
 
 **Interpreter:**
 - `kirin-interpreter` — Interpreter traits, `StackInterpreter`, `AbstractInterpreter`
@@ -64,9 +63,9 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-bitwise`, `kirin-cmp`, `kirin-function`
 
 **Derive Infrastructure:**
-- `kirin-derive-core` — Shared derive utilities
-- `kirin-derive` — `#[derive(Dialect)]`
-- `kirin-prettyless-derive` — `#[derive(PrettyPrint)]` code generation (internal)
+- `kirin-derive-toolkit` — Shared derive utilities (IR model, darling re-export, template system)
+- `kirin-derive-ir` — `#[derive(Dialect, StageMeta)]` and IR property traits
+- `kirin-derive-prettyless` — `#[derive(RenderStage)]` (proc-macro)
 
 **Analysis:**
 - `kirin-interval` — Interval domain for abstract interpretation
@@ -77,7 +76,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 ## Derive Infrastructure Conventions
 
-- **Darling re-export rule**: Derive crates that depend on `kirin-derive-core` must use `kirin_derive_core::prelude::darling` — never import `darling` directly. The workspace has multiple darling versions (0.20 via `bon`, 0.23 via `kirin-derive-core`); a direct import may resolve to the wrong version.
+- **Darling re-export rule**: Derive crates that depend on `kirin-derive-toolkit` must use `kirin_derive_toolkit::prelude::darling` — never import `darling` directly. The workspace has multiple darling versions (0.20 via `bon`, 0.23 via `kirin-derive-toolkit`); a direct import may resolve to the wrong version.
 
 - **Helper attribute pattern**: `#[wraps]` and `#[callable]` are intentionally separate from `#[kirin(...)]` for composability. `#[kirin(...)]` is the carry attribute for dialect-specific options (parsed by darling). `#[wraps]` is a generic helper for delegation/wrapper patterns, and `#[callable]` is interpreter-specific. Keeping them as bare attributes lets different derive macros compose independently — e.g. a type can use `#[wraps]` with both `#[derive(Dialect)]` and `#[derive(Interpretable)]` without coupling those derives. Since darling's `#[darling(attributes(...))]` only supports `#[attr(key = val)]` form, bare flag attributes are parsed manually via `attrs.iter().any(|a| a.path().is_ident("name"))`.
 
