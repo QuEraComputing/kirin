@@ -16,9 +16,21 @@ kirin-lexer = { version = "0.1.0", path = "crates/kirin-lexer" }
 
 [dev-dependencies]
 kirin-arith = { workspace = true }
+kirin-bitwise = { workspace = true }
 kirin-cf = { workspace = true }
+kirin-cmp = { workspace = true }
+kirin-constant = { workspace = true }
 kirin-function = { workspace = true }
-kirin-test-languages = { workspace = true, features = ["simple-language", "parser", "pretty"] }
+kirin-scf = { workspace = true }
+kirin-test-languages = { workspace = true, features = [
+    "simple-language",
+    "arith-function-language",
+    "bitwise-function-language",
+    "callable-language",
+    "namespaced-language",
+    "parser",
+    "pretty",
+] }
 kirin-test-utils = { workspace = true, features = ["roundtrip"] }
 
 [features]
