@@ -34,6 +34,11 @@ pub trait FormatVisitor<'ir> {
         Ok(())
     }
 
+    /// Called for keyword literals in the format string.
+    fn visit_keyword(&mut self, _keyword: &str) -> syn::Result<()> {
+        Ok(())
+    }
+
     /// Called for fields not in format string (have defaults).
     fn visit_default_field(&mut self, _field: &'ir FieldInfo<ChumskyLayout>) -> syn::Result<()> {
         Ok(())
@@ -73,7 +78,9 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
                     visitor.visit_field_occurrence(field, option)?;
                 }
             }
-            FormatElement::Keyword(_) => {}
+            FormatElement::Keyword(kw) => {
+                visitor.visit_keyword(kw)?;
+            }
         }
     }
 
