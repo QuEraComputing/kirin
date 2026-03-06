@@ -68,9 +68,10 @@ mod pretty_impl {
     use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
     impl PrettyPrint for UnitType {
-        fn pretty_print<'a, L: kirin_ir::Dialect + PrettyPrint>(
+        fn namespaced_pretty_print<'a, L: kirin_ir::Dialect + PrettyPrint>(
             &self,
             doc: &'a Document<'a, L>,
+            _namespace: &[&str],
         ) -> ArenaDoc<'a>
         where
             L::Type: std::fmt::Display,

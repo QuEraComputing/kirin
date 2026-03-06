@@ -39,6 +39,17 @@ use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};
 pub trait PrettyPrint {
     fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
     where
+        L::Type: std::fmt::Display,
+    {
+        self.namespaced_pretty_print(doc, &[])
+    }
+
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        namespace: &[&str],
+    ) -> ArenaDoc<'a>
+    where
         L::Type: std::fmt::Display;
 
     /// Pretty print only the "name" view of a value.
@@ -203,11 +214,15 @@ where
 }
 
 impl<T: PrettyPrint> PrettyPrint for &T {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
-        (*self).pretty_print(doc)
+        T::namespaced_pretty_print(self, doc, namespace)
     }
 
     fn pretty_print_name<'a, L: Dialect + PrettyPrint>(

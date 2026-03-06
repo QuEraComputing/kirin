@@ -7,7 +7,11 @@ use prettyless::DocAllocator;
 use crate::{ArenaDoc, Config, Document, PrettyPrint, PrettyPrintExt, PrintExt};
 
 impl PrettyPrint for SimpleLanguage {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {

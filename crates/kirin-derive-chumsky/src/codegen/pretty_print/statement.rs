@@ -95,9 +95,10 @@ impl GeneratePrettyPrint {
                 for #dialect_name #ty_generics
             #where_clause
             {
-                fn pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
+                fn namespaced_pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
                     &self,
                     doc: &'a #prettyless_path::Document<'a, __L>,
+                    _namespace: &[&str],
                 ) -> #prettyless_path::ArenaDoc<'a>
                 where
                     __L::Type: ::core::fmt::Display,
@@ -142,15 +143,16 @@ impl GeneratePrettyPrint {
                 for #dialect_name #ty_generics
             #final_where
             {
-                fn pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
+                fn namespaced_pretty_print<'a, __L: #ir_path::Dialect + #prettyless_path::PrettyPrint>(
                     &self,
                     doc: &'a #prettyless_path::Document<'a, __L>,
+                    _namespace: &[&str],
                 ) -> #prettyless_path::ArenaDoc<'a>
                 where
                     __L::Type: ::core::fmt::Display,
                 {
                     let inner = &self.0;
-                    #prettyless_path::PrettyPrint::pretty_print(inner, doc)
+                    inner.namespaced_pretty_print(doc, _namespace)
                 }
             }
         }
@@ -225,14 +227,12 @@ impl GeneratePrettyPrint {
         data: &kirin_derive_toolkit::ir::DataEnum<PrettyPrintLayout>,
         dialect_name: &syn::Ident,
     ) -> TokenStream {
-        let prettyless_path = &self.prettyless_path;
-
         generate_enum_match(
             dialect_name,
             data,
             |_name, _wrapper| {
                 quote! {
-                    #prettyless_path::PrettyPrint::pretty_print(inner, doc)
+                    inner.namespaced_pretty_print(doc, _namespace)
                 }
             },
             |name, variant| self.generate_variant_print(ir_input, variant, dialect_name, name),
@@ -287,7 +287,8 @@ impl GeneratePrettyPrint {
                         let var = &field_vars[*idx];
                         let var_ref = quote! { #var };
 
-                        let print_expr = field_kind::print_expr(field, prettyless_path, &var_ref, opt);
+                        let print_expr =
+                            field_kind::print_expr(field, prettyless_path, &var_ref, opt);
 
                         if !is_first && prev_is_field {
                             parts.push(quote! { doc.text(" ") });

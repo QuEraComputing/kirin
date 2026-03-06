@@ -52,7 +52,11 @@ where
 ///
 /// Prints symbols with the `@` prefix: `@main`, `@foo`, etc.
 impl<'src> PrettyPrint for SymbolName<'src> {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {

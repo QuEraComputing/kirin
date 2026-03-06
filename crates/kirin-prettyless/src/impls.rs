@@ -9,7 +9,11 @@ use prettyless::DocAllocator;
 use crate::{ArenaDoc, Document, PrettyPrint};
 
 impl PrettyPrint for ResultValue {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -51,7 +55,11 @@ impl PrettyPrint for ResultValue {
 }
 
 impl PrettyPrint for SSAValue {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -93,7 +101,11 @@ impl PrettyPrint for SSAValue {
 }
 
 impl PrettyPrint for Successor {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -102,7 +114,11 @@ impl PrettyPrint for Successor {
 }
 
 impl PrettyPrint for Symbol {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -117,7 +133,11 @@ impl PrettyPrint for Symbol {
 }
 
 impl PrettyPrint for GlobalSymbol {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -131,7 +151,11 @@ impl PrettyPrint for GlobalSymbol {
 }
 
 impl<T: PrettyPrint> PrettyPrint for Vec<T> {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -140,7 +164,11 @@ impl<T: PrettyPrint> PrettyPrint for Vec<T> {
 }
 
 impl<T: PrettyPrint> PrettyPrint for Option<T> {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -152,7 +180,11 @@ impl<T: PrettyPrint> PrettyPrint for Option<T> {
 }
 
 impl PrettyPrint for SpecializedFunction {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -161,7 +193,11 @@ impl PrettyPrint for SpecializedFunction {
 }
 
 impl PrettyPrint for StagedFunction {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -178,9 +214,10 @@ macro_rules! impl_pretty_print_int {
     ($($ty:ty),*) => {
         $(
             impl PrettyPrint for $ty {
-                fn pretty_print<'a, L: Dialect + PrettyPrint>(
+                fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
                     &self,
                     doc: &'a Document<'a, L>,
+                    _namespace: &[&str],
                 ) -> ArenaDoc<'a>
                 where
                     L::Type: std::fmt::Display,
@@ -197,7 +234,11 @@ impl_pretty_print_int!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 
 // Floating point types need special handling to ensure decimal point
 impl PrettyPrint for f32 {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -211,7 +252,11 @@ impl PrettyPrint for f32 {
 }
 
 impl PrettyPrint for f64 {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -225,7 +270,11 @@ impl PrettyPrint for f64 {
 }
 
 impl PrettyPrint for bool {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
@@ -234,7 +283,11 @@ impl PrettyPrint for bool {
 }
 
 impl PrettyPrint for String {
-    fn pretty_print<'a, L: Dialect + PrettyPrint>(&self, doc: &'a Document<'a, L>) -> ArenaDoc<'a>
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
