@@ -1144,10 +1144,7 @@ name = "kirin-cmp"
 version = "0.1.0"
 dependencies = [
  "kirin",
- "kirin-cf",
- "kirin-constant",
  "kirin-interpreter",
- "kirin-test-utils",
 ]
 
 [[package]]

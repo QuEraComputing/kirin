@@ -11,9 +11,9 @@ pub mod parser;
 #[cfg(feature = "roundtrip")]
 pub mod roundtrip;
 
+pub use kirin_test_types::UnitType;
 pub use rustfmt::{rustfmt, rustfmt_display};
 pub use ssa::new_test_ssa;
-pub use kirin_test_types::UnitType;
 
 /// Dump a specialized function's IR using the builtin pretty printer.
 #[cfg(feature = "interpreter")]

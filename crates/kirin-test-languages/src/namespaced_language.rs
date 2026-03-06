@@ -12,7 +12,10 @@ use kirin_ir::{Dialect, Region};
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
 pub enum NamespacedLanguage {
-    #[cfg_attr(any(feature = "parser", feature = "pretty"), chumsky(format = "{body}"))]
+    #[cfg_attr(
+        any(feature = "parser", feature = "pretty"),
+        chumsky(format = "{body}")
+    )]
     Function { body: Region },
     #[wraps]
     #[cfg_attr(any(feature = "parser", feature = "pretty"), chumsky(format = "arith"))]
