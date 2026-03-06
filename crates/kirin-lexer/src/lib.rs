@@ -9,9 +9,9 @@ pub enum Token<'src> {
     /// ```ignore
     /// %<identifier>
     /// ```
-    #[regex(r"%[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
+    #[regex(r"%[\p{XID_Continue}_]+", |lex| &lex.slice()[1..])]
     SSAValue(&'src str),
-    #[regex(r"\^[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
+    #[regex(r"\^[\p{XID_Continue}_]+", |lex| &lex.slice()[1..])]
     /// ```ignore
     /// ^<identifier>
     /// ```
@@ -19,17 +19,17 @@ pub enum Token<'src> {
     /// ```ignore
     /// <identifier>
     /// ```
-    #[regex(r"[\p{XID_Start}_][\p{XID_Continue}_$.]*")]
+    #[regex(r"[\p{XID_Start}_][\p{XID_Continue}_]*")]
     Identifier(&'src str),
     /// ```ignore
     /// @<symbol>
     /// ```
-    #[regex(r"@[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
+    #[regex(r"@[\p{XID_Continue}_]+", |lex| &lex.slice()[1..])]
     Symbol(&'src str),
     /// ```ignore
     /// #<attr_id>
     /// ```
-    #[regex(r"#[\p{XID_Continue}_$.]+", |lex| &lex.slice()[1..])]
+    #[regex(r"#[\p{XID_Continue}_]+", |lex| &lex.slice()[1..])]
     AttrId(&'src str),
 
     #[regex(r"-?[0-9]+", |lex| lex.slice())]
@@ -78,6 +78,8 @@ pub enum Token<'src> {
     Equal,
     #[token("->")]
     Arrow,
+    #[token(".")]
+    Dot,
     #[token("..")]
     DotDot,
     #[token("...")]
@@ -118,6 +120,7 @@ impl std::fmt::Display for Token<'_> {
             Token::Comma => write!(f, ","),
             Token::Equal => write!(f, "="),
             Token::Arrow => write!(f, "->"),
+            Token::Dot => write!(f, "."),
             Token::DotDot => write!(f, ".."),
             Token::Ellipsis => write!(f, "..."),
             Token::DoubleColon => write!(f, "::"),
@@ -221,6 +224,9 @@ impl quote::ToTokens for Token<'_> {
             }
             Token::Arrow => {
                 tokens.extend(quote::quote! { Token::Arrow });
+            }
+            Token::Dot => {
+                tokens.extend(quote::quote! { Token::Dot });
             }
             Token::DotDot => {
                 tokens.extend(quote::quote! { Token::DotDot });
@@ -350,6 +356,26 @@ mod tests {
         let mut lexer = Token::lexer(input);
         assert_eq!(lexer.next(), Some(Ok(Token::Identifier("foo"))));
         assert_eq!(lexer.next(), Some(Ok(Token::Identifier("bar"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_dot_token() {
+        let input = "arith.add";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("arith"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Dot)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("add"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_dot_dot_still_works() {
+        let input = "a..b";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("a"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::DotDot)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("b"))));
         assert_eq!(lexer.next(), None);
     }
 }
