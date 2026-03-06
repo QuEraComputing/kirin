@@ -280,6 +280,7 @@ impl GeneratePrettyPrint {
                     let text = tokens_to_string_with_spacing(tokens, prev_is_field, next_is_field);
                     parts.push(quote! { doc.text(#text) });
                 }
+                FormatElement::Keyword(_) => {}
                 FormatElement::Field(name, opt) => {
                     let name_str = name.to_string();
                     if let Some((idx, field)) = field_map.get(&name_str) {

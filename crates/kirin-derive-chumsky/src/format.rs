@@ -32,6 +32,8 @@ pub enum FormatElement<'src> {
     Token(Vec<Token<'src>>),
     /// A field interpolation like `{name}` or `{name:type}`.
     Field(&'src str, FormatOption),
+    /// A keyword interpolation like `{.add}` that gets namespace-prefixed.
+    Keyword(&'src str),
 }
 
 /// Options for field interpolation.
@@ -77,6 +79,13 @@ impl<'src> Format<'src> {
         let escaped_rbrace =
             just(Token::EscapedRBrace).to(FormatElement::Token(vec![Token::EscapedRBrace]));
 
+        // Parse keyword interpolations like {.add}
+        let keyword = just(Token::LBrace)
+            .ignore_then(just(Token::Dot))
+            .ignore_then(select! { Token::Identifier(name) => name })
+            .then_ignore(just(Token::RBrace))
+            .map(FormatElement::Keyword);
+
         // Parse field interpolations like {name} or {name:type}
         let interpolation = just(Token::LBrace)
             .ignore_then(
@@ -110,9 +119,10 @@ impl<'src> Format<'src> {
             .collect()
             .map(FormatElement::Token);
 
-        // Order matters: try escaped braces first, then interpolation, then other
+        // Order matters: try escaped braces first, then keyword, then interpolation, then other
         escaped_lbrace
             .or(escaped_rbrace)
+            .or(keyword)
             .or(interpolation)
             .or(other)
             .repeated()
@@ -172,6 +182,22 @@ mod tests {
     fn test_format_parser_positional() {
         // New syntax: explicit {field:name} for result name, {field:type} for result type
         let input = "{0:name} = add {1}, {2} -> {0:type}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_format_parser_keyword() {
+        let input = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_format_parser_keyword_only() {
+        let input = "{.ret} {0}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);

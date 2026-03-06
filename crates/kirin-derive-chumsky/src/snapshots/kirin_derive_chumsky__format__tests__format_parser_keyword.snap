@@ -1,0 +1,43 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 195
+expression: format
+---
+Format {
+    elements: [
+        Field(
+            "result",
+            Name,
+        ),
+        Token(
+            [
+                Equal,
+            ],
+        ),
+        Keyword(
+            "add",
+        ),
+        Field(
+            "lhs",
+            Default,
+        ),
+        Token(
+            [
+                Comma,
+            ],
+        ),
+        Field(
+            "rhs",
+            Default,
+        ),
+        Token(
+            [
+                Arrow,
+            ],
+        ),
+        Field(
+            "result",
+            Type,
+        ),
+    ],
+}

@@ -73,6 +73,7 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
                     visitor.visit_field_occurrence(field, option)?;
                 }
             }
+            FormatElement::Keyword(_) => {}
         }
     }
 

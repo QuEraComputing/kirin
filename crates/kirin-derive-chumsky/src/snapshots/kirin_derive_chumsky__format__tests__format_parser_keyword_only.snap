@@ -1,0 +1,16 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 203
+expression: format
+---
+Format {
+    elements: [
+        Keyword(
+            "ret",
+        ),
+        Field(
+            "0",
+            Default,
+        ),
+    ],
+}

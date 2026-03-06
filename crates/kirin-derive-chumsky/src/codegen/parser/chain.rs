@@ -41,6 +41,7 @@ impl GenerateHasDialectParser {
                 FormatElement::Token(tokens) => {
                     parser_parts.push(ParserPart::Token(self.token_parser(tokens)));
                 }
+                FormatElement::Keyword(_) => {}
                 FormatElement::Field(_, _) => {
                     let occurrence = occurrence_iter
                         .next()
