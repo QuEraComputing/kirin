@@ -6,9 +6,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 
-use crate::field_kind::collect_fields;
-
-use crate::generate::{filter_ast_fields, get_fields_in_format};
+use crate::codegen::{filter_ast_fields, get_fields_in_format};
 
 use super::GenerateEmitIR;
 
@@ -21,7 +19,7 @@ impl GenerateEmitIR {
         original_ty_generics: &syn::TypeGenerics<'_>,
         variant_name: Option<&syn::Ident>,
     ) -> TokenStream {
-        let collected = collect_fields(stmt);
+        let collected = stmt.collect_fields();
         let fields_in_fmt = get_fields_in_format(ir_input, stmt);
         let ast_fields = filter_ast_fields(&collected, &fields_in_fmt);
 

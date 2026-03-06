@@ -3,7 +3,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 
-use crate::generate::collect_wrapper_types;
+use crate::codegen::collect_wrapper_types;
 
 use super::GenerateAST;
 

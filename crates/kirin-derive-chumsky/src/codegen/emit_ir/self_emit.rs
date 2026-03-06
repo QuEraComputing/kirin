@@ -3,7 +3,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 
-use crate::generate::{BoundsBuilder, collect_all_value_types_needing_bounds};
+use crate::codegen::{BoundsBuilder, collect_all_value_types_needing_bounds};
 
 use super::GenerateEmitIR;
 
@@ -64,7 +64,7 @@ impl GenerateEmitIR {
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.emit_ir_bounds(&value_types);
 
-        let wrapper_types = crate::generate::collect_wrapper_types(ir_input);
+        let wrapper_types = crate::codegen::collect_wrapper_types(ir_input);
         let wrapper_from_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
             .map(|ty| syn::parse_quote! { Language: ::core::convert::From<#ty> })

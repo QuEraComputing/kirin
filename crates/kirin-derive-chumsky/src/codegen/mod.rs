@@ -17,7 +17,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 use crate::ChumskyStatementAttrs;
-use crate::field_kind::{collect_fields, collect_value_types_needing_bounds, fields_in_format};
+use crate::field_kind::{collect_value_types_needing_bounds, fields_in_format};
 use crate::format::Format;
 
 pub use self::ast::GenerateAST;
@@ -176,12 +176,12 @@ pub(crate) fn get_fields_in_format(
     stmt: &kirin_derive_toolkit::ir::Statement<ChumskyLayout>,
 ) -> HashSet<usize> {
     let Some(format_str) = format_for_statement(ir_input, stmt) else {
-        return collect_fields(stmt).iter().map(|f| f.index).collect();
+        return stmt.collect_fields().iter().map(|f| f.index).collect();
     };
 
     match Format::parse(&format_str, None) {
         Ok(format) => fields_in_format(&format, stmt),
-        Err(_) => collect_fields(stmt).iter().map(|f| f.index).collect(),
+        Err(_) => stmt.collect_fields().iter().map(|f| f.index).collect(),
     }
 }
 

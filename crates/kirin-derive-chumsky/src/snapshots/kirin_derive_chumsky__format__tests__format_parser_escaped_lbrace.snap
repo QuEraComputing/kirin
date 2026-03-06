@@ -35,8 +35,4 @@ Format {
             Default,
         ),
     ],
-    fields: {
-        "key": 0,
-        "value": 1,
-    },
 }

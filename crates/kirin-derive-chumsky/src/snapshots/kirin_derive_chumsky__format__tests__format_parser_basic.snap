@@ -30,8 +30,4 @@ Format {
             Default,
         ),
     ],
-    fields: {
-        "value": 0,
-        "address": 1,
-    },
 }

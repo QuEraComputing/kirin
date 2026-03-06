@@ -16,7 +16,6 @@
 use chumsky::input::Stream;
 use chumsky::prelude::*;
 use chumsky::span::SimpleSpan;
-use indexmap::IndexMap;
 use kirin_lexer::{Logos, Token};
 use proc_macro2::Span;
 
@@ -24,7 +23,6 @@ use proc_macro2::Span;
 #[derive(Debug, Clone, Default)]
 pub struct Format<'src> {
     elements: Vec<FormatElement<'src>>,
-    fields: IndexMap<&'src str, usize>,
 }
 
 /// An element in a format string.
@@ -56,40 +54,12 @@ impl Default for FormatOption {
 impl<'src> Format<'src> {
     /// Creates a new format from parsed elements.
     pub fn new(elements: Vec<FormatElement<'src>>) -> Self {
-        let mut fields = IndexMap::new();
-        for elem in &elements {
-            if let FormatElement::Field(name, _) = elem {
-                let len = fields.len();
-                fields.entry(*name).or_insert(len);
-            }
-        }
-        Self { elements, fields }
-    }
-
-    /// Returns the index of a field by name.
-    pub fn get_field_index(&self, name: &str) -> Option<usize> {
-        self.fields.get(name).copied()
-    }
-
-    /// Returns the format option for a field by name.
-    pub fn get_field(&self, name: &str) -> Option<FormatOption> {
-        self.fields
-            .get(name)
-            .map(|idx| self.elements[*idx].clone())
-            .and_then(|elem| match elem {
-                FormatElement::Field(_, opt) => Some(opt),
-                _ => None,
-            })
+        Self { elements }
     }
 
     /// Returns all elements in the format string.
     pub fn elements(&self) -> &[FormatElement<'src>] {
         &self.elements
-    }
-
-    /// Returns true if the format has any elements.
-    pub fn is_empty(&self) -> bool {
-        self.elements.is_empty()
     }
 
     /// Creates a parser for format strings.

@@ -1,5 +1,10 @@
 //! Code generation for the `EmitIR` derive macro.
 
+mod enum_emit;
+mod field_emit;
+mod self_emit;
+mod struct_emit;
+
 use kirin_derive_toolkit::ir::{
     VariantRef,
     fields::{FieldCategory, FieldInfo},
@@ -9,16 +14,14 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 
-use crate::field_kind::collect_fields;
-
-use crate::generate::{
+use crate::codegen::{
     BoundsBuilder, GeneratorConfig, collect_all_value_types_needing_bounds, filter_ast_fields,
     get_fields_in_format,
 };
 
 /// Generator for the `EmitIR` trait implementation.
 pub struct GenerateEmitIR {
-    pub(super) config: GeneratorConfig,
+    pub(in crate::codegen) config: GeneratorConfig,
 }
 
 impl GenerateEmitIR {
@@ -43,7 +46,7 @@ impl GenerateEmitIR {
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());
         let ast_self_name =
             syn::Ident::new(&format!("{}ASTSelf", ir_input.name), ir_input.name.span());
-        let ast_generics = crate::generate::build_ast_generics(&ir_input.generics, true);
+        let ast_generics = crate::codegen::build_ast_generics(&ir_input.generics, true);
         let crate_path = &self.config.crate_path;
 
         let emit_impl = self.generate_emit_impl(ir_input, &ast_name, &ast_generics, crate_path);
@@ -56,7 +59,7 @@ impl GenerateEmitIR {
         }
     }
 
-    pub(super) fn build_ast_ty_generics(
+    pub(in crate::codegen) fn build_ast_ty_generics(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
     ) -> TokenStream {
@@ -76,7 +79,7 @@ impl GenerateEmitIR {
         }
     }
 
-    pub(super) fn language_output_emit_bound(
+    pub(in crate::codegen) fn language_output_emit_bound(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         crate_path: &syn::Path,
@@ -91,7 +94,7 @@ impl GenerateEmitIR {
         }
     }
 
-    pub(super) fn ast_needs_language_output_emit_bound(
+    pub(in crate::codegen) fn ast_needs_language_output_emit_bound(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
     ) -> bool {
@@ -110,7 +113,7 @@ impl GenerateEmitIR {
         }
     }
 
-    pub(super) fn statement_needs_language_output_emit_bound(
+    pub(in crate::codegen) fn statement_needs_language_output_emit_bound(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         stmt: &kirin_derive_toolkit::ir::Statement<ChumskyLayout>,
@@ -123,13 +126,13 @@ impl GenerateEmitIR {
             return false;
         }
 
-        let collected = collect_fields(stmt);
+        let collected = stmt.collect_fields();
         let fields_in_fmt = get_fields_in_format(ir_input, stmt);
         let ast_fields = filter_ast_fields(&collected, &fields_in_fmt);
         self.ast_fields_contain_statement_recursion_fields(&ast_fields)
     }
 
-    pub(super) fn statement_contains_statement_recursion_fields(
+    pub(in crate::codegen) fn statement_contains_statement_recursion_fields(
         &self,
         stmt: &kirin_derive_toolkit::ir::Statement<ChumskyLayout>,
     ) -> bool {
@@ -141,7 +144,7 @@ impl GenerateEmitIR {
         })
     }
 
-    pub(super) fn ast_fields_contain_statement_recursion_fields(
+    pub(in crate::codegen) fn ast_fields_contain_statement_recursion_fields(
         &self,
         ast_fields: &[&FieldInfo<ChumskyLayout>],
     ) -> bool {
@@ -153,7 +156,7 @@ impl GenerateEmitIR {
         })
     }
 
-    pub(super) fn is_ir_type_a_type_param(
+    pub(in crate::codegen) fn is_ir_type_a_type_param(
         &self,
         ir_type: &syn::Path,
         generics: &syn::Generics,
@@ -166,7 +169,7 @@ impl GenerateEmitIR {
         generics.type_params().any(|tp| &tp.ident == ir_type_name)
     }
 
-    pub(super) fn generate_emit_impl(
+    pub(in crate::codegen) fn generate_emit_impl(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
@@ -200,7 +203,7 @@ impl GenerateEmitIR {
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.emit_ir_bounds(&value_types);
 
-        let wrapper_types = crate::generate::collect_wrapper_types(ir_input);
+        let wrapper_types = crate::codegen::collect_wrapper_types(ir_input);
         let wrapper_from_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
             .map(|ty| syn::parse_quote! { Language: ::core::convert::From<#ty> })

@@ -2,9 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::collect_fields;
-
-use crate::generate::{collect_wrapper_types, filter_ast_fields, get_fields_in_format};
+use crate::codegen::{collect_wrapper_types, filter_ast_fields, get_fields_in_format};
 
 use super::GenerateAST;
 
@@ -45,7 +43,7 @@ impl GenerateAST {
                 #(#value_debug_bounds,)*
         };
 
-        let collected = collect_fields(stmt);
+        let collected = stmt.collect_fields();
         let fields_in_fmt = get_fields_in_format(ir_input, stmt);
         let filtered: Vec<_> = filter_ast_fields(&collected, &fields_in_fmt);
 
@@ -222,9 +220,9 @@ impl GenerateAST {
                     }
                 }
                 VariantRef::Regular { name, stmt } => {
-                    let collected = crate::field_kind::collect_fields(stmt);
-                    let fields_in_fmt = crate::generate::get_fields_in_format(ir_input, stmt);
-                    let filtered = crate::generate::filter_ast_fields(&collected, &fields_in_fmt);
+                    let collected = stmt.collect_fields();
+                    let fields_in_fmt = crate::codegen::get_fields_in_format(ir_input, stmt);
+                    let filtered = crate::codegen::filter_ast_fields(&collected, &fields_in_fmt);
 
                     if stmt.is_tuple_style() {
                         let fields: Vec<_> = (0..filtered.len())
@@ -258,9 +256,9 @@ impl GenerateAST {
                     }
                 }
                 VariantRef::Regular { name, stmt } => {
-                    let collected = crate::field_kind::collect_fields(stmt);
-                    let fields_in_fmt = crate::generate::get_fields_in_format(ir_input, stmt);
-                    let filtered = crate::generate::filter_ast_fields(&collected, &fields_in_fmt);
+                    let collected = stmt.collect_fields();
+                    let fields_in_fmt = crate::codegen::get_fields_in_format(ir_input, stmt);
+                    let filtered = crate::codegen::filter_ast_fields(&collected, &fields_in_fmt);
 
                     let name_str = name.to_string();
                     if stmt.is_tuple_style() {
@@ -297,9 +295,9 @@ impl GenerateAST {
                     }
                 }
                 VariantRef::Regular { name, stmt } => {
-                    let collected = crate::field_kind::collect_fields(stmt);
-                    let fields_in_fmt = crate::generate::get_fields_in_format(ir_input, stmt);
-                    let filtered = crate::generate::filter_ast_fields(&collected, &fields_in_fmt);
+                    let collected = stmt.collect_fields();
+                    let fields_in_fmt = crate::codegen::get_fields_in_format(ir_input, stmt);
+                    let filtered = crate::codegen::filter_ast_fields(&collected, &fields_in_fmt);
 
                     if stmt.is_tuple_style() {
                         let fields_a: Vec<_> = (0..filtered.len())

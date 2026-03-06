@@ -7,7 +7,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::field_kind::collect_fields;
 use crate::format::Format;
 use crate::validation::validate_format;
 
@@ -122,7 +121,7 @@ impl GenerateHasDialectParser {
             .ok_or_else(|| syn::Error::new(stmt.name.span(), "missing chumsky format attribute"))?;
 
         let format = Format::parse(&format_str, None)?;
-        let collected = collect_fields(stmt);
+        let collected = stmt.collect_fields();
 
         let validation_result = validate_format(stmt, &format, &collected)?;
         let occurrences = validation_result.occurrences;

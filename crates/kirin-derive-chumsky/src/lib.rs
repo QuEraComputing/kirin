@@ -1,16 +1,15 @@
 extern crate proc_macro;
 
 mod attrs;
+mod codegen;
 mod field_kind;
 mod format;
-mod generate;
-mod generics;
 mod input;
 mod validation;
 mod visitor;
 
 use attrs::{ChumskyFieldAttrs, ChumskyGlobalAttrs, ChumskyStatementAttrs, PrettyGlobalAttrs};
-use generate::{GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint};
+use codegen::{GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint};
 use input::{parse_derive_input, parse_pretty_derive_input};
 
 use kirin_derive_toolkit::ir::Layout;

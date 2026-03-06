@@ -20,10 +20,6 @@ pub struct ChumskyGlobalAttrs {
 pub struct ChumskyStatementAttrs {
     /// The format string for this statement.
     pub format: Option<String>,
-
-    /// Override crate path for this statement.
-    #[darling(rename = "crate")]
-    pub crate_path: Option<syn::Path>,
 }
 
 /// Attributes applied to individual fields.

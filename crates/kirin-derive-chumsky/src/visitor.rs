@@ -90,7 +90,7 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
 }
 
 /// Builds a map from field name (string or index) to FieldInfo.
-pub(super) fn build_field_map<'a>(
+pub(crate) fn build_field_map<'a>(
     stmt: &Statement<ChumskyLayout>,
     collected: &'a [FieldInfo<ChumskyLayout>],
 ) -> HashMap<String, &'a FieldInfo<ChumskyLayout>> {

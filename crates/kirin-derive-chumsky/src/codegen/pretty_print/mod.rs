@@ -1,9 +1,11 @@
+mod statement;
+
 use proc_macro2::TokenStream;
 
 use crate::PrettyPrintLayout;
 
 pub struct GeneratePrettyPrint {
-    pub(super) prettyless_path: syn::Path,
+    pub(in crate::codegen) prettyless_path: syn::Path,
 }
 
 impl GeneratePrettyPrint {

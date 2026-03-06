@@ -6,9 +6,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 
-use crate::field_kind::collect_fields;
-
-use crate::generate::{filter_ast_fields, generate_enum_match, get_fields_in_format};
+use crate::codegen::{filter_ast_fields, generate_enum_match, get_fields_in_format};
 
 use super::GenerateEmitIR;
 
@@ -56,7 +54,7 @@ impl GenerateEmitIR {
         ast_name: &syn::Ident,
         variant_name: &syn::Ident,
     ) -> TokenStream {
-        let collected = collect_fields(variant);
+        let collected = variant.collect_fields();
         let fields_in_fmt = get_fields_in_format(ir_input, variant);
         let ast_fields = filter_ast_fields(&collected, &fields_in_fmt);
         let is_tuple = variant.is_tuple_style();

@@ -48,9 +48,4 @@ Format {
             Type,
         ),
     ],
-    fields: {
-        "value": 0,
-        "address": 1,
-        "result": 2,
-    },
 }

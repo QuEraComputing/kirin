@@ -1,5 +1,9 @@
 //! Code generation for AST types corresponding to dialect definitions.
 
+mod definition;
+mod trait_impls;
+mod wrapper;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -7,11 +11,11 @@ use crate::ChumskyLayout;
 
 use kirin_derive_toolkit::codegen::deduplicate_types;
 
-use crate::generate::{GeneratorConfig, collect_all_value_types_needing_bounds};
+use crate::codegen::{GeneratorConfig, collect_all_value_types_needing_bounds};
 
 /// Generator for AST type definitions.
 pub struct GenerateAST {
-    pub(super) config: GeneratorConfig,
+    pub(in crate::codegen) config: GeneratorConfig,
 }
 
 impl GenerateAST {
@@ -46,7 +50,7 @@ impl GenerateAST {
     }
 
     /// Collects all types that contain type parameters and need HasParser bounds.
-    pub(super) fn collect_value_types_needing_bounds(
+    pub(in crate::codegen) fn collect_value_types_needing_bounds(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
     ) -> Vec<syn::Type> {
