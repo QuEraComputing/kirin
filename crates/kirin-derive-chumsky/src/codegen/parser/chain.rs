@@ -41,7 +41,9 @@ impl GenerateHasDialectParser {
                 FormatElement::Token(tokens) => {
                     parser_parts.push(ParserPart::Token(self.token_parser(tokens)));
                 }
-                FormatElement::Keyword(_) => {}
+                FormatElement::Keyword(name) => {
+                    parser_parts.push(ParserPart::Token(self.keyword_parser(name)));
+                }
                 FormatElement::Field(_, _) => {
                     let occurrence = occurrence_iter
                         .next()
@@ -207,8 +209,10 @@ impl GenerateHasDialectParser {
                 let var = &occ.var_name;
 
                 match &occ.option {
-                    FormatOption::Name => field_kind::construct_from_name_only(field, crate_path, var)
-                        .unwrap_or_else(|| quote! { #var }),
+                    FormatOption::Name => {
+                        field_kind::construct_from_name_only(field, crate_path, var)
+                            .unwrap_or_else(|| quote! { #var })
+                    }
                     FormatOption::Type if field.category().is_ssa_like() => {
                         unreachable!(
                             "field '{}' has only :type occurrence - this should have been caught by validation",
@@ -223,11 +227,16 @@ impl GenerateHasDialectParser {
                 let type_occ = occs.iter().find(|o| matches!(o.option, FormatOption::Type));
 
                 match (name_occ, type_occ) {
-                    (Some(name), Some(ty)) => field_kind::construct_from_name_and_type(field, crate_path, &name.var_name, &ty.var_name)
-                        .unwrap_or_else(|| {
-                            let var = &occs[0].var_name;
-                            quote! { #var }
-                        }),
+                    (Some(name), Some(ty)) => field_kind::construct_from_name_and_type(
+                        field,
+                        crate_path,
+                        &name.var_name,
+                        &ty.var_name,
+                    )
+                    .unwrap_or_else(|| {
+                        let var = &occs[0].var_name;
+                        quote! { #var }
+                    }),
                     _ => {
                         let var = &occs[0].var_name;
                         quote! { #var }
@@ -248,6 +257,32 @@ impl GenerateHasDialectParser {
             parser = quote! { #parser.then_ignore(#crate_path::chumsky::prelude::just(#tok)) };
         }
         parser
+    }
+
+    fn keyword_parser(&self, name: &str) -> TokenStream {
+        let crate_path = &self.config.crate_path;
+        quote! {
+            {
+                let __keyword_parser = if namespace.is_empty() {
+                    #crate_path::chumsky::prelude::just(#crate_path::Token::Identifier(#name)).boxed()
+                } else {
+                    let mut __parts: ::std::vec::Vec<&'static str> = namespace.to_vec();
+                    __parts.push(#name);
+                    let mut __p = #crate_path::chumsky::prelude::just(
+                        #crate_path::Token::Identifier(__parts[0])
+                    );
+                    for &__part in &__parts[1..] {
+                        __p = __p
+                            .then_ignore(#crate_path::chumsky::prelude::just(#crate_path::Token::Dot))
+                            .then_ignore(#crate_path::chumsky::prelude::just(
+                                #crate_path::Token::Identifier(__part)
+                            ));
+                    }
+                    __p.boxed()
+                };
+                __keyword_parser
+            }
+        }
     }
 }
 

@@ -191,7 +191,7 @@ impl GenerateHasDialectParser {
                 #[inline]
                 fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
                     language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-                    _namespace: &[&'static str],
+                    namespace: &[&'static str],
                 ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
@@ -342,14 +342,14 @@ impl GenerateHasDialectParser {
                 #[inline]
                 fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
                     language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
-                    _namespace: &[&'static str],
+                    namespace: &[&'static str],
                 ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
                     I: #crate_path::TokenInput<'tokens, 'src>,
                     __TypeOutput: Clone + PartialEq + 'tokens,
                     __LanguageOutput: Clone + PartialEq + 'tokens,
                 {
-                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language, _namespace)
+                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language, namespace)
                 }
             }
         }
