@@ -19,6 +19,7 @@ kirin-arith = { workspace = true }
 kirin-cf = { workspace = true }
 kirin-function = { workspace = true }
 kirin-test-languages = { workspace = true, features = ["simple-language", "parser", "pretty"] }
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }
 
 [features]
 default = ["interpreter"]

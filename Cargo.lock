@@ -1088,6 +1088,7 @@ dependencies = [
  "kirin-lexer",
  "kirin-prettyless",
  "kirin-test-languages",
+ "kirin-test-utils",
  "serde",
 ]
 
