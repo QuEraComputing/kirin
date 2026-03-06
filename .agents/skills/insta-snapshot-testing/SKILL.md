@@ -1,66 +1,51 @@
 ---
 name: insta-snapshot-testing
-description: Use when writing, updating, or reviewing snapshot tests with insta in the kirin project
+description: Use when writing, updating, reviewing, or troubleshooting snapshot tests with cargo insta — covers assertion macros, file locations, pending snapshot workflow, unreferenced cleanup, and CI behavior
 ---
 
 # Insta Snapshot Testing
 
 ## Overview
 
-Insta captures output as snapshot files. Snapshot files are **generated artifacts** — never manually create, edit, or delete `.snap` files. All snapshot management goes through `cargo insta`.
+Insta captures output as `.snap` files. These are **generated artifacts** — all management goes through `cargo insta`. Never manually create, edit, move, or delete `.snap` or `.snap.new` files.
 
 ## Quick Reference
 
 | Action | Command |
 |--------|---------|
-| Run tests (creates `.snap.new` for changes) | `cargo nextest run -p <crate>` |
+| Run tests (creates `.snap.new` for mismatches) | `cargo nextest run -p <crate>` |
 | Review pending snapshots interactively | `cargo insta review` |
-| Accept all pending snapshots | `cargo insta accept` |
-| Reject all pending snapshots | `cargo insta reject` |
+| Accept all pending | `cargo insta accept` |
+| Reject all pending | `cargo insta reject` |
 | Run + review in one step | `cargo insta test -p <crate> --review` |
-| Test single snapshot test | `cargo nextest run -p <crate> -E 'test(test_name)'` |
+| Run + accept in one step | `cargo insta test -p <crate> --accept` |
+| Accept only brand-new snapshots | `cargo insta test --accept-unseen` |
+| Delete orphaned snapshots | `cargo insta test --unreferenced delete` |
+| Force-update all snapshots | `cargo insta test --force-update-snapshots` |
+| Target single snapshot | `cargo insta review --snapshot path/to/file.snap` |
 
 ## Assertion Macros
 
 ```rust
-// Auto-named (module path + test function → .snap filename)
-insta::assert_snapshot!(string_value);
-
-// Debug format (for structs implementing Debug)
-insta::assert_debug_snapshot!(value);
-
-// Explicit name (when multiple snapshots per test)
-insta::assert_snapshot!("snapshot_name", string_value);
-
-// Inline (small values, no .snap file created)
-insta::assert_snapshot!(value, @"expected text");
+insta::assert_snapshot!(string_value);                    // auto-named from test fn
+insta::assert_snapshot!("explicit_name", string_value);   // explicit name
+insta::assert_debug_snapshot!(value);                     // Debug format
+insta::assert_snapshot!(value, @"expected inline text");  // inline (no .snap file)
 ```
+
+Auto-naming: test function name with `test_` prefix stripped. Multiple snapshots per test get `-2`, `-3` suffixes. Inline snapshots update in-place in `.rs` source when accepted.
 
 ## Snapshot File Locations
 
-Snapshots live in `snapshots/` directories **adjacent to the test source file**:
+Snapshots live in `snapshots/` adjacent to the test source. Naming: `<crate>__<module_path>__<test_name>.snap`.
 
 ```
-src/format.rs          → src/snapshots/crate__format__tests__test_name.snap
-tests/roundtrip.rs     → tests/snapshots/roundtrip__test_name.snap
+src/format.rs              → src/snapshots/kirin_derive_chumsky__format__tests__test_name.snap
+src/codegen/parser/gen.rs  → src/codegen/parser/snapshots/...__gen__tests__test_name.snap
+tests/stack_interp.rs      → tests/snapshots/stack_interp__test_name.snap
 ```
 
-## Workflow
-
-1. **Write test** with `insta::assert_snapshot!(output)`
-2. **Run test** — first run creates `.snap.new` (pending) file, test "fails"
-3. **Review** with `cargo insta review` — interactively accept/reject each change
-4. **Commit** the `.snap` files alongside test code
-
-## Key Rules
-
-- **Never `rm` snapshot files** — they are generated. Use `cargo insta reject` or just delete the test.
-- **Never manually edit `.snap` files** — always regenerate by running the test.
-- **Always `cargo insta review`** after test changes — don't blindly accept with `cargo insta accept`.
-- **Commit `.snap` files** — they are source-controlled test expectations.
-- **Inline snapshots** (`@"..."`) update in-place in source when accepted.
-
-## Snap File Format
+## Snapshot File Format
 
 ```
 ---
@@ -70,32 +55,60 @@ expression: format
 <snapshot content here>
 ```
 
-The `source` and `expression` fields are metadata. Content below the second `---` is the expected output.
+Pending changes are written as `.snap.new` files alongside existing `.snap` files.
+
+## Workflows
+
+### New snapshot test
+1. Write test with `insta::assert_snapshot!(output)`
+2. Run test — creates `.snap.new`, test "fails" (expected)
+3. `cargo insta review` — accept if correct
+4. Commit `.snap` file with test code
+
+### Update after code change
+1. Run tests — mismatches create `.snap.new`
+2. `cargo insta review` — accept intentional changes, fix regressions
+3. Commit updated `.snap` files
+
+### Delete a snapshot test
+1. Delete the test function
+2. `cargo insta test --unreferenced delete` — removes orphaned `.snap` files
+3. Commit
+
+### Move/rename test files
+1. New location gets new `snapshots/` dir automatically
+2. `cargo insta test --unreferenced delete` — cleans old location
+3. Commit new snapshots + deletions
+
+`--unreferenced` modes: `ignore`, `warn`, `reject` (CI), `delete`, `auto` (delete locally, reject in CI).
+
+## Key Rules
+
+- **Never manually edit/rm/mv `.snap` files** — use `cargo insta` commands
+- **Review before accepting** — `cargo insta review` shows diffs; don't blindly accept
+- **Commit `.snap` files** — they are source-controlled expectations
+- CI auto-detects (`CI` env var) and sets `INSTA_UPDATE=no` to prevent overwrites
 
 ## Common Patterns in Kirin
 
-**Codegen snapshots** (derive macro output):
 ```rust
-let output = generate(&ir).unwrap();
-let formatted = rustfmt_token_stream(&output);
-insta::assert_snapshot!(formatted);
+// Codegen snapshots (derive macro output)
+let tokens = generator.generate(&ir_input);
+insta::assert_snapshot!(rustfmt(tokens.to_string()));
+
+// Pretty-print snapshots (IR rendering)
+insta::assert_snapshot!(pipeline.sprint::<L>());
+
+// Format parser snapshots
+insta::assert_debug_snapshot!(Format::parse(input, None).unwrap());
 ```
 
-**Pretty-print snapshots** (IR rendering):
-```rust
-let buf = pipeline.sprint::<L>();
-insta::assert_snapshot!(buf);
-```
+## Troubleshooting
 
-**Format parser snapshots** (parsed format strings):
-```rust
-let format = Format::parse(input, span).unwrap();
-insta::assert_debug_snapshot!(format);
-```
-
-## When Snapshots Change Unexpectedly
-
-If tests fail with snapshot mismatches after a code change:
-1. Run `cargo insta review` to see the diff
-2. Determine if the change is intentional (accept) or a regression (fix code)
-3. Accept intentional changes, fix regressions
+| Problem | Fix |
+|---------|-----|
+| Tests fail but output looks correct | `cargo insta review` and accept |
+| Stale `.snap.new` files | `cargo insta reject` |
+| Orphaned snapshots after moving tests | `cargo insta test --unreferenced delete` |
+| Non-deterministic output (HashMaps) | Use `with_settings! { sort_maps => true, { ... } }` |
+| Wrong auto-name for multiple snapshots | Use explicit: `assert_snapshot!("name", value)` |
