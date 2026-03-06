@@ -1,7 +1,6 @@
 pub mod lattice;
 mod rustfmt;
 mod ssa;
-mod unit_type;
 
 #[cfg(feature = "interpreter")]
 pub mod ir_fixtures;
@@ -14,7 +13,7 @@ pub mod roundtrip;
 
 pub use rustfmt::{rustfmt, rustfmt_display};
 pub use ssa::new_test_ssa;
-pub use unit_type::UnitType;
+pub use kirin_test_types::UnitType;
 
 /// Dump a specialized function's IR using the builtin pretty printer.
 #[cfg(feature = "interpreter")]

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
+kirin-test-types = { workspace = true, features = ["parser", "pretty"] }
 kirin-chumsky = { workspace = true, optional = true }
 kirin-lexer = { workspace = true, optional = true }
 kirin-prettyless = { workspace = true, optional = true }
