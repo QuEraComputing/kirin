@@ -1,0 +1,18 @@
+---
+source: crates/kirin-derive-prettyless/src/generate.rs
+expression: generate_render_stage_code(input)
+---
+impl kirin_prettyless::RenderStage for Stage {
+    fn render_staged_function(
+        &self,
+        sf: kirin_ir::StagedFunction,
+        config: &kirin_prettyless::Config,
+        global_symbols: &kirin_ir::InternTable<String, kirin_ir::GlobalSymbol>,
+    ) -> Result<Option<String>, std::fmt::Error> {
+        match self {
+            Stage::Source(s) => {
+                kirin_prettyless::RenderStage::render_staged_function(s, sf, config, global_symbols)
+            }
+        }
+    }
+}

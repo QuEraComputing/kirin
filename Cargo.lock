@@ -1199,7 +1199,9 @@ dependencies = [
 name = "kirin-derive-prettyless"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "kirin-derive-toolkit",
+ "kirin-test-utils",
  "proc-macro2",
  "quote",
  "syn",
