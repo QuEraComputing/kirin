@@ -1,9 +1,15 @@
 #[cfg(feature = "arith")]
 mod arith_impl;
+#[cfg(all(test, feature = "arith"))]
+mod arith_tests;
 mod arithmetic;
 mod bound;
+#[cfg(all(test, feature = "interpreter"))]
+mod branch_tests;
 #[cfg(feature = "cmp")]
 mod cmp_impl;
+#[cfg(all(test, feature = "cmp"))]
+mod cmp_tests;
 mod domain;
 #[cfg(feature = "interpreter")]
 mod interpreter_impl;
