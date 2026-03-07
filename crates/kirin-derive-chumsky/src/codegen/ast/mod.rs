@@ -82,3 +82,67 @@ impl GenerateAST {
         all_types
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::parse_derive_input;
+    use kirin_test_utils::rustfmt;
+
+    fn generate_ast_code(input: syn::DeriveInput) -> String {
+        let ir_input = parse_derive_input(&input).expect("Failed to parse derive input");
+        let generator = GenerateAST::new(&ir_input);
+        let tokens = generator.generate(&ir_input);
+        rustfmt(tokens.to_string())
+    }
+
+    #[test]
+    fn test_ast_struct_definition() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[chumsky(crate = kirin_chumsky, format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+            struct Add {
+                result: SSAValue,
+                lhs: Value,
+                rhs: Value,
+            }
+        };
+        insta::assert_snapshot!(generate_ast_code(input));
+    }
+
+    #[test]
+    fn test_ast_enum_definition() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum ArithOps {
+                #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+                Add {
+                    result: SSAValue,
+                    lhs: Value,
+                    rhs: Value,
+                },
+                #[chumsky(format = "{result:name} = {.neg} {operand} -> {result:type}")]
+                Neg {
+                    result: SSAValue,
+                    operand: Value,
+                },
+            }
+        };
+        insta::assert_snapshot!(generate_ast_code(input));
+    }
+
+    #[test]
+    fn test_ast_wrapper_enum_definition() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum MyLanguage {
+                #[wraps]
+                #[chumsky(format = "arith")]
+                Arith(ArithOps),
+                #[wraps]
+                Cf(CfOps),
+            }
+        };
+        insta::assert_snapshot!(generate_ast_code(input));
+    }
+}

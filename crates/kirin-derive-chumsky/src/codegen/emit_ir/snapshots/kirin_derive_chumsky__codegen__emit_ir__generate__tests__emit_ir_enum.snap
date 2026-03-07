@@ -1,0 +1,65 @@
+---
+source: crates/kirin-derive-chumsky/src/codegen/emit_ir/generate.rs
+expression: generate_emit_ir_code(input)
+---
+#[automatically_derived]
+impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput, Language>
+    ::kirin::parsers::EmitIR<Language> for ArithOpsAST<'tokens, 'src, TypeOutput, LanguageOutput>
+where
+    Language: ::kirin::ir::Dialect + From<ArithOps>,
+    TypeOutput: Clone + PartialEq,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
+{
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
+        match self {
+            ArithOpsAST::Add {
+                result: f_result,
+                lhs: f_lhs,
+                rhs: f_rhs,
+            } => {
+                let f_result_ir = ::kirin::parsers::EmitIR::emit(f_result, ctx);
+                let f_lhs_ir = f_lhs.clone();
+                let f_rhs_ir = f_rhs.clone();
+                let dialect_variant: ArithOps = ArithOps::Add {
+                    result: f_result_ir.into(),
+                    lhs: f_lhs_ir,
+                    rhs: f_rhs_ir,
+                };
+                ctx.stage.statement().definition(dialect_variant).new()
+            }
+            ArithOpsAST::Neg {
+                result: f_result,
+                operand: f_operand,
+            } => {
+                let f_result_ir = ::kirin::parsers::EmitIR::emit(f_result, ctx);
+                let f_operand_ir = f_operand.clone();
+                let dialect_variant: ArithOps = ArithOps::Neg {
+                    result: f_result_ir.into(),
+                    operand: f_operand_ir,
+                };
+                ctx.stage.statement().definition(dialect_variant).new()
+            }
+            ArithOpsAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
+#[automatically_derived]
+impl<'tokens, 'src, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
+    for ArithOpsASTSelf<'tokens, 'src, TypeOutput>
+where
+    Language: ::kirin::ir::Dialect + From<ArithOps>,
+    TypeOutput: Clone + PartialEq,
+    'src: 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
+{
+    type Output = ::kirin::ir::Statement;
+    fn emit(&self, ctx: &mut ::kirin::parsers::EmitContext<'_, Language>) -> Self::Output {
+        ::kirin::parsers::EmitIR::emit(&self.0, ctx)
+    }
+}
