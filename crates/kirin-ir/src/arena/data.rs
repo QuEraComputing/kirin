@@ -87,3 +87,89 @@ impl<T, I: Identifier> std::ops::IndexMut<I> for Arena<I, T> {
         &mut self.items[index.into().raw()]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A minimal identifier for testing.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    struct TestId(Id);
+
+    impl From<Id> for TestId {
+        fn from(id: Id) -> Self {
+            TestId(id)
+        }
+    }
+
+    impl From<TestId> for Id {
+        fn from(id: TestId) -> Self {
+            id.0
+        }
+    }
+
+    impl Identifier for TestId {}
+
+    #[test]
+    fn arena_alloc_and_get() {
+        let mut arena: Arena<TestId, i32> = Arena::default();
+        let id = arena.alloc(42);
+        assert_eq!(**arena.get(id).unwrap(), 42);
+        assert_eq!(arena.len(), 1);
+    }
+
+    #[test]
+    fn arena_delete_tombstones_excluded_from_iter() {
+        let mut arena: Arena<TestId, &str> = Arena::default();
+        let a = arena.alloc("a");
+        let _b = arena.alloc("b");
+        let c = arena.alloc("c");
+
+        assert!(arena.delete(a));
+        // DESIGN NOTE: Arena::len() includes tombstones. A live_count() method would be useful.
+        assert_eq!(arena.len(), 3);
+
+        let live: Vec<&str> = arena.iter().map(|item| **item).collect();
+        assert_eq!(live, vec!["b", "c"]);
+
+        // get() still returns deleted items (with deleted flag)
+        assert!(arena.get(a).unwrap().deleted());
+        assert!(!arena.get(c).unwrap().deleted());
+    }
+
+    #[test]
+    fn arena_delete_returns_false_for_already_deleted() {
+        let mut arena: Arena<TestId, i32> = Arena::default();
+        let id = arena.alloc(1);
+        assert!(arena.delete(id));
+        assert!(!arena.delete(id), "second delete should return false");
+    }
+
+    #[test]
+    fn arena_alloc_with_id() {
+        let mut arena: Arena<TestId, (TestId, String)> = Arena::default();
+        let id = arena.alloc_with_id(|id| (id, "self-referential".to_string()));
+        let item = arena.get(id).unwrap();
+        assert_eq!(item.0, id);
+        assert_eq!(item.1, "self-referential");
+    }
+
+    #[test]
+    fn arena_is_empty() {
+        let mut arena: Arena<TestId, i32> = Arena::default();
+        assert!(arena.is_empty());
+        arena.alloc(1);
+        assert!(!arena.is_empty());
+    }
+
+    #[test]
+    fn arena_next_id_increments() {
+        let mut arena: Arena<TestId, i32> = Arena::default();
+        let id0 = arena.next_id();
+        arena.alloc(10);
+        let id1 = arena.next_id();
+        assert_ne!(id0, id1);
+        assert_eq!(Id::from(id0).raw(), 0);
+        assert_eq!(Id::from(id1).raw(), 1);
+    }
+}

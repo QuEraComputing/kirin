@@ -358,4 +358,49 @@ mod tests {
             .expect("foo symbol should exist");
         assert_eq!(pipeline.function_by_name(sym), Some(foo));
     }
+
+    #[test]
+    fn pipeline_intern_resolve_roundtrip() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let sym = pipeline.intern("hello");
+        assert_eq!(pipeline.resolve(sym), Some("hello"));
+    }
+
+    #[test]
+    fn pipeline_intern_is_idempotent() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let s1 = pipeline.intern("hello");
+        let s2 = pipeline.intern("hello");
+        assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn pipeline_anonymous_function() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let f1 = pipeline.function().new();
+        let f2 = pipeline.function().new();
+        // Anonymous functions don't conflict
+        assert_ne!(f1, f2);
+    }
+
+    #[test]
+    fn pipeline_add_stage_and_access() {
+        let mut pipeline: Pipeline<String> = Pipeline::new();
+        let id = pipeline.add_stage_raw("stage0".to_string());
+        assert_eq!(pipeline.stage(id), Some(&"stage0".to_string()));
+    }
+
+    #[test]
+    fn pipeline_lookup_symbol_returns_none_for_missing() {
+        let pipeline: Pipeline<()> = Pipeline::new();
+        assert_eq!(pipeline.lookup_symbol("nonexistent"), None);
+    }
+
+    #[test]
+    fn pipeline_function_by_name_returns_none_for_missing() {
+        use crate::node::symbol::GlobalSymbol;
+        let pipeline: Pipeline<()> = Pipeline::new();
+        // GlobalSymbol(0) has never been allocated
+        assert_eq!(pipeline.function_by_name(GlobalSymbol::from(0)), None);
+    }
 }

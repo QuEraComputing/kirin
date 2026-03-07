@@ -138,3 +138,154 @@ impl<T: TypeLattice> SignatureSemantics<T> for LatticeSemantics<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lattice::{HasBottom, HasTop, Lattice};
+
+    /// A simple 3-element lattice: Bot < Mid < Top
+    #[derive(Clone, Debug, Hash, PartialEq, Eq, Default)]
+    enum SimpleType {
+        Bot,
+        #[default]
+        Mid,
+        Top,
+    }
+
+    impl Lattice for SimpleType {
+        fn join(&self, other: &Self) -> Self {
+            match (self, other) {
+                (SimpleType::Top, _) | (_, SimpleType::Top) => SimpleType::Top,
+                (SimpleType::Mid, _) | (_, SimpleType::Mid) => SimpleType::Mid,
+                _ => SimpleType::Bot,
+            }
+        }
+
+        fn meet(&self, other: &Self) -> Self {
+            match (self, other) {
+                (SimpleType::Bot, _) | (_, SimpleType::Bot) => SimpleType::Bot,
+                (SimpleType::Mid, _) | (_, SimpleType::Mid) => SimpleType::Mid,
+                _ => SimpleType::Top,
+            }
+        }
+
+        fn is_subseteq(&self, other: &Self) -> bool {
+            matches!(
+                (self, other),
+                (SimpleType::Bot, _)
+                    | (SimpleType::Mid, SimpleType::Mid)
+                    | (SimpleType::Mid, SimpleType::Top)
+                    | (SimpleType::Top, SimpleType::Top)
+            )
+        }
+    }
+
+    impl HasBottom for SimpleType {
+        fn bottom() -> Self {
+            SimpleType::Bot
+        }
+    }
+
+    impl HasTop for SimpleType {
+        fn top() -> Self {
+            SimpleType::Top
+        }
+    }
+
+    impl TypeLattice for SimpleType {}
+
+    fn make_sig(params: Vec<SimpleType>, ret: SimpleType) -> Signature<SimpleType> {
+        Signature {
+            params,
+            ret,
+            constraints: (),
+        }
+    }
+
+    #[test]
+    fn lattice_semantics_applicable_subtype() {
+        let call = make_sig(vec![SimpleType::Bot], SimpleType::Mid);
+        let cand = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+
+        // Bot is_subseteq Mid, so call is applicable to cand
+        assert!(LatticeSemantics::<SimpleType>::applicable(&call, &cand).is_some());
+    }
+
+    #[test]
+    fn lattice_semantics_not_applicable_supertype() {
+        let call = make_sig(vec![SimpleType::Top], SimpleType::Mid);
+        let cand = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+
+        // Top is NOT is_subseteq Mid
+        assert!(LatticeSemantics::<SimpleType>::applicable(&call, &cand).is_none());
+    }
+
+    #[test]
+    fn lattice_semantics_not_applicable_arity_mismatch() {
+        let call = make_sig(vec![SimpleType::Bot, SimpleType::Bot], SimpleType::Mid);
+        let cand = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+
+        assert!(LatticeSemantics::<SimpleType>::applicable(&call, &cand).is_none());
+    }
+
+    #[test]
+    fn lattice_semantics_cmp_more_specific() {
+        let a = make_sig(vec![SimpleType::Bot], SimpleType::Mid);
+        let b = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+
+        // a (Bot) is more specific than b (Mid)
+        assert_eq!(
+            LatticeSemantics::<SimpleType>::cmp_candidate(&a, &(), &b, &()),
+            SignatureCmp::More
+        );
+    }
+
+    #[test]
+    fn lattice_semantics_cmp_less_specific() {
+        let a = make_sig(vec![SimpleType::Top], SimpleType::Mid);
+        let b = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+
+        assert_eq!(
+            LatticeSemantics::<SimpleType>::cmp_candidate(&a, &(), &b, &()),
+            SignatureCmp::Less
+        );
+    }
+
+    #[test]
+    fn lattice_semantics_cmp_equal() {
+        let a = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+        let b = make_sig(vec![SimpleType::Mid], SimpleType::Mid);
+
+        assert_eq!(
+            LatticeSemantics::<SimpleType>::cmp_candidate(&a, &(), &b, &()),
+            SignatureCmp::Equal
+        );
+    }
+
+    #[test]
+    fn exact_semantics_applicable_and_cmp() {
+        let sig1 = Signature {
+            params: vec![1, 2],
+            ret: 3,
+            constraints: (),
+        };
+        let sig2 = Signature {
+            params: vec![1, 2],
+            ret: 3,
+            constraints: (),
+        };
+        assert!(ExactSemantics::applicable(&sig1, &sig2).is_some());
+        assert_eq!(
+            ExactSemantics::cmp_candidate(&sig1, &(), &sig2, &()),
+            SignatureCmp::Equal
+        );
+
+        let sig3 = Signature {
+            params: vec![1, 99],
+            ret: 3,
+            constraints: (),
+        };
+        assert!(ExactSemantics::applicable(&sig1, &sig3).is_none());
+    }
+}

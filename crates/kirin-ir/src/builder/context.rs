@@ -558,4 +558,597 @@ mod tests {
             StagedFunctionConflictKind::DuplicateSignature
         );
     }
+
+    // --- Richer dialect supporting terminators for builder tests ---
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    enum RichDialect {
+        Nop,
+        Add(SSAValue, SSAValue),
+        Return,
+    }
+
+    impl<'a> HasArguments<'a> for RichDialect {
+        type Iter = std::vec::IntoIter<&'a SSAValue>;
+        fn arguments(&'a self) -> Self::Iter {
+            match self {
+                RichDialect::Add(a, b) => vec![a, b].into_iter(),
+                _ => vec![].into_iter(),
+            }
+        }
+    }
+
+    impl<'a> HasArgumentsMut<'a> for RichDialect {
+        type IterMut = std::vec::IntoIter<&'a mut SSAValue>;
+        fn arguments_mut(&'a mut self) -> Self::IterMut {
+            match self {
+                RichDialect::Add(a, b) => vec![a, b].into_iter(),
+                _ => vec![].into_iter(),
+            }
+        }
+    }
+
+    impl<'a> HasResults<'a> for RichDialect {
+        type Iter = std::iter::Empty<&'a ResultValue>;
+        fn results(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasResultsMut<'a> for RichDialect {
+        type IterMut = std::iter::Empty<&'a mut ResultValue>;
+        fn results_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasBlocks<'a> for RichDialect {
+        type Iter = std::iter::Empty<&'a Block>;
+        fn blocks(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasBlocksMut<'a> for RichDialect {
+        type IterMut = std::iter::Empty<&'a mut Block>;
+        fn blocks_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasSuccessors<'a> for RichDialect {
+        type Iter = std::iter::Empty<&'a Successor>;
+        fn successors(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasSuccessorsMut<'a> for RichDialect {
+        type IterMut = std::iter::Empty<&'a mut Successor>;
+        fn successors_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasRegions<'a> for RichDialect {
+        type Iter = std::iter::Empty<&'a Region>;
+        fn regions(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasRegionsMut<'a> for RichDialect {
+        type IterMut = std::iter::Empty<&'a mut Region>;
+        fn regions_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl IsTerminator for RichDialect {
+        fn is_terminator(&self) -> bool {
+            matches!(self, RichDialect::Return)
+        }
+    }
+
+    impl IsConstant for RichDialect {
+        fn is_constant(&self) -> bool {
+            false
+        }
+    }
+
+    impl IsPure for RichDialect {
+        fn is_pure(&self) -> bool {
+            true
+        }
+    }
+
+    impl IsSpeculatable for RichDialect {
+        fn is_speculatable(&self) -> bool {
+            true
+        }
+    }
+
+    impl Dialect for RichDialect {
+        type Type = TestType;
+    }
+
+    // --- BlockBuilder tests ---
+
+    #[test]
+    fn block_builder_creates_block_with_arguments_and_statements() {
+        use crate::arena::GetInfo;
+        use crate::node::SSAKind;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+
+        let block = stage
+            .block()
+            .argument(TestType::I32)
+            .arg_name("x")
+            .argument(TestType::I64)
+            .arg_name("y")
+            .stmt(s0)
+            .stmt(s1)
+            .new();
+
+        let info = block.expect_info(&stage);
+        assert_eq!(info.arguments.len(), 2);
+
+        // Verify block arguments have correct SSAKind
+        for (idx, &arg) in info.arguments.iter().enumerate() {
+            let ssa = arg.expect_info(&stage);
+            assert_eq!(ssa.kind, SSAKind::BlockArgument(block, idx));
+        }
+
+        // Verify iteration over statements
+        let stmts: Vec<_> = block.statements(&stage).collect();
+        assert_eq!(stmts.len(), 2);
+        assert_eq!(stmts[0], s0);
+        assert_eq!(stmts[1], s1);
+    }
+
+    #[test]
+    fn block_builder_substitutes_builder_block_arguments() {
+        use crate::arena::GetInfo;
+        use crate::node::SSAKind;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+
+        // Create placeholder block arguments
+        let arg0 = stage.block_argument(0);
+        let arg1 = stage.block_argument(1);
+
+        // Create a statement that uses the placeholder block arguments
+        let add_stmt = stage
+            .statement()
+            .definition(RichDialect::Add(arg0.into(), arg1.into()))
+            .new();
+
+        let block = stage
+            .block()
+            .argument(TestType::I32)
+            .argument(TestType::I64)
+            .stmt(add_stmt)
+            .new();
+
+        let block_info = block.expect_info(&stage);
+        let real_arg0: SSAValue = block_info.arguments[0].into();
+        let real_arg1: SSAValue = block_info.arguments[1].into();
+
+        // Verify the statement's arguments were substituted
+        let stmt_info = add_stmt.expect_info(&stage);
+        match &stmt_info.definition {
+            RichDialect::Add(a, b) => {
+                assert_eq!(*a, real_arg0, "first arg should be substituted");
+                assert_eq!(*b, real_arg1, "second arg should be substituted");
+            }
+            _ => panic!("expected Add"),
+        }
+
+        // Verify the real block arguments have BlockArgument kind
+        let ssa0 = real_arg0.get_info(&stage).unwrap();
+        assert!(matches!(ssa0.kind, SSAKind::BlockArgument(_, 0)));
+        let ssa1 = real_arg1.get_info(&stage).unwrap();
+        assert!(matches!(ssa1.kind, SSAKind::BlockArgument(_, 1)));
+    }
+
+    #[test]
+    #[should_panic(expected = "is not a terminator")]
+    fn block_builder_terminator_rejects_non_terminator() {
+        // DESIGN NOTE: BlockBuilder::terminator() panics instead of returning Result.
+        // This is a footgun for users who might accidentally pass a non-terminator.
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let nop = stage.statement().definition(RichDialect::Nop).new();
+        let _ = stage.block().terminator(nop).new();
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot add terminator statement")]
+    fn block_builder_stmt_rejects_terminator() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let ret = stage.statement().definition(RichDialect::Return).new();
+        let _ = stage.block().stmt(ret).new();
+    }
+
+    // --- StatementIter tests ---
+
+    #[test]
+    fn statement_iter_double_ended() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+        let s2 = stage.statement().definition(RichDialect::Nop).new();
+
+        let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
+
+        // Collect via next_back (reverse)
+        let mut iter = block.statements(&stage);
+        let last = iter.next_back().unwrap();
+        let mid = iter.next_back().unwrap();
+        let first = iter.next_back().unwrap();
+        assert_eq!(first, s0);
+        assert_eq!(mid, s1);
+        assert_eq!(last, s2);
+        assert!(iter.next_back().is_none());
+    }
+
+    #[test]
+    fn statement_iter_exact_size() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+
+        let block = stage.block().stmt(s0).stmt(s1).new();
+
+        let mut iter = block.statements(&stage);
+        assert_eq!(iter.len(), 2);
+        iter.next();
+        assert_eq!(iter.len(), 1);
+        iter.next();
+        assert_eq!(iter.len(), 0);
+    }
+
+    #[test]
+    fn block_first_last_statement_with_terminator_only() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let ret = stage.statement().definition(RichDialect::Return).new();
+        let block = stage.block().terminator(ret).new();
+
+        // No non-terminator statements
+        assert_eq!(block.statements(&stage).len(), 0);
+        // first_statement falls back to terminator
+        assert_eq!(block.first_statement(&stage), Some(ret));
+        // last_statement returns terminator
+        assert_eq!(block.last_statement(&stage), Some(ret));
+    }
+
+    #[test]
+    fn block_last_statement_without_terminator() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+        let block = stage.block().stmt(s0).stmt(s1).new();
+
+        // No terminator — last_statement should be tail of linked list
+        assert_eq!(block.terminator(&stage), None);
+        assert_eq!(block.last_statement(&stage), Some(s1));
+        assert_eq!(block.first_statement(&stage), Some(s0));
+    }
+
+    // --- RegionBuilder tests ---
+
+    #[test]
+    fn region_builder_creates_region_with_ordered_blocks() {
+        use crate::arena::GetInfo;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let b0 = stage.block().new();
+        let b1 = stage.block().new();
+        let b2 = stage.block().new();
+
+        let region = stage
+            .region()
+            .add_block(b0)
+            .add_block(b1)
+            .add_block(b2)
+            .new();
+
+        let info = region.expect_info(&stage);
+        assert_eq!(info.blocks.len, 3);
+        assert_eq!(info.blocks.head, Some(b0));
+        assert_eq!(info.blocks.tail, Some(b2));
+
+        // Verify linked list order via block nodes
+        let b0_info = b0.expect_info(&stage);
+        assert_eq!(b0_info.node.next, Some(b1));
+        let b1_info = b1.expect_info(&stage);
+        assert_eq!(b1_info.node.prev, Some(b0));
+        assert_eq!(b1_info.node.next, Some(b2));
+        let b2_info = b2.expect_info(&stage);
+        assert_eq!(b2_info.node.prev, Some(b1));
+        assert_eq!(b2_info.node.next, None);
+    }
+
+    #[test]
+    #[should_panic(expected = "already added to the region")]
+    fn region_builder_panics_on_duplicate_block() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let b0 = stage.block().new();
+        let _ = stage.region().add_block(b0).add_block(b0).new();
+    }
+
+    // --- Detach tests ---
+
+    #[test]
+    fn detach_statement_updates_neighbors_and_parent_len() {
+        use crate::arena::GetInfo;
+        use crate::detach::Detach;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+        let s2 = stage.statement().definition(RichDialect::Nop).new();
+        let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
+
+        // Detach the middle statement
+        s1.detach(&mut stage);
+
+        // Parent block should have 2 statements
+        let block_info = block.expect_info(&stage);
+        assert_eq!(block_info.statements.len, 2);
+
+        // s0 and s2 should be neighbors
+        let s0_info = s0.expect_info(&stage);
+        assert_eq!(s0_info.node.next, Some(s2));
+        let s2_info = s2.expect_info(&stage);
+        assert_eq!(s2_info.node.prev, Some(s0));
+
+        // Detached statement should have no links
+        let s1_info = s1.expect_info(&stage);
+        assert_eq!(s1_info.node.prev, None);
+        assert_eq!(s1_info.node.next, None);
+        assert_eq!(s1_info.parent, None);
+    }
+
+    #[test]
+    fn detach_head_statement_updates_block_head() {
+        use crate::arena::GetInfo;
+        use crate::detach::Detach;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+        let block = stage.block().stmt(s0).stmt(s1).new();
+
+        s0.detach(&mut stage);
+
+        let block_info = block.expect_info(&stage);
+        assert_eq!(block_info.statements.head, Some(s1));
+        assert_eq!(block_info.statements.len, 1);
+    }
+
+    #[test]
+    fn detach_tail_statement_updates_block_tail() {
+        use crate::arena::GetInfo;
+        use crate::detach::Detach;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+        let block = stage.block().stmt(s0).stmt(s1).new();
+
+        s1.detach(&mut stage);
+
+        let block_info = block.expect_info(&stage);
+        assert_eq!(block_info.statements.tail, Some(s0));
+        assert_eq!(block_info.statements.len, 1);
+    }
+
+    // --- Specialize / Redefine tests ---
+
+    #[test]
+    fn specialize_success_and_duplicate_error() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+
+        let sf = stage.staged_function().new().unwrap();
+
+        let body1 = stage.statement().definition(RichDialect::Return).new();
+        let _spec1 = stage
+            .specialize()
+            .staged_func(sf)
+            .body(body1)
+            .new()
+            .expect("first specialize should succeed");
+
+        let body2 = stage.statement().definition(RichDialect::Return).new();
+        let err = stage
+            .specialize()
+            .staged_func(sf)
+            .body(body2)
+            .new()
+            .expect_err("duplicate signature should fail");
+
+        assert_eq!(err.conflicting.len(), 1);
+    }
+
+    #[test]
+    fn redefine_specialization_invalidates_and_registers() {
+        use crate::arena::GetInfo;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let sf = stage.staged_function().new().unwrap();
+
+        let body1 = stage.statement().definition(RichDialect::Return).new();
+        let spec1 = stage
+            .specialize()
+            .staged_func(sf)
+            .body(body1)
+            .new()
+            .unwrap();
+
+        let body2 = stage.statement().definition(RichDialect::Return).new();
+        let err = stage
+            .specialize()
+            .staged_func(sf)
+            .body(body2)
+            .new()
+            .expect_err("duplicate");
+
+        let spec2 = stage.redefine_specialization(err);
+
+        // Old specialization should be invalidated
+        let old = spec1.get_info(&stage).unwrap();
+        assert!(old.is_invalidated());
+
+        // New specialization should be valid
+        let new = spec2.get_info(&stage).unwrap();
+        assert!(!new.is_invalidated());
+    }
+
+    #[test]
+    fn redefine_staged_function_invalidates_and_registers() {
+        use crate::arena::GetInfo;
+
+        let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
+        let foo = gs.intern("foo".to_string());
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+
+        let sf1 = stage.staged_function().name(foo).new().unwrap();
+
+        let err = stage
+            .staged_function()
+            .name(foo)
+            .new()
+            .expect_err("duplicate signature");
+
+        let sf2 = stage.redefine_staged_function(err);
+
+        let old_info = sf1.get_info(&stage).unwrap();
+        assert!(old_info.is_invalidated());
+
+        let new_info = sf2.get_info(&stage).unwrap();
+        assert!(!new_info.is_invalidated());
+    }
+
+    // --- remap_block_identity tests ---
+
+    #[test]
+    fn remap_block_identity_remaps_parents_and_ssa_kinds() {
+        use crate::arena::GetInfo;
+        use crate::node::SSAKind;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+
+        // Create a stub block (empty, pre-allocated for forward refs)
+        let stub = stage.block().new();
+
+        // Create a real block with content
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let real = stage.block().argument(TestType::I32).stmt(s0).new();
+
+        // Remap real -> stub
+        stage.remap_block_identity(stub, real);
+
+        // Statement parent should now point to stub
+        let stmt_info = s0.expect_info(&stage);
+        assert_eq!(stmt_info.parent, Some(stub));
+
+        // Block arguments should have SSAKind pointing to stub
+        let stub_info = stub.expect_info(&stage);
+        assert_eq!(stub_info.arguments.len(), 1);
+        let arg = stub_info.arguments[0];
+        let arg_info = arg.expect_info(&stage);
+        assert!(matches!(arg_info.kind, SSAKind::BlockArgument(owner, 0) if owner == stub));
+
+        // Real block should be deleted
+        assert!(stage.blocks.get(real).unwrap().deleted());
+    }
+
+    // --- StagedFunctionInfo::all_matching tests ---
+
+    #[test]
+    fn staged_function_all_matching_returns_most_specific() {
+        use crate::arena::GetInfo;
+        use crate::signature::{ExactSemantics, Signature};
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let sf = stage.staged_function().new().unwrap();
+
+        // Create two specializations with different signatures
+        let body1 = stage.statement().definition(RichDialect::Return).new();
+        let sig_i32 = Signature {
+            params: vec![TestType::I32],
+            ret: TestType::Any,
+            constraints: (),
+        };
+        let _spec1 = stage
+            .specialize()
+            .staged_func(sf)
+            .signature(sig_i32.clone())
+            .body(body1)
+            .new()
+            .unwrap();
+
+        let body2 = stage.statement().definition(RichDialect::Return).new();
+        let sig_i64 = Signature {
+            params: vec![TestType::I64],
+            ret: TestType::Any,
+            constraints: (),
+        };
+        let _spec2 = stage
+            .specialize()
+            .staged_func(sf)
+            .signature(sig_i64)
+            .body(body2)
+            .new()
+            .unwrap();
+
+        let sf_info = sf.get_info(&stage).unwrap();
+
+        // Query with I32 signature — should match only spec1
+        let matches = sf_info.all_matching::<ExactSemantics>(&sig_i32);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].0.signature(), &sig_i32);
+    }
+
+    #[test]
+    fn staged_function_all_matching_excludes_invalidated() {
+        use crate::arena::GetInfo;
+        use crate::signature::{ExactSemantics, Signature};
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let sf = stage.staged_function().new().unwrap();
+
+        let body1 = stage.statement().definition(RichDialect::Return).new();
+        let default_sig: Signature<TestType> = Signature::default();
+        let spec1 = stage
+            .specialize()
+            .staged_func(sf)
+            .body(body1)
+            .new()
+            .unwrap();
+
+        // Invalidate spec1 by redefining
+        let body2 = stage.statement().definition(RichDialect::Return).new();
+        let err = stage
+            .specialize()
+            .staged_func(sf)
+            .body(body2)
+            .new()
+            .expect_err("duplicate");
+        let _spec2 = stage.redefine_specialization(err);
+
+        let sf_info = sf.get_info(&stage).unwrap();
+        let matches = sf_info.all_matching::<ExactSemantics>(&default_sig);
+
+        // Only the new (non-invalidated) spec should match
+        assert_eq!(matches.len(), 1);
+
+        // Verify the old one is indeed invalidated
+        let old = spec1.get_info(&stage).unwrap();
+        assert!(old.is_invalidated());
+    }
 }

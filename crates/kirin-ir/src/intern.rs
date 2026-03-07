@@ -61,3 +61,54 @@ impl<T: Clone + Eq + std::hash::Hash, Key: InternKey> InternTable<T, Key> {
         self.item_map.get(item).copied()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn intern_table_idempotent() {
+        let mut table: InternTable<String> = InternTable::new();
+        let k1 = table.intern("hello".to_string());
+        let k2 = table.intern("hello".to_string());
+        assert_eq!(
+            k1, k2,
+            "interning the same string twice must return the same key"
+        );
+    }
+
+    #[test]
+    fn intern_resolve_roundtrip() {
+        let mut table: InternTable<String> = InternTable::new();
+        let key = table.intern("world".to_string());
+        let resolved = table.resolve(key);
+        assert_eq!(resolved, Some(&"world".to_string()));
+    }
+
+    #[test]
+    fn resolve_out_of_bounds_returns_none() {
+        let table: InternTable<String> = InternTable::new();
+        assert_eq!(table.resolve(42usize), None);
+    }
+
+    #[test]
+    fn lookup_returns_none_for_missing() {
+        let table: InternTable<String> = InternTable::new();
+        assert_eq!(table.lookup("missing"), None);
+    }
+
+    #[test]
+    fn lookup_returns_key_for_interned() {
+        let mut table: InternTable<String> = InternTable::new();
+        let key = table.intern("found".to_string());
+        assert_eq!(table.lookup("found"), Some(key));
+    }
+
+    #[test]
+    fn distinct_strings_get_distinct_keys() {
+        let mut table: InternTable<String> = InternTable::new();
+        let k1 = table.intern("alpha".to_string());
+        let k2 = table.intern("beta".to_string());
+        assert_ne!(k1, k2);
+    }
+}
