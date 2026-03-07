@@ -140,3 +140,104 @@ fn extract_stage_info_type_param(ty: &Type) -> Option<Type> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_stage_variant_missing_name() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                Source(StageInfo<HighLevel>),
+            }
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("missing"),
+            "Expected 'missing' in error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variant_multi_field() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                #[stage(name = "source")]
+                Source(StageInfo<HighLevel>, u32),
+            }
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("single-field tuple"),
+            "Expected 'single-field tuple' in error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variants_on_struct() {
+        let input: DeriveInput = syn::parse_quote! {
+            struct Stage {
+                info: StageInfo<HighLevel>,
+            }
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("only be applied to enums"),
+            "Expected enum-only error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variants_empty_enum() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {}
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("at least one variant"),
+            "Expected at-least-one error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variant_success() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                #[stage(name = "source")]
+                Source(StageInfo<HighLevel>),
+            }
+        };
+        let variants = parse_stage_variants(&input).unwrap();
+        assert_eq!(variants.len(), 1);
+        assert_eq!(variants[0].stage_name, "source");
+        assert_eq!(variants[0].ident, "Source");
+    }
+
+    #[test]
+    fn test_parse_ir_crate_path_default() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {}
+        };
+        let path = parse_ir_crate_path(&input.attrs).unwrap();
+        assert_eq!(path, DEFAULT_IR_CRATE);
+    }
+
+    #[test]
+    fn test_parse_ir_crate_path_override() {
+        let input: DeriveInput = syn::parse_quote! {
+            #[stage(crate = "kirin_ir")]
+            enum Stage {}
+        };
+        let path = parse_ir_crate_path(&input.attrs).unwrap();
+        assert_eq!(path, "kirin_ir");
+    }
+}
