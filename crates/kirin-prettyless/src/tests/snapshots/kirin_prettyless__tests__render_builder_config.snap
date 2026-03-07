@@ -1,0 +1,12 @@
+---
+source: crates/kirin-prettyless/src/tests/impls.rs
+expression: output
+---
+specialize @0 fn @test(i64) -> i64 {
+  ^0 {
+    constant 1;
+    constant 2;
+    add %0, %1;
+    return %2;
+  }
+}

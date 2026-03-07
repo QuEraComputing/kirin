@@ -88,3 +88,4 @@ include!("write.rs");
 include!("global_symbol.rs");
 include!("sprint_with_globals.rs");
 include!("pipeline.rs");
+include!("impls.rs");
