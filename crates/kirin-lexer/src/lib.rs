@@ -378,4 +378,228 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(Token::Identifier("b"))));
         assert_eq!(lexer.next(), None);
     }
+
+    #[test]
+    fn test_symbol() {
+        let input = "@main @foo_bar";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Symbol("main"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Symbol("foo_bar"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_attr_id() {
+        let input = "#attr #my_tag";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::AttrId("attr"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::AttrId("my_tag"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_unsigned_hex() {
+        let input = "0xFF 0x00 0xDEAD";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Unsigned("FF"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Unsigned("00"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Unsigned("DEAD"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_float() {
+        let input = "3.14 1.0 0.5";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("3.14"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("1.0"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("0.5"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_float_scientific_notation() {
+        let input = "1.0e3 2.5e-2";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("1.0e3"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("2.5e-2"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_string_lit() {
+        let input = r#""hello" "world""#;
+        let mut lexer = Token::lexer(input);
+        assert_eq!(
+            lexer.next(),
+            Some(Ok(Token::StringLit("\"hello\"".to_string())))
+        );
+        assert_eq!(
+            lexer.next(),
+            Some(Ok(Token::StringLit("\"world\"".to_string())))
+        );
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_escaped_braces() {
+        let input = "{{ }}";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::EscapedLBrace)));
+        assert_eq!(lexer.next(), Some(Ok(Token::EscapedRBrace)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_brackets() {
+        let input = "[0, 1]";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::LBracket)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("0"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Comma)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("1"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::RBracket)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_dollar_asterisk_question() {
+        let input = "$ * ?";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Dollar)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Asterisk)));
+        assert_eq!(lexer.next(), Some(Ok(Token::QuestionMark)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_double_colon() {
+        let input = "foo::bar";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("foo"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::DoubleColon)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("bar"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_colon_vs_double_colon() {
+        let input = ": ::";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Colon)));
+        assert_eq!(lexer.next(), Some(Ok(Token::DoubleColon)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_ellipsis() {
+        let input = "a...b";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("a"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Ellipsis)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("b"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_negative_integer() {
+        let input = "-42 -1";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("-42"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("-1"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_negative_float() {
+        let input = "-3.14 -0.5e-1";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("-3.14"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("-0.5e-1"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_lex_public_api() {
+        let input = "%x = addi %y, 42";
+        let tokens: Vec<_> = lex(input).collect();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(Token::SSAValue("x")),
+                Ok(Token::Equal),
+                Ok(Token::Identifier("addi")),
+                Ok(Token::SSAValue("y")),
+                Ok(Token::Comma),
+                Ok(Token::Int("42")),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_lex_error_on_invalid_input() {
+        // `~` is not a recognized token
+        let tokens: Vec<_> = lex("~").collect();
+        assert_eq!(tokens.len(), 1);
+        assert!(tokens[0].is_err());
+    }
+
+    #[test]
+    fn test_lex_empty_input() {
+        let tokens: Vec<_> = lex("").collect();
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_lex_whitespace_only() {
+        let tokens: Vec<_> = lex("   \t\n  ").collect();
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_unicode_identifier() {
+        let input = "_foo α";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("_foo"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("α"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_display_roundtrip() {
+        // Verify Display outputs expected strings for all token variants
+        assert_eq!(Token::Error.to_string(), "error");
+        assert_eq!(Token::SSAValue("x").to_string(), "%x");
+        assert_eq!(Token::Block("bb0").to_string(), "^bb0");
+        assert_eq!(Token::Identifier("foo").to_string(), "foo");
+        assert_eq!(Token::Symbol("main").to_string(), "@main");
+        assert_eq!(Token::AttrId("tag").to_string(), "#tag");
+        assert_eq!(Token::Int("42").to_string(), "42");
+        assert_eq!(Token::Unsigned("FF").to_string(), "0xFF");
+        assert_eq!(Token::Float("3.14").to_string(), "3.14");
+        assert_eq!(Token::LParen.to_string(), "(");
+        assert_eq!(Token::RParen.to_string(), ")");
+        // DESIGN NOTE: LBrace Display outputs `{` (the `{{` is Rust fmt escaping).
+        // EscapedLBrace Display outputs `{{` (the `{{{{` is Rust fmt escaping).
+        assert_eq!(Token::LBrace.to_string(), "{");
+        assert_eq!(Token::RBrace.to_string(), "}");
+        assert_eq!(Token::EscapedLBrace.to_string(), "{{");
+        assert_eq!(Token::EscapedRBrace.to_string(), "}}");
+        assert_eq!(Token::LBracket.to_string(), "[");
+        assert_eq!(Token::RBracket.to_string(), "]");
+        assert_eq!(Token::LAngle.to_string(), "<");
+        assert_eq!(Token::RAngle.to_string(), ">");
+        assert_eq!(Token::Dollar.to_string(), "$");
+        assert_eq!(Token::Asterisk.to_string(), "*");
+        assert_eq!(Token::QuestionMark.to_string(), "?");
+        assert_eq!(Token::Colon.to_string(), ":");
+        assert_eq!(Token::Comma.to_string(), ",");
+        assert_eq!(Token::Equal.to_string(), "=");
+        assert_eq!(Token::Arrow.to_string(), "->");
+        assert_eq!(Token::Dot.to_string(), ".");
+        assert_eq!(Token::DotDot.to_string(), "..");
+        assert_eq!(Token::Ellipsis.to_string(), "...");
+        assert_eq!(Token::DoubleColon.to_string(), "::");
+        assert_eq!(Token::Semicolon.to_string(), ";");
+    }
 }
