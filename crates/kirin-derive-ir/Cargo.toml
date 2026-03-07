@@ -11,3 +11,7 @@ kirin-derive-toolkit = { version = "0.1.0", path = "../kirin-derive-toolkit" }
 proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+kirin-test-utils.workspace = true

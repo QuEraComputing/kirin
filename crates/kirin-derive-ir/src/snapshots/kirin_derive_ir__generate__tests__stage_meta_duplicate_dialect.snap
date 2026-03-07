@@ -1,0 +1,59 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_stage_meta_code(input)
+---
+#[automatically_derived]
+impl kirin_ir::HasStageInfo<ArithDialect> for MultiArithStage {
+    fn try_stage_info(&self) -> Option<&kirin_ir::StageInfo<ArithDialect>> {
+        match self {
+            MultiArithStage::ArithOpt(s) | MultiArithStage::ArithLower(s) => Some(s),
+        }
+    }
+    fn try_stage_info_mut(&mut self) -> Option<&mut kirin_ir::StageInfo<ArithDialect>> {
+        match self {
+            MultiArithStage::ArithOpt(s) | MultiArithStage::ArithLower(s) => Some(s),
+        }
+    }
+}
+#[automatically_derived]
+impl kirin_ir::StageMeta for MultiArithStage {
+    type Languages = (ArithDialect, ());
+    fn stage_name(&self) -> Option<kirin_ir::GlobalSymbol> {
+        match self {
+            MultiArithStage::ArithOpt(s) => kirin_ir::StageMeta::stage_name(s),
+            MultiArithStage::ArithLower(s) => kirin_ir::StageMeta::stage_name(s),
+        }
+    }
+    fn set_stage_name(&mut self, name: Option<kirin_ir::GlobalSymbol>) {
+        match self {
+            MultiArithStage::ArithOpt(s) => kirin_ir::StageMeta::set_stage_name(s, name),
+            MultiArithStage::ArithLower(s) => kirin_ir::StageMeta::set_stage_name(s, name),
+        }
+    }
+    fn stage_id(&self) -> Option<kirin_ir::CompileStage> {
+        match self {
+            MultiArithStage::ArithOpt(s) => kirin_ir::StageMeta::stage_id(s),
+            MultiArithStage::ArithLower(s) => kirin_ir::StageMeta::stage_id(s),
+        }
+    }
+    fn set_stage_id(&mut self, id: Option<kirin_ir::CompileStage>) {
+        match self {
+            MultiArithStage::ArithOpt(s) => kirin_ir::StageMeta::set_stage_id(s, id),
+            MultiArithStage::ArithLower(s) => kirin_ir::StageMeta::set_stage_id(s, id),
+        }
+    }
+    fn from_stage_name(stage_name: &str) -> Result<Self, String> {
+        match stage_name {
+            "arith_opt" => Ok(MultiArithStage::ArithOpt(
+                kirin_ir::StageInfo::<ArithDialect>::default(),
+            )),
+            "arith_lower" => Ok(MultiArithStage::ArithLower(kirin_ir::StageInfo::<
+                ArithDialect,
+            >::default())),
+            _ => Err(format!("no stage variant mapping for '@{}'", stage_name)),
+        }
+    }
+    fn declared_stage_names() -> &'static [&'static str] {
+        &["arith_opt", "arith_lower"]
+    }
+}

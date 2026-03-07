@@ -1,0 +1,242 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> kirin_ir::HasArguments<'a> for Nop {
+    type Iter = NopArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        NopArgumentsIter {
+            inner: std::iter::empty::<&'a kirin_ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopArgumentsIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopArgumentsIter<'a> {
+    type Item = &'a kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasArgumentsMut<'a> for Nop {
+    type IterMut = NopArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        NopArgumentsMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopArgumentsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopArgumentsMutIter<'a> {
+    type Item = &'a mut kirin_ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasResults<'a> for Nop {
+    type Iter = NopResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        NopResultsIter {
+            inner: std::iter::empty::<&'a kirin_ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopResultsIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopResultsIter<'a> {
+    type Item = &'a kirin_ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasResultsMut<'a> for Nop {
+    type IterMut = NopResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        NopResultsMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopResultsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopResultsMutIter<'a> {
+    type Item = &'a mut kirin_ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasBlocks<'a> for Nop {
+    type Iter = NopBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        NopBlocksIter {
+            inner: std::iter::empty::<&'a kirin_ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopBlocksIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopBlocksIter<'a> {
+    type Item = &'a kirin_ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasBlocksMut<'a> for Nop {
+    type IterMut = NopBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        NopBlocksMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopBlocksMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopBlocksMutIter<'a> {
+    type Item = &'a mut kirin_ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasSuccessors<'a> for Nop {
+    type Iter = NopSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        NopSuccessorsIter {
+            inner: std::iter::empty::<&'a kirin_ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopSuccessorsIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopSuccessorsIter<'a> {
+    type Item = &'a kirin_ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasSuccessorsMut<'a> for Nop {
+    type IterMut = NopSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        NopSuccessorsMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopSuccessorsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopSuccessorsMutIter<'a> {
+    type Item = &'a mut kirin_ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasRegions<'a> for Nop {
+    type Iter = NopRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        NopRegionsIter {
+            inner: std::iter::empty::<&'a kirin_ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopRegionsIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopRegionsIter<'a> {
+    type Item = &'a kirin_ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasRegionsMut<'a> for Nop {
+    type IterMut = NopRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        NopRegionsMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopRegionsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopRegionsMutIter<'a> {
+    type Item = &'a mut kirin_ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl kirin_ir::IsTerminator for Nop {
+    fn is_terminator(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl kirin_ir::IsConstant for Nop {
+    fn is_constant(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl kirin_ir::IsPure for Nop {
+    fn is_pure(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl kirin_ir::IsSpeculatable for Nop {
+    fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl kirin_ir::Dialect for Nop {
+    type Type = SimpleType;
+}

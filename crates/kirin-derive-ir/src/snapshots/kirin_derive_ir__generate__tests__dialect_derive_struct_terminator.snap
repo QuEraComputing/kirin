@@ -1,0 +1,252 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for Return {
+    type Iter = ReturnArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self { value } = self;
+        ReturnArgumentsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnArgumentsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for Return {
+    type IterMut = ReturnArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        let Self { value } = self;
+        ReturnArgumentsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnArgumentsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for Return {
+    type Iter = ReturnResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        let Self { value } = self;
+        ReturnResultsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnResultsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for Return {
+    type IterMut = ReturnResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        let Self { value } = self;
+        ReturnResultsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnResultsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for Return {
+    type Iter = ReturnBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        let Self { value } = self;
+        ReturnBlocksIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnBlocksIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for Return {
+    type IterMut = ReturnBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        let Self { value } = self;
+        ReturnBlocksMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnBlocksMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for Return {
+    type Iter = ReturnSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        let Self { value } = self;
+        ReturnSuccessorsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnSuccessorsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for Return {
+    type IterMut = ReturnSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        let Self { value } = self;
+        ReturnSuccessorsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnSuccessorsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for Return {
+    type Iter = ReturnRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        let Self { value } = self;
+        ReturnRegionsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnRegionsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for Return {
+    type IterMut = ReturnRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        let Self { value } = self;
+        ReturnRegionsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ReturnRegionsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ReturnRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for Return {
+    fn is_terminator(&self) -> bool {
+        true
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for Return {
+    fn is_constant(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for Return {
+    fn is_pure(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for Return {
+    fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for Return {
+    type Type = SimpleType;
+}

@@ -1,0 +1,98 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_stage_meta_code(input)
+---
+#[automatically_derived]
+impl kirin_ir::HasStageInfo<ArithDialect> for CompositeStage {
+    fn try_stage_info(&self) -> Option<&kirin_ir::StageInfo<ArithDialect>> {
+        match self {
+            CompositeStage::Arith(s) => Some(s),
+            CompositeStage::Func(_) | CompositeStage::Cf(_) => None,
+        }
+    }
+    fn try_stage_info_mut(&mut self) -> Option<&mut kirin_ir::StageInfo<ArithDialect>> {
+        match self {
+            CompositeStage::Arith(s) => Some(s),
+            CompositeStage::Func(_) | CompositeStage::Cf(_) => None,
+        }
+    }
+}
+#[automatically_derived]
+impl kirin_ir::HasStageInfo<CfDialect> for CompositeStage {
+    fn try_stage_info(&self) -> Option<&kirin_ir::StageInfo<CfDialect>> {
+        match self {
+            CompositeStage::Cf(s) => Some(s),
+            CompositeStage::Arith(_) | CompositeStage::Func(_) => None,
+        }
+    }
+    fn try_stage_info_mut(&mut self) -> Option<&mut kirin_ir::StageInfo<CfDialect>> {
+        match self {
+            CompositeStage::Cf(s) => Some(s),
+            CompositeStage::Arith(_) | CompositeStage::Func(_) => None,
+        }
+    }
+}
+#[automatically_derived]
+impl kirin_ir::HasStageInfo<FuncDialect> for CompositeStage {
+    fn try_stage_info(&self) -> Option<&kirin_ir::StageInfo<FuncDialect>> {
+        match self {
+            CompositeStage::Func(s) => Some(s),
+            CompositeStage::Arith(_) | CompositeStage::Cf(_) => None,
+        }
+    }
+    fn try_stage_info_mut(&mut self) -> Option<&mut kirin_ir::StageInfo<FuncDialect>> {
+        match self {
+            CompositeStage::Func(s) => Some(s),
+            CompositeStage::Arith(_) | CompositeStage::Cf(_) => None,
+        }
+    }
+}
+#[automatically_derived]
+impl kirin_ir::StageMeta for CompositeStage {
+    type Languages = (ArithDialect, (FuncDialect, (CfDialect, ())));
+    fn stage_name(&self) -> Option<kirin_ir::GlobalSymbol> {
+        match self {
+            CompositeStage::Arith(s) => kirin_ir::StageMeta::stage_name(s),
+            CompositeStage::Func(s) => kirin_ir::StageMeta::stage_name(s),
+            CompositeStage::Cf(s) => kirin_ir::StageMeta::stage_name(s),
+        }
+    }
+    fn set_stage_name(&mut self, name: Option<kirin_ir::GlobalSymbol>) {
+        match self {
+            CompositeStage::Arith(s) => kirin_ir::StageMeta::set_stage_name(s, name),
+            CompositeStage::Func(s) => kirin_ir::StageMeta::set_stage_name(s, name),
+            CompositeStage::Cf(s) => kirin_ir::StageMeta::set_stage_name(s, name),
+        }
+    }
+    fn stage_id(&self) -> Option<kirin_ir::CompileStage> {
+        match self {
+            CompositeStage::Arith(s) => kirin_ir::StageMeta::stage_id(s),
+            CompositeStage::Func(s) => kirin_ir::StageMeta::stage_id(s),
+            CompositeStage::Cf(s) => kirin_ir::StageMeta::stage_id(s),
+        }
+    }
+    fn set_stage_id(&mut self, id: Option<kirin_ir::CompileStage>) {
+        match self {
+            CompositeStage::Arith(s) => kirin_ir::StageMeta::set_stage_id(s, id),
+            CompositeStage::Func(s) => kirin_ir::StageMeta::set_stage_id(s, id),
+            CompositeStage::Cf(s) => kirin_ir::StageMeta::set_stage_id(s, id),
+        }
+    }
+    fn from_stage_name(stage_name: &str) -> Result<Self, String> {
+        match stage_name {
+            "arith" => Ok(CompositeStage::Arith(
+                kirin_ir::StageInfo::<ArithDialect>::default(),
+            )),
+            "func" => Ok(CompositeStage::Func(
+                kirin_ir::StageInfo::<FuncDialect>::default(),
+            )),
+            "cf" => Ok(CompositeStage::Cf(
+                kirin_ir::StageInfo::<CfDialect>::default(),
+            )),
+            _ => Err(format!("no stage variant mapping for '@{}'", stage_name)),
+        }
+    }
+    fn declared_stage_names() -> &'static [&'static str] {
+        &["arith", "func", "cf"]
+    }
+}

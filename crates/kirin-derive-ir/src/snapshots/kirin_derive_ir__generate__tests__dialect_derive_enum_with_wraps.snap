@@ -1,0 +1,344 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for ArithLanguage {
+    type Iter = ArithLanguageArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => ArithLanguageArgumentsIter::Add(
+                <AddOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageArgumentsIter::Sub(
+                <SubOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageArgumentsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasArguments<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasArguments<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageArgumentsMutIter::Add(
+                <AddOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageArgumentsMutIter::Sub(
+                <SubOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageArgumentsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for ArithLanguage {
+    type Iter = ArithLanguageResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                ArithLanguageResultsIter::Add(<AddOp as ::kirin::ir::HasResults>::results(field_0))
+            }
+            Self::Sub(field_0) => {
+                ArithLanguageResultsIter::Sub(<SubOp as ::kirin::ir::HasResults>::results(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageResultsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasResults<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasResults<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageResultsMutIter::Add(
+                <AddOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageResultsMutIter::Sub(
+                <SubOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageResultsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for ArithLanguage {
+    type Iter = ArithLanguageBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                ArithLanguageBlocksIter::Add(<AddOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+            Self::Sub(field_0) => {
+                ArithLanguageBlocksIter::Sub(<SubOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageBlocksIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageBlocksMutIter::Add(
+                <AddOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageBlocksMutIter::Sub(
+                <SubOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageBlocksMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for ArithLanguage {
+    type Iter = ArithLanguageSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => ArithLanguageSuccessorsIter::Add(
+                <AddOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageSuccessorsIter::Sub(
+                <SubOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageSuccessorsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageSuccessorsMutIter::Add(
+                <AddOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageSuccessorsMutIter::Sub(
+                <SubOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageSuccessorsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for ArithLanguage {
+    type Iter = ArithLanguageRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                ArithLanguageRegionsIter::Add(<AddOp as ::kirin::ir::HasRegions>::regions(field_0))
+            }
+            Self::Sub(field_0) => {
+                ArithLanguageRegionsIter::Sub(<SubOp as ::kirin::ir::HasRegions>::regions(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageRegionsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasRegions<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasRegions<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageRegionsMutIter::Add(
+                <AddOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageRegionsMutIter::Sub(
+                <SubOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageRegionsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for ArithLanguage {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsTerminator>::is_terminator(field_0),
+            Self::Sub(field_0) => <SubOp as ::kirin::ir::IsTerminator>::is_terminator(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for ArithLanguage {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+            Self::Sub(field_0) => <SubOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for ArithLanguage {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsPure>::is_pure(field_0),
+            Self::Sub(field_0) => <SubOp as ::kirin::ir::IsPure>::is_pure(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for ArithLanguage {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0),
+            Self::Sub(field_0) => <SubOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for ArithLanguage {
+    type Type = SimpleType;
+}

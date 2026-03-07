@@ -1,0 +1,10 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for Return {
+    fn is_terminator(&self) -> bool {
+        true
+    }
+}

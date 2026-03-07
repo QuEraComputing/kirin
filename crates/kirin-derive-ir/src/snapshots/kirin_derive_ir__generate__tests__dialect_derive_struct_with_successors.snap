@@ -1,0 +1,252 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for Branch {
+    type Iter = BranchArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        BranchArgumentsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchArgumentsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for Branch {
+    type IterMut = BranchArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        BranchArgumentsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchArgumentsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for Branch {
+    type Iter = BranchResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        BranchResultsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchResultsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for Branch {
+    type IterMut = BranchResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        BranchResultsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchResultsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for Branch {
+    type Iter = BranchBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        BranchBlocksIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchBlocksIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for Branch {
+    type IterMut = BranchBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        BranchBlocksMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchBlocksMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for Branch {
+    type Iter = BranchSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        BranchSuccessorsIter {
+            inner: std::iter::once(target),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchSuccessorsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for Branch {
+    type IterMut = BranchSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        BranchSuccessorsMutIter {
+            inner: std::iter::once(target),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchSuccessorsMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for Branch {
+    type Iter = BranchRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        BranchRegionsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchRegionsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for Branch {
+    type IterMut = BranchRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        BranchRegionsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchRegionsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for Branch {
+    fn is_terminator(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for Branch {
+    fn is_constant(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for Branch {
+    fn is_pure(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for Branch {
+    fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for Branch {
+    type Type = SimpleType;
+}

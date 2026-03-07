@@ -1,0 +1,352 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for CfOps {
+    type Iter = CfOpsArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => CfOpsArgumentsIter::Branch(
+                <BranchOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+            Self::Return(field_0) => CfOpsArgumentsIter::Return(
+                <ReturnOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsArgumentsIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasArguments<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasArguments<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for CfOps {
+    type IterMut = CfOpsArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsArgumentsMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsArgumentsMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsArgumentsMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for CfOps {
+    type Iter = CfOpsResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => {
+                CfOpsResultsIter::Branch(<BranchOp as ::kirin::ir::HasResults>::results(field_0))
+            }
+            Self::Return(field_0) => {
+                CfOpsResultsIter::Return(<ReturnOp as ::kirin::ir::HasResults>::results(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsResultsIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasResults<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasResults<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for CfOps {
+    type IterMut = CfOpsResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsResultsMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsResultsMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsResultsMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for CfOps {
+    type Iter = CfOpsBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => {
+                CfOpsBlocksIter::Branch(<BranchOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+            Self::Return(field_0) => {
+                CfOpsBlocksIter::Return(<ReturnOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsBlocksIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for CfOps {
+    type IterMut = CfOpsBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsBlocksMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsBlocksMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsBlocksMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for CfOps {
+    type Iter = CfOpsSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => CfOpsSuccessorsIter::Branch(
+                <BranchOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+            Self::Return(field_0) => CfOpsSuccessorsIter::Return(
+                <ReturnOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsSuccessorsIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for CfOps {
+    type IterMut = CfOpsSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsSuccessorsMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsSuccessorsMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsSuccessorsMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for CfOps {
+    type Iter = CfOpsRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => {
+                CfOpsRegionsIter::Branch(<BranchOp as ::kirin::ir::HasRegions>::regions(field_0))
+            }
+            Self::Return(field_0) => {
+                CfOpsRegionsIter::Return(<ReturnOp as ::kirin::ir::HasRegions>::regions(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsRegionsIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasRegions<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasRegions<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for CfOps {
+    type IterMut = CfOpsRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsRegionsMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsRegionsMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsRegionsMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for CfOps {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Branch(field_0) => {
+                <BranchOp as ::kirin::ir::IsTerminator>::is_terminator(field_0)
+            }
+            Self::Return(field_0) => {
+                <ReturnOp as ::kirin::ir::IsTerminator>::is_terminator(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for CfOps {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Branch(field_0) => <BranchOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+            Self::Return(field_0) => <ReturnOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for CfOps {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Branch(field_0) => <BranchOp as ::kirin::ir::IsPure>::is_pure(field_0),
+            Self::Return(field_0) => <ReturnOp as ::kirin::ir::IsPure>::is_pure(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for CfOps {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Branch(field_0) => {
+                <BranchOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+            Self::Return(field_0) => {
+                <ReturnOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for CfOps {
+    type Type = SimpleType;
+}

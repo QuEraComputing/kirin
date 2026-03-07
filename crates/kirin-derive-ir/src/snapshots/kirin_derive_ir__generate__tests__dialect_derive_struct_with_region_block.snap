@@ -1,0 +1,308 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for IfOp {
+    type Iter = IfOpArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpArgumentsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpArgumentsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for IfOp {
+    type IterMut = IfOpArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpArgumentsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpArgumentsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for IfOp {
+    type Iter = IfOpResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpResultsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpResultsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for IfOp {
+    type IterMut = IfOpResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpResultsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpResultsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for IfOp {
+    type Iter = IfOpBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpBlocksIter {
+            inner: std::iter::once(then_block).chain(std::iter::once(else_block)),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpBlocksIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Once<&'a ::kirin::ir::Block>,
+        std::iter::Once<&'a ::kirin::ir::Block>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for IfOp {
+    type IterMut = IfOpBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpBlocksMutIter {
+            inner: std::iter::once(then_block).chain(std::iter::once(else_block)),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpBlocksMutIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Once<&'a mut ::kirin::ir::Block>,
+        std::iter::Once<&'a mut ::kirin::ir::Block>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for IfOp {
+    type Iter = IfOpSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpSuccessorsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpSuccessorsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for IfOp {
+    type IterMut = IfOpSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpSuccessorsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpSuccessorsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for IfOp {
+    type Iter = IfOpRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpRegionsIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpRegionsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for IfOp {
+    type IterMut = IfOpRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpRegionsMutIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpRegionsMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for IfOp {
+    fn is_terminator(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for IfOp {
+    fn is_constant(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for IfOp {
+    fn is_pure(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for IfOp {
+    fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for IfOp {
+    type Type = SimpleType;
+}

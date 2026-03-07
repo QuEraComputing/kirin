@@ -1185,7 +1185,9 @@ dependencies = [
 name = "kirin-derive-ir"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "kirin-derive-toolkit",
+ "kirin-test-utils",
  "proc-macro2",
  "quote",
  "syn",

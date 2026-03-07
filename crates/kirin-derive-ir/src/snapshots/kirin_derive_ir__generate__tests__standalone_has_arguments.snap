@@ -1,0 +1,26 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for BinaryOp {
+    type Iter = BinaryOpArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self { result, lhs, rhs } = self;
+        BinaryOpArgumentsIter {
+            inner: std::iter::once(result),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BinaryOpArgumentsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BinaryOpArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
