@@ -82,3 +82,61 @@ pub fn do_derive_interpretable(input: &syn::DeriveInput) -> darling::Result<Toke
 
     ir.compose().add(template).build()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_test_utils::rustfmt;
+
+    fn generate_interpretable_code(input: syn::DeriveInput) -> String {
+        let tokens = do_derive_interpretable(&input).expect("Failed to generate Interpretable");
+        rustfmt(tokens.to_string())
+    }
+
+    #[test]
+    fn test_interpretable_enum_all_wraps() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum ArithOps {
+                #[wraps]
+                Add(AddOp),
+                #[wraps]
+                Sub(SubOp),
+                #[wraps]
+                Mul(MulOp),
+            }
+        };
+        insta::assert_snapshot!(generate_interpretable_code(input));
+    }
+
+    #[test]
+    fn test_interpretable_validation_error_non_wraps() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum MixedOps {
+                #[wraps]
+                Add(AddOp),
+                Literal { value: i64 },
+            }
+        };
+        let result = do_derive_interpretable(&input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Literal"),
+            "Error should mention the non-wraps variant: {err}"
+        );
+    }
+
+    #[test]
+    fn test_interpretable_single_wraps() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum SingleOp {
+                #[wraps]
+                Only(OnlyOp),
+            }
+        };
+        insta::assert_snapshot!(generate_interpretable_code(input));
+    }
+}

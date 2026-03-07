@@ -1,0 +1,35 @@
+---
+source: crates/kirin-derive-interpreter/src/eval_call/generate.rs
+expression: generate_call_semantics_code(input)
+---
+#[automatically_derived]
+impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps> for FuncOps
+where
+    __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
+    __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+    CallOp: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps>,
+    InvokeOp: ::kirin_interpreter::CallSemantics<
+        '__ir,
+        __CallSemI,
+        FuncOps,
+        Result = <CallOp as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps>>::Result,
+    >,
+{
+    type Result =
+        <CallOp as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps>>::Result;
+    fn eval_call(
+        &self,
+        interpreter: &mut __CallSemI,
+        stage: &'__ir ::kirin::ir::StageInfo<FuncOps>,
+        callee: ::kirin::ir::SpecializedFunction,
+        args: &[__CallSemI::Value],
+    ) -> Result<Self::Result, __CallSemI::Error> {
+        match self {
+            Self::Call(field_0) => field_0.eval_call(interpreter, stage, callee, args),
+            Self::Return(field_0) => {
+                Err(::kirin_interpreter::InterpreterError::MissingEntry.into())
+            }
+            Self::Invoke(field_0) => field_0.eval_call(interpreter, stage, callee, args),
+        }
+    }
+}

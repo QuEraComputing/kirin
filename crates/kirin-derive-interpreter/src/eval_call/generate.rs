@@ -158,3 +158,76 @@ fn collect_callable_wrappers<'a>(ctx: &'a DeriveContext<'_, EvalCallLayout>) -> 
         .filter_map(|stmt_ctx| stmt_ctx.wrapper_type)
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_test_utils::rustfmt;
+
+    fn generate_call_semantics_code(input: syn::DeriveInput) -> String {
+        let tokens = do_derive_eval_call(&input).expect("Failed to generate CallSemantics");
+        rustfmt(tokens.to_string())
+    }
+
+    #[test]
+    fn test_call_semantics_with_callable() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum FuncOps {
+                #[wraps]
+                #[callable]
+                Call(CallOp),
+                #[wraps]
+                Return(ReturnOp),
+            }
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+
+    #[test]
+    fn test_call_semantics_without_callable() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum FuncOps {
+                #[wraps]
+                Call(CallOp),
+                #[wraps]
+                Return(ReturnOp),
+            }
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+
+    #[test]
+    fn test_call_semantics_all_callable() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[callable]
+            enum FuncOps {
+                #[wraps]
+                Call(CallOp),
+                #[wraps]
+                Invoke(InvokeOp),
+            }
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+
+    #[test]
+    fn test_call_semantics_mixed_callable_non_wraps() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum FuncOps {
+                #[wraps]
+                #[callable]
+                Call(CallOp),
+                #[wraps]
+                Return(ReturnOp),
+                #[wraps]
+                #[callable]
+                Invoke(InvokeOp),
+            }
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+}
