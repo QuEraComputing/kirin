@@ -90,3 +90,61 @@ pub fn parse_pretty_derive_input(
 
     Ok(input)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_input_without_type_annotation() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[chumsky(format = "{.literal} {value}")]
+            struct Literal {
+                value: i64,
+            }
+        };
+        let result = parse_derive_input(&input);
+        assert!(
+            result.is_ok(),
+            "Value-only struct should not require #[kirin(type)]"
+        );
+    }
+
+    #[test]
+    fn test_parse_input_ssa_without_type_requires_annotation() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+            struct Add {
+                result: SSAValue,
+                lhs: Value,
+                rhs: Value,
+            }
+        };
+        let result = parse_derive_input(&input);
+        assert!(result.is_err(), "SSA fields should require #[kirin(type)]");
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("kirin(type"),
+            "Error should mention kirin(type): {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_input_with_type_annotation() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+            struct Add {
+                result: SSAValue,
+                lhs: Value,
+                rhs: Value,
+            }
+        };
+        let result = parse_derive_input(&input);
+        assert!(
+            result.is_ok(),
+            "Should parse with type annotation: {:?}",
+            result.err()
+        );
+    }
+}
