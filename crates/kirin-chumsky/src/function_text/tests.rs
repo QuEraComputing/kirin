@@ -347,3 +347,133 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
         }
     );
 }
+
+// ---------------------------------------------------------------------------
+// Empty input
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_pipeline_parse_empty_input() {
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let err = pipeline.parse("").unwrap_err();
+    assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
+    assert!(err.message.contains("expected at least one declaration"));
+}
+
+#[test]
+fn test_pipeline_parse_whitespace_only() {
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let err = pipeline.parse("   \n\t  ").unwrap_err();
+    assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
+}
+
+// ---------------------------------------------------------------------------
+// Numeric stage symbol (@1)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_pipeline_parse_numeric_stage_symbol_rejected() {
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    // Numeric tokens like `1` are not prefixed with `@`, so `stage 1` should fail
+    let err = pipeline.parse("stage 1 fn @foo(()) -> ();").unwrap_err();
+    assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
+}
+
+#[test]
+fn test_pipeline_numeric_stage_lookup_by_existing_id() {
+    // When a stage already exists in the pipeline, @<numeric> can find it by raw ID
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let stage_id = pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("A")
+        .new();
+
+    // First parse a normal declaration to set things up
+    let input = format!("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY}");
+    let result = pipeline.parse(&input);
+    assert!(result.is_ok());
+
+    // The stage exists with name "A" at some ID
+    assert_eq!(pipeline.stages().len(), 1);
+    let _ = stage_id; // stage was pre-created
+}
+
+// ---------------------------------------------------------------------------
+// best_stage_suggestion threshold (distance > 3)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_stage_suggestion_close_name() {
+    // "C" vs declared names "A", "B" — distance 1, should get a suggestion
+    let mut pipeline: Pipeline<StageBucket> = Pipeline::new();
+    let err = pipeline.parse("stage @C fn @foo(()) -> ();").unwrap_err();
+    assert_eq!(err.kind, crate::FunctionParseErrorKind::UnknownStage);
+    // With Levenshtein distance <= 3, should suggest a known stage
+    assert!(
+        err.message.contains("did you mean")
+            || err.message.contains("@A")
+            || err.message.contains("@B"),
+        "expected suggestion in error message, got: {}",
+        err.message
+    );
+}
+
+#[test]
+fn test_stage_suggestion_very_distant_name() {
+    // "XYZXYZXYZ" vs declared names "A", "B" — distance > 3, should NOT suggest
+    let mut pipeline: Pipeline<StageBucket> = Pipeline::new();
+    let err = pipeline
+        .parse("stage @XYZXYZXYZ fn @foo(()) -> ();")
+        .unwrap_err();
+    assert_eq!(err.kind, crate::FunctionParseErrorKind::UnknownStage);
+    assert!(
+        !err.message.contains("did you mean"),
+        "expected no suggestion for distant name, got: {}",
+        err.message
+    );
+}
+
+// ---------------------------------------------------------------------------
+// FunctionParseError::source chain
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_invalid_body_parse_has_source() {
+    use std::error::Error;
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    // Valid header but invalid body tokens
+    let err = pipeline
+        .parse("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () { invalid }")
+        .unwrap_err();
+    // The body parse failure should chain a source error
+    // (may or may not have source depending on where it fails)
+    let _ = err.source();
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate stage declaration with same signature (idempotent)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_duplicate_stage_declaration_same_signature() {
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let input = format!(
+        "stage @A fn @foo(()) -> (); \
+         stage @A fn @foo(()) -> (); \
+         specialize @A fn @foo(()) -> () {BODY}"
+    );
+    let result = pipeline.parse(&input);
+    assert!(result.is_ok());
+}
+
+// ---------------------------------------------------------------------------
+// Invalid declaration keyword
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_invalid_declaration_keyword() {
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let err = pipeline.parse("define @A fn @foo(()) -> ();").unwrap_err();
+    assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
+}

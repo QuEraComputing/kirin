@@ -424,3 +424,133 @@ fn test_emit_context_ssa_overwrite() {
     ctx.register_ssa("x".to_string(), ssa2);
     assert_eq!(ctx.lookup_ssa("x"), Some(ssa2));
 }
+
+// === parse_ast Tests ===
+
+#[test]
+fn test_parse_ast_empty_input() {
+    let result = crate::traits::parse_ast::<i32>("");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_ast_valid_int() {
+    let result = crate::traits::parse_ast::<i32>("42");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 42);
+}
+
+#[test]
+fn test_parse_ast_invalid_input() {
+    let result = crate::traits::parse_ast::<i32>("not_a_number");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_parse_ast_multiple_errors() {
+    // Completely invalid token sequence should produce errors
+    let result = crate::traits::parse_ast::<i32>("@#$");
+    assert!(result.is_err());
+    let errors = result.unwrap_err();
+    assert!(!errors.is_empty());
+}
+
+// === ParseError Display Tests ===
+
+#[test]
+fn test_parse_error_display() {
+    let err = crate::traits::ParseError {
+        message: "unexpected token".to_string(),
+        span: SimpleSpan::from(5..10),
+    };
+    let display = format!("{}", err);
+    assert_eq!(display, "error at 5..10: unexpected token");
+}
+
+#[test]
+fn test_parse_error_is_std_error() {
+    let err = crate::traits::ParseError {
+        message: "test".to_string(),
+        span: SimpleSpan::from(0..1),
+    };
+    // Verify it implements std::error::Error
+    let _: &dyn std::error::Error = &err;
+}
+
+// === FunctionParseError Display Tests ===
+
+#[test]
+fn test_function_parse_error_display_with_span() {
+    let err = crate::FunctionParseError::new(
+        crate::FunctionParseErrorKind::InvalidHeader,
+        Some(SimpleSpan::from(3..7)),
+        "missing semicolon",
+    );
+    let display = format!("{}", err);
+    assert_eq!(
+        display,
+        "invalid function header at 3..7: missing semicolon"
+    );
+}
+
+#[test]
+fn test_function_parse_error_display_without_span() {
+    let err = crate::FunctionParseError::new(
+        crate::FunctionParseErrorKind::UnknownStage,
+        None,
+        "stage not found",
+    );
+    let display = format!("{}", err);
+    assert_eq!(display, "unknown stage: stage not found");
+}
+
+#[test]
+fn test_function_parse_error_kind_display() {
+    assert_eq!(
+        format!("{}", crate::FunctionParseErrorKind::InvalidHeader),
+        "invalid function header"
+    );
+    assert_eq!(
+        format!("{}", crate::FunctionParseErrorKind::UnknownStage),
+        "unknown stage"
+    );
+    assert_eq!(
+        format!(
+            "{}",
+            crate::FunctionParseErrorKind::InconsistentFunctionName
+        ),
+        "inconsistent function name"
+    );
+    assert_eq!(
+        format!("{}", crate::FunctionParseErrorKind::MissingStageDeclaration),
+        "missing stage declaration"
+    );
+    assert_eq!(
+        format!("{}", crate::FunctionParseErrorKind::BodyParseFailed),
+        "function body parse failed"
+    );
+    assert_eq!(
+        format!("{}", crate::FunctionParseErrorKind::EmitFailed),
+        "IR emission failed"
+    );
+}
+
+#[test]
+fn test_function_parse_error_source() {
+    use std::error::Error;
+
+    // Without source
+    let err =
+        crate::FunctionParseError::new(crate::FunctionParseErrorKind::InvalidHeader, None, "test");
+    assert!(err.source().is_none());
+
+    // With source
+    let source_err = std::io::Error::new(std::io::ErrorKind::Other, "inner");
+    let err = crate::FunctionParseError::new(
+        crate::FunctionParseErrorKind::BodyParseFailed,
+        None,
+        "outer",
+    )
+    .with_source(source_err);
+    assert!(err.source().is_some());
+}
