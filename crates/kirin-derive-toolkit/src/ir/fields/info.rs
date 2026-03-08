@@ -95,7 +95,7 @@ impl<L: Layout> FieldInfo<L> {
     /// Return the SSA type expression for `Argument` or `Result` fields.
     pub fn ssa_type(&self) -> Option<&syn::Expr> {
         match &self.data {
-            FieldData::Argument { ssa_type } | FieldData::Result { ssa_type } => Some(ssa_type),
+            FieldData::Argument { ssa_type } | FieldData::Result { ssa_type, .. } => Some(ssa_type),
             _ => None,
         }
     }
@@ -111,6 +111,17 @@ impl<L: Layout> FieldInfo<L> {
     /// Return `true` if this `Value` field has `#[kirin(into)]`, enabling `.into()` coercion.
     pub fn has_into(&self) -> bool {
         matches!(&self.data, FieldData::Value { into: true, .. })
+    }
+
+    /// Return `true` if this `Result` field's SSA type was auto-generated as a placeholder.
+    pub fn is_auto_placeholder(&self) -> bool {
+        matches!(
+            &self.data,
+            FieldData::Result {
+                is_auto_placeholder: true,
+                ..
+            }
+        )
     }
 
     /// Return layout-specific extra attributes for `Value` fields.
@@ -143,7 +154,7 @@ mod tests {
             ident: name.map(|n| syn::Ident::new(n, Span::call_site())),
             collection: Collection::Single,
             data: FieldData::Argument {
-                ssa_type: syn::parse_quote!(Default::default()),
+                ssa_type: syn::parse_quote!(Placeholder::placeholder()),
             },
         }
     }
@@ -155,6 +166,7 @@ mod tests {
             collection: Collection::Single,
             data: FieldData::Result {
                 ssa_type: syn::parse_quote!(MyType),
+                is_auto_placeholder: false,
             },
         }
     }
@@ -213,6 +225,7 @@ mod tests {
             (
                 FieldData::Result {
                     ssa_type: syn::parse_quote!(()),
+                    is_auto_placeholder: false,
                 },
                 "result",
             ),

@@ -30,7 +30,7 @@ impl FieldCategory {
 
 /// Semantic data associated with a field, varying by [`FieldCategory`].
 ///
-/// `Argument` and `Result` variants carry an `ssa_type` expression.
+/// `Argument` and `Result` variants carry an `ssa_type` expression from `#[kirin(type = ...)]`.
 /// `Value` carries the original Rust type and optional default/into metadata.
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -40,6 +40,7 @@ pub enum FieldData<L: Layout> {
     },
     Result {
         ssa_type: syn::Expr,
+        is_auto_placeholder: bool,
     },
     Block,
     Successor,
@@ -59,8 +60,12 @@ impl<L: Layout> Clone for FieldData<L> {
             FieldData::Argument { ssa_type } => FieldData::Argument {
                 ssa_type: ssa_type.clone(),
             },
-            FieldData::Result { ssa_type } => FieldData::Result {
+            FieldData::Result {
+                ssa_type,
+                is_auto_placeholder,
+            } => FieldData::Result {
                 ssa_type: ssa_type.clone(),
+                is_auto_placeholder: *is_auto_placeholder,
             },
             FieldData::Block => FieldData::Block,
             FieldData::Successor => FieldData::Successor,

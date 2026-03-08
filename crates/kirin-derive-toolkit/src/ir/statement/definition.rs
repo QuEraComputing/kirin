@@ -63,7 +63,10 @@ impl<L: Layout> Statement<L> {
     }
 
     /// Parse a struct-shaped `DeriveInput` into a `Statement`, classifying all fields.
-    pub fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
+    pub fn from_derive_input(
+        input: &syn::DeriveInput,
+        ir_type: &syn::Path,
+    ) -> darling::Result<Self> {
         let syn::Data::Struct(data) = &input.data else {
             return Err(
                 darling::Error::custom("Kirin statements can only be derived for structs")
@@ -83,13 +86,18 @@ impl<L: Layout> Statement<L> {
         .update_fields(
             input.attrs.iter().any(|attr| attr.path().is_ident("wraps")),
             &data.fields,
+            ir_type,
         )
     }
 
     /// Parse an enum variant into a `Statement`, classifying all fields.
     ///
     /// `wraps` indicates whether the parent enum has a top-level `#[wraps]` attribute.
-    pub fn from_variant(wraps: bool, variant: &syn::Variant) -> darling::Result<Self> {
+    pub fn from_variant(
+        wraps: bool,
+        variant: &syn::Variant,
+        ir_type: &syn::Path,
+    ) -> darling::Result<Self> {
         let attrs = StatementOptions::from_variant(variant)?;
         let extra = L::StatementExtra::from_variant(variant)?;
         let extra_attrs = L::ExtraStatementAttrs::from_variant(variant)?;
@@ -107,10 +115,16 @@ impl<L: Layout> Statement<L> {
                     .iter()
                     .any(|attr| attr.path().is_ident("wraps")),
             &variant.fields,
+            ir_type,
         )
     }
 
-    fn update_fields(mut self, wraps: bool, fields: &syn::Fields) -> darling::Result<Self> {
+    fn update_fields(
+        mut self,
+        wraps: bool,
+        fields: &syn::Fields,
+        ir_type: &syn::Path,
+    ) -> darling::Result<Self> {
         let mut errors = darling::Error::accumulator();
 
         if wraps
@@ -126,7 +140,7 @@ impl<L: Layout> Statement<L> {
                         if f.attrs.iter().any(|attr| attr.path().is_ident("wraps")) {
                             self.wraps = Some(Wrapper::new(i, f));
                         } else {
-                            self.fields.push(Self::parse_field(i, f)?);
+                            self.fields.push(Self::parse_field(i, f, ir_type)?);
                         }
                         Ok(())
                     });
@@ -145,7 +159,7 @@ impl<L: Layout> Statement<L> {
 
         for (i, f) in fields.iter().enumerate() {
             errors.handle_in(|| {
-                self.fields.push(Self::parse_field(i, f)?);
+                self.fields.push(Self::parse_field(i, f, ir_type)?);
                 Ok(())
             });
         }
@@ -153,33 +167,36 @@ impl<L: Layout> Statement<L> {
         Ok(self)
     }
 
-    fn parse_field(index: usize, f: &syn::Field) -> darling::Result<FieldInfo<L>> {
+    fn parse_field(index: usize, f: &syn::Field, ir_type: &syn::Path) -> darling::Result<FieldInfo<L>> {
         let kirin_opts = KirinFieldOptions::from_field(f)?;
         let extra = L::ExtraFieldAttrs::from_field(f)?;
         let ident = f.ident.clone();
         let ty = &f.ty;
 
         if let Some(collection) = Collection::from_type(ty, "SSAValue") {
-            let ssa_type = kirin_opts
-                .ssa_ty
-                .unwrap_or_else(|| syn::parse_quote! { Default::default() });
             return Ok(FieldInfo {
                 index,
                 ident,
                 collection,
-                data: FieldData::Argument { ssa_type },
+                data: FieldData::Argument {
+                    ssa_type: kirin_opts.ssa_ty.unwrap_or_else(|| syn::parse_quote! { () }),
+                },
             });
         }
 
         if let Some(collection) = Collection::from_type(ty, "ResultValue") {
-            let ssa_type = kirin_opts
-                .ssa_ty
-                .unwrap_or_else(|| syn::parse_quote! { Default::default() });
+            let (ssa_type, is_auto_placeholder) = match kirin_opts.ssa_ty {
+                Some(expr) => (expr, false),
+                None => (syn::parse_quote!(#ir_type::placeholder()), true),
+            };
             return Ok(FieldInfo {
                 index,
                 ident,
                 collection,
-                data: FieldData::Result { ssa_type },
+                data: FieldData::Result {
+                    ssa_type,
+                    is_auto_placeholder,
+                },
             });
         }
 

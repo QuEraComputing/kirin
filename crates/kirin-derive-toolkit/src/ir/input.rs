@@ -44,39 +44,43 @@ impl<L: Layout> Input<L> {
     ///
     /// Supports structs and enums; unions produce an error.
     pub fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
-        match &input.data {
-            syn::Data::Struct(_) => Ok(Self {
-                name: input.ident.clone(),
-                generics: input.generics.clone(),
-                attrs: GlobalOptions::from_derive_input(input)?,
-                extra_attrs: L::ExtraGlobalAttrs::from_derive_input(input)?,
-                data: Data::Struct(DataStruct(Statement::from_derive_input(input)?)),
-                raw_attrs: input.attrs.clone(),
+        let attrs = GlobalOptions::from_derive_input(input)?;
+        let extra_attrs = L::ExtraGlobalAttrs::from_derive_input(input)?;
+        let ir_type = &attrs.ir_type;
+
+        let data = match &input.data {
+            syn::Data::Struct(_) => {
+                Data::Struct(DataStruct(Statement::from_derive_input(input, ir_type)?))
+            }
+            syn::Data::Enum(data) => Data::Enum(DataEnum {
+                variants: data
+                    .variants
+                    .iter()
+                    .map(|v| {
+                        Statement::from_variant(
+                            input.attrs.iter().any(|f| f.path().is_ident("wraps")),
+                            v,
+                            ir_type,
+                        )
+                    })
+                    .collect::<darling::Result<Vec<_>>>()?,
             }),
-            syn::Data::Enum(data) => Ok(Self {
-                name: input.ident.clone(),
-                generics: input.generics.clone(),
-                attrs: GlobalOptions::from_derive_input(input)?,
-                extra_attrs: L::ExtraGlobalAttrs::from_derive_input(input)?,
-                data: Data::Enum(DataEnum {
-                    variants: data
-                        .variants
-                        .iter()
-                        .map(|v| {
-                            Statement::from_variant(
-                                input.attrs.iter().any(|f| f.path().is_ident("wraps")),
-                                v,
-                            )
-                        })
-                        .collect::<darling::Result<Vec<_>>>()?,
-                }),
-                raw_attrs: input.attrs.clone(),
-            }),
-            syn::Data::Union(_) => Err(darling::Error::custom(
-                "Kirin ASTs can only be derived for structs or enums",
-            )
-            .with_span(input)),
-        }
+            syn::Data::Union(_) => {
+                return Err(darling::Error::custom(
+                    "Kirin ASTs can only be derived for structs or enums",
+                )
+                .with_span(input));
+            }
+        };
+
+        Ok(Self {
+            name: input.ident.clone(),
+            generics: input.generics.clone(),
+            attrs,
+            extra_attrs,
+            data,
+            raw_attrs: input.attrs.clone(),
+        })
     }
 }
 
