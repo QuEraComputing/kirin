@@ -149,6 +149,32 @@ impl GenerateEmitIR {
         })
     }
 
+    /// Returns `true` when the generated `EmitIR` impl needs a
+    /// `<Language as Dialect>::Type: Placeholder` bound.
+    ///
+    /// This is required whenever there is at least one `ResultValue` field,
+    /// because the `ResultValue` AST type's own `EmitIR` impl requires
+    /// `Placeholder` (it may call `placeholder()` when no type annotation
+    /// was parsed).
+    pub(super) fn needs_placeholder_bound(
+        &self,
+        ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+    ) -> bool {
+        use kirin_derive_toolkit::ir::fields::FieldCategory;
+        match &ir_input.data {
+            kirin_derive_toolkit::ir::Data::Struct(data) => data
+                .0
+                .fields
+                .iter()
+                .any(|f| f.category() == FieldCategory::Result),
+            kirin_derive_toolkit::ir::Data::Enum(data) => data.variants.iter().any(|stmt| {
+                stmt.fields
+                    .iter()
+                    .any(|f| f.category() == FieldCategory::Result)
+            }),
+        }
+    }
+
     pub(in crate::codegen) fn is_ir_type_a_type_param(
         &self,
         ir_type: &syn::Path,
@@ -223,9 +249,15 @@ impl GenerateEmitIR {
         };
         let language_output_emit_bound =
             self.language_output_emit_bound(ir_input, crate_path, ir_path);
+        let placeholder_bound = if self.needs_placeholder_bound(ir_input) {
+            quote! { <Language as #ir_path::Dialect>::Type: #ir_path::Placeholder, }
+        } else {
+            quote! {}
+        };
         let base_bounds = quote! {
             Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
             #dialect_type_bound
+            #placeholder_bound
             TypeOutput: Clone + PartialEq,
             LanguageOutput: Clone + PartialEq + 'tokens,
             #language_output_emit_bound

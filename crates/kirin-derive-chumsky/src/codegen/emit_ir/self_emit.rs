@@ -89,9 +89,15 @@ impl GenerateEmitIR {
         } else {
             quote! {}
         };
+        let placeholder_bound = if self.needs_placeholder_bound(ir_input) {
+            quote! { <Language as #ir_path::Dialect>::Type: #ir_path::Placeholder, }
+        } else {
+            quote! {}
+        };
         let base_bounds = quote! {
             Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
             #dialect_type_bound
+            #placeholder_bound
             TypeOutput: Clone + PartialEq,
             'src: 'tokens,
             #ir_type: #crate_path::HasParser<'tokens, 'src> + 'tokens,
