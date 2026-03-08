@@ -1,0 +1,11 @@
+---
+source: crates/kirin-prettyless/src/tests/edge_cases.rs
+expression: output
+---
+stage @0 fn @nullary() -> i64;
+specialize @0 fn @nullary() -> i64 {
+  ^0 {
+    constant 0;
+    return %0;
+  }
+}

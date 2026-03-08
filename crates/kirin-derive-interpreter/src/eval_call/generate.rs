@@ -242,4 +242,75 @@ mod tests {
         };
         insta::assert_snapshot!(generate_call_semantics_code(input));
     }
+
+    #[test]
+    fn test_call_semantics_struct_callable_wraps() {
+        // Struct with both #[callable] and #[wraps]
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[callable]
+            #[wraps]
+            struct CallOp(InnerCall);
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+
+    #[test]
+    fn test_call_semantics_struct_callable_without_wraps() {
+        // Struct with #[callable] but without #[wraps] — produces error fallback
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[callable]
+            struct DirectCall {
+                target: Symbol,
+            }
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+
+    #[test]
+    fn test_call_semantics_enum_all_callable_with_non_wraps_variant() {
+        // Enum-level #[callable] but some variants are not #[wraps]
+        // Should generate error fallback for non-wraps variants
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[callable]
+            enum FuncOps {
+                #[wraps]
+                Call(CallOp),
+                Plain { value: i64 },
+            }
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+
+    #[test]
+    fn test_call_semantics_single_callable_variant() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum FuncOps {
+                #[wraps]
+                #[callable]
+                Call(CallOp),
+            }
+        };
+        insta::assert_snapshot!(generate_call_semantics_code(input));
+    }
+
+    #[test]
+    fn test_call_semantics_struct_not_callable_error() {
+        // Struct without #[callable] should error
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[wraps]
+            struct WrapperOp(InnerOp);
+        };
+        let result = do_derive_eval_call(&input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("callable"),
+            "Error should mention #[callable] requirement: {err}"
+        );
+    }
 }

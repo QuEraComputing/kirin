@@ -434,3 +434,142 @@ fn test_new_reversed_becomes_bottom() {
     let reversed = Interval::new(10, 5);
     assert_eq!(reversed, Interval::bottom_interval());
 }
+
+// --- i64 boundary tests ---
+
+#[test]
+fn test_interval_add_overflow_saturates() {
+    // [i64::MAX - 1, i64::MAX] + [1, 2] should saturate via saturating_add
+    let a = Interval::new(i64::MAX - 1, i64::MAX);
+    let b = Interval::new(1, 2);
+    let result = interval_add(&a, &b);
+    // saturating_add(i64::MAX - 1, 1) = i64::MAX, saturating_add(i64::MAX, 2) = i64::MAX
+    assert_eq!(result.lo, Bound::Finite(i64::MAX));
+    assert_eq!(result.hi, Bound::Finite(i64::MAX));
+}
+
+#[test]
+fn test_interval_sub_underflow_saturates() {
+    // [i64::MIN, i64::MIN + 1] - [1, 2] should saturate via saturating_sub
+    let a = Interval::new(i64::MIN, i64::MIN + 1);
+    let b = Interval::new(1, 2);
+    let result = interval_sub(&a, &b);
+    // lo = saturating_sub(i64::MIN, 2) = i64::MIN
+    // hi = saturating_sub(i64::MIN + 1, 1) = i64::MIN
+    assert_eq!(result.lo, Bound::Finite(i64::MIN));
+    assert_eq!(result.hi, Bound::Finite(i64::MIN));
+}
+
+#[test]
+fn test_interval_mul_overflow_saturates() {
+    let a = Interval::new(i64::MAX / 2, i64::MAX);
+    let b = Interval::new(2, 3);
+    let result = interval_mul(&a, &b);
+    // All products saturate to i64::MAX except possibly (MAX/2)*2 which is exact
+    assert!(!result.is_empty());
+    // lo should be (i64::MAX / 2) * 2, which is i64::MAX - 1 (since MAX is odd)
+    assert_eq!(result.lo, Bound::Finite((i64::MAX / 2) * 2));
+    // hi should be saturating_mul(i64::MAX, 3) = i64::MAX
+    assert_eq!(result.hi, Bound::Finite(i64::MAX));
+}
+
+#[test]
+fn test_bound_negate_i64_min_maps_to_pos_inf() {
+    // -i64::MIN overflows i64, so negate maps it to PosInf (sound conservative choice)
+    assert_eq!(Bound::Finite(i64::MIN).negate(), Bound::PosInf);
+}
+
+#[test]
+fn test_interval_add_both_bottom() {
+    let bot = Interval::bottom_interval();
+    assert!(interval_add(&bot, &bot).is_empty());
+}
+
+#[test]
+fn test_interval_sub_both_bottom() {
+    let bot = Interval::bottom_interval();
+    assert!(interval_sub(&bot, &bot).is_empty());
+}
+
+#[test]
+fn test_interval_mul_both_infinity() {
+    let a = Interval::half_bounded_below(1); // [1, +inf)
+    let b = Interval::half_bounded_below(1); // [1, +inf)
+    let result = interval_mul(&a, &b);
+    assert_eq!(result.lo, Bound::Finite(1));
+    assert_eq!(result.hi, Bound::PosInf);
+}
+
+#[test]
+fn test_interval_mul_crossing_zero_with_infinity() {
+    let a = Interval::new(-1, 1);
+    let b = Interval::half_bounded_below(0); // [0, +inf)
+    let result = interval_mul(&a, &b);
+    // products: (-1*0)=0, (-1*+inf)=-inf, (1*0)=0, (1*+inf)=+inf
+    assert_eq!(result.lo, Bound::NegInf);
+    assert_eq!(result.hi, Bound::PosInf);
+}
+
+#[test]
+fn test_interval_operator_traits() {
+    let a = Interval::new(1, 5);
+    let b = Interval::new(2, 3);
+    assert_eq!(a.clone() + b.clone(), interval_add(&a, &b));
+    assert_eq!(a.clone() - b.clone(), interval_sub(&a, &b));
+    assert_eq!(a.clone() * b.clone(), interval_mul(&a, &b));
+    assert_eq!(-a.clone(), interval_neg(&a));
+}
+
+#[test]
+fn test_interval_div_returns_top() {
+    let a = Interval::new(1, 10);
+    let b = Interval::new(2, 5);
+    let result = a / b;
+    assert_eq!(result, Interval::top());
+}
+
+#[test]
+fn test_interval_rem_returns_top() {
+    let a = Interval::new(1, 10);
+    let b = Interval::new(2, 5);
+    let result = a % b;
+    assert_eq!(result, Interval::top());
+}
+
+// --- meet/join edge cases ---
+
+#[test]
+fn test_meet_disjoint_intervals() {
+    let a = Interval::new(0, 5);
+    let b = Interval::new(10, 20);
+    assert!(a.meet(&b).is_empty());
+}
+
+#[test]
+fn test_meet_touching_intervals() {
+    let a = Interval::new(0, 5);
+    let b = Interval::new(5, 10);
+    assert_eq!(a.meet(&b), Interval::constant(5));
+}
+
+#[test]
+fn test_join_disjoint_creates_hull() {
+    let a = Interval::new(0, 5);
+    let b = Interval::new(10, 20);
+    assert_eq!(a.join(&b), Interval::new(0, 20));
+}
+
+#[test]
+fn test_subseteq_point_in_range() {
+    let point = Interval::constant(5);
+    let range = Interval::new(0, 10);
+    assert!(point.is_subseteq(&range));
+}
+
+#[test]
+fn test_subseteq_half_bounded() {
+    let a = Interval::new(0, 10);
+    let b = Interval::half_bounded_below(0);
+    assert!(a.is_subseteq(&b));
+    assert!(!b.is_subseteq(&a));
+}

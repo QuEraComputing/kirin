@@ -240,4 +240,125 @@ mod tests {
         let path = parse_ir_crate_path(&input.attrs).unwrap();
         assert_eq!(path, "kirin_ir");
     }
+
+    #[test]
+    fn test_parse_stage_variant_named_fields() {
+        // Variant with named fields (struct-like) should fail
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                #[stage(name = "source")]
+                Source { info: StageInfo<HighLevel> },
+            }
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("single-field tuple"),
+            "Expected 'single-field tuple' in error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variant_unit_variant() {
+        // Unit variant (no fields) should fail
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                #[stage(name = "source")]
+                Source,
+            }
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("single-field tuple"),
+            "Expected 'single-field tuple' in error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variant_non_stage_info_type() {
+        // Field type is not StageInfo<T>
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                #[stage(name = "source")]
+                Source(HighLevel),
+            }
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("StageInfo"),
+            "Expected StageInfo requirement in error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variant_no_stage_attr() {
+        // Variant has no #[stage(...)] at all
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                Source(StageInfo<HighLevel>),
+            }
+        };
+        let result = parse_stage_variants(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("missing"),
+            "Expected 'missing' in error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_stage_variants_multiple_success() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                #[stage(name = "source")]
+                Source(StageInfo<HighLevel>),
+                #[stage(name = "target")]
+                Target(StageInfo<LowLevel>),
+            }
+        };
+        let variants = parse_stage_variants(&input).unwrap();
+        assert_eq!(variants.len(), 2);
+        assert_eq!(variants[0].stage_name, "source");
+        assert_eq!(variants[0].ident, "Source");
+        assert_eq!(variants[1].stage_name, "target");
+        assert_eq!(variants[1].ident, "Target");
+    }
+
+    #[test]
+    fn test_parse_ir_crate_path_non_stage_attr_ignored() {
+        let input: DeriveInput = syn::parse_quote! {
+            #[derive(Debug)]
+            #[some_other(crate = "wrong")]
+            enum Stage {}
+        };
+        let path = parse_ir_crate_path(&input.attrs).unwrap();
+        assert_eq!(path, DEFAULT_IR_CRATE);
+    }
+
+    #[test]
+    fn test_extract_stage_info_type_param_no_generics() {
+        // StageInfo without angle brackets
+        let ty: Type = syn::parse_quote!(StageInfo);
+        assert!(extract_stage_info_type_param(&ty).is_none());
+    }
+
+    #[test]
+    fn test_extract_stage_info_type_param_multiple_generics() {
+        // StageInfo<A, B> - two type params
+        let ty: Type = syn::parse_quote!(StageInfo<A, B>);
+        assert!(extract_stage_info_type_param(&ty).is_none());
+    }
+
+    #[test]
+    fn test_extract_stage_info_type_param_non_type_arg() {
+        // StageInfo<'a> - lifetime param, not type
+        let ty: Type = syn::parse_quote!(StageInfo<'a>);
+        assert!(extract_stage_info_type_param(&ty).is_none());
+    }
 }

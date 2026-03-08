@@ -164,4 +164,114 @@ mod tests {
         assert_eq!(popped.callee(), callee);
         assert_eq!(stack.depth(), 0);
     }
+
+    #[test]
+    fn test_frame_stack_max_depth_exceeded() {
+        let (_pipeline, stage_id, callee, _block, _result) = build_fixture();
+        let mut stack: FrameStack<i32, ()> = FrameStack::new().with_max_depth(1);
+
+        stack
+            .push::<InterpreterError>(Frame::new(callee, stage_id, ()))
+            .unwrap();
+        assert_eq!(stack.depth(), 1);
+
+        let err = stack
+            .push::<InterpreterError>(Frame::new(callee, stage_id, ()))
+            .unwrap_err();
+        assert!(
+            matches!(err, InterpreterError::MaxDepthExceeded),
+            "expected MaxDepthExceeded, got {err:?}"
+        );
+        assert_eq!(stack.depth(), 1);
+    }
+
+    #[test]
+    fn test_frame_stack_pop_empty_returns_no_frame() {
+        let mut stack: FrameStack<i32, ()> = FrameStack::new();
+        let err = stack.pop::<InterpreterError>().unwrap_err();
+        assert!(
+            matches!(err, InterpreterError::NoFrame),
+            "expected NoFrame, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_frame_stack_current_empty_returns_no_frame() {
+        let stack: FrameStack<i32, ()> = FrameStack::new();
+        let err = stack.current::<InterpreterError>().unwrap_err();
+        assert!(
+            matches!(err, InterpreterError::NoFrame),
+            "expected NoFrame, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_frame_stack_read_unbound_value() {
+        use kirin_ir::TestSSAValue;
+
+        let (_pipeline, stage_id, callee, _block, _result) = build_fixture();
+        let mut stack: FrameStack<i32, ()> = FrameStack::new();
+        stack
+            .push::<InterpreterError>(Frame::new(callee, stage_id, ()))
+            .unwrap();
+
+        let bogus = SSAValue::from(TestSSAValue(9999));
+        let err = stack.read::<InterpreterError>(bogus).unwrap_err();
+        assert!(
+            matches!(err, InterpreterError::UnboundValue(v) if v == bogus),
+            "expected UnboundValue, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_frame_stack_write_ssa_and_read_back() {
+        use kirin_ir::TestSSAValue;
+
+        let (_pipeline, stage_id, callee, _block, _result) = build_fixture();
+        let mut stack: FrameStack<i32, ()> = FrameStack::new();
+        stack
+            .push::<InterpreterError>(Frame::new(callee, stage_id, ()))
+            .unwrap();
+
+        let ssa = SSAValue::from(TestSSAValue(42));
+        stack.write_ssa::<InterpreterError>(ssa, 123).unwrap();
+        let got = stack.read::<InterpreterError>(ssa).unwrap();
+        assert_eq!(*got, 123);
+    }
+
+    #[test]
+    fn test_frame_stack_active_stage_follows_top() {
+        let (_pipeline1, stage1, callee1, _block1, _result1) = build_fixture();
+        // Build a second fixture to get a different stage
+        let (_pipeline2, stage2, callee2, _block2, _result2) = build_fixture();
+
+        let mut stack: FrameStack<i32, ()> = FrameStack::new();
+        let fallback = stage1;
+
+        // Empty stack returns fallback
+        assert_eq!(stack.active_stage_or(fallback), fallback);
+
+        // Push first frame
+        stack
+            .push::<InterpreterError>(Frame::new(callee1, stage1, ()))
+            .unwrap();
+        assert_eq!(stack.active_stage_or(fallback), stage1);
+
+        // Push second frame with different stage
+        stack
+            .push::<InterpreterError>(Frame::new(callee2, stage2, ()))
+            .unwrap();
+        assert_eq!(stack.active_stage_or(fallback), stage2);
+
+        // Pop second, should revert to first
+        stack.pop::<InterpreterError>().unwrap();
+        assert_eq!(stack.active_stage_or(fallback), stage1);
+    }
+
+    #[test]
+    fn test_frame_stack_with_capacity() {
+        let stack: FrameStack<i32, ()> = FrameStack::with_capacity(16);
+        assert!(stack.is_empty());
+        assert_eq!(stack.depth(), 0);
+    }
 }

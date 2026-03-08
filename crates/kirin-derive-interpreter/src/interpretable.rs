@@ -139,4 +139,76 @@ mod tests {
         };
         insta::assert_snapshot!(generate_interpretable_code(input));
     }
+
+    #[test]
+    fn test_interpretable_all_non_wraps_error() {
+        // No variants have #[wraps]
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum PlainOps {
+                Lit { value: i64 },
+                Nop {},
+            }
+        };
+        let result = do_derive_interpretable(&input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Lit"),
+            "Error should mention the non-wraps variant Lit: {err}"
+        );
+        assert!(
+            err.contains("Nop"),
+            "Error should mention the non-wraps variant Nop: {err}"
+        );
+    }
+
+    #[test]
+    fn test_interpretable_struct_wraps() {
+        // Struct with #[wraps] — should succeed as it's a wrapper
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[wraps]
+            struct WrappedOp(InnerOp);
+        };
+        insta::assert_snapshot!(generate_interpretable_code(input));
+    }
+
+    #[test]
+    fn test_interpretable_struct_without_wraps_error() {
+        // Struct without #[wraps] — should error
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct PlainStruct {
+                value: i64,
+            }
+        };
+        let result = do_derive_interpretable(&input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("PlainStruct"),
+            "Error should mention the struct name: {err}"
+        );
+    }
+
+    #[test]
+    fn test_interpretable_many_wraps() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum BigOps {
+                #[wraps]
+                A(AOp),
+                #[wraps]
+                B(BOp),
+                #[wraps]
+                C(COp),
+                #[wraps]
+                D(DOp),
+                #[wraps]
+                E(EOp),
+            }
+        };
+        insta::assert_snapshot!(generate_interpretable_code(input));
+    }
 }

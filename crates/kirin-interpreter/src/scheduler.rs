@@ -79,4 +79,55 @@ mod tests {
         }
         assert_eq!(popped, vec![1, 2]);
     }
+
+    #[test]
+    fn test_dedup_scheduler_pop_empty() {
+        let mut scheduler = DedupScheduler::<usize>::new();
+        assert_eq!(scheduler.pop(), None);
+    }
+
+    #[test]
+    fn test_dedup_scheduler_requeue_after_pop() {
+        let mut scheduler = DedupScheduler::new();
+        assert!(scheduler.push_unique(1usize));
+        assert_eq!(scheduler.pop(), Some(1));
+
+        // After popping, re-pushing the same item should succeed
+        assert!(scheduler.push_unique(1usize));
+        assert_eq!(scheduler.pop(), Some(1));
+    }
+
+    #[test]
+    fn test_dedup_scheduler_len_tracks_correctly() {
+        let mut scheduler = DedupScheduler::new();
+        assert_eq!(scheduler.len(), 0);
+        assert!(scheduler.is_empty());
+
+        scheduler.push_unique(10usize);
+        scheduler.push_unique(20usize);
+        scheduler.push_unique(30usize);
+        assert_eq!(scheduler.len(), 3);
+        assert!(!scheduler.is_empty());
+
+        scheduler.pop();
+        assert_eq!(scheduler.len(), 2);
+
+        scheduler.pop();
+        scheduler.pop();
+        assert_eq!(scheduler.len(), 0);
+        assert!(scheduler.is_empty());
+    }
+
+    #[test]
+    fn test_dedup_scheduler_fifo_order() {
+        let mut scheduler = DedupScheduler::new();
+        scheduler.push_unique(1usize);
+        scheduler.push_unique(2usize);
+        scheduler.push_unique(3usize);
+
+        assert_eq!(scheduler.pop(), Some(1));
+        assert_eq!(scheduler.pop(), Some(2));
+        assert_eq!(scheduler.pop(), Some(3));
+        assert_eq!(scheduler.pop(), None);
+    }
 }

@@ -5,6 +5,9 @@ pub use interpret_impl::CompareValue;
 
 use kirin::prelude::*;
 
+#[cfg(test)]
+mod tests;
+
 /// Generic comparison statements parameterized by a compile-time type lattice.
 ///
 /// Each operation takes two operands and produces a result of the same type `T`.

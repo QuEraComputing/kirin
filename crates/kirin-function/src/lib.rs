@@ -31,6 +31,9 @@ pub use ret::Return;
 #[cfg(feature = "interpret")]
 mod interpret_impl;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
 #[kirin(fn, type = T)]

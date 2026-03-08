@@ -3,6 +3,9 @@ mod interpret_impl;
 
 use kirin::prelude::*;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(HasParser, PrettyPrint)]
 #[chumsky(format = "{result:name} = {.constant} {value} -> {result:type}")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]

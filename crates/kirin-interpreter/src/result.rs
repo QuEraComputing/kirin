@@ -113,3 +113,168 @@ impl<V> AnalysisResult<V> {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_interval::Interval;
+    use kirin_ir::{Arena, Block, TestSSAValue};
+    use rustc_hash::FxHashMap;
+
+    #[test]
+    fn bottom_result_has_no_values() {
+        let result = AnalysisResult::<Interval>::bottom();
+        assert!(result.return_value().is_none());
+        assert_eq!(result.visited_blocks().count(), 0);
+    }
+
+    #[test]
+    fn ssa_value_returns_none_for_missing() {
+        let result = AnalysisResult::<Interval>::bottom();
+        let bogus: SSAValue = TestSSAValue(999).into();
+        assert!(result.ssa_value(bogus).is_none());
+    }
+
+    #[test]
+    fn block_arg_values_returns_none_for_unvisited_block() {
+        let result = AnalysisResult::<Interval>::bottom();
+        let mut arena: Arena<Block, ()> = Arena::default();
+        let block = arena.alloc(());
+        assert!(result.block_arg_values(block).is_none());
+    }
+
+    #[test]
+    fn is_subseteq_both_bottom() {
+        let a = AnalysisResult::<Interval>::bottom();
+        let b = AnalysisResult::<Interval>::bottom();
+        assert!(a.is_subseteq(&b));
+    }
+
+    #[test]
+    fn is_subseteq_reflexive() {
+        let result = AnalysisResult::<Interval>::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(0, 10)),
+        );
+        assert!(result.is_subseteq(&result));
+    }
+
+    #[test]
+    fn is_subseteq_narrower_return_subsumed() {
+        let narrow = AnalysisResult::<Interval>::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(2, 5)),
+        );
+        let wide = AnalysisResult::<Interval>::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(0, 10)),
+        );
+        assert!(narrow.is_subseteq(&wide));
+        assert!(!wide.is_subseteq(&narrow));
+    }
+
+    #[test]
+    fn is_subseteq_some_vs_none_return() {
+        let with_return = AnalysisResult::<Interval>::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(1)),
+        );
+        let without_return = AnalysisResult::<Interval>::bottom();
+        // Some(_) is NOT subsumed by None
+        assert!(!with_return.is_subseteq(&without_return));
+        // None IS subsumed by Some(_)
+        assert!(without_return.is_subseteq(&with_return));
+    }
+
+    #[test]
+    fn clone_preserves_values() {
+        let mut values = FxHashMap::default();
+        let ssa: SSAValue = TestSSAValue(0).into();
+        values.insert(ssa, Interval::constant(42));
+
+        let result = AnalysisResult::new(values, Default::default(), Some(Interval::constant(42)));
+        let cloned = result.clone();
+
+        assert_eq!(cloned.ssa_value(ssa), Some(&Interval::constant(42)));
+        assert_eq!(cloned.return_value(), Some(&Interval::constant(42)));
+    }
+
+    #[test]
+    fn visited_blocks_tracks_entries() {
+        let mut arena: Arena<Block, ()> = Arena::default();
+        let b0 = arena.alloc(());
+        let b1 = arena.alloc(());
+
+        let mut block_args = FxHashMap::default();
+        block_args.insert(b0, vec![]);
+        block_args.insert(b1, vec![]);
+
+        let result = AnalysisResult::<Interval>::new(Default::default(), block_args, None);
+        assert_eq!(result.visited_blocks().count(), 2);
+    }
+
+    #[test]
+    fn block_arg_values_iterates_bindings() {
+        let mut arena: Arena<Block, ()> = Arena::default();
+        let block = arena.alloc(());
+
+        let ssa0: SSAValue = TestSSAValue(10).into();
+        let ssa1: SSAValue = TestSSAValue(11).into();
+
+        let mut values = FxHashMap::default();
+        values.insert(ssa0, Interval::constant(100));
+        values.insert(ssa1, Interval::constant(200));
+
+        let mut block_args = FxHashMap::default();
+        block_args.insert(block, vec![ssa0, ssa1]);
+
+        let result = AnalysisResult::new(values, block_args, None);
+        let bindings: Vec<_> = result.block_arg_values(block).unwrap().collect();
+        assert_eq!(bindings.len(), 2);
+        assert!(bindings.contains(&(ssa0, &Interval::constant(100))));
+        assert!(bindings.contains(&(ssa1, &Interval::constant(200))));
+    }
+
+    #[test]
+    fn is_subseteq_with_block_args() {
+        let mut arena: Arena<Block, ()> = Arena::default();
+        let block = arena.alloc(());
+
+        let ssa: SSAValue = TestSSAValue(0).into();
+
+        let mut values_narrow = FxHashMap::default();
+        values_narrow.insert(ssa, Interval::new(2, 5));
+        let mut block_args = FxHashMap::default();
+        block_args.insert(block, vec![ssa]);
+        let narrow = AnalysisResult::new(values_narrow, block_args, None);
+
+        let mut values_wide = FxHashMap::default();
+        values_wide.insert(ssa, Interval::new(0, 10));
+        let mut block_args2 = FxHashMap::default();
+        block_args2.insert(block, vec![ssa]);
+        let wide = AnalysisResult::new(values_wide, block_args2, None);
+
+        assert!(narrow.is_subseteq(&wide));
+        assert!(!wide.is_subseteq(&narrow));
+    }
+
+    #[test]
+    fn is_subseteq_missing_block_in_other() {
+        let mut arena: Arena<Block, ()> = Arena::default();
+        let block = arena.alloc(());
+
+        let mut block_args = FxHashMap::default();
+        block_args.insert(block, vec![]);
+        let with_block = AnalysisResult::<Interval>::new(Default::default(), block_args, None);
+        let without_block = AnalysisResult::<Interval>::bottom();
+
+        // self has block that other doesn't — not subsumed
+        assert!(!with_block.is_subseteq(&without_block));
+        // other has block that self doesn't — still subsumed (self is smaller)
+        assert!(without_block.is_subseteq(&with_block));
+    }
+}

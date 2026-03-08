@@ -291,7 +291,7 @@ impl PrettyPrint for String {
     where
         L::Type: std::fmt::Display,
     {
-        // Print as quoted string
-        doc.text(format!("\"{}\"", self))
+        // Print as quoted string with proper escaping
+        doc.text(format!("{:?}", self))
     }
 }

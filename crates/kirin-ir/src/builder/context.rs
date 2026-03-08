@@ -1151,4 +1151,234 @@ mod tests {
         let old = spec1.get_info(&stage).unwrap();
         assert!(old.is_invalidated());
     }
+
+    // --- link_statements edge cases ---
+
+    #[test]
+    fn link_statements_empty_slice() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let list = stage.link_statements(&[]);
+        assert_eq!(list.len(), 0);
+        assert!(list.head().is_none());
+        assert!(list.tail().is_none());
+    }
+
+    #[test]
+    fn link_statements_single_element() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let list = stage.link_statements(&[s0]);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list.head(), Some(&s0));
+        assert_eq!(list.tail(), Some(&s0));
+        // Single element should have no prev/next
+        let info = s0.expect_info(&stage);
+        assert_eq!(info.node.prev, None);
+        assert_eq!(info.node.next, None);
+    }
+
+    // --- link_blocks edge cases ---
+
+    #[test]
+    fn link_blocks_empty_slice() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let list = stage.link_blocks(&[]);
+        assert_eq!(list.len(), 0);
+        assert!(list.head().is_none());
+        assert!(list.tail().is_none());
+    }
+
+    #[test]
+    fn link_blocks_single_element() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let b0 = stage.block().new();
+        let list = stage.link_blocks(&[b0]);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list.head(), Some(&b0));
+        assert_eq!(list.tail(), Some(&b0));
+    }
+
+    // --- Empty block iteration ---
+
+    #[test]
+    fn empty_block_iteration() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let block = stage.block().new();
+
+        let stmts: Vec<_> = block.statements(&stage).collect();
+        assert!(stmts.is_empty());
+        assert_eq!(block.statements(&stage).len(), 0);
+        assert_eq!(block.first_statement(&stage), None);
+        assert_eq!(block.last_statement(&stage), None);
+        assert_eq!(block.terminator(&stage), None);
+    }
+
+    // --- Single statement double-ended iteration ---
+
+    #[test]
+    fn single_statement_double_ended_iteration() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let block = stage.block().stmt(s0).new();
+
+        // Forward
+        let mut iter = block.statements(&stage);
+        assert_eq!(iter.next(), Some(s0));
+        assert_eq!(iter.next(), None);
+
+        // Backward
+        let mut iter = block.statements(&stage);
+        assert_eq!(iter.next_back(), Some(s0));
+        assert_eq!(iter.next_back(), None);
+    }
+
+    // --- Region BlockIter ---
+
+    #[test]
+    fn region_block_iter_single_block() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let b0 = stage.block().new();
+        let region = stage.region().add_block(b0).new();
+
+        let blocks: Vec<_> = region.blocks(&stage).collect();
+        assert_eq!(blocks, vec![b0]);
+        assert_eq!(region.blocks(&stage).len(), 1);
+    }
+
+    #[test]
+    fn region_block_iter_double_ended() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let b0 = stage.block().new();
+        let b1 = stage.block().new();
+        let b2 = stage.block().new();
+        let region = stage
+            .region()
+            .add_block(b0)
+            .add_block(b1)
+            .add_block(b2)
+            .new();
+
+        let mut iter = region.blocks(&stage);
+        assert_eq!(iter.next_back(), Some(b2));
+        assert_eq!(iter.next(), Some(b0));
+        assert_eq!(iter.next_back(), Some(b1));
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
+    fn region_block_iter_exact_size() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let b0 = stage.block().new();
+        let b1 = stage.block().new();
+        let region = stage.region().add_block(b0).add_block(b1).new();
+
+        let mut iter = region.blocks(&stage);
+        assert_eq!(iter.len(), 2);
+        iter.next();
+        assert_eq!(iter.len(), 1);
+        iter.next();
+        assert_eq!(iter.len(), 0);
+    }
+
+    // --- Empty region ---
+
+    #[test]
+    fn empty_region() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let region = stage.region().new();
+
+        let blocks: Vec<_> = region.blocks(&stage).collect();
+        assert!(blocks.is_empty());
+        assert_eq!(region.blocks(&stage).len(), 0);
+    }
+
+    // --- SSA creation edge cases ---
+
+    #[test]
+    fn ssa_with_name_is_resolvable() {
+        use crate::node::SSAKind;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let ssa = stage
+            .ssa()
+            .name("x")
+            .ty(TestType::I32)
+            .kind(SSAKind::Test)
+            .new();
+
+        let info = ssa.expect_info(&stage);
+        assert!(info.name().is_some());
+        assert_eq!(info.ty(), &TestType::I32);
+        assert_eq!(*info.kind(), SSAKind::Test);
+    }
+
+    #[test]
+    fn ssa_without_name() {
+        use crate::node::SSAKind;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let ssa = stage.ssa().ty(TestType::I64).kind(SSAKind::Test).new();
+
+        let info = ssa.expect_info(&stage);
+        assert!(info.name().is_none());
+        assert_eq!(info.ty(), &TestType::I64);
+    }
+
+    // --- Block argument edge cases ---
+
+    #[test]
+    fn block_argument_placeholder_substitution_with_zero_args() {
+        // Block with no arguments — should work fine
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let block = stage.block().stmt(s0).new();
+
+        let info = block.expect_info(&stage);
+        assert!(info.arguments.is_empty());
+    }
+
+    // --- Detach edge cases ---
+
+    #[test]
+    fn detach_only_statement_leaves_empty_block() {
+        use crate::arena::GetInfo;
+        use crate::detach::Detach;
+
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let block = stage.block().stmt(s0).new();
+
+        s0.detach(&mut stage);
+
+        let block_info = block.expect_info(&stage);
+        assert_eq!(block_info.statements.len, 0);
+        assert_eq!(block_info.statements.head, None);
+        assert_eq!(block_info.statements.tail, None);
+    }
+
+    // --- Statement with terminator + body statements ---
+
+    #[test]
+    fn block_with_statements_and_terminator() {
+        let mut stage: StageInfo<RichDialect> = StageInfo::default();
+        let s0 = stage.statement().definition(RichDialect::Nop).new();
+        let s1 = stage.statement().definition(RichDialect::Nop).new();
+        let ret = stage.statement().definition(RichDialect::Return).new();
+
+        let block = stage.block().stmt(s0).stmt(s1).terminator(ret).new();
+
+        // statements() should only iterate non-terminator statements
+        let stmts: Vec<_> = block.statements(&stage).collect();
+        assert_eq!(stmts, vec![s0, s1]);
+
+        // terminator should be ret
+        assert_eq!(block.terminator(&stage), Some(ret));
+
+        // first_statement is head of linked list
+        assert_eq!(block.first_statement(&stage), Some(s0));
+
+        // last_statement is the terminator
+        assert_eq!(block.last_statement(&stage), Some(ret));
+    }
 }

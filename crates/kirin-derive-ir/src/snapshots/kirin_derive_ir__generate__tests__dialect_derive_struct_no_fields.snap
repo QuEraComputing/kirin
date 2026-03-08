@@ -1,0 +1,242 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for Nop {
+    type Iter = NopArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        NopArgumentsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopArgumentsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for Nop {
+    type IterMut = NopArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        NopArgumentsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::SSAValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopArgumentsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::SSAValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for Nop {
+    type Iter = NopResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        NopResultsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopResultsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for Nop {
+    type IterMut = NopResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        NopResultsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopResultsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for Nop {
+    type Iter = NopBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        NopBlocksIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopBlocksIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for Nop {
+    type IterMut = NopBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        NopBlocksMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopBlocksMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for Nop {
+    type Iter = NopSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        NopSuccessorsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopSuccessorsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for Nop {
+    type IterMut = NopSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        NopSuccessorsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopSuccessorsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for Nop {
+    type Iter = NopRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        NopRegionsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopRegionsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for Nop {
+    type IterMut = NopRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        NopRegionsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopRegionsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for Nop {
+    fn is_terminator(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for Nop {
+    fn is_constant(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for Nop {
+    fn is_pure(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for Nop {
+    fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for Nop {
+    type Type = SimpleType;
+}

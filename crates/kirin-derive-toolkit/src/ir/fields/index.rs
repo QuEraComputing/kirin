@@ -37,3 +37,33 @@ impl ToTokens for FieldName<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proc_macro2::Span;
+
+    #[test]
+    fn field_index_named_to_tokens() {
+        let idx = FieldIndex::new(Some(syn::Ident::new("foo", Span::call_site())), 0);
+        let name = idx.name();
+        let tokens = quote::quote! { #name };
+        assert_eq!(tokens.to_string(), "foo");
+    }
+
+    #[test]
+    fn field_index_positional_to_tokens() {
+        let idx = FieldIndex::new(None, 2);
+        let name = idx.name();
+        let tokens = quote::quote! { #name };
+        assert_eq!(tokens.to_string(), "field_2");
+    }
+
+    #[test]
+    fn field_index_positional_zero() {
+        let idx = FieldIndex::new(None, 0);
+        let name = idx.name();
+        let tokens = quote::quote! { #name };
+        assert_eq!(tokens.to_string(), "field_0");
+    }
+}

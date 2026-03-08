@@ -48,3 +48,6 @@ pub enum ControlFlow<T: CompileTimeValue + Default> {
 
 #[cfg(feature = "interpret")]
 mod interpret_impl;
+
+#[cfg(test)]
+mod tests;

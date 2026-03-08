@@ -1,0 +1,344 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for MixedOps {
+    type Iter = MixedOpsArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                MixedOpsArgumentsIter::Add(<AddOp as ::kirin::ir::HasArguments>::arguments(field_0))
+            }
+            Self::Literal { value } => {
+                MixedOpsArgumentsIter::Literal(std::iter::empty::<&'a ::kirin::ir::SSAValue>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsArgumentsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasArguments<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for MixedOps {
+    type IterMut = MixedOpsArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsArgumentsMutIter::Add(
+                <AddOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+            Self::Literal { value } => MixedOpsArgumentsMutIter::Literal(std::iter::empty::<
+                &'a mut ::kirin::ir::SSAValue,
+            >()),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsArgumentsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for MixedOps {
+    type Iter = MixedOpsResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                MixedOpsResultsIter::Add(<AddOp as ::kirin::ir::HasResults>::results(field_0))
+            }
+            Self::Literal { value } => {
+                MixedOpsResultsIter::Literal(std::iter::empty::<&'a ::kirin::ir::ResultValue>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsResultsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasResults<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::ResultValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for MixedOps {
+    type IterMut = MixedOpsResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsResultsMutIter::Add(
+                <AddOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+            Self::Literal { value } => MixedOpsResultsMutIter::Literal(std::iter::empty::<
+                &'a mut ::kirin::ir::ResultValue,
+            >()),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsResultsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::ResultValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for MixedOps {
+    type Iter = MixedOpsBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                MixedOpsBlocksIter::Add(<AddOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+            Self::Literal { value } => {
+                MixedOpsBlocksIter::Literal(std::iter::empty::<&'a ::kirin::ir::Block>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsBlocksIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::Block>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for MixedOps {
+    type IterMut = MixedOpsBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsBlocksMutIter::Add(
+                <AddOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+            Self::Literal { value } => {
+                MixedOpsBlocksMutIter::Literal(std::iter::empty::<&'a mut ::kirin::ir::Block>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsBlocksMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::Block>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for MixedOps {
+    type Iter = MixedOpsSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => MixedOpsSuccessorsIter::Add(
+                <AddOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+            Self::Literal { value } => {
+                MixedOpsSuccessorsIter::Literal(std::iter::empty::<&'a ::kirin::ir::Successor>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsSuccessorsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::Successor>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for MixedOps {
+    type IterMut = MixedOpsSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsSuccessorsMutIter::Add(
+                <AddOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+            Self::Literal { value } => MixedOpsSuccessorsMutIter::Literal(std::iter::empty::<
+                &'a mut ::kirin::ir::Successor,
+            >()),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsSuccessorsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::Successor>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for MixedOps {
+    type Iter = MixedOpsRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                MixedOpsRegionsIter::Add(<AddOp as ::kirin::ir::HasRegions>::regions(field_0))
+            }
+            Self::Literal { value } => {
+                MixedOpsRegionsIter::Literal(std::iter::empty::<&'a ::kirin::ir::Region>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsRegionsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasRegions<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::Region>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for MixedOps {
+    type IterMut = MixedOpsRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsRegionsMutIter::Add(
+                <AddOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+            Self::Literal { value } => {
+                MixedOpsRegionsMutIter::Literal(std::iter::empty::<&'a mut ::kirin::ir::Region>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsRegionsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::Region>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for MixedOps {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsTerminator>::is_terminator(field_0),
+            Self::Literal { value } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for MixedOps {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+            Self::Literal { value } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for MixedOps {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsPure>::is_pure(field_0),
+            Self::Literal { value } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for MixedOps {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0),
+            Self::Literal { value } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for MixedOps {
+    type Type = SimpleType;
+}

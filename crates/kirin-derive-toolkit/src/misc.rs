@@ -233,4 +233,80 @@ mod tests {
         assert!(is_type_in(&ty, "String", |seg| seg.ident == "Result"));
         assert!(!is_type_in(&ty, "f64", |seg| seg.ident == "Result"));
     }
+
+    #[test]
+    fn test_to_camel_case_empty_string() {
+        assert_eq!(to_camel_case(""), "");
+    }
+
+    #[test]
+    fn test_to_camel_case_leading_underscore() {
+        assert_eq!(to_camel_case("_leading"), "Leading");
+    }
+
+    #[test]
+    fn test_to_camel_case_trailing_underscore() {
+        assert_eq!(to_camel_case("trailing_"), "Trailing");
+    }
+
+    #[test]
+    fn test_to_camel_case_single_char() {
+        assert_eq!(to_camel_case("a"), "A");
+    }
+
+    #[test]
+    fn test_to_snake_case_empty_string() {
+        assert_eq!(to_snake_case(""), "");
+    }
+
+    #[test]
+    fn test_to_snake_case_all_uppercase() {
+        assert_eq!(to_snake_case("ABC"), "a_b_c");
+    }
+
+    #[test]
+    fn test_to_snake_case_single_char() {
+        assert_eq!(to_snake_case("X"), "x");
+    }
+
+    #[test]
+    fn test_to_snake_case_already_snake() {
+        assert_eq!(to_snake_case("already_snake"), "already_snake");
+    }
+
+    #[test]
+    fn test_is_type_non_path() {
+        // A reference type should not match
+        let ty: syn::Type = syn::parse_str("&str").unwrap();
+        assert!(!is_type(&ty, "str"));
+    }
+
+    #[test]
+    fn test_is_type_empty_path() {
+        // A tuple type should not match anything
+        let ty: syn::Type = syn::parse_str("(i32, i32)").unwrap();
+        assert!(!is_type(&ty, "i32"));
+    }
+
+    #[test]
+    fn test_is_vec_type_not_vec() {
+        let ty: syn::Type = syn::parse_str("Option<String>").unwrap();
+        assert!(!is_vec_type(&ty, "String"));
+    }
+
+    #[test]
+    fn test_is_type_in_generic_bare_type() {
+        // Bare type without generics should not match
+        let ty: syn::Type = syn::parse_str("i32").unwrap();
+        assert!(!is_type_in_generic(&ty, "i32"));
+    }
+
+    #[test]
+    fn test_is_type_in_no_type_arg() {
+        // A type with a lifetime argument, not a type argument
+        let ty: syn::Type = syn::parse_str("Cow<'static, str>").unwrap();
+        // "str" as an inner type: this should match because Cow<'static, str>
+        // has GenericArgument::Type(str) as its second arg
+        assert!(is_type_in_generic(&ty, "str"));
+    }
 }

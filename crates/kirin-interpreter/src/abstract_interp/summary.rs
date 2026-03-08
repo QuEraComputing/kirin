@@ -167,3 +167,220 @@ impl<V: Lattice + Clone> SummaryCache<V> {
         self.find_best_match(query_args).map(|e| &e.result)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_interval::Interval;
+    use kirin_ir::HasTop;
+
+    #[test]
+    fn empty_cache_is_empty() {
+        let cache = SummaryCache::<Interval>::default();
+        assert!(cache.is_empty());
+        assert!(cache.fixed().is_none());
+        assert!(cache.tentative_result().is_none());
+        assert_eq!(cache.entries().count(), 0);
+    }
+
+    #[test]
+    fn fixed_summary_always_returned() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let fixed = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(42)),
+        );
+        cache.set_fixed(fixed);
+
+        // lookup always returns fixed regardless of query args
+        assert_eq!(
+            cache.lookup(&[Interval::top()]).unwrap().return_value(),
+            Some(&Interval::constant(42))
+        );
+        assert_eq!(
+            cache.lookup(&[]).unwrap().return_value(),
+            Some(&Interval::constant(42))
+        );
+        assert!(!cache.is_empty());
+    }
+
+    #[test]
+    fn fixed_takes_priority_over_computed() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let computed = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(0, 10)),
+        );
+        cache.push_entry(vec![Interval::top()], computed);
+
+        let fixed = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(99)),
+        );
+        cache.set_fixed(fixed);
+
+        // lookup returns fixed even though computed matches
+        assert_eq!(
+            cache.lookup(&[Interval::top()]).unwrap().return_value(),
+            Some(&Interval::constant(99))
+        );
+    }
+
+    #[test]
+    fn find_best_match_returns_tightest() {
+        let mut cache = SummaryCache::<Interval>::default();
+
+        // Wide entry: args = [0, 100]
+        let wide = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(0, 100)),
+        );
+        cache.push_entry(vec![Interval::new(0, 100)], wide);
+
+        // Narrow entry: args = [0, 10]
+        let narrow = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(0, 10)),
+        );
+        cache.push_entry(vec![Interval::new(0, 10)], narrow);
+
+        // Query with [0, 5] — both entries subsume it, but narrow is tighter
+        let best = cache.find_best_match(&[Interval::new(0, 5)]).unwrap();
+        assert_eq!(best.result.return_value(), Some(&Interval::new(0, 10)));
+    }
+
+    #[test]
+    fn find_best_match_returns_none_when_not_subsumed() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let entry = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(0, 10)),
+        );
+        cache.push_entry(vec![Interval::new(0, 10)], entry);
+
+        // Query with [50, 100] — not subsumed by [0, 10]
+        assert!(cache.find_best_match(&[Interval::new(50, 100)]).is_none());
+    }
+
+    #[test]
+    fn find_best_match_skips_invalidated() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let entry = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::new(0, 10)),
+        );
+        cache.push_entry(vec![Interval::top()], entry);
+
+        cache.invalidate();
+
+        assert!(cache.find_best_match(&[Interval::new(0, 5)]).is_none());
+    }
+
+    #[test]
+    fn find_best_match_arity_mismatch_skipped() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let entry = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(1)),
+        );
+        cache.push_entry(vec![Interval::top(), Interval::top()], entry); // 2 args
+
+        // Query with 1 arg — arity mismatch, should return None
+        assert!(cache.find_best_match(&[Interval::top()]).is_none());
+    }
+
+    #[test]
+    fn invalidate_returns_count() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let r = AnalysisResult::new(Default::default(), Default::default(), None);
+        cache.push_entry(vec![], r.clone());
+        cache.push_entry(vec![], r.clone());
+        cache.push_entry(vec![], r);
+
+        assert_eq!(cache.invalidate(), 3);
+        // Second invalidate returns 0 (already invalidated)
+        assert_eq!(cache.invalidate(), 0);
+    }
+
+    #[test]
+    fn gc_removes_invalidated() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let r = AnalysisResult::new(Default::default(), Default::default(), None);
+        cache.push_entry(vec![], r);
+
+        cache.invalidate();
+        assert!(!cache.is_empty()); // entries still present (invalidated)
+
+        cache.gc();
+        assert!(cache.is_empty()); // entries removed
+    }
+
+    #[test]
+    fn gc_keeps_valid_entries() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let r1 = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(1)),
+        );
+        let r2 = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(2)),
+        );
+        cache.push_entry(vec![Interval::new(0, 10)], r1);
+        cache.push_entry(vec![Interval::new(20, 30)], r2);
+
+        cache.gc(); // nothing invalidated, so nothing removed
+        assert_eq!(cache.entries().count(), 2);
+    }
+
+    #[test]
+    fn tentative_set_and_promote() {
+        let mut cache = SummaryCache::<Interval>::default();
+        assert!(cache.tentative_result().is_none());
+
+        let r = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(5)),
+        );
+        cache.set_tentative(vec![], r);
+
+        assert!(cache.tentative_result().is_some());
+        assert_eq!(
+            cache.tentative_result().unwrap().return_value(),
+            Some(&Interval::constant(5))
+        );
+        assert!(!cache.is_empty()); // tentative counts
+
+        let promoted = AnalysisResult::new(
+            Default::default(),
+            Default::default(),
+            Some(Interval::constant(5)),
+        );
+        cache.promote_tentative(vec![], promoted);
+
+        assert!(cache.tentative_result().is_none());
+        assert_eq!(cache.entries().count(), 1);
+    }
+
+    #[test]
+    fn invalidate_clears_tentative() {
+        let mut cache = SummaryCache::<Interval>::default();
+        let r = AnalysisResult::new(Default::default(), Default::default(), None);
+        cache.set_tentative(vec![], r);
+        assert!(cache.tentative_result().is_some());
+
+        cache.invalidate();
+        assert!(cache.tentative_result().is_none());
+    }
+}

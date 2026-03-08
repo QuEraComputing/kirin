@@ -89,3 +89,4 @@ include!("global_symbol.rs");
 include!("sprint_with_globals.rs");
 include!("pipeline.rs");
 include!("impls.rs");
+include!("edge_cases.rs");

@@ -130,3 +130,236 @@ impl<L: Layout> std::fmt::Display for FieldInfo<L> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::{DefaultValue, StandardLayout};
+    use proc_macro2::Span;
+
+    fn make_argument_field(index: usize, name: Option<&str>) -> FieldInfo<StandardLayout> {
+        FieldInfo {
+            index,
+            ident: name.map(|n| syn::Ident::new(n, Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::Argument {
+                ssa_type: syn::parse_quote!(Default::default()),
+            },
+        }
+    }
+
+    fn make_result_field(index: usize, name: &str) -> FieldInfo<StandardLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::Result {
+                ssa_type: syn::parse_quote!(MyType),
+            },
+        }
+    }
+
+    fn make_value_field(
+        index: usize,
+        name: &str,
+        default: Option<DefaultValue>,
+        into: bool,
+    ) -> FieldInfo<StandardLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::Value {
+                ty: syn::parse_quote!(i64),
+                default,
+                into,
+                extra: (),
+            },
+        }
+    }
+
+    #[test]
+    fn category_argument() {
+        let f = make_argument_field(0, Some("x"));
+        assert_eq!(f.category(), FieldCategory::Argument);
+    }
+
+    #[test]
+    fn category_result() {
+        let f = make_result_field(0, "out");
+        assert_eq!(f.category(), FieldCategory::Result);
+    }
+
+    #[test]
+    fn category_block() {
+        let f: FieldInfo<StandardLayout> = FieldInfo {
+            index: 0,
+            ident: Some(syn::Ident::new("blk", Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::Block,
+        };
+        assert_eq!(f.category(), FieldCategory::Block);
+    }
+
+    #[test]
+    fn kind_name_all_categories() {
+        let cases: Vec<(FieldData<StandardLayout>, &str)> = vec![
+            (
+                FieldData::Argument {
+                    ssa_type: syn::parse_quote!(()),
+                },
+                "argument",
+            ),
+            (
+                FieldData::Result {
+                    ssa_type: syn::parse_quote!(()),
+                },
+                "result",
+            ),
+            (FieldData::Block, "block"),
+            (FieldData::Successor, "successor"),
+            (FieldData::Region, "region"),
+            (FieldData::Symbol, "symbol"),
+            (
+                FieldData::Value {
+                    ty: syn::parse_quote!(i32),
+                    default: None,
+                    into: false,
+                    extra: (),
+                },
+                "value",
+            ),
+        ];
+        for (data, expected_kind) in cases {
+            let f: FieldInfo<StandardLayout> = FieldInfo {
+                index: 0,
+                ident: None,
+                collection: Collection::Single,
+                data,
+            };
+            assert_eq!(f.kind_name(), expected_kind);
+        }
+    }
+
+    #[test]
+    fn name_ident_named_field() {
+        let f = make_argument_field(0, Some("my_field"));
+        let ident = f.name_ident(Span::call_site());
+        assert_eq!(ident, "my_field");
+    }
+
+    #[test]
+    fn name_ident_positional_field() {
+        let f = make_argument_field(3, None);
+        let ident = f.name_ident(Span::call_site());
+        assert_eq!(ident, "field_3");
+    }
+
+    #[test]
+    fn has_default_with_default() {
+        let f = make_value_field(0, "x", Some(DefaultValue::Default), false);
+        assert!(f.has_default());
+    }
+
+    #[test]
+    fn has_default_without_default() {
+        let f = make_value_field(0, "x", None, false);
+        assert!(!f.has_default());
+    }
+
+    #[test]
+    fn has_default_on_non_value_field() {
+        let f = make_argument_field(0, Some("x"));
+        assert!(!f.has_default());
+    }
+
+    #[test]
+    fn default_value_some() {
+        let f = make_value_field(0, "x", Some(DefaultValue::Default), false);
+        assert!(f.default_value().is_some());
+    }
+
+    #[test]
+    fn default_value_none() {
+        let f = make_value_field(0, "x", None, false);
+        assert!(f.default_value().is_none());
+    }
+
+    #[test]
+    fn default_value_on_argument() {
+        let f = make_argument_field(0, Some("x"));
+        assert!(f.default_value().is_none());
+    }
+
+    #[test]
+    fn ssa_type_on_argument() {
+        let f = make_argument_field(0, Some("x"));
+        assert!(f.ssa_type().is_some());
+    }
+
+    #[test]
+    fn ssa_type_on_result() {
+        let f = make_result_field(0, "out");
+        assert!(f.ssa_type().is_some());
+    }
+
+    #[test]
+    fn ssa_type_on_value() {
+        let f = make_value_field(0, "x", None, false);
+        assert!(f.ssa_type().is_none());
+    }
+
+    #[test]
+    fn value_type_on_value() {
+        let f = make_value_field(0, "x", None, false);
+        assert!(f.value_type().is_some());
+    }
+
+    #[test]
+    fn value_type_on_argument() {
+        let f = make_argument_field(0, Some("x"));
+        assert!(f.value_type().is_none());
+    }
+
+    #[test]
+    fn has_into_true() {
+        let f = make_value_field(0, "x", None, true);
+        assert!(f.has_into());
+    }
+
+    #[test]
+    fn has_into_false() {
+        let f = make_value_field(0, "x", None, false);
+        assert!(!f.has_into());
+    }
+
+    #[test]
+    fn has_into_on_non_value() {
+        let f = make_argument_field(0, Some("x"));
+        assert!(!f.has_into());
+    }
+
+    #[test]
+    fn extra_on_value() {
+        let f = make_value_field(0, "x", None, false);
+        assert!(f.extra().is_some());
+    }
+
+    #[test]
+    fn extra_on_non_value() {
+        let f = make_argument_field(0, Some("x"));
+        assert!(f.extra().is_none());
+    }
+
+    #[test]
+    fn display_named() {
+        let f = make_argument_field(0, Some("my_field"));
+        assert_eq!(format!("{}", f), "my_field");
+    }
+
+    #[test]
+    fn display_positional() {
+        let f = make_argument_field(5, None);
+        assert_eq!(format!("{}", f), "field_5");
+    }
+}

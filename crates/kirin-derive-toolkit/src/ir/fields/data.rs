@@ -79,3 +79,43 @@ impl<L: Layout> Clone for FieldData<L> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn field_category_is_ssa_like_argument() {
+        assert!(FieldCategory::Argument.is_ssa_like());
+    }
+
+    #[test]
+    fn field_category_is_ssa_like_result() {
+        assert!(FieldCategory::Result.is_ssa_like());
+    }
+
+    #[test]
+    fn field_category_is_ssa_like_block() {
+        assert!(!FieldCategory::Block.is_ssa_like());
+    }
+
+    #[test]
+    fn field_category_is_ssa_like_successor() {
+        assert!(!FieldCategory::Successor.is_ssa_like());
+    }
+
+    #[test]
+    fn field_category_is_ssa_like_region() {
+        assert!(!FieldCategory::Region.is_ssa_like());
+    }
+
+    #[test]
+    fn field_category_is_ssa_like_symbol() {
+        assert!(!FieldCategory::Symbol.is_ssa_like());
+    }
+
+    #[test]
+    fn field_category_is_ssa_like_value() {
+        assert!(!FieldCategory::Value.is_ssa_like());
+    }
+}

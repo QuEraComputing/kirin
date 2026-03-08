@@ -99,3 +99,91 @@ impl<V> Frame<V, Option<Statement>> {
         self.extra = cursor;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_arith::{ArithType, ArithValue};
+    use kirin_constant::Constant;
+    use kirin_function::{FunctionBody, Return};
+    use kirin_ir::{Pipeline, StageInfo, TestSSAValue};
+    use kirin_test_languages::CompositeLanguage;
+
+    fn build_fixture() -> (
+        Pipeline<StageInfo<CompositeLanguage>>,
+        CompileStage,
+        SpecializedFunction,
+        kirin_ir::Block,
+        ResultValue,
+    ) {
+        let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+        let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+        let stage = pipeline.stage_mut(stage_id).unwrap();
+
+        let sf = stage.staged_function().new().unwrap();
+        let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
+        let c0_result = c0.result;
+        let ret = Return::<ArithType>::new(stage, c0_result);
+        let block = stage.block().stmt(c0).terminator(ret).new();
+        let region = stage.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(stage, region);
+        let spec = stage.specialize().staged_func(sf).body(body).new().unwrap();
+        (pipeline, stage_id, spec, block, c0_result)
+    }
+
+    #[test]
+    fn test_frame_read_returns_none_for_missing() {
+        let (_pipeline, stage_id, callee, _block, _result) = build_fixture();
+        let frame: Frame<i32, ()> = Frame::new(callee, stage_id, ());
+
+        let bogus = SSAValue::from(TestSSAValue(9999));
+        assert!(frame.read(bogus).is_none());
+    }
+
+    #[test]
+    fn test_frame_write_overwrites() {
+        let (_pipeline, stage_id, callee, _block, result) = build_fixture();
+        let mut frame: Frame<i32, ()> = Frame::new(callee, stage_id, ());
+
+        let old = frame.write(result, 10);
+        assert!(old.is_none(), "first write should return None");
+
+        let old = frame.write(result, 20);
+        assert_eq!(old, Some(10), "second write should return previous value");
+
+        let ssa: SSAValue = result.into();
+        assert_eq!(frame.read(ssa), Some(&20));
+    }
+
+    #[test]
+    fn test_frame_into_parts() {
+        let (_pipeline, stage_id, callee, _block, result) = build_fixture();
+        let mut frame: Frame<i32, String> = Frame::new(callee, stage_id, "extra".to_string());
+        frame.write(result, 42);
+
+        let (got_callee, got_stage, got_values, got_extra) = frame.into_parts();
+        assert_eq!(got_callee, callee);
+        assert_eq!(got_stage, stage_id);
+        assert_eq!(got_extra, "extra");
+        let ssa: SSAValue = result.into();
+        assert_eq!(got_values.get(&ssa), Some(&42));
+    }
+
+    #[test]
+    fn test_frame_cursor_methods() {
+        let (pipeline, stage_id, callee, block, _result) = build_fixture();
+        let mut frame: Frame<i32, Option<Statement>> = Frame::new(callee, stage_id, None);
+
+        assert_eq!(frame.cursor(), None);
+
+        let stage = pipeline.stage(stage_id).unwrap();
+        let stmt = block
+            .first_statement(stage)
+            .expect("fixture has statements");
+        frame.set_cursor(Some(stmt));
+        assert_eq!(frame.cursor(), Some(stmt));
+
+        frame.set_cursor(None);
+        assert_eq!(frame.cursor(), None);
+    }
+}

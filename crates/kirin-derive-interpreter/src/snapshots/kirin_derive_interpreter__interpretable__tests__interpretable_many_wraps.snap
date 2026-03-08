@@ -1,0 +1,30 @@
+---
+source: crates/kirin-derive-interpreter/src/interpretable.rs
+expression: generate_interpretable_code(input)
+---
+#[automatically_derived]
+impl<'__ir, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>
+    for BigOps
+where
+    __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
+    __InterpL: ::kirin_ir::Dialect,
+    AOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    BOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    COp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    DOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    EOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+{
+    fn interpret(
+        &self,
+        interpreter: &mut __InterpI,
+    ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    {
+        match self {
+            Self::A(field_0) => field_0.interpret(interpreter),
+            Self::B(field_0) => field_0.interpret(interpreter),
+            Self::C(field_0) => field_0.interpret(interpreter),
+            Self::D(field_0) => field_0.interpret(interpreter),
+            Self::E(field_0) => field_0.interpret(interpreter),
+        }
+    }
+}

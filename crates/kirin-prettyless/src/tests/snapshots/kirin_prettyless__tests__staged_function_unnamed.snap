@@ -1,0 +1,11 @@
+---
+source: crates/kirin-prettyless/src/tests/edge_cases.rs
+expression: output
+---
+stage @X fn @unnamed() -> i64;
+specialize @X fn @unnamed() -> i64 {
+  ^0 {
+    constant 0;
+    return %0;
+  }
+}

@@ -43,3 +43,35 @@ impl Hygiene {
         format_ident!("__{}{}", camel_prefix, camel_name)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ident_generation() {
+        let h = Hygiene::new("kirin");
+        assert_eq!(h.ident("state").to_string(), "__kirin_state");
+    }
+
+    #[test]
+    fn lifetime_generation() {
+        let h = Hygiene::new("kirin");
+        let lt = h.lifetime("ir");
+        assert_eq!(lt.to_string(), "'__kirin_ir");
+    }
+
+    #[test]
+    fn type_ident_generation() {
+        let h = Hygiene::new("kirin");
+        let ty = h.type_ident("helper");
+        assert_eq!(ty.to_string(), "__KirinHelper");
+    }
+
+    #[test]
+    fn type_ident_snake_case_prefix() {
+        let h = Hygiene::new("my_derive");
+        let ty = h.type_ident("iter_state");
+        assert_eq!(ty.to_string(), "__MyDeriveIterState");
+    }
+}

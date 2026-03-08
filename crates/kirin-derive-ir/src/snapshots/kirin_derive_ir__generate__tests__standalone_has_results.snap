@@ -1,0 +1,26 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for UnaryOp {
+    type Iter = UnaryOpResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        let Self { result, arg } = self;
+        UnaryOpResultsIter {
+            inner: std::iter::once(result),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct UnaryOpResultsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for UnaryOpResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

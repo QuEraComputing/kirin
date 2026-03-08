@@ -1,7 +1,7 @@
 pub use logos::Logos;
 
 #[derive(Logos, Debug, Clone, PartialEq)]
-#[logos(skip r"[ \t\n\f]+")]
+#[logos(skip r"[ \t\n\r\f]+")]
 #[logos(skip r"//[^\n\r]*")]
 #[logos(skip r"/\*([^*]|\*+[^*/])*\*+/")]
 pub enum Token<'src> {
@@ -601,5 +601,391 @@ mod tests {
         assert_eq!(Token::Ellipsis.to_string(), "...");
         assert_eq!(Token::DoubleColon.to_string(), "::");
         assert_eq!(Token::Semicolon.to_string(), ";");
+    }
+
+    // --- Integer literal edge cases ---
+
+    #[test]
+    fn test_int_boundary_values() {
+        // i64::MAX as string
+        let input = "9223372036854775807";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("9223372036854775807"))));
+        assert_eq!(lexer.next(), None);
+
+        // i64::MIN as string
+        let input = "-9223372036854775808";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("-9223372036854775808"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_int_overflow_still_lexes_as_string() {
+        // Larger than i64::MAX — lexer stores raw text, so this is fine
+        let input = "99999999999999999999999";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(
+            lexer.next(),
+            Some(Ok(Token::Int("99999999999999999999999")))
+        );
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_int_zero() {
+        let input = "0 -0";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("0"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("-0"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_int_leading_zeros() {
+        let input = "007 -007";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("007"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("-007"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    // --- Float literal edge cases ---
+
+    #[test]
+    fn test_float_very_small() {
+        let input = "0.0000000001";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("0.0000000001"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_float_very_large() {
+        let input = "99999999999999.99999999999";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(
+            lexer.next(),
+            Some(Ok(Token::Float("99999999999999.99999999999")))
+        );
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_float_large_exponent() {
+        let input = "1.0e308 1.0e-308";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("1.0e308"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("1.0e-308"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_float_capital_e_exponent() {
+        let input = "1.0E10 2.5E-3";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("1.0E10"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("2.5E-3"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_float_zero() {
+        let input = "0.0 -0.0";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("0.0"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Float("-0.0"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_no_trailing_dot_float() {
+        // "1." should NOT be a Float — it should be Int + Dot
+        let input = "1.";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("1"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Dot)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_no_leading_dot_float() {
+        // ".5" should NOT be a Float — Dot + Int
+        let input = ".5";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Dot)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("5"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    // --- Hex / Unsigned edge cases ---
+
+    #[test]
+    fn test_unsigned_hex_full_range() {
+        let input = "0xFFFFFFFFFFFFFFFF";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Unsigned("FFFFFFFFFFFFFFFF"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_unsigned_hex_mixed_case() {
+        let input = "0xAbCd01";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Unsigned("AbCd01"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_unsigned_hex_zero() {
+        let input = "0x0";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Unsigned("0"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    // --- String literal edge cases ---
+
+    #[test]
+    fn test_string_empty() {
+        let input = r#""""#;
+        let mut lexer = Token::lexer(input);
+        assert_eq!(
+            lexer.next(),
+            Some(Ok(Token::StringLit(r#""""#.to_string())))
+        );
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_string_with_escapes() {
+        let input = r#""\n\t\\\"""#;
+        let mut lexer = Token::lexer(input);
+        assert_eq!(
+            lexer.next(),
+            Some(Ok(Token::StringLit(r#""\n\t\\\"""#.to_string())))
+        );
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_string_unclosed_is_error() {
+        // An unclosed string should not produce a StringLit token
+        let input = r#""hello"#;
+        let mut lexer = Token::lexer(input);
+        let tok = lexer.next();
+        assert!(tok.is_some());
+        assert!(tok.unwrap().is_err());
+    }
+
+    // --- Identifier edge cases ---
+
+    #[test]
+    fn test_identifier_underscore_only() {
+        let input = "_";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("_"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_identifier_leading_underscores() {
+        let input = "___foo __";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("___foo"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("__"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_identifier_with_digits() {
+        let input = "x0 a123b _9";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("x0"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("a123b"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("_9"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_identifier_unicode_extended() {
+        // CJK ideograph and accented letter
+        let input = "日本語 café";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("日本語"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("café"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    // --- SSA / Block edge cases ---
+
+    #[test]
+    fn test_ssa_with_underscores_and_digits() {
+        let input = "%_0 %arg_1_2 %_";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::SSAValue("_0"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::SSAValue("arg_1_2"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::SSAValue("_"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_block_with_digits() {
+        let input = "^bb0 ^entry ^_hidden";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Block("bb0"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Block("entry"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Block("_hidden"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_bare_percent_is_error() {
+        // A bare `%` followed by space is not a valid SSAValue
+        let tokens: Vec<_> = lex("% x").collect();
+        assert!(tokens[0].is_err());
+    }
+
+    #[test]
+    fn test_bare_caret_is_error() {
+        // A bare `^` followed by space is not a valid Block
+        let tokens: Vec<_> = lex("^ bb").collect();
+        assert!(tokens[0].is_err());
+    }
+
+    #[test]
+    fn test_bare_at_is_error() {
+        // A bare `@` followed by space is not a valid Symbol
+        let tokens: Vec<_> = lex("@ foo").collect();
+        assert!(tokens[0].is_err());
+    }
+
+    #[test]
+    fn test_bare_hash_is_error() {
+        // A bare `#` followed by space is not a valid AttrId
+        let tokens: Vec<_> = lex("# tag").collect();
+        assert!(tokens[0].is_err());
+    }
+
+    // --- Error token handling ---
+
+    #[test]
+    fn test_multiple_error_tokens() {
+        let tokens: Vec<_> = lex("~ ! `").collect();
+        assert_eq!(tokens.len(), 3);
+        for tok in &tokens {
+            assert!(tok.is_err());
+        }
+    }
+
+    #[test]
+    fn test_error_interspersed_with_valid() {
+        let tokens: Vec<_> = lex("foo ~ bar").collect();
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0], Ok(Token::Identifier("foo")));
+        assert!(tokens[1].is_err());
+        assert_eq!(tokens[2], Ok(Token::Identifier("bar")));
+    }
+
+    // --- Comment edge cases ---
+
+    #[test]
+    fn test_comment_only_input() {
+        let tokens: Vec<_> = lex("// just a comment").collect();
+        assert!(tokens.is_empty());
+
+        let tokens: Vec<_> = lex("/* block only */").collect();
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_line_comment_no_trailing_newline() {
+        let input = "foo // trailing";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("foo"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_empty_block_comment() {
+        let input = "a /**/ b";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("a"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("b"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    // --- Punctuation ambiguity edge cases ---
+
+    #[test]
+    fn test_arrow_vs_negative_int() {
+        // "->" should be Arrow, not negative-something
+        let input = "-> -1";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Arrow)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Int("-1"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_dot_disambiguation() {
+        // `.` vs `..` vs `...`
+        let input = ". .. ...";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Dot)));
+        assert_eq!(lexer.next(), Some(Ok(Token::DotDot)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Ellipsis)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_four_dots() {
+        // Four dots: `...` + `.`
+        let input = "....";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Ellipsis)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Dot)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_colon_disambiguation() {
+        // `:` vs `::`
+        let input = ": :: :";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Colon)));
+        assert_eq!(lexer.next(), Some(Ok(Token::DoubleColon)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Colon)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    // --- Display for StringLit ---
+
+    #[test]
+    fn test_display_string_lit_uses_debug_format() {
+        // StringLit Display uses {:?} which adds quotes and escapes
+        let tok = Token::StringLit("hello\nworld".to_string());
+        let display = tok.to_string();
+        assert_eq!(display, "\"hello\\nworld\"");
+    }
+
+    // --- Whitespace handling ---
+
+    #[test]
+    fn test_form_feed_is_skipped() {
+        let input = "a\x0Cb";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("a"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("b"))));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_carriage_return_is_skipped() {
+        // \r is in the skip pattern, so it's treated as whitespace
+        let tokens: Vec<_> = lex("a\rb").collect();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], Ok(Token::Identifier("a")));
+        assert_eq!(tokens[1], Ok(Token::Identifier("b")));
     }
 }

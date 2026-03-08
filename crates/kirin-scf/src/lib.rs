@@ -32,6 +32,9 @@ pub use interpret_impl::ForLoopValue;
 
 use kirin::prelude::*;
 
+#[cfg(test)]
+mod tests;
+
 /// Wrapper enum that composes all structured control flow operations.
 ///
 /// Use `#[wraps]` delegation so that each variant's `Dialect` impl is

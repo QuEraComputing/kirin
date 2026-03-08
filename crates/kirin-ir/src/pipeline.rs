@@ -426,4 +426,100 @@ mod tests {
         // GlobalSymbol(0) has never been allocated
         assert_eq!(pipeline.function_by_name(GlobalSymbol::from(0)), None);
     }
+
+    #[test]
+    fn pipeline_stage_returns_none_for_invalid_id() {
+        use crate::arena::Id;
+        use crate::node::function::CompileStage;
+
+        let mut pipeline: Pipeline<String> = Pipeline::new();
+        pipeline.add_stage_raw("stage0".to_string());
+        let invalid = CompileStage::new(Id(999));
+        assert_eq!(pipeline.stage(invalid), None);
+    }
+
+    #[test]
+    fn pipeline_stage_mut_returns_none_for_invalid_id() {
+        use crate::arena::Id;
+        use crate::node::function::CompileStage;
+
+        let mut pipeline: Pipeline<String> = Pipeline::new();
+        pipeline.add_stage_raw("stage0".to_string());
+        let invalid = CompileStage::new(Id(999));
+        assert_eq!(pipeline.stage_mut(invalid), None);
+    }
+
+    #[test]
+    fn pipeline_stages_slice() {
+        let mut pipeline: Pipeline<String> = Pipeline::new();
+        pipeline.add_stage_raw("a".to_string());
+        pipeline.add_stage_raw("b".to_string());
+        pipeline.add_stage_raw("c".to_string());
+        assert_eq!(pipeline.stages().len(), 3);
+        assert_eq!(pipeline.stages()[0], "a");
+        assert_eq!(pipeline.stages()[1], "b");
+        assert_eq!(pipeline.stages()[2], "c");
+    }
+
+    #[test]
+    fn pipeline_link_unknown_function_returns_error() {
+        use crate::arena::Id;
+        use crate::node::function::{Function, StagedFunction};
+
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let stage = pipeline.add_stage_raw(());
+        // Create a Function ID that doesn't exist in the pipeline
+        let invalid_func = Function::from(Id(999));
+        let sf = StagedFunction::from(Id(0));
+        let result = pipeline.link(invalid_func, stage, sf);
+        assert!(
+            matches!(result, Err(PipelineError::UnknownFunction(_))),
+            "expected UnknownFunction, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn pipeline_function_info_returns_none_for_invalid() {
+        use crate::arena::Id;
+        use crate::node::function::Function;
+
+        let pipeline: Pipeline<()> = Pipeline::new();
+        let invalid_func = Function::from(Id(999));
+        assert!(pipeline.function_info(invalid_func).is_none());
+    }
+
+    #[test]
+    fn pipeline_resolve_returns_none_for_invalid_symbol() {
+        use crate::node::symbol::GlobalSymbol;
+
+        let pipeline: Pipeline<()> = Pipeline::new();
+        // GlobalSymbol(42) was never interned
+        let invalid_sym = GlobalSymbol::from(42);
+        assert_eq!(pipeline.resolve(invalid_sym), None);
+    }
+
+    #[test]
+    fn pipeline_multiple_anonymous_functions_are_distinct() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let funcs: Vec<_> = (0..10)
+            .map(|_| pipeline.function().new().unwrap())
+            .collect();
+        // All should be distinct
+        for i in 0..funcs.len() {
+            for j in (i + 1)..funcs.len() {
+                assert_ne!(
+                    funcs[i], funcs[j],
+                    "anonymous functions {i} and {j} collided"
+                );
+            }
+        }
+        // All should have function_info
+        for f in &funcs {
+            assert!(pipeline.function_info(*f).is_some());
+        }
+        // None should have names
+        for f in &funcs {
+            assert_eq!(pipeline.function_info(*f).unwrap().name(), None);
+        }
+    }
 }

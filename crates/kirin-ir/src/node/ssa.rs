@@ -216,4 +216,51 @@ mod tests {
         assert_eq!(ssa_from_rv, SSAValue(Id(42)));
         assert_eq!(ssa_from_ba, SSAValue(Id(84)));
     }
+
+    #[test]
+    fn test_ssa_value_display() {
+        assert_eq!(format!("{}", SSAValue(Id(0))), "%0");
+        assert_eq!(format!("{}", SSAValue(Id(42))), "%42");
+    }
+
+    #[test]
+    fn test_result_value_display() {
+        assert_eq!(format!("{}", ResultValue(Id(3))), "%3");
+    }
+
+    #[test]
+    fn test_block_argument_display() {
+        assert_eq!(format!("{}", BlockArgument(Id(7))), "%7");
+    }
+
+    #[test]
+    fn test_ssa_roundtrip_through_result_value() {
+        let rv = ResultValue(Id(42));
+        let ssa: SSAValue = rv.into();
+        let rv_back: ResultValue = ssa.into();
+        assert_eq!(rv, rv_back);
+    }
+
+    #[test]
+    fn test_ssa_roundtrip_through_block_argument() {
+        let ba = BlockArgument(Id(10));
+        let ssa: SSAValue = ba.into();
+        let ba_back: BlockArgument = ssa.into();
+        assert_eq!(ba, ba_back);
+    }
+
+    #[test]
+    fn test_test_ssa_value_conversion() {
+        let tsv = TestSSAValue(5);
+        let ssa: SSAValue = tsv.into();
+        let tsv_back: TestSSAValue = ssa.into();
+        assert_eq!(tsv, tsv_back);
+    }
+
+    #[test]
+    fn test_ssa_from_ref() {
+        let ssa = SSAValue(Id(99));
+        let ssa_copy: SSAValue = (&ssa).into();
+        assert_eq!(ssa, ssa_copy);
+    }
 }

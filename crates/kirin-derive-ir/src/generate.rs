@@ -461,4 +461,228 @@ mod tests {
         };
         insta::assert_snapshot!(generate_stage_meta_code(input));
     }
+
+    // ---- Dialect derive: union should error ----
+
+    #[test]
+    fn test_dialect_derive_union_error() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            union MyUnion {
+                x: i32,
+                y: f32,
+            }
+        };
+        let result = generate_dialect(&input);
+        assert!(result.is_err(), "union should produce an error");
+    }
+
+    // ---- Dialect derive: struct with no fields (unit-like) ----
+
+    #[test]
+    fn test_dialect_derive_struct_no_fields() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct Nop {}
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Dialect derive: struct with Vec<SSAValue> field ----
+
+    #[test]
+    fn test_dialect_derive_struct_vec_ssa_value() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct CallOp {
+                args: Vec<SSAValue>,
+                result: ResultValue,
+            }
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Dialect derive: struct with Option<Block> field ----
+
+    #[test]
+    fn test_dialect_derive_struct_option_block() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct ConditionalOp {
+                cond: SSAValue,
+                then_block: Block,
+                else_block: Option<Block>,
+            }
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Dialect derive: struct with Symbol field ----
+
+    #[test]
+    fn test_dialect_derive_struct_symbol() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct CallExtern {
+                target: Symbol,
+                args: Vec<SSAValue>,
+            }
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Dialect derive: enum with mixed wrapper and non-wrapper variants ----
+
+    #[test]
+    fn test_dialect_derive_enum_mixed_wraps_and_fields() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum MixedOps {
+                #[wraps]
+                Add(AddOp),
+                Literal { value: i64 },
+            }
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Property validation: constant without pure should error ----
+
+    #[test]
+    fn test_is_constant_without_pure_error() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType, constant)]
+            struct BadConstant {
+                value: i64,
+            }
+        };
+        let result = generate_property(&input, IS_CONSTANT);
+        assert!(result.is_err(), "constant without pure should error");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("pure"),
+            "Error should mention pure requirement: {err}"
+        );
+    }
+
+    // ---- Property validation: speculatable without pure should error ----
+
+    #[test]
+    fn test_is_speculatable_without_pure_error() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType, speculatable)]
+            struct BadSpec {
+                value: i64,
+            }
+        };
+        let result = generate_property(&input, IS_SPECULATABLE);
+        assert!(result.is_err(), "speculatable without pure should error");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("pure"),
+            "Error should mention pure requirement: {err}"
+        );
+    }
+
+    // ---- Property validation: constant with pure should succeed ----
+
+    #[test]
+    fn test_is_constant_with_pure_succeeds() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType, constant, pure)]
+            struct GoodConstant {
+                value: i64,
+            }
+        };
+        let result = generate_property(&input, IS_CONSTANT);
+        assert!(result.is_ok(), "constant with pure should succeed");
+    }
+
+    // ---- Enum variant: constant without pure on specific variant ----
+    // NOTE: Design issue — BoolProperty::for_variant does not call validate(),
+    // so per-variant constant-without-pure is not caught at derive time.
+    // The validation only runs through the for_struct path (struct inputs).
+    // This test documents the current behavior.
+
+    #[test]
+    fn test_enum_variant_constant_without_pure_errors() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            enum Ops {
+                #[kirin(constant)]
+                Lit { value: i64 },
+                Add { lhs: SSAValue, rhs: SSAValue },
+            }
+        };
+        // for_variant now validates: constant requires pure
+        let result = generate_property(&input, IS_CONSTANT);
+        assert!(
+            result.is_err(),
+            "constant without pure should error on enum variants too"
+        );
+    }
+
+    // ---- Standalone HasResults derive ----
+
+    #[test]
+    fn test_standalone_has_results() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct UnaryOp {
+                result: ResultValue,
+                arg: SSAValue,
+            }
+        };
+        let tokens =
+            generate_field_iter(&input, HAS_RESULTS).expect("Failed to generate HasResults");
+        insta::assert_snapshot!(rustfmt(tokens.to_string()));
+    }
+
+    // ---- Standalone HasRegions derive ----
+
+    #[test]
+    fn test_standalone_has_regions() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct Lambda {
+                body: Region,
+            }
+        };
+        let tokens =
+            generate_field_iter(&input, HAS_REGIONS).expect("Failed to generate HasRegions");
+        insta::assert_snapshot!(rustfmt(tokens.to_string()));
+    }
+
+    // ---- StageMeta derive error: applied to struct ----
+
+    #[test]
+    fn test_stage_meta_on_struct_error() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[stage(crate = "kirin_ir")]
+            struct NotAnEnum {
+                info: StageInfo<ArithDialect>,
+            }
+        };
+        let result = kirin_derive_toolkit::stage_info::generate(&input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("enum"), "Expected enum-only error: {err}");
+    }
+
+    // ---- StageMeta derive error: empty enum ----
+
+    #[test]
+    fn test_stage_meta_empty_enum_error() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[stage(crate = "kirin_ir")]
+            enum EmptyStage {}
+        };
+        let result = kirin_derive_toolkit::stage_info::generate(&input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("at least one"),
+            "Expected at-least-one error: {err}"
+        );
+    }
 }

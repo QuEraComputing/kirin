@@ -7,7 +7,7 @@ description: Use when wanting to improve test coverage while simultaneously disc
 
 ## Overview
 
-Test-driven codebase review. Discovers design issues, bugs, and ergonomic problems by actually writing tests — not by reading code and speculating. Three phases: write tests and collect findings, present findings to the user for confirmation, then iterate on solutions together.
+Test-driven codebase review. Discovers design issues, bugs, and ergonomic problems by actually writing tests — not by reading code and speculating. Three phases: dispatch agents to write tests and collect findings autonomously, merge findings and present them to the user, then iterate on solutions together.
 
 The insight: writing a test is the fastest way to discover whether an API is awkward, a behavior is wrong, or a design forces unnecessary boilerplate. If you can't write a clean test for something, that's a signal worth reporting.
 
@@ -25,15 +25,32 @@ The insight: writing a test is the fastest way to discover whether an API is awk
 - Implementing fixes from an existing review (just fix them directly or use `/refactor`)
 - Writing tests for a specific known bug (just write the test)
 
-## Phase 1: Test Writing and Discovery
+## Phase 1: Test Writing and Discovery (Agent-Driven)
 
 ### Scoping
 
 Ask the user what to cover. Accept a crate name, subsystem, or specific module. If unspecified, look at recent git changes to pick a focus area.
 
-Read the target code thoroughly before writing any tests. Understand the public API, internal invariants, and existing test coverage.
+### Dispatching test agents
 
-### Test writing strategy
+Partition the scope into independent work areas (e.g., by crate, module, or subsystem). Launch agents in parallel — each agent owns a slice of the codebase and works autonomously.
+
+The orchestrator picks a `<title>` slug summarizing the review scope (e.g., `test-coverage`, `interpreter-edge-cases`). Agent findings go into a shared directory: `design/reviews/review-<date>-<title>/`. Each agent writes to its own file within that directory.
+
+Each agent's prompt must include:
+1. Which files/modules to cover
+2. The test writing strategy and discovery signals (below)
+3. **A unique findings document path** — `design/reviews/review-<date>-<title>/review-<date>-<area-slug>.md`
+4. Instructions to write findings to that document as they're discovered (not at the end)
+5. The finding format template (below)
+
+The orchestrator does NOT read or merge findings during Phase 1. Let agents run to completion.
+
+### Agent instructions (include in each agent prompt)
+
+#### Test writing strategy
+
+Read the target code thoroughly before writing any tests. Understand the public API, internal invariants, and existing test coverage.
 
 Write tests in priority order:
 
@@ -49,9 +66,9 @@ Follow the project's test conventions from AGENTS.md:
 - New test types → `kirin-test-types`
 - New test helpers → `kirin-test-utils`
 
-### Discovery signals — when to stop and report
+#### Discovery signals — when to stop and report
 
-While writing each test, watch for these signals. When you hit one, **stop writing that test** and record it as a finding:
+While writing each test, watch for these signals. When you hit one, **stop writing that test**, record it as a finding in your findings document, then continue to the next test:
 
 | Signal | Finding type | Example |
 |--------|-------------|---------|
@@ -64,23 +81,21 @@ While writing each test, watch for these signals. When you hit one, **stop writi
 
 When a test compiles and passes cleanly with minimal setup, that's a healthy signal — keep it and move on to the next test.
 
-### What to produce
+#### Finding document format
 
-For each test area, either:
-- **A passing test** — commit-ready, following project conventions
-- **A finding** — with the incomplete test as evidence
+Each agent writes to its own findings document. The document has two sections:
 
-Aim for a natural ratio. A good session might produce 5-8 passing tests and 2-4 findings. Don't force findings — if the code is well-designed, report that too.
+```markdown
+# Test Coverage Review — <area> — <date>
 
-## Phase 2: Findings Report
+## Tests Written
 
-### Report format
+| File | New Tests | Focus |
+|------|-----------|-------|
+| ... | ... | ... |
 
-Summarize all findings. Keep it lightweight — no roleplay panels, no multi-reviewer synthesis. Just the facts from what you observed while testing.
+## Findings
 
-For each finding:
-
-```
 ### [SEVERITY] [CONFIDENCE] Short title — file:line
 
 **Found while:** writing test for [what you were testing]
@@ -94,71 +109,108 @@ For each finding:
 
 **Potential direction:**
 [1-2 sentences on how this could be addressed — not a full solution, just a direction]
+
+## Dropped Findings
+
+- **<title>** — <reason it was dropped, e.g., intentional per AGENTS.md>
 ```
 
-#### Severity levels
+Agents update the document incrementally — append each finding as it's discovered, don't batch them. This way if the agent is interrupted, findings aren't lost.
 
+#### Severity and confidence levels
+
+Severity:
 - **P1 — Bug**: Wrong behavior, panic, unsoundness. The code does something incorrect.
-- **P2 — Design issue**: Excessive boilerplate, missing abstraction, encapsulation violation. The code works but the design makes it harder than it should be.
+- **P2 — Design issue**: Excessive boilerplate, missing abstraction, encapsulation violation, compile failure. The code works (or doesn't) but the design makes it harder than it should be.
 - **P3 — Ergonomic nit**: Inconsistent naming, minor API awkwardness, documentation gap. Low impact but worth noting.
 
-#### Confidence levels
-
+Confidence:
 - **certain**: You have a failing test or a clear reproduction demonstrating the issue.
 - **likely**: The test evidence strongly suggests an issue, but there may be context you're missing.
 - **uncertain**: Something feels off but you're not sure if it's intentional. Frame as a question.
 
 Do not assign P1 to findings with "uncertain" confidence.
 
-### Cross-reference with AGENTS.md
+Cross-reference each finding against AGENTS.md design conventions before writing it. Drop findings that flag intentional patterns — note them in "Dropped Findings."
 
-Before finalizing findings, check each one against documented design conventions in AGENTS.md. Drop findings that flag intentional patterns. Note dropped findings briefly at the end so the user can audit.
+### What agents produce
 
-## Phase 3: User Walkthrough and Solution Iteration
+For each test area, either:
+- **A passing test** — commit-ready, following project conventions
+- **A finding** — written to the findings document with evidence
 
-Present findings to the user using `AskUserQuestion`. The goal is not just confirmation — it's a conversation to understand the right solution together.
+Aim for a natural ratio. Don't force findings — if the code is well-designed, report that too.
 
-### Walkthrough procedure
+## Phase 2: Merge and Verify
 
-Present findings one at a time (or up to 4 per AskUserQuestion call for lower severity), ordered by severity.
+After all agents complete:
 
-For each finding, include a `markdown` preview showing:
-- The actual code at the cited location (or the test that exposed the issue)
-- Keep previews to 15 lines or fewer — show only relevant lines with `...` for elided context
+1. **Verify the build** — run `cargo nextest run --workspace` to confirm all new tests pass
+2. **Fix compilation errors** — if any agent introduced broken tests, fix them before proceeding
+3. **Read all agent findings documents** — collect findings from each file in `design/reviews/review-<date>-<title>/`
+4. **Merge into a single report** — create `design/reviews/review-<date>-<title>.md` (at the same level as the agent directory) with a combined tests table and all findings, ordered by severity (P1 first, then P2, then P3)
+5. **Deduplicate** — if multiple agents found the same issue, keep the one with stronger evidence
+6. **Clean up** — delete the agent directory `design/reviews/review-<date>-<title>/` and its contents, since the merged report now contains everything
 
-#### Question format
+The orchestrator should not re-discover or re-investigate findings at this stage. Trust the agents' reports — just merge and organize.
+
+## Phase 3: Findings Interview
+
+Present findings to the user using `AskUserQuestion`. The goal is not just "which do you want to fix?" — it's a conversation where you explain each finding clearly so the user can make an informed decision.
+
+### Interview procedure
+
+Walk through findings one at a time, ordered by severity (P1 first). For each finding, use `AskUserQuestion` with:
+
+1. **A clear question** — the finding title with severity and confidence
+2. **Option descriptions** that explain why it matters and what each choice means
+3. **Preview panels** on options that show code — the problematic code, the test evidence, and/or a before/after fix example
+
+#### AskUserQuestion format
+
+Use `preview` fields on options to show code in the side-by-side panel. The `description` field explains the option; `preview` shows the code.
 
 ```
-question: "[P1] [certain] <finding title> — <file:line>"
+question: "[P2] [certain] `Bound::Finite(i64::MIN).negate()` panics in debug mode"
 options:
-  - label: "Confirm — let's fix this"
-    markdown: |
-      ```rust
-      // The problematic code or test evidence
-      // ... (15 lines max)
-      ```
-      **Direction:** <potential solution approach>
-  - label: "Won't Fix — intentional"
-    description: "This behavior is by design"
-  - label: "Needs Discussion"
-    description: "I want to explore this more"
+  - label: "Fix it"
+    description: "Use checked_neg() and map overflow to PosInf"
+    preview: |
+      // bound.rs:85 — current (panics on i64::MIN):
+      Bound::Finite(v) => Bound::Finite(-v),
+
+      // proposed fix:
+      Bound::Finite(v) => match v.checked_neg() {
+          Some(neg) => Bound::Finite(neg),
+          None => Bound::PosInf,
+      },
+  - label: "Won't fix — intentional"
+    description: "i64::MIN is not a valid bound in practice — mark as known limitation"
+  - label: "Needs discussion"
+    description: "Not sure PosInf is right for the overflow case — let's talk semantics"
+    preview: |
+      // -i64::MIN would be i64::MAX + 1
+      // Options: PosInf, saturate to i64::MAX, or error
 ```
 
-### Solution iteration
+The key difference from a plain list: each option includes enough context that the user can decide without having to go read the code themselves. The "Fix it" option shows both the problem and the solution. The "Won't fix" option explains when ignoring it is reasonable. The "Needs discussion" option names the specific ambiguity.
 
-When the user selects "Confirm" or "Needs Discussion", dig deeper:
+**Preview size constraint:** The `preview` field renders in a side-by-side panel with limited vertical space. Keep code snippets to **15 lines or fewer** — show only the relevant lines with `// ...` for elided context. If the finding involves a large function, extract just the problematic lines plus 1-2 lines of surrounding context. Never paste an entire function or file into a preview.
 
-1. **Explain the finding with a concrete example** — show a before/after of what a clean test *would* look like if the issue were fixed
-2. **Propose 1-2 solution directions** — not full implementations, just approaches. For example: "We could add a `TestPipelineBuilder` helper in `kirin-test-utils`" or "We could make the `stage` parameter optional with a default"
-3. **Ask for the user's preference** — they may have context about why the current design exists
-4. **If the user provides new context**, revise the finding accordingly — maybe it's actually intentional, or maybe there's a better solution direction than what you proposed
+### After each response
 
-Continue iterating until the user is satisfied with the direction for each confirmed finding.
+- **"Fix it"**: Record the decision. Move to the next finding.
+- **"Won't fix"**: Record as intentional. Move to the next finding.
+- **"Needs discussion"**: Dig deeper — propose 1-2 alternative approaches, show tradeoffs, ask a more specific follow-up question. Continue until the user is satisfied.
 
-### After walkthrough
+### Batching lower-severity findings
 
-1. **Commit passing tests** that were written during Phase 1 (with user approval)
-2. **Update the findings report** with the agreed solution direction for each confirmed finding
+For P3 findings, you can batch up to 3-4 per `AskUserQuestion` call. Still include code snippets and explanations for each, but present them as a group with a single set of options (e.g., "Fix all", "Fix #1 and #3 only", "Skip all").
+
+### After the interview
+
+1. **Update the merged findings report** with the user's decisions (confirmed, won't fix, needs discussion resolution)
+2. **Commit passing tests** with user approval
 3. Proceed to Phase 4
 
 ## Phase 4: Solution Planning and Implementation
@@ -177,10 +229,10 @@ Provide `/brainstorming` with the finding, the test evidence, and the solution d
 
 ### Step 2: Write a fix plan with `/writing-plans`
 
-Once all confirmed findings have clear solution directions (either from the walkthrough or from brainstorming), delegate to `/writing-plans` to produce an implementation plan.
+Once all confirmed findings have clear solution directions (either from the interview or from brainstorming), delegate to `/writing-plans` to produce an implementation plan.
 
 Provide the plan with:
-- The updated findings report (with solution directions)
+- The updated findings report (with solution directions and user decisions)
 - Which findings can be fixed independently vs. which have dependencies
 - Any ordering constraints (e.g., trait changes before call-site updates)
 
@@ -203,11 +255,12 @@ Use judgment. The full pipeline (brainstorm → plan → parallel implement) is 
 - Implementing fixes during Phase 1 (discovery phase writes tests, not fixes)
 - Reporting a finding without test evidence or a concrete example
 - Assigning P1 severity with "uncertain" confidence
-- Skipping the user walkthrough and producing only a report
+- Asking the user mid-Phase-1 about findings (agents work autonomously, findings go to documents)
+- Presenting findings as a bare list without code snippets or explanations
 - Flagging documented AGENTS.md conventions as issues
 - Forcing findings when the code is actually well-designed
 - Writing tests that only pass because they test trivial/tautological things
-- Jumping to implementation without updating the findings report with agreed solutions
+- Jumping to implementation without the findings interview
 - Starting `/subagent-driven-development` without a plan from `/writing-plans` (unless trivially simple)
 - Skipping `/brainstorming` for design-heavy findings where the solution direction is unclear
 

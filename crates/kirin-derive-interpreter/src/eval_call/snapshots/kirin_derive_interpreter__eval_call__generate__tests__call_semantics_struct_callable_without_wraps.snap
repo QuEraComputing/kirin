@@ -1,0 +1,22 @@
+---
+source: crates/kirin-derive-interpreter/src/eval_call/generate.rs
+expression: generate_call_semantics_code(input)
+---
+#[automatically_derived]
+impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, DirectCall>
+    for DirectCall
+where
+    __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
+    __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+{
+    type Result = __CallSemI::Value;
+    fn eval_call(
+        &self,
+        interpreter: &mut __CallSemI,
+        stage: &'__ir ::kirin::ir::StageInfo<DirectCall>,
+        callee: ::kirin::ir::SpecializedFunction,
+        args: &[__CallSemI::Value],
+    ) -> Result<Self::Result, __CallSemI::Error> {
+        Err(::kirin_interpreter::InterpreterError::missing_function_entry().into())
+    }
+}

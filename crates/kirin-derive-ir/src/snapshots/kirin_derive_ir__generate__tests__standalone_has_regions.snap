@@ -1,0 +1,26 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for Lambda {
+    type Iter = LambdaRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        let Self { body } = self;
+        LambdaRegionsIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct LambdaRegionsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for LambdaRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

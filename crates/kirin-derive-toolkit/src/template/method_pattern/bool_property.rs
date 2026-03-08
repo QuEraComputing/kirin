@@ -192,6 +192,7 @@ impl MethodPattern<StandardLayout> for BoolProperty {
         ctx: &DeriveContext<'_, StandardLayout>,
         stmt_ctx: &StatementContext<'_, StandardLayout>,
     ) -> darling::Result<TokenStream> {
+        self.reader.validate(ctx.input)?;
         Ok(self.value_expr(ctx, stmt_ctx))
     }
 }

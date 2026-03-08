@@ -82,7 +82,10 @@ impl Bound {
         match self {
             Bound::NegInf => Bound::PosInf,
             Bound::PosInf => Bound::NegInf,
-            Bound::Finite(v) => Bound::Finite(-v),
+            Bound::Finite(v) => match v.checked_neg() {
+                Some(neg) => Bound::Finite(neg),
+                None => Bound::PosInf,
+            },
         }
     }
 }
