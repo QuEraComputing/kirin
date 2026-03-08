@@ -1,5 +1,5 @@
 use kirin::prelude::*;
-use kirin_arith::{Arith, ArithType};
+use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
 use kirin_cmp::Cmp;
@@ -43,6 +43,15 @@ pub enum HighLevel {
     #[chumsky(format = "{.yield} {value}")]
     Yield { value: SSAValue },
 
+    #[kirin(constant, pure)]
+    #[chumsky(format = "{result:name} = {.constant} {value} -> {result:type}")]
+    Constant {
+        #[kirin(into)]
+        value: ArithValue,
+        #[kirin(type = value.type_of())]
+        result: ResultValue,
+    },
+
     #[wraps]
     Arith(Arith<ArithType>),
     #[wraps]
@@ -64,6 +73,15 @@ pub enum HighLevel {
 pub enum LowLevel {
     #[chumsky(format = "{body}")]
     Function { body: Region },
+
+    #[kirin(constant, pure)]
+    #[chumsky(format = "{result:name} = {.constant} {value} -> {result:type}")]
+    Constant {
+        #[kirin(into)]
+        value: ArithValue,
+        #[kirin(type = value.type_of())]
+        result: ResultValue,
+    },
 
     #[wraps]
     Arith(Arith<ArithType>),
