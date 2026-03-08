@@ -1,0 +1,22 @@
+[package]
+name = "toy-lang"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "toy-lang"
+path = "src/main.rs"
+
+[dependencies]
+kirin = { workspace = true, features = ["interpreter"] }
+kirin-arith = { workspace = true, features = ["interpret"] }
+kirin-bitwise = { workspace = true, features = ["interpret"] }
+kirin-cf = { workspace = true, features = ["interpret"] }
+kirin-cmp = { workspace = true, features = ["interpret"] }
+kirin-constant = { workspace = true, features = ["interpret"] }
+kirin-function = { workspace = true, features = ["interpret"] }
+kirin-scf = { workspace = true, features = ["interpret"] }
+kirin-interpreter = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+smallvec = { workspace = true }
