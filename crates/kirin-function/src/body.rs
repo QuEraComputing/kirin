@@ -6,7 +6,7 @@ use kirin::prelude::*;
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = T)]
 #[chumsky(format = "{body}")]
-pub struct FunctionBody<T: CompileTimeValue + Default> {
+pub struct FunctionBody<T: CompileTimeValue> {
     pub(crate) body: Region,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,

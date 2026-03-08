@@ -8,7 +8,7 @@ use crate::{Call, FunctionBody, Return};
 
 impl<T> SSACFGRegion for FunctionBody<T>
 where
-    T: kirin::prelude::CompileTimeValue + Default,
+    T: kirin::prelude::CompileTimeValue,
 {
     fn entry_block<L: Dialect>(
         &self,
@@ -27,7 +27,7 @@ where
     I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
     L: Dialect + 'ir,
-    T: kirin::prelude::CompileTimeValue + Default,
+    T: kirin::prelude::CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let stage = interp.resolve_stage::<L>()?;
@@ -47,7 +47,7 @@ where
     I::Error: From<InterpreterError>,
     I::Value: Clone,
     L: Dialect + 'ir,
-    T: kirin::prelude::CompileTimeValue + Default,
+    T: kirin::prelude::CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let stage_id = interp.active_stage();
@@ -156,7 +156,7 @@ where
     I: Interpreter<'ir>,
     I::Value: Clone,
     L: Dialect,
-    T: kirin::prelude::CompileTimeValue + Default,
+    T: kirin::prelude::CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let v = interp.read(self.value)?;

@@ -77,7 +77,7 @@ enum LambdaLanguage {
         name: Symbol,
         captures: Vec<SSAValue>,
         body: Region,
-        #[kirin(type = SimpleType::default())]
+        #[kirin(type = SimpleType::placeholder())]
         res: ResultValue,
     },
     #[wraps]

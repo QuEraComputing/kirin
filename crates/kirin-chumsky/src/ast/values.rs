@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{Dialect, SSAKind};
+use kirin_ir::{Dialect, Placeholder, SSAKind};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -91,18 +91,19 @@ where
 impl<'src, TypeOutput, IR> EmitIR<IR> for ResultValue<'src, TypeOutput>
 where
     IR: Dialect,
+    IR::Type: kirin_ir::Placeholder,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
 {
     type Output = kirin_ir::ResultValue;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
-        // Convert the parsed type to Dialect::Type via EmitIR, or use default if no type annotation
+        // Convert the parsed type to Dialect::Type via EmitIR, or use placeholder if no type annotation
         let ty: IR::Type = self
             .ty
             .as_ref()
             .map(|t| t.emit(ctx))
             .transpose()?
-            .unwrap_or_default();
+            .unwrap_or_else(|| IR::Type::placeholder());
 
         // Create a new SSA value with the parsed name and type
         let ssa = ctx

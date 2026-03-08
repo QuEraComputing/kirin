@@ -262,6 +262,7 @@ impl<S> Pipeline<S> {
     ) -> Result<StagedFunction, PipelineStagedError<L>>
     where
         S: HasStageInfo<L>,
+        L::Type: crate::Placeholder,
     {
         // Read name from FunctionInfo (GlobalSymbol is Copy, borrow ends immediately).
         let name = self
@@ -328,6 +329,7 @@ impl<S> Pipeline<S> {
     ) -> Result<(Function, StagedFunction, SpecializedFunction), PipelineStagedError<L>>
     where
         S: HasStageInfo<L>,
+        L::Type: crate::Placeholder,
     {
         let func = self.function().maybe_name(name).new()?;
 

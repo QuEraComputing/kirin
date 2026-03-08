@@ -83,7 +83,7 @@ pub use types::{ArithType, ArithValue};
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(pure, fn, type = T)]
-pub enum Arith<T: CompileTimeValue + Default> {
+pub enum Arith<T: CompileTimeValue> {
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
     Add {

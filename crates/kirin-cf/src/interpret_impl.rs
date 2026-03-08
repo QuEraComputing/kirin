@@ -9,7 +9,7 @@ where
     I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition,
     L: Dialect,
-    T: kirin::prelude::CompileTimeValue + Default,
+    T: kirin::prelude::CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         match self {

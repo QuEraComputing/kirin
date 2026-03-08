@@ -19,7 +19,7 @@ pub use builder::error::{
     PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,
     StagedFunctionError,
 };
-pub use comptime::{CompileTimeValue, Typeof};
+pub use comptime::{CompileTimeValue, Placeholder, Typeof};
 pub use context::StageInfo;
 pub use detach::Detach;
 pub use intern::InternTable;
@@ -50,7 +50,7 @@ pub mod prelude {
         Block, CompileStage, Dialect, Function, GetInfo, HasStageInfo, Pipeline, Region,
         ResultValue, SSAValue, Signature, SignatureSemantics, StageInfo, StageMeta, Statement,
     };
-    pub use crate::{CompileTimeValue, Typeof};
+    pub use crate::{CompileTimeValue, Placeholder, Typeof};
 }
 
 #[cfg(feature = "derive")]

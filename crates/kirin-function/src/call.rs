@@ -3,16 +3,15 @@ use kirin::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = T)]
 #[chumsky(format = "{res:name} = {.call} {target}({args}) -> {res:type}")]
-pub struct Call<T: CompileTimeValue + Default> {
+pub struct Call<T: CompileTimeValue> {
     target: Symbol,
     args: Vec<SSAValue>,
-    #[kirin(type = T::default())]
     res: ResultValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
 
-impl<T: CompileTimeValue + Default> Call<T> {
+impl<T: CompileTimeValue> Call<T> {
     pub fn target(&self) -> Symbol {
         self.target
     }
@@ -34,7 +33,7 @@ mod tests {
         IsSpeculatable, IsTerminator, TestSSAValue,
     };
 
-    #[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
+    #[derive(Debug, Clone, Hash, PartialEq, Eq)]
     struct UnitTy;
 
     fn make_call(num_args: usize) -> Call<UnitTy> {

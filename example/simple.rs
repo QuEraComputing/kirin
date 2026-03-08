@@ -24,7 +24,7 @@ enum HighLevel {
         name: Symbol,
         captures: Vec<SSAValue>,
         body: Region,
-        #[kirin(type = ArithType::default())]
+        #[kirin(type = ArithType::placeholder())]
         res: ResultValue,
     },
 

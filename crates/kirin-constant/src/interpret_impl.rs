@@ -10,7 +10,7 @@ where
     I::Error: From<InterpreterError>,
     L: Dialect,
     T: CompileTimeValue + Typeof<Ty> + Clone + PrettyPrint,
-    Ty: CompileTimeValue + Default,
+    Ty: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let val = I::Value::from(self.value.clone());

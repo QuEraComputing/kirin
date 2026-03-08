@@ -367,6 +367,12 @@ fn test_function_type_multi_args() {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 struct TestType;
 
+impl kirin_ir::Placeholder for TestType {
+    fn placeholder() -> Self {
+        TestType
+    }
+}
+
 impl std::fmt::Display for TestType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "test")

@@ -14,7 +14,7 @@ mod tests;
 /// The result convention follows integer semantics: 1 for true, 0 for false.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(pure, fn, type = T)]
-pub enum Cmp<T: CompileTimeValue + Default> {
+pub enum Cmp<T: CompileTimeValue> {
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.eq} {lhs}, {rhs} -> {result:type}")]
     Eq {

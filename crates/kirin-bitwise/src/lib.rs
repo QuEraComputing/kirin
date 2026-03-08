@@ -52,7 +52,7 @@ mod tests;
 /// Generic bitwise statements parameterized by a compile-time type lattice.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(pure, fn, type = T)]
-pub enum Bitwise<T: CompileTimeValue + Default> {
+pub enum Bitwise<T: CompileTimeValue> {
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.and} {lhs}, {rhs} -> {result:type}")]
     And {

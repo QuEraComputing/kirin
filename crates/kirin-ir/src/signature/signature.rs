@@ -10,11 +10,14 @@ pub struct Signature<T, C = ()> {
     pub constraints: C,
 }
 
-impl<T: Default> Default for Signature<T> {
-    fn default() -> Self {
+impl<T: crate::Placeholder> Signature<T> {
+    /// Creates a signature with no parameters and a placeholder return type.
+    ///
+    /// Use this when constructing IR before type inference has resolved types.
+    pub fn placeholder() -> Self {
         Signature {
             params: Vec::new(),
-            ret: T::default(),
+            ret: T::placeholder(),
             constraints: (),
         }
     }

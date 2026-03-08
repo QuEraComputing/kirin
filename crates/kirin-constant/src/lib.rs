@@ -10,7 +10,7 @@ mod tests;
 #[chumsky(format = "{result:name} = {.constant} {value} -> {result:type}")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(constant, pure, fn = new, type = Ty)]
-pub struct Constant<T: CompileTimeValue + Typeof<Ty> + PrettyPrint, Ty: CompileTimeValue + Default>
+pub struct Constant<T: CompileTimeValue + Typeof<Ty> + PrettyPrint, Ty: CompileTimeValue>
 {
     #[kirin(into)]
     pub value: T,

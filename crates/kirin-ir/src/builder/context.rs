@@ -2,6 +2,7 @@ use super::block::BlockBuilder;
 use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
 use super::region::RegionBuilder;
 
+use crate::Placeholder;
 use crate::arena::GetInfo;
 use crate::node::symbol::GlobalSymbol;
 use crate::node::*;
@@ -87,12 +88,15 @@ impl<L: Dialect> StageInfo<L> {
     }
 
     /// create a placeholder block argument SSAValue
-    pub fn block_argument(&mut self, index: usize) -> BlockArgument {
+    pub fn block_argument(&mut self, index: usize) -> BlockArgument
+    where
+        L::Type: crate::Placeholder,
+    {
         let id: BlockArgument = self.ssas.next_id().into();
         let ssa = SSAInfo::new(
             id.into(),
             None,
-            L::Type::default(),
+            L::Type::placeholder(),
             SSAKind::BuilderBlockArgument(index),
         );
         self.ssas.alloc(ssa);
@@ -137,8 +141,11 @@ impl<L: Dialect> StageInfo<L> {
         signature: Option<Signature<L::Type>>,
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
-    ) -> Result<StagedFunction, StagedFunctionError<L>> {
-        let sig = signature.unwrap_or_default();
+    ) -> Result<StagedFunction, StagedFunctionError<L>>
+    where
+        L::Type: crate::Placeholder,
+    {
+        let sig = signature.unwrap_or_else(|| Signature::placeholder());
 
         // Check policy conflicts for named staged functions.
         if name.is_some() {
@@ -358,6 +365,12 @@ mod tests {
         Any,
         I32,
         I64,
+    }
+
+    impl crate::Placeholder for TestType {
+        fn placeholder() -> Self {
+            Self::Any
+        }
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1123,7 +1136,7 @@ mod tests {
         let sf = stage.staged_function().new().unwrap();
 
         let body1 = stage.statement().definition(RichDialect::Return).new();
-        let default_sig: Signature<TestType> = Signature::default();
+        let default_sig: Signature<TestType> = Signature::placeholder();
         let spec1 = stage
             .specialize()
             .staged_func(sf)

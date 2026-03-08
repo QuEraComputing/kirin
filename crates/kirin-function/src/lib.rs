@@ -37,7 +37,7 @@ mod tests;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
 #[kirin(fn, type = T)]
-pub enum Lexical<T: CompileTimeValue + Default> {
+pub enum Lexical<T: CompileTimeValue> {
     FunctionBody(FunctionBody<T>),
     Lambda(Lambda<T>),
     Call(Call<T>),
@@ -47,7 +47,7 @@ pub enum Lexical<T: CompileTimeValue + Default> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
 #[kirin(fn, type = T)]
-pub enum Lifted<T: CompileTimeValue + Default> {
+pub enum Lifted<T: CompileTimeValue> {
     FunctionBody(FunctionBody<T>),
     Bind(Bind<T>),
     Call(Call<T>),

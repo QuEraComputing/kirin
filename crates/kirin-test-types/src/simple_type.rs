@@ -58,6 +58,12 @@ impl Default for SimpleType {
     }
 }
 
+impl kirin_ir::Placeholder for SimpleType {
+    fn placeholder() -> Self {
+        Self::bottom()
+    }
+}
+
 impl std::fmt::Display for SimpleType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

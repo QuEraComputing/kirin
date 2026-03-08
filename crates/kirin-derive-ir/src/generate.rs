@@ -332,6 +332,7 @@ mod tests {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType, constant, pure, speculatable)]
             struct Constant {
+                #[kirin(type = SimpleType::placeholder())]
                 result: ResultValue,
             }
         };
@@ -496,6 +497,7 @@ mod tests {
             #[kirin(type = SimpleType)]
             struct CallOp {
                 args: Vec<SSAValue>,
+                #[kirin(type = SimpleType::placeholder())]
                 result: ResultValue,
             }
         };
@@ -629,6 +631,7 @@ mod tests {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType)]
             struct UnaryOp {
+                #[kirin(type = SimpleType::placeholder())]
                 result: ResultValue,
                 arg: SSAValue,
             }

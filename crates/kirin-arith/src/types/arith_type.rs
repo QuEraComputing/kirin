@@ -46,6 +46,12 @@ impl Default for ArithType {
     }
 }
 
+impl kirin::ir::Placeholder for ArithType {
+    fn placeholder() -> Self {
+        Self::I64
+    }
+}
+
 impl Display for ArithType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let name = match self {

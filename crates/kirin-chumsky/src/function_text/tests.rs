@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use chumsky::prelude::*;
 use kirin_ir::{
-    Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
-    Region, Signature, StageInfo, TypeLattice,
+    Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Placeholder,
+    Pipeline, Region, Signature, StageInfo, TypeLattice,
 };
 use kirin_prettyless::PrintExt;
 
@@ -52,6 +52,13 @@ macro_rules! trivial_type_lattice {
         }
 
         impl TypeLattice for $name {}
+
+        impl Placeholder for $name {
+            fn placeholder() -> Self {
+                $name
+            }
+        }
+
         impl DirectlyParsable for $name {}
 
         impl<'tokens, 'src: 'tokens> crate::HasParser<'tokens, 'src> for $name {

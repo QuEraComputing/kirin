@@ -95,5 +95,5 @@ pub trait Dialect:
     + PartialEq
     + std::fmt::Debug
 {
-    type Type: CompileTimeValue + Default;
+    type Type: CompileTimeValue;
 }

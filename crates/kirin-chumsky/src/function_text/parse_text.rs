@@ -166,6 +166,7 @@ impl<'src, S, L> StageActionMut<S, L> for FirstPassAction<'_, 'src>
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
+    L::Type: kirin_ir::Placeholder,
     for<'tokens> L: HasParser<'tokens, 'tokens>,
     for<'tokens> L::Type: HasParser<'tokens, 'tokens, Output = L::Type>,
     for<'tokens> <L as HasParser<'tokens, 'tokens>>::Output: EmitIR<L, Output = Statement>,
@@ -484,6 +485,7 @@ fn apply_stage_declaration<'src, L>(
 ) -> Result<Option<StagedFunction>, FunctionParseError>
 where
     L: Dialect,
+    L::Type: kirin_ir::Placeholder,
 {
     state.record(function);
 

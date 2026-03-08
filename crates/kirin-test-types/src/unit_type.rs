@@ -38,6 +38,12 @@ impl HasTop for UnitType {
 
 impl TypeLattice for UnitType {}
 
+impl kirin_ir::Placeholder for UnitType {
+    fn placeholder() -> Self {
+        UnitType
+    }
+}
+
 #[cfg(feature = "parser")]
 mod parser_impls {
     use super::UnitType;

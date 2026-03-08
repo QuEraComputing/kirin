@@ -161,7 +161,7 @@ where
     I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition,
     L: Dialect,
-    T: CompileTimeValue + Default,
+    T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let cond = interp.read(self.condition)?;
@@ -183,7 +183,7 @@ where
     I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
     L: Dialect + Interpretable<'ir, I, L> + 'ir,
-    T: CompileTimeValue + Default,
+    T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let mut iv = interp.read(self.start)?;
@@ -208,7 +208,7 @@ where
     I: Interpreter<'ir>,
     I::Value: Clone,
     L: Dialect,
-    T: CompileTimeValue + Default,
+    T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let v = interp.read(self.value)?;
@@ -223,7 +223,7 @@ where
     I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
     L: Dialect + Interpretable<'ir, I, L> + 'ir,
-    T: CompileTimeValue + Default,
+    T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         match self {

@@ -10,17 +10,16 @@ use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(fn, type = T, crate = kirin_ir)]
-struct StageCall<T: CompileTimeValue + Default> {
+struct StageCall<T: CompileTimeValue> {
     target: Function,
     callee_stage: CompileStage,
     args: Vec<SSAValue>,
-    #[kirin(type = T::default())]
     result: ResultValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
 
-impl<T: CompileTimeValue + Default> StageCall<T> {
+impl<T: CompileTimeValue> StageCall<T> {
     fn target(&self) -> Function {
         self.target
     }
@@ -45,7 +44,7 @@ where
     I::Error: From<InterpreterError>,
     I::Value: Clone,
     L: Dialect + 'ir,
-    T: CompileTimeValue + Default,
+    T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let target_stage = self.target_stage();

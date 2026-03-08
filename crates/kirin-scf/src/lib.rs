@@ -42,7 +42,7 @@ mod tests;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
 #[kirin(fn, type = T)]
-pub enum StructuredControlFlow<T: CompileTimeValue + Default> {
+pub enum StructuredControlFlow<T: CompileTimeValue> {
     If(If<T>),
     For(For<T>),
     #[kirin(terminator)]
@@ -56,7 +56,7 @@ pub enum StructuredControlFlow<T: CompileTimeValue + Default> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "{.if} {condition} then {then_body} else {else_body}")]
 #[kirin(fn, type = T)]
-pub struct If<T: CompileTimeValue + Default> {
+pub struct If<T: CompileTimeValue> {
     condition: SSAValue,
     then_body: Block,
     else_body: Block,
@@ -72,7 +72,7 @@ pub struct If<T: CompileTimeValue + Default> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "{.for} {induction_var} in {start}..{end} step {step} do {body}")]
 #[kirin(fn, type = T)]
-pub struct For<T: CompileTimeValue + Default> {
+pub struct For<T: CompileTimeValue> {
     induction_var: SSAValue,
     start: SSAValue,
     end: SSAValue,
@@ -87,7 +87,7 @@ pub struct For<T: CompileTimeValue + Default> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "{.yield} {value}")]
 #[kirin(terminator, type = T)]
-pub struct Yield<T: CompileTimeValue + Default> {
+pub struct Yield<T: CompileTimeValue> {
     value: SSAValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,

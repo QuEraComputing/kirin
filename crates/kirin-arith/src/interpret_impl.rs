@@ -28,7 +28,7 @@ where
         + Neg<Output = I::Value>,
     I::Error: From<InterpreterError>,
     L: Dialect,
-    T: CompileTimeValue + Default,
+    T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         match self {
