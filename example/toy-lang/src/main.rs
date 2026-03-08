@@ -2,6 +2,10 @@ mod language;
 mod stage;
 
 use clap::{Parser, Subcommand};
+use kirin::prelude::*;
+use kirin::pretty::PipelinePrintExt;
+
+use stage::Stage;
 
 #[derive(Parser)]
 #[command(name = "toy-lang")]
@@ -36,22 +40,15 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Parse { file } => {
-            println!("TODO: parse {}", file.display());
+            let src = std::fs::read_to_string(&file)?;
+            let mut pipeline: Pipeline<Stage> = Pipeline::new();
+            ParsePipelineText::parse(&mut pipeline, &src)?;
+            let rendered = pipeline.sprint();
+            print!("{rendered}");
+            Ok(())
         }
-        Command::Run {
-            file,
-            stage,
-            function,
-            args,
-        } => {
-            println!(
-                "TODO: run {} @{} @{} {:?}",
-                file.display(),
-                stage,
-                function,
-                args
-            );
+        Command::Run { .. } => {
+            anyhow::bail!("run subcommand not yet implemented");
         }
     }
-    Ok(())
 }
