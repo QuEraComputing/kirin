@@ -1,5 +1,6 @@
 //! Tests for abstract interpreter gaps: recursive analysis, narrowing,
 //! summary cache tightest-match, seed summaries, and AnalysisResult edge cases.
+#![allow(clippy::drop_non_drop)]
 
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
@@ -252,7 +253,7 @@ fn test_summary_seed_refinable() {
     let cached = staged.summary(spec_fn, &[Interval::new(0, 10)]);
     assert!(cached.is_some(), "seed summary should be queryable");
     assert_eq!(cached.unwrap().return_value(), Some(&Interval::top()));
-    drop(staged);
+    drop(staged); // release mutable borrow on interp
 
     // Invalidate the seed, then re-analyze for a precise result.
     let count = interp.in_stage::<CallLang>().invalidate_summary(spec_fn);

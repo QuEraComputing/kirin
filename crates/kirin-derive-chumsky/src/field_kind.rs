@@ -278,7 +278,7 @@ pub fn fields_in_format<L: Layout>(
             let index = name
                 .parse::<usize>()
                 .ok()
-                .or_else(|| map_by_ident.get(&name.to_string()).copied());
+                .or_else(|| map_by_ident.get(*name).copied());
             if let Some(idx) = index {
                 indices.insert(idx);
             }

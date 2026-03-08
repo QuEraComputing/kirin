@@ -92,11 +92,12 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             "Statement {:?} is not a terminator and cannot be set as block terminator",
             info.definition
         );
-        self.terminator = Some(term.into());
+        self.terminator = Some(term);
         self
     }
 
     /// Finalize the block and add it to the context.
+    #[allow(clippy::wrong_self_convention, clippy::new_ret_no_self)]
     pub fn new(self) -> Block {
         let id = self.stage.blocks.next_id();
         let block_args = self

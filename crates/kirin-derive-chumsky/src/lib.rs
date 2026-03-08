@@ -1,3 +1,6 @@
+// Codegen functions pass through many IR context parameters.
+#![allow(clippy::too_many_arguments)]
+
 extern crate proc_macro;
 
 mod attrs;

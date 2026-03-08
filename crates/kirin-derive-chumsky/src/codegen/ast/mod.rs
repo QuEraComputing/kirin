@@ -32,10 +32,10 @@ impl GenerateAST {
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
     ) -> TokenStream {
         // For wrapper structs, don't generate any AST type.
-        if let kirin_derive_toolkit::ir::Data::Struct(data) = &ir_input.data {
-            if data.0.wraps.is_some() {
-                return TokenStream::new();
-            }
+        if let kirin_derive_toolkit::ir::Data::Struct(data) = &ir_input.data
+            && data.0.wraps.is_some()
+        {
+            return TokenStream::new();
         }
 
         let ast_name = syn::Ident::new(&format!("{}AST", ir_input.name), ir_input.name.span());

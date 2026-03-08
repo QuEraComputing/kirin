@@ -66,12 +66,11 @@ where
         Advance: FnMut(&mut Self, &Continuation<V, ConcreteExt>) -> Result<(), E>,
     {
         loop {
-            if stop_on_breakpoint {
-                if let Some(cursor) = self.current_cursor()? {
-                    if self.breakpoints.contains(&cursor) {
-                        return Ok(Continuation::Ext(ConcreteExt::Break));
-                    }
-                }
+            if stop_on_breakpoint
+                && let Some(cursor) = self.current_cursor()?
+                && self.breakpoints.contains(&cursor)
+            {
+                return Ok(Continuation::Ext(ConcreteExt::Break));
             }
 
             let control = step_fn(self)?;

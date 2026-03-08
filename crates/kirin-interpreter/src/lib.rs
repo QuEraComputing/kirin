@@ -1,3 +1,11 @@
+// Trait method signatures duplicate `L: Dialect` bound from `Interpretable` supertrait;
+// complex fn-pointer types are inherent to the abstract interpreter's design.
+#![allow(
+    clippy::trait_duplication_in_bounds,
+    clippy::multiple_bound_locations,
+    clippy::type_complexity
+)]
+
 mod abstract_interp;
 mod block_eval;
 mod call;

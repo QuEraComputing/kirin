@@ -27,7 +27,7 @@ fn test_parse_u64_hex() {
 
 #[test]
 fn test_parse_f64() {
-    assert_eq!(parse_with::<f64>("3.14"), Ok(3.14));
+    assert_eq!(parse_with::<f64>("1.23"), Ok(1.23));
     assert_eq!(parse_with::<f64>("1"), Ok(1.0));
     assert_eq!(parse_with::<f64>("-2.5"), Ok(-2.5));
 }

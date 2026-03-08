@@ -49,7 +49,7 @@ fn test_from_arith_value_i8() {
 
 #[test]
 fn test_from_arith_value_float_becomes_top() {
-    let v = ArithValue::F64(3.14);
+    let v = ArithValue::F64(2.72);
     let interval: Interval = v.into();
     assert_eq!(interval, Interval::top());
 

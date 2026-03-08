@@ -151,14 +151,14 @@ fn test_literal_int_large() {
 #[test]
 fn test_literal_float() {
     let result = test_parse!(
-        "3.14",
+        "1.23",
         literal_float(|s, span| s
             .parse::<f64>()
             .map_err(|_| Rich::custom(span, "bad float")))
     );
     assert!(result.is_ok());
     let f = result.unwrap().value;
-    assert!((f - 3.14).abs() < 0.001);
+    assert!((f - 1.23).abs() < 0.001);
 }
 
 #[test]
@@ -376,6 +376,7 @@ impl std::fmt::Display for TestType {
 /// Minimal dialect for EmitContext tests (avoids circular dependency on kirin-test-languages).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, kirin_derive_ir::Dialect)]
 #[kirin(crate = kirin_ir, type = TestType)]
+#[allow(dead_code)]
 enum TestDialect {
     Noop,
 }
@@ -545,7 +546,7 @@ fn test_function_parse_error_source() {
     assert!(err.source().is_none());
 
     // With source
-    let source_err = std::io::Error::new(std::io::ErrorKind::Other, "inner");
+    let source_err = std::io::Error::other("inner");
     let err = crate::FunctionParseError::new(
         crate::FunctionParseErrorKind::BodyParseFailed,
         None,

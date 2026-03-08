@@ -64,10 +64,10 @@ where
     I: ?Sized,
     syn::Ident: PartialEq<I>,
 {
-    if let syn::Type::Path(syn::TypePath { path, .. }) = ty {
-        if let Some(seg) = path.segments.last() {
-            return seg.ident == *name;
-        }
+    if let syn::Type::Path(syn::TypePath { path, .. }) = ty
+        && let Some(seg) = path.segments.last()
+    {
+        return seg.ident == *name;
     }
     false
 }
@@ -97,18 +97,16 @@ where
     syn::Ident: PartialEq<I>,
     F: Fn(&syn::PathSegment) -> bool,
 {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(seg) = type_path.path.segments.last() {
-            if f(seg) {
-                if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-                    for each in &args.args {
-                        if let syn::GenericArgument::Type(inner_ty) = &each {
-                            if is_type(inner_ty, name) {
-                                return true;
-                            }
-                        }
-                    }
-                }
+    if let syn::Type::Path(type_path) = ty
+        && let Some(seg) = type_path.path.segments.last()
+        && f(seg)
+        && let syn::PathArguments::AngleBracketed(args) = &seg.arguments
+    {
+        for each in &args.args {
+            if let syn::GenericArgument::Type(inner_ty) = &each
+                && is_type(inner_ty, name)
+            {
+                return true;
             }
         }
     }
@@ -135,14 +133,14 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
         .iter()
         .any(|name| meta.path.is_ident(name))
     {
-        return meta.error(format!(
+        meta.error(format!(
             "the '{}' attribute is only allowed on the type level #[kirin(...)]",
             meta.path.get_ident().unwrap()
-        ));
+        ))
     } else if meta.path.is_ident("callable") {
-        return meta.error(
+        meta.error(
             "the 'callable' attribute is not part of #[kirin(...)]; use #[callable] with #[derive(CallSemantics)]",
-        );
+        )
     } else if [
         "constant",
         "pure",
@@ -154,23 +152,23 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
     .iter()
     .any(|name| meta.path.is_ident(name))
     {
-        return meta.error(format!(
+        meta.error(format!(
             "the '{}' attribute is only allowed on the per statement #[kirin(...)]",
             meta.path.get_ident().unwrap()
-        ));
+        ))
     } else if ["into", "default", "type"]
         .iter()
         .any(|name| meta.path.is_ident(name))
     {
-        return meta.error(format!(
+        meta.error(format!(
             "the '{}' attribute is only allowed on fields inside statements",
             meta.path.get_ident().unwrap()
-        ));
+        ))
     } else {
-        return meta.error(format!(
+        meta.error(format!(
             "unknown attribute '{}' for #[kirin(...)]",
             meta.path.get_ident().unwrap()
-        ));
+        ))
     }
 }
 

@@ -111,6 +111,7 @@ pub struct Use {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::manual_non_exhaustive)]
 pub enum SSAKind {
     Result(Statement, usize),
     BlockArgument(Block, usize),

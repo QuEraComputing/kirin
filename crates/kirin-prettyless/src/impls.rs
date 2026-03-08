@@ -18,10 +18,10 @@ impl PrettyPrint for ResultValue {
         L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.stage());
-        if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
-                return doc.text(format!("%{}", resolved_name));
-            }
+        if let Some(name) = info.name()
+            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
+        {
+            return doc.text(format!("%{}", resolved_name));
         }
         doc.text(self.to_string())
     }
@@ -34,10 +34,10 @@ impl PrettyPrint for ResultValue {
         L::Type: std::fmt::Display,
     {
         let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
-        if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
-                return doc.text(format!("%{}", resolved_name));
-            }
+        if let Some(name) = info.name()
+            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
+        {
+            return doc.text(format!("%{}", resolved_name));
         }
         doc.text(self.to_string())
     }
@@ -64,10 +64,10 @@ impl PrettyPrint for SSAValue {
         L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.stage());
-        if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
-                return doc.text(format!("%{}", resolved_name));
-            }
+        if let Some(name) = info.name()
+            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
+        {
+            return doc.text(format!("%{}", resolved_name));
         }
         doc.text(self.to_string())
     }
@@ -80,10 +80,10 @@ impl PrettyPrint for SSAValue {
         L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.stage());
-        if let Some(name) = info.name() {
-            if let Some(resolved_name) = doc.stage().symbol_table().resolve(name) {
-                return doc.text(format!("%{}", resolved_name));
-            }
+        if let Some(name) = info.name()
+            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
+        {
+            return doc.text(format!("%{}", resolved_name));
         }
         doc.text(self.to_string())
     }
@@ -141,10 +141,10 @@ impl PrettyPrint for GlobalSymbol {
     where
         L::Type: std::fmt::Display,
     {
-        if let Some(gs) = doc.global_symbols() {
-            if let Some(name) = gs.resolve(*self) {
-                return doc.text(format!("@{}", name));
-            }
+        if let Some(gs) = doc.global_symbols()
+            && let Some(name) = gs.resolve(*self)
+        {
+            return doc.text(format!("@{}", name));
         }
         doc.text(format!("@<global:{}>", usize::from(*self)))
     }

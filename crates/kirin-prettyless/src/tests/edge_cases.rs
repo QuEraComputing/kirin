@@ -268,10 +268,7 @@ fn test_render_error_display_unknown_function() {
 fn test_render_error_source() {
     use std::error::Error;
 
-    let io_err = crate::RenderError::Io(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "test",
-    ));
+    let io_err = crate::RenderError::Io(std::io::Error::other("test"));
     assert!(io_err.source().is_some());
 
     let fmt_err = crate::RenderError::Fmt(std::fmt::Error);
@@ -362,7 +359,7 @@ fn test_document_list_custom_separator() {
     let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let doc = Document::new(Default::default(), &stage);
 
-    let items = vec![1, 2, 3];
+    let items = [1, 2, 3];
     let result = doc.list(items.iter(), " | ", |i| doc.text(format!("{}", i)));
     let mut buf = String::new();
     result.render_fmt(80, &mut buf).unwrap();

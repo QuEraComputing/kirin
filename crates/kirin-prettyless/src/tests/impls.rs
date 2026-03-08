@@ -62,10 +62,10 @@ fn test_pretty_print_f32_whole_number() {
 fn test_pretty_print_f32_fractional() {
     let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let doc = Document::new(Default::default(), &stage);
-    let arena_doc = 3.14f32.pretty_print(&doc);
+    let arena_doc = 1.23f32.pretty_print(&doc);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
-    assert_eq!(buf, "3.14");
+    assert_eq!(buf, "1.23");
 }
 
 // --- f64 ---
@@ -84,10 +84,10 @@ fn test_pretty_print_f64_whole_number() {
 fn test_pretty_print_f64_fractional() {
     let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let doc = Document::new(Default::default(), &stage);
-    let arena_doc = 2.718f64.pretty_print(&doc);
+    let arena_doc = 1.234f64.pretty_print(&doc);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
-    assert_eq!(buf, "2.718");
+    assert_eq!(buf, "1.234");
 }
 
 #[test]
@@ -315,7 +315,7 @@ fn test_render_builder_write_to() {
     let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let value = 42i32;
     let mut output = Vec::new();
-    PrettyPrintExt::<SimpleLanguage>::render(&value, &stage)
+    let _ = PrettyPrintExt::<SimpleLanguage>::render(&value, &stage)
         .write_to(&mut output);
     assert_eq!(String::from_utf8(output).unwrap(), "42\n");
 }

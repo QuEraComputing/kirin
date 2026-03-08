@@ -70,7 +70,7 @@ where
         self.spend_fuel()?;
         let cursor = self
             .current_cursor()?
-            .ok_or_else(|| InterpreterError::NoFrame.into())?;
+            .ok_or_else(|| InterpreterError::NoFrame)?;
         let def: &L = cursor.definition(stage);
         def.interpret(self)
     }
@@ -116,7 +116,7 @@ where
     {
         let cursor = self
             .current_cursor()?
-            .ok_or_else(|| InterpreterError::NoFrame.into())?;
+            .ok_or_else(|| InterpreterError::NoFrame)?;
         let next = *cursor.next::<L>(stage);
         if let Some(next_stmt) = next {
             self.set_current_cursor(Some(next_stmt))?;

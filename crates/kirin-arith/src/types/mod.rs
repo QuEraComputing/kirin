@@ -75,7 +75,7 @@ mod tests {
     fn test_arith_value_display_float_edge_cases() {
         assert_eq!(ArithValue::F64(0.0).to_string(), "0.0");
         assert_eq!(ArithValue::F32(1.0).to_string(), "1.0");
-        assert_eq!(ArithValue::F64(3.14).to_string(), "3.14");
+        assert_eq!(ArithValue::F64(2.72).to_string(), "2.72");
     }
 
     #[test]

@@ -54,11 +54,11 @@ impl<I: Identifier, T> Arena<I, T> {
     }
 
     pub fn delete(&mut self, id: impl Into<I>) -> bool {
-        if let Some(arena_item) = self.get_mut(id) {
-            if !arena_item.deleted {
-                arena_item.deleted = true;
-                return true;
-            }
+        if let Some(arena_item) = self.get_mut(id)
+            && !arena_item.deleted
+        {
+            arena_item.deleted = true;
+            return true;
         }
         false
     }

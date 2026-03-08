@@ -63,10 +63,10 @@ impl<V, X> FrameStack<V, X> {
     }
 
     pub fn push<E: From<InterpreterError>>(&mut self, frame: Frame<V, X>) -> Result<(), E> {
-        if let Some(max) = self.max_depth {
-            if self.frames.len() >= max {
-                return Err(InterpreterError::MaxDepthExceeded.into());
-            }
+        if let Some(max) = self.max_depth
+            && self.frames.len() >= max
+        {
+            return Err(InterpreterError::MaxDepthExceeded.into());
         }
         self.frames.push(frame);
         Ok(())

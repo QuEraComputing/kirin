@@ -81,7 +81,7 @@ impl<L: Dialect> StageInfo<L> {
         kind: SSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
-        let ssa = SSAInfo::new(id.into(), name.map(|n| self.symbols.intern(n)), ty, kind);
+        let ssa = SSAInfo::new(id, name.map(|n| self.symbols.intern(n)), ty, kind);
         self.ssas.alloc(ssa);
         id
     }

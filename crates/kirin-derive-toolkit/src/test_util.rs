@@ -18,12 +18,11 @@ pub fn rustfmt_tokens(tokens: &TokenStream) -> String {
         if let Some(stdin) = child.stdin.as_mut() {
             let _ = stdin.write_all(src.as_bytes());
         }
-        if let Ok(output) = child.wait_with_output() {
-            if output.status.success() {
-                if let Ok(formatted) = String::from_utf8(output.stdout) {
-                    return formatted;
-                }
-            }
+        if let Ok(output) = child.wait_with_output()
+            && output.status.success()
+            && let Ok(formatted) = String::from_utf8(output.stdout)
+        {
+            return formatted;
         }
     }
     src

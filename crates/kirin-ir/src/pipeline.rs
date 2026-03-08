@@ -209,10 +209,10 @@ impl<S> Pipeline<S> {
     ) -> Result<Function, PipelineError> {
         let sym = name
             .map(|n| {
-                if let Some(existing) = self.global_symbols.lookup(n.as_str()) {
-                    if self.name_index.contains_key(&existing) {
-                        return Err(PipelineError::DuplicateFunctionName(existing));
-                    }
+                if let Some(existing) = self.global_symbols.lookup(n.as_str())
+                    && self.name_index.contains_key(&existing)
+                {
+                    return Err(PipelineError::DuplicateFunctionName(existing));
                 }
                 Ok(self.global_symbols.intern(n))
             })

@@ -720,10 +720,10 @@ where
     candidates.sort();
     candidates.dedup();
 
-    if let Some(suggestion) = best_stage_suggestion(stage_symbol, &candidates) {
-        if !output.contains(&suggestion) {
-            output.push_str(&format!(", did you mean '@{suggestion}'?"));
-        }
+    if let Some(suggestion) = best_stage_suggestion(stage_symbol, &candidates)
+        && !output.contains(&suggestion)
+    {
+        output.push_str(&format!(", did you mean '@{suggestion}'?"));
     }
     output
 }
@@ -737,21 +737,19 @@ where
         if let Some(name) = stage
             .stage_name()
             .and_then(|symbol| pipeline.resolve(symbol).map(str::to_string))
+            && name == stage_symbol
+            && let Some(stage_id) = stage.stage_id()
         {
-            if name == stage_symbol {
-                if let Some(stage_id) = stage.stage_id() {
-                    return Some(stage_id);
-                }
-            }
+            return Some(stage_id);
         }
     }
 
     if let Ok(raw_id) = stage_symbol.parse::<usize>() {
         for stage in pipeline.stages() {
-            if let Some(stage_id) = stage.stage_id() {
-                if Id::from(stage_id).raw() == raw_id {
-                    return Some(stage_id);
-                }
+            if let Some(stage_id) = stage.stage_id()
+                && Id::from(stage_id).raw() == raw_id
+            {
+                return Some(stage_id);
             }
         }
     }

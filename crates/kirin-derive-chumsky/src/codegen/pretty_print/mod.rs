@@ -24,14 +24,14 @@ impl GeneratePrettyPrint {
             .as_ref()
             .map(|p| {
                 let mut segments = p.segments.clone();
-                if let Some(last) = segments.last_mut() {
-                    if last.ident == "parsers" {
-                        last.ident = syn::Ident::new("pretty", last.ident.span());
-                        return syn::Path {
-                            leading_colon: p.leading_colon,
-                            segments,
-                        };
-                    }
+                if let Some(last) = segments.last_mut()
+                    && last.ident == "parsers"
+                {
+                    last.ident = syn::Ident::new("pretty", last.ident.span());
+                    return syn::Path {
+                        leading_colon: p.leading_colon,
+                        segments,
+                    };
                 }
                 syn::parse_quote!(::kirin::pretty)
             })
@@ -43,10 +43,10 @@ impl GeneratePrettyPrint {
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<PrettyPrintLayout>,
     ) -> TokenStream {
-        if let kirin_derive_toolkit::ir::Data::Struct(data) = &ir_input.data {
-            if let Some(wrapper) = &data.0.wraps {
-                return self.generate_wrapper_struct_pretty_print(ir_input, wrapper);
-            }
+        if let kirin_derive_toolkit::ir::Data::Struct(data) = &ir_input.data
+            && let Some(wrapper) = &data.0.wraps
+        {
+            return self.generate_wrapper_struct_pretty_print(ir_input, wrapper);
         }
 
         self.generate_pretty_print(ir_input)

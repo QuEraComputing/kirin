@@ -15,7 +15,7 @@ fn test_document_list_single() {
     let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let doc = Document::new(Default::default(), &stage);
 
-    let items = vec![42];
+    let items = [42];
     let result = doc.list(items.iter(), ", ", |i| doc.text(format!("{}", i)));
     let mut buf = String::new();
     result.render_fmt(80, &mut buf).unwrap();
@@ -27,7 +27,7 @@ fn test_document_list_multiple() {
     let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let doc = Document::new(Default::default(), &stage);
 
-    let items = vec![1, 2, 3];
+    let items = [1, 2, 3];
     let result = doc.list(items.iter(), ", ", |i| doc.text(format!("{}", i)));
     let mut buf = String::new();
     result.render_fmt(80, &mut buf).unwrap();

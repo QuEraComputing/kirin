@@ -58,6 +58,7 @@ impl<T: PartialEq, C: PartialEq> SignatureSemantics<T, C> for ExactSemantics {
             .iter()
             .zip(cand.params.iter())
             .all(|(a, b)| a == b);
+        #[allow(clippy::unit_cmp)]
         if params_match && call.ret == cand.ret && call.constraints == cand.constraints {
             Some(())
         } else {
@@ -93,6 +94,7 @@ impl<T: TypeLattice> SignatureSemantics<T> for LatticeSemantics<T> {
         if call.params.len() != cand.params.len() {
             return None;
         }
+        #[allow(clippy::unit_cmp)]
         if call.constraints != cand.constraints {
             return None;
         }

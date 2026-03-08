@@ -1,3 +1,6 @@
+// Derive macro infrastructure naturally uses complex closure types and builder-pattern `add` methods.
+#![allow(clippy::type_complexity, clippy::should_implement_trait)]
+
 //! A metaprogramming toolkit for building Kirin dialect derive macros.
 //!
 //! # Architecture

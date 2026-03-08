@@ -26,7 +26,7 @@ fn report(violations: Vec<String>) {
     }
     let mut msg = format!("{} lattice law violation(s):\n", violations.len());
     for (i, v) in violations.iter().enumerate() {
-        let _ = write!(msg, "  {}. {}\n", i + 1, v);
+        let _ = writeln!(msg, "  {}. {}", i + 1, v);
     }
     panic!("{msg}");
 }

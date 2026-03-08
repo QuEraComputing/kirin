@@ -276,21 +276,19 @@ fn test_session_abstract_interp_with_args() {
     let blocks: Vec<_> = regions[0].blocks(stage_info).collect();
     let block_info = blocks[0].expect_info(stage_info);
     let first_stmt = block_info.statements.head().copied();
-    let block_args: Vec<_> = block_info.arguments.iter().copied().collect();
+    let block_args: Vec<_> = block_info.arguments.to_vec();
 
     let call_with = |input: Interval| -> Interval {
         let mut interp: StackInterpreter<Interval, _> = StackInterpreter::new(&pipeline, stage_id);
         let mut frame = Frame::new(spec_fn, stage_id, first_stmt);
         frame.write_ssa(SSAValue::from(block_args[0]), input);
         interp.push_frame(frame).unwrap();
-        loop {
-            match interp.in_stage::<CompositeLanguage>().run().unwrap() {
-                Continuation::Return(v) => {
-                    interp.pop_frame().unwrap();
-                    return v;
-                }
-                _ => panic!("expected Return"),
+        match interp.in_stage::<CompositeLanguage>().run().unwrap() {
+            Continuation::Return(v) => {
+                interp.pop_frame().unwrap();
+                v
             }
+            other => panic!("expected Return, got {:?}", other),
         }
     };
 

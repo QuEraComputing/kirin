@@ -37,20 +37,15 @@ pub enum FormatElement<'src> {
 }
 
 /// Options for field interpolation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum FormatOption {
     /// Interpolate the field's name (e.g., for SSAValue use its name).
     Name,
     /// Interpolate the field's type (e.g., for SSAValue use its type).
     Type,
     /// Default behavior based on field type.
+    #[default]
     Default,
-}
-
-impl Default for FormatOption {
-    fn default() -> Self {
-        FormatOption::Default
-    }
 }
 
 impl<'src> Format<'src> {

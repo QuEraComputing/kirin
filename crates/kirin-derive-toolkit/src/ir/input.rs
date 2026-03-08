@@ -95,6 +95,7 @@ where
 
 /// The body of the derive input — either a single struct or an enum with variants.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Data<L: Layout> {
     Struct(DataStruct<L>),
     Enum(DataEnum<L>),

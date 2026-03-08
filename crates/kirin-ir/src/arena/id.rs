@@ -66,6 +66,6 @@ macro_rules! identifier {
             }
         }
 
-        impl crate::arena::Identifier for $name {}
+        impl $crate::arena::Identifier for $name {}
     };
 }

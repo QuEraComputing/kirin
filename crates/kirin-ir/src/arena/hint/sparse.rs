@@ -19,6 +19,10 @@ impl<I: Identifier, T> SparseHint<I, T> {
         self.data.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     pub fn get(&self, id: I) -> Option<&T> {
         self.data.get(&id)
     }

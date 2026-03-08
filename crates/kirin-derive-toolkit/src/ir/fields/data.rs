@@ -33,6 +33,7 @@ impl FieldCategory {
 /// `Argument` and `Result` variants carry an `ssa_type` expression.
 /// `Value` carries the original Rust type and optional default/into metadata.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum FieldData<L: Layout> {
     Argument {
         ssa_type: syn::Expr,

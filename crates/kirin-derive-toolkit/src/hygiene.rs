@@ -39,7 +39,7 @@ impl Hygiene {
     /// Generate a CamelCase type identifier: `__{Prefix}{Name}`
     pub fn type_ident(&self, name: &str) -> syn::Ident {
         let camel_prefix = crate::misc::to_camel_case(self.prefix.clone());
-        let camel_name = crate::misc::to_camel_case(name.to_string());
+        let camel_name = crate::misc::to_camel_case(name);
         format_ident!("__{}{}", camel_prefix, camel_name)
     }
 }

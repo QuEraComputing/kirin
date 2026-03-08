@@ -544,11 +544,11 @@ fn update_existing_rfc_metadata(
             legacy_agent_index = Some(index);
         }
 
-        if let Some(status_line) = &status_line {
-            if line.trim_start().starts_with("status = ") {
-                *line = status_line.clone();
-                status_set = true;
-            }
+        if let Some(status_line) = &status_line
+            && line.trim_start().starts_with("status = ")
+        {
+            *line = status_line.clone();
+            status_set = true;
         }
     }
     if !last_updated_set {

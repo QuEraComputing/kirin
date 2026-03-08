@@ -1,3 +1,6 @@
+// Parser combinators produce deeply nested types; internal functions thread many parameters.
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
+
 //! # kirin-chumsky
 //!
 //! Runtime API for Kirin chumsky parsers, providing traits and common syntax nodes

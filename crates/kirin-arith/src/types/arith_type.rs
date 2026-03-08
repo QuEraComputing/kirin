@@ -39,6 +39,7 @@ pub enum ArithType {
     F64,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for ArithType {
     fn default() -> Self {
         Self::I64

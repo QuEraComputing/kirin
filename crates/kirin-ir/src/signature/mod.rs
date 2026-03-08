@@ -1,4 +1,5 @@
 mod semantics;
+#[allow(clippy::module_inception)]
 mod signature;
 
 #[cfg(test)]
