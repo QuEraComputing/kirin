@@ -1,9 +1,8 @@
 use kirin::prelude::*;
-use kirin_arith::{Arith, ArithType, ArithValue};
+use kirin_arith::{Arith, ArithType};
 use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
 use kirin_cmp::Cmp;
-use kirin_constant::Constant;
 use kirin_function::{Bind, Call, Return};
 
 /// Source-stage language: structured control flow + lexical lambdas.
@@ -51,8 +50,6 @@ pub enum HighLevel {
     #[wraps]
     Bitwise(Bitwise<ArithType>),
     #[wraps]
-    Constant(Constant<ArithValue, ArithType>),
-    #[wraps]
     Call(Call<ArithType>),
     #[wraps]
     Return(Return<ArithType>),
@@ -74,8 +71,6 @@ pub enum LowLevel {
     Cmp(Cmp<ArithType>),
     #[wraps]
     Bitwise(Bitwise<ArithType>),
-    #[wraps]
-    Constant(Constant<ArithValue, ArithType>),
     #[wraps]
     Cf(ControlFlow<ArithType>),
     #[wraps]
