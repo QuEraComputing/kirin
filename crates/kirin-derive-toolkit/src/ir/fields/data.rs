@@ -38,6 +38,10 @@ pub enum FieldData<L: Layout> {
     Argument {
         ssa_type: syn::Expr,
     },
+    /// SSA output value. When the user omits `#[kirin(type = ...)]`, `ssa_type`
+    /// defaults to `ir_type::placeholder()` (from the enum/struct-level
+    /// `#[kirin(type = T)]`) and `is_auto_placeholder` is set to `true`.
+    /// Codegen uses this flag to conditionally add `T: Placeholder` bounds.
     Result {
         ssa_type: syn::Expr,
         is_auto_placeholder: bool,

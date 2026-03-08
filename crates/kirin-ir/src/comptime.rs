@@ -4,14 +4,41 @@ pub trait CompileTimeValue: Clone + std::fmt::Debug + std::hash::Hash + PartialE
 ///
 /// Unlike `Default`, which implies a semantically meaningful "zero" value,
 /// `Placeholder` explicitly marks a value as temporary — it will be replaced
-/// by a real type during inference or lowering. Dialect types that need
-/// pre-inference construction (e.g., function call results whose types are
-/// resolved later) should implement this trait.
+/// by a real type during inference or lowering.
 ///
-/// Dialects with simple, fixed type systems (e.g., only `i64`) don't need
-/// this trait at all — it's only required where the builder needs to create
-/// SSA values without a known type (e.g., `ResultValue` fields without an
-/// explicit `#[kirin(type = ...)]` annotation).
+/// # When is this needed?
+///
+/// `ResultValue` fields in dialect structs/enums represent SSA outputs that
+/// need a type at construction time. When a `ResultValue` field has no
+/// explicit `#[kirin(type = ...)]` annotation, the derive macro automatically
+/// uses `T::placeholder()` as the default type expression and adds
+/// `T: Placeholder` to the generated builder's `where` clause.
+///
+/// Dialect authors **do not** need to write `+ Placeholder` on their struct
+/// definitions or interpreter impls — the bound only appears in
+/// derive-generated code (builders and parsers).
+///
+/// Use explicit `#[kirin(type = expr)]` to override the default when the
+/// result type is computed from other fields (e.g., `#[kirin(type = value.type_of())]`
+/// in [`Constant`](crate::Typeof)).
+///
+/// # Example
+///
+/// ```ignore
+/// // The derive auto-infers T::placeholder() for `result` and adds
+/// // T: Placeholder to the generated builder's where clause.
+/// #[derive(Dialect)]
+/// #[kirin(fn, type = T)]
+/// pub enum Arith<T: CompileTimeValue> {
+///     Add {
+///         lhs: SSAValue,
+///         rhs: SSAValue,
+///         result: ResultValue,  // no #[kirin(type = ...)] needed
+///         #[kirin(default)]
+///         marker: PhantomData<T>,
+///     },
+/// }
+/// ```
 pub trait Placeholder: CompileTimeValue {
     fn placeholder() -> Self;
 }
