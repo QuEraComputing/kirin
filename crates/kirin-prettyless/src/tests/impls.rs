@@ -360,6 +360,7 @@ fn test_render_builder_config() {
     let output = PrettyPrintExt::<SimpleLanguage>::render(&f, &stage)
         .config(Config::default().with_width(30))
         .globals(&gs)
-        .to_string();
+        .to_string()
+        .unwrap();
     insta::assert_snapshot!(output);
 }

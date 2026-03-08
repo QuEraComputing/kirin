@@ -37,7 +37,7 @@ fn build_abstract_recursive(
     pipeline: &mut Pipeline<StageInfo<CallLang>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
-    let func = pipeline.function().name("rec").new();
+    let func = pipeline.function().name("rec").new().unwrap();
     let staged = pipeline
         .staged_function::<CallLang>()
         .func(func)

@@ -38,7 +38,7 @@ fn build_recursive_func(
     pipeline: &mut Pipeline<StageInfo<RecursiveLang>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
-    let func = pipeline.function().name("rec").new();
+    let func = pipeline.function().name("rec").new().unwrap();
     let staged = pipeline
         .staged_function::<RecursiveLang>()
         .func(func)
@@ -451,7 +451,7 @@ fn test_halt_during_nested_call() {
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     // Build callee: a function whose body contains a HaltStmt.
-    let callee_func = pipeline.function().name("halter").new();
+    let callee_func = pipeline.function().name("halter").new().unwrap();
     let callee_staged = pipeline
         .staged_function::<HaltLang>()
         .func(callee_func)
@@ -473,7 +473,7 @@ fn test_halt_during_nested_call() {
         .unwrap();
 
     // Build caller: calls the callee function by name.
-    let caller_func = pipeline.function().name("caller").new();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
     let caller_staged = pipeline
         .staged_function::<HaltLang>()
         .func(caller_func)
@@ -524,13 +524,13 @@ where
 {
     fn interpret(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         // Body interpret is not used via SSACFGRegion path.
-        Err(InterpreterError::MissingEntry.into())
+        Err(InterpreterError::missing_entry_block().into())
     }
 }
 
 impl kirin_interpreter::SSACFGRegion for BadBody {
     fn entry_block<L: Dialect>(&self, _stage: &StageInfo<L>) -> Result<Block, InterpreterError> {
-        Err(InterpreterError::MissingEntry)
+        Err(InterpreterError::missing_entry_block())
     }
 }
 
@@ -570,7 +570,7 @@ fn test_missing_entry_from_bad_body() {
         .call(spec_fn, &[])
         .unwrap_err();
     assert!(
-        matches!(err, InterpreterError::MissingEntry),
+        matches!(err, InterpreterError::MissingEntry(_)),
         "expected MissingEntry, got: {err:?}"
     );
 }

@@ -45,7 +45,7 @@ fn test_roundtrip_add() {
     emit_ctx.register_ssa("a".to_string(), ssa_a);
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
-    let statement = ast.emit(&mut emit_ctx);
+    let statement = ast.emit(&mut emit_ctx).expect("emit failed");
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -82,7 +82,7 @@ fn test_roundtrip_constant() {
 
     // Emit
     let mut emit_ctx = EmitContext::new(&mut stage);
-    let statement = ast.emit(&mut emit_ctx);
+    let statement = ast.emit(&mut emit_ctx).expect("emit failed");
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -129,7 +129,7 @@ fn test_roundtrip_return() {
     let mut emit_ctx = EmitContext::new(&mut stage);
     emit_ctx.register_ssa("v".to_string(), ssa_v);
 
-    let statement = ast.emit(&mut emit_ctx);
+    let statement = ast.emit(&mut emit_ctx).expect("emit failed");
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -169,7 +169,7 @@ fn test_roundtrip_function() {
 
     // Emit to IR
     let mut emit_ctx = EmitContext::new(&mut stage);
-    let statement = ast.emit(&mut emit_ctx);
+    let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
     // Pretty print using Document method
     let doc = Document::new(Config::default(), &stage);
@@ -217,7 +217,7 @@ fn test_roundtrip_function_multiple_blocks() {
 
     // Emit to IR
     let mut emit_ctx = EmitContext::new(&mut stage);
-    let statement = ast.emit(&mut emit_ctx);
+    let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
     // Pretty print using Document method with 4-space indentation to match input
     let config = Config {

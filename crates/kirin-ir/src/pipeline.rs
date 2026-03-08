@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use crate::arena::{Arena, Id, Item};
-use crate::builder::error::StagedFunctionError;
+use crate::builder::error::{PipelineError, PipelineStagedError};
 use crate::intern::InternTable;
 use crate::language::Dialect;
 use crate::node::function::{
@@ -137,16 +137,22 @@ impl<S> Pipeline<S> {
     /// Prefer [`Pipeline::staged_function`] which creates and links in one step.
     ///
     /// Equivalent to
-    /// `pipeline.function_info_mut(func).unwrap().add_staged_function(stage, sf)`.
+    /// `pipeline.function_info_mut(func)?.add_staged_function(stage, sf)`.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `func` refers to an unknown [`Function`].
-    pub fn link(&mut self, func: Function, stage: CompileStage, sf: StagedFunction) {
+    /// Returns [`PipelineError::UnknownFunction`] if `func` does not exist.
+    pub fn link(
+        &mut self,
+        func: Function,
+        stage: CompileStage,
+        sf: StagedFunction,
+    ) -> Result<(), PipelineError> {
         self.functions
             .get_mut(func)
-            .expect("unknown Function")
+            .ok_or(PipelineError::UnknownFunction(func))?
             .add_staged_function(stage, sf);
+        Ok(())
     }
 }
 
@@ -185,33 +191,39 @@ impl<S> Pipeline<S> {
     /// Returns the [`Function`] identifier. If a name is provided it is
     /// interned into the global symbol table and stored on the [`FunctionInfo`].
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if a function with the same name already exists.
+    /// Returns [`PipelineError::DuplicateFunctionName`] if a function with
+    /// the same name already exists.
     ///
     /// # Examples
     ///
     /// ```ignore
-    /// let func = pipeline.function().new();               // anonymous
-    /// let func = pipeline.function().name("foo").new();   // named
+    /// let func = pipeline.function().new()?;               // anonymous
+    /// let func = pipeline.function().name("foo").new()?;   // named
     /// ```
     #[builder(finish_fn = new)]
-    pub fn function(&mut self, #[builder(into)] name: Option<String>) -> Function {
-        let sym = name.map(|n| {
-            if let Some(existing) = self.global_symbols.lookup(n.as_str()) {
-                if self.name_index.contains_key(&existing) {
-                    panic!("duplicate abstract function name: {n}");
+    pub fn function(
+        &mut self,
+        #[builder(into)] name: Option<String>,
+    ) -> Result<Function, PipelineError> {
+        let sym = name
+            .map(|n| {
+                if let Some(existing) = self.global_symbols.lookup(n.as_str()) {
+                    if self.name_index.contains_key(&existing) {
+                        return Err(PipelineError::DuplicateFunctionName(existing));
+                    }
                 }
-            }
-            self.global_symbols.intern(n)
-        });
+                Ok(self.global_symbols.intern(n))
+            })
+            .transpose()?;
         let func = self
             .functions
             .alloc_with_id(|id| FunctionInfo::new(id, sym));
         if let Some(s) = sym {
             self.name_index.insert(s, func);
         }
-        func
+        Ok(func)
     }
 
     /// Create a staged function for an abstract [`Function`] at the given stage.
@@ -223,9 +235,11 @@ impl<S> Pipeline<S> {
     /// Delegates to [`crate::StageInfo::staged_function`] internally, so all the same
     /// duplicate-detection and policy rules apply.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if `func` or `stage` refers to an unknown ID.
+    /// Returns [`PipelineStagedError::Pipeline`] if `func` or `stage` refers
+    /// to an unknown ID, or [`PipelineStagedError::StagedFunction`] if the
+    /// stage-level staged-function creation conflicts.
     ///
     /// # Examples
     ///
@@ -245,19 +259,23 @@ impl<S> Pipeline<S> {
         signature: Option<Signature<L::Type>>,
         specializations: Option<Vec<SpecializedFunctionInfo<L>>>,
         backedges: Option<Vec<StagedFunction>>,
-    ) -> Result<StagedFunction, StagedFunctionError<L>>
+    ) -> Result<StagedFunction, PipelineStagedError<L>>
     where
         S: HasStageInfo<L>,
     {
         // Read name from FunctionInfo (GlobalSymbol is Copy, borrow ends immediately).
-        let name = self.functions.get(func).expect("unknown Function").name();
+        let name = self
+            .functions
+            .get(func)
+            .ok_or(PipelineError::UnknownFunction(func))?
+            .name();
 
         // Borrow the stage mutably to access its StageInfo.
         let stage_info = self
             .stages
             .get_mut(Id::from(stage).raw())
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
-            .expect("invalid stage or stage does not contain a StageInfo for this dialect");
+            .ok_or(PipelineError::UnknownFunction(func))?;
 
         // Delegate to StageInfo::staged_function builder.
         let sf = stage_info
@@ -271,7 +289,7 @@ impl<S> Pipeline<S> {
         // Auto-link the staged function to the abstract Function.
         self.functions
             .get_mut(func)
-            .expect("unknown Function")
+            .ok_or(PipelineError::UnknownFunction(func))?
             .add_staged_function(stage, sf);
 
         Ok(sf)
@@ -283,10 +301,11 @@ impl<S> Pipeline<S> {
     /// three-level function hierarchy (Function → StagedFunction → SpecializedFunction)
     /// with a single body.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the stage does not contain a `StageInfo` for the given dialect,
-    /// or if a function with the same name already exists.
+    /// Returns [`PipelineStagedError`] if the stage does not contain a
+    /// `StageInfo` for the given dialect, or if a function with the same name
+    /// already exists.
     ///
     /// # Examples
     ///
@@ -306,11 +325,11 @@ impl<S> Pipeline<S> {
         stage: CompileStage,
         signature: Option<Signature<L::Type>>,
         #[builder(into)] body: Statement,
-    ) -> Result<(Function, StagedFunction, SpecializedFunction), StagedFunctionError<L>>
+    ) -> Result<(Function, StagedFunction, SpecializedFunction), PipelineStagedError<L>>
     where
         S: HasStageInfo<L>,
     {
-        let func = self.function().maybe_name(name).new();
+        let func = self.function().maybe_name(name).new()?;
 
         let sf = self
             .staged_function::<L>()
@@ -323,7 +342,7 @@ impl<S> Pipeline<S> {
             .stages
             .get_mut(Id::from(stage).raw())
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
-            .expect("invalid stage or stage does not contain a StageInfo for this dialect");
+            .ok_or(PipelineError::UnknownFunction(func))?;
 
         // Omit signature — specialize defaults to the staged function's signature.
         let spec = stage_info
@@ -340,19 +359,23 @@ impl<S> Pipeline<S> {
 #[cfg(test)]
 mod tests {
     use super::Pipeline;
+    use crate::builder::error::PipelineError;
 
     #[test]
-    #[should_panic(expected = "duplicate abstract function name")]
     fn duplicate_function_names_are_forbidden() {
         let mut pipeline: Pipeline<()> = Pipeline::new();
-        let _ = pipeline.function().name("foo").new();
-        let _ = pipeline.function().name("foo").new();
+        let _ = pipeline.function().name("foo").new().unwrap();
+        let result = pipeline.function().name("foo").new();
+        assert!(
+            matches!(result, Err(PipelineError::DuplicateFunctionName(_))),
+            "expected DuplicateFunctionName, got: {result:?}"
+        );
     }
 
     #[test]
     fn function_by_name_is_stable_for_unique_names() {
         let mut pipeline: Pipeline<()> = Pipeline::new();
-        let foo = pipeline.function().name("foo").new();
+        let foo = pipeline.function().name("foo").new().unwrap();
         let sym = pipeline
             .lookup_symbol("foo")
             .expect("foo symbol should exist");
@@ -377,8 +400,8 @@ mod tests {
     #[test]
     fn pipeline_anonymous_function() {
         let mut pipeline: Pipeline<()> = Pipeline::new();
-        let f1 = pipeline.function().new();
-        let f2 = pipeline.function().new();
+        let f1 = pipeline.function().new().unwrap();
+        let f2 = pipeline.function().new().unwrap();
         // Anonymous functions don't conflict
         assert_ne!(f1, f2);
     }

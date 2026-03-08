@@ -75,7 +75,7 @@ where
             DerivedInterpretableDialect::FunctionBody(body) => {
                 body.eval_call(interp, stage, callee, args)
             }
-            _ => Err(InterpreterError::MissingEntry),
+            _ => Err(InterpreterError::missing_function_entry()),
         }
     }
 }

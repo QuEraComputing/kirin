@@ -267,7 +267,7 @@ fn test_pipeline_roundtrip_print_parse_print() {
         .stage(StageInfo::default())
         .name("A")
         .new();
-    let function = pipeline.function().name("foo").new();
+    let function = pipeline.function().name("foo").new().unwrap();
     let staged_function = pipeline
         .staged_function()
         .func(function)

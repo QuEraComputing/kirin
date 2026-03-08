@@ -24,6 +24,20 @@ pub enum StageResolutionError {
     MissingCallee { callee: SpecializedFunction },
 }
 
+/// Detailed reason for a missing entry failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+pub enum MissingEntryError {
+    /// The region has no entry block.
+    #[error("entry block not found")]
+    EntryBlock,
+    /// A block has no terminator statement.
+    #[error("block terminator not found")]
+    BlockTerminator,
+    /// A callable body did not resolve to a function entry.
+    #[error("function entry not found")]
+    FunctionEntry,
+}
+
 /// Error type for interpreter failures.
 ///
 /// Framework errors cover common interpreter failure modes. User-defined
@@ -43,9 +57,9 @@ pub enum InterpreterError {
     /// Call depth exceeded the configured maximum.
     #[error("call depth exceeded maximum")]
     MaxDepthExceeded,
-    /// Function entry block could not be resolved.
-    #[error("function entry block not found")]
-    MissingEntry,
+    /// An entry-related lookup failed.
+    #[error("{0}")]
+    MissingEntry(MissingEntryError),
     /// Argument count does not match block/function parameter count.
     #[error("arity mismatch: expected {expected} arguments, got {got}")]
     ArityMismatch { expected: usize, got: usize },
@@ -67,5 +81,20 @@ impl InterpreterError {
     /// Wrap an arbitrary error as [`InterpreterError::Custom`].
     pub fn custom(error: impl std::error::Error + Send + Sync + 'static) -> Self {
         InterpreterError::Custom(Box::new(error))
+    }
+
+    /// The region has no entry block.
+    pub fn missing_entry_block() -> Self {
+        Self::MissingEntry(MissingEntryError::EntryBlock)
+    }
+
+    /// A block has no terminator statement.
+    pub fn missing_terminator() -> Self {
+        Self::MissingEntry(MissingEntryError::BlockTerminator)
+    }
+
+    /// A callable body did not resolve to a function entry.
+    pub fn missing_function_entry() -> Self {
+        Self::MissingEntry(MissingEntryError::FunctionEntry)
     }
 }

@@ -15,6 +15,20 @@ const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStream> {
     let ir = Input::<EvalCallLayout>::from_derive_input(input)?;
 
+    // Validate that at least one variant has #[callable] (or #[callable] is on the enum itself).
+    let callable_all = ir.extra_attrs.callable;
+    let any_variant_callable = match &ir.data {
+        kirin_derive_toolkit::ir::Data::Enum(data) => {
+            data.variants.iter().any(|s| s.extra_attrs.callable)
+        }
+        kirin_derive_toolkit::ir::Data::Struct(data) => data.0.extra_attrs.callable,
+    };
+    if !callable_all && !any_variant_callable {
+        return Err(darling::Error::custom(
+            "derive(CallSemantics) requires at least one #[callable] variant",
+        ));
+    }
+
     let ir_crate: syn::Path = ir
         .attrs
         .crate_path
@@ -112,7 +126,7 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
                     })
                 } else {
                     Ok(quote! {
-                        Err(#interp_crate::InterpreterError::MissingEntry.into())
+                        Err(#interp_crate::InterpreterError::missing_function_entry().into())
                     })
                 }
             },
@@ -123,7 +137,7 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
                     let binding = stmt_ctx.wrapper_binding.as_ref().unwrap();
                     Ok(quote! { #binding.eval_call(interpreter, stage, callee, args) })
                 } else {
-                    Ok(quote! { Err(#interp_crate::InterpreterError::MissingEntry.into()) })
+                    Ok(quote! { Err(#interp_crate::InterpreterError::missing_function_entry().into()) })
                 }
             },
         )),
@@ -133,21 +147,14 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
 }
 
 /// Determine if a variant should forward eval_call.
+/// A variant forwards only if it has `#[wraps]` AND (`#[callable]` on itself or on the enum).
 fn is_call_forwarding(
     ctx: &DeriveContext<'_, EvalCallLayout>,
     stmt_ctx: &StatementContext<'_, EvalCallLayout>,
 ) -> bool {
     let callable_all = ctx.input.extra_attrs.callable;
-    let any_callable = callable_all || ctx.statements.values().any(|s| s.stmt.extra_attrs.callable);
-
     let is_callable = callable_all || stmt_ctx.stmt.extra_attrs.callable;
-
-    if any_callable {
-        stmt_ctx.is_wrapper && is_callable
-    } else {
-        // Backward compat: if no #[callable] used anywhere, all wrappers forward
-        stmt_ctx.is_wrapper
-    }
+    stmt_ctx.is_wrapper && is_callable
 }
 
 /// Collect wrapper types that should forward eval_call.
@@ -195,7 +202,12 @@ mod tests {
                 Return(ReturnOp),
             }
         };
-        insta::assert_snapshot!(generate_call_semantics_code(input));
+        let err = do_derive_eval_call(&input).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("derive(CallSemantics) requires at least one #[callable] variant"),
+            "unexpected error: {err}",
+        );
     }
 
     #[test]

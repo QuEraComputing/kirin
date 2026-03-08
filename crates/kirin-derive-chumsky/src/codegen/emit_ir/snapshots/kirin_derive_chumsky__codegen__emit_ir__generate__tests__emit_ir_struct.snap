@@ -14,14 +14,17 @@ where
         kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
 {
     type Output = ::kirin::ir::Statement;
-    fn emit(&self, ctx: &mut kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+    fn emit(
+        &self,
+        ctx: &mut kirin_chumsky::EmitContext<'_, Language>,
+    ) -> ::core::result::Result<Self::Output, kirin_chumsky::EmitError> {
         let Self {
             result: f_result,
             lhs: f_lhs,
             rhs: f_rhs,
             ..
         } = self;
-        let f_result_ir = kirin_chumsky::EmitIR::emit(f_result, ctx);
+        let f_result_ir = kirin_chumsky::EmitIR::emit(f_result, ctx)?;
         let f_lhs_ir = f_lhs.clone();
         let f_rhs_ir = f_rhs.clone();
         let dialect_variant: Add = Add {
@@ -29,7 +32,7 @@ where
             lhs: f_lhs_ir,
             rhs: f_rhs_ir,
         };
-        ctx.stage.statement().definition(dialect_variant).new()
+        Ok(ctx.stage.statement().definition(dialect_variant).new())
     }
 }
 #[automatically_derived]
@@ -44,7 +47,10 @@ where
         kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
 {
     type Output = ::kirin::ir::Statement;
-    fn emit(&self, ctx: &mut kirin_chumsky::EmitContext<'_, Language>) -> Self::Output {
+    fn emit(
+        &self,
+        ctx: &mut kirin_chumsky::EmitContext<'_, Language>,
+    ) -> ::core::result::Result<Self::Output, kirin_chumsky::EmitError> {
         kirin_chumsky::EmitIR::emit(&self.0, ctx)
     }
 }

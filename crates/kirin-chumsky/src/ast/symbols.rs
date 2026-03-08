@@ -3,7 +3,7 @@ use kirin_ir::Dialect;
 use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
 use super::Spanned;
-use crate::traits::{EmitContext, EmitIR};
+use crate::traits::{EmitContext, EmitError, EmitIR};
 
 /// A symbol name (prefixed with `@` in source).
 ///
@@ -43,8 +43,8 @@ where
 {
     type Output = kirin_ir::Symbol;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
-        ctx.stage.symbol_table_mut().intern(self.name.to_string())
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
+        Ok(ctx.stage.symbol_table_mut().intern(self.name.to_string()))
     }
 }
 

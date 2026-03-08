@@ -85,7 +85,7 @@ where
             Ok(Continuation::Jump(entry, _)) => entry,
             Ok(_) => {
                 let _ = self.pop_frame();
-                return Err(InterpreterError::MissingEntry.into());
+                return Err(InterpreterError::missing_function_entry().into());
             }
             Err(err) => {
                 let _ = self.pop_frame();

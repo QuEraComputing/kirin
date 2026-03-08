@@ -268,7 +268,7 @@ fn test_cross_stage_recursive_call() {
     let stage_a = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage_b = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let func = pipeline.function().name("rec").new();
+    let func = pipeline.function().name("rec").new().unwrap();
     let staged_a = pipeline
         .staged_function::<StageDynLang>()
         .func(func)
@@ -326,8 +326,8 @@ fn test_function_call_missing_stage_mapping_error() {
     let stage_a = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage_b = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function().name("callee").new();
-    let caller_func = pipeline.function().name("caller").new();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let callee_staged_a = pipeline
         .staged_function::<FunctionCallLang>()
@@ -377,8 +377,8 @@ fn test_function_call_no_specialization_error() {
     let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
     let stage = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function().name("callee").new();
-    let caller_func = pipeline.function().name("caller").new();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let _callee_staged = pipeline
         .staged_function::<FunctionCallLang>()
@@ -423,8 +423,8 @@ fn test_function_call_ambiguous_specialization_error() {
     let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
     let stage = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function().name("callee").new();
-    let caller_func = pipeline.function().name("caller").new();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let callee_staged = pipeline
         .staged_function::<FunctionCallLang>()
@@ -475,8 +475,8 @@ fn test_function_call_unique_specialization_success() {
     let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
     let stage = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function().name("callee").new();
-    let caller_func = pipeline.function().name("caller").new();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let callee_staged = pipeline
         .staged_function::<FunctionCallLang>()
@@ -615,7 +615,7 @@ fn test_typed_call_reports_stage_mismatch() {
         .stage(MixedStage::Dummy(StageInfo::default()))
         .new();
 
-    let func = pipeline.function().name("f").new();
+    let func = pipeline.function().name("f").new().unwrap();
     let staged = pipeline
         .staged_function::<StageDynLang>()
         .func(func)

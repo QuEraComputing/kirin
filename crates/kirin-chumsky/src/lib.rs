@@ -75,7 +75,7 @@ pub mod prelude {
     pub use crate::function_text::{FunctionParseError, FunctionParseErrorKind, ParsePipelineText};
     pub use crate::parsers::*;
     pub use crate::traits::{
-        BoxedParser, DirectlyParsable, EmitContext, EmitIR, HasDialectParser, HasParser,
+        BoxedParser, DirectlyParsable, EmitContext, EmitError, EmitIR, HasDialectParser, HasParser,
         ParseError, ParseStatementText, ParseStatementTextExt, ParserError, RecursiveParser,
         TokenInput, parse_ast,
     };

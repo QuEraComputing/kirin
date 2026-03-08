@@ -1,7 +1,7 @@
 #[test]
 fn test_pipeline_function_print() {
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("foo").new();
+    let func = pipeline.function().name("foo").new().unwrap();
 
     // --- Stage A: a simple function with one constant ---
     let stage0_id = pipeline
@@ -65,7 +65,7 @@ fn test_pipeline_function_print() {
 #[test]
 fn test_pipeline_unnamed_stage() {
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("bar").new();
+    let func = pipeline.function().name("bar").new().unwrap();
 
     // --- Unnamed stage (no .name() call) ---
     let stage_id = pipeline
@@ -100,7 +100,7 @@ fn test_pipeline_unnamed_stage() {
 #[test]
 fn test_pipeline_staged_function_no_specialization() {
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("extern_fn").new();
+    let func = pipeline.function().name("extern_fn").new().unwrap();
 
     // Stage with a named stage but no specialization (declaration-only)
     let stage_id = pipeline

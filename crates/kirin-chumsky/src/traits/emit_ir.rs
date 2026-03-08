@@ -1,6 +1,29 @@
 use kirin_ir::{Dialect, StageInfo};
 use rustc_hash::FxHashMap;
 
+/// Error type for IR emission from parsed AST nodes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EmitError {
+    /// An SSA value was referenced but never defined.
+    UndefinedSSA(String),
+    /// A block label was referenced but never defined.
+    UndefinedBlock(String),
+    /// A custom error from dialect-specific emit logic.
+    Custom(String),
+}
+
+impl std::fmt::Display for EmitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EmitError::UndefinedSSA(name) => write!(f, "undefined SSA value: %{name}"),
+            EmitError::UndefinedBlock(name) => write!(f, "undefined block: ^{name}"),
+            EmitError::Custom(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
+impl std::error::Error for EmitError {}
+
 /// Context for emitting IR from parsed AST, tracking name mappings.
 pub struct EmitContext<'a, L: Dialect> {
     pub stage: &'a mut StageInfo<L>,
@@ -37,7 +60,7 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
 /// Trait for emitting IR nodes from parsed AST nodes.
 pub trait EmitIR<L: Dialect> {
     type Output;
-    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output;
+    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Result<Self::Output, EmitError>;
 }
 
 /// Marker trait for types that can be directly parsed into themselves.
@@ -58,8 +81,8 @@ where
 {
     type Output = T;
 
-    fn emit(&self, _ctx: &mut EmitContext<'_, L>) -> Self::Output {
-        self.clone()
+    fn emit(&self, _ctx: &mut EmitContext<'_, L>) -> Result<Self::Output, EmitError> {
+        Ok(self.clone())
     }
 }
 
@@ -70,7 +93,7 @@ where
 {
     type Output = Vec<T::Output>;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output {
+    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Result<Self::Output, EmitError> {
         self.iter().map(|item| item.emit(ctx)).collect()
     }
 }
@@ -82,7 +105,7 @@ where
 {
     type Output = Option<T::Output>;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Self::Output {
-        self.as_ref().map(|item| item.emit(ctx))
+    fn emit(&self, ctx: &mut EmitContext<'_, L>) -> Result<Self::Output, EmitError> {
+        self.as_ref().map(|item| item.emit(ctx)).transpose()
     }
 }

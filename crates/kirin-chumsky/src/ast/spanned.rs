@@ -1,7 +1,7 @@
 use chumsky::span::SimpleSpan;
 use kirin_ir::Dialect;
 
-use crate::traits::{EmitContext, EmitIR};
+use crate::traits::{EmitContext, EmitError, EmitIR};
 
 /// A value with an associated span.
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ where
 {
     type Output = T::Output;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
         self.value.emit(ctx)
     }
 }

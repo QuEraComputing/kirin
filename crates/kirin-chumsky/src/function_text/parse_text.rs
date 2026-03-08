@@ -328,7 +328,8 @@ where
                 dispatch_stage_action_required(self, stage_id, &head.stage, &mut action)?;
             let outcome = dispatch.outcome;
             if let Some((function, staged_function)) = dispatch.link {
-                self.link(function, stage_id, staged_function);
+                self.link(function, stage_id, staged_function)
+                    .expect("link should succeed for valid function");
             }
 
             if outcome.keyword != head.keyword {
@@ -532,7 +533,13 @@ where
 
     let body_statement = {
         let mut emit_ctx = EmitContext::new(stage);
-        body.emit(&mut emit_ctx)
+        body.emit(&mut emit_ctx).map_err(|err| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::EmitFailed,
+                Some(span),
+                err.to_string(),
+            )
+        })?
     };
 
     stage
@@ -642,7 +649,11 @@ fn get_or_create_function_by_name<S>(
     if let Some(existing) = function_lookup.get(name).copied() {
         return existing;
     }
-    let function = pipeline.function().name(name.to_string()).new();
+    let function = pipeline
+        .function()
+        .name(name.to_string())
+        .new()
+        .expect("failed to create function in pipeline");
     function_lookup.insert(name.to_string(), function);
     function
 }

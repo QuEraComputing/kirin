@@ -2,7 +2,7 @@
 
 use std::io::{Write, stdout};
 
-use crate::{ArenaDoc, Config, Document};
+use crate::{ArenaDoc, Config, Document, RenderError};
 use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};
 
 /// Core trait for pretty printing values to a document.
@@ -126,30 +126,33 @@ where
     }
 
     /// Render to a string.
-    pub fn to_string(self) -> String {
+    pub fn to_string(self) -> Result<String, RenderError> {
         let node = self.node;
         let mut doc = self.into_document();
-        doc.render(node).expect("render failed")
+        Ok(doc.render(node)?)
     }
 
     /// Write to a writer.
-    pub fn write_to(self, writer: &mut impl Write) {
-        let output = self.to_string();
-        writer.write_all(output.as_bytes()).expect("write failed");
+    pub fn write_to(self, writer: &mut impl Write) -> Result<(), RenderError> {
+        let output = self.to_string()?;
+        writer.write_all(output.as_bytes())?;
+        Ok(())
     }
 
     /// Print to stdout.
-    pub fn print(self) {
-        let output = self.to_string();
-        stdout().write_all(output.as_bytes()).expect("write failed");
+    pub fn print(self) -> Result<(), RenderError> {
+        let output = self.to_string()?;
+        stdout().write_all(output.as_bytes())?;
+        Ok(())
     }
 
     /// Display with bat pager.
     #[cfg(feature = "bat")]
-    pub fn bat(self) {
+    pub fn bat(self) -> Result<(), RenderError> {
         let node = self.node;
         let mut doc = self.into_document();
-        doc.pager(node).expect("pager failed");
+        doc.pager(node)?;
+        Ok(())
     }
 
     fn into_document(self) -> Document<'s, L> {
@@ -209,7 +212,7 @@ where
     }
 
     fn sprint(&self, stage: &StageInfo<L>) -> String {
-        self.render(stage).to_string()
+        self.render(stage).to_string().expect("render failed")
     }
 }
 

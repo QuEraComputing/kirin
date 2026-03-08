@@ -23,7 +23,7 @@ pub use abstract_interp::{
 pub use block_eval::BlockEvaluator;
 pub use call::{CallSemantics, SSACFGRegion};
 pub use control::{Args, ConcreteExt, Continuation};
-pub use error::{InterpreterError, StageResolutionError};
+pub use error::{InterpreterError, MissingEntryError, StageResolutionError};
 pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use interpretable::Interpretable;

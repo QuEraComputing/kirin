@@ -122,7 +122,7 @@ impl GenerateEmitIR {
             {
                 type Output = #ir_path::Statement;
 
-                fn emit(&self, ctx: &mut #crate_path::EmitContext<'_, Language>) -> Self::Output {
+                fn emit(&self, ctx: &mut #crate_path::EmitContext<'_, Language>) -> ::core::result::Result<Self::Output, #crate_path::EmitError> {
                     #crate_path::EmitIR::emit(&self.0, ctx)
                 }
             }

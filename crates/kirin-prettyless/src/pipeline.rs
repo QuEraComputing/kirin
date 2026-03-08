@@ -8,7 +8,7 @@ use std::io::{Write, stdout};
 
 use kirin_ir::{Dialect, Function, GlobalSymbol, InternTable, Pipeline, StageInfo, StagedFunction};
 
-use crate::{Config, Document, PrettyPrint};
+use crate::{Config, Document, PrettyPrint, RenderError};
 
 /// Trait for rendering a specific staged function within a compilation stage.
 ///
@@ -97,12 +97,12 @@ impl<'a, S: RenderStage> PipelineDocument<'a, S> {
     /// [`Function`] and renders each staged function in its corresponding stage,
     /// separated by blank lines. The stage prefix (e.g., `stage @A`) is derived
     /// from each context's own identity — no external prefix is needed.
-    pub fn render_function(&self, func: Function) -> Result<String, std::fmt::Error> {
+    pub fn render_function(&self, func: Function) -> Result<String, RenderError> {
         let gs = self.pipeline.global_symbols();
         let func_info = self
             .pipeline
             .function_info(func)
-            .expect("Function ID not found in pipeline");
+            .ok_or(RenderError::UnknownFunction(func))?;
 
         let mut output = String::new();
         for (&stage_id, &sf_id) in func_info.staged_functions() {
@@ -134,28 +134,29 @@ impl<'a, S: RenderStage> FunctionRenderBuilder<'a, S> {
     }
 
     /// Render to a string.
-    pub fn to_string(self) -> String {
-        PipelineDocument::new(self.config, self.pipeline)
-            .render_function(self.function)
-            .expect("render failed")
+    pub fn to_string(self) -> Result<String, RenderError> {
+        PipelineDocument::new(self.config, self.pipeline).render_function(self.function)
     }
 
     /// Write to a writer.
-    pub fn write_to(self, writer: &mut impl Write) {
-        let output = self.to_string();
-        writer.write_all(output.as_bytes()).expect("write failed");
+    pub fn write_to(self, writer: &mut impl Write) -> Result<(), RenderError> {
+        let output = self.to_string()?;
+        writer.write_all(output.as_bytes())?;
+        Ok(())
     }
 
     /// Print to stdout.
-    pub fn print(self) {
-        let output = self.to_string();
-        stdout().write_all(output.as_bytes()).expect("write failed");
+    pub fn print(self) -> Result<(), RenderError> {
+        let output = self.to_string()?;
+        stdout().write_all(output.as_bytes())?;
+        Ok(())
     }
 
     /// Display with bat pager.
     #[cfg(feature = "bat")]
-    pub fn bat(self) {
-        crate::bat::print_str(&self.to_string());
+    pub fn bat(self) -> Result<(), RenderError> {
+        crate::bat::print_str(&self.to_string()?);
+        Ok(())
     }
 }
 
@@ -173,34 +174,37 @@ impl<'a, S: RenderStage> PipelineRenderBuilder<'a, S> {
     }
 
     /// Render to a string.
-    pub fn to_string(self) -> String {
+    pub fn to_string(self) -> Result<String, RenderError> {
         let doc = PipelineDocument::new(self.config, self.pipeline);
         let mut parts = Vec::new();
         for func_info in self.pipeline.function_arena().iter() {
-            let rendered = doc.render_function(func_info.id()).expect("render failed");
+            let rendered = doc.render_function(func_info.id())?;
             if !rendered.is_empty() {
                 parts.push(rendered);
             }
         }
-        parts.join("\n")
+        Ok(parts.join("\n"))
     }
 
     /// Write to a writer.
-    pub fn write_to(self, writer: &mut impl Write) {
-        let output = self.to_string();
-        writer.write_all(output.as_bytes()).expect("write failed");
+    pub fn write_to(self, writer: &mut impl Write) -> Result<(), RenderError> {
+        let output = self.to_string()?;
+        writer.write_all(output.as_bytes())?;
+        Ok(())
     }
 
     /// Print to stdout.
-    pub fn print(self) {
-        let output = self.to_string();
-        stdout().write_all(output.as_bytes()).expect("write failed");
+    pub fn print(self) -> Result<(), RenderError> {
+        let output = self.to_string()?;
+        stdout().write_all(output.as_bytes())?;
+        Ok(())
     }
 
     /// Display with bat pager.
     #[cfg(feature = "bat")]
-    pub fn bat(self) {
-        crate::bat::print_str(&self.to_string());
+    pub fn bat(self) -> Result<(), RenderError> {
+        crate::bat::print_str(&self.to_string()?);
+        Ok(())
     }
 }
 
@@ -212,7 +216,7 @@ pub trait PrintExt {
 
     /// Convenience shorthand: render to string with default config.
     fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String {
-        self.render(pipeline).to_string()
+        self.render(pipeline).to_string().expect("render failed")
     }
 }
 
@@ -238,7 +242,7 @@ pub trait PipelinePrintExt {
 
     /// Convenience shorthand: render to string with default config.
     fn sprint(&self) -> String {
-        self.render().to_string()
+        self.render().to_string().expect("render failed")
     }
 }
 

@@ -1,7 +1,7 @@
 use kirin_ir::{Dialect, GetInfo, SSAKind};
 
 use super::Spanned;
-use crate::traits::{EmitContext, EmitIR};
+use crate::traits::{EmitContext, EmitError, EmitIR};
 
 /// A block label.
 ///
@@ -88,11 +88,11 @@ where
 {
     type Output = kirin_ir::Successor;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
         let block = ctx
             .lookup_block(self.name.value)
-            .unwrap_or_else(|| panic!("Undefined block: ^{}", self.name.value));
-        kirin_ir::Successor::from_block(block)
+            .ok_or_else(|| EmitError::UndefinedBlock(self.name.value.to_string()))?;
+        Ok(kirin_ir::Successor::from_block(block))
     }
 }
 
@@ -101,7 +101,7 @@ where
 fn emit_block<'src, TypeOutput, StmtOutput, IR>(
     block_ast: &Block<'src, TypeOutput, StmtOutput>,
     ctx: &mut EmitContext<'_, IR>,
-) -> kirin_ir::Block
+) -> Result<kirin_ir::Block, EmitError>
 where
     IR: Dialect,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
@@ -117,10 +117,10 @@ where
         .enumerate()
         .map(|(idx, arg)| {
             let name = arg.value.name.value.to_string();
-            let ty: IR::Type = arg.value.ty.value.emit(ctx);
-            (name, ty, idx)
+            let ty: IR::Type = arg.value.ty.value.emit(ctx)?;
+            Ok((name, ty, idx))
         })
-        .collect();
+        .collect::<Result<Vec<_>, EmitError>>()?;
 
     // Create placeholder SSAs for block arguments so they can be referenced
     // in statement emission. These use BuilderBlockArgument kind.
@@ -140,15 +140,15 @@ where
         .statements
         .iter()
         .map(|stmt_ast| {
-            let stmt = stmt_ast.value.emit(ctx);
+            let stmt = stmt_ast.value.emit(ctx)?;
             let is_terminator = stmt
                 .get_info(ctx.stage)
                 .expect("statement should exist")
                 .definition()
                 .is_terminator();
-            (stmt, is_terminator)
+            Ok((stmt, is_terminator))
         })
-        .collect();
+        .collect::<Result<Vec<_>, EmitError>>()?;
 
     // Build the block with arguments and statements
     let block_name = block_ast.header.value.label.name.value.to_string();
@@ -176,7 +176,7 @@ where
         ctx.register_block(block_label.to_string(), block);
     }
 
-    block
+    Ok(block)
 }
 
 /// Implementation of EmitIR for Block AST nodes.
@@ -194,7 +194,7 @@ where
 {
     type Output = kirin_ir::Block;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
         emit_block(self, ctx)
     }
 }
@@ -215,7 +215,7 @@ where
 {
     type Output = kirin_ir::Region;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
         // Pass 1: Create stub blocks and register their names so that forward
         // references (e.g. `br ^exit` before ^exit is defined) can resolve.
         let stub_blocks: Vec<_> = self
@@ -235,7 +235,7 @@ where
             .blocks
             .iter()
             .map(|block_ast| emit_block(&block_ast.value, ctx))
-            .collect();
+            .collect::<Result<Vec<_>, EmitError>>()?;
 
         // Swap real block data into stub arena slots so that all existing
         // Successor handles (which point to stub IDs) see the real data.
@@ -249,6 +249,6 @@ where
         for block in stub_blocks {
             builder = builder.add_block(block);
         }
-        builder.new()
+        Ok(builder.new())
     }
 }

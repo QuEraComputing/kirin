@@ -21,7 +21,7 @@ where
         match self {
             Self::Call(field_0) => field_0.eval_call(interpreter, stage, callee, args),
             Self::Return(field_0) => {
-                Err(::kirin_interpreter::InterpreterError::MissingEntry.into())
+                Err(::kirin_interpreter::InterpreterError::missing_function_entry().into())
             }
         }
     }

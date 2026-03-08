@@ -44,7 +44,7 @@ impl GenerateEmitIR {
 
                         if needs_emit_ir {
                             quote! {
-                                let #emitted_var = #crate_path::EmitIR::emit(#var, ctx);
+                                let #emitted_var = #crate_path::EmitIR::emit(#var, ctx)?;
                             }
                         } else {
                             quote! {
@@ -53,7 +53,7 @@ impl GenerateEmitIR {
                         }
                     }
                     _ => quote! {
-                        let #emitted_var = #crate_path::EmitIR::emit(#var, ctx);
+                        let #emitted_var = #crate_path::EmitIR::emit(#var, ctx)?;
                     },
                 }
             })

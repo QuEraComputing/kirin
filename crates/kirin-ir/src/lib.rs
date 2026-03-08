@@ -15,7 +15,10 @@ mod stage;
 pub mod query;
 
 pub use arena::{Arena, DenseHint, GetInfo, Id, Identifier, Item, SparseHint};
-pub use builder::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
+pub use builder::error::{
+    PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,
+    StagedFunctionError,
+};
 pub use comptime::{CompileTimeValue, Typeof};
 pub use context::StageInfo;
 pub use detach::Detach;

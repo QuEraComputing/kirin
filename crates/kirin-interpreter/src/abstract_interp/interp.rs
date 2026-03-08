@@ -349,7 +349,7 @@ where
             let control = def.interpret(self)?;
             Ok(control)
         } else {
-            Err(InterpreterError::MissingEntry.into())
+            Err(InterpreterError::missing_terminator().into())
         }
     }
 }

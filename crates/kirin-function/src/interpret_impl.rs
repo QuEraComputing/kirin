@@ -17,7 +17,7 @@ where
         self.body
             .blocks(stage)
             .next()
-            .ok_or(InterpreterError::MissingEntry)
+            .ok_or(InterpreterError::missing_entry_block())
     }
 }
 
@@ -35,7 +35,7 @@ where
             .body
             .blocks(stage)
             .next()
-            .ok_or(InterpreterError::MissingEntry)?;
+            .ok_or(InterpreterError::missing_entry_block())?;
         Ok(Continuation::Jump(entry, smallvec![]))
     }
 }

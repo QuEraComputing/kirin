@@ -83,7 +83,12 @@ where
     for (name, ssa) in existing_ssas {
         emit_ctx.register_ssa(name, ssa);
     }
-    Ok(ast.emit(&mut emit_ctx))
+    ast.emit(&mut emit_ctx).map_err(|e| {
+        vec![ParseError {
+            message: e.to_string(),
+            span: SimpleSpan::from(0..0),
+        }]
+    })
 }
 
 impl<L> ParseStatementText<L> for StageInfo<L>

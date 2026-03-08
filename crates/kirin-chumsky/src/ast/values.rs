@@ -2,7 +2,7 @@ use chumsky::span::SimpleSpan;
 use kirin_ir::{Dialect, SSAKind};
 
 use super::Spanned;
-use crate::traits::{EmitContext, EmitIR};
+use crate::traits::{EmitContext, EmitError, EmitIR};
 
 /// An SSA value reference with optional type annotation.
 ///
@@ -71,9 +71,9 @@ where
 {
     type Output = kirin_ir::SSAValue;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
         ctx.lookup_ssa(self.name.value)
-            .unwrap_or_else(|| panic!("Undefined SSA value: %{}", self.name.value))
+            .ok_or_else(|| EmitError::UndefinedSSA(self.name.value.to_string()))
     }
 }
 
@@ -95,9 +95,14 @@ where
 {
     type Output = kirin_ir::ResultValue;
 
-    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Self::Output {
+    fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
         // Convert the parsed type to Dialect::Type via EmitIR, or use default if no type annotation
-        let ty: IR::Type = self.ty.as_ref().map(|t| t.emit(ctx)).unwrap_or_default();
+        let ty: IR::Type = self
+            .ty
+            .as_ref()
+            .map(|t| t.emit(ctx))
+            .transpose()?
+            .unwrap_or_default();
 
         // Create a new SSA value with the parsed name and type
         let ssa = ctx
@@ -111,6 +116,6 @@ where
         // Register the SSA in the symbol table for later reference
         ctx.register_ssa(self.name.value.to_string(), ssa);
 
-        ssa.into()
+        Ok(ssa.into())
     }
 }
