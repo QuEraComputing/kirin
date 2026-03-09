@@ -139,8 +139,7 @@ impl GenerateHasDialectParser {
         if let kirin_derive_toolkit::ir::Data::Struct(data) = &ir_input.data
             && let Some(wrapper) = &data.0.wraps
         {
-            return self
-                .generate_wrapper_struct_dialect_parser_impl(ir_input, wrapper, crate_path);
+            return self.generate_wrapper_struct_dialect_parser_impl(ir_input, wrapper, crate_path);
         }
 
         let original_name = &ir_input.name;

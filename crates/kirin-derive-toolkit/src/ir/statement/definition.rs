@@ -167,7 +167,11 @@ impl<L: Layout> Statement<L> {
         Ok(self)
     }
 
-    fn parse_field(index: usize, f: &syn::Field, ir_type: &syn::Path) -> darling::Result<FieldInfo<L>> {
+    fn parse_field(
+        index: usize,
+        f: &syn::Field,
+        ir_type: &syn::Path,
+    ) -> darling::Result<FieldInfo<L>> {
         let kirin_opts = KirinFieldOptions::from_field(f)?;
         let extra = L::ExtraFieldAttrs::from_field(f)?;
         let ident = f.ident.clone();
@@ -179,7 +183,9 @@ impl<L: Layout> Statement<L> {
                 ident,
                 collection,
                 data: FieldData::Argument {
-                    ssa_type: kirin_opts.ssa_ty.unwrap_or_else(|| syn::parse_quote! { () }),
+                    ssa_type: kirin_opts
+                        .ssa_ty
+                        .unwrap_or_else(|| syn::parse_quote! { () }),
                 },
             });
         }

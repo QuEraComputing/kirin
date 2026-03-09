@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use chumsky::prelude::*;
 use kirin_ir::{
-    Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Placeholder,
-    Pipeline, Region, Signature, StageInfo, TypeLattice,
+    Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
+    Placeholder, Region, Signature, StageInfo, TypeLattice,
 };
 use kirin_prettyless::PrintExt;
 

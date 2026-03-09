@@ -310,10 +310,7 @@ pub(super) fn build_fn_for_statement(
     let body = build_fn_body(info, input, &result_name_map);
     let self_ty = quote! { #name #ty_generics };
 
-    let needs_placeholder_bound = info
-        .fields
-        .iter()
-        .any(|f| f.is_auto_placeholder());
+    let needs_placeholder_bound = info.fields.iter().any(|f| f.is_auto_placeholder());
 
     let placeholder_bound = if needs_placeholder_bound {
         quote! { , #ir_type: #crate_path::Placeholder }
