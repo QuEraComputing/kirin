@@ -1,0 +1,14 @@
+stage @source fn @abs(i64) -> i64;
+
+specialize @source fn @abs(i64) -> i64 {
+  ^entry(%x: i64) {
+    %zero = constant 0 -> i64;
+    %is_neg = lt %x, %zero -> i64;
+    if %is_neg then ^then() {
+      %negated = neg %x -> i64;
+      ret %negated;
+    } else ^else() {
+      ret %x;
+    };
+  }
+}

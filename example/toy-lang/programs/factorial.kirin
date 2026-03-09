@@ -1,0 +1,16 @@
+stage @source fn @factorial(i64) -> i64;
+
+specialize @source fn @factorial(i64) -> i64 {
+  ^entry(%n: i64) {
+    %one = constant 1 -> i64;
+    %is_base = le %n, %one -> i64;
+    if %is_base then ^then() {
+      ret %one;
+    } else ^else() {
+      %n_minus_1 = sub %n, %one -> i64;
+      %rec = call @factorial(%n_minus_1) -> i64;
+      %result = mul %n, %rec -> i64;
+      ret %result;
+    };
+  }
+}
