@@ -96,11 +96,6 @@ impl<L: Dialect> StageInfo<L> {
         &self.ssas
     }
 
-    /// Get a mutable reference to the SSA values arena.
-    pub fn ssa_arena_mut(&mut self) -> &mut Arena<SSAValue, SSAInfo<L>> {
-        &mut self.ssas
-    }
-
     /// Get a reference to the symbols intern table.
     pub fn symbol_table(&self) -> &InternTable<String, Symbol> {
         &self.symbols
@@ -144,77 +139,26 @@ impl<L: Dialect> StageInfo<L> {
         &self.blocks
     }
 
-    /// Get a mutable reference to the blocks arena.
-    pub fn block_arena_mut(&mut self) -> &mut Arena<Block, BlockInfo<L>> {
-        &mut self.blocks
-    }
-
-    /// Pre-allocate a block with typed arguments, returning the block ID and
-    /// real `BlockArgument` SSAs. Statements can then reference these SSAs
-    /// during emit, and the block can be finalized later via
-    /// [`finalize_block`](Self::finalize_block).
+    /// Attach statements and an optional terminator to an existing block.
     ///
-    /// This avoids `BuilderBlockArgument` placeholders, which inner (nested)
-    /// block builders may incorrectly try to resolve.
-    pub fn pre_allocate_block(
+    /// Sets each statement's parent to `block`, links the statements into a
+    /// linked list, and stores them on the block info. This is used by parser
+    /// emit flows that create a block (with arguments) first, then emit
+    /// statements in a second phase.
+    pub fn attach_statements_to_block(
         &mut self,
-        name: impl Into<String>,
-        arg_types: Vec<(String, L::Type)>,
-    ) -> (Block, Vec<BlockArgument>) {
-        let block_id = self.blocks.next_id();
-        let name_sym = self.symbols.intern(name.into());
-
-        // Allocate a stub block.
-        let stub = BlockInfo::builder()
-            .name(name_sym)
-            .node(LinkedListNode::new(block_id))
-            .arguments(Vec::new())
-            .new();
-        self.blocks.alloc(stub);
-
-        // Create real BlockArgument SSAs.
-        let mut args = Vec::with_capacity(arg_types.len());
-        for (idx, (arg_name, ty)) in arg_types.into_iter().enumerate() {
-            let arg: BlockArgument = self.ssas.next_id().into();
-            let ssa = SSAInfo::new(
-                arg.into(),
-                Some(self.symbols.intern(arg_name)),
-                ty,
-                SSAKind::BlockArgument(block_id, idx),
-            );
-            self.ssas.alloc(ssa);
-            args.push(arg);
-        }
-
-        (block_id, args)
-    }
-
-    /// Finalize a pre-allocated block by attaching statements and a terminator.
-    ///
-    /// Must be called after [`pre_allocate_block`](Self::pre_allocate_block).
-    /// Statements' parent fields are updated to point to this block.
-    pub fn finalize_block(
-        &mut self,
-        block_id: Block,
-        block_args: Vec<BlockArgument>,
-        stmt_ids: Vec<Statement>,
+        block: Block,
+        stmts: &[Statement],
         terminator: Option<Statement>,
     ) {
-        // Set parent on all statements.
-        for &stmt in &stmt_ids {
-            self.statements[stmt].parent = Some(block_id);
+        for &stmt in stmts {
+            stmt.expect_info_mut(self).parent = Some(block);
         }
         if let Some(term) = terminator {
-            self.statements[term].parent = Some(block_id);
+            term.expect_info_mut(self).parent = Some(block);
         }
-
-        let linked = self.link_statements(&stmt_ids);
-
-        let block_info = self
-            .blocks
-            .get_mut(block_id)
-            .expect("pre-allocated block should exist");
-        block_info.arguments = block_args;
+        let linked = self.link_statements(stmts);
+        let block_info = block.expect_info_mut(self);
         block_info.statements = linked;
         block_info.terminator = terminator;
     }

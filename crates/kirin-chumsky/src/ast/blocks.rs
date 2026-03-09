@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, GetInfo};
+use kirin_ir::{Dialect, GetInfo, Id};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -98,6 +98,11 @@ where
 
 /// Emit a single block AST node into the IR, reusing an existing block ID if
 /// the name was already registered (e.g. by a two-pass Region emit).
+///
+/// Uses a two-phase approach: first creates the block with its arguments (to
+/// get real `BlockArgument` SSAs), then emits statements and attaches them.
+/// This avoids `BuilderBlockArgument` placeholders which panic when nested
+/// blocks (e.g. if/else bodies) reference outer block arguments.
 fn emit_block<'src, TypeOutput, StmtOutput, IR>(
     block_ast: &Block<'src, TypeOutput, StmtOutput>,
     ctx: &mut EmitContext<'_, IR>,
@@ -107,9 +112,8 @@ where
     TypeOutput: EmitIR<IR, Output = IR::Type>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
-    // Collect argument info for registration
-    // Convert TypeOutput to Dialect::Type using EmitIR
-    let arg_types: Vec<_> = block_ast
+    // Collect argument info for registration.
+    let arg_info: Vec<_> = block_ast
         .header
         .value
         .arguments
@@ -121,57 +125,55 @@ where
         })
         .collect::<Result<Vec<_>, EmitError>>()?;
 
-    // Pre-allocate the block and its argument SSAs so that nested blocks
-    // (e.g. if/else bodies) see real BlockArgument SSAs instead of
-    // BuilderBlockArgument placeholders. This prevents inner block builders
-    // from incorrectly trying to resolve outer block argument placeholders.
+    // Phase 1: Build the block with arguments only (no statements).
+    // This creates real BlockArgument SSAs that nested blocks can safely
+    // reference without triggering BuilderBlockArgument resolution panics.
     let block_name = block_ast.header.value.label.name.value.to_string();
-    let (block_id, block_args) = ctx.stage.pre_allocate_block(block_name, arg_types.clone());
+    let mut builder = ctx.stage.block().name(block_name);
+    for (name, ty) in &arg_info {
+        builder = builder.argument(ty.clone()).arg_name(name.clone());
+    }
+    let block = builder.new();
 
-    // Register the argument SSAs in the emit context so statements can
-    // reference them by name.
-    for ((name, _ty), &arg) in arg_types.iter().zip(block_args.iter()) {
-        ctx.register_ssa(name.clone(), arg.into());
+    // Read back the real BlockArgument SSAs and register them in emit context.
+    let block_args: Vec<kirin_ir::SSAValue> = block
+        .expect_info(ctx.stage)
+        .arguments
+        .iter()
+        .map(|arg| kirin_ir::SSAValue::from(Id::from(*arg)))
+        .collect();
+    for ((name, _), ssa) in arg_info.iter().zip(block_args.iter()) {
+        ctx.register_ssa(name.clone(), *ssa);
     }
 
-    // Emit all statements in the block and check which are terminators.
-    let statements: Vec<_> = block_ast
-        .statements
-        .iter()
-        .map(|stmt_ast| {
-            let stmt = stmt_ast.value.emit(ctx)?;
-            let is_terminator = stmt
-                .get_info(ctx.stage)
-                .expect("statement should exist")
-                .definition()
-                .is_terminator();
-            Ok((stmt, is_terminator))
-        })
-        .collect::<Result<Vec<_>, EmitError>>()?;
-
-    // Separate statements and terminator.
-    let mut stmt_ids = Vec::new();
+    // Phase 2: Emit statements now that block arguments are real SSAs.
+    let mut stmts = Vec::new();
     let mut terminator = None;
-    for (stmt, is_terminator) in statements {
+    for stmt_ast in &block_ast.statements {
+        let stmt = stmt_ast.value.emit(ctx)?;
+        let is_terminator = stmt
+            .get_info(ctx.stage)
+            .expect("statement should exist")
+            .definition()
+            .is_terminator();
         if is_terminator {
             terminator = Some(stmt);
         } else {
-            stmt_ids.push(stmt);
+            stmts.push(stmt);
         }
     }
 
-    // Finalize the pre-allocated block with statements and terminator.
-    ctx.stage
-        .finalize_block(block_id, block_args, stmt_ids, terminator);
+    // Attach statements and terminator to the already-created block.
+    ctx.stage.attach_statements_to_block(block, &stmts, terminator);
 
     // Register the block only if not already registered (two-pass Region
     // creates stubs first, so the name may already be present).
     let block_label = block_ast.header.value.label.name.value;
     if ctx.lookup_block(block_label).is_none() {
-        ctx.register_block(block_label.to_string(), block_id);
+        ctx.register_block(block_label.to_string(), block);
     }
 
-    Ok(block_id)
+    Ok(block)
 }
 
 /// Implementation of EmitIR for Block AST nodes.

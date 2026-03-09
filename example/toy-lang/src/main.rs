@@ -35,6 +35,7 @@ enum Command {
         #[arg(long, value_name = "NAME")]
         function: String,
         /// Arguments to the function (parsed as i64)
+        #[arg(allow_negative_numbers = true)]
         args: Vec<String>,
     },
 }
