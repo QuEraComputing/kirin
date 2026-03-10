@@ -1,10 +1,10 @@
-use kirin::prelude::{Dialect, GetInfo, HasStageInfo};
+use kirin::prelude::{CompileTimeValue, Dialect, GetInfo, HasStageInfo};
 use kirin_interpreter::{
     Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageResolutionError,
 };
 use smallvec::smallvec;
 
-use crate::{Bind, Call, FunctionBody, Lambda, Return};
+use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
 
 impl<T> SSACFGRegion for FunctionBody<T>
 where
@@ -71,6 +71,43 @@ where
             .next()
             .ok_or(InterpreterError::missing_entry_block())?;
         Ok(Continuation::Jump(entry, smallvec![]))
+    }
+}
+
+impl<T> SSACFGRegion for Lexical<T>
+where
+    T: CompileTimeValue,
+{
+    fn entry_block<L: Dialect>(
+        &self,
+        stage: &kirin::prelude::StageInfo<L>,
+    ) -> Result<kirin::prelude::Block, InterpreterError> {
+        match self {
+            Lexical::FunctionBody(op) => op.entry_block(stage),
+            Lexical::Lambda(op) => op.entry_block(stage),
+            _ => Err(InterpreterError::missing_entry_block()),
+        }
+    }
+}
+
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Lexical<T>
+where
+    I: Interpreter<'ir>,
+    I::StageInfo: HasStageInfo<L>,
+    I::Value: Clone,
+    I::Error: From<InterpreterError>,
+    L: Dialect + 'ir,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+        match self {
+            Lexical::FunctionBody(op) => {
+                <FunctionBody<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
+            }
+            Lexical::Lambda(op) => <Lambda<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+            Lexical::Call(op) => <Call<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+            Lexical::Return(op) => <Return<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+        }
     }
 }
 
@@ -211,5 +248,41 @@ where
     fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
         let v = interp.read(self.value)?;
         Ok(Continuation::Return(v))
+    }
+}
+
+impl<T> SSACFGRegion for Lifted<T>
+where
+    T: CompileTimeValue,
+{
+    fn entry_block<L: Dialect>(
+        &self,
+        stage: &kirin::prelude::StageInfo<L>,
+    ) -> Result<kirin::prelude::Block, InterpreterError> {
+        match self {
+            Lifted::FunctionBody(op) => op.entry_block(stage),
+            _ => Err(InterpreterError::missing_entry_block()),
+        }
+    }
+}
+
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Lifted<T>
+where
+    I: Interpreter<'ir>,
+    I::StageInfo: HasStageInfo<L>,
+    I::Value: Clone,
+    I::Error: From<InterpreterError>,
+    L: Dialect + 'ir,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+        match self {
+            Lifted::FunctionBody(op) => {
+                <FunctionBody<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
+            }
+            Lifted::Bind(op) => <Bind<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+            Lifted::Call(op) => <Call<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+            Lifted::Return(op) => <Return<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+        }
     }
 }

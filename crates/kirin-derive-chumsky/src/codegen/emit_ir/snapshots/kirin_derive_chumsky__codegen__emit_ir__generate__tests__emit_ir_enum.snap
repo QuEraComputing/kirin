@@ -2,6 +2,66 @@
 source: crates/kirin-derive-chumsky/src/codegen/emit_ir/generate.rs
 expression: generate_emit_ir_code(input)
 ---
+impl<'t, TypeOutput, LanguageOutput> ArithOpsAST<'t, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
+    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+{
+    fn emit_with<__Language, __EmitLanguageOutput>(
+        &self,
+        ctx: &mut ::kirin::parsers::EmitContext<'_, __Language>,
+        emit_language_output: &__EmitLanguageOutput,
+    ) -> ::core::result::Result<ArithOps, ::kirin::parsers::EmitError>
+    where
+        __Language: ::kirin::ir::Dialect,
+        TypeOutput: Clone + PartialEq,
+        LanguageOutput: Clone + PartialEq + 't,
+        __EmitLanguageOutput: for<'ctx> Fn(
+            &LanguageOutput,
+            &mut ::kirin::parsers::EmitContext<'ctx, __Language>,
+        ) -> ::core::result::Result<
+            ::kirin::ir::Statement,
+            ::kirin::parsers::EmitError,
+        >,
+        SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+        <SimpleType as ::kirin::parsers::HasParser<'t>>::Output: ::kirin::parsers::EmitIR<
+            __Language,
+            Output = <__Language as ::kirin::ir::Dialect>::Type,
+        >,
+    {
+        match self {
+            ArithOpsAST::Add {
+                result: f_result,
+                lhs: f_lhs,
+                rhs: f_rhs,
+            } => {
+                let f_result_ir = ::kirin::parsers::EmitIR::emit(f_result, ctx)?;
+                let f_lhs_ir = f_lhs.clone();
+                let f_rhs_ir = f_rhs.clone();
+                let dialect_variant: ArithOps = ArithOps::Add {
+                    result: f_result_ir.into(),
+                    lhs: f_lhs_ir,
+                    rhs: f_rhs_ir,
+                };
+                Ok(dialect_variant)
+            }
+            ArithOpsAST::Neg {
+                result: f_result,
+                operand: f_operand,
+            } => {
+                let f_result_ir = ::kirin::parsers::EmitIR::emit(f_result, ctx)?;
+                let f_operand_ir = f_operand.clone();
+                let dialect_variant: ArithOps = ArithOps::Neg {
+                    result: f_result_ir.into(),
+                    operand: f_operand_ir,
+                };
+                Ok(dialect_variant)
+            }
+            ArithOpsAST::__Marker(_, unreachable) => match *unreachable {},
+        }
+    }
+}
 #[automatically_derived]
 impl<'t, TypeOutput, LanguageOutput, Language> ::kirin::parsers::EmitIR<Language>
     for ArithOpsAST<'t, TypeOutput, LanguageOutput>
@@ -18,36 +78,8 @@ where
         &self,
         ctx: &mut ::kirin::parsers::EmitContext<'_, Language>,
     ) -> ::core::result::Result<Self::Output, ::kirin::parsers::EmitError> {
-        match self {
-            ArithOpsAST::Add {
-                result: f_result,
-                lhs: f_lhs,
-                rhs: f_rhs,
-            } => {
-                let f_result_ir = ::kirin::parsers::EmitIR::emit(f_result, ctx)?;
-                let f_lhs_ir = f_lhs.clone();
-                let f_rhs_ir = f_rhs.clone();
-                let dialect_variant: ArithOps = ArithOps::Add {
-                    result: f_result_ir.into(),
-                    lhs: f_lhs_ir,
-                    rhs: f_rhs_ir,
-                };
-                Ok(ctx.stage.statement().definition(dialect_variant).new())
-            }
-            ArithOpsAST::Neg {
-                result: f_result,
-                operand: f_operand,
-            } => {
-                let f_result_ir = ::kirin::parsers::EmitIR::emit(f_result, ctx)?;
-                let f_operand_ir = f_operand.clone();
-                let dialect_variant: ArithOps = ArithOps::Neg {
-                    result: f_result_ir.into(),
-                    operand: f_operand_ir,
-                };
-                Ok(ctx.stage.statement().definition(dialect_variant).new())
-            }
-            ArithOpsAST::__Marker(_, unreachable) => match *unreachable {},
-        }
+        let dialect_variant = self.emit_with(ctx, &|_, _| unreachable!())?;
+        Ok(ctx.stage.statement().definition(dialect_variant).new())
     }
 }
 #[automatically_derived]
@@ -65,6 +97,9 @@ where
         &self,
         ctx: &mut ::kirin::parsers::EmitContext<'_, Language>,
     ) -> ::core::result::Result<Self::Output, ::kirin::parsers::EmitError> {
-        ::kirin::parsers::EmitIR::emit(&self.0, ctx)
+        let dialect_variant = self.0.emit_with(ctx, &|stmt, ctx| {
+            <ArithOpsASTSelf<'t, TypeOutput> as ::kirin::parsers::EmitIR<Language>>::emit(stmt, ctx)
+        })?;
+        Ok(ctx.stage.statement().definition(dialect_variant).new())
     }
 }

@@ -2,6 +2,7 @@ mod arith;
 mod bitwise;
 mod cf;
 mod cmp;
+mod composable_existing_dialects;
 mod composite;
 mod constant;
 mod function;

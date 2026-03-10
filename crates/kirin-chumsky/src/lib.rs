@@ -28,8 +28,9 @@
 //!   let functions = pipeline.parse(src)?;
 //!   ```
 //!
-//! For lower-level control, [`parse_ast`] parses text into an AST without emitting
-//! IR, and [`EmitContext`] gives full control over SSA name registration.
+//! For lower-level control, [`parse_ast`] still parses text into an AST without
+//! emitting IR, and [`EmitContext`] gives full control over SSA name
+//! registration.
 //!
 //! # Defining Dialects
 //!
@@ -81,8 +82,8 @@ pub mod prelude {
     pub use crate::parsers::*;
     pub use crate::traits::{
         BoxedParser, DirectlyParsable, EmitContext, EmitError, EmitIR, HasDialectParser, HasParser,
-        ParseError, ParseStatementText, ParseStatementTextExt, ParserError, RecursiveParser,
-        TokenInput, parse_ast,
+        HasParserEmitIR, ParseError, ParseStatementText, ParseStatementTextExt, ParserError,
+        RecursiveParser, TokenInput, parse_ast,
     };
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;

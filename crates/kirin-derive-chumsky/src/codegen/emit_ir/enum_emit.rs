@@ -28,8 +28,15 @@ impl GenerateEmitIR {
         generate_enum_match(
             ast_name,
             data,
-            move |_name, _wrapper, _stmt| {
-                quote! { #crate_path_for_match::EmitIR::emit(inner, ctx) }
+            move |_name, wrapper, _stmt| {
+                let wrapped_ty = &wrapper.ty;
+                quote! {
+                    <#wrapped_ty as #crate_path_for_match::HasDialectEmitIR<'t, __Language, LanguageOutput>>::emit_output(
+                        inner,
+                        ctx,
+                        emit_language_output,
+                    ).map(Into::into)
+                }
             },
             |name, variant| {
                 self.generate_variant_emit(
@@ -86,7 +93,7 @@ impl GenerateEmitIR {
             #full_pattern => {
                 #emit_calls
                 let dialect_variant: #original_name #original_ty_generics = #constructor;
-                Ok(ctx.stage.statement().definition(dialect_variant).new())
+                Ok(dialect_variant)
             }
         }
     }

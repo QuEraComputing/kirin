@@ -48,3 +48,53 @@ where
         .boxed()
     }
 }
+#[automatically_derived]
+impl<'t> ::kirin::parsers::HasParserEmitIR<'t> for ArithOps
+where
+    ArithOps: ::kirin::ir::Dialect<Type = SimpleType>,
+    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    <SimpleType as ::kirin::parsers::HasParser<'t>>::Output:
+        ::kirin::parsers::EmitIR<ArithOps, Output = <ArithOps as ::kirin::ir::Dialect>::Type>,
+{
+    fn emit_parsed(
+        output: &<Self as ::kirin::parsers::HasParser<'t>>::Output,
+        ctx: &mut ::kirin::parsers::EmitContext<'_, Self>,
+    ) -> ::core::result::Result<::kirin::ir::Statement, ::kirin::parsers::EmitError> {
+        let dialect_variant = output.0.emit_with(ctx, &|stmt, ctx| {
+            <ArithOps as ::kirin::parsers::HasParserEmitIR<'t>>::emit_parsed(stmt, ctx)
+        })?;
+        Ok(ctx.stage.statement().definition(dialect_variant).new())
+    }
+}
+#[automatically_derived]
+impl<'tokens, Language, LanguageOutput>
+    ::kirin::parsers::HasDialectEmitIR<'tokens, Language, LanguageOutput> for ArithOps
+where
+    Language: ::kirin::ir::Dialect<Type = SimpleType>,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens> + 'tokens,
+    <SimpleType as ::kirin::parsers::HasParser<'tokens>>::Output:
+        ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
+{
+    #[inline]
+    fn emit_output<__TypeOutput, __EmitLanguageOutput>(
+        output: &<Self as ::kirin::parsers::HasDialectParser<'tokens>>::Output<
+            __TypeOutput,
+            LanguageOutput,
+        >,
+        ctx: &mut ::kirin::parsers::EmitContext<'_, Language>,
+        emit_language_output: &__EmitLanguageOutput,
+    ) -> ::core::result::Result<Self, ::kirin::parsers::EmitError>
+    where
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __EmitLanguageOutput: for<'ctx> Fn(
+            &LanguageOutput,
+            &mut ::kirin::parsers::EmitContext<'ctx, Language>,
+        ) -> ::core::result::Result<
+            ::kirin::ir::Statement,
+            ::kirin::parsers::EmitError,
+        >,
+    {
+        output.emit_with(ctx, emit_language_output)
+    }
+}

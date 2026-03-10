@@ -237,7 +237,7 @@ impl GenerateHasDialectParser {
         }
     }
 
-    fn build_ast_self_type_reference(
+    pub(super) fn build_ast_self_type_reference(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         ast_self_name: &syn::Ident,

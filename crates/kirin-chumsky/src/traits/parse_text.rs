@@ -1,8 +1,9 @@
 use chumsky::prelude::*;
 use kirin_ir::{Dialect, Pipeline, StageInfo};
 
-use super::emit_ir::{EmitContext, EmitIR};
-use super::has_parser::{HasParser, ParseError};
+use super::emit_ir::EmitContext;
+use super::has_parser::ParseError;
+use super::has_parser_emit_ir::HasParserEmitIR;
 
 /// Extension trait for parsing a single statement from text.
 ///
@@ -74,8 +75,7 @@ fn parse_statement_on_stage<L>(
 ) -> Result<kirin_ir::Statement, Vec<ParseError>>
 where
     L: Dialect,
-    for<'t> L: HasParser<'t>,
-    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
+    for<'t> L: HasParserEmitIR<'t>,
 {
     let ast = super::has_parser::parse_ast::<L>(input)?;
     let existing_ssas = collect_existing_ssas(stage);
@@ -83,7 +83,7 @@ where
     for (name, ssa) in existing_ssas {
         emit_ctx.register_ssa(name, ssa);
     }
-    ast.emit(&mut emit_ctx).map_err(|e| {
+    L::emit_parsed(&ast, &mut emit_ctx).map_err(|e| {
         vec![ParseError {
             message: e.to_string(),
             span: SimpleSpan::from(0..0),
@@ -94,8 +94,7 @@ where
 impl<L> ParseStatementText<L> for StageInfo<L>
 where
     L: Dialect,
-    for<'t> L: HasParser<'t>,
-    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
+    for<'t> L: HasParserEmitIR<'t>,
 {
     fn parse_statement(
         &mut self,
@@ -110,8 +109,7 @@ impl<L, S> ParseStatementText<L, kirin_ir::CompileStage> for Pipeline<S>
 where
     L: Dialect,
     S: kirin_ir::HasStageInfo<L>,
-    for<'t> L: HasParser<'t>,
-    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
+    for<'t> L: HasParserEmitIR<'t>,
 {
     fn parse_statement(
         &mut self,

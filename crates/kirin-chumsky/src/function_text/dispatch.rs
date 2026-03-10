@@ -11,9 +11,9 @@
 //! For multi-dialect stage enums, use `#[derive(ParseDispatch)]` from
 //! `kirin-derive-ir`.
 
-use kirin_ir::{CompileStage, Dialect, StageInfo, StageMeta, Statement};
+use kirin_ir::{CompileStage, Dialect, StageInfo, StageMeta};
 
-use crate::{EmitIR, HasParser};
+use crate::{HasParser, HasParserEmitIR};
 
 use super::error::FunctionParseError;
 use super::parse_text::{FirstPassCtx, FirstPassDispatchResult, SecondPassCtx};
@@ -49,9 +49,8 @@ impl<L> ParseDispatch for StageInfo<L>
 where
     L: Dialect,
     L::Type: kirin_ir::Placeholder,
-    for<'t> L: HasParser<'t>,
+    for<'t> L: HasParserEmitIR<'t>,
     for<'t> L::Type: HasParser<'t, Output = L::Type>,
-    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = Statement>,
 {
     fn dispatch_first_pass(
         &mut self,

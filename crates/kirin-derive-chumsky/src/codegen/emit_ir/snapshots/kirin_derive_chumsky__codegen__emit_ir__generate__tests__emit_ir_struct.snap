@@ -2,6 +2,49 @@
 source: crates/kirin-derive-chumsky/src/codegen/emit_ir/generate.rs
 expression: generate_emit_ir_code(input)
 ---
+impl<'t, TypeOutput, LanguageOutput> AddAST<'t, TypeOutput, LanguageOutput>
+where
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
+    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+{
+    fn emit_with<__Language, __EmitLanguageOutput>(
+        &self,
+        ctx: &mut kirin_chumsky::EmitContext<'_, __Language>,
+        emit_language_output: &__EmitLanguageOutput,
+    ) -> ::core::result::Result<Add, kirin_chumsky::EmitError>
+    where
+        __Language: ::kirin::ir::Dialect,
+        TypeOutput: Clone + PartialEq,
+        LanguageOutput: Clone + PartialEq + 't,
+        __EmitLanguageOutput: for<'ctx> Fn(
+            &LanguageOutput,
+            &mut kirin_chumsky::EmitContext<'ctx, __Language>,
+        ) -> ::core::result::Result<
+            ::kirin::ir::Statement,
+            kirin_chumsky::EmitError,
+        >,
+        SimpleType: kirin_chumsky::HasParser<'t> + 't,
+        <SimpleType as kirin_chumsky::HasParser<'t>>::Output:
+            kirin_chumsky::EmitIR<__Language, Output = <__Language as ::kirin::ir::Dialect>::Type>,
+    {
+        let Self {
+            result: f_result,
+            lhs: f_lhs,
+            rhs: f_rhs,
+            ..
+        } = self;
+        let f_result_ir = kirin_chumsky::EmitIR::emit(f_result, ctx)?;
+        let f_lhs_ir = f_lhs.clone();
+        let f_rhs_ir = f_rhs.clone();
+        let dialect_variant: Add = Add {
+            result: f_result_ir.into(),
+            lhs: f_lhs_ir,
+            rhs: f_rhs_ir,
+        };
+        Ok(dialect_variant)
+    }
+}
 #[automatically_derived]
 impl<'t, TypeOutput, LanguageOutput, Language> kirin_chumsky::EmitIR<Language>
     for AddAST<'t, TypeOutput, LanguageOutput>
@@ -18,20 +61,7 @@ where
         &self,
         ctx: &mut kirin_chumsky::EmitContext<'_, Language>,
     ) -> ::core::result::Result<Self::Output, kirin_chumsky::EmitError> {
-        let Self {
-            result: f_result,
-            lhs: f_lhs,
-            rhs: f_rhs,
-            ..
-        } = self;
-        let f_result_ir = kirin_chumsky::EmitIR::emit(f_result, ctx)?;
-        let f_lhs_ir = f_lhs.clone();
-        let f_rhs_ir = f_rhs.clone();
-        let dialect_variant: Add = Add {
-            result: f_result_ir.into(),
-            lhs: f_lhs_ir,
-            rhs: f_rhs_ir,
-        };
+        let dialect_variant = self.emit_with(ctx, &|_, _| unreachable!())?;
         Ok(ctx.stage.statement().definition(dialect_variant).new())
     }
 }
@@ -49,6 +79,9 @@ where
         &self,
         ctx: &mut kirin_chumsky::EmitContext<'_, Language>,
     ) -> ::core::result::Result<Self::Output, kirin_chumsky::EmitError> {
-        kirin_chumsky::EmitIR::emit(&self.0, ctx)
+        let dialect_variant = self.0.emit_with(ctx, &|stmt, ctx| {
+            <AddASTSelf<'t, TypeOutput> as kirin_chumsky::EmitIR<Language>>::emit(stmt, ctx)
+        })?;
+        Ok(ctx.stage.statement().definition(dialect_variant).new())
     }
 }

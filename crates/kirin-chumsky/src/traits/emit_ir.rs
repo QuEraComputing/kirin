@@ -76,7 +76,7 @@ pub trait DirectlyParsable: Clone {}
 /// which is useful for type lattices and compile-time value types.
 impl<T, L> EmitIR<L> for T
 where
-    L: Dialect<Type = T>,
+    L: Dialect,
     T: DirectlyParsable,
 {
     type Output = T;

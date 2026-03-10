@@ -87,3 +87,53 @@ where
         .boxed()
     }
 }
+#[automatically_derived]
+impl<'t> kirin_chumsky::HasParserEmitIR<'t> for Return
+where
+    Return: ::kirin::ir::Dialect<Type = SimpleType>,
+    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+    <SimpleType as kirin_chumsky::HasParser<'t>>::Output:
+        kirin_chumsky::EmitIR<Return, Output = <Return as ::kirin::ir::Dialect>::Type>,
+{
+    fn emit_parsed(
+        output: &<Self as kirin_chumsky::HasParser<'t>>::Output,
+        ctx: &mut kirin_chumsky::EmitContext<'_, Self>,
+    ) -> ::core::result::Result<::kirin::ir::Statement, kirin_chumsky::EmitError> {
+        let dialect_variant = output.0.emit_with(ctx, &|stmt, ctx| {
+            <Return as kirin_chumsky::HasParserEmitIR<'t>>::emit_parsed(stmt, ctx)
+        })?;
+        Ok(ctx.stage.statement().definition(dialect_variant).new())
+    }
+}
+#[automatically_derived]
+impl<'tokens, Language, LanguageOutput>
+    kirin_chumsky::HasDialectEmitIR<'tokens, Language, LanguageOutput> for Return
+where
+    Language: ::kirin::ir::Dialect<Type = SimpleType>,
+    LanguageOutput: Clone + PartialEq + 'tokens,
+    SimpleType: kirin_chumsky::HasParser<'tokens> + 'tokens,
+    <SimpleType as kirin_chumsky::HasParser<'tokens>>::Output:
+        kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
+{
+    #[inline]
+    fn emit_output<__TypeOutput, __EmitLanguageOutput>(
+        output: &<Self as kirin_chumsky::HasDialectParser<'tokens>>::Output<
+            __TypeOutput,
+            LanguageOutput,
+        >,
+        ctx: &mut kirin_chumsky::EmitContext<'_, Language>,
+        emit_language_output: &__EmitLanguageOutput,
+    ) -> ::core::result::Result<Self, kirin_chumsky::EmitError>
+    where
+        __TypeOutput: Clone + PartialEq + 'tokens,
+        __EmitLanguageOutput: for<'ctx> Fn(
+            &LanguageOutput,
+            &mut kirin_chumsky::EmitContext<'ctx, Language>,
+        ) -> ::core::result::Result<
+            ::kirin::ir::Statement,
+            kirin_chumsky::EmitError,
+        >,
+    {
+        output.emit_with(ctx, emit_language_output)
+    }
+}

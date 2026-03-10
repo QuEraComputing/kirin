@@ -11,7 +11,7 @@ impl GenerateEmitIR {
     pub(super) fn generate_ast_self_emit_impl(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
-        ast_name: &syn::Ident,
+        _ast_name: &syn::Ident,
         ast_self_name: &syn::Ident,
         crate_path: &syn::Path,
     ) -> TokenStream {
@@ -54,31 +54,16 @@ impl GenerateEmitIR {
             quote! { <'t, #(#type_params,)* TypeOutput> }
         };
 
-        let _inner_ast_type = if type_params.is_empty() {
-            quote! { #ast_name<'t, TypeOutput, #ast_self_name<'t, TypeOutput>> }
-        } else {
-            quote! { #ast_name<'t, #(#type_params,)* TypeOutput, #ast_self_name<'t, #(#type_params,)* TypeOutput>> }
-        };
-
         let bounds = BoundsBuilder::new(crate_path);
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let value_type_bounds = bounds.emit_ir_bounds(&value_types);
 
         let wrapper_types = crate::codegen::collect_wrapper_types(ir_input);
-        let wrapper_from_bounds: Vec<syn::WherePredicate> = wrapper_types
-            .iter()
-            .map(|ty| syn::parse_quote! { Language: ::core::convert::From<#ty> })
-            .collect();
-        let wrapper_dialect_parser_bounds: Vec<syn::WherePredicate> = wrapper_types
-            .iter()
-            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'t> })
-            .collect();
         let wrapper_emit_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
             .map(|ty| {
                 syn::parse_quote! {
-                    <#ty as #crate_path::HasDialectParser<'t>>::Output<TypeOutput, #ast_self_name #ast_self_ty_generics>:
-                        #crate_path::EmitIR<Language, Output = #ir_path::Statement>
+                    #ty: #crate_path::HasDialectEmitIR<'t, Language, #ast_self_name #ast_self_ty_generics>
                 }
             })
             .collect();
@@ -109,13 +94,9 @@ impl GenerateEmitIR {
             let bounds_tokens = value_type_bounds.iter().map(|b| quote! { #b, });
             all_bounds.push(quote! { #(#bounds_tokens)* });
         }
-        if !wrapper_from_bounds.is_empty() {
-            let from_tokens = wrapper_from_bounds.iter().map(|b| quote! { #b, });
+        if !wrapper_emit_bounds.is_empty() {
             let emit_tokens = wrapper_emit_bounds.iter().map(|b| quote! { #b, });
-            let dialect_parser_tokens =
-                wrapper_dialect_parser_bounds.iter().map(|b| quote! { #b, });
-            all_bounds
-                .push(quote! { #(#from_tokens)* #(#emit_tokens)* #(#dialect_parser_tokens)* });
+            all_bounds.push(quote! { #(#emit_tokens)* });
         }
 
         let where_clause = quote! { where #(#all_bounds)* };
@@ -128,7 +109,13 @@ impl GenerateEmitIR {
                 type Output = #ir_path::Statement;
 
                 fn emit(&self, ctx: &mut #crate_path::EmitContext<'_, Language>) -> ::core::result::Result<Self::Output, #crate_path::EmitError> {
-                    #crate_path::EmitIR::emit(&self.0, ctx)
+                    let dialect_variant = self.0.emit_with(
+                        ctx,
+                        &|stmt, ctx| {
+                            <#ast_self_name #ast_self_ty_generics as #crate_path::EmitIR<Language>>::emit(stmt, ctx)
+                        },
+                    )?;
+                    Ok(ctx.stage.statement().definition(dialect_variant).new())
                 }
             }
         }

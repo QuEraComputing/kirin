@@ -52,6 +52,12 @@ impl GenerateEmitIR {
                             }
                         }
                     }
+                    FieldCategory::Block => quote! {
+                        let #emitted_var = #var.value.emit_with(ctx, emit_language_output)?;
+                    },
+                    FieldCategory::Region => quote! {
+                        let #emitted_var = #var.emit_with(ctx, emit_language_output)?;
+                    },
                     _ => quote! {
                         let #emitted_var = #crate_path::EmitIR::emit(#var, ctx)?;
                     },

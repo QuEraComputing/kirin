@@ -84,12 +84,12 @@ use rustc_hash::FxHashMap;
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
     CompileStage, Dialect, Function, GetInfo, GlobalSymbol, Id, Pipeline, StageInfo, StageMeta,
-    StagedFunction, Statement,
+    StagedFunction,
 };
 use kirin_lexer::Token;
 use strsim::levenshtein;
 
-use crate::{EmitContext, EmitIR, HasParser};
+use crate::{EmitContext, HasParser, HasParserEmitIR};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
@@ -209,7 +209,6 @@ pub fn first_pass_concrete<'t, L>(
 where
     L: Dialect + HasParser<'t>,
     L::Type: kirin_ir::Placeholder + HasParser<'t, Output = L::Type>,
-    <L as HasParser<'t>>::Output: EmitIR<L, Output = Statement>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
         .map_err(parse_error_from_chumsky)?;
@@ -259,9 +258,8 @@ pub fn second_pass_concrete<'t, L>(
     ctx: &mut SecondPassCtx<'t>,
 ) -> Result<usize, FunctionParseError>
 where
-    L: Dialect + HasParser<'t>,
+    L: Dialect + HasParserEmitIR<'t>,
     L::Type: HasParser<'t, Output = L::Type>,
-    <L as HasParser<'t>>::Output: EmitIR<L, Output = Statement>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
         .map_err(parse_error_from_chumsky)?;
@@ -558,16 +556,15 @@ fn apply_specialize_declaration<'src, L>(
     state: &mut ParseState,
 ) -> Result<(), FunctionParseError>
 where
-    L: Dialect + HasParser<'src>,
+    L: Dialect + HasParserEmitIR<'src>,
     L::Type: HasParser<'src, Output = L::Type>,
-    <L as HasParser<'src>>::Output: EmitIR<L, Output = Statement>,
 {
     let (function, staged_function) =
         resolve_specialize_target::<L>(stage_id, header, span, function_lookup, staged_lookup)?;
 
     let body_statement = {
         let mut emit_ctx = EmitContext::new(stage);
-        body.emit(&mut emit_ctx).map_err(|err| {
+        L::emit_parsed(body, &mut emit_ctx).map_err(|err| {
             FunctionParseError::new(
                 FunctionParseErrorKind::EmitFailed,
                 Some(span),

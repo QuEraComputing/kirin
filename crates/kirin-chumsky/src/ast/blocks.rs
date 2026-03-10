@@ -106,11 +106,14 @@ where
 fn emit_block<'src, TypeOutput, StmtOutput, IR>(
     block_ast: &Block<'src, TypeOutput, StmtOutput>,
     ctx: &mut EmitContext<'_, IR>,
+    emit_statement: &impl for<'ctx> Fn(
+        &StmtOutput,
+        &mut EmitContext<'ctx, IR>,
+    ) -> Result<kirin_ir::Statement, EmitError>,
 ) -> Result<kirin_ir::Block, EmitError>
 where
     IR: Dialect,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
-    StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
     // Collect argument info for registration.
     let arg_info: Vec<_> = block_ast
@@ -150,7 +153,7 @@ where
     let mut stmts = Vec::new();
     let mut terminator = None;
     for stmt_ast in &block_ast.statements {
-        let stmt = stmt_ast.value.emit(ctx)?;
+        let stmt = emit_statement(&stmt_ast.value, ctx)?;
         let is_terminator = stmt
             .get_info(ctx.stage)
             .expect("statement should exist")
@@ -177,6 +180,23 @@ where
     Ok(block)
 }
 
+impl<'src, TypeOutput, StmtOutput> Block<'src, TypeOutput, StmtOutput> {
+    pub fn emit_with<IR>(
+        &self,
+        ctx: &mut EmitContext<'_, IR>,
+        emit_statement: &impl for<'ctx> Fn(
+            &StmtOutput,
+            &mut EmitContext<'ctx, IR>,
+        ) -> Result<kirin_ir::Statement, EmitError>,
+    ) -> Result<kirin_ir::Block, EmitError>
+    where
+        IR: Dialect,
+        TypeOutput: EmitIR<IR, Output = IR::Type>,
+    {
+        emit_block(self, ctx, emit_statement)
+    }
+}
+
 /// Implementation of EmitIR for Block AST nodes.
 ///
 /// This builds an IR block with the parsed label, arguments, and statements.
@@ -193,7 +213,57 @@ where
     type Output = kirin_ir::Block;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
-        emit_block(self, ctx)
+        self.emit_with(ctx, &|stmt, ctx| stmt.emit(ctx))
+    }
+}
+
+impl<'src, TypeOutput, StmtOutput> Region<'src, TypeOutput, StmtOutput> {
+    pub fn emit_with<IR>(
+        &self,
+        ctx: &mut EmitContext<'_, IR>,
+        emit_statement: &impl for<'ctx> Fn(
+            &StmtOutput,
+            &mut EmitContext<'ctx, IR>,
+        ) -> Result<kirin_ir::Statement, EmitError>,
+    ) -> Result<kirin_ir::Region, EmitError>
+    where
+        IR: Dialect,
+        TypeOutput: EmitIR<IR, Output = IR::Type>,
+    {
+        // Pass 1: Create stub blocks and register their names so that forward
+        // references (e.g. `br ^exit` before ^exit is defined) can resolve.
+        let stub_blocks: Vec<_> = self
+            .blocks
+            .iter()
+            .map(|block_ast| {
+                let name = block_ast.value.header.value.label.name.value.to_string();
+                let stub = ctx.stage.block().name(name.clone()).new();
+                ctx.register_block(name, stub);
+                stub
+            })
+            .collect();
+
+        // Pass 2: Emit full block bodies. Successor references inside these
+        // blocks resolve to the stubs created above.
+        let real_blocks: Vec<_> = self
+            .blocks
+            .iter()
+            .map(|block_ast| emit_block(&block_ast.value, ctx, emit_statement))
+            .collect::<Result<Vec<_>, EmitError>>()?;
+
+        // Swap real block data into stub arena slots so that all existing
+        // Successor handles (which point to stub IDs) see the real data.
+        // This also remaps statement parents and block-arg ownership to stub IDs.
+        for (&stub, &real) in stub_blocks.iter().zip(real_blocks.iter()) {
+            ctx.stage.remap_block_identity(stub, real);
+        }
+
+        // Build the region using the stub IDs (now containing real data).
+        let mut builder = ctx.stage.region();
+        for block in stub_blocks {
+            builder = builder.add_block(block);
+        }
+        Ok(builder.new())
     }
 }
 
@@ -214,39 +284,6 @@ where
     type Output = kirin_ir::Region;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
-        // Pass 1: Create stub blocks and register their names so that forward
-        // references (e.g. `br ^exit` before ^exit is defined) can resolve.
-        let stub_blocks: Vec<_> = self
-            .blocks
-            .iter()
-            .map(|block_ast| {
-                let name = block_ast.value.header.value.label.name.value.to_string();
-                let stub = ctx.stage.block().name(name.clone()).new();
-                ctx.register_block(name, stub);
-                stub
-            })
-            .collect();
-
-        // Pass 2: Emit full block bodies. Successor references inside these
-        // blocks resolve to the stubs created above.
-        let real_blocks: Vec<_> = self
-            .blocks
-            .iter()
-            .map(|block_ast| emit_block(&block_ast.value, ctx))
-            .collect::<Result<Vec<_>, EmitError>>()?;
-
-        // Swap real block data into stub arena slots so that all existing
-        // Successor handles (which point to stub IDs) see the real data.
-        // This also remaps statement parents and block-arg ownership to stub IDs.
-        for (&stub, &real) in stub_blocks.iter().zip(real_blocks.iter()) {
-            ctx.stage.remap_block_identity(stub, real);
-        }
-
-        // Build the region using the stub IDs (now containing real data).
-        let mut builder = ctx.stage.region();
-        for block in stub_blocks {
-            builder = builder.add_block(block);
-        }
-        Ok(builder.new())
+        self.emit_with(ctx, &|stmt, ctx| stmt.emit(ctx))
     }
 }
