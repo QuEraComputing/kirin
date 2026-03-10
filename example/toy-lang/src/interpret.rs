@@ -89,9 +89,9 @@ where
                 }
                 Ok(Continuation::Continue)
             }
-            HighLevel::Yield { value } => {
-                let v = interp.read(*value)?;
-                Ok(Continuation::Yield(v))
+            // Delegate to built-in dialect impls for #[wraps] variants.
+            HighLevel::Yield(inner) => {
+                <kirin_scf::Yield<_> as Interpretable<'ir, I, HighLevel>>::interpret(inner, interp)
             }
             HighLevel::Constant { value, result } => {
                 let val = I::Value::from(value.clone());
@@ -182,6 +182,7 @@ where
                 interp.write(*result, val)?;
                 Ok(Continuation::Continue)
             }
+            // Delegate to built-in dialect impls for #[wraps] variants.
             LowLevel::Arith(inner) => {
                 <kirin_arith::Arith<_> as Interpretable<'ir, I, LowLevel>>::interpret(inner, interp)
             }
@@ -198,11 +199,11 @@ where
                     inner, interp,
                 )
             }
-            LowLevel::Bind(_) => Err(InterpreterError::custom(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                "bind is not yet supported in the interpreter",
-            ))
-            .into()),
+            LowLevel::Bind(inner) => {
+                <kirin_function::Bind<_> as Interpretable<'ir, I, LowLevel>>::interpret(
+                    inner, interp,
+                )
+            }
             LowLevel::Call(inner) => {
                 <kirin_function::Call<_> as Interpretable<'ir, I, LowLevel>>::interpret(
                     inner, interp,

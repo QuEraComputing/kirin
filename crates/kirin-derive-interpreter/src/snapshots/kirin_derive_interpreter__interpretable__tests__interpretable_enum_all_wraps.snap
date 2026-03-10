@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-derive-interpreter/src/interpretable.rs
+assertion_line: 116
 expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
@@ -7,7 +8,7 @@ impl<'__ir, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<'__ir, __In
     for ArithOps
 where
     __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
-    __InterpL: ::kirin_ir::Dialect,
+    __InterpL: ::kirin::ir::Dialect,
     AddOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
     SubOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
     MulOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,

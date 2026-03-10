@@ -4,7 +4,7 @@ use kirin_interpreter::{
 };
 use smallvec::smallvec;
 
-use crate::{Call, FunctionBody, Return};
+use crate::{Bind, Call, FunctionBody, Lambda, Return};
 
 impl<T> SSACFGRegion for FunctionBody<T>
 where
@@ -37,6 +37,56 @@ where
             .next()
             .ok_or(InterpreterError::missing_entry_block())?;
         Ok(Continuation::Jump(entry, smallvec![]))
+    }
+}
+
+impl<T> SSACFGRegion for Lambda<T>
+where
+    T: kirin::prelude::CompileTimeValue,
+{
+    fn entry_block<L: Dialect>(
+        &self,
+        stage: &kirin::prelude::StageInfo<L>,
+    ) -> Result<kirin::prelude::Block, InterpreterError> {
+        self.body
+            .blocks(stage)
+            .next()
+            .ok_or(InterpreterError::missing_entry_block())
+    }
+}
+
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Lambda<T>
+where
+    I: Interpreter<'ir>,
+    I::StageInfo: HasStageInfo<L>,
+    I::Error: From<InterpreterError>,
+    L: Dialect + 'ir,
+    T: kirin::prelude::CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+        let stage = interp.resolve_stage::<L>()?;
+        let entry = self
+            .body
+            .blocks(stage)
+            .next()
+            .ok_or(InterpreterError::missing_entry_block())?;
+        Ok(Continuation::Jump(entry, smallvec![]))
+    }
+}
+
+impl<'ir, I, L, T> Interpretable<'ir, I, L> for Bind<T>
+where
+    I: Interpreter<'ir>,
+    I::Error: From<InterpreterError>,
+    L: Dialect,
+    T: kirin::prelude::CompileTimeValue,
+{
+    fn interpret(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+        Err(InterpreterError::custom(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "bind is not yet supported in the interpreter",
+        ))
+        .into())
     }
 }
 

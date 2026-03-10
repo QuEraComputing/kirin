@@ -4,11 +4,16 @@ use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
 use kirin_cmp::Cmp;
 use kirin_function::{Bind, Call, Return};
+use kirin_scf::Yield;
 
 /// Source-stage language: structured control flow + lexical lambdas.
 ///
-/// Block/Region-containing types (If, For, Lambda) are inlined to avoid
-/// E0275 trait recursion overflow with `#[wraps]` + `HasParser`.
+/// Block/Region-containing types (Function, Lambda, If, For) are inlined
+/// because the recursive AST types overflow trait resolution (E0275) when
+/// composed via `#[wraps]` + `HasParser`. Constant is inlined because its
+/// multi-param `EmitIR` bound is not yet resolved by the `ParseDispatch`
+/// macro. All other variants use `#[wraps]` delegation to built-in dialect
+/// types.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = ArithType)]
 pub enum HighLevel {
@@ -39,9 +44,8 @@ pub enum HighLevel {
         body: Block,
     },
 
-    #[kirin(terminator)]
-    #[chumsky(format = "{.yield} {value}")]
-    Yield { value: SSAValue },
+    #[wraps]
+    Yield(Yield<ArithType>),
 
     #[kirin(constant, pure)]
     #[chumsky(format = "{result:name} = {.constant} {value} -> {result:type}")]
@@ -66,8 +70,8 @@ pub enum HighLevel {
 
 /// Lowered-stage language: unstructured CF + lifted functions.
 ///
-/// Function body is inlined (Region field, E0275 workaround).
-/// All other variants use `#[wraps]` delegation.
+/// Function body and Constant are inlined; all other variants use `#[wraps]`
+/// delegation to built-in dialect types.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = ArithType)]
 pub enum LowLevel {

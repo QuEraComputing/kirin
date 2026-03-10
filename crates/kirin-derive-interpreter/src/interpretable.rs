@@ -7,10 +7,16 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 const DEFAULT_INTERP_CRATE: &str = "::kirin_interpreter";
+const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 
 pub fn do_derive_interpretable(input: &syn::DeriveInput) -> darling::Result<TokenStream> {
     let ir = Input::<StandardLayout>::from_derive_input(input)?;
     let interp_crate: syn::Path = from_str(DEFAULT_INTERP_CRATE);
+    let ir_crate: syn::Path = ir
+        .attrs
+        .crate_path
+        .clone()
+        .unwrap_or_else(|| from_str(DEFAULT_IR_CRATE));
 
     let template = TraitImplTemplate::new(
         syn::parse_quote!(::kirin_interpreter::Interpretable),
@@ -32,10 +38,11 @@ pub fn do_derive_interpretable(input: &syn::DeriveInput) -> darling::Result<Toke
     .trait_generics(|_ctx| quote! { <'__ir, __InterpI, __InterpL> })
     .where_clause({
         let interp_crate = interp_crate.clone();
+        let ir_crate = ir_crate.clone();
         move |ctx| {
             let mut predicates: Vec<syn::WherePredicate> = vec![
                 syn::parse_quote! { __InterpI: #interp_crate::Interpreter<'__ir> },
-                syn::parse_quote! { __InterpL: ::kirin_ir::Dialect },
+                syn::parse_quote! { __InterpL: #ir_crate::Dialect },
             ];
             for stmt_ctx in ctx.statements.values() {
                 if let Some(wrapper_ty) = stmt_ctx.wrapper_type {
