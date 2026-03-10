@@ -86,8 +86,12 @@ impl GenerateHasDialectParser {
             .collect();
         let wrapper_types = collect_wrapper_types(ir_input);
 
-        // Build where clause
-        let needs_placeholder = self.needs_result_fields(ir_input) || !wrapper_types.is_empty();
+        // Build where clause.
+        // Placeholder is needed for ResultValue fields (auto-default) AND for
+        // wrapper types (wrapped dialects may themselves have ResultValue fields
+        // whose Placeholder bound is satisfied through HasDialectEmitIR).
+        let needs_placeholder =
+            crate::codegen::has_result_fields(ir_input) || !wrapper_types.is_empty();
 
         // Wrapper types need HasDialectEmitIR<'tokens, Language, LanguageOutput>
         // bounds so recursive statement emission crosses the boundary through
@@ -250,23 +254,4 @@ impl GenerateHasDialectParser {
         }
     }
 
-    /// Check if any statement has ResultValue fields (needs Placeholder bound).
-    pub(super) fn needs_result_fields(
-        &self,
-        ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
-    ) -> bool {
-        use kirin_derive_toolkit::ir::fields::FieldCategory;
-        match &ir_input.data {
-            kirin_derive_toolkit::ir::Data::Struct(data) => data
-                .0
-                .fields
-                .iter()
-                .any(|f| f.category() == FieldCategory::Result),
-            kirin_derive_toolkit::ir::Data::Enum(data) => data.variants.iter().any(|stmt| {
-                stmt.fields
-                    .iter()
-                    .any(|f| f.category() == FieldCategory::Result)
-            }),
-        }
-    }
 }

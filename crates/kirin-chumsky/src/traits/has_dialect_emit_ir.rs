@@ -2,6 +2,13 @@ use super::{EmitContext, EmitError, HasDialectParser};
 
 /// Witness trait for emitting IR from a dialect's parsed AST output.
 ///
+/// **This trait is an implementation detail of derive-generated code.**
+/// Dialect authors should not implement or reference it directly. The
+/// `#[derive(HasParser)]` macro generates all required impls automatically.
+/// The public parsing API uses [`HasParserEmitIR`] (via `ParseStatementText`
+/// and `ParsePipelineText`), which is the only emit-related trait that
+/// appears in user-facing where clauses.
+///
 /// This is a separate trait from [`HasDialectParser`] because it is parameterized
 /// by `Language`. This allows each impl to carry dialect-specific bounds at the
 /// impl level (e.g., value type `HasParser`/`EmitIR` bounds, `Placeholder` bounds)

@@ -137,27 +137,16 @@ impl GenerateEmitIR {
     /// Returns `true` when the generated `EmitIR` impl needs a
     /// `<Language as Dialect>::Type: Placeholder` bound.
     ///
-    /// This is required whenever there is at least one `ResultValue` field,
-    /// because the `ResultValue` AST type's own `EmitIR` impl requires
-    /// `Placeholder` (it may call `placeholder()` when no type annotation
-    /// was parsed).
+    /// This only checks for `ResultValue` fields. The `HasDialectEmitIR`
+    /// codegen additionally adds `Placeholder` when wrapper types are
+    /// present (since wrapped dialects may themselves have ResultValue
+    /// fields), but that bound is carried by the `HasDialectEmitIR` impl
+    /// and does not need to be repeated here on the `EmitIR` impl.
     pub(super) fn needs_placeholder_bound(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
     ) -> bool {
-        use kirin_derive_toolkit::ir::fields::FieldCategory;
-        match &ir_input.data {
-            kirin_derive_toolkit::ir::Data::Struct(data) => data
-                .0
-                .fields
-                .iter()
-                .any(|f| f.category() == FieldCategory::Result),
-            kirin_derive_toolkit::ir::Data::Enum(data) => data.variants.iter().any(|stmt| {
-                stmt.fields
-                    .iter()
-                    .any(|f| f.category() == FieldCategory::Result)
-            }),
-        }
+        crate::codegen::has_result_fields(ir_input)
     }
 
     pub(in crate::codegen) fn is_ir_type_a_type_param(

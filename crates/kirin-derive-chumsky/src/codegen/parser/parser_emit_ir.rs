@@ -89,7 +89,7 @@ impl GenerateHasDialectParser {
         wc.predicates.extend(value_type_bounds);
         wc.predicates.extend(wrapper_emit_bounds);
 
-        if self.needs_result_fields(ir_input) || !wrapper_types.is_empty() {
+        if crate::codegen::has_result_fields(ir_input) || !wrapper_types.is_empty() {
             wc.predicates.push(syn::parse_quote! {
                 <#language as #ir_path::Dialect>::Type: #ir_path::Placeholder
             });

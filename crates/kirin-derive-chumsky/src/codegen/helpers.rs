@@ -154,6 +154,25 @@ pub(crate) fn collect_wrapper_types(
     }
 }
 
+/// Returns `true` when any statement has `ResultValue` fields (which need `Placeholder` bounds).
+pub(crate) fn has_result_fields(
+    ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+) -> bool {
+    use kirin_derive_toolkit::ir::fields::FieldCategory;
+    match &ir_input.data {
+        kirin_derive_toolkit::ir::Data::Struct(data) => data
+            .0
+            .fields
+            .iter()
+            .any(|f| f.category() == FieldCategory::Result),
+        kirin_derive_toolkit::ir::Data::Enum(data) => data.variants.iter().any(|stmt| {
+            stmt.fields
+                .iter()
+                .any(|f| f.category() == FieldCategory::Result)
+        }),
+    }
+}
+
 /// Filters collected fields to only include those needed in the AST.
 pub(crate) fn filter_ast_fields<'a>(
     collected: &'a [FieldInfo<ChumskyLayout>],
