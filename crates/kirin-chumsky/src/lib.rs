@@ -75,7 +75,9 @@ pub use kirin_derive_chumsky::PrettyPrint;
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::ast;
-    pub use crate::function_text::{FunctionParseError, FunctionParseErrorKind, ParsePipelineText};
+    pub use crate::function_text::{
+        FunctionParseError, FunctionParseErrorKind, ParseDispatch, ParsePipelineText,
+    };
     pub use crate::parsers::*;
     pub use crate::traits::{
         BoxedParser, DirectlyParsable, EmitContext, EmitError, EmitIR, HasDialectParser, HasParser,

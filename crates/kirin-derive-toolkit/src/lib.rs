@@ -46,6 +46,7 @@ pub mod context;
 pub mod hygiene;
 pub mod ir;
 pub mod misc;
+pub mod parse_dispatch;
 pub mod stage;
 pub mod stage_info;
 pub mod template;

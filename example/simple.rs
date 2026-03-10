@@ -71,7 +71,7 @@ enum LowLevel {
 ///
 /// `@source` uses the higher-level IR (structured control flow, lambdas).
 /// `@lowered` uses the lower-level IR (unstructured control flow, bind).
-#[derive(Debug, StageMeta, RenderStage)]
+#[derive(Debug, StageMeta, ParseDispatch, RenderStage)]
 enum Stage {
     #[stage(name = "source")]
     Source(StageInfo<HighLevel>),

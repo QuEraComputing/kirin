@@ -29,6 +29,10 @@ pub fn parse_ir_crate_path(attrs: &[syn::Attribute]) -> Result<String, syn::Erro
                 crate_path = Some(lit.value());
                 Ok(())
             } else {
+                // Consume value tokens of unknown keys so the parser advances
+                // past `key = "value"` pairs added by other derive macros
+                // (e.g. `chumsky_crate = "..."`).
+                skip_meta_value(&meta);
                 Ok(())
             }
         })?;
@@ -108,6 +112,7 @@ fn parse_stage_name_attr(variant: &syn::Variant) -> Result<String, syn::Error> {
                 name = Some(lit.value());
                 Ok(())
             } else {
+                skip_meta_value(&meta);
                 Ok(())
             }
         })?;
@@ -119,6 +124,16 @@ fn parse_stage_name_attr(variant: &syn::Variant) -> Result<String, syn::Error> {
         variant,
         "missing `#[stage(name = \"...\")]` attribute",
     ))
+}
+
+/// Consume the `= <value>` tokens of a `parse_nested_meta` item so the parser
+/// can advance past unknown key-value pairs without producing a syntax error.
+pub fn skip_meta_value(meta: &syn::meta::ParseNestedMeta<'_>) {
+    // If the next token is `=`, consume the value; otherwise it's a bare ident — nothing to skip.
+    // We try parsing as a LitStr first (most common case), then fall back to Expr for paths/exprs.
+    let _ = meta.value().map(|v| {
+        let _ = v.parse::<syn::Expr>();
+    });
 }
 
 fn extract_stage_info_type_param(ty: &Type) -> Option<Type> {

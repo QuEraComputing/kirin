@@ -1,0 +1,44 @@
+---
+source: crates/kirin-derive-toolkit/src/parse_dispatch.rs
+assertion_line: 177
+expression: generate_parse_dispatch_code(input)
+---
+#[automatically_derived]
+impl kirin_chumsky::ParseDispatch for MixedStage {
+    fn dispatch_first_pass(
+        &mut self,
+        stage_id: kirin_ir::CompileStage,
+        ctx: &mut kirin_chumsky::FirstPassCtx<'_>,
+    ) -> ::core::result::Result<
+        ::core::option::Option<kirin_chumsky::FirstPassDispatchResult>,
+        kirin_chumsky::FunctionParseError,
+    > {
+        match self {
+            MixedStage::StageA(stage_info) => {
+                kirin_chumsky::first_pass_concrete::<FunctionBody>(stage_info, stage_id, ctx)
+                    .map(::core::option::Option::Some)
+            }
+            MixedStage::StageB(stage_info) => {
+                kirin_chumsky::first_pass_concrete::<LowerBody>(stage_info, stage_id, ctx)
+                    .map(::core::option::Option::Some)
+            }
+        }
+    }
+    fn dispatch_second_pass(
+        &mut self,
+        stage_id: kirin_ir::CompileStage,
+        ctx: &mut kirin_chumsky::SecondPassCtx<'_>,
+    ) -> ::core::result::Result<::core::option::Option<usize>, kirin_chumsky::FunctionParseError>
+    {
+        match self {
+            MixedStage::StageA(stage_info) => {
+                kirin_chumsky::second_pass_concrete::<FunctionBody>(stage_info, stage_id, ctx)
+                    .map(::core::option::Option::Some)
+            }
+            MixedStage::StageB(stage_info) => {
+                kirin_chumsky::second_pass_concrete::<LowerBody>(stage_info, stage_id, ctx)
+                    .map(::core::option::Option::Some)
+            }
+        }
+    }
+}

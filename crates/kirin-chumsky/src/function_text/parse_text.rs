@@ -83,15 +83,15 @@ use rustc_hash::FxHashMap;
 
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
-    CompileStage, Dialect, Function, GetInfo, GlobalSymbol, HasStageInfo, Id, Pipeline,
-    StageActionMut, StageDispatchMiss, StageDispatchRequiredError, StageInfo, StageMeta,
-    StagedFunction, Statement, SupportsStageDispatchMut,
+    CompileStage, Dialect, Function, GetInfo, GlobalSymbol, Id, Pipeline, StageInfo, StageMeta,
+    StagedFunction, Statement,
 };
 use kirin_lexer::Token;
 use strsim::levenshtein;
 
 use crate::{EmitContext, EmitIR, HasParser};
 
+use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
 use super::syntax::{ChumskyError, Declaration, Header, parse_one_declaration, tokenize};
 use crate::ast::SymbolName;
@@ -101,14 +101,22 @@ pub trait ParsePipelineText {
     fn parse(&mut self, src: &str) -> Result<Vec<Function>, FunctionParseError>;
 }
 
+// ---------------------------------------------------------------------------
+// Internal types used by both the pipeline impl and the concrete helpers.
+// Made pub(crate) so the dispatch module and derive-generated code can see them.
+// ---------------------------------------------------------------------------
+
+/// Composite key for staged-function lookup: `(stage, function)`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct StagedKey {
-    stage: CompileStage,
-    function: Function,
+pub struct StagedKey {
+    /// The compile stage this function belongs to.
+    pub stage: CompileStage,
+    /// The abstract function handle.
+    pub function: Function,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum DeclKeyword {
+pub(super) enum DeclKeyword {
     Stage,
     Specialize,
 }
@@ -121,19 +129,25 @@ struct DeclarationHead<'src> {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct FirstPassOutcome {
-    keyword: DeclKeyword,
-    next_index: usize,
+pub(super) struct FirstPassOutcome {
+    pub(super) keyword: DeclKeyword,
+    pub(super) next_index: usize,
 }
 
+/// Result of a first-pass dispatch for a single declaration.
+///
+/// Returned by [`first_pass_concrete`] and consumed by the pipeline parsing loop.
 #[derive(Clone, Copy, Debug)]
-struct FirstPassDispatchResult {
-    outcome: FirstPassOutcome,
-    link: Option<(Function, StagedFunction)>,
+pub struct FirstPassDispatchResult {
+    pub(super) outcome: FirstPassOutcome,
+    pub(super) link: Option<(Function, StagedFunction)>,
 }
 
 /// Shared mutable state threaded through both parse passes.
-struct ParseState {
+///
+/// This type is opaque to external callers; it is only constructed inside the
+/// pipeline parsing loop and passed through context structs.
+pub struct ParseState {
     touched_functions: Vec<Function>,
     touched_function_set: HashSet<Function>,
 }
@@ -146,146 +160,143 @@ impl ParseState {
         }
     }
 
-    fn record(&mut self, function: Function) {
+    /// Record a function as touched during parsing.
+    pub fn record(&mut self, function: Function) {
         if self.touched_function_set.insert(function) {
             self.touched_functions.push(function);
         }
     }
 }
 
-struct FirstPassAction<'a, 'src> {
-    tokens: &'a [(Token<'src>, SimpleSpan)],
-    start_index: usize,
-    function: Option<Function>,
-    function_symbol: Option<GlobalSymbol>,
-    staged_lookup: &'a mut FxHashMap<StagedKey, StagedFunction>,
-    state: &'a mut ParseState,
+// ---------------------------------------------------------------------------
+// Context types for concrete dispatch helpers
+// ---------------------------------------------------------------------------
+
+/// Bundled state for first-pass dispatch. Created by the pipeline impl and
+/// passed to [`ParseDispatch::dispatch_first_pass`] or [`first_pass_concrete`].
+pub struct FirstPassCtx<'t> {
+    pub tokens: &'t [(Token<'t>, SimpleSpan)],
+    pub start_index: usize,
+    pub function: Option<Function>,
+    pub function_symbol: Option<GlobalSymbol>,
+    pub staged_lookup: &'t mut FxHashMap<StagedKey, StagedFunction>,
+    pub state: &'t mut ParseState,
 }
 
-impl<'src, S, L> StageActionMut<S, L> for FirstPassAction<'_, 'src>
+/// Bundled state for second-pass dispatch. Created by the pipeline impl and
+/// passed to [`ParseDispatch::dispatch_second_pass`] or [`second_pass_concrete`].
+pub struct SecondPassCtx<'t> {
+    pub tokens: &'t [(Token<'t>, SimpleSpan)],
+    pub start_index: usize,
+    pub function_lookup: &'t FxHashMap<String, Function>,
+    pub staged_lookup: &'t FxHashMap<StagedKey, StagedFunction>,
+    pub state: &'t mut ParseState,
+}
+
+// ---------------------------------------------------------------------------
+// Concrete (monomorphic) helpers — called by ParseDispatch impls
+// ---------------------------------------------------------------------------
+
+/// First-pass concrete helper for a single dialect `L`.
+///
+/// This is the monomorphic extraction of what `FirstPassAction::run` used to do.
+/// The lifetime `'t` is the lifetime of the token slice, NOT an HRTB — this is
+/// called with a concrete lifetime from within the pipeline `parse` method.
+pub fn first_pass_concrete<'t, L>(
+    stage: &mut StageInfo<L>,
+    stage_id: CompileStage,
+    ctx: &mut FirstPassCtx<'t>,
+) -> Result<FirstPassDispatchResult, FunctionParseError>
 where
-    S: StageMeta + HasStageInfo<L>,
-    L: Dialect,
-    L::Type: kirin_ir::Placeholder,
-    for<'t> L: HasParser<'t>,
-    for<'t> L::Type: HasParser<'t, Output = L::Type>,
-    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = Statement>,
+    L: Dialect + HasParser<'t>,
+    L::Type: kirin_ir::Placeholder + HasParser<'t, Output = L::Type>,
+    <L as HasParser<'t>>::Output: EmitIR<L, Output = Statement>,
 {
-    type Output = FirstPassDispatchResult;
-    type Error = FunctionParseError;
+    let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
+        .map_err(parse_error_from_chumsky)?;
+    let next_index = advance_to_next_declaration(ctx.tokens, ctx.start_index, consumed_span);
 
-    fn run(
-        &mut self,
-        stage_id: CompileStage,
-        stage: &mut StageInfo<L>,
-    ) -> Result<Self::Output, Self::Error> {
-        // Pass 1 only registers `stage` declarations and records where
-        // `specialize` declarations occur. This guarantees all staged-function
-        // headers exist before any specialize body is emitted.
-        let (declaration, consumed_span) =
-            parse_one_declaration::<L>(&self.tokens[self.start_index..])
-                .map_err(parse_error_from_chumsky)?;
-        let next_index = advance_to_next_declaration(self.tokens, self.start_index, consumed_span);
-
-        match declaration {
-            Declaration::Stage(header) => {
-                let function = self
-                    .function
-                    .expect("stage declaration should have a resolved function");
-                let function_symbol = self
-                    .function_symbol
-                    .expect("stage declaration should have a function symbol");
-                let staged_function = apply_stage_declaration::<L>(
-                    stage,
-                    stage_id,
-                    function,
-                    function_symbol,
-                    &header,
-                    self.staged_lookup,
-                    self.state,
-                )?;
-                Ok(FirstPassDispatchResult {
-                    outcome: FirstPassOutcome {
-                        keyword: DeclKeyword::Stage,
-                        next_index,
-                    },
-                    link: staged_function.map(|staged| (function, staged)),
-                })
-            }
-            Declaration::Specialize { .. } => Ok(FirstPassDispatchResult {
+    match declaration {
+        Declaration::Stage(header) => {
+            let function = ctx
+                .function
+                .expect("stage declaration should have a resolved function");
+            let function_symbol = ctx
+                .function_symbol
+                .expect("stage declaration should have a function symbol");
+            let staged_function = apply_stage_declaration::<L>(
+                stage,
+                stage_id,
+                function,
+                function_symbol,
+                &header,
+                ctx.staged_lookup,
+                ctx.state,
+            )?;
+            Ok(FirstPassDispatchResult {
                 outcome: FirstPassOutcome {
-                    keyword: DeclKeyword::Specialize,
+                    keyword: DeclKeyword::Stage,
                     next_index,
                 },
-                link: None,
-            }),
+                link: staged_function.map(|staged| (function, staged)),
+            })
         }
+        Declaration::Specialize { .. } => Ok(FirstPassDispatchResult {
+            outcome: FirstPassOutcome {
+                keyword: DeclKeyword::Specialize,
+                next_index,
+            },
+            link: None,
+        }),
     }
 }
 
-struct SecondPassSpecializeAction<'a, 'src> {
-    tokens: &'a [(Token<'src>, SimpleSpan)],
-    start_index: usize,
-    function_lookup: &'a FxHashMap<String, Function>,
-    staged_lookup: &'a FxHashMap<StagedKey, StagedFunction>,
-    state: &'a mut ParseState,
-}
-
-impl<'src, S, L> StageActionMut<S, L> for SecondPassSpecializeAction<'_, 'src>
+/// Second-pass concrete helper for a single dialect `L`.
+///
+/// Monomorphic extraction of what `SecondPassSpecializeAction::run` used to do.
+pub fn second_pass_concrete<'t, L>(
+    stage: &mut StageInfo<L>,
+    stage_id: CompileStage,
+    ctx: &mut SecondPassCtx<'t>,
+) -> Result<usize, FunctionParseError>
 where
-    S: StageMeta + HasStageInfo<L>,
-    L: Dialect + HasParser<'src>,
-    L::Type: HasParser<'src, Output = L::Type>,
-    <L as HasParser<'src>>::Output: EmitIR<L, Output = Statement>,
+    L: Dialect + HasParser<'t>,
+    L::Type: HasParser<'t, Output = L::Type>,
+    <L as HasParser<'t>>::Output: EmitIR<L, Output = Statement>,
 {
-    type Output = usize;
-    type Error = FunctionParseError;
+    let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
+        .map_err(parse_error_from_chumsky)?;
+    let next_index = advance_to_next_declaration(ctx.tokens, ctx.start_index, consumed_span);
 
-    fn run(
-        &mut self,
-        stage_id: CompileStage,
-        stage: &mut StageInfo<L>,
-    ) -> Result<Self::Output, Self::Error> {
-        // Pass 2 re-parses only pending specialize declarations once pass 1 has
-        // built a complete `(stage, function) -> staged_function` lookup.
-        let (declaration, consumed_span) =
-            parse_one_declaration::<L>(&self.tokens[self.start_index..])
-                .map_err(parse_error_from_chumsky)?;
-        let next_index = advance_to_next_declaration(self.tokens, self.start_index, consumed_span);
+    let Declaration::Specialize { header, body, span } = declaration else {
+        return Err(FunctionParseError::new(
+            FunctionParseErrorKind::InvalidHeader,
+            Some(consumed_span),
+            "expected specialize declaration",
+        ));
+    };
 
-        let Declaration::Specialize { header, body, span } = declaration else {
-            return Err(FunctionParseError::new(
-                FunctionParseErrorKind::InvalidHeader,
-                Some(consumed_span),
-                "expected specialize declaration",
-            ));
-        };
+    apply_specialize_declaration::<L>(
+        stage,
+        stage_id,
+        &header,
+        &body,
+        span,
+        ctx.function_lookup,
+        ctx.staged_lookup,
+        ctx.state,
+    )?;
 
-        apply_specialize_declaration::<L>(
-            stage,
-            stage_id,
-            &header,
-            &body,
-            span,
-            self.function_lookup,
-            self.staged_lookup,
-            self.state,
-        )?;
-
-        Ok(next_index)
-    }
+    Ok(next_index)
 }
+
+// ---------------------------------------------------------------------------
+// Pipeline impl using ParseDispatch
+// ---------------------------------------------------------------------------
 
 impl<S> ParsePipelineText for Pipeline<S>
 where
-    S: StageMeta,
-    for<'a, 'src> S: SupportsStageDispatchMut<
-            FirstPassAction<'a, 'src>,
-            FirstPassDispatchResult,
-            FunctionParseError,
-        >,
-    for<'a, 'src> S:
-        SupportsStageDispatchMut<SecondPassSpecializeAction<'a, 'src>, usize, FunctionParseError>,
+    S: StageMeta + ParseDispatch,
 {
     fn parse(&mut self, src: &str) -> Result<Vec<Function>, FunctionParseError> {
         let tokens = tokenize(src);
@@ -312,12 +323,12 @@ where
             let (function, function_symbol) = if matches!(head.keyword, DeclKeyword::Stage) {
                 let function =
                     get_or_create_function_by_name(self, &mut function_lookup, head.function.name);
-                (Some(function), Some(function_symbol(self, function)))
+                (Some(function), Some(fn_symbol(self, function)))
             } else {
                 (None, None)
             };
 
-            let mut action = FirstPassAction {
+            let mut ctx = FirstPassCtx {
                 tokens: &tokens,
                 start_index: index,
                 function,
@@ -325,8 +336,18 @@ where
                 staged_lookup: &mut staged_lookup,
                 state: &mut state,
             };
-            let dispatch =
-                dispatch_stage_action_required(self, stage_id, &head.stage, &mut action)?;
+
+            let stage = self
+                .stage_mut(stage_id)
+                .ok_or_else(|| stage_missing_error(head.stage.name, Some(head.stage.span)))?;
+            let dispatch = stage
+                .dispatch_first_pass(stage_id, &mut ctx)
+                .and_then(|opt| {
+                    opt.ok_or_else(|| {
+                        stage_dialect_mismatch_error(head.stage.name, Some(head.stage.span))
+                    })
+                })?;
+
             let outcome = dispatch.outcome;
             if let Some((function, staged_function)) = dispatch.link {
                 self.link(function, stage_id, staged_function)
@@ -355,15 +376,23 @@ where
         }
 
         for (start_index, stage_id, stage_symbol) in pending_specializations {
-            let mut action = SecondPassSpecializeAction {
+            let mut ctx = SecondPassCtx {
                 tokens: &tokens,
                 start_index,
                 function_lookup: &function_lookup,
                 staged_lookup: &staged_lookup,
                 state: &mut state,
             };
-            let next_index =
-                dispatch_stage_action_required(self, stage_id, &stage_symbol, &mut action)?;
+            let stage = self
+                .stage_mut(stage_id)
+                .ok_or_else(|| stage_missing_error(stage_symbol.name, Some(stage_symbol.span)))?;
+            let next_index = stage
+                .dispatch_second_pass(stage_id, &mut ctx)
+                .and_then(|opt| {
+                    opt.ok_or_else(|| {
+                        stage_dialect_mismatch_error(stage_symbol.name, Some(stage_symbol.span))
+                    })
+                })?;
             ensure_forward_progress(
                 next_index,
                 start_index,
@@ -375,6 +404,10 @@ where
         Ok(state.touched_functions)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Internal helpers (unchanged from original)
+// ---------------------------------------------------------------------------
 
 fn parse_declaration_head<'src>(
     tokens: &[(Token<'src>, SimpleSpan)],
@@ -585,20 +618,6 @@ where
     Ok((function, staged_function))
 }
 
-fn dispatch_stage_action_required<'src, S, A, R>(
-    pipeline: &mut Pipeline<S>,
-    stage_id: CompileStage,
-    stage_symbol: &SymbolName<'src>,
-    action: &mut A,
-) -> Result<R, FunctionParseError>
-where
-    S: StageMeta + SupportsStageDispatchMut<A, R, FunctionParseError>,
-{
-    pipeline
-        .dispatch_stage_mut_required(stage_id, action)
-        .map_err(|error| stage_dispatch_error(error, stage_symbol.name, Some(stage_symbol.span)))
-}
-
 fn ensure_forward_progress(
     next_index: usize,
     start_index: usize,
@@ -660,7 +679,7 @@ fn get_or_create_function_by_name<S>(
     function
 }
 
-fn function_symbol<S>(pipeline: &Pipeline<S>, function: Function) -> GlobalSymbol {
+fn fn_symbol<S>(pipeline: &Pipeline<S>, function: Function) -> GlobalSymbol {
     pipeline
         .function_info(function)
         .and_then(|info| info.name())
@@ -824,32 +843,12 @@ fn stage_dialect_mismatch_error(
     )
 }
 
-fn stage_dispatch_miss_error(
-    miss: StageDispatchMiss,
-    stage_symbol: &str,
-    span: Option<SimpleSpan>,
-) -> FunctionParseError {
-    match miss {
-        StageDispatchMiss::MissingDialect => stage_dialect_mismatch_error(stage_symbol, span),
-        StageDispatchMiss::MissingStage => FunctionParseError::new(
-            FunctionParseErrorKind::EmitFailed,
-            span,
-            format!("stage '@{stage_symbol}' does not exist in the pipeline"),
-        ),
-    }
-}
-
-fn stage_dispatch_error(
-    error: StageDispatchRequiredError<FunctionParseError>,
-    stage_symbol: &str,
-    span: Option<SimpleSpan>,
-) -> FunctionParseError {
-    match error {
-        StageDispatchRequiredError::Action(error) => error,
-        StageDispatchRequiredError::Miss(miss) => {
-            stage_dispatch_miss_error(miss, stage_symbol, span)
-        }
-    }
+fn stage_missing_error(stage_symbol: &str, span: Option<SimpleSpan>) -> FunctionParseError {
+    FunctionParseError::new(
+        FunctionParseErrorKind::EmitFailed,
+        span,
+        format!("stage '@{stage_symbol}' does not exist in the pipeline"),
+    )
 }
 
 /// Build a standardized error for `specialize` declarations without a matching stage header.

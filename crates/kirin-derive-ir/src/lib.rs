@@ -78,3 +78,32 @@ pub fn derive_stage_meta(input: TokenStream) -> TokenStream {
         Err(err) => TokenStream::from(err.into_compile_error()),
     }
 }
+
+/// Derive macro that generates a monomorphic [`ParseDispatch`] implementation
+/// for stage enums. Uses the same `#[stage(...)]` attributes as `StageMeta`.
+///
+/// # Optional attributes
+///
+/// - `#[stage(chumsky_crate = "path")]` — override the path to the kirin-chumsky
+///   crate (default: `::kirin::parsers`).
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(StageMeta, ParseDispatch)]
+/// #[stage(crate = "kirin_ir", chumsky_crate = "kirin_chumsky")]
+/// enum MixedStage {
+///     #[stage(name = "A")]
+///     StageA(StageInfo<FunctionBody>),
+///     #[stage(name = "B")]
+///     StageB(StageInfo<LowerBody>),
+/// }
+/// ```
+#[proc_macro_derive(ParseDispatch, attributes(stage))]
+pub fn derive_parse_dispatch(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match kirin_derive_toolkit::parse_dispatch::generate(&ast) {
+        Ok(tokens) => TokenStream::from(tokens),
+        Err(err) => TokenStream::from(err.into_compile_error()),
+    }
+}
