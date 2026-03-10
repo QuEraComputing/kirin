@@ -199,7 +199,6 @@ pub struct SecondPassCtx<'t> {
 
 /// First-pass concrete helper for a single dialect `L`.
 ///
-/// This is the monomorphic extraction of what `FirstPassAction::run` used to do.
 /// The lifetime `'t` is the lifetime of the token slice, NOT an HRTB — this is
 /// called with a concrete lifetime from within the pipeline `parse` method.
 pub fn first_pass_concrete<'t, L>(
@@ -253,7 +252,7 @@ where
 
 /// Second-pass concrete helper for a single dialect `L`.
 ///
-/// Monomorphic extraction of what `SecondPassSpecializeAction::run` used to do.
+/// Called with a concrete lifetime from within the pipeline `parse` method.
 pub fn second_pass_concrete<'t, L>(
     stage: &mut StageInfo<L>,
     stage_id: CompileStage,

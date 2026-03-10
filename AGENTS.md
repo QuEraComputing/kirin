@@ -110,9 +110,11 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 ## Chumsky Parser Conventions
 
-- **`for<'src> HasParser` lifetime pattern**: `HasParser<'src, 'src>` ties the AST output lifetime to the input string. When writing trait impls that call `parse_ast::<L>(input)` and then `emit()`, the return type (`Statement`) does not borrow the input — but the compiler cannot prove this through the associated type chain. Do **not** use an associated `Output` type derived from `<<L as HasParser<'static, 'static>>::Output as EmitIR<L>>::Output` — it creates an unsatisfiable `'static` requirement on the input. Instead, hardcode `Statement` as the return type or use a helper function generic over `'src`.
+- **Single lifetime `HasParser<'t>`**: All parser traits use a single lifetime `'t` (the input text lifetime). The old two-lifetime system (`HasParser<'tokens, 'src>`) has been collapsed. `HasDialectParser<'t>` has 4 required items: `Output` type, `namespaced_parser`, `clone_output`, `eq_output` — `recursive_parser` has a default impl.
 
-- **E0275 with Region-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `FunctionBody`, SCF operations) overflow the trait solver when composed via `#[wraps]` + `HasParser`. The recursive AST types exceed the default trait recursion limit. Workaround: inline the fields directly into the parent language enum instead of using `#[wraps]` delegation. See `example/simple.rs` for a working example.
+- **`ParseDispatch` for pipeline parsing**: Multi-dialect pipeline parsing uses `ParseDispatch` (a monomorphic dispatch trait) instead of HRTB-based `SupportsStageDispatchMut`. Add `#[derive(ParseDispatch)]` alongside `#[derive(StageMeta)]` on stage enums. Single-dialect pipelines (`Pipeline<StageInfo<L>>`) get a blanket `ParseDispatch` impl. Zero HRTB in the dispatch chain.
+
+- **E0275 with Region/Block-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `FunctionBody`, SCF operations) still overflow the trait solver when composed via `#[wraps]` + `HasParser` due to recursive `EmitIR` bound evaluation. Workaround: inline the fields directly into the parent language enum. Non-recursive types (no Block/Region) work fine with `#[wraps]`. See `example/toy-lang/src/language.rs`.
 
 - **`Ctx` default parameter for unified traits**: When the same trait method needs extra context for some implementors (e.g., `CompileStage` for `Pipeline`) but not others (e.g., `StageInfo`), use a default type parameter `Ctx = ()` on the trait. Pair with a blanket `Ext` trait that erases the `()` arg for ergonomic call sites. See `ParseStatementText<L, Ctx>` / `ParseStatementTextExt<L>`.
 
