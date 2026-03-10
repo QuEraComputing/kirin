@@ -8,7 +8,7 @@ mod helpers;
 mod parser;
 mod pretty_print;
 
-pub(crate) use bounds::BoundsBuilder;
+pub(crate) use bounds::{ImplBounds, WhereClauseExt, init_where_clause};
 pub(crate) use config::GeneratorConfig;
 pub(crate) use helpers::{
     build_ast_generics, collect_all_value_types_needing_bounds, collect_wrapper_types,

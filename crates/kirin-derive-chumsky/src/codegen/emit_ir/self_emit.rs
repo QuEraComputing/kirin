@@ -3,7 +3,7 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 
-use crate::codegen::{BoundsBuilder, collect_all_value_types_needing_bounds};
+use crate::codegen::{ImplBounds, WhereClauseExt};
 
 use super::GenerateEmitIR;
 
@@ -17,7 +17,6 @@ impl GenerateEmitIR {
     ) -> TokenStream {
         let original_name = &ir_input.name;
         let ir_path = &self.config.ir_path;
-        let ir_type = &self.config.ir_type;
         let (_, original_ty_generics, _) = ir_input.generics.split_for_impl();
 
         let type_params: Vec<TokenStream> = ir_input
@@ -54,57 +53,34 @@ impl GenerateEmitIR {
             quote! { <'t, #(#type_params,)* TypeOutput> }
         };
 
-        let bounds = BoundsBuilder::new(crate_path);
-        let value_types = collect_all_value_types_needing_bounds(ir_input);
-        let value_type_bounds = bounds.emit_ir_bounds(&value_types);
+        let lt_t: syn::Lifetime = syn::parse_quote!('t);
+        let lang = quote! { Language };
+        let bounds = ImplBounds::from_input(ir_input, &self.config);
 
-        let wrapper_types = crate::codegen::collect_wrapper_types(ir_input);
-        let wrapper_emit_bounds: Vec<syn::WherePredicate> = wrapper_types
-            .iter()
-            .map(|ty| {
-                syn::parse_quote! {
-                    #ty: #crate_path::HasDialectEmitIR<'t, Language, #ast_self_name #ast_self_ty_generics>
-                }
-            })
-            .collect();
-
-        let ir_type_is_param = self.is_ir_type_a_type_param(ir_type, &ir_input.generics);
-        let dialect_type_bound = if ir_type_is_param {
-            quote! { Language: #ir_path::Dialect<Type = #ir_type>, }
-        } else {
-            quote! {}
+        let mut wc = syn::WhereClause {
+            where_token: syn::token::Where::default(),
+            predicates: syn::punctuated::Punctuated::new(),
         };
-        let placeholder_bound = if self.needs_placeholder_bound(ir_input) {
-            quote! { <Language as #ir_path::Dialect>::Type: #ir_path::Placeholder, }
-        } else {
-            quote! {}
-        };
-        let base_bounds = quote! {
-            Language: #ir_path::Dialect + From<#original_name #original_ty_generics>,
-            #dialect_type_bound
-            #placeholder_bound
-            TypeOutput: Clone + PartialEq,
-            #ir_type: #crate_path::HasParser<'t> + 't,
-            <#ir_type as #crate_path::HasParser<'t>>::Output:
-                #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::Type>,
-        };
-
-        let mut all_bounds = vec![base_bounds];
-        if !value_type_bounds.is_empty() {
-            let bounds_tokens = value_type_bounds.iter().map(|b| quote! { #b, });
-            all_bounds.push(quote! { #(#bounds_tokens)* });
+        wc.predicates.push(syn::parse_quote! {
+            Language: #ir_path::Dialect + From<#original_name #original_ty_generics>
+        });
+        wc.push_opt(bounds.dialect_type_bound(&lang));
+        if bounds.needs_placeholder() {
+            wc.predicates.push(bounds.placeholder_predicate(&lang));
         }
-        if !wrapper_emit_bounds.is_empty() {
-            let emit_tokens = wrapper_emit_bounds.iter().map(|b| quote! { #b, });
-            all_bounds.push(quote! { #(#emit_tokens)* });
-        }
-
-        let where_clause = quote! { where #(#all_bounds)* };
+        wc.predicates
+            .push(syn::parse_quote! { TypeOutput: Clone + PartialEq });
+        wc.predicates.push(bounds.ir_type_has_parser(&lt_t));
+        wc.predicates.push(bounds.ir_type_emit_ir(&lt_t, &lang));
+        wc.predicates.extend(bounds.value_types_all(&lt_t, &lang));
+        wc.predicates.extend(
+            bounds.wrappers_emit_ir(&lt_t, &lang, &quote! { #ast_self_name #ast_self_ty_generics }),
+        );
 
         quote! {
             #[automatically_derived]
             impl #impl_generics #crate_path::EmitIR<Language> for #ast_self_name #ast_self_ty_generics
-            #where_clause
+            #wc
             {
                 type Output = #ir_path::Statement;
 

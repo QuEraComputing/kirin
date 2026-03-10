@@ -1,10 +1,11 @@
+//! Code generation for the `HasParserEmitIR` trait implementation.
+
 use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use kirin_derive_toolkit::codegen::combine_where_clauses;
+use crate::codegen::{ImplBounds, init_where_clause};
 
-use super::super::{collect_all_value_types_needing_bounds, collect_wrapper_types};
 use super::GenerateHasDialectParser;
 
 impl GenerateHasDialectParser {
@@ -38,58 +39,24 @@ impl GenerateHasDialectParser {
         let impl_generics = self.build_original_type_impl_generics(ir_input);
         let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
-        let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         let ast_self_name = syn::Ident::new(&format!("{}Self", ast_name), ast_name.span());
         let ast_self_type = self.build_ast_self_type_reference(ir_input, &ast_self_name, ir_type);
         let language = quote! { #original_name #ty_generics };
 
-        let value_types = collect_all_value_types_needing_bounds(ir_input);
-        let value_type_bounds: Vec<syn::WherePredicate> = value_types
-            .iter()
-            .flat_map(|ty| {
-                [
-                    syn::parse_quote! {
-                        #ty: #crate_path::HasParser<'t> + 't
-                    },
-                    syn::parse_quote! {
-                        <#ty as #crate_path::HasParser<'t>>::Output:
-                            #crate_path::EmitIR<#language, Output = #ty>
-                    },
-                ]
-            })
-            .collect();
+        let lt_t: syn::Lifetime = syn::parse_quote!('t);
+        let bounds = ImplBounds::from_input(ir_input, &self.config);
 
-        let wrapper_types = collect_wrapper_types(ir_input);
-        let wrapper_emit_bounds: Vec<syn::WherePredicate> = wrapper_types
-            .iter()
-            .map(|ty| {
-                syn::parse_quote! {
-                    #ty: #crate_path::HasDialectEmitIR<'t, #language, #ast_self_type>
-                }
-            })
-            .collect();
-
-        let mut wc = match combined_where {
-            Some(wc) => wc,
-            None => syn::WhereClause {
-                where_token: syn::token::Where::default(),
-                predicates: syn::punctuated::Punctuated::new(),
-            },
-        };
-
+        let mut wc = init_where_clause(where_clause, impl_where_clause);
         wc.predicates
             .push(syn::parse_quote! { #language: #ir_path::Dialect<Type = #ir_type> });
+        wc.predicates.push(bounds.ir_type_has_parser(&lt_t));
+        wc.predicates.push(bounds.ir_type_emit_ir(&lt_t, &language));
         wc.predicates
-            .push(syn::parse_quote! { #ir_type: #crate_path::HasParser<'t> + 't });
-        wc.predicates.push(syn::parse_quote! {
-            <#ir_type as #crate_path::HasParser<'t>>::Output:
-                #crate_path::EmitIR<#language, Output = <#language as #ir_path::Dialect>::Type>
-        });
-        wc.predicates.extend(value_type_bounds);
-        wc.predicates.extend(wrapper_emit_bounds);
-
-        if crate::codegen::has_result_fields(ir_input) || !wrapper_types.is_empty() {
+            .extend(bounds.value_types_all(&lt_t, &language));
+        wc.predicates
+            .extend(bounds.wrappers_emit_ir(&lt_t, &language, &ast_self_type));
+        if bounds.needs_placeholder_with_wrappers() {
             wc.predicates.push(syn::parse_quote! {
                 <#language as #ir_path::Dialect>::Type: #ir_path::Placeholder
             });
@@ -130,38 +97,23 @@ impl GenerateHasDialectParser {
         let impl_generics = self.build_original_type_impl_generics(ir_input);
         let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
-        let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         let language = quote! { #original_name #ty_generics };
-        let emit_bound: syn::WherePredicate = syn::parse_quote! {
+
+        let mut wc = init_where_clause(where_clause, impl_where_clause);
+        wc.predicates
+            .push(syn::parse_quote! { #language: #ir_path::Dialect<Type = #ir_type> });
+        wc.predicates
+            .push(syn::parse_quote! { #wrapped_ty: #crate_path::HasParser<'t> });
+        wc.predicates.push(syn::parse_quote! {
             <#wrapped_ty as #crate_path::HasParser<'t>>::Output:
                 #crate_path::EmitIR<#language, Output = #ir_path::Statement>
-        };
-        let wrapped_bound: syn::WherePredicate =
-            syn::parse_quote! { #wrapped_ty: #crate_path::HasParser<'t> };
-
-        let where_clause = match combined_where {
-            Some(mut wc) => {
-                wc.predicates
-                    .push(syn::parse_quote! { #language: #ir_path::Dialect });
-                wc.predicates.push(wrapped_bound);
-                wc.predicates.push(emit_bound);
-                quote! { #wc }
-            }
-            None => {
-                quote! {
-                    where
-                        #language: #ir_path::Dialect<Type = #ir_type>,
-                        #wrapped_ty: #crate_path::HasParser<'t>,
-                        #emit_bound
-                }
-            }
-        };
+        });
 
         quote! {
             #[automatically_derived]
             impl #impl_generics #crate_path::HasParserEmitIR<'t> for #original_name #ty_generics
-            #where_clause
+            #wc
             {
                 fn emit_parsed(
                     output: &<Self as #crate_path::HasParser<'t>>::Output,
