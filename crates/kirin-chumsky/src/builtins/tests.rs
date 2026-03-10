@@ -1,6 +1,6 @@
 use crate::traits::HasParser;
 
-fn parse_with<T: HasParser<'static, 'static>>(input: &'static str) -> Result<T::Output, ()> {
+fn parse_with<T: HasParser<'static>>(input: &'static str) -> Result<T::Output, ()> {
     kirin_test_utils::parse_tokens!(input, T::parser()).map_err(|_| ())
 }
 

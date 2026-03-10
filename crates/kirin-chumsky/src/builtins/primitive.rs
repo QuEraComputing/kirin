@@ -3,12 +3,12 @@ use kirin_lexer::Token;
 
 use crate::traits::{BoxedParser, DirectlyParsable, HasParser, TokenInput};
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for bool {
+impl<'t> HasParser<'t> for bool {
     type Output = bool;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         select! {
             Token::Identifier("true") => true,
@@ -21,12 +21,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for bool {
 
 impl DirectlyParsable for bool {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for String {
+impl<'t> HasParser<'t> for String {
     type Output = String;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         // Accept both string literals and identifiers
         select! {

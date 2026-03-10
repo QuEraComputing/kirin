@@ -9,16 +9,12 @@ use kirin_lexer::Token;
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `FunctionType<<T as HasParser>::Output>`.
-pub fn function_type<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
-    'tokens,
-    I,
-    Spanned<FunctionType<<T as HasParser<'tokens, 'src>>::Output>>,
-    ParserError<'tokens, 'src>,
->
+pub fn function_type<'t, I, T>()
+-> impl Parser<'t, I, Spanned<FunctionType<<T as HasParser<'t>>::Output>>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
-    <T as HasParser<'tokens, 'src>>::Output: Clone,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+    <T as HasParser<'t>>::Output: Clone,
 {
     let input_types = T::parser()
         .map_with(|ty, e| Spanned {

@@ -161,9 +161,9 @@ impl GenerateHasDialectParser {
         let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
 
         let phantom_data = if type_params.is_empty() {
-            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), __TypeOutput, __LanguageOutput)> }
+            quote! { ::core::marker::PhantomData::<fn() -> (&'t (), __TypeOutput, __LanguageOutput)> }
         } else {
-            quote! { ::core::marker::PhantomData::<fn() -> (&'tokens (), &'src (), #(#type_params,)* __TypeOutput, __LanguageOutput)> }
+            quote! { ::core::marker::PhantomData::<fn() -> (&'t (), #(#type_params,)* __TypeOutput, __LanguageOutput)> }
         };
 
         if has_named {
@@ -263,12 +263,12 @@ impl GenerateHasDialectParser {
         let crate_path = &self.config.crate_path;
         quote! {
             {
-                let __keyword_parser: #crate_path::BoxedParser<'tokens, 'src, I, _> = if namespace.is_empty() {
+                let __keyword_parser: #crate_path::BoxedParser<'t, I, _> = if namespace.is_empty() {
                     #crate_path::chumsky::prelude::just(#crate_path::Token::Identifier(#name)).boxed()
                 } else {
                     let mut __parts: ::std::vec::Vec<&'static str> = namespace.to_vec();
                     __parts.push(#name);
-                    let mut __p: #crate_path::BoxedParser<'tokens, 'src, I, _> = #crate_path::chumsky::prelude::just(
+                    let mut __p: #crate_path::BoxedParser<'t, I, _> = #crate_path::chumsky::prelude::just(
                         #crate_path::Token::Identifier(__parts[0])
                     ).boxed();
                     for &__part in &__parts[1..] {

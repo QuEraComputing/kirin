@@ -25,7 +25,7 @@ impl GenerateAST {
         let value_types_needing_bounds = self.collect_value_types_needing_bounds(ir_input);
         let value_debug_bounds: Vec<_> = value_types_needing_bounds
             .iter()
-            .map(|ty| quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug })
+            .map(|ty| quote! { <#ty as #crate_path::HasParser<'t>>::Output: ::core::fmt::Debug })
             .collect();
 
         let where_clause = quote! {
@@ -38,7 +38,7 @@ impl GenerateAST {
             where
                 #base_bounds
                 #(#has_parser_bounds,)*
-                <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+                <#ir_type as #crate_path::HasParser<'t>>::Output: ::core::fmt::Debug,
                 LanguageOutput: ::core::fmt::Debug,
                 #(#value_debug_bounds,)*
         };
@@ -185,13 +185,13 @@ impl GenerateAST {
         let wrapper_types = collect_wrapper_types(ir_input);
         let has_dialect_parser_base_bounds: Vec<_> = wrapper_types
             .iter()
-            .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
+            .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'t> })
             .collect();
 
         let value_types_needing_bounds = self.collect_value_types_needing_bounds(ir_input);
         let value_debug_bounds: Vec<_> = value_types_needing_bounds
             .iter()
-            .map(|ty| quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug })
+            .map(|ty| quote! { <#ty as #crate_path::HasParser<'t>>::Output: ::core::fmt::Debug })
             .collect();
 
         let where_clause = quote! {
@@ -206,7 +206,7 @@ impl GenerateAST {
                 #base_bounds
                 #(#has_parser_bounds,)*
                 #(#has_dialect_parser_base_bounds,)*
-                <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+                <#ir_type as #crate_path::HasParser<'t>>::Output: ::core::fmt::Debug,
                 LanguageOutput: ::core::fmt::Debug,
                 #(#value_debug_bounds,)*
         };
@@ -350,10 +350,10 @@ impl GenerateAST {
             .collect();
 
         let clone_bounds: Vec<_> = wrapper_types.iter()
-            .map(|ty| quote! { <#ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<TypeOutput, LanguageOutput>: Clone })
+            .map(|ty| quote! { <#ty as #crate_path::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>: Clone })
             .collect();
         let partial_eq_bounds: Vec<_> = wrapper_types.iter()
-            .map(|ty| quote! { <#ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<TypeOutput, LanguageOutput>: PartialEq })
+            .map(|ty| quote! { <#ty as #crate_path::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>: PartialEq })
             .collect();
 
         quote! {

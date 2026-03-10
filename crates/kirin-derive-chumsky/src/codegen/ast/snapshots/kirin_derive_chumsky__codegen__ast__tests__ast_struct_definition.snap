@@ -4,39 +4,31 @@ expression: generate_ast_code(input)
 ---
 #[derive(Clone, Debug, PartialEq)]
 #[doc(hidden)]
-pub struct AddAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
+pub struct AddAST<'t, TypeOutput, LanguageOutput>
 where
-    TypeOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: Clone + PartialEq + 'tokens,
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
 {
-    pub result: kirin_chumsky::SSAValue<
-        'src,
-        <SimpleType as kirin_chumsky::HasParser<'tokens, 'src>>::Output,
-    >,
-    pub lhs: <Value as kirin_chumsky::HasParser<'tokens, 'src>>::Output,
-    pub rhs: <Value as kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+    pub result: kirin_chumsky::SSAValue<'t, <SimpleType as kirin_chumsky::HasParser<'t>>::Output>,
+    pub lhs: <Value as kirin_chumsky::HasParser<'t>>::Output,
+    pub rhs: <Value as kirin_chumsky::HasParser<'t>>::Output,
     #[doc(hidden)]
-    _marker:
-        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
+    _marker: ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput, LanguageOutput)>,
 }
 #[derive(Clone, Debug, PartialEq)]
 #[doc(hidden)]
-pub struct AddASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
-    pub AddAST<'tokens, 'src, TypeOutput, AddASTSelf<'tokens, 'src, TypeOutput>>,
-    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,
+pub struct AddASTSelf<'t, TypeOutput>(
+    pub AddAST<'t, TypeOutput, AddASTSelf<'t, TypeOutput>>,
+    ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput)>,
 )
 where
-    TypeOutput: Clone + PartialEq,
-    'src: 'tokens;
-impl<'tokens, 'src, TypeOutput> AddASTSelf<'tokens, 'src, TypeOutput>
+    TypeOutput: Clone + PartialEq;
+impl<'t, TypeOutput> AddASTSelf<'t, TypeOutput>
 where
     TypeOutput: Clone + PartialEq,
-    'src: 'tokens,
 {
     #[doc = r" Creates a new ASTSelf wrapper."]
-    pub fn new(
-        inner: AddAST<'tokens, 'src, TypeOutput, AddASTSelf<'tokens, 'src, TypeOutput>>,
-    ) -> Self {
+    pub fn new(inner: AddAST<'t, TypeOutput, AddASTSelf<'t, TypeOutput>>) -> Self {
         Self(inner, ::core::marker::PhantomData)
     }
 }

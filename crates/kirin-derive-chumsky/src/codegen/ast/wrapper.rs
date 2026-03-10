@@ -27,13 +27,13 @@ impl GenerateAST {
             .collect();
 
         let inner_ast_type = if type_params.is_empty() {
-            quote! { #ast_name<'tokens, 'src, TypeOutput, #ast_self_name<'tokens, 'src, TypeOutput>> }
+            quote! { #ast_name<'t, TypeOutput, #ast_self_name<'t, TypeOutput>> }
         } else {
-            quote! { #ast_name<'tokens, 'src, #(#type_params,)* TypeOutput, #ast_self_name<'tokens, 'src, #(#type_params,)* TypeOutput>> }
+            quote! { #ast_name<'t, #(#type_params,)* TypeOutput, #ast_self_name<'t, #(#type_params,)* TypeOutput>> }
         };
 
         let ast_self_def_generics = if type_params.is_empty() {
-            quote! { <'tokens, 'src: 'tokens, TypeOutput> }
+            quote! { <'t, TypeOutput> }
         } else {
             let type_param_bounds: Vec<_> = ir_input
                 .generics
@@ -48,11 +48,11 @@ impl GenerateAST {
                     }
                 })
                 .collect();
-            quote! { <'tokens, 'src: 'tokens, #(#type_param_bounds,)* TypeOutput> }
+            quote! { <'t, #(#type_param_bounds,)* TypeOutput> }
         };
 
         let ast_self_impl_generics = if type_params.is_empty() {
-            quote! { <'tokens, 'src, TypeOutput> }
+            quote! { <'t, TypeOutput> }
         } else {
             let type_param_bounds: Vec<_> = ir_input
                 .generics
@@ -67,31 +67,31 @@ impl GenerateAST {
                     }
                 })
                 .collect();
-            quote! { <'tokens, 'src, #(#type_param_bounds,)* TypeOutput> }
+            quote! { <'t, #(#type_param_bounds,)* TypeOutput> }
         };
 
         let ast_self_ty_generics = if type_params.is_empty() {
-            quote! { <'tokens, 'src, TypeOutput> }
+            quote! { <'t, TypeOutput> }
         } else {
-            quote! { <'tokens, 'src, #(#type_params,)* TypeOutput> }
+            quote! { <'t, #(#type_params,)* TypeOutput> }
         };
 
         let phantom = if type_params.is_empty() {
-            quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)> }
+            quote! { ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput)> }
         } else {
-            quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), #(#type_params,)* TypeOutput)> }
+            quote! { ::core::marker::PhantomData<fn() -> (&'t (), #(#type_params,)* TypeOutput)> }
         };
 
         let value_types_needing_bounds = self.collect_value_types_needing_bounds(ir_input);
         let has_parser_bounds: Vec<_> = value_types_needing_bounds
             .iter()
-            .map(|ty| quote! { #ty: #crate_path::HasParser<'tokens, 'src> + 'tokens })
+            .map(|ty| quote! { #ty: #crate_path::HasParser<'t> + 't })
             .collect();
 
         let wrapper_types = collect_wrapper_types(ir_input);
         let has_dialect_parser_bounds: Vec<_> = wrapper_types
             .iter()
-            .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
+            .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'t> })
             .collect();
 
         let all_bounds: Vec<_> = has_parser_bounds
@@ -99,9 +99,9 @@ impl GenerateAST {
             .chain(has_dialect_parser_bounds)
             .collect();
         let where_clause = if all_bounds.is_empty() {
-            quote! { where TypeOutput: Clone + PartialEq, 'src: 'tokens }
+            quote! { where TypeOutput: Clone + PartialEq }
         } else {
-            quote! { where TypeOutput: Clone + PartialEq, 'src: 'tokens, #(#all_bounds),* }
+            quote! { where TypeOutput: Clone + PartialEq, #(#all_bounds),* }
         };
 
         let has_wrapper_variants = !wrapper_types.is_empty();

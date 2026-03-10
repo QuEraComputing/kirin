@@ -5,13 +5,13 @@ use kirin_lexer::{Logos, Token};
 use super::BoxedParser;
 
 /// An alias for token input types used in Kirin Chumsky parsers.
-pub trait TokenInput<'tokens, 'src: 'tokens>:
-    chumsky::input::ValueInput<'tokens, Token = Token<'src>, Span = SimpleSpan>
+pub trait TokenInput<'t>:
+    chumsky::input::ValueInput<'t, Token = Token<'t>, Span = SimpleSpan>
 {
 }
 
-impl<'tokens, 'src: 'tokens, I> TokenInput<'tokens, 'src> for I where
-    I: chumsky::input::ValueInput<'tokens, Token = Token<'src>, Span = SimpleSpan>
+impl<'t, I> TokenInput<'t> for I where
+    I: chumsky::input::ValueInput<'t, Token = Token<'t>, Span = SimpleSpan>
 {
 }
 
@@ -19,14 +19,14 @@ impl<'tokens, 'src: 'tokens, I> TokenInput<'tokens, 'src> for I where
 ///
 /// This is used for simple types like type lattices that don't need
 /// recursive parsing.
-pub trait HasParser<'tokens, 'src: 'tokens> {
+pub trait HasParser<'t> {
     /// The output type of the parser.
     type Output: Clone + PartialEq;
 
     /// Returns a parser for this type.
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>;
+        I: TokenInput<'t>;
 }
 
 /// Trait for dialect types that can be parsed with chumsky.
@@ -39,15 +39,15 @@ pub trait HasParser<'tokens, 'src: 'tokens> {
 /// compilation times when the Language type is self-referential.
 ///
 /// Note: This trait is implemented by the original dialect type (e.g., `SimpleLang`).
-pub trait HasDialectParser<'tokens, 'src: 'tokens>: Sized {
+pub trait HasDialectParser<'t>: Sized {
     /// The AST type produced by parsing this dialect.
     ///
     /// - `TypeOutput`: The parsed representation of type annotations
     /// - `LanguageOutput`: The AST type for statements in blocks/regions
     type Output<TypeOutput, LanguageOutput>: Clone + PartialEq
     where
-        TypeOutput: Clone + PartialEq + 'tokens,
-        LanguageOutput: Clone + PartialEq + 'tokens;
+        TypeOutput: Clone + PartialEq + 't,
+        LanguageOutput: Clone + PartialEq + 't;
 
     /// Returns a recursive parser for this dialect.
     ///
@@ -60,12 +60,12 @@ pub trait HasDialectParser<'tokens, 'src: 'tokens>: Sized {
     /// This is a convenience method that delegates to [`namespaced_parser`](Self::namespaced_parser)
     /// with an empty namespace.
     fn recursive_parser<I, TypeOutput, LanguageOutput>(
-        language: super::RecursiveParser<'tokens, 'src, I, LanguageOutput>,
-    ) -> BoxedParser<'tokens, 'src, I, Self::Output<TypeOutput, LanguageOutput>>
+        language: super::RecursiveParser<'t, I, LanguageOutput>,
+    ) -> BoxedParser<'t, I, Self::Output<TypeOutput, LanguageOutput>>
     where
-        I: TokenInput<'tokens, 'src>,
-        TypeOutput: Clone + PartialEq + 'tokens,
-        LanguageOutput: Clone + PartialEq + 'tokens,
+        I: TokenInput<'t>,
+        TypeOutput: Clone + PartialEq + 't,
+        LanguageOutput: Clone + PartialEq + 't,
     {
         Self::namespaced_parser::<I, TypeOutput, LanguageOutput>(language, &[])
     }
@@ -76,13 +76,13 @@ pub trait HasDialectParser<'tokens, 'src: 'tokens>: Sized {
     /// one of the namespace prefixes are parsed. An empty namespace means
     /// all statements are eligible (no filtering).
     fn namespaced_parser<I, TypeOutput, LanguageOutput>(
-        language: super::RecursiveParser<'tokens, 'src, I, LanguageOutput>,
+        language: super::RecursiveParser<'t, I, LanguageOutput>,
         namespace: &[&'static str],
-    ) -> BoxedParser<'tokens, 'src, I, Self::Output<TypeOutput, LanguageOutput>>
+    ) -> BoxedParser<'t, I, Self::Output<TypeOutput, LanguageOutput>>
     where
-        I: TokenInput<'tokens, 'src>,
-        TypeOutput: Clone + PartialEq + 'tokens,
-        LanguageOutput: Clone + PartialEq + 'tokens;
+        I: TokenInput<'t>,
+        TypeOutput: Clone + PartialEq + 't,
+        LanguageOutput: Clone + PartialEq + 't;
 }
 
 /// A parse error with location information.
@@ -105,9 +105,9 @@ impl std::fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 /// Parses a source string into an AST using the given language's parser.
-pub fn parse_ast<'src, L>(input: &'src str) -> Result<L::Output, Vec<ParseError>>
+pub fn parse_ast<'t, L>(input: &'t str) -> Result<L::Output, Vec<ParseError>>
 where
-    L: HasParser<'src, 'src>,
+    L: HasParser<'t>,
 {
     let tokens: Vec<_> = Token::lexer(input)
         .spanned()

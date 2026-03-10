@@ -4,12 +4,10 @@ use kirin_lexer::Token;
 use crate::traits::{BoxedParser, DirectlyParsable, HasParser, TokenInput};
 
 /// Creates a parser for floating point numbers.
-pub(super) fn float_parser<'tokens, 'src: 'tokens, T, I>(
-    type_name: &'static str,
-) -> BoxedParser<'tokens, 'src, I, T>
+pub(super) fn float_parser<'t, T, I>(type_name: &'static str) -> BoxedParser<'t, I, T>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: std::str::FromStr + Clone + PartialEq + 'tokens,
+    I: TokenInput<'t>,
+    T: std::str::FromStr + Clone + PartialEq + 't,
 {
     // Accept both Float tokens and Int tokens (for cases like "1" meaning 1.0)
     let float_token = select! { Token::Float(v) = e => (v, e.span()) };
@@ -25,12 +23,12 @@ where
         .boxed()
 }
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for f32 {
+impl<'t> HasParser<'t> for f32 {
     type Output = f32;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         float_parser("f32")
     }
@@ -38,12 +36,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for f32 {
 
 impl DirectlyParsable for f32 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for f64 {
+impl<'t> HasParser<'t> for f64 {
     type Output = f64;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         float_parser("f64")
     }

@@ -60,24 +60,23 @@ impl GenerateHasDialectParser {
 
         let ast_self_name = syn::Ident::new(&format!("{}Self", ast_name), ast_name.span());
         let ast_self_type = self.build_ast_self_type_reference(ir_input, &ast_self_name, ir_type);
-        let type_output = quote! { <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let type_output = quote! { <#ir_type as #crate_path::HasParser<'t>>::Output };
 
         quote! {
             #[automatically_derived]
-            impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
+            impl #impl_generics #crate_path::HasParser<'t> for #original_name #ty_generics
             #where_clause
             {
                 type Output = #ast_self_type;
 
-                fn parser<I>() -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output>
+                fn parser<I>() -> #crate_path::BoxedParser<'t, I, Self::Output>
                 where
-                    I: #crate_path::TokenInput<'tokens, 'src>,
+                    I: #crate_path::TokenInput<'t>,
                 {
                     use #crate_path::chumsky::prelude::*;
                     #crate_path::chumsky::recursive::recursive(|language| {
                         <#original_name #ty_generics as #crate_path::HasDialectParser<
-                            'tokens,
-                            'src,
+                            't,
                         >>::recursive_parser::<I, #type_output, Self::Output>(language)
                             .map(|inner| #ast_self_name::new(inner))
                     }).boxed()
@@ -101,7 +100,7 @@ impl GenerateHasDialectParser {
         let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         let wrapped_bound: syn::WherePredicate =
-            syn::parse_quote! { #wrapped_ty: #crate_path::HasParser<'tokens, 'src> };
+            syn::parse_quote! { #wrapped_ty: #crate_path::HasParser<'t> };
 
         let where_clause = match combined_where {
             Some(mut wc) => {
@@ -115,16 +114,16 @@ impl GenerateHasDialectParser {
 
         quote! {
             #[automatically_derived]
-            impl #impl_generics #crate_path::HasParser<'tokens, 'src> for #original_name #ty_generics
+            impl #impl_generics #crate_path::HasParser<'t> for #original_name #ty_generics
             #where_clause
             {
-                type Output = <#wrapped_ty as #crate_path::HasParser<'tokens, 'src>>::Output;
+                type Output = <#wrapped_ty as #crate_path::HasParser<'t>>::Output;
 
-                fn parser<I>() -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output>
+                fn parser<I>() -> #crate_path::BoxedParser<'t, I, Self::Output>
                 where
-                    I: #crate_path::TokenInput<'tokens, 'src>,
+                    I: #crate_path::TokenInput<'t>,
                 {
-                    <#wrapped_ty as #crate_path::HasParser<'tokens, 'src>>::parser()
+                    <#wrapped_ty as #crate_path::HasParser<'t>>::parser()
                 }
             }
         }
@@ -178,24 +177,24 @@ impl GenerateHasDialectParser {
 
         quote! {
             #[automatically_derived]
-            impl #impl_generics #crate_path::HasDialectParser<'tokens, 'src>
+            impl #impl_generics #crate_path::HasDialectParser<'t>
                 for #original_name #ty_generics
             #final_where
             {
                 type Output<__TypeOutput, __LanguageOutput> = #ast_type
                 where
-                    __TypeOutput: Clone + PartialEq + 'tokens,
-                    __LanguageOutput: Clone + PartialEq + 'tokens;
+                    __TypeOutput: Clone + PartialEq + 't,
+                    __LanguageOutput: Clone + PartialEq + 't;
 
                 #[inline]
                 fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
-                    language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+                    language: #crate_path::RecursiveParser<'t, I, __LanguageOutput>,
                     namespace: &[&'static str],
-                ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
+                ) -> #crate_path::BoxedParser<'t, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
-                    I: #crate_path::TokenInput<'tokens, 'src>,
-                    __TypeOutput: Clone + PartialEq + 'tokens,
-                    __LanguageOutput: Clone + PartialEq + 'tokens,
+                    I: #crate_path::TokenInput<'t>,
+                    __TypeOutput: Clone + PartialEq + 't,
+                    __LanguageOutput: Clone + PartialEq + 't,
                 {
                     use #crate_path::chumsky::prelude::*;
                     #parser_body.boxed()
@@ -232,9 +231,9 @@ impl GenerateHasDialectParser {
             .collect();
 
         if type_params.is_empty() {
-            quote! { #ast_name<'tokens, 'src, __TypeOutput, __LanguageOutput> }
+            quote! { #ast_name<'t, __TypeOutput, __LanguageOutput> }
         } else {
-            quote! { #ast_name<'tokens, 'src, #(#type_params,)* __TypeOutput, __LanguageOutput> }
+            quote! { #ast_name<'t, #(#type_params,)* __TypeOutput, __LanguageOutput> }
         }
     }
 
@@ -260,12 +259,12 @@ impl GenerateHasDialectParser {
             })
             .collect();
 
-        let type_output = quote! { <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output };
+        let type_output = quote! { <#ir_type as #crate_path::HasParser<'t>>::Output };
 
         if type_params.is_empty() {
-            quote! { #ast_self_name<'tokens, 'src, #type_output> }
+            quote! { #ast_self_name<'t, #type_output> }
         } else {
-            quote! { #ast_self_name<'tokens, 'src, #(#type_params,)* #type_output> }
+            quote! { #ast_self_name<'t, #(#type_params,)* #type_output> }
         }
     }
 
@@ -291,9 +290,9 @@ impl GenerateHasDialectParser {
             .collect();
 
         if type_params.is_empty() {
-            quote! { #ast_name<'tokens, 'src, #type_output, #language_output> }
+            quote! { #ast_name<'t, #type_output, #language_output> }
         } else {
-            quote! { #ast_name<'tokens, 'src, #(#type_params,)* #type_output, #language_output> }
+            quote! { #ast_name<'t, #(#type_params,)* #type_output, #language_output> }
         }
     }
 
@@ -312,7 +311,7 @@ impl GenerateHasDialectParser {
         let combined_where = combine_where_clauses(where_clause, impl_where_clause);
 
         let wrapped_bound: syn::WherePredicate =
-            syn::parse_quote! { #wrapped_ty: #crate_path::HasDialectParser<'tokens, 'src> };
+            syn::parse_quote! { #wrapped_ty: #crate_path::HasDialectParser<'t> };
 
         let final_where = {
             let mut wc = match combined_where {
@@ -328,27 +327,27 @@ impl GenerateHasDialectParser {
 
         quote! {
             #[automatically_derived]
-            impl #impl_generics #crate_path::HasDialectParser<'tokens, 'src>
+            impl #impl_generics #crate_path::HasDialectParser<'t>
                 for #original_name #ty_generics
             #final_where
             {
                 type Output<__TypeOutput, __LanguageOutput> =
-                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<__TypeOutput, __LanguageOutput>
+                    <#wrapped_ty as #crate_path::HasDialectParser<'t>>::Output<__TypeOutput, __LanguageOutput>
                 where
-                    __TypeOutput: Clone + PartialEq + 'tokens,
-                    __LanguageOutput: Clone + PartialEq + 'tokens;
+                    __TypeOutput: Clone + PartialEq + 't,
+                    __LanguageOutput: Clone + PartialEq + 't;
 
                 #[inline]
                 fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
-                    language: #crate_path::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+                    language: #crate_path::RecursiveParser<'t, I, __LanguageOutput>,
                     namespace: &[&'static str],
-                ) -> #crate_path::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
+                ) -> #crate_path::BoxedParser<'t, I, Self::Output<__TypeOutput, __LanguageOutput>>
                 where
-                    I: #crate_path::TokenInput<'tokens, 'src>,
-                    __TypeOutput: Clone + PartialEq + 'tokens,
-                    __LanguageOutput: Clone + PartialEq + 'tokens,
+                    I: #crate_path::TokenInput<'t>,
+                    __TypeOutput: Clone + PartialEq + 't,
+                    __LanguageOutput: Clone + PartialEq + 't,
                 {
-                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language, namespace)
+                    <#wrapped_ty as #crate_path::HasDialectParser<'t>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language, namespace)
                 }
             }
         }

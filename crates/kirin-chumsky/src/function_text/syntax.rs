@@ -33,11 +33,11 @@ struct ParsedFnSignature<'src, T> {
     signature: Signature<T>,
 }
 
-fn type_list_parser<'src, I, L>() -> impl Parser<'src, I, Vec<L::Type>, ParserError<'src, 'src>>
+fn type_list_parser<'src, I, L>() -> impl Parser<'src, I, Vec<L::Type>, ParserError<'src>>
 where
-    I: TokenInput<'src, 'src>,
-    L: Dialect + HasParser<'src, 'src>,
-    L::Type: HasParser<'src, 'src, Output = L::Type>,
+    I: TokenInput<'src>,
+    L: Dialect + HasParser<'src>,
+    L::Type: HasParser<'src, Output = L::Type>,
 {
     L::Type::parser()
         .separated_by(just(Token::Comma))
@@ -47,11 +47,11 @@ where
 }
 
 fn fn_signature_parser<'src, I, L>()
--> impl Parser<'src, I, ParsedFnSignature<'src, L::Type>, ParserError<'src, 'src>>
+-> impl Parser<'src, I, ParsedFnSignature<'src, L::Type>, ParserError<'src>>
 where
-    I: TokenInput<'src, 'src>,
-    L: Dialect + HasParser<'src, 'src>,
-    L::Type: HasParser<'src, 'src, Output = L::Type>,
+    I: TokenInput<'src>,
+    L: Dialect + HasParser<'src>,
+    L::Type: HasParser<'src, Output = L::Type>,
 {
     identifier("fn")
         .ignore_then(symbol())
@@ -69,16 +69,12 @@ where
         .labelled("function signature")
 }
 
-fn declaration_parser<'src, I, L>() -> impl Parser<
-    'src,
-    I,
-    Declaration<'src, L::Type, <L as HasParser<'src, 'src>>::Output>,
-    ParserError<'src, 'src>,
->
+fn declaration_parser<'src, I, L>()
+-> impl Parser<'src, I, Declaration<'src, L::Type, <L as HasParser<'src>>::Output>, ParserError<'src>>
 where
-    I: TokenInput<'src, 'src>,
-    L: Dialect + HasParser<'src, 'src>,
-    L::Type: HasParser<'src, 'src, Output = L::Type>,
+    I: TokenInput<'src>,
+    L: Dialect + HasParser<'src>,
+    L::Type: HasParser<'src, Output = L::Type>,
 {
     let stage_decl = identifier("stage")
         .ignore_then(symbol())
@@ -122,14 +118,14 @@ pub(super) fn parse_one_declaration<'src, L>(
     tokens: &[(Token<'src>, SimpleSpan)],
 ) -> Result<
     (
-        Declaration<'src, L::Type, <L as HasParser<'src, 'src>>::Output>,
+        Declaration<'src, L::Type, <L as HasParser<'src>>::Output>,
         SimpleSpan,
     ),
     Vec<ChumskyError<'src>>,
 >
 where
-    L: Dialect + HasParser<'src, 'src>,
-    L::Type: HasParser<'src, 'src, Output = L::Type>,
+    L: Dialect + HasParser<'src>,
+    L::Type: HasParser<'src, Output = L::Type>,
 {
     let end = tokens.last().map(|(_, span)| span.end).unwrap_or_default();
     let eoi = SimpleSpan::from(end..end);

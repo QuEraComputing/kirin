@@ -196,12 +196,12 @@ impl Typeof<ArithType> for ArithValue {
 
 impl DirectlyParsable for ArithValue {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for ArithValue {
+impl<'t> HasParser<'t> for ArithValue {
     type Output = ArithValue;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         let integer =
             select! { Token::Int(value) = e => (value, e.span()) }.try_map(|(value, span), _| {

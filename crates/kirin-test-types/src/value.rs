@@ -104,12 +104,12 @@ mod parser_impl {
 
     impl DirectlyParsable for Value {}
 
-    impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for Value {
+    impl<'t> HasParser<'t> for Value {
         type Output = Value;
 
-        fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+        fn parser<I>() -> BoxedParser<'t, I, Self::Output>
         where
-            I: TokenInput<'tokens, 'src>,
+            I: TokenInput<'t>,
         {
             let integer = select! { Token::Int(value) = e => (value, e.span()) }.try_map(
                 |(value, span), _| {

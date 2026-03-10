@@ -28,28 +28,28 @@ impl GenerateAST {
         let has_original_type_params = !type_params.is_empty();
 
         let phantom = if has_original_type_params {
-            quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), #(#type_params,)* TypeOutput, LanguageOutput)> }
+            quote! { ::core::marker::PhantomData<fn() -> (&'t (), #(#type_params,)* TypeOutput, LanguageOutput)> }
         } else {
-            quote! { ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)> }
+            quote! { ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput, LanguageOutput)> }
         };
 
         let value_types_needing_bounds = self.collect_value_types_needing_bounds(ir_input);
         let crate_path = &self.config.crate_path;
         let has_parser_bounds: Vec<_> = value_types_needing_bounds
             .iter()
-            .map(|ty| quote! { #ty: #crate_path::HasParser<'tokens, 'src> + 'tokens })
+            .map(|ty| quote! { #ty: #crate_path::HasParser<'t> + 't })
             .collect();
 
         let wrapper_types = collect_wrapper_types(ir_input);
         let has_dialect_parser_bounds: Vec<_> = wrapper_types
             .iter()
-            .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
+            .map(|ty| quote! { #ty: #crate_path::HasDialectParser<'t> })
             .collect();
         let has_wrapper_variants = !wrapper_types.is_empty();
 
         let base_bounds = quote! {
-            TypeOutput: Clone + PartialEq + 'tokens,
-            LanguageOutput: Clone + PartialEq + 'tokens,
+            TypeOutput: Clone + PartialEq + 't,
+            LanguageOutput: Clone + PartialEq + 't,
         };
 
         let needs_manual_impls = has_original_type_params || has_wrapper_variants;
@@ -240,7 +240,7 @@ impl GenerateAST {
                 VariantRef::Wrapper { name, wrapper, .. } => {
                     let wrapped_ty = &wrapper.ty;
                     quote! {
-                        #name(<#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<TypeOutput, LanguageOutput>)
+                        #name(<#wrapped_ty as #crate_path::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>)
                     }
                 }
                 VariantRef::Regular { name, stmt } => {

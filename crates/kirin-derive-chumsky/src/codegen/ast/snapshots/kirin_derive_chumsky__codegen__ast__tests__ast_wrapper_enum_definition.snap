@@ -3,46 +3,29 @@ source: crates/kirin-derive-chumsky/src/codegen/ast/mod.rs
 expression: generate_ast_code(input)
 ---
 #[doc(hidden)]
-pub enum MyLanguageAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
+pub enum MyLanguageAST<'t, TypeOutput, LanguageOutput>
 where
-    TypeOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: Clone + PartialEq + 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
-    Arith(
-        <ArithOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
-            TypeOutput,
-            LanguageOutput,
-        >,
-    ),
-    Cf(
-        <CfOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
-            TypeOutput,
-            LanguageOutput,
-        >,
-    ),
+    Arith(<ArithOps as ::kirin::parsers::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>),
+    Cf(<CfOps as ::kirin::parsers::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>),
     #[doc(hidden)]
     __Marker(
-        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
+        ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput, LanguageOutput)>,
         ::core::convert::Infallible,
     ),
 }
-impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> Clone
-    for MyLanguageAST<'tokens, 'src, TypeOutput, LanguageOutput>
+impl<'t, TypeOutput, LanguageOutput> Clone for MyLanguageAST<'t, TypeOutput, LanguageOutput>
 where
-    TypeOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: Clone + PartialEq + 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    <ArithOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
-        TypeOutput,
-        LanguageOutput,
-    >: Clone,
-    <CfOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
-        TypeOutput,
-        LanguageOutput,
-    >: Clone,
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
+    <ArithOps as ::kirin::parsers::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>: Clone,
+    <CfOps as ::kirin::parsers::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>: Clone,
 {
     fn clone(&self) -> Self {
         match self {
@@ -52,14 +35,14 @@ where
         }
     }
 }
-impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> ::core::fmt::Debug
-    for MyLanguageAST<'tokens, 'src, TypeOutput, LanguageOutput>
+impl<'t, TypeOutput, LanguageOutput> ::core::fmt::Debug
+    for MyLanguageAST<'t, TypeOutput, LanguageOutput>
 where
-    TypeOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: Clone + PartialEq + 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output: ::core::fmt::Debug,
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
+    <SimpleType as ::kirin::parsers::HasParser<'t>>::Output: ::core::fmt::Debug,
     LanguageOutput: ::core::fmt::Debug,
 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
@@ -70,21 +53,16 @@ where
         }
     }
 }
-impl<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput> PartialEq
-    for MyLanguageAST<'tokens, 'src, TypeOutput, LanguageOutput>
+impl<'t, TypeOutput, LanguageOutput> PartialEq for MyLanguageAST<'t, TypeOutput, LanguageOutput>
 where
-    TypeOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: Clone + PartialEq + 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    <ArithOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
-        TypeOutput,
-        LanguageOutput,
-    >: PartialEq,
-    <CfOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::Output<
-        TypeOutput,
-        LanguageOutput,
-    >: PartialEq,
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
+    <ArithOps as ::kirin::parsers::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>:
+        PartialEq,
+    <CfOps as ::kirin::parsers::HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>:
+        PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -97,64 +75,52 @@ where
     }
 }
 #[doc(hidden)]
-pub struct MyLanguageASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
-    pub MyLanguageAST<'tokens, 'src, TypeOutput, MyLanguageASTSelf<'tokens, 'src, TypeOutput>>,
-    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,
+pub struct MyLanguageASTSelf<'t, TypeOutput>(
+    pub MyLanguageAST<'t, TypeOutput, MyLanguageASTSelf<'t, TypeOutput>>,
+    ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput)>,
 )
 where
     TypeOutput: Clone + PartialEq,
-    'src: 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>;
-impl<'tokens, 'src, TypeOutput> Clone for MyLanguageASTSelf<'tokens, 'src, TypeOutput>
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>;
+impl<'t, TypeOutput> Clone for MyLanguageASTSelf<'t, TypeOutput>
 where
     TypeOutput: Clone + PartialEq,
-    'src: 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
     fn clone(&self) -> Self {
         Self(self.0.clone(), ::core::marker::PhantomData)
     }
 }
-impl<'tokens, 'src, TypeOutput> ::core::fmt::Debug for MyLanguageASTSelf<'tokens, 'src, TypeOutput>
+impl<'t, TypeOutput> ::core::fmt::Debug for MyLanguageASTSelf<'t, TypeOutput>
 where
     TypeOutput: Clone + PartialEq,
-    'src: 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_tuple("MyLanguageASTSelf").field(&"..").finish()
     }
 }
-impl<'tokens, 'src, TypeOutput> PartialEq for MyLanguageASTSelf<'tokens, 'src, TypeOutput>
+impl<'t, TypeOutput> PartialEq for MyLanguageASTSelf<'t, TypeOutput>
 where
     TypeOutput: Clone + PartialEq,
-    'src: 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
-impl<'tokens, 'src, TypeOutput> MyLanguageASTSelf<'tokens, 'src, TypeOutput>
+impl<'t, TypeOutput> MyLanguageASTSelf<'t, TypeOutput>
 where
     TypeOutput: Clone + PartialEq,
-    'src: 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
     #[doc = r" Creates a new ASTSelf wrapper."]
-    pub fn new(
-        inner: MyLanguageAST<
-            'tokens,
-            'src,
-            TypeOutput,
-            MyLanguageASTSelf<'tokens, 'src, TypeOutput>,
-        >,
-    ) -> Self {
+    pub fn new(inner: MyLanguageAST<'t, TypeOutput, MyLanguageASTSelf<'t, TypeOutput>>) -> Self {
         Self(inner, ::core::marker::PhantomData)
     }
 }

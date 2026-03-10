@@ -30,7 +30,7 @@ impl GenerateEmitIR {
             .collect();
 
         let impl_generics = if type_params.is_empty() {
-            quote! { <'tokens, 'src, TypeOutput, Language> }
+            quote! { <'t, TypeOutput, Language> }
         } else {
             let type_param_bounds: Vec<_> = ir_input
                 .generics
@@ -45,19 +45,19 @@ impl GenerateEmitIR {
                     }
                 })
                 .collect();
-            quote! { <'tokens, 'src, #(#type_param_bounds,)* TypeOutput, Language> }
+            quote! { <'t, #(#type_param_bounds,)* TypeOutput, Language> }
         };
 
         let ast_self_ty_generics = if type_params.is_empty() {
-            quote! { <'tokens, 'src, TypeOutput> }
+            quote! { <'t, TypeOutput> }
         } else {
-            quote! { <'tokens, 'src, #(#type_params,)* TypeOutput> }
+            quote! { <'t, #(#type_params,)* TypeOutput> }
         };
 
         let _inner_ast_type = if type_params.is_empty() {
-            quote! { #ast_name<'tokens, 'src, TypeOutput, #ast_self_name<'tokens, 'src, TypeOutput>> }
+            quote! { #ast_name<'t, TypeOutput, #ast_self_name<'t, TypeOutput>> }
         } else {
-            quote! { #ast_name<'tokens, 'src, #(#type_params,)* TypeOutput, #ast_self_name<'tokens, 'src, #(#type_params,)* TypeOutput>> }
+            quote! { #ast_name<'t, #(#type_params,)* TypeOutput, #ast_self_name<'t, #(#type_params,)* TypeOutput>> }
         };
 
         let bounds = BoundsBuilder::new(crate_path);
@@ -71,13 +71,13 @@ impl GenerateEmitIR {
             .collect();
         let wrapper_dialect_parser_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
-            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
+            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'t> })
             .collect();
         let wrapper_emit_bounds: Vec<syn::WherePredicate> = wrapper_types
             .iter()
             .map(|ty| {
                 syn::parse_quote! {
-                    <#ty as #crate_path::HasDialectParser<'tokens, 'src>>::Output<TypeOutput, #ast_self_name #ast_self_ty_generics>:
+                    <#ty as #crate_path::HasDialectParser<'t>>::Output<TypeOutput, #ast_self_name #ast_self_ty_generics>:
                         #crate_path::EmitIR<Language, Output = #ir_path::Statement>
                 }
             })
@@ -99,9 +99,8 @@ impl GenerateEmitIR {
             #dialect_type_bound
             #placeholder_bound
             TypeOutput: Clone + PartialEq,
-            'src: 'tokens,
-            #ir_type: #crate_path::HasParser<'tokens, 'src> + 'tokens,
-            <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output:
+            #ir_type: #crate_path::HasParser<'t> + 't,
+            <#ir_type as #crate_path::HasParser<'t>>::Output:
                 #crate_path::EmitIR<Language, Output = <Language as #ir_path::Dialect>::Type>,
         };
 

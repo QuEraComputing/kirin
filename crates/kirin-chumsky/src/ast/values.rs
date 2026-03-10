@@ -11,7 +11,7 @@ use crate::traits::{EmitContext, EmitError, EmitIR};
 /// - `%value: type` (with type)
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'t>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SSAValue<'src, TypeOutput> {
     /// The name of the SSA value (without the `%` prefix).
@@ -25,7 +25,7 @@ pub struct SSAValue<'src, TypeOutput> {
 /// Represents syntax like: `%result` in `%result = add %a, %b`
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'t>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResultValue<'src, TypeOutput> {
     /// The name of the result value (without the `%` prefix).
@@ -40,7 +40,7 @@ pub struct ResultValue<'src, TypeOutput> {
 /// for example in `add %a, %b -> bool` where `bool` is the result type.
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'t>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeofSSAValue<TypeOutput> {
     /// The type value.

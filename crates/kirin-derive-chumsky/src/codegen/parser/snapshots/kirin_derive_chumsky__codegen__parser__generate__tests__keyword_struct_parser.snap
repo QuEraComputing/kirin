@@ -1,41 +1,39 @@
 ---
 source: crates/kirin-derive-chumsky/src/codegen/parser/generate.rs
-assertion_line: 233
 expression: generate_parser_code(input)
 ---
 #[automatically_derived]
-impl<'tokens, 'src: 'tokens> kirin_chumsky::HasDialectParser<'tokens, 'src> for Return
+impl<'t> kirin_chumsky::HasDialectParser<'t> for Return
 where
-    SimpleType: kirin_chumsky::HasParser<'tokens, 'src> + 'tokens,
+    SimpleType: kirin_chumsky::HasParser<'t> + 't,
 {
     type Output<__TypeOutput, __LanguageOutput>
-        = ReturnAST<'tokens, 'src, __TypeOutput, __LanguageOutput>
+        = ReturnAST<'t, __TypeOutput, __LanguageOutput>
     where
-        __TypeOutput: Clone + PartialEq + 'tokens,
-        __LanguageOutput: Clone + PartialEq + 'tokens;
+        __TypeOutput: Clone + PartialEq + 't,
+        __LanguageOutput: Clone + PartialEq + 't;
     #[inline]
     fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
-        language: kirin_chumsky::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+        language: kirin_chumsky::RecursiveParser<'t, I, __LanguageOutput>,
         namespace: &[&'static str],
-    ) -> kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
+    ) -> kirin_chumsky::BoxedParser<'t, I, Self::Output<__TypeOutput, __LanguageOutput>>
     where
-        I: kirin_chumsky::TokenInput<'tokens, 'src>,
-        __TypeOutput: Clone + PartialEq + 'tokens,
-        __LanguageOutput: Clone + PartialEq + 'tokens,
+        I: kirin_chumsky::TokenInput<'t>,
+        __TypeOutput: Clone + PartialEq + 't,
+        __LanguageOutput: Clone + PartialEq + 't,
     {
         use kirin_chumsky::chumsky::prelude::*;
         {
             use kirin_chumsky::Token;
             {
-                let __keyword_parser: kirin_chumsky::BoxedParser<'tokens, 'src, I, _> = if namespace
-                    .is_empty()
+                let __keyword_parser: kirin_chumsky::BoxedParser<'t, I, _> = if namespace.is_empty()
                 {
                     kirin_chumsky::chumsky::prelude::just(kirin_chumsky::Token::Identifier("ret"))
                         .boxed()
                 } else {
                     let mut __parts: ::std::vec::Vec<&'static str> = namespace.to_vec();
                     __parts.push("ret");
-                    let mut __p: kirin_chumsky::BoxedParser<'tokens, 'src, I, _> =
+                    let mut __p: kirin_chumsky::BoxedParser<'t, I, _> =
                         kirin_chumsky::chumsky::prelude::just(kirin_chumsky::Token::Identifier(
                             __parts[0],
                         ))
@@ -54,40 +52,34 @@ where
                 };
                 __keyword_parser
             }
-            .ignore_then(<Value as kirin_chumsky::HasParser<'tokens, 'src>>::parser())
-            .map(
-                |value| -> ReturnAST<'tokens, 'src, __TypeOutput, __LanguageOutput> {
-                    ReturnAST {
-                        value: value,
-                        _marker: ::core::marker::PhantomData::<
-                            fn() -> (&'tokens (), &'src (), __TypeOutput, __LanguageOutput),
-                        >,
-                    }
-                },
-            )
+            .ignore_then(<Value as kirin_chumsky::HasParser<'t>>::parser())
+            .map(|value| -> ReturnAST<'t, __TypeOutput, __LanguageOutput> {
+                ReturnAST {
+                    value: value,
+                    _marker: ::core::marker::PhantomData::<
+                        fn() -> (&'t (), __TypeOutput, __LanguageOutput),
+                    >,
+                }
+            })
         }
         .boxed()
     }
 }
 #[automatically_derived]
-impl<'tokens, 'src: 'tokens> kirin_chumsky::HasParser<'tokens, 'src> for Return
+impl<'t> kirin_chumsky::HasParser<'t> for Return
 where
-    SimpleType: kirin_chumsky::HasParser<'tokens, 'src> + 'tokens,
+    SimpleType: kirin_chumsky::HasParser<'t> + 't,
 {
-    type Output = ReturnASTSelf<
-        'tokens,
-        'src,
-        <SimpleType as kirin_chumsky::HasParser<'tokens, 'src>>::Output,
-    >;
-    fn parser<I>() -> kirin_chumsky::BoxedParser<'tokens, 'src, I, Self::Output>
+    type Output = ReturnASTSelf<'t, <SimpleType as kirin_chumsky::HasParser<'t>>::Output>;
+    fn parser<I>() -> kirin_chumsky::BoxedParser<'t, I, Self::Output>
     where
-        I: kirin_chumsky::TokenInput<'tokens, 'src>,
+        I: kirin_chumsky::TokenInput<'t>,
     {
         use kirin_chumsky::chumsky::prelude::*;
         kirin_chumsky::chumsky::recursive::recursive(|language| {
-            <Return as kirin_chumsky::HasDialectParser<'tokens, 'src>>::recursive_parser::<
+            <Return as kirin_chumsky::HasDialectParser<'t>>::recursive_parser::<
                 I,
-                <SimpleType as kirin_chumsky::HasParser<'tokens, 'src>>::Output,
+                <SimpleType as kirin_chumsky::HasParser<'t>>::Output,
                 Self::Output,
             >(language)
             .map(|inner| ReturnASTSelf::new(inner))

@@ -8,10 +8,9 @@ use super::values::ssa_name;
 /// Parses a block label.
 ///
 /// Matches: `^bb0`
-pub fn block_label<'tokens, 'src: 'tokens, I>()
--> impl Parser<'tokens, I, BlockLabel<'src>, ParserError<'tokens, 'src>>
+pub fn block_label<'t, I>() -> impl Parser<'t, I, BlockLabel<'t>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! { Token::Block(name) = e => Spanned {
         value: name,
@@ -26,24 +25,20 @@ where
 /// The `D` parameter is the dialect being parsed.
 /// The `TypeOutput` parameter is the parsed type representation.
 /// The `LanguageOutput` parameter is the AST type for nested statements.
-pub type StmtOutput<'tokens, 'src, D, TypeOutput, LanguageOutput> =
-    <D as HasDialectParser<'tokens, 'src>>::Output<TypeOutput, LanguageOutput>;
+pub type StmtOutput<'t, D, TypeOutput, LanguageOutput> =
+    <D as HasDialectParser<'t>>::Output<TypeOutput, LanguageOutput>;
 
 /// Parses a block argument.
 ///
 /// Matches: `%arg: type`
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
-/// The parser produces `BlockArgument<'src, <T as HasParser>::Output>`.
-pub fn block_argument<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
-    'tokens,
-    I,
-    Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>,
-    ParserError<'tokens, 'src>,
->
+/// The parser produces `BlockArgument<'t, <T as HasParser>::Output>`.
+pub fn block_argument<'t, I, T>()
+-> impl Parser<'t, I, Spanned<BlockArgument<'t, <T as HasParser<'t>>::Output>>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
 {
     ssa_name()
         .then_ignore(just(Token::Colon))
@@ -63,16 +58,12 @@ where
 /// Matches: `(%arg0: i32, %arg1: f64)` or `()` for empty argument lists.
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
-/// The parser produces `Vec<Spanned<BlockArgument<'src, <T as HasParser>::Output>>>`.
-pub fn block_argument_list<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
-    'tokens,
-    I,
-    Vec<Spanned<BlockArgument<'src, <T as HasParser<'tokens, 'src>>::Output>>>,
-    ParserError<'tokens, 'src>,
->
+/// The parser produces `Vec<Spanned<BlockArgument<'t, <T as HasParser>::Output>>>`.
+pub fn block_argument_list<'t, I, T>()
+-> impl Parser<'t, I, Vec<Spanned<BlockArgument<'t, <T as HasParser<'t>>::Output>>>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
 {
     block_argument::<_, T>()
         .separated_by(just(Token::Comma))
@@ -90,16 +81,12 @@ where
 /// - `^bb0` for omitted empty argument lists
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
-/// The parser produces `BlockHeader<'src, <T as HasParser>::Output>`.
-pub fn block_header<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
-    'tokens,
-    I,
-    Spanned<BlockHeader<'src, <T as HasParser<'tokens, 'src>>::Output>>,
-    ParserError<'tokens, 'src>,
->
+/// The parser produces `BlockHeader<'t, <T as HasParser>::Output>`.
+pub fn block_header<'t, I, T>()
+-> impl Parser<'t, I, Spanned<BlockHeader<'t, <T as HasParser<'t>>::Output>>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
 {
     let arguments = block_argument_list::<_, T>()
         .or_not()
@@ -120,18 +107,13 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The type parameter `S` is the statement AST type produced by the language parser.
-/// The parser produces `Block<'src, <T as HasParser>::Output, S>`.
-pub fn block<'tokens, 'src: 'tokens, I, T, S>(
-    language: RecursiveParser<'tokens, 'src, I, S>,
-) -> impl Parser<
-    'tokens,
-    I,
-    Spanned<Block<'src, <T as HasParser<'tokens, 'src>>::Output, S>>,
-    ParserError<'tokens, 'src>,
->
+/// The parser produces `Block<'t, <T as HasParser>::Output, S>`.
+pub fn block<'t, I, T, S>(
+    language: RecursiveParser<'t, I, S>,
+) -> impl Parser<'t, I, Spanned<Block<'t, <T as HasParser<'t>>::Output, S>>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
     S: Clone,
 {
     let header = block_header::<_, T>();
@@ -170,18 +152,13 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The type parameter `S` is the statement AST type produced by the language parser.
-/// The parser produces `Region<'src, <T as HasParser>::Output, S>`.
-pub fn region<'tokens, 'src: 'tokens, I, T, S>(
-    language: RecursiveParser<'tokens, 'src, I, S>,
-) -> impl Parser<
-    'tokens,
-    I,
-    Region<'src, <T as HasParser<'tokens, 'src>>::Output, S>,
-    ParserError<'tokens, 'src>,
->
+/// The parser produces `Region<'t, <T as HasParser>::Output, S>`.
+pub fn region<'t, I, T, S>(
+    language: RecursiveParser<'t, I, S>,
+) -> impl Parser<'t, I, Region<'t, <T as HasParser<'t>>::Output, S>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
     S: Clone,
 {
     block::<_, T, S>(language)

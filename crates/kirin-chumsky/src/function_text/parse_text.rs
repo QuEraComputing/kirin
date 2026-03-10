@@ -167,9 +167,9 @@ where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
     L::Type: kirin_ir::Placeholder,
-    for<'tokens> L: HasParser<'tokens, 'tokens>,
-    for<'tokens> L::Type: HasParser<'tokens, 'tokens, Output = L::Type>,
-    for<'tokens> <L as HasParser<'tokens, 'tokens>>::Output: EmitIR<L, Output = Statement>,
+    for<'t> L: HasParser<'t>,
+    for<'t> L::Type: HasParser<'t, Output = L::Type>,
+    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = Statement>,
 {
     type Output = FirstPassDispatchResult;
     type Error = FunctionParseError;
@@ -234,9 +234,9 @@ struct SecondPassSpecializeAction<'a, 'src> {
 impl<'src, S, L> StageActionMut<S, L> for SecondPassSpecializeAction<'_, 'src>
 where
     S: StageMeta + HasStageInfo<L>,
-    L: Dialect + HasParser<'src, 'src>,
-    L::Type: HasParser<'src, 'src, Output = L::Type>,
-    <L as HasParser<'src, 'src>>::Output: EmitIR<L, Output = Statement>,
+    L: Dialect + HasParser<'src>,
+    L::Type: HasParser<'src, Output = L::Type>,
+    <L as HasParser<'src>>::Output: EmitIR<L, Output = Statement>,
 {
     type Output = usize;
     type Error = FunctionParseError;
@@ -519,16 +519,16 @@ fn apply_specialize_declaration<'src, L>(
     stage: &mut StageInfo<L>,
     stage_id: CompileStage,
     header: &Header<'src, L::Type>,
-    body: &<L as HasParser<'src, 'src>>::Output,
+    body: &<L as HasParser<'src>>::Output,
     span: SimpleSpan,
     function_lookup: &FxHashMap<String, Function>,
     staged_lookup: &FxHashMap<StagedKey, StagedFunction>,
     state: &mut ParseState,
 ) -> Result<(), FunctionParseError>
 where
-    L: Dialect + HasParser<'src, 'src>,
-    L::Type: HasParser<'src, 'src, Output = L::Type>,
-    <L as HasParser<'src, 'src>>::Output: EmitIR<L, Output = Statement>,
+    L: Dialect + HasParser<'src>,
+    L::Type: HasParser<'src, Output = L::Type>,
+    <L as HasParser<'src>>::Output: EmitIR<L, Output = Statement>,
 {
     let (function, staged_function) =
         resolve_specialize_target::<L>(stage_id, header, span, function_lookup, staged_lookup)?;

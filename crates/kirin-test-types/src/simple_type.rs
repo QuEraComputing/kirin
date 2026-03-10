@@ -94,12 +94,12 @@ mod parser_impls {
 
     impl DirectlyParsable for SimpleType {}
 
-    impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for SimpleType {
+    impl<'t> HasParser<'t> for SimpleType {
         type Output = SimpleType;
 
-        fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+        fn parser<I>() -> BoxedParser<'t, I, Self::Output>
         where
-            I: TokenInput<'tokens, 'src>,
+            I: TokenInput<'t>,
         {
             select! {
                 Token::Identifier("any") => SimpleType::Any,

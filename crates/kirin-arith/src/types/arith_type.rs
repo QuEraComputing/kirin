@@ -75,12 +75,12 @@ impl Display for ArithType {
 
 impl DirectlyParsable for ArithType {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for ArithType {
+impl<'t> HasParser<'t> for ArithType {
     type Output = ArithType;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         select! {
             Token::Identifier("i8") => ArithType::I8,

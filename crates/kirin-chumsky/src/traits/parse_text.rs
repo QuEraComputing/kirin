@@ -74,8 +74,8 @@ fn parse_statement_on_stage<L>(
 ) -> Result<kirin_ir::Statement, Vec<ParseError>>
 where
     L: Dialect,
-    for<'src> L: HasParser<'src, 'src>,
-    for<'src> <L as HasParser<'src, 'src>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
+    for<'t> L: HasParser<'t>,
+    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
 {
     let ast = super::has_parser::parse_ast::<L>(input)?;
     let existing_ssas = collect_existing_ssas(stage);
@@ -94,8 +94,8 @@ where
 impl<L> ParseStatementText<L> for StageInfo<L>
 where
     L: Dialect,
-    for<'src> L: HasParser<'src, 'src>,
-    for<'src> <L as HasParser<'src, 'src>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
+    for<'t> L: HasParser<'t>,
+    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
 {
     fn parse_statement(
         &mut self,
@@ -110,8 +110,8 @@ impl<L, S> ParseStatementText<L, kirin_ir::CompileStage> for Pipeline<S>
 where
     L: Dialect,
     S: kirin_ir::HasStageInfo<L>,
-    for<'src> L: HasParser<'src, 'src>,
-    for<'src> <L as HasParser<'src, 'src>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
+    for<'t> L: HasParser<'t>,
+    for<'t> <L as HasParser<'t>>::Output: EmitIR<L, Output = kirin_ir::Statement>,
 {
     fn parse_statement(
         &mut self,

@@ -53,12 +53,12 @@ mod parser_impls {
 
     impl DirectlyParsable for UnitType {}
 
-    impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for UnitType {
+    impl<'t> HasParser<'t> for UnitType {
         type Output = UnitType;
 
-        fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+        fn parser<I>() -> BoxedParser<'t, I, Self::Output>
         where
-            I: TokenInput<'tokens, 'src>,
+            I: TokenInput<'t>,
         {
             just(Token::LParen)
                 .ignore_then(just(Token::RParen))

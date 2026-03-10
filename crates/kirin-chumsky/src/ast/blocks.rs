@@ -17,7 +17,7 @@ pub struct BlockLabel<'src> {
 /// Represents syntax like: `%arg: i32`
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'t>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockArgument<'src, TypeOutput> {
     /// The name of the argument (without the `%` prefix).
@@ -31,7 +31,7 @@ pub struct BlockArgument<'src, TypeOutput> {
 /// Represents syntax like: `^bb0(%arg0: i32, %arg1: f64)`
 ///
 /// The `TypeOutput` parameter is the parsed type representation, typically
-/// `<L::Type as HasParser<'tokens, 'src>>::Output`.
+/// `<L::Type as HasParser<'t>>::Output`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockHeader<'src, TypeOutput> {
     /// The block label.
@@ -164,7 +164,8 @@ where
     }
 
     // Attach statements and terminator to the already-created block.
-    ctx.stage.attach_statements_to_block(block, &stmts, terminator);
+    ctx.stage
+        .attach_statements_to_block(block, &stmts, terminator);
 
     // Register the block only if not already registered (two-pass Region
     // creates stubs first, so the name may already be present).

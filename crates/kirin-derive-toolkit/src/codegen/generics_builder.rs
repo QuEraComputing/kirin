@@ -2,7 +2,7 @@ use proc_macro2::Span;
 
 /// Manipulates generics for generated trait impls.
 ///
-/// Adds the `'ir` lifetime and optional `L: Language` type parameter
+/// Adds the `'t` lifetime and optional `L: Language` type parameter
 /// required by Kirin trait impls.
 pub struct GenericsBuilder<'a> {
     ir_path: &'a syn::Path,
@@ -14,33 +14,20 @@ impl<'a> GenericsBuilder<'a> {
         Self { ir_path }
     }
 
-    /// Add `'tokens` and `'src: 'tokens` lifetimes to `base` if not already present.
+    /// Add `'t` lifetime to `base` if not already present.
     pub fn with_lifetimes(&self, base: &syn::Generics) -> syn::Generics {
         let mut generics = base.clone();
 
-        let tokens_lt = syn::Lifetime::new("'tokens", Span::call_site());
+        let t_lt = syn::Lifetime::new("'t", Span::call_site());
         if !generics
             .params
             .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
+            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "t"))
         {
             generics.params.insert(
                 0,
-                syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
+                syn::GenericParam::Lifetime(syn::LifetimeParam::new(t_lt)),
             );
-        }
-
-        let src_lt = syn::Lifetime::new("'src", Span::call_site());
-        if !generics
-            .params
-            .iter()
-            .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
-        {
-            let mut src_param = syn::LifetimeParam::new(src_lt);
-            src_param.bounds.push(tokens_lt);
-            generics
-                .params
-                .insert(1, syn::GenericParam::Lifetime(src_param));
         }
 
         generics

@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-derive-chumsky/src/generics.rs
+source: crates/kirin-derive-chumsky/src/codegen/parser/impl_gen.rs
 expression: format_generics(&result)
 ---
-< 'tokens , 'src : 'tokens , T : Clone >
+< 't , T : Clone >

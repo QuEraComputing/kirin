@@ -12,28 +12,28 @@ impl<'a> BoundsBuilder<'a> {
         Self { crate_path }
     }
 
-    /// Generates `HasParser<'tokens, 'src> + 'tokens` bounds for the given types.
+    /// Generates `HasParser<'t> + 't` bounds for the given types.
     pub fn has_parser_bounds(&self, types: &[syn::Type]) -> Vec<syn::WherePredicate> {
         let crate_path = self.crate_path;
         types
             .iter()
-            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasParser<'tokens, 'src> + 'tokens })
+            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasParser<'t> + 't })
             .collect()
     }
 
-    /// Generates `HasDialectParser<'tokens, 'src>` bounds for wrapper types.
+    /// Generates `HasDialectParser<'t>` bounds for wrapper types.
     pub fn has_dialect_parser_bounds(&self, types: &[syn::Type]) -> Vec<syn::WherePredicate> {
         let crate_path = self.crate_path;
         types
             .iter()
-            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'tokens, 'src> })
+            .map(|ty| syn::parse_quote! { #ty: #crate_path::HasDialectParser<'t> })
             .collect()
     }
 
-    /// Generates the IR type bound: `IrType: HasParser<'tokens, 'src> + 'tokens`.
+    /// Generates the IR type bound: `IrType: HasParser<'t> + 't`.
     pub fn ir_type_has_parser_bound(&self, ir_type: &syn::Path) -> syn::WherePredicate {
         let crate_path = self.crate_path;
-        syn::parse_quote! { #ir_type: #crate_path::HasParser<'tokens, 'src> + 'tokens }
+        syn::parse_quote! { #ir_type: #crate_path::HasParser<'t> + 't }
     }
 
     /// Generates `EmitIR` bounds for the given types.
@@ -44,10 +44,10 @@ impl<'a> BoundsBuilder<'a> {
             .flat_map(|ty| {
                 vec![
                     syn::parse_quote! {
-                        #ty: #crate_path::HasParser<'tokens, 'src> + 'tokens
+                        #ty: #crate_path::HasParser<'t> + 't
                     },
                     syn::parse_quote! {
-                        <#ty as #crate_path::HasParser<'tokens, 'src>>::Output: #crate_path::EmitIR<Language, Output = #ty>
+                        <#ty as #crate_path::HasParser<'t>>::Output: #crate_path::EmitIR<Language, Output = #ty>
                     },
                 ]
             })

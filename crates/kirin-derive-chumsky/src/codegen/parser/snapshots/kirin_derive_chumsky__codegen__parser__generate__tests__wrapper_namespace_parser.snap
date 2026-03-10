@@ -1,53 +1,52 @@
 ---
 source: crates/kirin-derive-chumsky/src/codegen/parser/generate.rs
-assertion_line: 270
 expression: generate_parser_code(input)
 ---
 #[automatically_derived]
-impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasDialectParser<'tokens, 'src> for MyLanguage
+impl<'t> ::kirin::parsers::HasDialectParser<'t> for MyLanguage
 where
-    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
     type Output<__TypeOutput, __LanguageOutput>
-        = MyLanguageAST<'tokens, 'src, __TypeOutput, __LanguageOutput>
+        = MyLanguageAST<'t, __TypeOutput, __LanguageOutput>
     where
-        __TypeOutput: Clone + PartialEq + 'tokens,
-        __LanguageOutput: Clone + PartialEq + 'tokens;
+        __TypeOutput: Clone + PartialEq + 't,
+        __LanguageOutput: Clone + PartialEq + 't;
     #[inline]
     fn namespaced_parser<I, __TypeOutput, __LanguageOutput>(
-        language: ::kirin::parsers::RecursiveParser<'tokens, 'src, I, __LanguageOutput>,
+        language: ::kirin::parsers::RecursiveParser<'t, I, __LanguageOutput>,
         namespace: &[&'static str],
-    ) -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output<__TypeOutput, __LanguageOutput>>
+    ) -> ::kirin::parsers::BoxedParser<'t, I, Self::Output<__TypeOutput, __LanguageOutput>>
     where
-        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
-        __TypeOutput: Clone + PartialEq + 'tokens,
-        __LanguageOutput: Clone + PartialEq + 'tokens,
+        I: ::kirin::parsers::TokenInput<'t>,
+        __TypeOutput: Clone + PartialEq + 't,
+        __LanguageOutput: Clone + PartialEq + 't,
     {
         use kirin::parsers::chumsky::prelude::*;
         {
             let mut __ns: ::std::vec::Vec<&'static str> = namespace.to_vec();
             __ns.push("arith");
-            <ArithOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::namespaced_parser::<
+            <ArithOps as ::kirin::parsers::HasDialectParser<'t>>::namespaced_parser::<
                 I,
                 __TypeOutput,
                 __LanguageOutput,
             >(language.clone(), &__ns)
             .map(
-                |inner| -> MyLanguageAST<'tokens, 'src, __TypeOutput, __LanguageOutput> {
+                |inner| -> MyLanguageAST<'t, __TypeOutput, __LanguageOutput> {
                     MyLanguageAST::Arith(inner)
                 },
             )
         }
         .or(
-            <CfOps as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::namespaced_parser::<
+            <CfOps as ::kirin::parsers::HasDialectParser<'t>>::namespaced_parser::<
                 I,
                 __TypeOutput,
                 __LanguageOutput,
             >(language.clone(), namespace)
             .map(
-                |inner| -> MyLanguageAST<'tokens, 'src, __TypeOutput, __LanguageOutput> {
+                |inner| -> MyLanguageAST<'t, __TypeOutput, __LanguageOutput> {
                     MyLanguageAST::Cf(inner)
                 },
             ),
@@ -56,26 +55,22 @@ where
     }
 }
 #[automatically_derived]
-impl<'tokens, 'src: 'tokens> ::kirin::parsers::HasParser<'tokens, 'src> for MyLanguage
+impl<'t> ::kirin::parsers::HasParser<'t> for MyLanguage
 where
-    SimpleType: ::kirin::parsers::HasParser<'tokens, 'src> + 'tokens,
-    ArithOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
-    CfOps: ::kirin::parsers::HasDialectParser<'tokens, 'src>,
+    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    ArithOps: ::kirin::parsers::HasDialectParser<'t>,
+    CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
-    type Output = MyLanguageASTSelf<
-        'tokens,
-        'src,
-        <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
-    >;
-    fn parser<I>() -> ::kirin::parsers::BoxedParser<'tokens, 'src, I, Self::Output>
+    type Output = MyLanguageASTSelf<'t, <SimpleType as ::kirin::parsers::HasParser<'t>>::Output>;
+    fn parser<I>() -> ::kirin::parsers::BoxedParser<'t, I, Self::Output>
     where
-        I: ::kirin::parsers::TokenInput<'tokens, 'src>,
+        I: ::kirin::parsers::TokenInput<'t>,
     {
         use kirin::parsers::chumsky::prelude::*;
         ::kirin::parsers::chumsky::recursive::recursive(|language| {
-            <MyLanguage as ::kirin::parsers::HasDialectParser<'tokens, 'src>>::recursive_parser::<
+            <MyLanguage as ::kirin::parsers::HasDialectParser<'t>>::recursive_parser::<
                 I,
-                <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+                <SimpleType as ::kirin::parsers::HasParser<'t>>::Output,
                 Self::Output,
             >(language)
             .map(|inner| MyLanguageASTSelf::new(inner))

@@ -49,32 +49,32 @@ pub fn ast_type<L: Layout>(
     ir_type: &syn::Path,
     _type_params: &[TokenStream],
 ) -> TokenStream {
-    let type_output = quote! { <#ir_type as #crate_path::HasParser<'tokens, 'src>>::Output };
+    let type_output = quote! { <#ir_type as #crate_path::HasParser<'t>>::Output };
     match field.category() {
         FieldCategory::Argument => {
-            quote! { #crate_path::SSAValue<'src, #type_output> }
+            quote! { #crate_path::SSAValue<'t, #type_output> }
         }
         FieldCategory::Result => {
-            quote! { #crate_path::ResultValue<'src, #type_output> }
+            quote! { #crate_path::ResultValue<'t, #type_output> }
         }
         FieldCategory::Block => {
-            quote! { #crate_path::Spanned<#crate_path::Block<'src, #type_output, LanguageOutput>> }
+            quote! { #crate_path::Spanned<#crate_path::Block<'t, #type_output, LanguageOutput>> }
         }
         FieldCategory::Successor => {
-            quote! { #crate_path::BlockLabel<'src> }
+            quote! { #crate_path::BlockLabel<'t> }
         }
         FieldCategory::Region => {
-            quote! { #crate_path::Region<'src, #type_output, LanguageOutput> }
+            quote! { #crate_path::Region<'t, #type_output, LanguageOutput> }
         }
         FieldCategory::Symbol => {
-            quote! { #crate_path::SymbolName<'src> }
+            quote! { #crate_path::SymbolName<'t> }
         }
         FieldCategory::Value => {
             let ty = field
                 .value_type()
                 .cloned()
                 .unwrap_or_else(|| syn::parse_quote!(()));
-            quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::Output }
+            quote! { <#ty as #crate_path::HasParser<'t>>::Output }
         }
     }
 }
@@ -128,7 +128,7 @@ pub fn parser_expr<L: Layout>(
                 .value_type()
                 .cloned()
                 .unwrap_or_else(|| syn::parse_quote!(()));
-            quote! { <#ty as #crate_path::HasParser<'tokens, 'src>>::parser() }
+            quote! { <#ty as #crate_path::HasParser<'t>>::parser() }
         }
     }
 }

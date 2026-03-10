@@ -4,10 +4,9 @@ use chumsky::prelude::*;
 use kirin_lexer::Token;
 
 /// Parses an SSA value name (prefixed with `%`).
-pub fn ssa_name<'tokens, 'src: 'tokens, I>()
--> impl Parser<'tokens, I, Spanned<&'src str>, ParserError<'tokens, 'src>>
+pub fn ssa_name<'t, I>() -> impl Parser<'t, I, Spanned<&'t str>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! {
         Token::SSAValue(name) = e => Spanned {
@@ -25,16 +24,12 @@ where
 /// - `%value: type`
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
-/// The parser produces `SSAValue<'src, <T as HasParser>::Output>`.
-pub fn ssa_value<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
-    'tokens,
-    I,
-    SSAValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
-    ParserError<'tokens, 'src>,
->
+/// The parser produces `SSAValue<'t, <T as HasParser>::Output>`.
+pub fn ssa_value<'t, I, T>()
+-> impl Parser<'t, I, SSAValue<'t, <T as HasParser<'t>>::Output>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
 {
     ssa_name()
         .then(just(Token::Colon).ignore_then(T::parser()).or_not())
@@ -52,16 +47,12 @@ where
 /// for ResultValue fields, allowing users to optionally annotate result types.
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
-/// The parser produces `ResultValue<'src, <T as HasParser>::Output>`.
-pub fn result_value<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
-    'tokens,
-    I,
-    ResultValue<'src, <T as HasParser<'tokens, 'src>>::Output>,
-    ParserError<'tokens, 'src>,
->
+/// The parser produces `ResultValue<'t, <T as HasParser>::Output>`.
+pub fn result_value<'t, I, T>()
+-> impl Parser<'t, I, ResultValue<'t, <T as HasParser<'t>>::Output>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
 {
     ssa_name()
         .then(just(Token::Colon).ignore_then(T::parser()).or_not())
@@ -70,10 +61,9 @@ where
 }
 
 /// Parses only the name portion of an SSA value.
-pub fn nameof_ssa<'tokens, 'src: 'tokens, I>()
--> impl Parser<'tokens, I, NameofSSAValue<'src>, ParserError<'tokens, 'src>>
+pub fn nameof_ssa<'t, I>() -> impl Parser<'t, I, NameofSSAValue<'t>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! {
         Token::SSAValue(name) = e => NameofSSAValue {
@@ -88,15 +78,11 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The parser produces `TypeofSSAValue<<T as HasParser>::Output>`.
-pub fn typeof_ssa<'tokens, 'src: 'tokens, I, T>() -> impl Parser<
-    'tokens,
-    I,
-    TypeofSSAValue<<T as HasParser<'tokens, 'src>>::Output>,
-    ParserError<'tokens, 'src>,
->
+pub fn typeof_ssa<'t, I, T>()
+-> impl Parser<'t, I, TypeofSSAValue<<T as HasParser<'t>>::Output>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: HasParser<'tokens, 'src>,
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
 {
     T::parser()
         .map_with(|ty, extra| TypeofSSAValue {
@@ -107,11 +93,11 @@ where
 }
 
 /// Parses a literal integer and converts it using the provided function.
-pub fn literal_int<'tokens, 'src: 'tokens, T, I>(
-    f: impl Fn(&str, SimpleSpan) -> Result<T, Rich<'tokens, Token<'src>, SimpleSpan>> + 'tokens,
-) -> impl Parser<'tokens, I, Spanned<T>, ParserError<'tokens, 'src>>
+pub fn literal_int<'t, T, I>(
+    f: impl Fn(&str, SimpleSpan) -> Result<T, Rich<'t, Token<'t>, SimpleSpan>> + 't,
+) -> impl Parser<'t, I, Spanned<T>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! { Token::Int(v) = e => f(v, e.span()) }
         .try_map(|res, span| match res {
@@ -122,11 +108,11 @@ where
 }
 
 /// Parses a literal float and converts it using the provided function.
-pub fn literal_float<'tokens, 'src: 'tokens, T, I>(
-    f: impl Fn(&str, SimpleSpan) -> Result<T, Rich<'tokens, Token<'src>, SimpleSpan>> + 'tokens,
-) -> impl Parser<'tokens, I, Spanned<T>, ParserError<'tokens, 'src>>
+pub fn literal_float<'t, T, I>(
+    f: impl Fn(&str, SimpleSpan) -> Result<T, Rich<'t, Token<'t>, SimpleSpan>> + 't,
+) -> impl Parser<'t, I, Spanned<T>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! { Token::Float(v) = e => f(v, e.span()) }
         .try_map(|res, span| match res {

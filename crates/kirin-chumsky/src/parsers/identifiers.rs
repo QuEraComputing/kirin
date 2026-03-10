@@ -10,11 +10,9 @@ use kirin_lexer::Token;
 /// ```ignore
 /// let add_kw = identifier("add"); // matches "add" exactly
 /// ```
-pub fn identifier<'tokens, 'src: 'tokens, I>(
-    name: &'src str,
-) -> impl Parser<'tokens, I, Spanned<&'src str>, ParserError<'tokens, 'src>>
+pub fn identifier<'t, I>(name: &'t str) -> impl Parser<'t, I, Spanned<&'t str>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! { Token::Identifier(id) = e if id == name => Spanned {
         value: id,
@@ -24,10 +22,9 @@ where
 }
 
 /// Parses any identifier.
-pub fn any_identifier<'tokens, 'src: 'tokens, I>()
--> impl Parser<'tokens, I, Spanned<&'src str>, ParserError<'tokens, 'src>>
+pub fn any_identifier<'t, I>() -> impl Parser<'t, I, Spanned<&'t str>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! { Token::Identifier(id) = e => Spanned {
         value: id,
@@ -43,10 +40,9 @@ where
 /// ```ignore
 /// let sym = symbol(); // matches "@foo", returns SymbolName { name: "foo", span: ... }
 /// ```
-pub fn symbol<'tokens, 'src: 'tokens, I>()
--> impl Parser<'tokens, I, SymbolName<'src>, ParserError<'tokens, 'src>>
+pub fn symbol<'t, I>() -> impl Parser<'t, I, SymbolName<'t>, ParserError<'t>>
 where
-    I: TokenInput<'tokens, 'src>,
+    I: TokenInput<'t>,
 {
     select! { Token::Symbol(sym) = e => SymbolName {
         name: sym,

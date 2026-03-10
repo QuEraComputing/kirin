@@ -4,12 +4,10 @@ use kirin_lexer::Token;
 use crate::traits::{BoxedParser, DirectlyParsable, HasParser, TokenInput};
 
 /// Creates a parser for signed integers.
-pub(super) fn signed_int_parser<'tokens, 'src: 'tokens, T, I>(
-    type_name: &'static str,
-) -> BoxedParser<'tokens, 'src, I, T>
+pub(super) fn signed_int_parser<'t, T, I>(type_name: &'static str) -> BoxedParser<'t, I, T>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: std::str::FromStr + Clone + PartialEq + 'tokens,
+    I: TokenInput<'t>,
+    T: std::str::FromStr + Clone + PartialEq + 't,
 {
     select! { Token::Int(v) = e => (v, e.span()) }
         .try_map(move |(v, span), _| {
@@ -21,12 +19,10 @@ where
 }
 
 /// Creates a parser for unsigned integers (accepts both decimal and hex).
-pub(super) fn unsigned_int_parser<'tokens, 'src: 'tokens, T, I>(
-    type_name: &'static str,
-) -> BoxedParser<'tokens, 'src, I, T>
+pub(super) fn unsigned_int_parser<'t, T, I>(type_name: &'static str) -> BoxedParser<'t, I, T>
 where
-    I: TokenInput<'tokens, 'src>,
-    T: std::str::FromStr + Clone + PartialEq + 'tokens,
+    I: TokenInput<'t>,
+    T: std::str::FromStr + Clone + PartialEq + 't,
     T: num_traits::Num,
 {
     let decimal = select! { Token::Int(v) = e => (v, e.span(), false) };
@@ -53,12 +49,12 @@ where
 // Signed integer implementations
 // ============================================================================
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i8 {
+impl<'t> HasParser<'t> for i8 {
     type Output = i8;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         signed_int_parser("i8")
     }
@@ -66,12 +62,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i8 {
 
 impl DirectlyParsable for i8 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i16 {
+impl<'t> HasParser<'t> for i16 {
     type Output = i16;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         signed_int_parser("i16")
     }
@@ -79,12 +75,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i16 {
 
 impl DirectlyParsable for i16 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i32 {
+impl<'t> HasParser<'t> for i32 {
     type Output = i32;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         signed_int_parser("i32")
     }
@@ -92,12 +88,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i32 {
 
 impl DirectlyParsable for i32 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i64 {
+impl<'t> HasParser<'t> for i64 {
     type Output = i64;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         signed_int_parser("i64")
     }
@@ -105,12 +101,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for i64 {
 
 impl DirectlyParsable for i64 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for isize {
+impl<'t> HasParser<'t> for isize {
     type Output = isize;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         signed_int_parser("isize")
     }
@@ -122,12 +118,12 @@ impl DirectlyParsable for isize {}
 // Unsigned integer implementations
 // ============================================================================
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u8 {
+impl<'t> HasParser<'t> for u8 {
     type Output = u8;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         unsigned_int_parser("u8")
     }
@@ -135,12 +131,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u8 {
 
 impl DirectlyParsable for u8 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u16 {
+impl<'t> HasParser<'t> for u16 {
     type Output = u16;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         unsigned_int_parser("u16")
     }
@@ -148,12 +144,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u16 {
 
 impl DirectlyParsable for u16 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u32 {
+impl<'t> HasParser<'t> for u32 {
     type Output = u32;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         unsigned_int_parser("u32")
     }
@@ -161,12 +157,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u32 {
 
 impl DirectlyParsable for u32 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u64 {
+impl<'t> HasParser<'t> for u64 {
     type Output = u64;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         unsigned_int_parser("u64")
     }
@@ -174,12 +170,12 @@ impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for u64 {
 
 impl DirectlyParsable for u64 {}
 
-impl<'tokens, 'src: 'tokens> HasParser<'tokens, 'src> for usize {
+impl<'t> HasParser<'t> for usize {
     type Output = usize;
 
-    fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
     where
-        I: TokenInput<'tokens, 'src>,
+        I: TokenInput<'t>,
     {
         unsigned_int_parser("usize")
     }

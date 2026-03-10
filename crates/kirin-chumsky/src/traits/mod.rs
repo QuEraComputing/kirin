@@ -9,15 +9,13 @@ use chumsky::recursive::{Direct, Recursive};
 use kirin_lexer::Token;
 
 /// Standard error type for Kirin chumsky parsers.
-pub type ParserError<'tokens, 'src> = extra::Err<Rich<'tokens, Token<'src>, SimpleSpan>>;
+pub type ParserError<'t> = extra::Err<Rich<'t, Token<'t>, SimpleSpan>>;
 
 /// Type alias for a boxed parser.
-pub type BoxedParser<'tokens, 'src, I, O> =
-    Boxed<'tokens, 'tokens, I, O, ParserError<'tokens, 'src>>;
+pub type BoxedParser<'t, I, O> = Boxed<'t, 't, I, O, ParserError<'t>>;
 
 /// Type alias for a recursive parser handle.
-pub type RecursiveParser<'tokens, 'src, I, O> =
-    Recursive<Direct<'tokens, 'tokens, I, O, ParserError<'tokens, 'src>>>;
+pub type RecursiveParser<'t, I, O> = Recursive<Direct<'t, 't, I, O, ParserError<'t>>>;
 
 pub use emit_ir::*;
 pub use has_parser::*;

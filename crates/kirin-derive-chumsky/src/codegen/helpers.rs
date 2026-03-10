@@ -19,29 +19,16 @@ pub(crate) fn build_ast_generics(
 
     let mut generics = base_generics.clone();
 
-    let tokens_lt = syn::Lifetime::new("'tokens", Span::call_site());
+    let t_lt = syn::Lifetime::new("'t", Span::call_site());
     if !generics
         .params
         .iter()
-        .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "tokens"))
+        .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "t"))
     {
         generics.params.insert(
             0,
-            syn::GenericParam::Lifetime(syn::LifetimeParam::new(tokens_lt.clone())),
+            syn::GenericParam::Lifetime(syn::LifetimeParam::new(t_lt)),
         );
-    }
-
-    let src_lt = syn::Lifetime::new("'src", Span::call_site());
-    if !generics
-        .params
-        .iter()
-        .any(|p| matches!(p, syn::GenericParam::Lifetime(l) if l.lifetime.ident == "src"))
-    {
-        let mut src_param = syn::LifetimeParam::new(src_lt);
-        src_param.bounds.push(tokens_lt);
-        generics
-            .params
-            .insert(1, syn::GenericParam::Lifetime(src_param));
     }
 
     let type_output_ident = syn::Ident::new("TypeOutput", Span::call_site());

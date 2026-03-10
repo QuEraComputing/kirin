@@ -61,12 +61,12 @@ macro_rules! trivial_type_lattice {
 
         impl DirectlyParsable for $name {}
 
-        impl<'tokens, 'src: 'tokens> crate::HasParser<'tokens, 'src> for $name {
+        impl<'t> crate::HasParser<'t> for $name {
             type Output = $name;
 
-            fn parser<I>() -> BoxedParser<'tokens, 'src, I, Self::Output>
+            fn parser<I>() -> BoxedParser<'t, I, Self::Output>
             where
-                I: TokenInput<'tokens, 'src>,
+                I: TokenInput<'t>,
             {
                 ($parser).to($name).boxed()
             }

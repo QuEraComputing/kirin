@@ -22,9 +22,9 @@ pub fn token_stream<'src>(
     Stream::from_iter(tokens).map(eoi, |(token, span)| (token, span))
 }
 
-pub fn parse_has_parser<'src, T>(input: &'src str) -> Result<T::Output, Vec<String>>
+pub fn parse_has_parser<'t, T>(input: &'t str) -> Result<T::Output, Vec<String>>
 where
-    T: HasParser<'src, 'src>,
+    T: HasParser<'t>,
 {
     use kirin_chumsky::chumsky::Parser;
 

@@ -192,13 +192,13 @@ impl GenerateHasDialectParser {
                 {
                     let mut __ns: ::std::vec::Vec<&'static str> = namespace.to_vec();
                     __ns.push(#ns);
-                    <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), &__ns)
+                    <#wrapped_ty as #crate_path::HasDialectParser<'t>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), &__ns)
                         .map(|inner| -> #return_type { #constructor(inner) })
                 }
             }
         } else {
             quote! {
-                <#wrapped_ty as #crate_path::HasDialectParser<'tokens, 'src>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), namespace)
+                <#wrapped_ty as #crate_path::HasDialectParser<'t>>::namespaced_parser::<I, __TypeOutput, __LanguageOutput>(language.clone(), namespace)
                     .map(|inner| -> #return_type { #constructor(inner) })
             }
         };

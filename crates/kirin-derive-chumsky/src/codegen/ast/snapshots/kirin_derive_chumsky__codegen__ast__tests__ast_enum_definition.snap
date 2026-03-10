@@ -4,50 +4,42 @@ expression: generate_ast_code(input)
 ---
 #[derive(Clone, Debug, PartialEq)]
 #[doc(hidden)]
-pub enum ArithOpsAST<'tokens, 'src: 'tokens, TypeOutput, LanguageOutput>
+pub enum ArithOpsAST<'t, TypeOutput, LanguageOutput>
 where
-    TypeOutput: Clone + PartialEq + 'tokens,
-    LanguageOutput: Clone + PartialEq + 'tokens,
+    TypeOutput: Clone + PartialEq + 't,
+    LanguageOutput: Clone + PartialEq + 't,
 {
     Add {
-        result: ::kirin::parsers::SSAValue<
-            'src,
-            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
-        >,
-        lhs: <Value as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
-        rhs: <Value as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+        result:
+            ::kirin::parsers::SSAValue<'t, <SimpleType as ::kirin::parsers::HasParser<'t>>::Output>,
+        lhs: <Value as ::kirin::parsers::HasParser<'t>>::Output,
+        rhs: <Value as ::kirin::parsers::HasParser<'t>>::Output,
     },
     Neg {
-        result: ::kirin::parsers::SSAValue<
-            'src,
-            <SimpleType as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
-        >,
-        operand: <Value as ::kirin::parsers::HasParser<'tokens, 'src>>::Output,
+        result:
+            ::kirin::parsers::SSAValue<'t, <SimpleType as ::kirin::parsers::HasParser<'t>>::Output>,
+        operand: <Value as ::kirin::parsers::HasParser<'t>>::Output,
     },
     #[doc(hidden)]
     __Marker(
-        ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput, LanguageOutput)>,
+        ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput, LanguageOutput)>,
         ::core::convert::Infallible,
     ),
 }
 #[derive(Clone, Debug, PartialEq)]
 #[doc(hidden)]
-pub struct ArithOpsASTSelf<'tokens, 'src: 'tokens, TypeOutput>(
-    pub ArithOpsAST<'tokens, 'src, TypeOutput, ArithOpsASTSelf<'tokens, 'src, TypeOutput>>,
-    ::core::marker::PhantomData<fn() -> (&'tokens (), &'src (), TypeOutput)>,
+pub struct ArithOpsASTSelf<'t, TypeOutput>(
+    pub ArithOpsAST<'t, TypeOutput, ArithOpsASTSelf<'t, TypeOutput>>,
+    ::core::marker::PhantomData<fn() -> (&'t (), TypeOutput)>,
 )
 where
-    TypeOutput: Clone + PartialEq,
-    'src: 'tokens;
-impl<'tokens, 'src, TypeOutput> ArithOpsASTSelf<'tokens, 'src, TypeOutput>
+    TypeOutput: Clone + PartialEq;
+impl<'t, TypeOutput> ArithOpsASTSelf<'t, TypeOutput>
 where
     TypeOutput: Clone + PartialEq,
-    'src: 'tokens,
 {
     #[doc = r" Creates a new ASTSelf wrapper."]
-    pub fn new(
-        inner: ArithOpsAST<'tokens, 'src, TypeOutput, ArithOpsASTSelf<'tokens, 'src, TypeOutput>>,
-    ) -> Self {
+    pub fn new(inner: ArithOpsAST<'t, TypeOutput, ArithOpsASTSelf<'t, TypeOutput>>) -> Self {
         Self(inner, ::core::marker::PhantomData)
     }
 }
