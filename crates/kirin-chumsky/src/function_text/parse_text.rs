@@ -89,7 +89,7 @@ use kirin_ir::{
 use kirin_lexer::Token;
 use strsim::levenshtein;
 
-use crate::{EmitContext, HasParser, HasParserEmitIR};
+use crate::{EmitContext, HasParser, ParseEmit};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
@@ -188,6 +188,7 @@ pub struct FirstPassCtx<'t> {
 pub struct SecondPassCtx<'t> {
     pub tokens: &'t [(Token<'t>, SimpleSpan)],
     pub start_index: usize,
+    pub src: &'t str,
     pub function_lookup: &'t FxHashMap<String, Function>,
     pub staged_lookup: &'t FxHashMap<StagedKey, StagedFunction>,
     pub state: &'t mut ParseState,
@@ -258,14 +259,20 @@ pub fn second_pass_concrete<'t, L>(
     ctx: &mut SecondPassCtx<'t>,
 ) -> Result<usize, FunctionParseError>
 where
-    L: Dialect + HasParserEmitIR<'t>,
+    L: Dialect + ParseEmit<L> + HasParser<'t>,
     L::Type: HasParser<'t, Output = L::Type>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
         .map_err(parse_error_from_chumsky)?;
     let next_index = advance_to_next_declaration(ctx.tokens, ctx.start_index, consumed_span);
 
-    let Declaration::Specialize { header, body, span } = declaration else {
+    let Declaration::Specialize {
+        header,
+        body: _,
+        body_span,
+        span,
+    } = declaration
+    else {
         return Err(FunctionParseError::new(
             FunctionParseErrorKind::InvalidHeader,
             Some(consumed_span),
@@ -273,11 +280,13 @@ where
         ));
     };
 
+    let body_text = &ctx.src[body_span.start..body_span.end];
+
     apply_specialize_declaration::<L>(
         stage,
         stage_id,
         &header,
-        &body,
+        body_text,
         span,
         ctx.function_lookup,
         ctx.staged_lookup,
@@ -376,6 +385,7 @@ where
             let mut ctx = SecondPassCtx {
                 tokens: &tokens,
                 start_index,
+                src,
                 function_lookup: &function_lookup,
                 staged_lookup: &staged_lookup,
                 state: &mut state,
@@ -545,30 +555,34 @@ where
     Ok(Some(staged_function))
 }
 
-fn apply_specialize_declaration<'src, L>(
+fn apply_specialize_declaration<L>(
     stage: &mut StageInfo<L>,
     stage_id: CompileStage,
-    header: &Header<'src, L::Type>,
-    body: &<L as HasParser<'src>>::Output,
+    header: &Header<'_, L::Type>,
+    body_text: &str,
     span: SimpleSpan,
     function_lookup: &FxHashMap<String, Function>,
     staged_lookup: &FxHashMap<StagedKey, StagedFunction>,
     state: &mut ParseState,
 ) -> Result<(), FunctionParseError>
 where
-    L: Dialect + HasParserEmitIR<'src>,
-    L::Type: HasParser<'src, Output = L::Type>,
+    L: Dialect + ParseEmit<L>,
 {
     let (function, staged_function) =
         resolve_specialize_target::<L>(stage_id, header, span, function_lookup, staged_lookup)?;
 
     let body_statement = {
         let mut emit_ctx = EmitContext::new(stage);
-        L::emit_parsed(body, &mut emit_ctx).map_err(|err| {
+        L::parse_and_emit(body_text, &mut emit_ctx).map_err(|errs| {
+            let message = errs
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join("; ");
             FunctionParseError::new(
                 FunctionParseErrorKind::EmitFailed,
                 Some(span),
-                err.to_string(),
+                message,
             )
         })?
     };

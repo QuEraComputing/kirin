@@ -23,6 +23,9 @@ pub(super) enum Declaration<'src, T, B> {
     Specialize {
         header: Header<'src, T>,
         body: B,
+        /// Span of the body portion only (the `L::parser()` output).
+        body_span: SimpleSpan,
+        /// Span of the entire specialize declaration.
         span: SimpleSpan,
     },
 }
@@ -92,8 +95,8 @@ where
     let specialize_decl = identifier("specialize")
         .ignore_then(symbol())
         .then(fn_signature_parser::<I, L>())
-        .then(L::parser())
-        .map_with(|((stage, sig), body), extra| Declaration::Specialize {
+        .then(L::parser().map_with(|body, extra| (body, extra.span())))
+        .map_with(|((stage, sig), (body, body_span)), extra| Declaration::Specialize {
             header: Header {
                 stage,
                 function: sig.function,
@@ -101,6 +104,7 @@ where
                 span: extra.span(),
             },
             body,
+            body_span,
             span: extra.span(),
         });
 
