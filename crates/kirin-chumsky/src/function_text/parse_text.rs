@@ -579,11 +579,7 @@ where
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
                 .join("; ");
-            FunctionParseError::new(
-                FunctionParseErrorKind::EmitFailed,
-                Some(span),
-                message,
-            )
+            FunctionParseError::new(FunctionParseErrorKind::EmitFailed, Some(span), message)
         })?
     };
 

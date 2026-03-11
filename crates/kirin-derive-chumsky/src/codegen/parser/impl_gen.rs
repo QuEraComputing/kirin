@@ -6,8 +6,8 @@ use quote::quote;
 use crate::ChumskyLayout;
 use kirin_derive_toolkit::codegen::GenericsBuilder;
 
-use crate::codegen::{ImplBounds, init_where_clause};
 use super::GenerateHasDialectParser;
+use crate::codegen::{ImplBounds, init_where_clause};
 
 impl GenerateHasDialectParser {
     /// Generates the `HasParser` impl for the original type.

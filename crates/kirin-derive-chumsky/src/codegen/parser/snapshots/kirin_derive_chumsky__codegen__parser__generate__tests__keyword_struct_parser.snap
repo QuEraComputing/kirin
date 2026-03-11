@@ -106,6 +106,25 @@ where
     }
 }
 #[automatically_derived]
+impl kirin_chumsky::ParseEmit for Return
+where
+    for<'t> Self: kirin_chumsky::HasParserEmitIR<'t>,
+{
+    fn parse_and_emit(
+        input: &str,
+        ctx: &mut kirin_chumsky::EmitContext<'_, Self>,
+    ) -> ::core::result::Result<::kirin::ir::Statement, ::std::vec::Vec<kirin_chumsky::ParseError>>
+    {
+        let ast = kirin_chumsky::parse_ast::<Self>(input)?;
+        kirin_chumsky::HasParserEmitIR::emit_parsed(&ast, ctx).map_err(|e| {
+            ::std::vec![kirin_chumsky::ParseError {
+                message: e.to_string(),
+                span: kirin_chumsky::chumsky::span::SimpleSpan::from(0..0),
+            }]
+        })
+    }
+}
+#[automatically_derived]
 impl<'tokens, Language, LanguageOutput>
     kirin_chumsky::HasDialectEmitIR<'tokens, Language, LanguageOutput> for Return
 where

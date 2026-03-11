@@ -218,9 +218,7 @@ impl GenerateEmitIR {
                 &mut #crate_path::EmitContext<'ctx, __Language>,
             ) -> ::core::result::Result<#ir_path::Statement, #crate_path::EmitError>
         });
-        helper_wc
-            .predicates
-            .push(bounds.ir_type_has_parser(&lt_t));
+        helper_wc.predicates.push(bounds.ir_type_has_parser(&lt_t));
         helper_wc
             .predicates
             .push(bounds.ir_type_emit_ir(&lt_t, &lang_emit_ir));
@@ -256,18 +254,18 @@ impl GenerateEmitIR {
                 LanguageOutput: #crate_path::EmitIR<Language, Output = #ir_path::Statement>
             });
         }
-        emit_ir_wc
-            .predicates
-            .push(bounds.ir_type_has_parser(&lt_t));
+        emit_ir_wc.predicates.push(bounds.ir_type_has_parser(&lt_t));
         emit_ir_wc
             .predicates
             .push(bounds.ir_type_emit_ir(&lt_t, &lang_trait_impl));
         emit_ir_wc
             .predicates
             .extend(bounds.value_types_all(&lt_t, &lang_trait_impl));
-        emit_ir_wc
-            .predicates
-            .extend(bounds.wrappers_emit_ir(&lt_t, &lang_trait_impl, &lang_output));
+        emit_ir_wc.predicates.extend(bounds.wrappers_emit_ir(
+            &lt_t,
+            &lang_trait_impl,
+            &lang_output,
+        ));
 
         let emit_language_output = if needs_language_output_emit {
             quote! { &|stmt, ctx| #crate_path::EmitIR::emit(stmt, ctx) }

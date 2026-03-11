@@ -96,17 +96,19 @@ where
         .ignore_then(symbol())
         .then(fn_signature_parser::<I, L>())
         .then(L::parser().map_with(|body, extra| (body, extra.span())))
-        .map_with(|((stage, sig), (body, body_span)), extra| Declaration::Specialize {
-            header: Header {
-                stage,
-                function: sig.function,
-                signature: sig.signature,
+        .map_with(
+            |((stage, sig), (body, body_span)), extra| Declaration::Specialize {
+                header: Header {
+                    stage,
+                    function: sig.function,
+                    signature: sig.signature,
+                    span: extra.span(),
+                },
+                body,
+                body_span,
                 span: extra.span(),
             },
-            body,
-            body_span,
-            span: extra.span(),
-        });
+        );
 
     choice((stage_decl, specialize_decl))
 }

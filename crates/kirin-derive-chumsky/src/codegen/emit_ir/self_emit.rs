@@ -73,9 +73,11 @@ impl GenerateEmitIR {
         wc.predicates.push(bounds.ir_type_has_parser(&lt_t));
         wc.predicates.push(bounds.ir_type_emit_ir(&lt_t, &lang));
         wc.predicates.extend(bounds.value_types_all(&lt_t, &lang));
-        wc.predicates.extend(
-            bounds.wrappers_emit_ir(&lt_t, &lang, &quote! { #ast_self_name #ast_self_ty_generics }),
-        );
+        wc.predicates.extend(bounds.wrappers_emit_ir(
+            &lt_t,
+            &lang,
+            &quote! { #ast_self_name #ast_self_ty_generics },
+        ));
 
         quote! {
             #[automatically_derived]

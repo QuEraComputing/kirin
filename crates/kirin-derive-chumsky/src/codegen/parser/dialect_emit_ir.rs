@@ -10,7 +10,9 @@ use super::GenerateHasDialectParser;
 
 /// Inserts `'tokens`, `Language`, and `LanguageOutput` type parameters into
 /// a clone of the input's generics for `HasDialectEmitIR` impls.
-fn build_dialect_emit_ir_generics(ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>) -> syn::Generics {
+fn build_dialect_emit_ir_generics(
+    ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+) -> syn::Generics {
     let mut generics = ir_input.generics.clone();
     let tokens_lt = syn::Lifetime::new("'tokens", proc_macro2::Span::call_site());
     if !generics
@@ -24,9 +26,7 @@ fn build_dialect_emit_ir_generics(ir_input: &kirin_derive_toolkit::ir::Input<Chu
         );
     }
     generics.params.push(syn::parse_quote! { Language });
-    generics
-        .params
-        .push(syn::parse_quote! { LanguageOutput });
+    generics.params.push(syn::parse_quote! { LanguageOutput });
     generics
 }
 
@@ -71,7 +71,8 @@ impl GenerateHasDialectParser {
         wc.predicates
             .push(syn::parse_quote! { LanguageOutput: Clone + PartialEq + 'tokens });
         wc.predicates.push(bounds.ir_type_has_parser(&lt_tokens));
-        wc.predicates.push(bounds.ir_type_emit_ir(&lt_tokens, &lang));
+        wc.predicates
+            .push(bounds.ir_type_emit_ir(&lt_tokens, &lang));
         wc.predicates
             .extend(bounds.value_types_all(&lt_tokens, &lang));
         wc.predicates

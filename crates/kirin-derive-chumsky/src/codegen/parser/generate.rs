@@ -33,14 +33,13 @@ impl GenerateHasDialectParser {
         let dialect_parser_impl =
             self.generate_dialect_parser_impl(ir_input, &ast_name, crate_path);
         let has_parser_impl = self.generate_has_parser_impl(ir_input, &ast_name, crate_path);
-        let has_parser_emit_ir_impl =
-            self.generate_has_parser_emit_ir_impl(ir_input, &ast_name, crate_path);
+        let parse_emit_impl = self.generate_parse_emit_impl(ir_input, &ast_name, crate_path);
         let dialect_emit_ir_impl = self.generate_has_dialect_emit_ir_impl(ir_input, crate_path);
 
         quote! {
             #dialect_parser_impl
             #has_parser_impl
-            #has_parser_emit_ir_impl
+            #parse_emit_impl
             #dialect_emit_ir_impl
         }
     }

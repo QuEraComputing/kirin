@@ -1,4 +1,9 @@
-//! Code generation for the `HasParserEmitIR` trait implementation.
+//! Code generation for the `ParseEmit` and `HasParserEmitIR` trait implementations.
+//!
+//! `HasParserEmitIR<'t>` carries a concrete lifetime so the compiler can
+//! normalize `<Self as HasParser<'t>>::Output` to the concrete AST type.
+//! `ParseEmit` is the public, lifetime-free trait that delegates to
+//! `HasParserEmitIR` internally via `parse_ast`.
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -9,8 +14,8 @@ use crate::codegen::{ImplBounds, init_where_clause};
 use super::GenerateHasDialectParser;
 
 impl GenerateHasDialectParser {
-    /// Generates the top-level IR emission witness for parsed dialect output.
-    pub(super) fn generate_has_parser_emit_ir_impl(
+    /// Generates both `HasParserEmitIR` and `ParseEmit` impls.
+    pub(super) fn generate_parse_emit_impl(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
@@ -19,14 +24,13 @@ impl GenerateHasDialectParser {
         if let kirin_derive_toolkit::ir::Data::Struct(data) = &ir_input.data
             && let Some(wrapper) = &data.0.wraps
         {
-            return self
-                .generate_wrapper_struct_has_parser_emit_ir_impl(ir_input, wrapper, crate_path);
+            return self.generate_wrapper_struct_parse_emit_impls(ir_input, wrapper, crate_path);
         }
 
-        self.generate_regular_has_parser_emit_ir_impl(ir_input, ast_name, crate_path)
+        self.generate_regular_parse_emit_impls(ir_input, ast_name, crate_path)
     }
 
-    fn generate_regular_has_parser_emit_ir_impl(
+    fn generate_regular_parse_emit_impls(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         ast_name: &syn::Ident,
@@ -36,8 +40,9 @@ impl GenerateHasDialectParser {
         let ir_path = &self.config.ir_path;
         let ir_type = &ir_input.attrs.ir_type;
 
+        // --- HasParserEmitIR<'t> impl (same as old generate_has_parser_emit_ir_impl) ---
         let impl_generics = self.build_original_type_impl_generics(ir_input);
-        let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
+        let (impl_generics_tok, _, impl_where_clause) = impl_generics.split_for_impl();
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
 
         let ast_self_name = syn::Ident::new(&format!("{}Self", ast_name), ast_name.span());
@@ -62,9 +67,9 @@ impl GenerateHasDialectParser {
             });
         }
 
-        quote! {
+        let has_parser_emit_ir_impl = quote! {
             #[automatically_derived]
-            impl #impl_generics #crate_path::HasParserEmitIR<'t> for #original_name #ty_generics
+            impl #impl_generics_tok #crate_path::HasParserEmitIR<'t> for #original_name #ty_generics
             #wc
             {
                 fn emit_parsed(
@@ -80,10 +85,18 @@ impl GenerateHasDialectParser {
                     Ok(ctx.stage.statement().definition(dialect_variant).new())
                 }
             }
+        };
+
+        // --- ParseEmit impl (delegates to HasParserEmitIR) ---
+        let parse_emit_impl = self.generate_parse_emit_delegating_impl(ir_input, crate_path);
+
+        quote! {
+            #has_parser_emit_ir_impl
+            #parse_emit_impl
         }
     }
 
-    fn generate_wrapper_struct_has_parser_emit_ir_impl(
+    fn generate_wrapper_struct_parse_emit_impls(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         wrapper: &kirin_derive_toolkit::ir::fields::Wrapper,
@@ -94,8 +107,9 @@ impl GenerateHasDialectParser {
         let ir_path = &self.config.ir_path;
         let ir_type = &ir_input.attrs.ir_type;
 
+        // --- HasParserEmitIR<'t> impl for wrapper struct ---
         let impl_generics = self.build_original_type_impl_generics(ir_input);
-        let (impl_generics, _, impl_where_clause) = impl_generics.split_for_impl();
+        let (impl_generics_tok, _, impl_where_clause) = impl_generics.split_for_impl();
         let (_, ty_generics, where_clause) = ir_input.generics.split_for_impl();
 
         let language = quote! { #original_name #ty_generics };
@@ -110,9 +124,9 @@ impl GenerateHasDialectParser {
                 #crate_path::EmitIR<#language, Output = #ir_path::Statement>
         });
 
-        quote! {
+        let has_parser_emit_ir_impl = quote! {
             #[automatically_derived]
-            impl #impl_generics #crate_path::HasParserEmitIR<'t> for #original_name #ty_generics
+            impl #impl_generics_tok #crate_path::HasParserEmitIR<'t> for #original_name #ty_generics
             #wc
             {
                 fn emit_parsed(
@@ -120,6 +134,51 @@ impl GenerateHasDialectParser {
                     ctx: &mut #crate_path::EmitContext<'_, Self>,
                 ) -> ::core::result::Result<#ir_path::Statement, #crate_path::EmitError> {
                     <#wrapped_ty as #crate_path::HasParser<'t>>::Output::emit(output, ctx)
+                }
+            }
+        };
+
+        // --- ParseEmit impl (delegates to HasParserEmitIR) ---
+        let parse_emit_impl = self.generate_parse_emit_delegating_impl(ir_input, crate_path);
+
+        quote! {
+            #has_parser_emit_ir_impl
+            #parse_emit_impl
+        }
+    }
+
+    /// Generates a `ParseEmit` impl that delegates to `HasParserEmitIR`.
+    ///
+    /// This is shared between regular and wrapper struct paths.
+    fn generate_parse_emit_delegating_impl(
+        &self,
+        ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
+        crate_path: &syn::Path,
+    ) -> TokenStream {
+        let original_name = &ir_input.name;
+        let ir_path = &self.config.ir_path;
+
+        let (impl_generics, ty_generics, where_clause) = ir_input.generics.split_for_impl();
+
+        let mut wc = init_where_clause(where_clause, None);
+        wc.predicates.push(syn::parse_quote! {
+            for<'t> Self: #crate_path::HasParserEmitIR<'t>
+        });
+
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics #crate_path::ParseEmit for #original_name #ty_generics
+            #wc
+            {
+                fn parse_and_emit(
+                    input: &str,
+                    ctx: &mut #crate_path::EmitContext<'_, Self>,
+                ) -> ::core::result::Result<#ir_path::Statement, ::std::vec::Vec<#crate_path::ParseError>> {
+                    let ast = #crate_path::parse_ast::<Self>(input)?;
+                    #crate_path::HasParserEmitIR::emit_parsed(&ast, ctx).map_err(|e| ::std::vec![#crate_path::ParseError {
+                        message: e.to_string(),
+                        span: #crate_path::chumsky::span::SimpleSpan::from(0..0),
+                    }])
                 }
             }
         }

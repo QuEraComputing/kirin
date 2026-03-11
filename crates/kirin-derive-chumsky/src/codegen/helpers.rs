@@ -155,9 +155,7 @@ pub(crate) fn collect_wrapper_types(
 }
 
 /// Returns `true` when any statement has `ResultValue` fields (which need `Placeholder` bounds).
-pub(crate) fn has_result_fields(
-    ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
-) -> bool {
+pub(crate) fn has_result_fields(ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>) -> bool {
     use kirin_derive_toolkit::ir::fields::FieldCategory;
     match &ir_input.data {
         kirin_derive_toolkit::ir::Data::Struct(data) => data

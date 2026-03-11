@@ -108,6 +108,25 @@ where
     }
 }
 #[automatically_derived]
+impl ::kirin::parsers::ParseEmit for MyLanguage
+where
+    for<'t> Self: ::kirin::parsers::HasParserEmitIR<'t>,
+{
+    fn parse_and_emit(
+        input: &str,
+        ctx: &mut ::kirin::parsers::EmitContext<'_, Self>,
+    ) -> ::core::result::Result<::kirin::ir::Statement, ::std::vec::Vec<::kirin::parsers::ParseError>>
+    {
+        let ast = ::kirin::parsers::parse_ast::<Self>(input)?;
+        ::kirin::parsers::HasParserEmitIR::emit_parsed(&ast, ctx).map_err(|e| {
+            ::std::vec![::kirin::parsers::ParseError {
+                message: e.to_string(),
+                span: ::kirin::parsers::chumsky::span::SimpleSpan::from(0..0),
+            }]
+        })
+    }
+}
+#[automatically_derived]
 impl<'tokens, Language, LanguageOutput>
     ::kirin::parsers::HasDialectEmitIR<'tokens, Language, LanguageOutput> for MyLanguage
 where
