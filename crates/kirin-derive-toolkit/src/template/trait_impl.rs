@@ -193,6 +193,8 @@ impl<L: Layout> Template<L> for TraitImplTemplate<L> {
                 params: method_spec.params.clone(),
                 return_type: method_spec.return_type.clone(),
                 body,
+                generics: method_spec.generics.clone(),
+                method_where_clause: method_spec.method_where_clause.clone(),
             });
         }
 
@@ -230,6 +232,8 @@ impl TraitImplTemplate<StandardLayout> {
                 trait_method,
                 crate_path,
             )),
+            generics: None,
+            method_where_clause: None,
         })
     }
 
@@ -255,6 +259,8 @@ impl TraitImplTemplate<StandardLayout> {
                 trait_method,
                 crate_path,
             )),
+            generics: None,
+            method_where_clause: None,
         })
     }
 

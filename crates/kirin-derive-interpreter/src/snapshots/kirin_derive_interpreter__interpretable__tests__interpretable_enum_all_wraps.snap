@@ -1,27 +1,28 @@
 ---
 source: crates/kirin-derive-interpreter/src/interpretable.rs
-assertion_line: 116
 expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
-impl<'__ir, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>
-    for ArithOps
+impl<'__ir, __InterpI> ::kirin_interpreter::Interpretable<'__ir, __InterpI> for ArithOps
 where
     __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
-    __InterpL: ::kirin::ir::Dialect,
-    AddOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
-    SubOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
-    MulOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    AddOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    SubOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    MulOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
 {
-    fn interpret(
+    fn interpret<__InterpL: ::kirin::ir::Dialect>(
         &self,
         interpreter: &mut __InterpI,
     ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    where
+        __InterpI::StageInfo: ::kirin::ir::HasStageInfo<__InterpL>,
+        __InterpI::Error: From<::kirin_interpreter::InterpreterError>,
+        __InterpL: ::kirin_interpreter::Interpretable<'__ir, __InterpI> + '__ir,
     {
         match self {
-            Self::Add(field_0) => field_0.interpret(interpreter),
-            Self::Sub(field_0) => field_0.interpret(interpreter),
-            Self::Mul(field_0) => field_0.interpret(interpreter),
+            Self::Add(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::Sub(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::Mul(field_0) => field_0.interpret::<__InterpL>(interpreter),
         }
     }
 }

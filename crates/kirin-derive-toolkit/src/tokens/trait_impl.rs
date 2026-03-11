@@ -12,6 +12,8 @@ use quote::{ToTokens, quote};
 ///         params: vec![quote!(x: u32)],
 ///         return_type: Some(quote!(bool)),
 ///         body: quote! { x > 0 },
+///         generics: None,
+///         method_where_clause: None,
 ///     })
 ///     .assoc_type(format_ident!("Output"), quote!(u32));
 /// // imp implements ToTokens
@@ -48,6 +50,10 @@ pub struct Method {
     pub return_type: Option<TokenStream>,
     /// Method body tokens.
     pub body: TokenStream,
+    /// Optional method-level generic parameters (e.g., `<L: Dialect>`).
+    pub generics: Option<TokenStream>,
+    /// Optional method-level where clause (e.g., `where I::StageInfo: HasStageInfo<L>`).
+    pub method_where_clause: Option<TokenStream>,
 }
 
 /// An associated type definition (`type Name = Ty;`).
@@ -168,13 +174,21 @@ impl ToTokens for Method {
             Some(rt) => quote! { -> #rt },
             None => TokenStream::new(),
         };
+        let generics = self
+            .generics
+            .as_ref()
+            .map_or_else(TokenStream::new, |g| g.clone());
+        let where_clause = self
+            .method_where_clause
+            .as_ref()
+            .map_or_else(TokenStream::new, |w| w.clone());
         let comma = if params.is_empty() {
             TokenStream::new()
         } else {
             quote! { , }
         };
         tokens.extend(quote! {
-            fn #name(#self_arg #comma #(#params),*) #ret {
+            fn #name #generics (#self_arg #comma #(#params),*) #ret #where_clause {
                 #body
             }
         });
@@ -217,6 +231,8 @@ mod tests {
             params: vec![],
             return_type: Some(quote! { bool }),
             body: quote! { true },
+            generics: None,
+            method_where_clause: None,
         });
 
         let output = rustfmt_tokens(&ti.to_token_stream());
@@ -244,6 +260,8 @@ mod tests {
             params: vec![quote! { x: i32 }, quote! { y: i32 }],
             return_type: Some(quote! { i32 }),
             body: quote! { x + y },
+            generics: None,
+            method_where_clause: None,
         };
 
         let output = rustfmt_tokens(&m.to_token_stream());
@@ -258,6 +276,8 @@ mod tests {
             params: vec![],
             return_type: None,
             body: quote! {},
+            generics: None,
+            method_where_clause: None,
         };
 
         let output = m.to_token_stream().to_string();

@@ -6,7 +6,7 @@ mod interpretable;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
-#[proc_macro_derive(Interpretable, attributes(wraps, kirin))]
+#[proc_macro_derive(Interpretable, attributes(wraps, kirin, interpret))]
 pub fn derive_interpretable(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match interpretable::do_derive_interpretable(&ast) {

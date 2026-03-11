@@ -31,23 +31,18 @@ pub fn do_derive_interpretable(input: &syn::DeriveInput) -> darling::Result<Toke
             .params
             .push(syn::GenericParam::Type(syn::parse_quote!(__InterpI)));
         generics
-            .params
-            .push(syn::GenericParam::Type(syn::parse_quote!(__InterpL)));
-        generics
     })
-    .trait_generics(|_ctx| quote! { <'__ir, __InterpI, __InterpL> })
+    .trait_generics(|_ctx| quote! { <'__ir, __InterpI> })
     .where_clause({
         let interp_crate = interp_crate.clone();
-        let ir_crate = ir_crate.clone();
         move |ctx| {
             let mut predicates: Vec<syn::WherePredicate> = vec![
                 syn::parse_quote! { __InterpI: #interp_crate::Interpreter<'__ir> },
-                syn::parse_quote! { __InterpL: #ir_crate::Dialect },
             ];
             for stmt_ctx in ctx.statements.values() {
                 if let Some(wrapper_ty) = stmt_ctx.wrapper_type {
                     predicates.push(syn::parse_quote! {
-                        #wrapper_ty: #interp_crate::Interpretable<'__ir, __InterpI, __InterpL>
+                        #wrapper_ty: #interp_crate::Interpretable<'__ir, __InterpI>
                     });
                 }
             }
@@ -70,21 +65,32 @@ pub fn do_derive_interpretable(input: &syn::DeriveInput) -> darling::Result<Toke
         }
         Ok(())
     })
-    .method(MethodSpec {
-        name: syn::parse_quote!(interpret),
-        self_arg: quote! { &self },
-        params: vec![quote! { interpreter: &mut __InterpI }],
-        return_type: Some({
-            let interp_crate = interp_crate.clone();
-            quote! { Result<#interp_crate::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error> }
-        }),
-        pattern: Box::new(Custom::new(|_ctx, stmt_ctx| {
-            let binding = stmt_ctx
-                .wrapper_binding
-                .as_ref()
-                .ok_or_else(|| darling::Error::custom("expected wrapper binding"))?;
-            Ok(quote! { #binding.interpret(interpreter) })
-        })),
+    .method({
+        let interp_crate_m = interp_crate.clone();
+        let ir_crate_m = ir_crate.clone();
+        MethodSpec {
+            name: syn::parse_quote!(interpret),
+            self_arg: quote! { &self },
+            params: vec![quote! { interpreter: &mut __InterpI }],
+            return_type: Some({
+                let interp_crate = interp_crate.clone();
+                quote! { Result<#interp_crate::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error> }
+            }),
+            pattern: Box::new(Custom::new(|_ctx, stmt_ctx| {
+                let binding = stmt_ctx
+                    .wrapper_binding
+                    .as_ref()
+                    .ok_or_else(|| darling::Error::custom("expected wrapper binding"))?;
+                Ok(quote! { #binding.interpret::<__InterpL>(interpreter) })
+            })),
+            generics: Some(quote! { <__InterpL: #ir_crate_m::Dialect> }),
+            method_where_clause: Some(quote! {
+                where
+                    __InterpI::StageInfo: #ir_crate_m::HasStageInfo<__InterpL>,
+                    __InterpI::Error: From<#interp_crate_m::InterpreterError>,
+                    __InterpL: #interp_crate_m::Interpretable<'__ir, __InterpI> + '__ir
+            }),
+        }
     });
 
     ir.compose().add(template).build()

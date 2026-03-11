@@ -65,6 +65,10 @@ pub struct MethodSpec<L: Layout> {
     pub return_type: Option<TokenStream>,
     /// Code generation strategy for the method body.
     pub pattern: Box<dyn MethodPattern<L>>,
+    /// Optional method-level generic parameters (e.g., `<L: Dialect>`).
+    pub generics: Option<TokenStream>,
+    /// Optional method-level where clause.
+    pub method_where_clause: Option<TokenStream>,
 }
 
 /// Specification for an associated type inside a template-generated trait impl.

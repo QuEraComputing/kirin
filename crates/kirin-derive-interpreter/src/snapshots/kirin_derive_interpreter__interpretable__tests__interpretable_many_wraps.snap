@@ -1,31 +1,32 @@
 ---
 source: crates/kirin-derive-interpreter/src/interpretable.rs
-assertion_line: 219
 expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
-impl<'__ir, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>
-    for BigOps
+impl<'__ir, __InterpI> ::kirin_interpreter::Interpretable<'__ir, __InterpI> for BigOps
 where
     __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
-    __InterpL: ::kirin::ir::Dialect,
-    AOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
-    BOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
-    COp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
-    DOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
-    EOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    AOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    BOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    COp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    DOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    EOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
 {
-    fn interpret(
+    fn interpret<__InterpL: ::kirin::ir::Dialect>(
         &self,
         interpreter: &mut __InterpI,
     ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    where
+        __InterpI::StageInfo: ::kirin::ir::HasStageInfo<__InterpL>,
+        __InterpI::Error: From<::kirin_interpreter::InterpreterError>,
+        __InterpL: ::kirin_interpreter::Interpretable<'__ir, __InterpI> + '__ir,
     {
         match self {
-            Self::A(field_0) => field_0.interpret(interpreter),
-            Self::B(field_0) => field_0.interpret(interpreter),
-            Self::C(field_0) => field_0.interpret(interpreter),
-            Self::D(field_0) => field_0.interpret(interpreter),
-            Self::E(field_0) => field_0.interpret(interpreter),
+            Self::A(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::B(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::C(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::D(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::E(field_0) => field_0.interpret::<__InterpL>(interpreter),
         }
     }
 }

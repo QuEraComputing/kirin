@@ -1,23 +1,24 @@
 ---
 source: crates/kirin-derive-interpreter/src/interpretable.rs
-assertion_line: 147
 expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
-impl<'__ir, __InterpI, __InterpL> ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>
-    for SingleOp
+impl<'__ir, __InterpI> ::kirin_interpreter::Interpretable<'__ir, __InterpI> for SingleOp
 where
     __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
-    __InterpL: ::kirin::ir::Dialect,
-    OnlyOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI, __InterpL>,
+    OnlyOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
 {
-    fn interpret(
+    fn interpret<__InterpL: ::kirin::ir::Dialect>(
         &self,
         interpreter: &mut __InterpI,
     ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    where
+        __InterpI::StageInfo: ::kirin::ir::HasStageInfo<__InterpL>,
+        __InterpI::Error: From<::kirin_interpreter::InterpreterError>,
+        __InterpL: ::kirin_interpreter::Interpretable<'__ir, __InterpI> + '__ir,
     {
         match self {
-            Self::Only(field_0) => field_0.interpret(interpreter),
+            Self::Only(field_0) => field_0.interpret::<__InterpL>(interpreter),
         }
     }
 }

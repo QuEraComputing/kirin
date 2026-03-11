@@ -139,6 +139,8 @@ impl FieldIterTemplateSet {
                 params: vec![],
                 return_type: Some(quote! { Self::#trait_type_iter }),
                 body,
+                generics: None,
+                method_where_clause: None,
             });
 
         let iter_def = StructDef {
@@ -254,6 +256,8 @@ impl FieldIterTemplateSet {
                 params: vec![],
                 return_type: Some(quote! { Self::#trait_type_iter }),
                 body,
+                generics: None,
+                method_where_clause: None,
             });
 
         let iter_def = EnumDef {

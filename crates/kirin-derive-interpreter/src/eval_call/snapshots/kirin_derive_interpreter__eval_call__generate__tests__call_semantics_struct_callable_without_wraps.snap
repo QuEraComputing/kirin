@@ -3,20 +3,26 @@ source: crates/kirin-derive-interpreter/src/eval_call/generate.rs
 expression: generate_call_semantics_code(input)
 ---
 #[automatically_derived]
-impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, DirectCall>
-    for DirectCall
+impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI> for DirectCall
 where
     __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
 {
     type Result = __CallSemI::Value;
-    fn eval_call(
+    fn eval_call<__CallSemL: ::kirin::ir::Dialect>(
         &self,
         interpreter: &mut __CallSemI,
-        stage: &'__ir ::kirin::ir::StageInfo<DirectCall>,
+        stage: &'__ir ::kirin::ir::StageInfo<__CallSemL>,
         callee: ::kirin::ir::SpecializedFunction,
         args: &[__CallSemI::Value],
-    ) -> Result<Self::Result, __CallSemI::Error> {
+    ) -> Result<Self::Result, __CallSemI::Error>
+    where
+        __CallSemI::StageInfo: ::kirin::ir::HasStageInfo<__CallSemL>,
+        __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+        __CallSemL: ::kirin_interpreter::Interpretable<'__ir, __CallSemI>
+            + ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, Result = Self::Result>
+            + '__ir,
+    {
         Err(::kirin_interpreter::InterpreterError::missing_function_entry().into())
     }
 }

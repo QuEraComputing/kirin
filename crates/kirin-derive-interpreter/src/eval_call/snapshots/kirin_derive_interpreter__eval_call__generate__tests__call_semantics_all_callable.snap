@@ -3,30 +3,39 @@ source: crates/kirin-derive-interpreter/src/eval_call/generate.rs
 expression: generate_call_semantics_code(input)
 ---
 #[automatically_derived]
-impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps> for FuncOps
+impl<'__ir, __CallSemI> ::kirin_interpreter::CallSemantics<'__ir, __CallSemI> for FuncOps
 where
     __CallSemI: ::kirin_interpreter::Interpreter<'__ir>,
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
-    CallOp: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps>,
+    CallOp: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI>,
     InvokeOp: ::kirin_interpreter::CallSemantics<
         '__ir,
         __CallSemI,
-        FuncOps,
-        Result = <CallOp as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps>>::Result,
+        Result = <CallOp as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI>>::Result,
     >,
 {
-    type Result =
-        <CallOp as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, FuncOps>>::Result;
-    fn eval_call(
+    type Result = <CallOp as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI>>::Result;
+    fn eval_call<__CallSemL: ::kirin::ir::Dialect>(
         &self,
         interpreter: &mut __CallSemI,
-        stage: &'__ir ::kirin::ir::StageInfo<FuncOps>,
+        stage: &'__ir ::kirin::ir::StageInfo<__CallSemL>,
         callee: ::kirin::ir::SpecializedFunction,
         args: &[__CallSemI::Value],
-    ) -> Result<Self::Result, __CallSemI::Error> {
+    ) -> Result<Self::Result, __CallSemI::Error>
+    where
+        __CallSemI::StageInfo: ::kirin::ir::HasStageInfo<__CallSemL>,
+        __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
+        __CallSemL: ::kirin_interpreter::Interpretable<'__ir, __CallSemI>
+            + ::kirin_interpreter::CallSemantics<'__ir, __CallSemI, Result = Self::Result>
+            + '__ir,
+    {
         match self {
-            Self::Call(field_0) => field_0.eval_call(interpreter, stage, callee, args),
-            Self::Invoke(field_0) => field_0.eval_call(interpreter, stage, callee, args),
+            Self::Call(field_0) => {
+                field_0.eval_call::<__CallSemL>(interpreter, stage, callee, args)
+            }
+            Self::Invoke(field_0) => {
+                field_0.eval_call::<__CallSemL>(interpreter, stage, callee, args)
+            }
         }
     }
 }

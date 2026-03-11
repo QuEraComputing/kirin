@@ -5,7 +5,7 @@ use kirin_derive_toolkit::prelude::darling;
 use kirin_derive_toolkit::template::TraitImplTemplate;
 use kirin_derive_toolkit::template::method_pattern::{AssocTypeSpec, Custom, MethodSpec};
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{format_ident, quote};
 
 use super::EvalCallLayout;
 
@@ -34,10 +34,6 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
         .crate_path
         .clone()
         .unwrap_or_else(|| from_str(DEFAULT_IR_CRATE));
-    let type_name = ir.name.clone();
-    let (_, ty_generics_raw, _) = ir.generics.split_for_impl();
-    let ty_generics = ty_generics_raw.to_token_stream();
-
     let template = TraitImplTemplate::new(
         syn::parse_quote!(::kirin_interpreter::CallSemantics),
         from_str(DEFAULT_INTERP_CRATE),
@@ -52,15 +48,11 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
             .push(syn::GenericParam::Type(syn::parse_quote!(__CallSemI)));
         generics
     })
-    .trait_generics(|ctx| {
-        let type_name = &ctx.meta.name;
-        let (_, ty_generics, _) = ctx.meta.generics.split_for_impl();
-        quote! { <'__ir, __CallSemI, #type_name #ty_generics> }
+    .trait_generics(|_ctx| {
+        quote! { <'__ir, __CallSemI> }
     })
     .where_clause(|ctx| {
         let interp_crate: syn::Path = from_str(DEFAULT_INTERP_CRATE);
-        let type_name = &ctx.meta.name;
-        let (_, ty_generics, _) = ctx.meta.generics.split_for_impl();
 
         let mut predicates: Vec<syn::WherePredicate> = vec![
             syn::parse_quote! { __CallSemI: #interp_crate::Interpreter<'__ir> },
@@ -69,7 +61,7 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
 
         let callable_wrappers = collect_callable_wrappers(ctx);
         let result_type = if let Some(first_ty) = callable_wrappers.first() {
-            quote! { <#first_ty as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result }
+            quote! { <#first_ty as #interp_crate::CallSemantics<'__ir, __CallSemI>>::Result }
         } else {
             quote! { __CallSemI::Value }
         };
@@ -77,11 +69,11 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
         for (i, wrapper_ty) in callable_wrappers.iter().enumerate() {
             if i == 0 {
                 predicates.push(syn::parse_quote! {
-                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>
+                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI>
                 });
             } else {
                 predicates.push(syn::parse_quote! {
-                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics, Result = #result_type>
+                    #wrapper_ty: #interp_crate::CallSemantics<'__ir, __CallSemI, Result = #result_type>
                 });
             }
         }
@@ -92,55 +84,66 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
         name: format_ident!("Result"),
         compute: Box::new(|ctx, _first_stmt| {
             let interp_crate: syn::Path = from_str(DEFAULT_INTERP_CRATE);
-            let type_name = &ctx.meta.name;
-            let (_, ty_generics, _) = ctx.meta.generics.split_for_impl();
 
             let callable_wrappers = collect_callable_wrappers(ctx);
             if let Some(first_ty) = callable_wrappers.first() {
-                quote! { <#first_ty as #interp_crate::CallSemantics<'__ir, __CallSemI, #type_name #ty_generics>>::Result }
+                quote! { <#first_ty as #interp_crate::CallSemantics<'__ir, __CallSemI>>::Result }
             } else {
                 quote! { __CallSemI::Value }
             }
         }),
     })
-    .method(MethodSpec {
-        name: format_ident!("eval_call"),
-        self_arg: quote! { &self },
-        params: vec![
-            quote! { interpreter: &mut __CallSemI },
-            quote! { stage: &'__ir #ir_crate::StageInfo<#type_name #ty_generics> },
-            quote! { callee: #ir_crate::SpecializedFunction },
-            quote! { args: &[__CallSemI::Value] },
-        ],
-        return_type: Some(quote! { Result<Self::Result, __CallSemI::Error> }),
-        pattern: Box::new(Custom::separate(
-            // for_struct
-            |_ctx, stmt_ctx| {
-                let interp_crate: syn::Path = from_str(DEFAULT_INTERP_CRATE);
-                if stmt_ctx.is_wrapper {
-                    let pattern = &stmt_ctx.pattern;
-                    let binding = stmt_ctx.wrapper_binding.as_ref().unwrap();
-                    Ok(quote! {
-                        let Self #pattern = self;
-                        #binding.eval_call(interpreter, stage, callee, args)
-                    })
-                } else {
-                    Ok(quote! {
-                        Err(#interp_crate::InterpreterError::missing_function_entry().into())
-                    })
-                }
-            },
-            // for_variant
-            |ctx, stmt_ctx| {
-                let interp_crate: syn::Path = from_str(DEFAULT_INTERP_CRATE);
-                if is_call_forwarding(ctx, stmt_ctx) {
-                    let binding = stmt_ctx.wrapper_binding.as_ref().unwrap();
-                    Ok(quote! { #binding.eval_call(interpreter, stage, callee, args) })
-                } else {
-                    Ok(quote! { Err(#interp_crate::InterpreterError::missing_function_entry().into()) })
-                }
-            },
-        )),
+    .method({
+        let ir_crate_m = ir_crate.clone();
+        let interp_crate_m: syn::Path = from_str(DEFAULT_INTERP_CRATE);
+        MethodSpec {
+            name: format_ident!("eval_call"),
+            self_arg: quote! { &self },
+            params: vec![
+                quote! { interpreter: &mut __CallSemI },
+                quote! { stage: &'__ir #ir_crate::StageInfo<__CallSemL> },
+                quote! { callee: #ir_crate::SpecializedFunction },
+                quote! { args: &[__CallSemI::Value] },
+            ],
+            return_type: Some(quote! { Result<Self::Result, __CallSemI::Error> }),
+            pattern: Box::new(Custom::separate(
+                // for_struct
+                |_ctx, stmt_ctx| {
+                    let interp_crate: syn::Path = from_str(DEFAULT_INTERP_CRATE);
+                    if stmt_ctx.is_wrapper {
+                        let pattern = &stmt_ctx.pattern;
+                        let binding = stmt_ctx.wrapper_binding.as_ref().unwrap();
+                        Ok(quote! {
+                            let Self #pattern = self;
+                            #binding.eval_call::<__CallSemL>(interpreter, stage, callee, args)
+                        })
+                    } else {
+                        Ok(quote! {
+                            Err(#interp_crate::InterpreterError::missing_function_entry().into())
+                        })
+                    }
+                },
+                // for_variant
+                |ctx, stmt_ctx| {
+                    let interp_crate: syn::Path = from_str(DEFAULT_INTERP_CRATE);
+                    if is_call_forwarding(ctx, stmt_ctx) {
+                        let binding = stmt_ctx.wrapper_binding.as_ref().unwrap();
+                        Ok(quote! { #binding.eval_call::<__CallSemL>(interpreter, stage, callee, args) })
+                    } else {
+                        Ok(quote! { Err(#interp_crate::InterpreterError::missing_function_entry().into()) })
+                    }
+                },
+            )),
+            generics: Some(quote! { <__CallSemL: #ir_crate_m::Dialect> }),
+            method_where_clause: Some(quote! {
+                where
+                    __CallSemI::StageInfo: #ir_crate_m::HasStageInfo<__CallSemL>,
+                    __CallSemI::Error: From<#interp_crate_m::InterpreterError>,
+                    __CallSemL: #interp_crate_m::Interpretable<'__ir, __CallSemI>
+                        + #interp_crate_m::CallSemantics<'__ir, __CallSemI, Result = Self::Result>
+                        + '__ir
+            }),
+        }
     });
 
     ir.compose().add(template).build()
