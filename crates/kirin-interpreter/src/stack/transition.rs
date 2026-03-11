@@ -1,4 +1,6 @@
-use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo, StageMeta, SupportsStageDispatch};
+use kirin_ir::{
+    CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo, StageMeta, SupportsStageDispatch,
+};
 
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
 use crate::{BlockEvaluator, ConcreteExt, Continuation, Interpretable, InterpreterError};

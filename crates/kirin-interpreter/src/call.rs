@@ -22,9 +22,7 @@ pub trait CallSemantics<'ir, I: Interpreter<'ir>>: Dialect {
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
-        L: crate::Interpretable<'ir, I>
-            + CallSemantics<'ir, I, Result = Self::Result>
-            + 'ir;
+        L: crate::Interpretable<'ir, I> + CallSemantics<'ir, I, Result = Self::Result> + 'ir;
 }
 
 /// Marker trait for body types that represent SSA CFG regions.
@@ -99,8 +97,11 @@ where
         S: HasStageInfo<L>,
         E: From<InterpreterError>,
         L: crate::Interpretable<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>>
-            + CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, Result = crate::AnalysisResult<V>>
-            + 'ir,
+            + CallSemantics<
+                'ir,
+                crate::AbstractInterpreter<'ir, V, S, E, G>,
+                Result = crate::AnalysisResult<V>,
+            > + 'ir,
     {
         let entry = self.entry_block::<L>(stage)?;
         let stage_id = interp.resolve_stage_id(stage);

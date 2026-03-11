@@ -44,7 +44,10 @@ where
     I::Value: Clone,
     T: CompileTimeValue,
 {
-    fn interpret<L: Dialect>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
