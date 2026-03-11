@@ -156,14 +156,21 @@ mod tests {
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for If<T>
+impl<'ir, I, T> Interpretable<'ir, I> for If<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition,
-    L: Dialect,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         let cond = interp.read(self.condition)?;
         match cond.is_truthy() {
             Some(true) => Ok(Continuation::Jump(self.then_body, smallvec![])),
@@ -176,16 +183,22 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for For<T>
+impl<'ir, I, T> Interpretable<'ir, I> for For<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone + ForLoopValue,
-    I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
-    L: Dialect + Interpretable<'ir, I, L> + 'ir,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         let mut iv = interp.read(self.start)?;
         let end = interp.read(self.end)?;
         let step = interp.read(self.step)?;
@@ -203,39 +216,46 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for Yield<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Yield<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone,
-    L: Dialect,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         let v = interp.read(self.value)?;
         Ok(Continuation::Yield(v))
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for StructuredControlFlow<T>
+impl<'ir, I, T> Interpretable<'ir, I> for StructuredControlFlow<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition + ForLoopValue,
-    I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
-    L: Dialect + Interpretable<'ir, I, L> + 'ir,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         match self {
-            StructuredControlFlow::If(op) => {
-                <If<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
-            }
-            StructuredControlFlow::For(op) => {
-                <For<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
-            }
-            StructuredControlFlow::Yield(op) => {
-                <Yield<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
-            }
+            StructuredControlFlow::If(op) => op.interpret::<L>(interp),
+            StructuredControlFlow::For(op) => op.interpret::<L>(interp),
+            StructuredControlFlow::Yield(op) => op.interpret::<L>(interp),
         }
     }
 }

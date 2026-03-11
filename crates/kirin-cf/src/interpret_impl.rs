@@ -1,17 +1,26 @@
-use kirin::prelude::{Dialect, SSAValue};
-use kirin_interpreter::{BranchCondition, Continuation, Interpretable, Interpreter};
+use kirin::prelude::{Dialect, HasStageInfo, SSAValue};
+use kirin_interpreter::{
+    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
+};
 use smallvec::smallvec;
 
 use crate::ControlFlow;
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for ControlFlow<T>
+impl<'ir, I, T> Interpretable<'ir, I> for ControlFlow<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition,
-    L: Dialect,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         match self {
             ControlFlow::Branch { target, args } => {
                 let values = args

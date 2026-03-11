@@ -21,15 +21,21 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for FunctionBody<T>
+impl<'ir, I, T> Interpretable<'ir, I> for FunctionBody<T>
 where
     I: Interpreter<'ir>,
-    I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
-    L: Dialect + 'ir,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         let stage = interp.resolve_stage::<L>()?;
         let entry = self
             .body
@@ -55,15 +61,21 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for Lambda<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Lambda<T>
 where
     I: Interpreter<'ir>,
-    I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
-    L: Dialect + 'ir,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         let stage = interp.resolve_stage::<L>()?;
         let entry = self
             .body
@@ -90,35 +102,46 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for Lexical<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Lexical<T>
 where
     I: Interpreter<'ir>,
-    I::StageInfo: HasStageInfo<L>,
     I::Value: Clone,
     I::Error: From<InterpreterError>,
-    L: Dialect + 'ir,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         match self {
-            Lexical::FunctionBody(op) => {
-                <FunctionBody<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
-            }
-            Lexical::Lambda(op) => <Lambda<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
-            Lexical::Call(op) => <Call<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
-            Lexical::Return(op) => <Return<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+            Lexical::FunctionBody(op) => op.interpret::<L>(interp),
+            Lexical::Lambda(op) => op.interpret::<L>(interp),
+            Lexical::Call(op) => op.interpret::<L>(interp),
+            Lexical::Return(op) => op.interpret::<L>(interp),
         }
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for Bind<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Bind<T>
 where
     I: Interpreter<'ir>,
     I::Error: From<InterpreterError>,
-    L: Dialect,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        _interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         Err(InterpreterError::custom(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "bind is not yet supported in the interpreter",
@@ -127,16 +150,22 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for Call<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Call<T>
 where
     I: Interpreter<'ir>,
-    I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
     I::Value: Clone,
-    L: Dialect + 'ir,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         let stage_id = interp.active_stage();
         let stage = interp.resolve_stage::<L>()?;
 
@@ -238,14 +267,21 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for Return<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Return<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone,
-    L: Dialect,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         let v = interp.read(self.value)?;
         Ok(Continuation::Return(v))
     }
@@ -266,23 +302,27 @@ where
     }
 }
 
-impl<'ir, I, L, T> Interpretable<'ir, I, L> for Lifted<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Lifted<T>
 where
     I: Interpreter<'ir>,
-    I::StageInfo: HasStageInfo<L>,
     I::Value: Clone,
     I::Error: From<InterpreterError>,
-    L: Dialect + 'ir,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(
+        &self,
+        interp: &mut I,
+    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         match self {
-            Lifted::FunctionBody(op) => {
-                <FunctionBody<T> as Interpretable<'ir, I, L>>::interpret(op, interp)
-            }
-            Lifted::Bind(op) => <Bind<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
-            Lifted::Call(op) => <Call<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
-            Lifted::Return(op) => <Return<T> as Interpretable<'ir, I, L>>::interpret(op, interp),
+            Lifted::FunctionBody(op) => op.interpret::<L>(interp),
+            Lifted::Bind(op) => op.interpret::<L>(interp),
+            Lifted::Call(op) => op.interpret::<L>(interp),
+            Lifted::Return(op) => op.interpret::<L>(interp),
         }
     }
 }
