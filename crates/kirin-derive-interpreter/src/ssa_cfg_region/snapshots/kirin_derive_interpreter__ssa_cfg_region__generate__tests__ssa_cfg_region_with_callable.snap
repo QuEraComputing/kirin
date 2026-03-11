@@ -1,0 +1,21 @@
+---
+source: crates/kirin-derive-interpreter/src/ssa_cfg_region/generate.rs
+expression: generate_ssa_cfg_region_code(input)
+---
+#[automatically_derived]
+impl ::kirin_interpreter::SSACFGRegion for MyLang
+where
+    LexicalOp: ::kirin_interpreter::SSACFGRegion,
+{
+    fn entry_block<__L: ::kirin::ir::Dialect>(
+        &self,
+        stage: &::kirin::ir::StageInfo<__L>,
+    ) -> Result<::kirin::ir::Block, ::kirin_interpreter::InterpreterError> {
+        match self {
+            Self::Lexical(field_0) => field_0.entry_block(stage),
+            Self::Arith(field_0) => {
+                Err(::kirin_interpreter::InterpreterError::missing_entry_block())
+            }
+        }
+    }
+}

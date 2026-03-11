@@ -2,6 +2,7 @@ extern crate proc_macro;
 
 mod eval_call;
 mod interpretable;
+mod ssa_cfg_region;
 
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -19,6 +20,15 @@ pub fn derive_interpretable(input: TokenStream) -> TokenStream {
 pub fn derive_call_semantics(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match eval_call::do_derive_eval_call(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.write_errors().into(),
+    }
+}
+
+#[proc_macro_derive(SSACFGRegion, attributes(wraps, callable, kirin))]
+pub fn derive_ssa_cfg_region(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match ssa_cfg_region::do_derive_ssa_cfg_region(&ast) {
         Ok(tokens) => tokens.into(),
         Err(e) => e.write_errors().into(),
     }
