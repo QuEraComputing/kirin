@@ -381,13 +381,17 @@ fn test_arity_mismatch_through_call() {
 #[kirin(fn, type = ArithType, crate = kirin_ir)]
 struct HaltStmt;
 
-impl<'ir, I, L> kirin_interpreter::Interpretable<'ir, I, L> for HaltStmt
+impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for HaltStmt
 where
     I: kirin_interpreter::Interpreter<'ir, Ext = ConcreteExt>,
     I::Error: From<InterpreterError>,
-    L: Dialect + 'ir,
 {
-    fn interpret(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
         Ok(Continuation::Ext(ConcreteExt::Halt))
     }
 }
@@ -408,7 +412,7 @@ enum HaltLang {
 
 /// Manual Interpretable impl for HaltLang — delegates to each inner type.
 /// We need this because HaltStmt requires I::Ext = ConcreteExt.
-impl<'ir, I, L> kirin_interpreter::Interpretable<'ir, I, L> for HaltLang
+impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for HaltLang
 where
     I: kirin_interpreter::Interpreter<'ir, Ext = ConcreteExt>,
     I::Value: Clone
@@ -421,26 +425,19 @@ where
         + From<i64>
         + From<ArithValue>,
     I::Error: From<InterpreterError>,
-    I::StageInfo: HasStageInfo<L>,
-    L: Dialect + 'ir,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
         match self {
-            HaltLang::Constant(inner) => {
-                <Constant<ArithValue, ArithType> as kirin_interpreter::Interpretable<'ir, I, L>>::interpret(inner, interp)
-            }
-            HaltLang::Call(inner) => {
-                <kirin_function::Call<ArithType> as kirin_interpreter::Interpretable<'ir, I, L>>::interpret(inner, interp)
-            }
-            HaltLang::FunctionBody(inner) => {
-                <FunctionBody<ArithType> as kirin_interpreter::Interpretable<'ir, I, L>>::interpret(inner, interp)
-            }
-            HaltLang::Return(inner) => {
-                <Return<ArithType> as kirin_interpreter::Interpretable<'ir, I, L>>::interpret(inner, interp)
-            }
-            HaltLang::Halt(inner) => {
-                <HaltStmt as kirin_interpreter::Interpretable<'ir, I, L>>::interpret(inner, interp)
-            }
+            HaltLang::Constant(inner) => inner.interpret::<L>(interp),
+            HaltLang::Call(inner) => inner.interpret::<L>(interp),
+            HaltLang::FunctionBody(inner) => inner.interpret::<L>(interp),
+            HaltLang::Return(inner) => inner.interpret::<L>(interp),
+            HaltLang::Halt(inner) => inner.interpret::<L>(interp),
         }
     }
 }
@@ -516,13 +513,17 @@ struct BadBody {
     body: Region,
 }
 
-impl<'ir, I, L> kirin_interpreter::Interpretable<'ir, I, L> for BadBody
+impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for BadBody
 where
     I: kirin_interpreter::Interpreter<'ir>,
     I::Error: From<InterpreterError>,
-    L: Dialect + 'ir,
 {
-    fn interpret(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
         // Body interpret is not used via SSACFGRegion path.
         Err(InterpreterError::missing_entry_block().into())
     }

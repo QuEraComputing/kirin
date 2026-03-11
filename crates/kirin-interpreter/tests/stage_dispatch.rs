@@ -37,16 +37,19 @@ impl<T: CompileTimeValue> StageCall<T> {
     }
 }
 
-impl<'ir, I, L, T> kirin_interpreter::Interpretable<'ir, I, L> for StageCall<T>
+impl<'ir, I, T> kirin_interpreter::Interpretable<'ir, I> for StageCall<T>
 where
     I: kirin_interpreter::Interpreter<'ir>,
-    I::StageInfo: HasStageInfo<L>,
     I::Error: From<InterpreterError>,
     I::Value: Clone,
-    L: Dialect + 'ir,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
         let target_stage = self.target_stage();
         let stage = interp.resolve_stage_info::<L>(target_stage)?;
 

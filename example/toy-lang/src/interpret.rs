@@ -1,11 +1,8 @@
 use kirin::prelude::*;
-use kirin_constant::Constant;
-use kirin_function::{Lexical, Lifted};
 use kirin_interpreter::{
     BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion,
 };
 use kirin_scf::ForLoopValue;
-use kirin_scf::StructuredControlFlow;
 
 use crate::language::{HighLevel, LowLevel};
 
@@ -13,7 +10,7 @@ use crate::language::{HighLevel, LowLevel};
 // HighLevel: Interpretable
 // ---------------------------------------------------------------------------
 
-impl<'ir, I> Interpretable<'ir, I, HighLevel> for HighLevel
+impl<'ir, I> Interpretable<'ir, I> for HighLevel
 where
     I: Interpreter<'ir>,
     I::Value: Clone
@@ -33,35 +30,21 @@ where
         + BranchCondition
         + ForLoopValue
         + From<kirin_arith::ArithValue>,
-    I::StageInfo: HasStageInfo<HighLevel>,
     I::Error: From<InterpreterError>,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         match self {
-            HighLevel::Lexical(inner) => {
-                <Lexical<_> as Interpretable<'ir, I, HighLevel>>::interpret(inner, interp)
-            }
-            HighLevel::Structured(inner) => {
-                <StructuredControlFlow<_> as Interpretable<'ir, I, HighLevel>>::interpret(
-                    inner, interp,
-                )
-            }
-            HighLevel::Constant(inner) => {
-                <Constant<_, _> as Interpretable<'ir, I, HighLevel>>::interpret(inner, interp)
-            }
-            HighLevel::Arith(inner) => {
-                <kirin_arith::Arith<_> as Interpretable<'ir, I, HighLevel>>::interpret(
-                    inner, interp,
-                )
-            }
-            HighLevel::Cmp(inner) => {
-                <kirin_cmp::Cmp<_> as Interpretable<'ir, I, HighLevel>>::interpret(inner, interp)
-            }
-            HighLevel::Bitwise(inner) => {
-                <kirin_bitwise::Bitwise<_> as Interpretable<'ir, I, HighLevel>>::interpret(
-                    inner, interp,
-                )
-            }
+            HighLevel::Lexical(inner) => inner.interpret::<L>(interp),
+            HighLevel::Structured(inner) => inner.interpret::<L>(interp),
+            HighLevel::Constant(inner) => inner.interpret::<L>(interp),
+            HighLevel::Arith(inner) => inner.interpret::<L>(interp),
+            HighLevel::Cmp(inner) => inner.interpret::<L>(interp),
+            HighLevel::Bitwise(inner) => inner.interpret::<L>(interp),
         }
     }
 }
@@ -83,7 +66,7 @@ impl SSACFGRegion for HighLevel {
 // LowLevel: Interpretable
 // ---------------------------------------------------------------------------
 
-impl<'ir, I> Interpretable<'ir, I, LowLevel> for LowLevel
+impl<'ir, I> Interpretable<'ir, I> for LowLevel
 where
     I: Interpreter<'ir>,
     I::Value: Clone
@@ -102,33 +85,21 @@ where
         + std::ops::Shr<Output = I::Value>
         + BranchCondition
         + From<kirin_arith::ArithValue>,
-    I::StageInfo: HasStageInfo<LowLevel>,
     I::Error: From<InterpreterError>,
 {
-    fn interpret(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error> {
+    fn interpret<L: Dialect>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
         match self {
-            LowLevel::Lifted(inner) => {
-                <Lifted<_> as Interpretable<'ir, I, LowLevel>>::interpret(inner, interp)
-            }
-            LowLevel::Constant(inner) => {
-                <Constant<_, _> as Interpretable<'ir, I, LowLevel>>::interpret(inner, interp)
-            }
-            LowLevel::Arith(inner) => {
-                <kirin_arith::Arith<_> as Interpretable<'ir, I, LowLevel>>::interpret(inner, interp)
-            }
-            LowLevel::Cmp(inner) => {
-                <kirin_cmp::Cmp<_> as Interpretable<'ir, I, LowLevel>>::interpret(inner, interp)
-            }
-            LowLevel::Bitwise(inner) => {
-                <kirin_bitwise::Bitwise<_> as Interpretable<'ir, I, LowLevel>>::interpret(
-                    inner, interp,
-                )
-            }
-            LowLevel::Cf(inner) => {
-                <kirin_cf::ControlFlow<_> as Interpretable<'ir, I, LowLevel>>::interpret(
-                    inner, interp,
-                )
-            }
+            LowLevel::Lifted(inner) => inner.interpret::<L>(interp),
+            LowLevel::Constant(inner) => inner.interpret::<L>(interp),
+            LowLevel::Arith(inner) => inner.interpret::<L>(interp),
+            LowLevel::Cmp(inner) => inner.interpret::<L>(interp),
+            LowLevel::Bitwise(inner) => inner.interpret::<L>(interp),
+            LowLevel::Cf(inner) => inner.interpret::<L>(interp),
         }
     }
 }

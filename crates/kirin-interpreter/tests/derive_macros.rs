@@ -4,9 +4,10 @@ use kirin_constant::Constant;
 use kirin_derive_interpreter::{CallSemantics, Interpretable};
 use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::{
-    BranchCondition, CallSemantics as CallSemanticsTrait, Interpreter, InterpreterError,
-    StackInterpreter, StageAccess,
+    CallSemantics as CallSemanticsTrait, Interpreter, InterpreterError, StackInterpreter,
+    StageAccess,
 };
+use kirin_ir::Dialect;
 use kirin_ir::*;
 
 // ---------------------------------------------------------------------------
@@ -44,36 +45,30 @@ pub enum DerivedInterpretableDialect {
     Return(Return<ArithType>),
 }
 
-impl<'ir, I> CallSemanticsTrait<'ir, I, DerivedInterpretableDialect> for DerivedInterpretableDialect
+impl<'ir, I> CallSemanticsTrait<'ir, I> for DerivedInterpretableDialect
 where
     I: Interpreter<'ir, Error = InterpreterError>,
-    I::StageInfo: HasStageInfo<DerivedInterpretableDialect>,
-    I::Value: std::ops::Add<Output = I::Value>
-        + std::ops::Sub<Output = I::Value>
-        + std::ops::Mul<Output = I::Value>
-        + kirin_arith::CheckedDiv
-        + kirin_arith::CheckedRem
-        + std::ops::Neg<Output = I::Value>
-        + From<ArithValue>
-        + BranchCondition,
-    FunctionBody<ArithType>: CallSemanticsTrait<'ir, I, DerivedInterpretableDialect>,
+    FunctionBody<ArithType>: CallSemanticsTrait<'ir, I>,
 {
-    type Result = <FunctionBody<ArithType> as CallSemanticsTrait<
-        'ir,
-        I,
-        DerivedInterpretableDialect,
-    >>::Result;
+    type Result = <FunctionBody<ArithType> as CallSemanticsTrait<'ir, I>>::Result;
 
-    fn eval_call(
+    fn eval_call<L: Dialect>(
         &self,
         interp: &mut I,
-        stage: &'ir kirin_ir::StageInfo<DerivedInterpretableDialect>,
+        stage: &'ir kirin_ir::StageInfo<L>,
         callee: SpecializedFunction,
         args: &[I::Value],
-    ) -> Result<Self::Result, InterpreterError> {
+    ) -> Result<Self::Result, InterpreterError>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I>
+            + CallSemanticsTrait<'ir, I, Result = Self::Result>
+            + 'ir,
+    {
         match self {
             DerivedInterpretableDialect::FunctionBody(body) => {
-                body.eval_call(interp, stage, callee, args)
+                body.eval_call::<L>(interp, stage, callee, args)
             }
             _ => Err(InterpreterError::missing_function_entry()),
         }
