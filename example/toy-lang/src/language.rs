@@ -4,14 +4,16 @@ use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
 use kirin_cmp::Cmp;
 use kirin_constant::Constant;
+use kirin_derive_interpreter::Interpretable;
 use kirin_function::{Lexical, Lifted};
 use kirin_scf::StructuredControlFlow;
 
 /// Source-stage language: structured control flow + lexical lambdas.
 ///
-/// This now composes the built-in dialect enums directly instead of inlining
-/// their `Block`/`Region`-containing operations.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+/// `#[derive(Interpretable)]` auto-generates inner-type bounds — no manual
+/// `Interpretable` impl needed. `SSACFGRegion` is still manual (in interpret.rs)
+/// to provide blanket `CallSemantics` via the Lexical variant.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[kirin(fn, type = ArithType)]
 pub enum HighLevel {
     #[wraps]
@@ -29,7 +31,7 @@ pub enum HighLevel {
 }
 
 /// Lowered-stage language: unstructured CF + lifted functions.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[kirin(fn, type = ArithType)]
 pub enum LowLevel {
     #[wraps]

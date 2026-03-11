@@ -2601,6 +2601,7 @@ dependencies = [
  "kirin-chumsky",
  "kirin-cmp",
  "kirin-constant",
+ "kirin-derive-interpreter",
  "kirin-function",
  "kirin-interpreter",
  "kirin-prettyless",
