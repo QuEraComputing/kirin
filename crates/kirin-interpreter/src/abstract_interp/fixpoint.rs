@@ -50,8 +50,8 @@ where
     where
         S: HasStageInfo<L>,
         L: Dialect
-            + Interpretable<'ir, Self, L>
-            + CallSemantics<'ir, Self, L, Result = AnalysisResult<V>>
+            + Interpretable<'ir, Self>
+            + CallSemantics<'ir, Self, Result = AnalysisResult<V>>
             + 'ir,
     {
         let stage = self.resolve_stage_info::<L>(stage_id)?;
@@ -66,9 +66,10 @@ where
         args: &[V],
     ) -> Result<AnalysisResult<V>, E>
     where
+        S: HasStageInfo<L>,
         L: Dialect
-            + Interpretable<'ir, Self, L>
-            + CallSemantics<'ir, Self, L, Result = AnalysisResult<V>>
+            + Interpretable<'ir, Self>
+            + CallSemantics<'ir, Self, Result = AnalysisResult<V>>
             + 'ir,
     {
         let key = Self::summary_key(stage_id, callee);
@@ -99,7 +100,7 @@ where
             })?;
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
-        def.eval_call(self, stage, callee, args)
+        def.eval_call::<L>(self, stage, callee, args)
     }
 
     /// Run forward abstract interpretation starting from `entry` block with
@@ -115,7 +116,7 @@ where
     ) -> Result<AnalysisResult<V>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+        L: Dialect + Interpretable<'ir, Self> + 'ir,
     {
         let stage = self.resolve_stage_info::<L>(stage_id)?;
 
@@ -391,8 +392,8 @@ where
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
     L: Dialect
-        + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>, L>
-        + CallSemantics<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
+        + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>>
+        + CallSemantics<'ir, AbstractInterpreter<'ir, V, S, E, G>, Result = AnalysisResult<V>>
         + 'ir,
 {
     type Output = AnalysisResult<V>;

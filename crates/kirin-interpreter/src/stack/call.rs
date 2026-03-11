@@ -1,5 +1,5 @@
 use kirin_ir::{
-    CompileStage, Dialect, GetInfo, SpecializedFunction, StageInfo, StageMeta,
+    CompileStage, Dialect, GetInfo, HasStageInfo, SpecializedFunction, StageInfo, StageMeta,
     SupportsStageDispatch,
 };
 
@@ -44,7 +44,8 @@ where
         args: &[V],
     ) -> Result<V, E>
     where
-        L: Dialect + Interpretable<'ir, Self, L> + CallSemantics<'ir, Self, L, Result = V> + 'ir,
+        S: HasStageInfo<L>,
+        L: Dialect + Interpretable<'ir, Self> + CallSemantics<'ir, Self, Result = V> + 'ir,
     {
         let stage_id = expect_stage_id(stage);
         let spec = callee
@@ -55,7 +56,7 @@ where
             })?;
         let body_stmt = *spec.body();
         let def: &L = body_stmt.definition(stage);
-        def.eval_call(self, stage, callee, args)
+        def.eval_call::<L>(self, stage, callee, args)
     }
 
     pub(super) fn push_call_frame_with_stage<L>(
@@ -65,7 +66,8 @@ where
         args: &[V],
     ) -> Result<(), E>
     where
-        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+        S: HasStageInfo<L>,
+        L: Dialect + Interpretable<'ir, Self> + 'ir,
     {
         let stage_id = expect_stage_id(stage);
         let spec = callee
@@ -81,7 +83,7 @@ where
         // resolves to the callee stage without mutable stage tracking on the
         // interpreter state.
         self.push_frame(Frame::new(callee, stage_id, None))?;
-        let entry_block = match def.interpret(self) {
+        let entry_block = match def.interpret::<L>(self) {
             Ok(Continuation::Jump(entry, _)) => entry,
             Ok(_) => {
                 let _ = self.pop_frame();

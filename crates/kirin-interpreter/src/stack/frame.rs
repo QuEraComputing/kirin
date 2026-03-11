@@ -145,7 +145,7 @@ where
     ) -> Result<Continuation<V, ConcreteExt>, E>
     where
         S: HasStageInfo<L>,
-        L: Interpretable<'ir, Self, L>,
+        L: Interpretable<'ir, Self>,
     {
         let saved_cursor = self.current_cursor()?;
         let first = block.first_statement(stage);

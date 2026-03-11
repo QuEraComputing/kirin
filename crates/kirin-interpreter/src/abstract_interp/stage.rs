@@ -15,8 +15,8 @@ where
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
     L: Dialect
-        + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>, L>
-        + CallSemantics<'ir, AbstractInterpreter<'ir, V, S, E, G>, L, Result = AnalysisResult<V>>
+        + Interpretable<'ir, AbstractInterpreter<'ir, V, S, E, G>>
+        + CallSemantics<'ir, AbstractInterpreter<'ir, V, S, E, G>, Result = AnalysisResult<V>>
         + 'ir,
     for<'x> S: SupportsStageDispatch<AnalyzeDynAction<'x, 'ir, V, S, E, G>, AnalysisResult<V>, E>,
 {

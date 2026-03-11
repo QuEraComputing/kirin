@@ -69,5 +69,5 @@ pub trait BlockEvaluator<'ir>: ValueStore + StageAccess<'ir> + 'ir {
     ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
     where
         Self::StageInfo: HasStageInfo<L>,
-        L: crate::Interpretable<'ir, Self, L>;
+        L: crate::Interpretable<'ir, Self>;
 }

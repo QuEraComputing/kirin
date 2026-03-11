@@ -58,8 +58,8 @@ where
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
     L: Dialect
-        + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L>
-        + CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>
+        + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>>
+        + CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = V>
         + 'ir,
 {
     type Output = V;
@@ -83,7 +83,7 @@ where
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
-    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
+    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>> + 'ir,
 {
     interp.in_stage::<L>().step()
 }
@@ -99,7 +99,7 @@ where
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
-    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
+    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>> + 'ir,
 {
     let stage = interp.resolve_stage_info::<L>(stage_id)?;
     interp.push_call_frame_with_stage::<L>(callee, stage, args)
@@ -114,7 +114,7 @@ where
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
-    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
+    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>> + 'ir,
 {
     let stage_id = interp.frames.current()?.stage();
     let stage = interp.resolve_stage_info::<L>(stage_id)?;
@@ -135,7 +135,7 @@ where
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
-    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
+    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>> + 'ir,
 {
     type Output = DynFrameDispatch<'ir, V, S, E, G>;
     type Error = E;

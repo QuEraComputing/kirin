@@ -1,4 +1,4 @@
-use kirin_ir::{CompileStage, Dialect, Pipeline, StageInfo, StageMeta, SupportsStageDispatch};
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo, StageMeta, SupportsStageDispatch};
 
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
 use crate::{BlockEvaluator, ConcreteExt, Continuation, Interpretable, InterpreterError};
@@ -65,14 +65,15 @@ where
         stage: &'ir StageInfo<L>,
     ) -> Result<Continuation<V, ConcreteExt>, E>
     where
-        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+        S: HasStageInfo<L>,
+        L: Dialect + Interpretable<'ir, Self> + 'ir,
     {
         self.spend_fuel()?;
         let cursor = self
             .current_cursor()?
             .ok_or_else(|| InterpreterError::NoFrame)?;
         let def: &L = cursor.definition(stage);
-        def.interpret(self)
+        def.interpret::<L>(self)
     }
 
     pub(super) fn advance_frame_with_stage<L>(
@@ -81,7 +82,8 @@ where
         control: &Continuation<V, ConcreteExt>,
     ) -> Result<(), E>
     where
-        L: Dialect + Interpretable<'ir, Self, L> + 'ir,
+        S: HasStageInfo<L>,
+        L: Dialect + Interpretable<'ir, Self> + 'ir,
     {
         match control {
             Continuation::Continue => {

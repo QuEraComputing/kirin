@@ -8,17 +8,23 @@ use crate::{BlockEvaluator, Interpreter, InterpreterError, StageAccess};
 /// - SSA CFG bodies get a blanket impl via [`SSACFGRegion`]
 /// - Non-SSA bodies (e.g. circuit graphs) can implement this directly
 ///
-/// `L` is the composed dialect enum that this body is part of.
-pub trait CallSemantics<'ir, I: Interpreter<'ir>, L: Dialect>: Dialect {
+/// `L` is moved to the method level to avoid recursive trait resolution cycles.
+pub trait CallSemantics<'ir, I: Interpreter<'ir>>: Dialect {
     type Result;
 
-    fn eval_call(
+    fn eval_call<L: Dialect>(
         &self,
         interpreter: &mut I,
         stage: &'ir StageInfo<L>,
         callee: SpecializedFunction,
         args: &[I::Value],
-    ) -> Result<Self::Result, I::Error>;
+    ) -> Result<Self::Result, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: crate::Interpretable<'ir, I>
+            + CallSemantics<'ir, I, Result = Self::Result>
+            + 'ir;
 }
 
 /// Marker trait for body types that represent SSA CFG regions.
@@ -34,24 +40,30 @@ pub trait SSACFGRegion: Dialect {
 // Blanket impl: SSACFGRegion -> CallSemantics<StackInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, T> CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>> for T
 where
     T: SSACFGRegion,
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: StageMeta + HasStageInfo<L> + 'ir,
+    S: StageMeta + 'ir,
     G: 'ir,
-    L: Dialect + crate::Interpretable<'ir, crate::StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     type Result = V;
 
-    fn eval_call(
+    fn eval_call<L: Dialect>(
         &self,
         interp: &mut crate::StackInterpreter<'ir, V, S, E, G>,
         stage: &'ir StageInfo<L>,
         callee: SpecializedFunction,
         args: &[V],
-    ) -> Result<V, E> {
+    ) -> Result<V, E>
+    where
+        S: HasStageInfo<L>,
+        E: From<InterpreterError>,
+        L: crate::Interpretable<'ir, crate::StackInterpreter<'ir, V, S, E, G>>
+            + CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, Result = V>
+            + 'ir,
+    {
         let entry = self.entry_block::<L>(stage)?;
         let first = entry.first_statement(stage);
         let frame_stage = interp.resolve_stage_id(stage);
@@ -66,24 +78,30 @@ where
 // Blanket impl: SSACFGRegion -> CallSemantics<AbstractInterpreter>
 // ---------------------------------------------------------------------------
 
-impl<'ir, V, S, E, G, L, T> CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> for T
+impl<'ir, V, S, E, G, T> CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>> for T
 where
     T: SSACFGRegion,
     V: crate::AbstractValue + Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: StageMeta + HasStageInfo<L> + 'ir,
+    S: StageMeta + 'ir,
     G: 'ir,
-    L: Dialect + crate::Interpretable<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, L> + 'ir,
 {
     type Result = crate::AnalysisResult<V>;
 
-    fn eval_call(
+    fn eval_call<L: Dialect>(
         &self,
         interp: &mut crate::AbstractInterpreter<'ir, V, S, E, G>,
         stage: &'ir StageInfo<L>,
         callee: SpecializedFunction,
         args: &[V],
-    ) -> Result<crate::AnalysisResult<V>, E> {
+    ) -> Result<crate::AnalysisResult<V>, E>
+    where
+        S: HasStageInfo<L>,
+        E: From<InterpreterError>,
+        L: crate::Interpretable<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>>
+            + CallSemantics<'ir, crate::AbstractInterpreter<'ir, V, S, E, G>, Result = crate::AnalysisResult<V>>
+            + 'ir,
+    {
         let entry = self.entry_block::<L>(stage)?;
         let stage_id = interp.resolve_stage_id(stage);
 

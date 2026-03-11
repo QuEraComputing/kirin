@@ -319,11 +319,11 @@ where
     ) -> Result<Continuation<V, std::convert::Infallible>, E>
     where
         S: HasStageInfo<L>,
-        L: Interpretable<'ir, Self, L>,
+        L: Interpretable<'ir, Self> + 'ir,
     {
         for stmt in block.statements(stage) {
             let def: &L = stmt.definition(stage);
-            let control = def.interpret(self)?;
+            let control = def.interpret::<L>(self)?;
             match control {
                 Continuation::Continue => {}
                 Continuation::Call {
@@ -346,7 +346,7 @@ where
         }
         if let Some(term) = block.terminator(stage) {
             let def: &L = term.definition(stage);
-            let control = def.interpret(self)?;
+            let control = def.interpret::<L>(self)?;
             Ok(control)
         } else {
             Err(InterpreterError::missing_terminator().into())

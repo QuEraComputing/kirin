@@ -9,9 +9,9 @@ impl<'a, 'ir, V, S, E, G, L> Staged<'a, 'ir, StackInterpreter<'ir, V, S, E, G>, 
 where
     V: Clone + 'ir,
     E: From<InterpreterError> + 'ir,
-    S: StageMeta + 'ir,
+    S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
-    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>, L> + 'ir,
+    L: Dialect + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>> + 'ir,
 {
     /// Execute the current statement's dialect semantics.
     /// Returns the raw continuation without advancing the cursor.
@@ -39,7 +39,7 @@ where
     /// Call a specialized function and return its result value.
     pub fn call(self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, L, Result = V>,
+        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = V>,
     {
         self.interp.call_with_stage::<L>(callee, self.stage, args)
     }
