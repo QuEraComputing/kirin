@@ -112,6 +112,8 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 - **Single lifetime `HasParser<'t>`**: All parser traits use a single lifetime `'t` (the input text lifetime). The old two-lifetime system (`HasParser<'tokens, 'src>`) has been collapsed. `HasDialectParser<'t>` has 4 required items: `Output` type, `namespaced_parser`, `clone_output`, `eq_output` — `recursive_parser` has a default impl.
 
+- **`ParseEmit<L>` for text parsing APIs**: `ParseStatementText` and `ParsePipelineText` require `L: ParseEmit<L>`. Three implementation paths: (1) `#[derive(HasParser)]` generates it automatically, (2) implement `SimpleParseEmit` marker for non-recursive dialects to get a blanket impl, (3) implement `ParseEmit` directly for full control. The derive-generated impl delegates to internal `HasParserEmitIR<'t>` (not in the public API) because GAT projection normalization requires a concrete lifetime parameter.
+
 - **`ParseDispatch` for pipeline parsing**: Multi-dialect pipeline parsing uses `ParseDispatch` (a monomorphic dispatch trait) instead of HRTB-based `SupportsStageDispatchMut`. Add `#[derive(ParseDispatch)]` alongside `#[derive(StageMeta)]` on stage enums. Single-dialect pipelines (`Pipeline<StageInfo<L>>`) get a blanket `ParseDispatch` impl. Zero HRTB in the dispatch chain.
 
 - **E0275 with Region/Block-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `FunctionBody`, SCF operations) still overflow the trait solver when composed via `#[wraps]` + `HasParser` due to recursive `EmitIR` bound evaluation. Workaround: inline the fields directly into the parent language enum. Non-recursive types (no Block/Region) work fine with `#[wraps]`. See `example/toy-lang/src/language.rs`.
