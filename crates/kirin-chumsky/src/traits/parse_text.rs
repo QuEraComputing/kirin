@@ -1,3 +1,4 @@
+use chumsky::span::SimpleSpan;
 use kirin_ir::{Dialect, Pipeline, StageInfo};
 
 use super::emit_ir::EmitContext;

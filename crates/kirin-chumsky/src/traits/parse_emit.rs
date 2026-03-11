@@ -1,6 +1,6 @@
 use kirin_ir::{Dialect, Statement};
 
-use super::{EmitContext, EmitError, EmitIR, HasParser, ParseError, parse_ast};
+use super::{EmitContext, EmitIR, HasParser, ParseError, parse_ast};
 
 /// A dialect that can parse text and emit IR in one step.
 ///
