@@ -4,6 +4,7 @@ mod emit_ir;
 mod has_dialect_emit_ir;
 mod has_parser;
 mod has_parser_emit_ir;
+mod parse_emit;
 mod parse_text;
 
 use chumsky::prelude::*;
@@ -23,4 +24,5 @@ pub use emit_ir::*;
 pub use has_dialect_emit_ir::*;
 pub use has_parser::*;
 pub use has_parser_emit_ir::*;
+pub use parse_emit::*;
 pub use parse_text::*;

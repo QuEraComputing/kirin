@@ -82,7 +82,8 @@ pub mod prelude {
     pub use crate::parsers::*;
     pub use crate::traits::{
         BoxedParser, DirectlyParsable, EmitContext, EmitError, EmitIR, HasDialectParser, HasParser,
-        HasParserEmitIR, ParseError, ParseStatementText, ParseStatementTextExt, ParserError,
+        HasParserEmitIR, ParseEmit, ParseError, ParseStatementText, ParseStatementTextExt,
+        ParserError, SimpleParseEmit,
         RecursiveParser, TokenInput, parse_ast,
     };
     pub use chumsky::prelude::*;
