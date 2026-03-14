@@ -51,7 +51,7 @@ Unstructured control flow + lifted functions:
 ### Stage Enum
 
 ```rust
-#[derive(StageMeta, RenderStage)]
+#[derive(StageMeta, RenderDispatch)]
 enum Stage {
     #[stage(name = "source")]
     Source(StageInfo<HighLevel>),

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use kirin_chumsky::{ParsePipelineText, ParseStatementTextExt, PrettyPrint};
 use kirin_ir::{Dialect, GetInfo, Pipeline, SSAKind, StageInfo, Statement};
-use kirin_prettyless::{Config, Document, PipelinePrintExt, RenderStage};
+use kirin_prettyless::{Config, Document, PipelinePrintExt, RenderDispatch};
 
 /// Parse a single statement with pre-registered operands.
 pub fn emit_statement<L>(input: &str, operands: &[(&str, L::Type)]) -> (StageInfo<L>, Statement)
@@ -66,7 +66,7 @@ where
 pub fn assert_pipeline_roundtrip<L>(input: &str)
 where
     Pipeline<StageInfo<L>>: ParsePipelineText,
-    StageInfo<L>: RenderStage,
+    StageInfo<L>: RenderDispatch,
     L: Dialect,
 {
     let mut parsed_pipeline: Pipeline<StageInfo<L>> = Pipeline::new();

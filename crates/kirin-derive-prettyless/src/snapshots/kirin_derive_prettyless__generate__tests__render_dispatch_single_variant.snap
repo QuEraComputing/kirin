@@ -2,7 +2,7 @@
 source: crates/kirin-derive-prettyless/src/generate.rs
 expression: generate_render_stage_code(input)
 ---
-impl ::kirin::pretty::RenderStage for Stage {
+impl ::kirin::pretty::RenderDispatch for SimpleStage {
     fn render_staged_function(
         &self,
         sf: kirin_ir::StagedFunction,
@@ -10,12 +10,12 @@ impl ::kirin::pretty::RenderStage for Stage {
         global_symbols: &kirin_ir::InternTable<String, kirin_ir::GlobalSymbol>,
     ) -> Result<Option<String>, std::fmt::Error> {
         match self {
-            Stage::Source(s) => {
-                ::kirin::pretty::RenderStage::render_staged_function(s, sf, config, global_symbols)
-            }
-            Stage::Lowered(s) => {
-                ::kirin::pretty::RenderStage::render_staged_function(s, sf, config, global_symbols)
-            }
+            SimpleStage::Main(s) => ::kirin::pretty::RenderDispatch::render_staged_function(
+                s,
+                sf,
+                config,
+                global_symbols,
+            ),
         }
     }
 }

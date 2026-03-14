@@ -2,7 +2,7 @@ use kirin::prelude::*;
 
 use crate::language::{HighLevel, LowLevel};
 
-#[derive(Debug, StageMeta, ParseDispatch, RenderStage)]
+#[derive(Debug, StageMeta, ParseDispatch, RenderDispatch)]
 pub enum Stage {
     #[stage(name = "source")]
     Source(StageInfo<HighLevel>),

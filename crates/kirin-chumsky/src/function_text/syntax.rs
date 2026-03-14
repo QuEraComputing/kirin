@@ -85,11 +85,9 @@ where
                 return Err(Rich::custom(
                     input.span_since(&start),
                     format!("expected '{{', found {found}"),
-                ))
+                ));
             }
-            None => {
-                return Err(Rich::custom(input.span_since(&start), "expected '{'"))
-            }
+            None => return Err(Rich::custom(input.span_since(&start), "expected '{'")),
         }
         let mut depth: u32 = 1;
         while depth > 0 {
@@ -97,12 +95,7 @@ where
                 Some(Token::LBrace) => depth += 1,
                 Some(Token::RBrace) => depth -= 1,
                 Some(_) => {}
-                None => {
-                    return Err(Rich::custom(
-                        input.span_since(&start),
-                        "unclosed '{'",
-                    ))
-                }
+                None => return Err(Rich::custom(input.span_since(&start), "unclosed '{'")),
             }
         }
         Ok(input.span_since(&start))
@@ -133,18 +126,16 @@ where
         .ignore_then(symbol())
         .then(fn_signature_parser::<I, L>())
         .then(brace_body_span::<I>())
-        .map_with(
-            |((stage, sig), body_span), extra| Declaration::Specialize {
-                header: Header {
-                    stage,
-                    function: sig.function,
-                    signature: sig.signature,
-                    span: extra.span(),
-                },
-                body_span,
+        .map_with(|((stage, sig), body_span), extra| Declaration::Specialize {
+            header: Header {
+                stage,
+                function: sig.function,
+                signature: sig.signature,
                 span: extra.span(),
             },
-        );
+            body_span,
+            span: extra.span(),
+        });
 
     choice((stage_decl, specialize_decl))
 }

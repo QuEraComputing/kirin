@@ -1,6 +1,6 @@
 //! Pipeline-wide pretty printing support.
 //!
-//! Provides [`RenderStage`] for type-erased per-function rendering within a
+//! Provides [`RenderDispatch`] for type-erased per-function rendering within a
 //! stage, and [`PipelineDocument`] for printing a specific function across all
 //! stages in a pipeline.
 
@@ -23,7 +23,7 @@ use crate::{Config, Document, PrettyPrint, RenderError};
 /// match arms:
 ///
 /// ```ignore
-/// impl RenderStage for Stage {
+/// impl RenderDispatch for Stage {
 ///     fn render_staged_function(
 ///         &self, sf: StagedFunction, config: &Config,
 ///         gs: &InternTable<String, GlobalSymbol>,
@@ -35,7 +35,7 @@ use crate::{Config, Document, PrettyPrint, RenderError};
 ///     }
 /// }
 /// ```
-pub trait RenderStage {
+pub trait RenderDispatch {
     /// Render a staged function by its [`StagedFunction`] ID.
     ///
     /// The stage prefix is derived from the context's own identity, so no
@@ -52,8 +52,8 @@ pub trait RenderStage {
 }
 
 /// Generic blanket implementation: any `StageInfo<L>` where `L` supports pretty
-/// printing automatically gets `RenderStage`.
-impl<L> RenderStage for StageInfo<L>
+/// printing automatically gets `RenderDispatch`.
+impl<L> RenderDispatch for StageInfo<L>
 where
     L: Dialect + PrettyPrint,
     L::Type: std::fmt::Display,
@@ -85,7 +85,7 @@ pub struct PipelineDocument<'a, S> {
     pipeline: &'a Pipeline<S>,
 }
 
-impl<'a, S: RenderStage> PipelineDocument<'a, S> {
+impl<'a, S: RenderDispatch> PipelineDocument<'a, S> {
     /// Create a new pipeline document.
     pub fn new(config: Config, pipeline: &'a Pipeline<S>) -> Self {
         Self { config, pipeline }
@@ -126,7 +126,7 @@ pub struct FunctionRenderBuilder<'a, S> {
     config: Config,
 }
 
-impl<'a, S: RenderStage> FunctionRenderBuilder<'a, S> {
+impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
     /// Set custom rendering configuration.
     pub fn config(mut self, config: Config) -> Self {
         self.config = config;
@@ -166,7 +166,7 @@ pub struct PipelineRenderBuilder<'a, S> {
     config: Config,
 }
 
-impl<'a, S: RenderStage> PipelineRenderBuilder<'a, S> {
+impl<'a, S: RenderDispatch> PipelineRenderBuilder<'a, S> {
     /// Set custom rendering configuration.
     pub fn config(mut self, config: Config) -> Self {
         self.config = config;
@@ -211,17 +211,19 @@ impl<'a, S: RenderStage> PipelineRenderBuilder<'a, S> {
 /// Extension trait for cross-stage printing on [`Function`] IDs.
 pub trait PrintExt {
     /// Create a builder for rendering this function across all stages.
-    fn render<'a, S: RenderStage>(&self, pipeline: &'a Pipeline<S>)
-    -> FunctionRenderBuilder<'a, S>;
+    fn render<'a, S: RenderDispatch>(
+        &self,
+        pipeline: &'a Pipeline<S>,
+    ) -> FunctionRenderBuilder<'a, S>;
 
     /// Convenience shorthand: render to string with default config.
-    fn sprint<S: RenderStage>(&self, pipeline: &Pipeline<S>) -> String {
+    fn sprint<S: RenderDispatch>(&self, pipeline: &Pipeline<S>) -> String {
         self.render(pipeline).to_string().expect("render failed")
     }
 }
 
 impl PrintExt for Function {
-    fn render<'a, S: RenderStage>(
+    fn render<'a, S: RenderDispatch>(
         &self,
         pipeline: &'a Pipeline<S>,
     ) -> FunctionRenderBuilder<'a, S> {
@@ -235,7 +237,7 @@ impl PrintExt for Function {
 
 /// Extension trait for printing all functions in a [`Pipeline`].
 pub trait PipelinePrintExt {
-    type Stage: RenderStage;
+    type Stage: RenderDispatch;
 
     /// Create a builder for rendering every function in the pipeline.
     fn render(&self) -> PipelineRenderBuilder<'_, Self::Stage>;
@@ -246,7 +248,7 @@ pub trait PipelinePrintExt {
     }
 }
 
-impl<S: RenderStage> PipelinePrintExt for Pipeline<S> {
+impl<S: RenderDispatch> PipelinePrintExt for Pipeline<S> {
     type Stage = S;
 
     fn render(&self) -> PipelineRenderBuilder<'_, Self::Stage> {

@@ -365,7 +365,7 @@ More aggressive option (deferred): Unify `Scan`/`Emit` into single `DeriveVisito
 - `PrettyPrint` trait is a natural transformation from IR -> Document algebra
 - `ScanResultWidth` breaks compositionality (two-pass with `&mut Document`)
 - `PrettyPrintName`/`PrettyPrintType` don't require `L: PrettyPrint` -- inconsistent
-- `RenderStage` correctly erases dialect type behind trait object for heterogeneous pipeline printing
+- `RenderDispatch` correctly erases dialect type behind trait object for heterogeneous pipeline printing
 - Lexer is minimal and fast (single file, Logos-based)
 - `EscapedLBrace`/`EscapedRBrace` Display semantics are correct but naming is confusing
 - `lex()` function may be unused in practice (callers use `Token::lexer().spanned()` directly)
@@ -381,7 +381,7 @@ More aggressive option (deferred): Unify `Scan`/`Emit` into single `DeriveVisito
 | Remove dead alignment code (`result_width`, `max_result_width`) | 0 | 2 | ~20 |
 | Inline lexer into kirin-chumsky (optional) | 0 | 0 | 1 crate boundary |
 
-Total: 3 traits eliminated, ~30 methods consolidated, ~310 lines saved. Core API surface drops from 5 traits to 2 (`PrettyPrint` + `RenderStage`).
+Total: 3 traits eliminated, ~30 methods consolidated, ~310 lines saved. Core API surface drops from 5 traits to 2 (`PrettyPrint` + `RenderDispatch`).
 
 Proposed builder pattern replacement:
 ```rust

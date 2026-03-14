@@ -150,9 +150,9 @@ Rationale:
   - print: `func.sprint(&pipeline)`
   - parse: `text.parse_function(&mut pipeline)`
 
-## Trait dual to `RenderStage`
+## Trait dual to `RenderDispatch`
 
-Pipeline printing uses type-erased `RenderStage`. Parsing needs the inverse:
+Pipeline printing uses type-erased `RenderDispatch`. Parsing needs the inverse:
 
 ```rust
 pub trait ParseStage {

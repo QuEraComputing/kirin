@@ -20,7 +20,7 @@ pub(crate) fn generate(input: &DeriveInput) -> Result<TokenStream2, syn::Error> 
     let all_idents: Vec<&syn::Ident> = variants.iter().map(|v| &v.ident).collect();
 
     Ok(quote! {
-        impl #impl_generics #pretty_crate::RenderStage for #enum_ident #ty_generics #where_clause {
+        impl #impl_generics #pretty_crate::RenderDispatch for #enum_ident #ty_generics #where_clause {
             fn render_staged_function(
                 &self,
                 sf: #ir_crate::StagedFunction,
@@ -29,7 +29,7 @@ pub(crate) fn generate(input: &DeriveInput) -> Result<TokenStream2, syn::Error> 
             ) -> Result<Option<String>, std::fmt::Error> {
                 match self {
                     #( #enum_ident::#all_idents(s) =>
-                        #pretty_crate::RenderStage::render_staged_function(s, sf, config, global_symbols), )*
+                        #pretty_crate::RenderDispatch::render_staged_function(s, sf, config, global_symbols), )*
                 }
             }
         }
@@ -69,12 +69,12 @@ mod tests {
     use kirin_test_utils::rustfmt;
 
     fn generate_render_stage_code(input: syn::DeriveInput) -> String {
-        let tokens = generate(&input).expect("Failed to generate RenderStage");
+        let tokens = generate(&input).expect("Failed to generate RenderDispatch");
         rustfmt(tokens.to_string())
     }
 
     #[test]
-    fn test_render_stage_two_variants() {
+    fn test_render_dispatch_two_variants() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[stage(crate = "kirin_ir")]
             enum Stage {
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn test_render_stage_custom_crate_path() {
+    fn test_render_dispatch_custom_crate_path() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[stage(crate = "kirin_ir")]
             #[pretty(crate = kirin_prettyless)]
@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_render_stage_single_variant() {
+    fn test_render_dispatch_single_variant() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[stage(crate = "kirin_ir")]
             enum SimpleStage {

@@ -851,7 +851,7 @@ Remove the `SSACFGRegion` manual impls too — the derive generates delegation f
 
 Add `#[derive(ParseDispatch)]` to the toy-lang stage enum:
 ```rust
-#[derive(Debug, Clone, StageMeta, RenderStage, ParseDispatch)]
+#[derive(Debug, Clone, StageMeta, RenderDispatch, ParseDispatch)]
 pub enum ToyStage {
     #[stage(name = "source", dialect = HighLevel)]
     Source(StageInfo<HighLevel>),

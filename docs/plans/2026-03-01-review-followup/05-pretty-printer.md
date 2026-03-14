@@ -5,7 +5,7 @@
 
 ## Goal
 
-Reduce the pretty printer's trait surface from 5 traits to 2 (`PrettyPrint` + `RenderStage`), replace the 12-method `PrettyPrintExt` with a builder pattern, and remove dead code.
+Reduce the pretty printer's trait surface from 5 traits to 2 (`PrettyPrint` + `RenderDispatch`), replace the 12-method `PrettyPrintExt` with a builder pattern, and remove dead code.
 
 ## Changes
 

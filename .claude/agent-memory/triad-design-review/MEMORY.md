@@ -34,7 +34,7 @@
 - `PrettyPrint` trait: catamorphism over IR, generic over `L: Dialect + PrettyPrint`
 - Sub-traits: `PrettyPrintName`, `PrettyPrintType` for format specifier projections
 - `ScanResultWidth<L>` pre-pass mutates `Document` for alignment; `PrettyPrintExt` requires both
-- `RenderStage`: type-erased per-stage rendering; blanket on `StageInfo<L>`
+- `RenderDispatch`: type-erased per-stage rendering; blanket on `StageInfo<L>`
 - **Dead code**: `Config.line_numbers` never read by renderer
 - **API gap**: `sprint()` vs `sprint_with_globals()` confusing for users
 - **Unused**: `lex()` function in kirin-lexer; duplicated tokenize pattern

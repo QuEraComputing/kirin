@@ -69,7 +69,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 **Derive Infrastructure:**
 - `kirin-derive-toolkit` — Shared derive utilities (IR model, darling re-export, template system)
 - `kirin-derive-ir` — `#[derive(Dialect, StageMeta)]` and IR property traits
-- `kirin-derive-prettyless` — `#[derive(RenderStage)]` (proc-macro)
+- `kirin-derive-prettyless` — `#[derive(RenderDispatch)]` (proc-macro)
 
 **Analysis:**
 - `kirin-interval` — Interval domain for abstract interpretation

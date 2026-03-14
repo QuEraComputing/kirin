@@ -266,7 +266,7 @@ use kirin::pretty::PipelinePrintExt;
 
 use crate::language::{HighLevel, LowLevel};
 
-#[derive(Debug, StageMeta, RenderStage)]
+#[derive(Debug, StageMeta, RenderDispatch)]
 pub enum Stage {
     #[stage(name = "source")]
     Source(StageInfo<HighLevel>),
