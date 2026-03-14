@@ -25,6 +25,7 @@
 use kirin::prelude::*;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
+#[non_exhaustive]
 #[kirin(terminator, builders, type = T)]
 pub enum ControlFlow<T: CompileTimeValue> {
     #[chumsky(format = "{.br} {target}({args})")]
@@ -41,9 +42,9 @@ pub enum ControlFlow<T: CompileTimeValue> {
         true_args: Vec<SSAValue>,
         false_target: Successor,
         false_args: Vec<SSAValue>,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
+    #[doc(hidden)]
+    __Phantom(std::marker::PhantomData<T>),
 }
 
 #[cfg(feature = "interpret")]

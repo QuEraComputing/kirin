@@ -74,6 +74,7 @@ where
                 interp.write(*result, a >> b)?;
                 Ok(Continuation::Continue)
             }
+            _ => unreachable!(),
         }
     }
 }

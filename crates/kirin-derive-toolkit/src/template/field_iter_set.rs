@@ -236,9 +236,18 @@ impl FieldIterTemplateSet {
         } else {
             quote! { &#trait_lifetime self }
         };
-        let body = quote! {
-            match self {
-                #(#variant_exprs),*
+        let body = if data.has_hidden_variants {
+            quote! {
+                match self {
+                    #(#variant_exprs,)*
+                    _ => unreachable!()
+                }
+            }
+        } else {
+            quote! {
+                match self {
+                    #(#variant_exprs),*
+                }
             }
         };
 

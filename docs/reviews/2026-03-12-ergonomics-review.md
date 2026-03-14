@@ -50,9 +50,9 @@ Confirmed: 8 | Likely: 2 | Uncertain: 0
 
 | Priority | Finding | Action | Status |
 |----------|---------|--------|--------|
-| P1 | PhantomData boilerplate | Refactor to `#[non_exhaustive]` + `__Phantom` per enum | To Do |
+| P1 | PhantomData boilerplate | Refactor to `#[non_exhaustive]` + `__Phantom` per enum | Done |
 | P2 | `#[kirin(fn)]` → `#[kirin(builders)]` | Rename attribute in derive-ir + update all consumers | Done |
-| P2 | Duplicate where-clause bounds | Remove redundant impl-level `I::Error: From<InterpreterError>` | To Do |
+| P2 | Duplicate where-clause bounds | Remove redundant impl-level `I::Error: From<InterpreterError>` | Done |
 | ~P2~ | ~#[wraps] + Region/Block E0275~ | Already fixed — stale docs updated, tests converted | Done |
 | P2 | Complexity cliff | Create intermediate example dialect | Deferred |
 

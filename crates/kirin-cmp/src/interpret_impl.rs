@@ -284,6 +284,7 @@ where
                 interp.write(*result, a.cmp_ge(&b))?;
                 Ok(Continuation::Continue)
             }
+            _ => unreachable!(),
         }
     }
 }

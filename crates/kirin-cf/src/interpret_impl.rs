@@ -35,7 +35,6 @@ where
                 true_args,
                 false_target,
                 false_args,
-                ..
             } => {
                 let cond = interp.read(*condition)?;
                 let read_args = |interp: &mut I, args: &[SSAValue]| -> Result<_, I::Error> {
@@ -62,6 +61,7 @@ where
                     }
                 }
             }
+            _ => unreachable!(),
         }
     }
 }

@@ -91,6 +91,7 @@ where
                 interp.write(*result, -a)?;
                 Ok(Continuation::Continue)
             }
+            _ => unreachable!(),
         }
     }
 }

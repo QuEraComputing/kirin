@@ -13,7 +13,6 @@ fn make_and() -> Bitwise<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -22,7 +21,6 @@ fn make_or() -> Bitwise<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -31,7 +29,6 @@ fn make_xor() -> Bitwise<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -39,7 +36,6 @@ fn make_not() -> Bitwise<UnitTy> {
     Bitwise::Not {
         operand: TestSSAValue(0).into(),
         result: TestSSAValue(1).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -48,7 +44,6 @@ fn make_shl() -> Bitwise<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -57,7 +52,6 @@ fn make_shr() -> Bitwise<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 

@@ -213,11 +213,17 @@ where
         })
         .collect();
 
-    if let Some(marker) = marker_handler {
+    let wildcard = if data.has_hidden_variants && marker_handler.is_none() {
+        Some(quote! { _ => unreachable!() })
+    } else {
+        marker_handler
+    };
+
+    if let Some(wildcard) = wildcard {
         quote! {
             match self {
                 #(#arms)*
-                #marker
+                #wildcard
             }
         }
     } else {

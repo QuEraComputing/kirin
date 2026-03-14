@@ -14,7 +14,6 @@ fn make_eq() -> Cmp<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -23,7 +22,6 @@ fn make_ne() -> Cmp<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -32,7 +30,6 @@ fn make_lt() -> Cmp<UnitTy> {
         lhs: TestSSAValue(3).into(),
         rhs: TestSSAValue(4).into(),
         result: TestSSAValue(5).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -41,7 +38,6 @@ fn make_le() -> Cmp<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -50,7 +46,6 @@ fn make_gt() -> Cmp<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -59,7 +54,6 @@ fn make_ge() -> Cmp<UnitTy> {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
         result: TestSSAValue(2).into(),
-        marker: std::marker::PhantomData,
     }
 }
 

@@ -52,10 +52,15 @@ impl<L: Layout> Input<L> {
             syn::Data::Struct(_) => {
                 Data::Struct(DataStruct(Statement::from_derive_input(input, ir_type)?))
             }
-            syn::Data::Enum(data) => Data::Enum(DataEnum {
-                variants: data
+            syn::Data::Enum(data) => {
+                let has_hidden_variants = data
                     .variants
                     .iter()
+                    .any(|v| v.ident.to_string().starts_with("__"));
+                let variants = data
+                    .variants
+                    .iter()
+                    .filter(|v| !v.ident.to_string().starts_with("__"))
                     .map(|v| {
                         Statement::from_variant(
                             input.attrs.iter().any(|f| f.path().is_ident("wraps")),
@@ -63,8 +68,12 @@ impl<L: Layout> Input<L> {
                             ir_type,
                         )
                     })
-                    .collect::<darling::Result<Vec<_>>>()?,
-            }),
+                    .collect::<darling::Result<Vec<_>>>()?;
+                Data::Enum(DataEnum {
+                    variants,
+                    has_hidden_variants,
+                })
+            }
             syn::Data::Union(_) => {
                 return Err(darling::Error::custom(
                     "Kirin ASTs can only be derived for structs or enums",
@@ -131,8 +140,12 @@ impl<L: Layout> DerefMut for DataStruct<L> {
 /// wrapper variants (marked with `#[wraps]`) from regular ones.
 #[derive(Debug, Clone)]
 pub struct DataEnum<L: Layout> {
-    /// One [`Statement`] per enum variant.
+    /// One [`Statement`] per enum variant (excludes hidden `__`-prefixed variants).
     pub variants: Vec<Statement<L>>,
+    /// Whether the original enum has hidden variants (e.g. `__Phantom`) that
+    /// were filtered out. When true, generated match expressions include a
+    /// `_ => unreachable!()` wildcard arm.
+    pub has_hidden_variants: bool,
 }
 
 impl<L: Layout> DataEnum<L> {

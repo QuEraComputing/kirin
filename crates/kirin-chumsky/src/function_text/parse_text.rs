@@ -268,7 +268,6 @@ where
 
     let Declaration::Specialize {
         header,
-        body: _,
         body_span,
         span,
     } = declaration

@@ -179,9 +179,18 @@ impl<L: Layout> Template<L> for TraitImplTemplate<L> {
                         };
                         arms.push(quote! { #arm_pattern => #variant_body });
                     }
-                    quote! {
-                        match self {
-                            #(#arms),*
+                    if data.has_hidden_variants {
+                        quote! {
+                            match self {
+                                #(#arms,)*
+                                _ => unreachable!()
+                            }
+                        }
+                    } else {
+                        quote! {
+                            match self {
+                                #(#arms),*
+                            }
                         }
                     }
                 }

@@ -29,7 +29,6 @@ fn make_cond_branch() -> ControlFlow<UnitTy> {
         true_args: vec![TestSSAValue(1).into()],
         false_target: Successor::from_block(Block::from(kirin::ir::Id::from(TestSSAValue(20)))),
         false_args: vec![TestSSAValue(2).into(), TestSSAValue(3).into()],
-        marker: std::marker::PhantomData,
     }
 }
 
@@ -40,7 +39,6 @@ fn make_cond_branch_no_args() -> ControlFlow<UnitTy> {
         true_args: vec![],
         false_target: Successor::from_block(Block::from(kirin::ir::Id::from(TestSSAValue(20)))),
         false_args: vec![],
-        marker: std::marker::PhantomData,
     }
 }
 

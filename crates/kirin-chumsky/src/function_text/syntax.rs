@@ -18,12 +18,11 @@ pub(super) struct Header<'src, T> {
 }
 
 #[derive(Debug, Clone)]
-pub(super) enum Declaration<'src, T, B> {
+pub(super) enum Declaration<'src, T> {
     Stage(Header<'src, T>),
     Specialize {
         header: Header<'src, T>,
-        body: B,
-        /// Span of the body portion only (the `L::parser()` output).
+        /// Span of the body portion only (the brace-balanced region).
         body_span: SimpleSpan,
         /// Span of the entire specialize declaration.
         span: SimpleSpan,
@@ -72,8 +71,46 @@ where
         .labelled("function signature")
 }
 
+/// Brace-balanced body scanner. Matches `{ ... }` with arbitrary nesting,
+/// returning only the span. Does not parse the body contents.
+fn brace_body_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>
+where
+    I: TokenInput<'src>,
+{
+    chumsky::primitive::custom(|input: &mut chumsky::input::InputRef<'src, '_, I, _>| {
+        let start = input.cursor();
+        match input.next() {
+            Some(Token::LBrace) => {}
+            Some(found) => {
+                return Err(Rich::custom(
+                    input.span_since(&start),
+                    format!("expected '{{', found {found}"),
+                ))
+            }
+            None => {
+                return Err(Rich::custom(input.span_since(&start), "expected '{'"))
+            }
+        }
+        let mut depth: u32 = 1;
+        while depth > 0 {
+            match input.next() {
+                Some(Token::LBrace) => depth += 1,
+                Some(Token::RBrace) => depth -= 1,
+                Some(_) => {}
+                None => {
+                    return Err(Rich::custom(
+                        input.span_since(&start),
+                        "unclosed '{'",
+                    ))
+                }
+            }
+        }
+        Ok(input.span_since(&start))
+    })
+}
+
 fn declaration_parser<'src, I, L>()
--> impl Parser<'src, I, Declaration<'src, L::Type, <L as HasParser<'src>>::Output>, ParserError<'src>>
+-> impl Parser<'src, I, Declaration<'src, L::Type>, ParserError<'src>>
 where
     I: TokenInput<'src>,
     L: Dialect + HasParser<'src>,
@@ -95,16 +132,15 @@ where
     let specialize_decl = identifier("specialize")
         .ignore_then(symbol())
         .then(fn_signature_parser::<I, L>())
-        .then(L::parser().map_with(|body, extra| (body, extra.span())))
+        .then(brace_body_span::<I>())
         .map_with(
-            |((stage, sig), (body, body_span)), extra| Declaration::Specialize {
+            |((stage, sig), body_span), extra| Declaration::Specialize {
                 header: Header {
                     stage,
                     function: sig.function,
                     signature: sig.signature,
                     span: extra.span(),
                 },
-                body,
                 body_span,
                 span: extra.span(),
             },
@@ -122,13 +158,7 @@ pub(super) fn tokenize<'src>(src: &'src str) -> Vec<(Token<'src>, SimpleSpan)> {
 
 pub(super) fn parse_one_declaration<'src, L>(
     tokens: &[(Token<'src>, SimpleSpan)],
-) -> Result<
-    (
-        Declaration<'src, L::Type, <L as HasParser<'src>>::Output>,
-        SimpleSpan,
-    ),
-    Vec<ChumskyError<'src>>,
->
+) -> Result<(Declaration<'src, L::Type>, SimpleSpan), Vec<ChumskyError<'src>>>
 where
     L: Dialect + HasParser<'src>,
     L::Type: HasParser<'src, Output = L::Type>,

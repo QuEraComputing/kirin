@@ -51,6 +51,7 @@ mod tests;
 
 /// Generic bitwise statements parameterized by a compile-time type lattice.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[non_exhaustive]
 #[kirin(pure, builders, type = T)]
 pub enum Bitwise<T: CompileTimeValue> {
     #[kirin(speculatable)]
@@ -59,8 +60,6 @@ pub enum Bitwise<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.or} {lhs}, {rhs} -> {result:type}")]
@@ -68,8 +67,6 @@ pub enum Bitwise<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.xor} {lhs}, {rhs} -> {result:type}")]
@@ -77,31 +74,25 @@ pub enum Bitwise<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.not} {operand} -> {result:type}")]
     Not {
         operand: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[chumsky(format = "{result:name} = {.shl} {lhs}, {rhs} -> {result:type}")]
     Shl {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[chumsky(format = "{result:name} = {.shr} {lhs}, {rhs} -> {result:type}")]
     Shr {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
+    #[doc(hidden)]
+    __Phantom(std::marker::PhantomData<T>),
 }

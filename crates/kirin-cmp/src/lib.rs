@@ -13,6 +13,7 @@ mod tests;
 /// Each operation takes two operands and produces a result of the same type `T`.
 /// The result convention follows integer semantics: 1 for true, 0 for false.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[non_exhaustive]
 #[kirin(pure, builders, type = T)]
 pub enum Cmp<T: CompileTimeValue> {
     #[kirin(speculatable)]
@@ -21,8 +22,6 @@ pub enum Cmp<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.ne} {lhs}, {rhs} -> {result:type}")]
@@ -30,8 +29,6 @@ pub enum Cmp<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.lt} {lhs}, {rhs} -> {result:type}")]
@@ -39,8 +36,6 @@ pub enum Cmp<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.le} {lhs}, {rhs} -> {result:type}")]
@@ -48,8 +43,6 @@ pub enum Cmp<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.gt} {lhs}, {rhs} -> {result:type}")]
@@ -57,8 +50,6 @@ pub enum Cmp<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.ge} {lhs}, {rhs} -> {result:type}")]
@@ -66,7 +57,7 @@ pub enum Cmp<T: CompileTimeValue> {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
-        #[kirin(default)]
-        marker: std::marker::PhantomData<T>,
     },
+    #[doc(hidden)]
+    __Phantom(std::marker::PhantomData<T>),
 }
