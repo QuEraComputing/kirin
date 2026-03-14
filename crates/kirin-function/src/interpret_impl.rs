@@ -24,7 +24,6 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for FunctionBody<T>
 where
     I: Interpreter<'ir>,
-    I::Error: From<InterpreterError>,
     T: kirin::prelude::CompileTimeValue,
 {
     fn interpret<L: Dialect>(
@@ -64,7 +63,6 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Lambda<T>
 where
     I: Interpreter<'ir>,
-    I::Error: From<InterpreterError>,
     T: kirin::prelude::CompileTimeValue,
 {
     fn interpret<L: Dialect>(
@@ -106,7 +104,6 @@ impl<'ir, I, T> Interpretable<'ir, I> for Lexical<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret<L: Dialect>(
@@ -130,7 +127,6 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Bind<T>
 where
     I: Interpreter<'ir>,
-    I::Error: From<InterpreterError>,
     T: kirin::prelude::CompileTimeValue,
 {
     fn interpret<L: Dialect>(
@@ -153,7 +149,6 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Call<T>
 where
     I: Interpreter<'ir>,
-    I::Error: From<InterpreterError>,
     I::Value: Clone,
     T: kirin::prelude::CompileTimeValue,
 {
@@ -306,7 +301,6 @@ impl<'ir, I, T> Interpretable<'ir, I> for Lifted<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret<L: Dialect>(

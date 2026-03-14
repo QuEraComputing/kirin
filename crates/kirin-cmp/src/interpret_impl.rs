@@ -224,7 +224,6 @@ impl<'ir, I, T> Interpretable<'ir, I> for Cmp<T>
 where
     I: Interpreter<'ir>,
     I::Value: CompareValue,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret<L: Dialect>(

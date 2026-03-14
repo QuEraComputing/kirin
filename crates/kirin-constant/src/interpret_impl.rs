@@ -7,7 +7,6 @@ impl<'ir, I, T, Ty> Interpretable<'ir, I> for Constant<T, Ty>
 where
     I: Interpreter<'ir>,
     I::Value: From<T>,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue + Typeof<Ty> + Clone + PrettyPrint,
     Ty: CompileTimeValue,
 {

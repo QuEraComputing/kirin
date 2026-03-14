@@ -187,7 +187,6 @@ impl<'ir, I, T> Interpretable<'ir, I> for For<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone + ForLoopValue,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret<L: Dialect>(
@@ -240,7 +239,6 @@ impl<'ir, I, T> Interpretable<'ir, I> for StructuredControlFlow<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone + BranchCondition + ForLoopValue,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret<L: Dialect>(

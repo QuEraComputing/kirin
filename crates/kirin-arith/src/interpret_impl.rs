@@ -26,7 +26,6 @@ where
         + CheckedDiv
         + CheckedRem
         + Neg<Output = I::Value>,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret<L: Dialect>(

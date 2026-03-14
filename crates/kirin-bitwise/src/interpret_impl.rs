@@ -15,7 +15,6 @@ where
         + Not<Output = I::Value>
         + Shl<Output = I::Value>
         + Shr<Output = I::Value>,
-    I::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret<L: Dialect>(
