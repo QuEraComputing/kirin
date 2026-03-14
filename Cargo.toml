@@ -3,80 +3,40 @@ name = "kirin"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
-kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
-kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless", features = ["derive"] }
-kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky", features = ["derive"] }
-kirin-interpreter = { version = "0.1.0", path = "crates/kirin-interpreter", features = ["derive"], optional = true }
-serde = { version = "1.0.228", optional = true }
-
-# Re-export dependencies needed by derive macros
-chumsky = "0.10"
-kirin-lexer = { version = "0.1.0", path = "crates/kirin-lexer" }
-
-[dev-dependencies]
-kirin-arith = { workspace = true }
-kirin-bitwise = { workspace = true }
-kirin-cf = { workspace = true }
-kirin-cmp = { workspace = true }
-kirin-constant = { workspace = true }
-kirin-function = { workspace = true }
-kirin-scf = { workspace = true }
-kirin-test-languages = { workspace = true, features = [
-    "simple-language",
-    "arith-function-language",
-    "bitwise-function-language",
-    "callable-language",
-    "namespaced-language",
-    "parser",
-    "pretty",
-] }
-kirin-test-utils = { workspace = true, features = ["roundtrip"] }
-
-[features]
-default = ["interpreter"]
-interpreter = ["dep:kirin-interpreter"]
-serde = ["dep:serde"]
-
-[[example]]
-name = "simple"
-path = "example/simple.rs"
-
 [workspace]
 resolver = "2"
 members = [
-    "crates/kirin-cf",
-    "crates/kirin-constant",
-    "crates/kirin-ir",
-    "crates/kirin-prettyless",
-    "crates/kirin-scf",
-    "crates/kirin-test-utils",
-    "crates/kirin-lexer",
-    "crates/kirin-chumsky",
-    "crates/kirin-function",
-    "xtask",
-    "crates/kirin-arith",
-    "crates/kirin-bitwise",
-    "crates/kirin-interpreter",
-    "crates/kirin-test-languages",
-    "crates/kirin-interval",
-    "crates/kirin-cmp",
-    "crates/kirin-derive-toolkit",
-    "crates/kirin-derive-ir",
-    "crates/kirin-derive-prettyless",
-    "crates/kirin-derive-interpreter",
-    "crates/kirin-derive-chumsky",
-    "crates/kirin-test-types",
-    "example/toy-lang",
+  "crates/kirin-arith",
+  "crates/kirin-bitwise",
+  "crates/kirin-cf",
+  "crates/kirin-chumsky",
+  "crates/kirin-cmp",
+  "crates/kirin-constant",
+  "crates/kirin-derive-chumsky",
+  "crates/kirin-derive-interpreter",
+  "crates/kirin-derive-ir",
+  "crates/kirin-derive-prettyless",
+  "crates/kirin-derive-toolkit",
+  "crates/kirin-function",
+  "crates/kirin-interpreter",
+  "crates/kirin-interval",
+  "crates/kirin-ir",
+  "crates/kirin-lexer",
+  "crates/kirin-prettyless",
+  "crates/kirin-scf",
+  "crates/kirin-test-languages",
+  "crates/kirin-test-types",
+  "crates/kirin-test-utils",
+  "example/toy-lang",
 ]
 
 [workspace.dependencies]
+darling = "0.23"
+manyhow = { version = "0.11", features = ["darling"] }
 # Proc-macro ecosystem - standardized versions
 proc-macro2 = "1.0"
 quote = "1.0"
-syn = { version = "2.0", features = ["full", "extra-traits"] }
-darling = "0.23"
-manyhow = { version = "0.11", features = ["darling"] }
+syn = { version = "2.0", features = ["extra-traits", "full"] }
 
 # Parser ecosystem
 chumsky = "0.10"
@@ -93,31 +53,76 @@ thiserror = "2"
 # Serialization
 serde = "1.0"
 
-# Internal crates
-kirin-ir = { version = "0.1.0", path = "crates/kirin-ir" }
-kirin-lexer = { version = "0.1.0", path = "crates/kirin-lexer" }
-kirin-prettyless = { version = "0.1.0", path = "crates/kirin-prettyless" }
-kirin-chumsky = { version = "0.1.0", path = "crates/kirin-chumsky" }
-kirin-test-utils = { version = "0.1.0", path = "crates/kirin-test-utils" }
-kirin-test-languages = { version = "0.1.0", path = "crates/kirin-test-languages" }
-kirin-interval = { version = "0.1.0", path = "crates/kirin-interval" }
-kirin = { version = "0.1.0", path = "." }
-kirin-cf = { version = "0.1.0", path = "crates/kirin-cf" }
-kirin-constant = { version = "0.1.0", path = "crates/kirin-constant" }
-kirin-scf = { version = "0.1.0", path = "crates/kirin-scf" }
-kirin-function = { version = "0.1.0", path = "crates/kirin-function" }
-kirin-arith = { version = "0.1.0", path = "crates/kirin-arith" }
-kirin-bitwise = { version = "0.1.0", path = "crates/kirin-bitwise" }
-kirin-interpreter = { version = "0.1.0", path = "crates/kirin-interpreter" }
-kirin-cmp = { version = "0.1.0", path = "crates/kirin-cmp" }
-kirin-derive-toolkit = { version = "0.1.0", path = "crates/kirin-derive-toolkit" }
-kirin-derive-ir = { version = "0.1.0", path = "crates/kirin-derive-ir" }
-kirin-derive-prettyless = { version = "0.1.0", path = "crates/kirin-derive-prettyless" }
-kirin-derive-interpreter = { version = "0.1.0", path = "crates/kirin-derive-interpreter" }
-kirin-derive-chumsky = { version = "0.1.0", path = "crates/kirin-derive-chumsky" }
-kirin-test-types = { version = "0.1.0", path = "crates/kirin-test-types" }
-smallvec = "1.13"
-clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 assert_cmd = "2"
+clap = { version = "4", features = ["derive"] }
+kirin = { path = ".", version = "0.1.0" }
+kirin-arith = { path = "crates/kirin-arith", version = "0.1.0" }
+kirin-bitwise = { path = "crates/kirin-bitwise", version = "0.1.0" }
+kirin-cf = { path = "crates/kirin-cf", version = "0.1.0" }
+kirin-chumsky = { path = "crates/kirin-chumsky", version = "0.1.0" }
+kirin-cmp = { path = "crates/kirin-cmp", version = "0.1.0" }
+kirin-constant = { path = "crates/kirin-constant", version = "0.1.0" }
+kirin-derive-chumsky = { path = "crates/kirin-derive-chumsky", version = "0.1.0" }
+kirin-derive-interpreter = { path = "crates/kirin-derive-interpreter", version = "0.1.0" }
+kirin-derive-ir = { path = "crates/kirin-derive-ir", version = "0.1.0" }
+kirin-derive-prettyless = { path = "crates/kirin-derive-prettyless", version = "0.1.0" }
+kirin-derive-toolkit = { path = "crates/kirin-derive-toolkit", version = "0.1.0" }
+kirin-function = { path = "crates/kirin-function", version = "0.1.0" }
+kirin-interpreter = { path = "crates/kirin-interpreter", version = "0.1.0" }
+kirin-interval = { path = "crates/kirin-interval", version = "0.1.0" }
+# Internal crates
+kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
+kirin-lexer = { path = "crates/kirin-lexer", version = "0.1.0" }
+kirin-prettyless = { path = "crates/kirin-prettyless", version = "0.1.0" }
+kirin-scf = { path = "crates/kirin-scf", version = "0.1.0" }
+kirin-test-languages = { path = "crates/kirin-test-languages", version = "0.1.0" }
+kirin-test-types = { path = "crates/kirin-test-types", version = "0.1.0" }
+kirin-test-utils = { path = "crates/kirin-test-utils", version = "0.1.0" }
 predicates = "3"
+smallvec = "1.13"
+
+[[example]]
+name = "simple"
+path = "example/simple.rs"
+
+[dependencies]
+kirin-chumsky = { path = "crates/kirin-chumsky", version = "0.1.0", features = [
+  "derive"
+] }
+kirin-interpreter = { path = "crates/kirin-interpreter", version = "0.1.0", features = [
+  "derive"
+], optional = true }
+kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
+kirin-prettyless = { path = "crates/kirin-prettyless", version = "0.1.0", features = [
+  "derive"
+] }
+serde = { version = "1.0.228", optional = true }
+
+# Re-export dependencies needed by derive macros
+chumsky = "0.10"
+kirin-lexer = { path = "crates/kirin-lexer", version = "0.1.0" }
+
+[dev-dependencies]
+kirin-arith = { workspace = true }
+kirin-bitwise = { workspace = true }
+kirin-cf = { workspace = true }
+kirin-cmp = { workspace = true }
+kirin-constant = { workspace = true }
+kirin-function = { workspace = true }
+kirin-scf = { workspace = true }
+kirin-test-languages = { workspace = true, features = [
+  "arith-function-language",
+  "bitwise-function-language",
+  "callable-language",
+  "namespaced-language",
+  "parser",
+  "pretty",
+  "simple-language",
+] }
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }
+
+[features]
+default = ["interpreter"]
+interpreter = ["dep:kirin-interpreter"]
+serde = ["dep:serde"]
