@@ -28,7 +28,7 @@ pub trait CompileTimeValue: Clone + std::fmt::Debug + std::hash::Hash + PartialE
 /// // The derive auto-infers T::placeholder() for `result` and adds
 /// // T: Placeholder to the generated builder's where clause.
 /// #[derive(Dialect)]
-/// #[kirin(fn, type = T)]
+/// #[kirin(builders, type = T)]
 /// pub enum Arith<T: CompileTimeValue> {
 ///     Add {
 ///         lhs: SSAValue,

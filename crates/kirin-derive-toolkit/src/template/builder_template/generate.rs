@@ -11,7 +11,7 @@ use quote::quote;
 /// - A result module with typed return structs
 /// - `From` impls for wrapper variants
 ///
-/// Activated by `#[kirin(fn)]` on the type. Skips wrapper variants (emits `From` impls instead).
+/// Activated by `#[kirin(builders)]` on the type. Skips wrapper variants (emits `From` impls instead).
 pub struct BuilderTemplate {
     default_crate_path: syn::Path,
 }

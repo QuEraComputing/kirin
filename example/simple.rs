@@ -14,7 +14,7 @@ use kirin_function::{Bind, Call, Return};
 /// to demonstrate the format-string parser path for inline variants.
 /// These types can also be composed via `#[wraps]` — see `toy-lang`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = ArithType)]
+#[kirin(builders, type = ArithType)]
 enum HighLevel {
     #[chumsky(format = "{body}")]
     Function { body: Region },
@@ -46,7 +46,7 @@ enum HighLevel {
 /// Lower-level language: unstructured control flow (`br`/`cond_br`/`ret`)
 /// and lifted function bindings instead of inline lambdas.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = ArithType)]
+#[kirin(builders, type = ArithType)]
 enum LowLevel {
     #[chumsky(format = "{body}")]
     Function { body: Region },

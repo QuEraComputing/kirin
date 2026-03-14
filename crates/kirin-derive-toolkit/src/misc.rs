@@ -146,7 +146,7 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
         "pure",
         "speculatable",
         "terminator",
-        "fn",
+        "builders",
         "text",
     ]
     .iter()

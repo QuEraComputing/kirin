@@ -41,7 +41,7 @@ mod tests;
 /// forwarded to the inner type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
-#[kirin(fn, type = T)]
+#[kirin(builders, type = T)]
 pub enum StructuredControlFlow<T: CompileTimeValue> {
     If(If<T>),
     For(For<T>),
@@ -55,7 +55,7 @@ pub enum StructuredControlFlow<T: CompileTimeValue> {
 /// Corresponds to MLIR's `scf.if`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "{.if} {condition} then {then_body} else {else_body}")]
-#[kirin(fn, type = T)]
+#[kirin(builders, type = T)]
 pub struct If<T: CompileTimeValue> {
     condition: SSAValue,
     then_body: Block,
@@ -71,7 +71,7 @@ pub struct If<T: CompileTimeValue> {
 /// Corresponds to MLIR's `scf.for`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "{.for} {induction_var} in {start}..{end} step {step} do {body}")]
-#[kirin(fn, type = T)]
+#[kirin(builders, type = T)]
 pub struct For<T: CompileTimeValue> {
     induction_var: SSAValue,
     start: SSAValue,

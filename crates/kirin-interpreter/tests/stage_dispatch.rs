@@ -9,7 +9,7 @@ use kirin_interpreter::{
 use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
-#[kirin(fn, type = T, crate = kirin_ir)]
+#[kirin(builders, type = T, crate = kirin_ir)]
 struct StageCall<T: CompileTimeValue> {
     target: Function,
     callee_stage: CompileStage,
@@ -132,7 +132,7 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 enum StageDynLang {
     Arith(Arith<ArithType>),
     #[kirin(terminator)]
@@ -147,7 +147,7 @@ enum StageDynLang {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 enum FunctionCallLang {
     Arith(Arith<ArithType>),
     #[kirin(terminator)]
@@ -519,7 +519,7 @@ fn test_function_call_unique_specialization_success() {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 enum DummyLang {
     #[callable]
     FunctionBody(FunctionBody<ArithType>),

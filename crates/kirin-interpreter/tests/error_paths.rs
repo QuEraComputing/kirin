@@ -20,7 +20,7 @@ use kirin_test_utils::ir_fixtures::first_statement_of_specialization;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 enum RecursiveLang {
     Arith(Arith<ArithType>),
     #[kirin(terminator)]
@@ -378,7 +378,7 @@ fn test_arity_mismatch_through_call() {
 
 /// A statement that always returns Halt when interpreted by StackInterpreter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 struct HaltStmt;
 
 impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for HaltStmt
@@ -402,7 +402,7 @@ where
 /// A language that includes a halt statement for testing Halt during nested calls.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 enum HaltLang {
     Constant(Constant<ArithValue, ArithType>),
     Call(kirin_function::Call<ArithType>),
@@ -514,7 +514,7 @@ fn test_halt_during_nested_call() {
 
 /// A callable body that always fails to resolve an entry block.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 struct BadBody {
     body: Region,
 }
@@ -547,7 +547,7 @@ impl kirin_interpreter::SSACFGRegion for BadBody {
 /// A language with BadBody as the callable — entry_block always fails.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 enum BadBodyLang {
     Constant(Constant<ArithValue, ArithType>),
     #[callable]

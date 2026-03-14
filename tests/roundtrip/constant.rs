@@ -6,7 +6,7 @@ use kirin_test_utils::roundtrip;
 /// Language with inlined Constant variant (inlined to test the format-derived
 /// parser path for generic value types with `#[kirin(into)]` + `#[kirin(type = ...)]`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = ArithType, crate = kirin::ir)]
+#[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum ConstantLanguage {
     #[chumsky(format = "{body}")]

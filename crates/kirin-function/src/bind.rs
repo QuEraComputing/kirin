@@ -1,7 +1,7 @@
 use kirin::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = T)]
+#[kirin(builders, type = T)]
 #[chumsky(format = "{res:name} = {.bind} {target} captures({captures}) -> {res:type}")]
 pub struct Bind<T: CompileTimeValue> {
     target: Symbol,

@@ -9,7 +9,7 @@ use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[wraps]
-#[kirin(fn, type = ArithType)]
+#[kirin(builders, type = ArithType)]
 enum NumericLanguage {
     Bitwise(Bitwise<ArithType>),
     Constant(Constant<ArithValue, ArithType>),

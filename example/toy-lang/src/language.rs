@@ -16,7 +16,7 @@ use kirin_scf::StructuredControlFlow;
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable, SSACFGRegion,
 )]
-#[kirin(fn, type = ArithType)]
+#[kirin(builders, type = ArithType)]
 pub enum HighLevel {
     #[wraps]
     #[callable]
@@ -37,7 +37,7 @@ pub enum HighLevel {
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable, SSACFGRegion,
 )]
-#[kirin(fn, type = ArithType)]
+#[kirin(builders, type = ArithType)]
 pub enum LowLevel {
     #[wraps]
     #[callable]

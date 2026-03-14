@@ -16,7 +16,7 @@ use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 pub enum DerivedEvalCallDialect {
     #[callable]
     FunctionBody(FunctionBody<ArithType>),
@@ -34,7 +34,7 @@ pub enum DerivedEvalCallDialect {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 pub enum DerivedInterpretableDialect {
     Arith(Arith<ArithType>),
     #[kirin(terminator)]

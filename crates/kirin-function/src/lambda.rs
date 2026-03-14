@@ -5,7 +5,7 @@ use kirin::prelude::*;
 /// Use `#[wraps] Lambda(Lambda<T>)` in your language enum to delegate
 /// parsing, printing, and interpretation to this type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = T)]
+#[kirin(builders, type = T)]
 #[chumsky(format = "{res:name} = {.lambda} {name} captures({captures}) {body} -> {res:type}")]
 pub struct Lambda<T: CompileTimeValue> {
     name: Symbol,

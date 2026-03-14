@@ -4,7 +4,7 @@ use kirin::prelude::*;
 ///
 /// Name, signature, and return type live on staged/specialized function headers.
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = T)]
+#[kirin(builders, type = T)]
 #[chumsky(format = "{body}")]
 pub struct FunctionBody<T: CompileTimeValue> {
     pub(crate) body: Region,

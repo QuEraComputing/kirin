@@ -66,7 +66,7 @@ specialize @A fn @main(i32) -> i32 {
 
 // Lambda (Region-containing) works with #[wraps] delegation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = SimpleType, crate = kirin::ir)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum LambdaLanguage {
     #[wraps]

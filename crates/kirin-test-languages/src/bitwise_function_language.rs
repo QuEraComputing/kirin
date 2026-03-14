@@ -9,7 +9,7 @@ use kirin_ir::{Dialect, Region};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
 #[cfg_attr(feature = "pretty", derive(kirin_derive_chumsky::PrettyPrint))]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
 pub enum BitwiseFunctionLanguage {

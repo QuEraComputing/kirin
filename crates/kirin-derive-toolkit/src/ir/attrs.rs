@@ -9,7 +9,7 @@ pub struct KirinStructOptions {
     #[darling(rename = "type")]
     pub ir_type: syn::Path,
     pub format: Option<String>,
-    #[darling(rename = "fn")]
+    #[darling(rename = "builders")]
     pub builder: Option<BuilderOptions>,
     #[darling(default)]
     pub constant: bool,
@@ -29,7 +29,7 @@ pub struct KirinEnumOptions {
     pub crate_path: Option<syn::Path>,
     #[darling(rename = "type")]
     pub ir_type: syn::Path,
-    #[darling(rename = "fn")]
+    #[darling(rename = "builders")]
     pub builder: Option<BuilderOptions>,
     #[darling(default)]
     pub constant: bool,
@@ -46,7 +46,7 @@ pub struct KirinEnumOptions {
 #[darling(attributes(kirin))]
 pub struct StatementOptions {
     pub format: Option<String>,
-    #[darling(rename = "fn")]
+    #[darling(rename = "builders")]
     pub builder: Option<BuilderOptions>,
     #[darling(default)]
     pub constant: bool,
@@ -140,7 +140,7 @@ pub struct GlobalOptions {
     pub crate_path: Option<syn::Path>,
     /// The `#[kirin(type = ...)]` IR enum type this statement belongs to.
     pub ir_type: syn::Path,
-    /// Builder function configuration from `#[kirin(fn)]` or `#[kirin(fn = name)]`.
+    /// Builder function configuration from `#[kirin(builders)]` or `#[kirin(builders = name)]`.
     pub builder: Option<BuilderOptions>,
     /// Whether the operation is marked `#[kirin(constant)]`.
     pub constant: bool,

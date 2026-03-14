@@ -25,7 +25,7 @@
 use kirin::prelude::*;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
-#[kirin(terminator, fn, type = T)]
+#[kirin(terminator, builders, type = T)]
 pub enum ControlFlow<T: CompileTimeValue> {
     #[chumsky(format = "{.br} {target}({args})")]
     Branch {

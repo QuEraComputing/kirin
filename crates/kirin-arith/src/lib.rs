@@ -12,7 +12,7 @@
 //!
 //! #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 //! #[wraps]
-//! #[kirin(fn, type = ArithType)]
+//! #[kirin(builders, type = ArithType)]
 //! enum NumericLanguage {
 //!     Arith(Arith<ArithType>),
 //!     ControlFlow(ControlFlow<ArithType>),
@@ -82,7 +82,7 @@ pub use types::{ArithType, ArithValue};
 /// let _sum = add_stmt.result;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(pure, fn, type = T)]
+#[kirin(pure, builders, type = T)]
 pub enum Arith<T: CompileTimeValue> {
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]

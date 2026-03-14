@@ -6,7 +6,7 @@ use kirin_test_utils::roundtrip;
 
 // SCF ops use #[wraps] delegation — Block-containing types work with #[wraps].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = ArithType, crate = kirin::ir)]
+#[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum ScfLanguage {
     #[chumsky(format = "{body}")]

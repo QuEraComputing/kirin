@@ -20,7 +20,7 @@ use kirin_test_utils::ir_fixtures::build_loop_program;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]
 #[wraps]
-#[kirin(fn, type = ArithType, crate = kirin_ir)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
 enum CallLang {
     Arith(Arith<ArithType>),
     #[kirin(terminator)]

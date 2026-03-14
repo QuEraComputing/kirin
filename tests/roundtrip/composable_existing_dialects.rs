@@ -7,7 +7,7 @@ use kirin_scf::StructuredControlFlow;
 use kirin_test_utils::roundtrip;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = ArithType, crate = kirin::ir)]
+#[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum ComposedSourceLanguage {
     #[wraps]
@@ -23,7 +23,7 @@ enum ComposedSourceLanguage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = ArithType, crate = kirin::ir)]
+#[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum WrappedConstantLanguage {
     #[wraps]
@@ -37,7 +37,7 @@ enum WrappedConstantLanguage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(fn, type = ArithType, crate = kirin::ir)]
+#[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum WrappedConstantStatementLanguage {
     #[wraps]

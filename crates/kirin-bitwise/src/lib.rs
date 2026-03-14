@@ -13,7 +13,7 @@
 //!
 //! #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 //! #[wraps]
-//! #[kirin(fn, type = ArithType)]
+//! #[kirin(builders, type = ArithType)]
 //! enum IntegerLanguage {
 //!     Bitwise(Bitwise<ArithType>),
 //!     ControlFlow(ControlFlow<ArithType>),
@@ -51,7 +51,7 @@ mod tests;
 
 /// Generic bitwise statements parameterized by a compile-time type lattice.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(pure, fn, type = T)]
+#[kirin(pure, builders, type = T)]
 pub enum Bitwise<T: CompileTimeValue> {
     #[kirin(speculatable)]
     #[chumsky(format = "{result:name} = {.and} {lhs}, {rhs} -> {result:type}")]
