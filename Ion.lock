@@ -1,4 +1,9 @@
 [[skill]]
+name = "ask-user-question"
+source = ""
+checksum = "sha256:78e99ecf50027fb87e37ef2b91294df6b7c714d24d4a1f5c6330dfa666e822ff"
+
+[[skill]]
 name = "brainstorming"
 source = "https://github.com/obra/superpowers.git"
 path = "brainstorming"
@@ -27,11 +32,41 @@ commit = "5ef73d25b71e69e63a74eae359fb26c7a6ac8fc0"
 checksum = "sha256:9edba9a38684c060fdc38290f640e1dc0c37de286723ac9be73bacacf7cd6f3d"
 
 [[skill]]
+name = "insta-snapshot-testing"
+source = ""
+checksum = "sha256:385b89e3f752d5c2ac169a41159ee6b91baee9d8390aca459d34c740392f886d"
+
+[[skill]]
+name = "ion-cli"
+source = ""
+checksum = "sha256:568522929f0ae87df17fd2f26a43fe1542f8a1b5abd2cd69f6e37aec4bf8d8f0"
+
+[[skill]]
+name = "kirin-derive-macros"
+source = ""
+checksum = "sha256:8dc3d12634c4fa38f978c3f7e77039598799d65f3693404f082d427137ea253e"
+
+[[skill]]
+name = "kirin-rfc-implementer"
+source = ""
+checksum = "sha256:78c9881c511bc1db2af0f41a053cbdb4fd06864f327f933d692de04032085029"
+
+[[skill]]
+name = "kirin-rfc-writer"
+source = ""
+checksum = "sha256:3145babf5d70175447e9b358f9e7ffdb4e90fc9f33c675e5200805feb47ca2fc"
+
+[[skill]]
 name = "receiving-code-review"
 source = "https://github.com/obra/superpowers.git"
 path = "receiving-code-review"
 commit = "5ef73d25b71e69e63a74eae359fb26c7a6ac8fc0"
 checksum = "sha256:2760c85d4f4117b0006e7ba755f4bbd61f8f4c185f347999763c97f507274e30"
+
+[[skill]]
+name = "refactor"
+source = ""
+checksum = "sha256:056c46d9e4d0c93f657c70b7ed04d72ea56328fa080ab4c9cef53a69d3fa03f0"
 
 [[skill]]
 name = "requesting-code-review"
@@ -62,11 +97,21 @@ commit = "5ef73d25b71e69e63a74eae359fb26c7a6ac8fc0"
 checksum = "sha256:6fddb1f3952f65f1f3a2ef267ae4ab6919ff70a8b36672ea908640ae21a34ea0"
 
 [[skill]]
+name = "test-coverage-review"
+source = ""
+checksum = "sha256:bdb7ce8b607a12c4fe2c5894bc12e103ded99d29cc495556b66c2820687fd063"
+
+[[skill]]
 name = "test-driven-development"
 source = "https://github.com/obra/superpowers.git"
 path = "test-driven-development"
 commit = "5ef73d25b71e69e63a74eae359fb26c7a6ac8fc0"
 checksum = "sha256:126f1ebf6ccd414f42544f6e83d8cc5adb089e1108eaffb7c400701e37eecd9f"
+
+[[skill]]
+name = "triage-review"
+source = ""
+checksum = "sha256:5fca55788caa5bf326a8bee9e827f37fb2d40efd1efcc37e9ad3164eb65278df"
 
 [[skill]]
 name = "using-git-worktrees"
