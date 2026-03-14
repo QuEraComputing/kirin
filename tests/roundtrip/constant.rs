@@ -3,8 +3,8 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_function::Return;
 use kirin_test_utils::roundtrip;
 
-/// Language with inlined Constant variant (can't use #[wraps] with Constant
-/// due to the `for<'src> HasParser` lifetime issue on generic value types).
+/// Language with inlined Constant variant (inlined to test the format-derived
+/// parser path for generic value types with `#[kirin(into)]` + `#[kirin(type = ...)]`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]

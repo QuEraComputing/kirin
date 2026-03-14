@@ -21,6 +21,9 @@ cargo fmt --all                  # Format code
 cargo insta review               # Review snapshot test changes
 cargo xtask quick-validate .agents/skills/<skill-name>  # Validate a skill's SKILL.md frontmatter/rules
 cargo xtask new-rfc "<title>" [--status <status> --author <name> --dependency <rfc-id> ...]  # Render rfc/<id>-<title>.md from the Tera template rfc/0000-template.md (`--update` refreshes timestamp and can append metadata on existing RFC)
+cargo build -p toy-lang          # Build the toy language example binary
+cargo run -p toy-lang -- parse example/toy-lang/programs/add.kirin  # Parse an example program from repo root
+cargo nextest run -p toy-lang    # Run toy language example tests
 ```
 
 Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
@@ -118,7 +121,7 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 
 - **`ParseDispatch` for pipeline parsing**: Multi-dialect pipeline parsing uses `ParseDispatch` (a monomorphic dispatch trait) instead of HRTB-based `SupportsStageDispatchMut`. Add `#[derive(ParseDispatch)]` alongside `#[derive(StageMeta)]` on stage enums. Single-dialect pipelines (`Pipeline<StageInfo<L>>`) get a blanket `ParseDispatch` impl. Zero HRTB in the dispatch chain.
 
-- **E0275 with Region/Block-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `FunctionBody`, SCF operations) still overflow the trait solver when composed via `#[wraps]` + `HasParser` due to recursive `EmitIR` bound evaluation. Workaround: inline the fields directly into the parent language enum. Non-recursive types (no Block/Region) work fine with `#[wraps]`. See `example/toy-lang/src/language.rs`.
+- **`#[wraps]` works with Region/Block-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `FunctionBody`, SCF operations) can be composed via `#[wraps]` + `HasParser`. See `example/toy-lang/src/language.rs` where `Lexical` (contains `FunctionBody` with Region and `Lambda` with Region) and `StructuredControlFlow` (contains `If`/`For` with Block fields) are both used with `#[wraps]`.
 
 - **`Ctx` default parameter for unified traits**: When the same trait method needs extra context for some implementors (e.g., `CompileStage` for `Pipeline`) but not others (e.g., `StageInfo`), use a default type parameter `Ctx = ()` on the trait. Pair with a blanket `Ext` trait that erases the `()` arg for ergonomic call sites. See `ParseStatementText<L, Ctx>` / `ParseStatementTextExt<L>`.
 

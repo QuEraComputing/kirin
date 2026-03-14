@@ -10,9 +10,9 @@ use kirin_function::{Bind, Call, Return};
 /// Higher-level language: structured control flow (`if`) and lexical
 /// lambdas that capture variables from the enclosing scope.
 ///
-/// Block/Region-containing dialect types (SCF, Lambda) are inlined rather
-/// than composed via `#[wraps]` because the recursive AST types overflow
-/// trait resolution (E0275).
+/// Block/Region-containing dialect types (SCF, Lambda) are inlined here
+/// to demonstrate the format-string parser path for inline variants.
+/// These types can also be composed via `#[wraps]` — see `toy-lang`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = ArithType)]
 enum HighLevel {

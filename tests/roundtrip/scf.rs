@@ -1,25 +1,18 @@
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
 use kirin_function::Return;
+use kirin_scf::StructuredControlFlow;
 use kirin_test_utils::roundtrip;
 
-// SCF ops have Block fields, can't use #[wraps] due to E0275.
-// Inline the SCF variants directly.
+// SCF ops use #[wraps] delegation — Block-containing types work with #[wraps].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum ScfLanguage {
     #[chumsky(format = "{body}")]
     Function { body: Region },
-    #[chumsky(format = "{.if} {condition} then {then_body} else {else_body}")]
-    If {
-        condition: SSAValue,
-        then_body: Block,
-        else_body: Block,
-    },
-    #[kirin(terminator)]
-    #[chumsky(format = "{.yield} {value}")]
-    Yield { value: SSAValue },
+    #[wraps]
+    Scf(StructuredControlFlow<ArithType>),
     #[wraps]
     Arith(Arith<ArithType>),
     #[wraps]

@@ -24,9 +24,10 @@ pub trait ParseEmit<L: Dialect = Self>: Dialect {
 
 /// Marker trait for dialects whose `HasParser::Output` directly implements `EmitIR`.
 ///
-/// Provides a blanket `ParseEmit` impl. Only works for non-recursive dialects
-/// (no `Block`/`Region` fields) — recursive types cause E0275 due to the
-/// `for<'t> <L as HasParser<'t>>::Output: EmitIR<L>` bound.
+/// Provides a blanket `ParseEmit` impl. Works for dialects that satisfy the
+/// `for<'t> <L as HasParser<'t>>::Output: EmitIR<L>` bound. For dialects
+/// using `#[derive(HasParser)]`, prefer the derive-generated `ParseEmit` impl
+/// (path 1) which handles this automatically.
 pub trait SimpleParseEmit: Dialect {}
 
 impl<L> ParseEmit<L> for L

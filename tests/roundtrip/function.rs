@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 use kirin_arith::ArithType;
-use kirin_function::{Bind, Return};
+use kirin_function::{Bind, Lambda, Return};
 use kirin_test_languages::{CallableLanguage, SimpleType};
 use kirin_test_utils::roundtrip;
 
@@ -62,24 +62,15 @@ specialize @A fn @main(i32) -> i32 {
     roundtrip::assert_pipeline_roundtrip::<CallableLanguage>(input);
 }
 
-// --- Tests from lambda_print.rs (LambdaLanguage must stay inline due to E0275) ---
+// --- Tests from lambda_print.rs ---
 
-// NOTE: Lambda (and other Region-containing types) cannot currently be used
-// with #[wraps] + HasParser due to recursive trait resolution overflow (E0275).
-// We inline the lambda fields here to test the format-derived parser path
-// for Vec<SSAValue> + Region combos.
+// Lambda (Region-containing) works with #[wraps] delegation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(fn, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum LambdaLanguage {
-    #[chumsky(format = "{res:name} = {.lambda} {name} captures({captures}) {body} -> {res:type}")]
-    Lambda {
-        name: Symbol,
-        captures: Vec<SSAValue>,
-        body: Region,
-        #[kirin(type = SimpleType::placeholder())]
-        res: ResultValue,
-    },
+    #[wraps]
+    Lambda(Lambda<SimpleType>),
     #[wraps]
     Bind(Bind<SimpleType>),
     #[wraps]
