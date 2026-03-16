@@ -39,6 +39,8 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - `example` contains example code of the top-level crate `kirin`
 - `tests` contains integration tests for the top-level crate `kirin`
 - `crates` contains the crates that make up the project, most implementation can be found here.
+- `docs/design` contains core design documents: syntax design, IR data structure design, text format specs, and semantic rule definitions. These are checked into git.
+- `docs/superpowers/` contains brainstorming artifacts, implementation plans, and other skill-generated working files. This directory is gitignored — do not check these files in.
 - `.agents` contains agent specific implementations that is not included in this file, e.g skills.
 
 ### Crates
