@@ -30,7 +30,7 @@ impl FieldCategoryExt for FieldCategory {
             FieldCategory::Symbol => "symbol",
             FieldCategory::Value => "value",
             FieldCategory::DiGraph | FieldCategory::UnGraph => {
-                todo!("DiGraph/UnGraph fields not yet supported by parser")
+                unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
             }
         }
     }
@@ -80,7 +80,7 @@ pub fn ast_type<L: Layout>(
             quote! { <#ty as #crate_path::HasParser<'t>>::Output }
         }
         FieldCategory::DiGraph | FieldCategory::UnGraph => {
-            todo!("DiGraph/UnGraph fields not yet supported by parser")
+            unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
         }
     }
 }
@@ -137,7 +137,7 @@ pub fn parser_expr<L: Layout>(
             quote! { <#ty as #crate_path::HasParser<'t>>::parser() }
         }
         FieldCategory::DiGraph | FieldCategory::UnGraph => {
-            todo!("DiGraph/UnGraph fields not yet supported by parser")
+            unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
         }
     }
 }
@@ -179,7 +179,7 @@ pub fn print_expr<L: Layout>(
             }
         }
         FieldCategory::DiGraph | FieldCategory::UnGraph => {
-            todo!("DiGraph/UnGraph fields not yet supported by printer")
+            unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
         }
     }
 }

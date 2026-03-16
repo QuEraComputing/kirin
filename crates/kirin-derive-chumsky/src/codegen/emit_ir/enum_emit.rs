@@ -144,7 +144,7 @@ impl GenerateEmitIR {
                             quote! { #emitted_var }
                         }
                         FieldCategory::DiGraph | FieldCategory::UnGraph => {
-                            todo!("DiGraph/UnGraph fields not yet supported by parser")
+                            unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
                         }
                     }
                 } else if let Some(default_value) = field.default_value() {
