@@ -1,4 +1,5 @@
 use crate::arena::GetInfo;
+use crate::node::stmt::StatementParent;
 use crate::node::*;
 use crate::{Dialect, StageInfo};
 
@@ -119,7 +120,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
 
         for &stmt_id in &self.statements {
             let info = &mut self.stage.statements[stmt_id];
-            info.parent = Some(id);
+            info.parent = Some(StatementParent::Block(id));
             for arg in info.definition.arguments_mut() {
                 let ssa_info = self
                     .stage
@@ -135,7 +136,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
 
         if let Some(term_id) = self.terminator {
             let info = &mut self.stage.statements[term_id];
-            info.parent = Some(id);
+            info.parent = Some(StatementParent::Block(id));
         }
 
         let block = BlockInfo::builder()

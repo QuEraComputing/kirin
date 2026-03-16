@@ -3,17 +3,27 @@ use crate::identifier;
 use crate::{Dialect, node::linked_list::LinkedListNode};
 
 use super::block::Block;
+use super::digraph::DiGraph;
+use super::ungraph::UnGraph;
 
 identifier! {
     /// An Id reference to statement in arena.
     struct Statement
 }
 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum StatementParent {
+    Block(Block),
+    DiGraph(DiGraph),
+    UnGraph(UnGraph),
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StatementInfo<L: Dialect> {
     pub(crate) node: LinkedListNode<Statement>,
-    pub(crate) parent: Option<Block>,
+    pub(crate) parent: Option<StatementParent>,
     pub(crate) definition: L,
 }
 
@@ -71,7 +81,10 @@ impl Statement {
         self.expect_info(stage).definition.successors()
     }
 
-    pub fn parent<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> &'a Option<Block> {
+    pub fn parent<'a, L: Dialect>(
+        &self,
+        stage: &'a crate::StageInfo<L>,
+    ) -> &'a Option<StatementParent> {
         &self.expect_info(stage).parent
     }
 

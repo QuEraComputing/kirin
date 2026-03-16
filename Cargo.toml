@@ -80,6 +80,7 @@ kirin-test-languages = { path = "crates/kirin-test-languages", version = "0.1.0"
 kirin-test-types = { path = "crates/kirin-test-types", version = "0.1.0" }
 kirin-test-utils = { path = "crates/kirin-test-utils", version = "0.1.0" }
 predicates = "3"
+petgraph = "0.7"
 smallvec = "1.13"
 
 [[example]]

@@ -3,6 +3,7 @@ use crate::identifier;
 use crate::{Dialect, Symbol};
 use smallvec::SmallVec;
 
+use super::port::{Port, PortParent};
 use super::{block::Block, stmt::Statement};
 
 identifier! {
@@ -45,6 +46,7 @@ impl_ssa_display!(SSAValue);
 impl_ssa_display!(ResultValue);
 impl_ssa_display!(BlockArgument);
 impl_ssa_display!(DeletedSSAValue);
+// Port has its own Display impl in port.rs
 
 /// Represents a test SSA value. Used in tests only.
 /// This SSAValue may not exist in the SSA database.
@@ -115,7 +117,10 @@ pub struct Use {
 pub enum SSAKind {
     Result(Statement, usize),
     BlockArgument(Block, usize),
+    Port(PortParent, usize),
     // should not appear in final SSA IR
+    #[doc(hidden)]
+    BuilderPort(usize),
     /// A placeholder for builders to update the Block information later.
     /// It holds the index of the argument in the block's argument list.
     #[doc(hidden)]
@@ -154,6 +159,7 @@ macro_rules! impl_from_ssa {
 impl_from_ssa!(ResultValue);
 impl_from_ssa!(BlockArgument);
 impl_from_ssa!(DeletedSSAValue);
+impl_from_ssa!(Port);
 
 impl From<SSAValue> for TestSSAValue {
     fn from(ssa: SSAValue) -> Self {
@@ -186,6 +192,7 @@ macro_rules! impl_from_test {
 impl_from_test!(ResultValue);
 impl_from_test!(BlockArgument);
 impl_from_test!(DeletedSSAValue);
+impl_from_test!(Port);
 
 impl<L: Dialect, T> GetInfo<L> for T
 where

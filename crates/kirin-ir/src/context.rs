@@ -1,6 +1,9 @@
 use crate::arena::{Arena, GetInfo};
+use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::function::CompileStage;
 use crate::node::region::RegionInfo;
+use crate::node::stmt::StatementParent;
+use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{Dialect, InternTable, node::*};
 
 #[derive(Debug)]
@@ -18,6 +21,8 @@ pub struct StageInfo<L: Dialect> {
     pub(crate) blocks: Arena<Block, BlockInfo<L>>,
     pub(crate) statements: Arena<Statement, StatementInfo<L>>,
     pub(crate) ssas: Arena<SSAValue, SSAInfo<L>>,
+    pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
+    pub(crate) ungraphs: Arena<UnGraph, UnGraphInfo<L>>,
     pub(crate) symbols: InternTable<String, Symbol>,
 }
 
@@ -35,6 +40,8 @@ where
             blocks: Arena::default(),
             statements: Arena::default(),
             ssas: Arena::default(),
+            digraphs: Arena::default(),
+            ungraphs: Arena::default(),
             symbols: InternTable::default(),
         }
     }
@@ -56,6 +63,8 @@ where
             blocks: self.blocks.clone(),
             statements: self.statements.clone(),
             ssas: self.ssas.clone(),
+            digraphs: self.digraphs.clone(),
+            ungraphs: self.ungraphs.clone(),
             symbols: self.symbols.clone(),
         }
     }
@@ -139,6 +148,20 @@ impl<L: Dialect> StageInfo<L> {
         &self.blocks
     }
 
+    /// Get a reference to the directed graph arena.
+    ///
+    /// Read-only access. Use `get_info_mut` on `DiGraph` for mutable access.
+    pub fn digraph_arena(&self) -> &Arena<DiGraph, DiGraphInfo<L>> {
+        &self.digraphs
+    }
+
+    /// Get a reference to the undirected graph arena.
+    ///
+    /// Read-only access. Use `get_info_mut` on `UnGraph` for mutable access.
+    pub fn ungraph_arena(&self) -> &Arena<UnGraph, UnGraphInfo<L>> {
+        &self.ungraphs
+    }
+
     /// Attach statements and an optional terminator to an existing block.
     ///
     /// Sets each statement's parent to `block`, links the statements into a
@@ -152,10 +175,10 @@ impl<L: Dialect> StageInfo<L> {
         terminator: Option<Statement>,
     ) {
         for &stmt in stmts {
-            stmt.expect_info_mut(self).parent = Some(block);
+            stmt.expect_info_mut(self).parent = Some(StatementParent::Block(block));
         }
         if let Some(term) = terminator {
-            term.expect_info_mut(self).parent = Some(block);
+            term.expect_info_mut(self).parent = Some(StatementParent::Block(block));
         }
         let linked = self.link_statements(stmts);
         let block_info = block.expect_info_mut(self);
@@ -177,10 +200,10 @@ impl<L: Dialect> StageInfo<L> {
         let terminator = real.terminator(self);
 
         for stmt in statements {
-            stmt.expect_info_mut(self).parent = Some(stub);
+            stmt.expect_info_mut(self).parent = Some(StatementParent::Block(stub));
         }
         if let Some(term) = terminator {
-            term.expect_info_mut(self).parent = Some(stub);
+            term.expect_info_mut(self).parent = Some(StatementParent::Block(stub));
         }
 
         for (idx, arg) in real_info.arguments.iter().copied().enumerate() {

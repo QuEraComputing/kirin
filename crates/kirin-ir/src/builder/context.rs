@@ -1067,7 +1067,10 @@ mod tests {
 
         // Statement parent should now point to stub
         let stmt_info = s0.expect_info(&stage);
-        assert_eq!(stmt_info.parent, Some(stub));
+        assert_eq!(
+            stmt_info.parent,
+            Some(crate::node::stmt::StatementParent::Block(stub))
+        );
 
         // Block arguments should have SSAKind pointing to stub
         let stub_info = stub.expect_info(&stage);
