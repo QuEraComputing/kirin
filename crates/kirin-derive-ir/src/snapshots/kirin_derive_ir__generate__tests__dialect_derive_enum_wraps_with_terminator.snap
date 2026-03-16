@@ -303,6 +303,126 @@ impl<'a> Iterator for CfOpsRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for CfOps {
+    type Iter = CfOpsDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => {
+                CfOpsDigraphsIter::Branch(<BranchOp as ::kirin::ir::HasDigraphs>::digraphs(field_0))
+            }
+            Self::Return(field_0) => {
+                CfOpsDigraphsIter::Return(<ReturnOp as ::kirin::ir::HasDigraphs>::digraphs(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsDigraphsIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for CfOps {
+    type IterMut = CfOpsDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsDigraphsMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsDigraphsMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsDigraphsMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for CfOps {
+    type Iter = CfOpsUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => {
+                CfOpsUngraphsIter::Branch(<BranchOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0))
+            }
+            Self::Return(field_0) => {
+                CfOpsUngraphsIter::Return(<ReturnOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsUngraphsIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for CfOps {
+    type IterMut = CfOpsUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsUngraphsMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsUngraphsMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsUngraphsMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for CfOps {
     fn is_terminator(&self) -> bool {
         match self {
@@ -343,6 +463,15 @@ impl ::kirin::ir::IsSpeculatable for CfOps {
             Self::Return(field_0) => {
                 <ReturnOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
             }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for CfOps {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Branch(field_0) => <BranchOp as ::kirin::ir::IsEdge>::is_edge(field_0),
+            Self::Return(field_0) => <ReturnOp as ::kirin::ir::IsEdge>::is_edge(field_0),
         }
     }
 }

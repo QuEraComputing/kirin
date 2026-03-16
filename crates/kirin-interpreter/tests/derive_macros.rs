@@ -103,7 +103,7 @@ fn build_add_one_eval_call(
     {
         use kirin_ir::query::ParentInfo;
         let br_stmt: Statement = br.into();
-        *br_stmt.expect_info_mut(stage).get_parent_mut() = Some(entry);
+        *br_stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
         let entry_info = entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);
     }
@@ -137,7 +137,7 @@ fn build_add_one_interpretable(
     {
         use kirin_ir::query::ParentInfo;
         let br_stmt: Statement = br.into();
-        *br_stmt.expect_info_mut(stage).get_parent_mut() = Some(entry);
+        *br_stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
         let entry_info = entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);
     }

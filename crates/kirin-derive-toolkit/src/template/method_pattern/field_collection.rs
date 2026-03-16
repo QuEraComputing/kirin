@@ -22,6 +22,10 @@ pub enum FieldIterKind {
     Successors,
     /// Nested region fields.
     Regions,
+    /// Directed graph body fields.
+    Digraphs,
+    /// Undirected graph body fields.
+    Ungraphs,
 }
 
 /// Method pattern that chains field iterators for a given [`FieldIterKind`] category.
@@ -97,6 +101,14 @@ impl FieldCollection {
                 .collect(),
             FieldIterKind::Regions => statement
                 .regions()
+                .map(FieldAccess::from_field_info)
+                .collect(),
+            FieldIterKind::Digraphs => statement
+                .digraphs()
+                .map(FieldAccess::from_field_info)
+                .collect(),
+            FieldIterKind::Ungraphs => statement
+                .ungraphs()
                 .map(FieldAccess::from_field_info)
                 .collect(),
         }

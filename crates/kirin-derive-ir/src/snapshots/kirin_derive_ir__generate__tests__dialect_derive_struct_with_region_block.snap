@@ -279,6 +279,114 @@ impl<'a> Iterator for IfOpRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for IfOp {
+    type Iter = IfOpDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpDigraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpDigraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for IfOp {
+    type IterMut = IfOpDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpDigraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpDigraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for IfOp {
+    type Iter = IfOpUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpUngraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpUngraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for IfOp {
+    type IterMut = IfOpUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            condition,
+            then_block,
+            else_block,
+            body,
+        } = self;
+        IfOpUngraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOpUngraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for IfOpUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for IfOp {
     fn is_terminator(&self) -> bool {
         false
@@ -299,6 +407,12 @@ impl ::kirin::ir::IsPure for IfOp {
 #[automatically_derived]
 impl ::kirin::ir::IsSpeculatable for IfOp {
     fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for IfOp {
+    fn is_edge(&self) -> bool {
         false
     }
 }

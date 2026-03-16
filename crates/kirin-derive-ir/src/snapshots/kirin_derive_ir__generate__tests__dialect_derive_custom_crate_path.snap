@@ -213,6 +213,90 @@ impl<'a> Iterator for NopRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> kirin_ir::HasDigraphs<'a> for Nop {
+    type Iter = NopDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        NopDigraphsIter {
+            inner: std::iter::empty::<&'a kirin_ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopDigraphsIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopDigraphsIter<'a> {
+    type Item = &'a kirin_ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasDigraphsMut<'a> for Nop {
+    type IterMut = NopDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        NopDigraphsMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopDigraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopDigraphsMutIter<'a> {
+    type Item = &'a mut kirin_ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasUngraphs<'a> for Nop {
+    type Iter = NopUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        NopUngraphsIter {
+            inner: std::iter::empty::<&'a kirin_ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopUngraphsIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopUngraphsIter<'a> {
+    type Item = &'a kirin_ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasUngraphsMut<'a> for Nop {
+    type IterMut = NopUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        NopUngraphsMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopUngraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopUngraphsMutIter<'a> {
+    type Item = &'a mut kirin_ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl kirin_ir::IsTerminator for Nop {
     fn is_terminator(&self) -> bool {
         false
@@ -233,6 +317,12 @@ impl kirin_ir::IsPure for Nop {
 #[automatically_derived]
 impl kirin_ir::IsSpeculatable for Nop {
     fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl kirin_ir::IsEdge for Nop {
+    fn is_edge(&self) -> bool {
         false
     }
 }

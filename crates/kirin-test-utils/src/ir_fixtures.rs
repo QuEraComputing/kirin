@@ -161,13 +161,13 @@ pub fn build_select_program(
         let stmts: Vec<Statement> = vec![c1.into(), sum.into(), c42.into()];
         for &s in &stmts {
             let info = s.expect_info_mut(stage);
-            *info.get_parent_mut() = Some(entry);
+            *info.get_parent_mut() = Some(StatementParent::Block(entry));
         }
         let linked = stage.link_statements(&stmts);
 
         let cond_br_stmt: Statement = cond_br.into();
         let info = cond_br_stmt.expect_info_mut(stage);
-        *info.get_parent_mut() = Some(entry);
+        *info.get_parent_mut() = Some(StatementParent::Block(entry));
 
         let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
             entry.get_info_mut(stage).unwrap();
@@ -249,13 +249,13 @@ pub fn build_branch_fork_program(
         let stmts: Vec<Statement> = vec![neg_result.into()];
         for &s in &stmts {
             let info = s.expect_info_mut(stage);
-            *info.get_parent_mut() = Some(entry_block_node);
+            *info.get_parent_mut() = Some(StatementParent::Block(entry_block_node));
         }
         let linked = stage.link_statements(&stmts);
 
         let cond_br_stmt: Statement = cond_br.into();
         let info = cond_br_stmt.expect_info_mut(stage);
-        *info.get_parent_mut() = Some(entry_block_node);
+        *info.get_parent_mut() = Some(StatementParent::Block(entry_block_node));
 
         let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
             entry_block_node.get_info_mut(stage).unwrap();
@@ -336,7 +336,7 @@ pub fn build_loop_program(
         let stmts: Vec<Statement> = vec![c1.into(), sum.into()];
         for &s in &stmts {
             let info = s.expect_info_mut(stage);
-            *info.get_parent_mut() = Some(loop_body);
+            *info.get_parent_mut() = Some(StatementParent::Block(loop_body));
         }
         let linked = stage.link_statements(&stmts);
 
@@ -344,7 +344,7 @@ pub fn build_loop_program(
         br_stmt
             .expect_info_mut(stage)
             .get_parent_mut()
-            .replace(loop_body);
+            .replace(StatementParent::Block(loop_body));
 
         let body_info: &mut Item<BlockInfo<CompositeLanguage>> =
             loop_body.get_info_mut(stage).unwrap();
@@ -360,7 +360,7 @@ pub fn build_loop_program(
         br_stmt
             .expect_info_mut(stage)
             .get_parent_mut()
-            .replace(entry);
+            .replace(StatementParent::Block(entry));
         let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
             entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);
@@ -380,7 +380,7 @@ pub fn build_loop_program(
         cond_stmt
             .expect_info_mut(stage)
             .get_parent_mut()
-            .replace(header);
+            .replace(StatementParent::Block(header));
         let header_info: &mut Item<BlockInfo<CompositeLanguage>> =
             header.get_info_mut(stage).unwrap();
         header_info.terminator = Some(cond_stmt);
@@ -455,7 +455,7 @@ pub fn build_infinite_loop(
         br_stmt
             .expect_info_mut(stage)
             .get_parent_mut()
-            .replace(body);
+            .replace(StatementParent::Block(body));
         let body_info: &mut Item<BlockInfo<CompositeLanguage>> = body.get_info_mut(stage).unwrap();
         body_info.terminator = Some(br_stmt);
     }
@@ -474,7 +474,7 @@ pub fn build_infinite_loop(
         cond_stmt
             .expect_info_mut(stage)
             .get_parent_mut()
-            .replace(header);
+            .replace(StatementParent::Block(header));
         let header_info: &mut Item<BlockInfo<CompositeLanguage>> =
             header.get_info_mut(stage).unwrap();
         header_info.terminator = Some(cond_stmt);
@@ -488,7 +488,7 @@ pub fn build_infinite_loop(
         br_stmt
             .expect_info_mut(stage)
             .get_parent_mut()
-            .replace(entry);
+            .replace(StatementParent::Block(entry));
         let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
             entry.get_info_mut(stage).unwrap();
         entry_info.terminator = Some(br_stmt);

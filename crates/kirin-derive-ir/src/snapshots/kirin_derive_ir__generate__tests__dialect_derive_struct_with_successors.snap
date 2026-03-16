@@ -223,6 +223,94 @@ impl<'a> Iterator for BranchRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for Branch {
+    type Iter = BranchDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        BranchDigraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchDigraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for Branch {
+    type IterMut = BranchDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        BranchDigraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchDigraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for Branch {
+    type Iter = BranchUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        BranchUngraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchUngraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for Branch {
+    type IterMut = BranchUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        BranchUngraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BranchUngraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BranchUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for Branch {
     fn is_terminator(&self) -> bool {
         false
@@ -243,6 +331,12 @@ impl ::kirin::ir::IsPure for Branch {
 #[automatically_derived]
 impl ::kirin::ir::IsSpeculatable for Branch {
     fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for Branch {
+    fn is_edge(&self) -> bool {
         false
     }
 }

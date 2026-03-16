@@ -36,6 +36,8 @@ pub enum PropertyKind {
     Speculatable,
     /// `#[kirin(terminator)]`
     Terminator,
+    /// `#[kirin(edge)]`
+    Edge,
 }
 
 impl PropertyValueReader for PropertyKind {
@@ -45,6 +47,7 @@ impl PropertyValueReader for PropertyKind {
             PropertyKind::Pure => input.attrs.pure,
             PropertyKind::Speculatable => input.attrs.speculatable,
             PropertyKind::Terminator => input.attrs.terminator,
+            PropertyKind::Edge => input.attrs.edge,
         }
     }
 
@@ -54,6 +57,7 @@ impl PropertyValueReader for PropertyKind {
             PropertyKind::Pure => statement.attrs.pure,
             PropertyKind::Speculatable => statement.attrs.speculatable,
             PropertyKind::Terminator => statement.attrs.terminator,
+            PropertyKind::Edge => statement.attrs.edge,
         }
     }
 

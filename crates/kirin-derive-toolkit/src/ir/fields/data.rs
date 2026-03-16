@@ -15,6 +15,10 @@ pub enum FieldCategory {
     Successor,
     /// Nested region (`Region` / `Region<T>`).
     Region,
+    /// Directed graph body (`DiGraph`).
+    DiGraph,
+    /// Undirected graph body (`UnGraph`).
+    UnGraph,
     /// Symbol reference (`Symbol`).
     Symbol,
     /// Plain Rust value (anything not recognized as an IR primitive).
@@ -49,6 +53,8 @@ pub enum FieldData<L: Layout> {
     Block,
     Successor,
     Region,
+    DiGraph,
+    UnGraph,
     Symbol,
     Value {
         ty: syn::Type,
@@ -74,6 +80,8 @@ impl<L: Layout> Clone for FieldData<L> {
             FieldData::Block => FieldData::Block,
             FieldData::Successor => FieldData::Successor,
             FieldData::Region => FieldData::Region,
+            FieldData::DiGraph => FieldData::DiGraph,
+            FieldData::UnGraph => FieldData::UnGraph,
             FieldData::Symbol => FieldData::Symbol,
             FieldData::Value {
                 ty,

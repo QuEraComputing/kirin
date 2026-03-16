@@ -142,8 +142,40 @@ pub(crate) const HAS_REGIONS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::n
     "regions_mut",
     "IterMut",
 );
+pub(crate) const HAS_DIGRAPHS: LocalFieldIterConfig = LocalFieldIterConfig::new(
+    FieldIterKind::Digraphs,
+    false,
+    "HasDigraphs",
+    "DiGraph",
+    "digraphs",
+    "Iter",
+);
+pub(crate) const HAS_DIGRAPHS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
+    FieldIterKind::Digraphs,
+    true,
+    "HasDigraphsMut",
+    "DiGraph",
+    "digraphs_mut",
+    "IterMut",
+);
+pub(crate) const HAS_UNGRAPHS: LocalFieldIterConfig = LocalFieldIterConfig::new(
+    FieldIterKind::Ungraphs,
+    false,
+    "HasUngraphs",
+    "UnGraph",
+    "ungraphs",
+    "Iter",
+);
+pub(crate) const HAS_UNGRAPHS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
+    FieldIterKind::Ungraphs,
+    true,
+    "HasUngraphsMut",
+    "UnGraph",
+    "ungraphs_mut",
+    "IterMut",
+);
 
-pub(crate) const FIELD_ITER_CONFIGS: [LocalFieldIterConfig; 10] = [
+pub(crate) const FIELD_ITER_CONFIGS: [LocalFieldIterConfig; 14] = [
     HAS_ARGUMENTS,
     HAS_ARGUMENTS_MUT,
     HAS_RESULTS,
@@ -154,6 +186,10 @@ pub(crate) const FIELD_ITER_CONFIGS: [LocalFieldIterConfig; 10] = [
     HAS_SUCCESSORS_MUT,
     HAS_REGIONS,
     HAS_REGIONS_MUT,
+    HAS_DIGRAPHS,
+    HAS_DIGRAPHS_MUT,
+    HAS_UNGRAPHS,
+    HAS_UNGRAPHS_MUT,
 ];
 
 pub(crate) const IS_TERMINATOR: LocalPropertyConfig =
@@ -168,8 +204,16 @@ pub(crate) const IS_SPECULATABLE: LocalPropertyConfig = LocalPropertyConfig::new
     "is_speculatable",
 );
 
-pub(crate) const PROPERTY_CONFIGS: [LocalPropertyConfig; 4] =
-    [IS_TERMINATOR, IS_CONSTANT, IS_PURE, IS_SPECULATABLE];
+pub(crate) const IS_EDGE: LocalPropertyConfig =
+    LocalPropertyConfig::new(PropertyKind::Edge, "IsEdge", "is_edge");
+
+pub(crate) const PROPERTY_CONFIGS: [LocalPropertyConfig; 5] = [
+    IS_TERMINATOR,
+    IS_CONSTANT,
+    IS_PURE,
+    IS_SPECULATABLE,
+    IS_EDGE,
+];
 
 pub(crate) fn to_field_iter_config(config: LocalFieldIterConfig) -> FieldIterConfig {
     FieldIterConfig {

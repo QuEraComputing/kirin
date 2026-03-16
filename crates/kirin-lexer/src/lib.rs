@@ -2,7 +2,7 @@ pub use logos::Logos;
 
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(skip r"[ \t\n\r\f]+")]
-#[logos(skip r"//[^\n\r]*")]
+#[logos(skip(r"//[^\n\r]*", allow_greedy = true))]
 #[logos(skip r"/\*([^*]|\*+[^*/])*\*+/")]
 pub enum Token<'src> {
     Error,

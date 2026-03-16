@@ -29,6 +29,9 @@ impl FieldCategoryExt for FieldCategory {
             FieldCategory::Region => "region",
             FieldCategory::Symbol => "symbol",
             FieldCategory::Value => "value",
+            FieldCategory::DiGraph | FieldCategory::UnGraph => {
+                todo!("DiGraph/UnGraph fields not yet supported by parser")
+            }
         }
     }
 
@@ -75,6 +78,9 @@ pub fn ast_type<L: Layout>(
                 .cloned()
                 .unwrap_or_else(|| syn::parse_quote!(()));
             quote! { <#ty as #crate_path::HasParser<'t>>::Output }
+        }
+        FieldCategory::DiGraph | FieldCategory::UnGraph => {
+            todo!("DiGraph/UnGraph fields not yet supported by parser")
         }
     }
 }
@@ -130,6 +136,9 @@ pub fn parser_expr<L: Layout>(
                 .unwrap_or_else(|| syn::parse_quote!(()));
             quote! { <#ty as #crate_path::HasParser<'t>>::parser() }
         }
+        FieldCategory::DiGraph | FieldCategory::UnGraph => {
+            todo!("DiGraph/UnGraph fields not yet supported by parser")
+        }
     }
 }
 
@@ -168,6 +177,9 @@ pub fn print_expr<L: Layout>(
             quote! {
                 #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
             }
+        }
+        FieldCategory::DiGraph | FieldCategory::UnGraph => {
+            todo!("DiGraph/UnGraph fields not yet supported by printer")
         }
     }
 }

@@ -143,6 +143,9 @@ impl GenerateEmitIR {
                         FieldCategory::Value => {
                             quote! { #emitted_var }
                         }
+                        FieldCategory::DiGraph | FieldCategory::UnGraph => {
+                            todo!("DiGraph/UnGraph fields not yet supported by parser")
+                        }
                     }
                 } else if let Some(default_value) = field.default_value() {
                     let default_expr = default_value.to_expr();

@@ -269,6 +269,110 @@ impl<'a> Iterator for ConditionalOpRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for ConditionalOp {
+    type Iter = ConditionalOpDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self {
+            cond,
+            then_block,
+            else_block,
+        } = self;
+        ConditionalOpDigraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ConditionalOpDigraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ConditionalOpDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for ConditionalOp {
+    type IterMut = ConditionalOpDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            cond,
+            then_block,
+            else_block,
+        } = self;
+        ConditionalOpDigraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ConditionalOpDigraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ConditionalOpDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for ConditionalOp {
+    type Iter = ConditionalOpUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self {
+            cond,
+            then_block,
+            else_block,
+        } = self;
+        ConditionalOpUngraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ConditionalOpUngraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ConditionalOpUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for ConditionalOp {
+    type IterMut = ConditionalOpUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            cond,
+            then_block,
+            else_block,
+        } = self;
+        ConditionalOpUngraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ConditionalOpUngraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ConditionalOpUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for ConditionalOp {
     fn is_terminator(&self) -> bool {
         false
@@ -289,6 +393,12 @@ impl ::kirin::ir::IsPure for ConditionalOp {
 #[automatically_derived]
 impl ::kirin::ir::IsSpeculatable for ConditionalOp {
     fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for ConditionalOp {
+    fn is_edge(&self) -> bool {
         false
     }
 }

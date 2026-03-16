@@ -19,6 +19,8 @@ pub struct KirinStructOptions {
     pub speculatable: bool,
     #[darling(default)]
     pub terminator: bool,
+    #[darling(default)]
+    pub edge: bool,
 }
 
 /// Raw darling-parsed options for enum inputs.
@@ -39,6 +41,8 @@ pub struct KirinEnumOptions {
     pub speculatable: bool,
     #[darling(default)]
     pub terminator: bool,
+    #[darling(default)]
+    pub edge: bool,
 }
 
 /// Per-variant/statement options from `#[kirin(...)]`.
@@ -56,6 +60,8 @@ pub struct StatementOptions {
     pub speculatable: bool,
     #[darling(default)]
     pub terminator: bool,
+    #[darling(default)]
+    pub edge: bool,
 }
 
 /// Field-level options from `#[kirin(...)]` on fields.
@@ -150,6 +156,8 @@ pub struct GlobalOptions {
     pub speculatable: bool,
     /// Whether the operation is a block terminator.
     pub terminator: bool,
+    /// Whether the operation is an edge.
+    pub edge: bool,
 }
 
 impl FromDeriveInput for GlobalOptions {
@@ -187,6 +195,7 @@ impl From<KirinStructOptions> for GlobalOptions {
             pure: opts.pure,
             speculatable: opts.speculatable,
             terminator: opts.terminator,
+            edge: opts.edge,
         }
     }
 }
@@ -200,6 +209,7 @@ impl From<KirinStructOptions> for StatementOptions {
             pure: opts.pure,
             speculatable: opts.speculatable,
             terminator: opts.terminator,
+            edge: opts.edge,
         }
     }
 }
@@ -214,6 +224,7 @@ impl From<KirinEnumOptions> for GlobalOptions {
             pure: value.pure,
             speculatable: value.speculatable,
             terminator: value.terminator,
+            edge: value.edge,
         }
     }
 }

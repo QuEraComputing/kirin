@@ -2,10 +2,11 @@ use std::convert::Infallible;
 
 use super::*;
 use crate::{
-    Block, CompileStage, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks,
-    HasBlocksMut, HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasStageInfo,
-    HasSuccessors, HasSuccessorsMut, Id, IsConstant, IsPure, IsSpeculatable, IsTerminator,
-    Pipeline, Region, ResultValue, SSAValue, StageInfo, StageMeta, StagedNamePolicy, Successor,
+    Block, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks,
+    HasBlocksMut, HasDigraphs, HasDigraphsMut, HasRegions, HasRegionsMut, HasResults,
+    HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasUngraphs, HasUngraphsMut, Id,
+    IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Pipeline, Region, ResultValue,
+    SSAValue, StageInfo, StageMeta, StagedNamePolicy, Successor, UnGraph,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -117,6 +118,40 @@ macro_rules! impl_empty_dialect_traits {
         impl IsSpeculatable for $dialect {
             fn is_speculatable(&self) -> bool {
                 true
+            }
+        }
+
+        impl<'a> HasDigraphs<'a> for $dialect {
+            type Iter = std::iter::Empty<&'a DiGraph>;
+            fn digraphs(&'a self) -> Self::Iter {
+                std::iter::empty()
+            }
+        }
+
+        impl<'a> HasDigraphsMut<'a> for $dialect {
+            type IterMut = std::iter::Empty<&'a mut DiGraph>;
+            fn digraphs_mut(&'a mut self) -> Self::IterMut {
+                std::iter::empty()
+            }
+        }
+
+        impl<'a> HasUngraphs<'a> for $dialect {
+            type Iter = std::iter::Empty<&'a UnGraph>;
+            fn ungraphs(&'a self) -> Self::Iter {
+                std::iter::empty()
+            }
+        }
+
+        impl<'a> HasUngraphsMut<'a> for $dialect {
+            type IterMut = std::iter::Empty<&'a mut UnGraph>;
+            fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+                std::iter::empty()
+            }
+        }
+
+        impl IsEdge for $dialect {
+            fn is_edge(&self) -> bool {
+                false
             }
         }
     };

@@ -48,6 +48,8 @@ impl<L: Layout> FieldInfo<L> {
             FieldData::Block => FieldCategory::Block,
             FieldData::Successor => FieldCategory::Successor,
             FieldData::Region => FieldCategory::Region,
+            FieldData::DiGraph => FieldCategory::DiGraph,
+            FieldData::UnGraph => FieldCategory::UnGraph,
             FieldData::Symbol => FieldCategory::Symbol,
             FieldData::Value { .. } => FieldCategory::Value,
         }
@@ -61,6 +63,8 @@ impl<L: Layout> FieldInfo<L> {
             FieldCategory::Block => "block",
             FieldCategory::Successor => "successor",
             FieldCategory::Region => "region",
+            FieldCategory::DiGraph => "digraph",
+            FieldCategory::UnGraph => "ungraph",
             FieldCategory::Symbol => "symbol",
             FieldCategory::Value => "value",
         }

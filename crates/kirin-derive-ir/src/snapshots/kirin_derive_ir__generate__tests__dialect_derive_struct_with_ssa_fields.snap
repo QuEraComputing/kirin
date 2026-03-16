@@ -223,6 +223,94 @@ impl<'a> Iterator for BinaryOpRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for BinaryOp {
+    type Iter = BinaryOpDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self { result, lhs, rhs } = self;
+        BinaryOpDigraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BinaryOpDigraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BinaryOpDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for BinaryOp {
+    type IterMut = BinaryOpDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self { result, lhs, rhs } = self;
+        BinaryOpDigraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BinaryOpDigraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BinaryOpDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for BinaryOp {
+    type Iter = BinaryOpUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self { result, lhs, rhs } = self;
+        BinaryOpUngraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BinaryOpUngraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BinaryOpUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for BinaryOp {
+    type IterMut = BinaryOpUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self { result, lhs, rhs } = self;
+        BinaryOpUngraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct BinaryOpUngraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for BinaryOpUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for BinaryOp {
     fn is_terminator(&self) -> bool {
         false
@@ -243,6 +331,12 @@ impl ::kirin::ir::IsPure for BinaryOp {
 #[automatically_derived]
 impl ::kirin::ir::IsSpeculatable for BinaryOp {
     fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for BinaryOp {
+    fn is_edge(&self) -> bool {
         false
     }
 }

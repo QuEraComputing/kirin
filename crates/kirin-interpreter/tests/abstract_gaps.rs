@@ -61,11 +61,13 @@ fn build_abstract_recursive(
     {
         let stmts: Vec<Statement> = vec![c0.into()];
         for stmt in &stmts {
-            *stmt.expect_info_mut(stage).get_parent_mut() = Some(exit_block);
+            *stmt.expect_info_mut(stage).get_parent_mut() =
+                Some(StatementParent::Block(exit_block));
         }
         let linked = stage.link_statements(&stmts);
         let ret_stmt: Statement = ret0.into();
-        *ret_stmt.expect_info_mut(stage).get_parent_mut() = Some(exit_block);
+        *ret_stmt.expect_info_mut(stage).get_parent_mut() =
+            Some(StatementParent::Block(exit_block));
         let exit_info = exit_block.get_info_mut(stage).unwrap();
         exit_info.statements = linked;
         exit_info.terminator = Some(ret_stmt);
@@ -77,10 +79,12 @@ fn build_abstract_recursive(
     let ret_call = Return::<ArithType>::new(stage, call.res);
     {
         let call_stmt: Statement = call.into();
-        *call_stmt.expect_info_mut(stage).get_parent_mut() = Some(call_block);
+        *call_stmt.expect_info_mut(stage).get_parent_mut() =
+            Some(StatementParent::Block(call_block));
         let linked = stage.link_statements(&[call_stmt]);
         let ret_stmt: Statement = ret_call.into();
-        *ret_stmt.expect_info_mut(stage).get_parent_mut() = Some(call_block);
+        *ret_stmt.expect_info_mut(stage).get_parent_mut() =
+            Some(StatementParent::Block(call_block));
         let call_info = call_block.get_info_mut(stage).unwrap();
         call_info.statements = linked;
         call_info.terminator = Some(ret_stmt);
@@ -100,11 +104,11 @@ fn build_abstract_recursive(
     {
         let stmts: Vec<Statement> = vec![c1.into(), dec.into()];
         for stmt in &stmts {
-            *stmt.expect_info_mut(stage).get_parent_mut() = Some(entry);
+            *stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
         }
         let linked = stage.link_statements(&stmts);
         let cond_stmt: Statement = cond.into();
-        *cond_stmt.expect_info_mut(stage).get_parent_mut() = Some(entry);
+        *cond_stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
         let entry_info = entry.get_info_mut(stage).unwrap();
         entry_info.statements = linked;
         entry_info.terminator = Some(cond_stmt);

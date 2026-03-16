@@ -125,8 +125,8 @@ where
         if let Some(next_stmt) = next {
             self.set_current_cursor(Some(next_stmt))?;
         } else {
-            let parent_block = *cursor.parent::<L>(stage);
-            if let Some(block) = parent_block {
+            let parent = *cursor.parent::<L>(stage);
+            if let Some(kirin_ir::StatementParent::Block(block)) = parent {
                 let term = block.terminator::<L>(stage);
                 if term == Some(cursor) {
                     self.set_current_cursor(None)?;

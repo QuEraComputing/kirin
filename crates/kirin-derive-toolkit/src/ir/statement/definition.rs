@@ -233,6 +233,24 @@ impl<L: Layout> Statement<L> {
             });
         }
 
+        if let Some(collection) = Collection::from_type(ty, "DiGraph") {
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::DiGraph,
+            });
+        }
+
+        if let Some(collection) = Collection::from_type(ty, "UnGraph") {
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::UnGraph,
+            });
+        }
+
         if let Some(collection) = Collection::from_type(ty, "Symbol") {
             return Ok(FieldInfo {
                 index,

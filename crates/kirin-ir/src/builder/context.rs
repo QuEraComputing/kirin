@@ -353,10 +353,11 @@ impl<L: Dialect> StageInfo<L> {
 mod tests {
     use super::*;
     use crate::{
-        Block, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut,
-        HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
-        InternTable, IsConstant, IsPure, IsSpeculatable, IsTerminator, Region, ResultValue,
-        SSAValue, StageInfo, StagedFunctionConflictKind, StagedNamePolicy, Successor,
+        Block, DiGraph, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks,
+        HasBlocksMut, HasDigraphs, HasDigraphsMut, HasRegions, HasRegionsMut, HasResults,
+        HasResultsMut, HasSuccessors, HasSuccessorsMut, HasUngraphs, HasUngraphsMut, InternTable,
+        IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Region, ResultValue, SSAValue,
+        StageInfo, StagedFunctionConflictKind, StagedNamePolicy, Successor, UnGraph,
     };
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -477,6 +478,40 @@ mod tests {
     impl IsSpeculatable for TestDialect {
         fn is_speculatable(&self) -> bool {
             true
+        }
+    }
+
+    impl<'a> HasDigraphs<'a> for TestDialect {
+        type Iter = std::iter::Empty<&'a DiGraph>;
+        fn digraphs(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasDigraphsMut<'a> for TestDialect {
+        type IterMut = std::iter::Empty<&'a mut DiGraph>;
+        fn digraphs_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasUngraphs<'a> for TestDialect {
+        type Iter = std::iter::Empty<&'a UnGraph>;
+        fn ungraphs(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasUngraphsMut<'a> for TestDialect {
+        type IterMut = std::iter::Empty<&'a mut UnGraph>;
+        fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl IsEdge for TestDialect {
+        fn is_edge(&self) -> bool {
+            false
         }
     }
 
@@ -678,6 +713,40 @@ mod tests {
     impl IsSpeculatable for RichDialect {
         fn is_speculatable(&self) -> bool {
             true
+        }
+    }
+
+    impl<'a> HasDigraphs<'a> for RichDialect {
+        type Iter = std::iter::Empty<&'a DiGraph>;
+        fn digraphs(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasDigraphsMut<'a> for RichDialect {
+        type IterMut = std::iter::Empty<&'a mut DiGraph>;
+        fn digraphs_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasUngraphs<'a> for RichDialect {
+        type Iter = std::iter::Empty<&'a UnGraph>;
+        fn ungraphs(&'a self) -> Self::Iter {
+            std::iter::empty()
+        }
+    }
+
+    impl<'a> HasUngraphsMut<'a> for RichDialect {
+        type IterMut = std::iter::Empty<&'a mut UnGraph>;
+        fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+            std::iter::empty()
+        }
+    }
+
+    impl IsEdge for RichDialect {
+        fn is_edge(&self) -> bool {
+            false
         }
     }
 

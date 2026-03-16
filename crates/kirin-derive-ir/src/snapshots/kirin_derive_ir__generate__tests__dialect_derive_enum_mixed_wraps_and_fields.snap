@@ -303,6 +303,126 @@ impl<'a> Iterator for MixedOpsRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for MixedOps {
+    type Iter = MixedOpsDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                MixedOpsDigraphsIter::Add(<AddOp as ::kirin::ir::HasDigraphs>::digraphs(field_0))
+            }
+            Self::Literal { value } => {
+                MixedOpsDigraphsIter::Literal(std::iter::empty::<&'a ::kirin::ir::DiGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsDigraphsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::DiGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for MixedOps {
+    type IterMut = MixedOpsDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsDigraphsMutIter::Add(
+                <AddOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+            Self::Literal { value } => {
+                MixedOpsDigraphsMutIter::Literal(std::iter::empty::<&'a mut ::kirin::ir::DiGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsDigraphsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::DiGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for MixedOps {
+    type Iter = MixedOpsUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                MixedOpsUngraphsIter::Add(<AddOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0))
+            }
+            Self::Literal { value } => {
+                MixedOpsUngraphsIter::Literal(std::iter::empty::<&'a ::kirin::ir::UnGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsUngraphsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::UnGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for MixedOps {
+    type IterMut = MixedOpsUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsUngraphsMutIter::Add(
+                <AddOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+            Self::Literal { value } => {
+                MixedOpsUngraphsMutIter::Literal(std::iter::empty::<&'a mut ::kirin::ir::UnGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsUngraphsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::UnGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for MixedOps {
     fn is_terminator(&self) -> bool {
         match self {
@@ -334,6 +454,15 @@ impl ::kirin::ir::IsSpeculatable for MixedOps {
     fn is_speculatable(&self) -> bool {
         match self {
             Self::Add(field_0) => <AddOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0),
+            Self::Literal { value } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for MixedOps {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsEdge>::is_edge(field_0),
             Self::Literal { value } => false || false,
         }
     }

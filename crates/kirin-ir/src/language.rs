@@ -52,6 +52,26 @@ pub trait HasRegionsMut<'a> {
     fn regions_mut(&'a mut self) -> Self::IterMut;
 }
 
+pub trait HasDigraphs<'a> {
+    type Iter: Iterator<Item = &'a crate::DiGraph>;
+    fn digraphs(&'a self) -> Self::Iter;
+}
+
+pub trait HasDigraphsMut<'a> {
+    type IterMut: Iterator<Item = &'a mut crate::DiGraph>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut;
+}
+
+pub trait HasUngraphs<'a> {
+    type Iter: Iterator<Item = &'a crate::UnGraph>;
+    fn ungraphs(&'a self) -> Self::Iter;
+}
+
+pub trait HasUngraphsMut<'a> {
+    type IterMut: Iterator<Item = &'a mut crate::UnGraph>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut;
+}
+
 pub trait IsTerminator {
     fn is_terminator(&self) -> bool;
 }
@@ -66,6 +86,10 @@ pub trait IsPure {
 
 pub trait IsSpeculatable {
     fn is_speculatable(&self) -> bool;
+}
+
+pub trait IsEdge {
+    fn is_edge(&self) -> bool;
 }
 
 /// The base trait that all dialects must implement.
@@ -87,10 +111,15 @@ pub trait Dialect:
     + for<'a> HasSuccessorsMut<'a>
     + for<'a> HasRegions<'a>
     + for<'a> HasRegionsMut<'a>
+    + for<'a> HasDigraphs<'a>
+    + for<'a> HasDigraphsMut<'a>
+    + for<'a> HasUngraphs<'a>
+    + for<'a> HasUngraphsMut<'a>
     + IsTerminator
     + IsConstant
     + IsPure
     + IsSpeculatable
+    + IsEdge
     + Clone
     + PartialEq
     + std::fmt::Debug

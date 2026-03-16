@@ -44,6 +44,20 @@ impl<L: Layout> Statement<L> {
             .filter(|f| f.category() == FieldCategory::Region)
     }
 
+    /// Iterates fields classified as [`FieldCategory::DiGraph`].
+    pub fn digraphs(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::DiGraph)
+    }
+
+    /// Iterates fields classified as [`FieldCategory::UnGraph`].
+    pub fn ungraphs(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::UnGraph)
+    }
+
     /// Iterates fields classified as [`FieldCategory::Value`] (plain Rust types).
     pub fn values(&self) -> impl Iterator<Item = &FieldInfo<L>> {
         self.fields

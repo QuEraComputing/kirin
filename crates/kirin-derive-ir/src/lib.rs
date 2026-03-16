@@ -64,11 +64,16 @@ derive_field_iter_macro!(
 );
 derive_field_iter_macro!(derive_has_regions, HasRegions, HAS_REGIONS);
 derive_field_iter_macro!(derive_has_regions_mut, HasRegionsMut, HAS_REGIONS_MUT);
+derive_field_iter_macro!(derive_has_digraphs, HasDigraphs, HAS_DIGRAPHS);
+derive_field_iter_macro!(derive_has_digraphs_mut, HasDigraphsMut, HAS_DIGRAPHS_MUT);
+derive_field_iter_macro!(derive_has_ungraphs, HasUngraphs, HAS_UNGRAPHS);
+derive_field_iter_macro!(derive_has_ungraphs_mut, HasUngraphsMut, HAS_UNGRAPHS_MUT);
 
 derive_property_macro!(derive_is_terminator, IsTerminator, IS_TERMINATOR);
 derive_property_macro!(derive_is_constant, IsConstant, IS_CONSTANT);
 derive_property_macro!(derive_is_pure, IsPure, IS_PURE);
 derive_property_macro!(derive_is_speculatable, IsSpeculatable, IS_SPECULATABLE);
+derive_property_macro!(derive_is_edge, IsEdge, IS_EDGE);
 
 #[proc_macro_derive(StageMeta, attributes(stage))]
 pub fn derive_stage_meta(input: TokenStream) -> TokenStream {

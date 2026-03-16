@@ -24,9 +24,9 @@ pub use context::StageInfo;
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasRegions, HasRegionsMut,
-    HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut, IsConstant, IsPure, IsSpeculatable,
-    IsTerminator,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasDigraphs, HasDigraphsMut,
+    HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
+    HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice};
 pub use node::{
@@ -56,6 +56,6 @@ pub mod prelude {
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_ir::{
-    Dialect, HasArguments, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
-    IsSpeculatable, IsTerminator, ParseDispatch, StageMeta,
+    Dialect, HasArguments, HasDigraphs, HasRegions, HasResults, HasSuccessors, HasUngraphs,
+    IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, ParseDispatch, StageMeta,
 };

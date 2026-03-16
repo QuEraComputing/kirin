@@ -303,6 +303,126 @@ impl<'a> Iterator for ArithLanguageRegionsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for ArithLanguage {
+    type Iter = ArithLanguageDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => ArithLanguageDigraphsIter::Add(
+                <AddOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageDigraphsIter::Sub(
+                <SubOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageDigraphsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageDigraphsMutIter::Add(
+                <AddOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageDigraphsMutIter::Sub(
+                <SubOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageDigraphsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for ArithLanguage {
+    type Iter = ArithLanguageUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => ArithLanguageUngraphsIter::Add(
+                <AddOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageUngraphsIter::Sub(
+                <SubOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageUngraphsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageUngraphsMutIter::Add(
+                <AddOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageUngraphsMutIter::Sub(
+                <SubOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageUngraphsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for ArithLanguage {
     fn is_terminator(&self) -> bool {
         match self {
@@ -335,6 +455,15 @@ impl ::kirin::ir::IsSpeculatable for ArithLanguage {
         match self {
             Self::Add(field_0) => <AddOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0),
             Self::Sub(field_0) => <SubOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for ArithLanguage {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::IsEdge>::is_edge(field_0),
+            Self::Sub(field_0) => <SubOp as ::kirin::ir::IsEdge>::is_edge(field_0),
         }
     }
 }
