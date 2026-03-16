@@ -23,3 +23,10 @@ refactor = { type = "local" }
 test-coverage-review = { type = "local" }
 triage-review = { type = "local" }
 ion-cli = { type = "local" }
+ir-spec-writing = { type = "local" }
+
+[options]
+skills-dir = "skills"
+
+[options.targets]
+claude = ".claude/skills"

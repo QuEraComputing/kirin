@@ -42,6 +42,11 @@ source = ""
 checksum = "sha256:568522929f0ae87df17fd2f26a43fe1542f8a1b5abd2cd69f6e37aec4bf8d8f0"
 
 [[skill]]
+name = "ir-spec-writing"
+source = "/Users/roger/Code/rust/kirin/skills/ir-spec-writing"
+checksum = "sha256:666621dc1737aadb95c65122f72f295968e24424670c90af4fd9eb20d13745c9"
+
+[[skill]]
 name = "kirin-derive-macros"
 source = ""
 checksum = "sha256:8dc3d12634c4fa38f978c3f7e77039598799d65f3693404f082d427137ea253e"
