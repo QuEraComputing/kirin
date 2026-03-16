@@ -1,5 +1,6 @@
 /target
 skills-lock.json
+docs/superpowers/
 
 # Managed by ion (all symlinks)
 .agents/skills/*
