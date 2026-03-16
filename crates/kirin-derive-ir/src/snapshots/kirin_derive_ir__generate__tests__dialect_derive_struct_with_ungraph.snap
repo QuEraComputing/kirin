@@ -1,0 +1,409 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+assertion_line: 732
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for ZxEval {
+    type Iter = ZxEvalArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalArgumentsIter {
+            inner: boundary.iter().chain(captures.iter()),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalArgumentsIter<'a> {
+    inner: std::iter::Chain<
+        std::slice::Iter<'a, ::kirin::ir::SSAValue>,
+        std::slice::Iter<'a, ::kirin::ir::SSAValue>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for ZxEval {
+    type IterMut = ZxEvalArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalArgumentsMutIter {
+            inner: boundary.iter_mut().chain(captures.iter_mut()),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalArgumentsMutIter<'a> {
+    inner: std::iter::Chain<
+        std::slice::IterMut<'a, ::kirin::ir::SSAValue>,
+        std::slice::IterMut<'a, ::kirin::ir::SSAValue>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for ZxEval {
+    type Iter = ZxEvalResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalResultsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalResultsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for ZxEval {
+    type IterMut = ZxEvalResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalResultsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::ResultValue>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalResultsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for ZxEval {
+    type Iter = ZxEvalBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalBlocksIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalBlocksIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for ZxEval {
+    type IterMut = ZxEvalBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalBlocksMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalBlocksMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for ZxEval {
+    type Iter = ZxEvalSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalSuccessorsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalSuccessorsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for ZxEval {
+    type IterMut = ZxEvalSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalSuccessorsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalSuccessorsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for ZxEval {
+    type Iter = ZxEvalRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalRegionsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalRegionsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for ZxEval {
+    type IterMut = ZxEvalRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalRegionsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalRegionsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for ZxEval {
+    type Iter = ZxEvalDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalDigraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalDigraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for ZxEval {
+    type IterMut = ZxEvalDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalDigraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::DiGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalDigraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for ZxEval {
+    type Iter = ZxEvalUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalUngraphsIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalUngraphsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for ZxEval {
+    type IterMut = ZxEvalUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalUngraphsMutIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalUngraphsMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for ZxEval {
+    fn is_terminator(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for ZxEval {
+    fn is_constant(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for ZxEval {
+    fn is_pure(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for ZxEval {
+    fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for ZxEval {
+    fn is_edge(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for ZxEval {
+    type Type = SimpleType;
+}

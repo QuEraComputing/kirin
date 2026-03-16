@@ -1,0 +1,423 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+assertion_line: 717
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for QuantumEval {
+    type Iter = QuantumEvalArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalArgumentsIter {
+            inner: std::iter::once(qubit).chain(std::iter::once(angle)),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalArgumentsIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Once<&'a ::kirin::ir::SSAValue>,
+        std::iter::Once<&'a ::kirin::ir::SSAValue>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalArgumentsMutIter {
+            inner: std::iter::once(qubit).chain(std::iter::once(angle)),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalArgumentsMutIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+        std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for QuantumEval {
+    type Iter = QuantumEvalResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalResultsIter {
+            inner: std::iter::once(res),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalResultsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalResultsMutIter {
+            inner: std::iter::once(res),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalResultsMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::ResultValue>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for QuantumEval {
+    type Iter = QuantumEvalBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalBlocksIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalBlocksIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalBlocksMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Block>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalBlocksMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Block>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for QuantumEval {
+    type Iter = QuantumEvalSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalSuccessorsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalSuccessorsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalSuccessorsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Successor>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalSuccessorsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Successor>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for QuantumEval {
+    type Iter = QuantumEvalRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalRegionsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalRegionsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalRegionsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalRegionsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for QuantumEval {
+    type Iter = QuantumEvalDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalDigraphsIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalDigraphsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalDigraphsMutIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalDigraphsMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for QuantumEval {
+    type Iter = QuantumEvalUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalUngraphsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalUngraphsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalUngraphsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::UnGraph>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalUngraphsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for QuantumEval {
+    fn is_terminator(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for QuantumEval {
+    fn is_constant(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for QuantumEval {
+    fn is_pure(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for QuantumEval {
+    fn is_speculatable(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for QuantumEval {
+    fn is_edge(&self) -> bool {
+        false
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for QuantumEval {
+    type Type = SimpleType;
+}

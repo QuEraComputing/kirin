@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+assertion_line: 776
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for Wire {
+    fn is_edge(&self) -> bool {
+        true
+    }
+}

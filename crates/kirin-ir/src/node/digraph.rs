@@ -101,3 +101,21 @@ impl<L: Dialect> GetInfo<L> for DiGraph {
         stage.digraphs.get_mut(*self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::arena::Id;
+
+    #[test]
+    fn test_digraph_display() {
+        let dg = DiGraph(Id(0));
+        assert_eq!(format!("{dg}"), "^dg0");
+    }
+
+    #[test]
+    fn test_digraph_display_nonzero() {
+        let dg = DiGraph(Id(42));
+        assert_eq!(format!("{dg}"), "^dg42");
+    }
+}

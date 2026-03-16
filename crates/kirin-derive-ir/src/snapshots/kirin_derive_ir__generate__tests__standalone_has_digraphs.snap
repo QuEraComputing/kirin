@@ -1,0 +1,27 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+assertion_line: 761
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for QuantumEval {
+    type Iter = QuantumEvalDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self { body } = self;
+        QuantumEvalDigraphsIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalDigraphsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::DiGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

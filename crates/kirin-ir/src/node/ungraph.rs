@@ -101,3 +101,21 @@ impl<L: Dialect> GetInfo<L> for UnGraph {
         stage.ungraphs.get_mut(*self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::arena::Id;
+
+    #[test]
+    fn test_ungraph_display() {
+        let ug = UnGraph(Id(0));
+        assert_eq!(format!("{ug}"), "^ug0");
+    }
+
+    #[test]
+    fn test_ungraph_display_nonzero() {
+        let ug = UnGraph(Id(7));
+        assert_eq!(format!("{ug}"), "^ug7");
+    }
+}

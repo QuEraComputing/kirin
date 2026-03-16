@@ -700,6 +700,82 @@ mod tests {
         insta::assert_snapshot!(rustfmt(tokens.to_string()));
     }
 
+    // ---- Dialect derive: struct with DiGraph field ----
+
+    #[test]
+    fn test_dialect_derive_struct_with_digraph() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct QuantumEval {
+                qubit: SSAValue,
+                angle: SSAValue,
+                body: DiGraph,
+                #[kirin(type = SimpleType::placeholder())]
+                res: ResultValue,
+            }
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Dialect derive: struct with UnGraph field ----
+
+    #[test]
+    fn test_dialect_derive_struct_with_ungraph() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct ZxEval {
+                boundary: Vec<SSAValue>,
+                captures: Vec<SSAValue>,
+                body: UnGraph,
+            }
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Dialect derive: struct with edge attribute ----
+
+    #[test]
+    fn test_dialect_derive_struct_edge() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType, edge)]
+            struct ZxWire {
+                #[kirin(type = SimpleType::placeholder())]
+                res: ResultValue,
+            }
+        };
+        insta::assert_snapshot!(generate_dialect_code(input));
+    }
+
+    // ---- Standalone HasDigraphs derive ----
+
+    #[test]
+    fn test_standalone_has_digraphs() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct QuantumEval {
+                body: DiGraph,
+            }
+        };
+        let tokens =
+            generate_field_iter(&input, HAS_DIGRAPHS).expect("Failed to generate HasDigraphs");
+        insta::assert_snapshot!(rustfmt(tokens.to_string()));
+    }
+
+    // ---- Standalone IsEdge derive ----
+
+    #[test]
+    fn test_standalone_is_edge() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType, edge)]
+            struct Wire {
+                #[kirin(type = SimpleType::placeholder())]
+                res: ResultValue,
+            }
+        };
+        let tokens = generate_property(&input, IS_EDGE).expect("Failed to generate IsEdge");
+        insta::assert_snapshot!(rustfmt(tokens.to_string()));
+    }
+
     // ---- StageMeta derive error: applied to struct ----
 
     #[test]
