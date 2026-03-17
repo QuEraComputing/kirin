@@ -1358,3 +1358,116 @@ fn test_parse_ast_collects_errors_with_spans() {
         assert!(e.span.start <= e.span.end);
     }
 }
+
+// === Graph Parser Tests ===
+
+/// Helper macro: create a recursive parser stub for graph tests.
+macro_rules! graph_lang {
+    () => {{
+        use chumsky::prelude::*;
+        chumsky::recursive::recursive::<_, _, chumsky::extra::Err<Rich<'_, kirin_lexer::Token<'_>>>, _, _>(|_| {
+            select! { kirin_lexer::Token::Int(v) => v.parse::<i32>().unwrap() }
+        })
+    }};
+}
+
+#[test]
+fn test_graph_header_ports_only() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "digraph ^dg0 ( %p0 : 1 ) { }",
+        digraph::<_, i32, _>(language)
+    );
+    assert!(result.is_ok());
+    let dg = result.unwrap();
+    assert_eq!(dg.header.value.name.value, "dg0");
+    assert_eq!(dg.header.value.ports.len(), 1);
+    assert_eq!(dg.header.value.ports[0].value.name.value, "p0");
+    assert!(dg.header.value.captures.is_empty());
+    assert!(dg.statements.is_empty());
+    assert!(dg.yields.is_empty());
+}
+
+#[test]
+fn test_graph_header_ports_and_captures() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "digraph ^dg0 ( %p0 : 1 , %p1 : 2 ) capture ( %theta : 3 ) { }",
+        digraph::<_, i32, _>(language)
+    );
+    assert!(result.is_ok());
+    let dg = result.unwrap();
+    assert_eq!(dg.header.value.ports.len(), 2);
+    assert_eq!(dg.header.value.captures.len(), 1);
+    assert_eq!(dg.header.value.captures[0].value.name.value, "theta");
+}
+
+#[test]
+fn test_digraph_with_yield() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "digraph ^dg0 ( %p0 : 1 ) { 42 ; yield %p0 ; }",
+        digraph::<_, i32, _>(language)
+    );
+    assert!(result.is_ok());
+    let dg = result.unwrap();
+    assert_eq!(dg.statements.len(), 1);
+    assert_eq!(dg.yields.len(), 1);
+    assert_eq!(dg.yields[0].value, "p0");
+}
+
+#[test]
+fn test_ungraph_with_edge_prefix() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "ungraph ^ug0 ( %p0 : 1 ) { edge 10 ; 20 ; 30 ; }",
+        ungraph::<_, i32, _>(language)
+    );
+    assert!(result.is_ok());
+    let ug = result.unwrap();
+    assert_eq!(ug.statements.len(), 3);
+    assert!(ug.statements[0].is_edge);
+    assert!(!ug.statements[1].is_edge);
+    assert!(!ug.statements[2].is_edge);
+}
+
+#[test]
+fn test_ungraph_no_captures() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "ungraph ^ug0 ( %p0 : 1 ) { }",
+        ungraph::<_, i32, _>(language)
+    );
+    assert!(result.is_ok());
+    let ug = result.unwrap();
+    assert!(ug.header.value.captures.is_empty());
+    assert!(ug.statements.is_empty());
+}
+
+#[test]
+fn test_digraph_no_yield() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "digraph ^dg0 ( %p0 : 1 ) { 42 ; }",
+        digraph::<_, i32, _>(language)
+    );
+    assert!(result.is_ok());
+    let dg = result.unwrap();
+    assert_eq!(dg.statements.len(), 1);
+    assert!(dg.yields.is_empty());
+}
+
+#[test]
+fn test_digraph_multiple_yields() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "digraph ^dg0 ( %p0 : 1 ) { yield %a , %b , %c ; }",
+        digraph::<_, i32, _>(language)
+    );
+    assert!(result.is_ok());
+    let dg = result.unwrap();
+    assert_eq!(dg.yields.len(), 3);
+    assert_eq!(dg.yields[0].value, "a");
+    assert_eq!(dg.yields[1].value, "b");
+    assert_eq!(dg.yields[2].value, "c");
+}

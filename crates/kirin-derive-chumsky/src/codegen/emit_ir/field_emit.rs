@@ -58,6 +58,12 @@ impl GenerateEmitIR {
                     FieldCategory::Region => quote! {
                         let #emitted_var = #var.emit_with(ctx, emit_language_output)?;
                     },
+                    FieldCategory::DiGraph => quote! {
+                        let #emitted_var = #var.emit_with(ctx, emit_language_output)?;
+                    },
+                    FieldCategory::UnGraph => quote! {
+                        let #emitted_var = #var.emit_with(ctx, emit_language_output)?;
+                    },
                     _ => quote! {
                         let #emitted_var = #crate_path::EmitIR::emit(#var, ctx)?;
                     },

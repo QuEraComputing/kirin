@@ -4,11 +4,13 @@
 //! converted to the IR representation.
 
 mod blocks;
+mod graphs;
 mod spanned;
 mod symbols;
 mod values;
 
 pub use blocks::*;
+pub use graphs::*;
 pub use spanned::*;
 pub use symbols::*;
 pub use values::*;

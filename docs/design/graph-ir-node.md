@@ -117,7 +117,6 @@ ungraph ^name(edge_args...) {
   edge %name = dialect_edge_op(metadata...) -> EdgeType;
   ...
   node_statements...
-  yield outputs...;
 }
 ```
 
@@ -166,7 +165,6 @@ specialize @zx fn @simplify(Wire, Wire, f64, f64, f64) -> (Wire, Wire) {
     z_spider(%zero, %p0, %w0, %w1);
     x_spider(%pi, %w0, %w2, %w3);
     z_spider(%half_pi, %w1, %w3, %w4);
-    yield %w2, %w4;
   }
 }
 ```
@@ -184,7 +182,6 @@ specialize @zx fn @colored(Wire, Wire, f64, f64) -> Wire {
     edge %w1 = plain_wire -> ZXEdge;
     z_spider(%theta, %p0, %w0);
     x_spider(%phi, %w0, %w1);
-    yield %w1;
   }
 }
 ```
@@ -201,14 +198,12 @@ A statement inside a graph body can contain an inner graph body, creating a comp
 %out = compound_op(%edge0, %edge1, %captured0) {
   ungraph ^ug1(%ip0: Wire, %ip1: Wire) capture(%c: f64) {
     ...
-    yield %result;
   }
 } -> Wire;
 // %edge0 → %ip0, %edge1 → %ip1, %captured0 → %c
 ```
 
 - Operands map positionally to inner `[edge_args ++ captures]`
-- Results map positionally to inner `yield` values
 - Compound node results are edge SSAValues in the outer graph
 
 ### Example: Nested ZX Diagram
@@ -227,10 +222,8 @@ specialize @zx fn @composed(Wire, Wire, f64, f64, f64, f64) -> Wire {
         edge %iw0 = wire -> Wire;
         z_spider(%a, %ip0, %iw0);
         x_spider(%b, %ip1, %iw0);
-        yield %iw0;
       }
     } -> Wire;
-    yield %w3;
   }
 }
 ```
@@ -317,10 +310,11 @@ Graph bodies use relaxed dominance (like MLIR graph regions). Statement order is
 
 ### `yield` Semantics
 
-`yield` terminates a graph body and declares its output edges:
+`yield` terminates a **digraph** body and declares its output edges:
 
 - Yielded values must be edge SSAValues (not captured values).
 - They map positionally to the enclosing operation's result types.
+- **`ungraph` bodies do not have `yield`** — undirected graphs have no notion of directed output edges. Edge ports on the boundary provide the interface to the enclosing scope.
 
 ### Edge Multiplicity
 
@@ -381,7 +375,6 @@ digraph ^dg0(%input: Signal) {
 ungraph ^ug0(%p0: Wire) {
   edge %w0 = wire -> Wire;
   z_spider(%theta, %p0, %w0, %w0);  // %w0 appears twice — self-loop
-  yield %p0;
 }
 ```
 

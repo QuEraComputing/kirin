@@ -29,9 +29,8 @@ impl FieldCategoryExt for FieldCategory {
             FieldCategory::Region => "region",
             FieldCategory::Symbol => "symbol",
             FieldCategory::Value => "value",
-            FieldCategory::DiGraph | FieldCategory::UnGraph => {
-                unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
-            }
+            FieldCategory::DiGraph => "digraph",
+            FieldCategory::UnGraph => "ungraph",
         }
     }
 
@@ -79,8 +78,11 @@ pub fn ast_type<L: Layout>(
                 .unwrap_or_else(|| syn::parse_quote!(()));
             quote! { <#ty as #crate_path::HasParser<'t>>::Output }
         }
-        FieldCategory::DiGraph | FieldCategory::UnGraph => {
-            unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
+        FieldCategory::DiGraph => {
+            quote! { #crate_path::DiGraph<'t, #type_output, LanguageOutput> }
+        }
+        FieldCategory::UnGraph => {
+            quote! { #crate_path::UnGraph<'t, #type_output, LanguageOutput> }
         }
     }
 }
@@ -136,8 +138,15 @@ pub fn parser_expr<L: Layout>(
                 .unwrap_or_else(|| syn::parse_quote!(()));
             quote! { <#ty as #crate_path::HasParser<'t>>::parser() }
         }
-        FieldCategory::DiGraph | FieldCategory::UnGraph => {
-            unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
+        FieldCategory::DiGraph => {
+            quote! {
+                #crate_path::digraph::<_, #ir_type, _>(language.clone())
+            }
+        }
+        FieldCategory::UnGraph => {
+            quote! {
+                #crate_path::ungraph::<_, #ir_type, _>(language.clone())
+            }
         }
     }
 }
