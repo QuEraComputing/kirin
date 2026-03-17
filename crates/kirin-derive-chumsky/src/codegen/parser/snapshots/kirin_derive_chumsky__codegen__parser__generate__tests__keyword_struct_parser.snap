@@ -94,6 +94,7 @@ where
     SimpleType: kirin_chumsky::HasParser<'t> + 't,
     <SimpleType as kirin_chumsky::HasParser<'t>>::Output:
         kirin_chumsky::EmitIR<Return, Output = <Return as ::kirin::ir::Dialect>::Type>,
+    <Return as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
 {
     fn emit_parsed(
         output: &<Self as kirin_chumsky::HasParser<'t>>::Output,
@@ -133,6 +134,7 @@ where
     SimpleType: kirin_chumsky::HasParser<'tokens> + 'tokens,
     <SimpleType as kirin_chumsky::HasParser<'tokens>>::Output:
         kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
+    SimpleType: ::kirin::ir::Placeholder,
 {
     #[inline]
     fn emit_output<__TypeOutput, __EmitLanguageOutput>(

@@ -15,6 +15,7 @@ where
     ) -> ::core::result::Result<Add, kirin_chumsky::EmitError>
     where
         __Language: ::kirin::ir::Dialect,
+        <__Language as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
         TypeOutput: Clone + PartialEq,
         LanguageOutput: Clone + PartialEq + 't,
         __EmitLanguageOutput: for<'ctx> Fn(
@@ -50,6 +51,7 @@ impl<'t, TypeOutput, LanguageOutput, Language> kirin_chumsky::EmitIR<Language>
     for AddAST<'t, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<Add>,
+    <Language as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 't,
     SimpleType: kirin_chumsky::HasParser<'t> + 't,
@@ -69,6 +71,7 @@ where
 impl<'t, TypeOutput, Language> kirin_chumsky::EmitIR<Language> for AddASTSelf<'t, TypeOutput>
 where
     Language: ::kirin::ir::Dialect + From<Add>,
+    <Language as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
     TypeOutput: Clone + PartialEq,
     SimpleType: kirin_chumsky::HasParser<'t> + 't,
     <SimpleType as kirin_chumsky::HasParser<'t>>::Output:

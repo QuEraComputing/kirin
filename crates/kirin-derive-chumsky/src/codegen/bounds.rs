@@ -26,7 +26,6 @@ pub(crate) struct ImplBounds {
     ir_type: syn::Path,
     value_types: Vec<syn::Type>,
     wrapper_types: Vec<syn::Type>,
-    has_result_fields: bool,
     ir_type_is_param: bool,
 }
 
@@ -38,7 +37,6 @@ impl ImplBounds {
     ) -> Self {
         let value_types = collect_all_value_types_needing_bounds(ir_input);
         let wrapper_types = collect_wrapper_types(ir_input);
-        let has_result_fields = super::has_result_fields(ir_input);
         let ir_type_is_param = {
             let ir_type = &config.ir_type;
             ir_type.segments.len() == 1
@@ -54,7 +52,6 @@ impl ImplBounds {
             ir_type: config.ir_type.clone(),
             value_types,
             wrapper_types,
-            has_result_fields,
             ir_type_is_param,
         }
     }
@@ -65,17 +62,19 @@ impl ImplBounds {
         !self.wrapper_types.is_empty()
     }
 
-    /// True when any statement has `ResultValue` fields (needs `Placeholder`).
+    /// True when `Placeholder` is needed.
+    ///
+    /// Always true because `SSAValue::emit` requires `IR::Type: Placeholder`
+    /// for forward-reference support in graph bodies with relaxed dominance.
     pub fn needs_placeholder(&self) -> bool {
-        self.has_result_fields
+        true
     }
 
     /// True when `Placeholder` is needed considering wrappers too.
     ///
-    /// Wrapped dialects may themselves have `ResultValue` fields whose
-    /// `Placeholder` bound is satisfied through `HasDialectEmitIR`.
+    /// Always true because `SSAValue::emit` requires `IR::Type: Placeholder`.
     pub fn needs_placeholder_with_wrappers(&self) -> bool {
-        self.has_result_fields || self.has_wrappers()
+        true
     }
 
     // --- IR type predicates ---
@@ -176,13 +175,24 @@ impl ImplBounds {
         }
     }
 
-    /// `<Lang as Dialect>::Type: Placeholder`
+    /// Placeholder predicates needed for the emit impl.
     ///
-    /// Always returns the predicate; caller checks [`needs_placeholder`] or
-    /// [`needs_placeholder_with_wrappers`] to decide whether to include it.
-    pub fn placeholder_predicate(&self, language: &TokenStream) -> syn::WherePredicate {
+    /// Returns `<Lang as Dialect>::Type: Placeholder`. When the IR type is a
+    /// type parameter (e.g. `T`), also returns `T: Placeholder` directly
+    /// so the compiler can resolve the bound without normalization.
+    pub fn placeholder_predicates(
+        &self,
+        language: &TokenStream,
+    ) -> Vec<syn::WherePredicate> {
         let ir_path = &self.ir_path;
-        syn::parse_quote! { <#language as #ir_path::Dialect>::Type: #ir_path::Placeholder }
+        let mut preds = vec![
+            syn::parse_quote! { <#language as #ir_path::Dialect>::Type: #ir_path::Placeholder },
+        ];
+        if self.ir_type_is_param {
+            let ir_type = &self.ir_type;
+            preds.push(syn::parse_quote! { #ir_type: #ir_path::Placeholder });
+        }
+        preds
     }
 }
 

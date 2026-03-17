@@ -15,6 +15,7 @@ where
     ) -> ::core::result::Result<ArithOps, ::kirin::parsers::EmitError>
     where
         __Language: ::kirin::ir::Dialect,
+        <__Language as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
         TypeOutput: Clone + PartialEq,
         LanguageOutput: Clone + PartialEq + 't,
         __EmitLanguageOutput: for<'ctx> Fn(
@@ -67,6 +68,7 @@ impl<'t, TypeOutput, LanguageOutput, Language> ::kirin::parsers::EmitIR<Language
     for ArithOpsAST<'t, TypeOutput, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect + From<ArithOps>,
+    <Language as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 't,
     SimpleType: ::kirin::parsers::HasParser<'t> + 't,
@@ -87,6 +89,7 @@ impl<'t, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
     for ArithOpsASTSelf<'t, TypeOutput>
 where
     Language: ::kirin::ir::Dialect + From<ArithOps>,
+    <Language as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
     TypeOutput: Clone + PartialEq,
     SimpleType: ::kirin::parsers::HasParser<'t> + 't,
     <SimpleType as ::kirin::parsers::HasParser<'t>>::Output:

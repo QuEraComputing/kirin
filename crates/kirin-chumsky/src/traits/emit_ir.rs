@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, StageInfo};
+use kirin_ir::{Dialect, Placeholder, SSAKind, StageInfo};
 use rustc_hash::FxHashMap;
 
 /// Error type for IR emission from parsed AST nodes.
@@ -29,6 +29,10 @@ pub struct EmitContext<'a, L: Dialect> {
     pub stage: &'a mut StageInfo<L>,
     ssa_names: FxHashMap<String, kirin_ir::SSAValue>,
     block_names: FxHashMap<String, kirin_ir::Block>,
+    /// When true, undefined SSA references create forward-reference
+    /// placeholders instead of returning errors. Used for graph bodies
+    /// with relaxed dominance.
+    relaxed_dominance: bool,
 }
 
 impl<'a, L: Dialect> EmitContext<'a, L> {
@@ -37,11 +41,43 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
             stage,
             ssa_names: FxHashMap::default(),
             block_names: FxHashMap::default(),
+            relaxed_dominance: false,
         }
     }
 
     pub fn lookup_ssa(&self, name: &str) -> Option<kirin_ir::SSAValue> {
         self.ssa_names.get(name).copied()
+    }
+
+    /// Look up an SSA value by name. In relaxed dominance mode, creates a
+    /// forward-reference placeholder if the name is not yet defined.
+    ///
+    /// The placeholder uses `Unresolved(Result(0))` and `Placeholder::placeholder()`
+    /// as the type — both are updated when the defining `ResultValue` is emitted.
+    pub fn resolve_ssa(&mut self, name: &str) -> Result<kirin_ir::SSAValue, EmitError>
+    where
+        L::Type: Placeholder,
+    {
+        if let Some(ssa) = self.ssa_names.get(name).copied() {
+            return Ok(ssa);
+        }
+        if self.relaxed_dominance {
+            let ssa = self
+                .stage
+                .ssa()
+                .name(name.to_string())
+                .ty(L::Type::placeholder())
+                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)))
+                .new();
+            self.ssa_names.insert(name.to_string(), ssa);
+            return Ok(ssa);
+        }
+        Err(EmitError::UndefinedSSA(name.to_string()))
+    }
+
+    /// Enable or disable relaxed dominance mode.
+    pub fn set_relaxed_dominance(&mut self, relaxed: bool) {
+        self.relaxed_dominance = relaxed;
     }
 
     pub fn register_ssa(&mut self, name: String, ssa: kirin_ir::SSAValue) {

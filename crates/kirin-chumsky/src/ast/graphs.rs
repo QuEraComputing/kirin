@@ -158,15 +158,16 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
             ctx.register_ssa(info.name.clone(), ssa);
         }
 
-        // Phase 2: Emit all statements
-        // Graph bodies have relaxed dominance — a statement may reference SSAs
-        // defined by later statements. We sort statements so definitions come
-        // before uses when possible, and rely on the builder to handle the rest.
+        // Phase 2: Emit all statements with relaxed dominance.
+        // Graph bodies allow forward SSA references — a statement may reference
+        // SSAs defined by later statements (e.g. cycles in signal processing graphs).
+        ctx.set_relaxed_dominance(true);
         let mut node_stmts = Vec::new();
         for stmt_ast in &self.statements {
             let stmt = emit_statement(&stmt_ast.value, ctx)?;
             node_stmts.push(stmt);
         }
+        ctx.set_relaxed_dominance(false);
 
         // Phase 3: Resolve yield references
         let mut yield_ssas = Vec::new();
@@ -283,7 +284,8 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
             ctx.register_ssa(info.name.clone(), ssa);
         }
 
-        // Phase 2: Emit all statements, tracking which are edges vs nodes
+        // Phase 2: Emit all statements with relaxed dominance, tracking edge vs node
+        ctx.set_relaxed_dominance(true);
         let mut edge_stmts = Vec::new();
         let mut node_stmts = Vec::new();
         for ug_stmt in &self.statements {
@@ -294,6 +296,7 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
                 node_stmts.push(stmt);
             }
         }
+        ctx.set_relaxed_dominance(false);
 
         // Phase 3: Build ungraph using builder
         let mut builder = ctx.stage.ungraph().name(graph_name);

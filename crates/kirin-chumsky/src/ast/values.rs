@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{Dialect, Placeholder, SSAKind};
+use kirin_ir::{Dialect, GetInfo, Placeholder, SSAKind};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -62,32 +62,28 @@ pub struct NameofSSAValue<'src> {
 
 /// Implementation of EmitIR for SSAValue AST nodes.
 ///
-/// This looks up the SSA value by name in the emit context's symbol table.
-/// The name must have been previously registered (e.g., when emitting a
-/// ResultValue or block argument).
+/// Looks up the SSA value by name. In relaxed dominance mode (graph bodies),
+/// creates a forward-reference placeholder if the name is not yet defined.
 impl<'src, TypeOutput, IR> EmitIR<IR> for SSAValue<'src, TypeOutput>
 where
     IR: Dialect,
+    IR::Type: kirin_ir::Placeholder,
 {
     type Output = kirin_ir::SSAValue;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
-        ctx.lookup_ssa(self.name.value)
-            .ok_or_else(|| EmitError::UndefinedSSA(self.name.value.to_string()))
+        ctx.resolve_ssa(self.name.value)
     }
 }
 
 /// Implementation of EmitIR for ResultValue AST nodes.
 ///
-/// This creates a new SSA value with the parsed name and registers it
-/// in the emit context's symbol table. The created SSA has `SSAKind::Unresolved(ResolutionInfo::Result(0))`
-/// which will be updated when the containing statement is finalized.
+/// If a forward-reference placeholder already exists for this name (created by
+/// `SSAValue::emit` in relaxed dominance mode), reuses it — updating its type
+/// in place. Otherwise creates a new SSA value.
 ///
-/// Note: The result index is set to 0 here. For statements with multiple results,
-/// the generated code should handle setting the correct indices.
-///
-/// The `TypeOutput: EmitIR<IR, Output = IR::Type>` bound allows proper type
-/// conversion from the parsed type AST to the IR's type lattice via the EmitIR trait.
+/// The SSA starts with `SSAKind::Unresolved(ResolutionInfo::Result(0))` which is
+/// resolved to `SSAKind::Result(stmt, idx)` when the statement builder finalizes.
 impl<'src, TypeOutput, IR> EmitIR<IR> for ResultValue<'src, TypeOutput>
 where
     IR: Dialect,
@@ -104,6 +100,20 @@ where
             .map(|t| t.emit(ctx))
             .transpose()?
             .unwrap_or_else(|| IR::Type::placeholder());
+
+        // Check if a forward-reference placeholder exists for this name
+        if let Some(existing) = ctx.lookup_ssa(self.name.value) {
+            if let Some(info) = existing.get_info_mut(ctx.stage) {
+                if matches!(
+                    info.kind(),
+                    SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))
+                ) {
+                    // Reuse the forward-ref SSA — update type in place
+                    info.set_ty(ty);
+                    return Ok(existing.into());
+                }
+            }
+        }
 
         // Create a new SSA value with the parsed name and type
         let ssa = ctx

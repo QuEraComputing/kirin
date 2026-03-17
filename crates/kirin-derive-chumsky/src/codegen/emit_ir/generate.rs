@@ -116,7 +116,10 @@ impl GenerateEmitIR {
         stmt.iter_all_fields().any(|field| {
             matches!(
                 field.category(),
-                FieldCategory::Block | FieldCategory::Region
+                FieldCategory::Block
+                    | FieldCategory::Region
+                    | FieldCategory::DiGraph
+                    | FieldCategory::UnGraph
             )
         })
     }
@@ -128,7 +131,10 @@ impl GenerateEmitIR {
         ast_fields.iter().any(|field| {
             matches!(
                 field.category(),
-                FieldCategory::Block | FieldCategory::Region
+                FieldCategory::Block
+                    | FieldCategory::Region
+                    | FieldCategory::DiGraph
+                    | FieldCategory::UnGraph
             )
         })
     }
@@ -204,7 +210,7 @@ impl GenerateEmitIR {
         if bounds.needs_placeholder() {
             helper_wc
                 .predicates
-                .push(bounds.placeholder_predicate(&lang_emit_ir));
+                .extend(bounds.placeholder_predicates(&lang_emit_ir));
         }
         helper_wc
             .predicates
@@ -241,7 +247,7 @@ impl GenerateEmitIR {
         if bounds.needs_placeholder() {
             emit_ir_wc
                 .predicates
-                .push(bounds.placeholder_predicate(&lang_trait_impl));
+                .extend(bounds.placeholder_predicates(&lang_trait_impl));
         }
         emit_ir_wc
             .predicates

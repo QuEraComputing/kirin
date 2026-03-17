@@ -62,9 +62,8 @@ impl GenerateHasDialectParser {
         wc.predicates
             .extend(bounds.wrappers_emit_ir(&lt_t, &language, &ast_self_type));
         if bounds.needs_placeholder_with_wrappers() {
-            wc.predicates.push(syn::parse_quote! {
-                <#language as #ir_path::Dialect>::Type: #ir_path::Placeholder
-            });
+            wc.predicates
+                .extend(bounds.placeholder_predicates(&language));
         }
 
         let has_parser_emit_ir_impl = quote! {

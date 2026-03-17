@@ -66,7 +66,8 @@ impl GenerateEmitIR {
         });
         wc.push_opt(bounds.dialect_type_bound(&lang));
         if bounds.needs_placeholder() {
-            wc.predicates.push(bounds.placeholder_predicate(&lang));
+            wc.predicates
+                .extend(bounds.placeholder_predicates(&lang));
         }
         wc.predicates
             .push(syn::parse_quote! { TypeOutput: Clone + PartialEq });
