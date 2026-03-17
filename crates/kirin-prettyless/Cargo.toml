@@ -8,6 +8,7 @@ bat = { version = "0.26", optional = true }
 bon = "3.8"
 kirin-ir.workspace = true
 kirin-derive-prettyless = { workspace = true, optional = true }
+petgraph.workspace = true
 prettyless = "0.3"
 serde = { workspace = true, optional = true, features = ["derive"] }
 

@@ -1,7 +1,10 @@
+use std::collections::HashSet;
+
 use kirin_ir::{
-    Block, Dialect, GetInfo, GlobalSymbol, Id, Item, Region, SSAInfo, Signature,
-    SpecializedFunction, StagedFunction, Statement,
+    Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Item, Port, Region, SSAInfo, SSAValue,
+    Signature, SpecializedFunction, StagedFunction, Statement, UnGraph,
 };
+use petgraph::visit::IntoNodeReferences;
 use prettyless::DocAllocator;
 
 use crate::{ArenaDoc, PrettyPrint};
@@ -86,6 +89,188 @@ where
             inner += self.line_();
         }
         self.block_indent(inner).enclose("{", "}")
+    }
+
+    /// Pretty print a list of ports.
+    ///
+    /// Edge ports (`ports[..edge_count]`) are printed as `(%name: Type, ...)`.
+    /// If capture ports (`ports[edge_count..]`) are present, they are appended as
+    /// ` capture(%name: Type, ...)`.
+    pub fn print_ports(&'a self, ports: &[Port], edge_count: usize) -> ArenaDoc<'a> {
+        let edge_ports = &ports[..edge_count];
+        let capture_ports = &ports[edge_count..];
+
+        if edge_ports.is_empty() && capture_ports.is_empty() {
+            return self.nil();
+        }
+
+        let print_port_list = |port_slice: &[Port]| -> ArenaDoc<'a> {
+            let mut doc = self.nil();
+            for (i, port) in port_slice.iter().enumerate() {
+                if i > 0 {
+                    doc += self.text(", ");
+                }
+                let info: &Item<SSAInfo<L>> = port.expect_info(self.stage);
+                let name = if let Some(name_sym) = info.name() {
+                    self.stage
+                        .symbol_table()
+                        .resolve(name_sym)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}", Id::from(*port).raw()))
+                } else {
+                    format!("{}", Id::from(*port).raw())
+                };
+                doc += self.text(format!("%{}: {}", name, info.ty()));
+            }
+            doc
+        };
+
+        let edge_doc = print_port_list(edge_ports).enclose("(", ")");
+
+        if capture_ports.is_empty() {
+            edge_doc
+        } else {
+            let capture_doc = print_port_list(capture_ports).enclose("(", ")");
+            if edge_ports.is_empty() {
+                self.text("()") + self.text(" capture") + capture_doc
+            } else {
+                edge_doc + self.text(" capture") + capture_doc
+            }
+        }
+    }
+
+    /// Pretty print a directed graph body.
+    pub fn print_digraph(&'a self, digraph: &DiGraph) -> ArenaDoc<'a> {
+        let info = digraph.expect_info(self.stage);
+
+        // Header: digraph ^name(ports) {
+        let graph_name = info
+            .name()
+            .and_then(|name_sym| {
+                self.stage
+                    .symbol_table()
+                    .resolve(name_sym)
+                    .map(|s| format!("^{}", s))
+            })
+            .unwrap_or_else(|| format!("{}", digraph));
+
+        let mut header = self.text("digraph ") + self.text(graph_name);
+        header += self.print_ports(info.ports(), info.edge_count());
+
+        // Body: nodes + yield
+        let mut inner = self.nil();
+        let mut first = true;
+        for (_idx, stmt) in info.graph().node_references() {
+            if !first {
+                inner += self.line_();
+            }
+            inner += self.print_statement(stmt) + self.text(";");
+            first = false;
+        }
+
+        // Yield line
+        if !info.yields().is_empty() {
+            if !first {
+                inner += self.line_();
+            }
+            let yield_doc = self.list(info.yields().iter(), ", ", |ssa| {
+                let ssa_info: &Item<SSAInfo<L>> = ssa.expect_info(self.stage);
+                let name = if let Some(name_sym) = ssa_info.name() {
+                    self.stage
+                        .symbol_table()
+                        .resolve(name_sym)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}", Id::from(*ssa).raw()))
+                } else {
+                    format!("{}", Id::from(*ssa).raw())
+                };
+                self.text(format!("%{}", name))
+            });
+            inner += self.text("yield ") + yield_doc + self.text(";");
+        }
+
+        header
+            + self.text(" {")
+            + self.block_indent(inner)
+            + self.line_()
+            + self.text("}")
+    }
+
+    /// Pretty print an undirected graph body.
+    pub fn print_ungraph(&'a self, ungraph: &UnGraph) -> ArenaDoc<'a> {
+        let info = ungraph.expect_info(self.stage);
+
+        // Header: ungraph ^name(ports) {
+        let graph_name = info
+            .name()
+            .and_then(|name_sym| {
+                self.stage
+                    .symbol_table()
+                    .resolve(name_sym)
+                    .map(|s| format!("^{}", s))
+            })
+            .unwrap_or_else(|| format!("{}", ungraph));
+
+        let mut header = self.text("ungraph ") + self.text(graph_name);
+        header += self.print_ports(info.ports(), info.edge_count());
+
+        // Body: interleave edge statements with node statements.
+        // For each node, print any unprinted edge statements whose results it uses,
+        // then print the node itself.
+        let edge_stmts = info.edge_statements();
+
+        // Build a map from result SSAValues to their edge statement
+        let edge_result_to_stmt: std::collections::HashMap<SSAValue, Statement> = edge_stmts
+            .iter()
+            .flat_map(|&edge_stmt| {
+                edge_stmt
+                    .results::<L>(self.stage)
+                    .map(move |rv| (SSAValue::from(*rv), edge_stmt))
+            })
+            .collect();
+
+        let mut printed_edges: HashSet<Statement> = HashSet::new();
+        let mut inner = self.nil();
+        let mut first = true;
+
+        for (_idx, node_stmt) in info.graph().node_references() {
+            // Find edge statements used by this node
+            for arg in node_stmt.arguments::<L>(self.stage) {
+                if let Some(&edge_stmt) = edge_result_to_stmt.get(arg)
+                    && printed_edges.insert(edge_stmt)
+                {
+                    if !first {
+                        inner += self.line_();
+                    }
+                    inner += self.print_statement(&edge_stmt) + self.text(";");
+                    first = false;
+                }
+            }
+
+            // Print the node
+            if !first {
+                inner += self.line_();
+            }
+            inner += self.print_statement(node_stmt) + self.text(";");
+            first = false;
+        }
+
+        // Print any remaining unprinted edge statements
+        for &edge_stmt in edge_stmts {
+            if printed_edges.insert(edge_stmt) {
+                if !first {
+                    inner += self.line_();
+                }
+                inner += self.print_statement(&edge_stmt) + self.text(";");
+                first = false;
+            }
+        }
+
+        header
+            + self.text(" {")
+            + self.block_indent(inner)
+            + self.line_()
+            + self.text("}")
     }
 
     /// Pretty print a specialized function with its full header.

@@ -178,9 +178,12 @@ pub fn print_expr<L: Layout>(
                 #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
             }
         }
-        FieldCategory::DiGraph | FieldCategory::UnGraph => {
-            unimplemented!("DiGraph/UnGraph fields are not yet supported by the parser/printer; this will be added in a future release")
-        }
+        FieldCategory::DiGraph => quote! {
+            doc.print_digraph(#field_ref)
+        },
+        FieldCategory::UnGraph => quote! {
+            doc.print_ungraph(#field_ref)
+        },
     }
 }
 
