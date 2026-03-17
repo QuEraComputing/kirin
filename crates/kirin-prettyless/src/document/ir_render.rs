@@ -242,7 +242,8 @@ where
                     if !first {
                         inner += self.line_();
                     }
-                    inner += self.print_statement(&edge_stmt) + self.text(";");
+                    inner +=
+                        self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
                     first = false;
                 }
             }
@@ -261,7 +262,8 @@ where
                 if !first {
                     inner += self.line_();
                 }
-                inner += self.print_statement(&edge_stmt) + self.text(";");
+                inner +=
+                    self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
                 first = false;
             }
         }
