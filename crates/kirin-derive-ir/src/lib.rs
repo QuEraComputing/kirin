@@ -5,6 +5,9 @@ use syn::parse_macro_input;
 
 mod generate;
 
+#[cfg(test)]
+mod tests;
+
 use generate::*;
 
 #[proc_macro_derive(Dialect, attributes(kirin, wraps))]
