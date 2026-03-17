@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use petgraph::algo::toposort;
-
 use crate::arena::GetInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::port::{Port, PortParent};
@@ -216,33 +214,12 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             }
         }
 
-        // Step 5: Topological sort and reorder
-        let mut nodes = self.nodes;
-        if let Ok(order) = toposort(&graph, None) {
-            let mut new_graph =
-                petgraph::Graph::<Statement, SSAValue, petgraph::Directed>::new();
-            let mut old_to_new: HashMap<petgraph::graph::NodeIndex, petgraph::graph::NodeIndex> =
-                HashMap::new();
-            let mut reordered_nodes = Vec::with_capacity(order.len());
+        // Preserve insertion order — the graph edges encode the topology
+        // regardless of node iteration order. Callers can request topological
+        // sort explicitly when needed.
+        let nodes = self.nodes;
 
-            for &old_ni in &order {
-                let stmt = graph[old_ni];
-                let new_ni = new_graph.add_node(stmt);
-                old_to_new.insert(old_ni, new_ni);
-                reordered_nodes.push(stmt);
-            }
-
-            for edge in graph.edge_indices() {
-                let (src, dst) = graph.edge_endpoints(edge).unwrap();
-                let weight = graph[edge];
-                new_graph.add_edge(old_to_new[&src], old_to_new[&dst], weight);
-            }
-
-            graph = new_graph;
-            nodes = reordered_nodes;
-        }
-
-        // Step 6: Set StatementParent::DiGraph on all node statements
+        // Step 5: Set StatementParent::DiGraph on all node statements
         for &stmt_id in &nodes {
             let info = &mut self.stage.statements[stmt_id];
             info.parent = Some(StatementParent::DiGraph(id));

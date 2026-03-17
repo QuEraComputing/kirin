@@ -105,6 +105,21 @@ impl<L: Dialect> StageInfo<L> {
             definition,
         };
         self.statements.alloc(statement);
+
+        // Resolve Unresolved(Result(idx)) SSAs now that the statement ID is known
+        let result_ssas: Vec<SSAValue> = self.statements[id]
+            .definition
+            .results()
+            .map(|rv| SSAValue::from(*rv))
+            .collect();
+        for ssa in result_ssas {
+            if let Some(info) = self.ssas.get_mut(ssa) {
+                if let SSAKind::Unresolved(ResolutionInfo::Result(idx)) = info.kind {
+                    info.kind = SSAKind::Result(id, idx);
+                }
+            }
+        }
+
         id
     }
 

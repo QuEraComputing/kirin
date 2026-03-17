@@ -55,17 +55,12 @@ fn test_digraph_body_parse_and_render() {
     assert!(rendered.contains("add"));
     assert!(rendered.contains("yield %r"));
 
-    // The builder reorders nodes (topological sort), so the rendered output
-    // may have forward SSA references (e.g. `add %p0, %c` before `%c = constant 1`).
-    // Reparsing this requires relaxed-dominance support in the emitter.
-    // This is tracked as a known limitation — verify it fails as expected.
-    let reparse_result = std::panic::catch_unwind(|| {
-        roundtrip::emit_statement::<DiGraphLanguage>(rendered.trim(), &[])
-    });
-    assert!(
-        reparse_result.is_err(),
-        "multi-node digraph reparse should fail due to forward SSA references (relaxed dominance not yet supported)"
-    );
+    // With Unresolved(Result) → Result resolution in the statement builder,
+    // topological sort now works correctly: definitions come before uses in DAGs.
+    // So reparsing the rendered output should succeed.
+    let (stage2, stmt2) = roundtrip::emit_statement::<DiGraphLanguage>(rendered.trim(), &[]);
+    let rendered2 = roundtrip::render_statement::<DiGraphLanguage>(&stage2, stmt2);
+    assert_eq!(rendered.trim(), rendered2.trim(), "multi-node digraph roundtrip should be stable");
 }
 
 #[test]
