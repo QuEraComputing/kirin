@@ -1,0 +1,27 @@
+---
+source: crates/kirin-derive-ir/src/generate.rs
+assertion_line: 776
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for ZxEval {
+    type Iter = ZxEvalUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self { body } = self;
+        ZxEvalUngraphsIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalUngraphsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::UnGraph>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

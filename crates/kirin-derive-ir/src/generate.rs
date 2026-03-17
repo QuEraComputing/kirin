@@ -761,6 +761,21 @@ mod tests {
         insta::assert_snapshot!(rustfmt(tokens.to_string()));
     }
 
+    // ---- Standalone HasUngraphs derive ----
+
+    #[test]
+    fn test_standalone_has_ungraphs() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            struct ZxEval {
+                body: UnGraph,
+            }
+        };
+        let tokens =
+            generate_field_iter(&input, HAS_UNGRAPHS).expect("Failed to generate HasUngraphs");
+        insta::assert_snapshot!(rustfmt(tokens.to_string()));
+    }
+
     // ---- Standalone IsEdge derive ----
 
     #[test]
