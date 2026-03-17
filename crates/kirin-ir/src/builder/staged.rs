@@ -29,11 +29,12 @@ where
     L::Type: Placeholder,
 {
     fn make_ssa_kind(&self, key: BuilderKey) -> SSAKind {
-        match self.kind {
-            PlaceholderKind::Port => SSAKind::BuilderPort(key),
-            PlaceholderKind::Capture => SSAKind::BuilderCapture(key),
-            PlaceholderKind::BlockArgument => SSAKind::BuilderBlockArgument(key),
-        }
+        let info = match self.kind {
+            PlaceholderKind::Port => ResolutionInfo::Port(key),
+            PlaceholderKind::Capture => ResolutionInfo::Capture(key),
+            PlaceholderKind::BlockArgument => ResolutionInfo::BlockArgument(key),
+        };
+        SSAKind::Unresolved(info)
     }
 
     /// Look up by positional index.

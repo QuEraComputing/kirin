@@ -101,7 +101,7 @@ where
 ///
 /// Uses a two-phase approach: first creates the block with its arguments (to
 /// get real `BlockArgument` SSAs), then emits statements and attaches them.
-/// This avoids `BuilderBlockArgument` placeholders which panic when nested
+/// This avoids `Unresolved(BlockArgument)` placeholders which panic when nested
 /// blocks (e.g. if/else bodies) reference outer block arguments.
 fn emit_block<'src, TypeOutput, StmtOutput, IR>(
     block_ast: &Block<'src, TypeOutput, StmtOutput>,
@@ -130,7 +130,7 @@ where
 
     // Phase 1: Build the block with arguments only (no statements).
     // This creates real BlockArgument SSAs that nested blocks can safely
-    // reference without triggering BuilderBlockArgument resolution panics.
+    // reference without triggering Unresolved(BlockArgument) resolution panics.
     let block_name = block_ast.header.value.label.name.value.to_string();
     let mut builder = ctx.stage.block().name(block_name);
     for (name, ty) in &arg_info {

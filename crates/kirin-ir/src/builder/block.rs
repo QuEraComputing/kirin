@@ -137,7 +137,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                     .ssas
                     .get(*arg)
                     .expect("SSAValue not found in stage");
-                if let SSAKind::BuilderBlockArgument(key) = ssa_info.kind {
+                if let SSAKind::Unresolved(ResolutionInfo::BlockArgument(key)) = ssa_info.kind {
                     let index = super::resolve_builder_key(
                         key,
                         block_args.len(),

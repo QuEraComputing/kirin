@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::arena::GetInfo;
 use crate::node::port::{Port, PortParent};
-use crate::node::ssa::{SSAInfo, SSAKind, SSAValue};
+use crate::node::ssa::{ResolutionInfo, SSAInfo, SSAKind, SSAValue};
 use crate::node::stmt::{Statement, StatementParent};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{Dialect, StageInfo};
@@ -128,7 +128,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             all_ports.push(port);
         }
 
-        // Step 3: Resolve BuilderPort/BuilderCapture placeholders in node AND edge statement operands
+        // Step 3: Resolve Unresolved(Port/Capture) placeholders in node AND edge statement operands
         let port_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
             [..edge_count]
             .iter()
@@ -163,7 +163,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                     .get(*arg)
                     .expect("SSAValue not found in stage");
                 match ssa_info.kind {
-                    SSAKind::BuilderPort(key) => {
+                    SSAKind::Unresolved(ResolutionInfo::Port(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             edge_count,
@@ -174,7 +174,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                         self.stage.ssas.delete(*arg);
                         *arg = all_ports[index].into();
                     }
-                    SSAKind::BuilderCapture(key) => {
+                    SSAKind::Unresolved(ResolutionInfo::Capture(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             all_ports.len() - edge_count,

@@ -336,7 +336,7 @@ fn ungraph_isolated_node_appended_after_bfs() {
     let port_placeholder = stage
         .ssa()
         .ty(TestType::Qubit)
-        .kind(SSAKind::BuilderPort(BuilderKey::Index(0)))
+        .kind(SSAKind::Unresolved(ResolutionInfo::Port(BuilderKey::Index(0))))
         .new();
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);

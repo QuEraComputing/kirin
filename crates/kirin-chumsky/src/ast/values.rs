@@ -80,7 +80,7 @@ where
 /// Implementation of EmitIR for ResultValue AST nodes.
 ///
 /// This creates a new SSA value with the parsed name and registers it
-/// in the emit context's symbol table. The created SSA has `SSAKind::BuilderResult`
+/// in the emit context's symbol table. The created SSA has `SSAKind::Unresolved(ResolutionInfo::Result(0))`
 /// which will be updated when the containing statement is finalized.
 ///
 /// Note: The result index is set to 0 here. For statements with multiple results,
@@ -111,7 +111,7 @@ where
             .ssa()
             .name(self.name.value.to_string())
             .ty(ty)
-            .kind(SSAKind::BuilderResult(0))
+            .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)))
             .new();
 
         // Register the SSA in the symbol table for later reference

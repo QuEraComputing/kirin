@@ -121,6 +121,25 @@ pub enum BuilderKey {
     Named(Symbol),
 }
 
+/// Build-time resolution info for [`SSAKind::Unresolved`] placeholders.
+///
+/// Each variant describes what the SSA value will eventually resolve to
+/// once the enclosing builder (block, digraph, ungraph, statement) finalizes.
+/// Must not appear in finalized IR.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ResolutionInfo {
+    /// References a graph edge port by index or name.
+    Port(BuilderKey),
+    /// References a graph capture port by index or name.
+    Capture(BuilderKey),
+    /// References a block argument by index or name.
+    BlockArgument(BuilderKey),
+    /// A result SSA whose parent statement is not yet known.
+    /// The `usize` is the result index in the statement's result list.
+    Result(usize),
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::manual_non_exhaustive)]
@@ -128,17 +147,10 @@ pub enum SSAKind {
     Result(Statement, usize),
     BlockArgument(Block, usize),
     Port(PortParent, usize),
-    // should not appear in final SSA IR
+    /// Build-time placeholder — resolved by the appropriate builder/emitter.
+    /// Must not appear in finalized IR.
     #[doc(hidden)]
-    BuilderPort(BuilderKey),
-    #[doc(hidden)]
-    BuilderCapture(BuilderKey),
-    #[doc(hidden)]
-    BuilderBlockArgument(BuilderKey),
-    /// A placeholder for builders to update the Result information later when building the statement.
-    /// It holds the index of the result in the statement's result list.
-    #[doc(hidden)]
-    BuilderResult(usize),
+    Unresolved(ResolutionInfo),
     /// A placeholder for tests to create SSA values that do not exist in the SSA database.
     #[doc(hidden)]
     Test,

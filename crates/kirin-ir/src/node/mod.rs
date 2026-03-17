@@ -19,8 +19,8 @@ pub use linked_list::{LinkedList, LinkedListNode};
 pub use port::{Port, PortParent};
 pub use region::{Region, RegionInfo};
 pub use ssa::{
-    BlockArgument, BuilderKey, DeletedSSAValue, ResultValue, SSAInfo, SSAKind, SSAValue,
-    TestSSAValue,
+    BlockArgument, BuilderKey, DeletedSSAValue, ResolutionInfo, ResultValue, SSAInfo, SSAKind,
+    SSAValue, TestSSAValue,
 };
 pub use stmt::{Statement, StatementInfo, StatementParent};
 pub use symbol::{GlobalSymbol, Symbol};

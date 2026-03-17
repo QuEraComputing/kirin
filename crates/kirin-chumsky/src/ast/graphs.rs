@@ -142,7 +142,7 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
                 .ssa()
                 .name(info.name.clone())
                 .ty(port_types[i].clone())
-                .kind(SSAKind::BuilderPort(kirin_ir::BuilderKey::Index(i)))
+                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Port(kirin_ir::BuilderKey::Index(i))))
                 .new();
             ctx.register_ssa(info.name.clone(), ssa);
         }
@@ -153,7 +153,7 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
                 .ssa()
                 .name(info.name.clone())
                 .ty(cap_types[i].clone())
-                .kind(SSAKind::BuilderCapture(kirin_ir::BuilderKey::Index(i)))
+                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Capture(kirin_ir::BuilderKey::Index(i))))
                 .new();
             ctx.register_ssa(info.name.clone(), ssa);
         }
@@ -178,7 +178,7 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         }
 
         // Phase 4: Build digraph using builder — it will create real port SSAs
-        // and resolve BuilderPort/BuilderCapture placeholders in statement operands
+        // and resolve Unresolved(Port/Capture) placeholders in statement operands
         let mut builder = ctx.stage.digraph().name(graph_name);
 
         for (info, ty) in port_infos.iter().zip(port_types.iter()) {
@@ -267,7 +267,7 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
                 .ssa()
                 .name(info.name.clone())
                 .ty(port_types[i].clone())
-                .kind(SSAKind::BuilderPort(kirin_ir::BuilderKey::Index(i)))
+                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Port(kirin_ir::BuilderKey::Index(i))))
                 .new();
             ctx.register_ssa(info.name.clone(), ssa);
         }
@@ -278,7 +278,7 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
                 .ssa()
                 .name(info.name.clone())
                 .ty(cap_types[i].clone())
-                .kind(SSAKind::BuilderCapture(kirin_ir::BuilderKey::Index(i)))
+                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Capture(kirin_ir::BuilderKey::Index(i))))
                 .new();
             ctx.register_ssa(info.name.clone(), ssa);
         }

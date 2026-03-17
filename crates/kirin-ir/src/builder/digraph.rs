@@ -5,7 +5,7 @@ use petgraph::algo::toposort;
 use crate::arena::GetInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::port::{Port, PortParent};
-use crate::node::ssa::{SSAInfo, SSAKind, SSAValue};
+use crate::node::ssa::{ResolutionInfo, SSAInfo, SSAKind, SSAValue};
 use crate::node::stmt::{Statement, StatementParent};
 use crate::{Dialect, StageInfo};
 
@@ -130,7 +130,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             all_ports.push(port);
         }
 
-        // Step 3: Resolve BuilderPort/BuilderCapture placeholders in node statement operands
+        // Step 3: Resolve Unresolved(Port/Capture) placeholders in node statement operands
         // Build name→index maps for port and capture lookup
         let port_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
             [..edge_count]
@@ -160,7 +160,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                     .get(*arg)
                     .expect("SSAValue not found in stage");
                 match ssa_info.kind {
-                    SSAKind::BuilderPort(key) => {
+                    SSAKind::Unresolved(ResolutionInfo::Port(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             edge_count,
@@ -171,7 +171,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                         self.stage.ssas.delete(*arg);
                         *arg = all_ports[index].into();
                     }
-                    SSAKind::BuilderCapture(key) => {
+                    SSAKind::Unresolved(ResolutionInfo::Capture(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             all_ports.len() - edge_count,
