@@ -2,6 +2,7 @@ use super::block::BlockBuilder;
 use super::digraph::DiGraphBuilder;
 use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
 use super::region::RegionBuilder;
+use super::ungraph::UnGraphBuilder;
 
 use crate::Placeholder;
 use crate::arena::GetInfo;
@@ -21,6 +22,10 @@ impl<L: Dialect> StageInfo<L> {
 
     pub fn digraph(&mut self) -> DiGraphBuilder<'_, L> {
         DiGraphBuilder::from_stage(self)
+    }
+
+    pub fn ungraph(&mut self) -> UnGraphBuilder<'_, L> {
+        UnGraphBuilder::from_stage(self)
     }
 
     pub fn link_statements(&mut self, ptrs: &[Statement]) -> LinkedList<Statement> {
