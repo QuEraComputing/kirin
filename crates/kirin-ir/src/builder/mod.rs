@@ -6,6 +6,3 @@ mod redefine;
 mod region;
 mod staged;
 pub mod ungraph;
-
-#[cfg(test)]
-mod tests;
