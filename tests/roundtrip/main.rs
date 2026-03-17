@@ -5,6 +5,8 @@ mod cmp;
 mod composable_existing_dialects;
 mod composite;
 mod constant;
+mod digraph;
 mod function;
 mod namespace;
 mod scf;
+mod ungraph;

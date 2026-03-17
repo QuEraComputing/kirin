@@ -158,7 +158,10 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
             ctx.register_ssa(info.name.clone(), ssa);
         }
 
-        // Phase 2: Emit all statements (they reference temp SSAs via ctx lookup)
+        // Phase 2: Emit all statements
+        // Graph bodies have relaxed dominance — a statement may reference SSAs
+        // defined by later statements. We sort statements so definitions come
+        // before uses when possible, and rely on the builder to handle the rest.
         let mut node_stmts = Vec::new();
         for stmt_ast in &self.statements {
             let stmt = emit_statement(&stmt_ast.value, ctx)?;
