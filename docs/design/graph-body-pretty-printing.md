@@ -8,118 +8,6 @@ Extends kirin-prettyless to print `digraph` and `ungraph` bodies following the t
 
 Both `DiGraphBuilder` and `UnGraphBuilder` reindex the petgraph at `.new()` time so that node indices are already in the correct print order. The printer just iterates `graph.node_references()` in index order.
 
-### DiGraph: Topological Order
-
-At builder `.new()` time:
-1. Build initial petgraph from SSA def-use analysis
-2. Run `petgraph::algo::toposort`
-3. If `Ok` (DAG): rebuild petgraph with nodes in topo order, remap edges
-4. If `Err` (cycle): keep insertion order (no reindex)
-
-### UnGraph: BFS from Boundary Ports
-
-At builder `.new()` time:
-1. Build initial petgraph from shared edge SSAValues
-2. BFS from boundary-port-connected nodes:
-   - For each node being visited, collect all its unvisited edges
-   - Visit those edge statements (mark as visited)
-   - For each newly visited edge, enqueue the other endpoint node
-   - Visit the node
-3. Remaining isolated nodes appended at the end
-4. Rebuild petgraph with nodes in BFS visit order, remap edges
-5. Reorder `edge_statements` to match BFS edge visitation order
-
-**Invariant:** every edge a node references is ordered before the node in `edge_statements`. This produces grouped output:
-
-```
-ungraph ^ug0(%p0: Wire) capture(%zero: f64, %pi: f64) {
-  edge %w0 = wire -> Wire;
-  edge %w1 = wire -> Wire;
-  z_spider(%zero, %p0, %w0, %w1);
-  edge %w2 = wire -> Wire;
-  x_spider(%pi, %w0, %w2);
-  another_spider(%zero, %w1, %w2);
-}
-```
-
-Both reindex operations are O(N + E), run once at construction time.
-
-## Builder Design
-
-### DiGraphBuilder
-
-```rust
-DiGraphBuilder::from_stage(stage)
-    .name("dg0")
-    .port(Qubit).port_name("q0")
-    .port(Qubit).port_name("q1")
-    .capture(F64).capture_name("theta")
-    .node(hadamard_stmt)
-    .node(cnot_stmt)
-    .yield_value(ssa1)
-    .yield_value(ssa2)
-    .new()  // -> DiGraph
-```
-
-**Fields:**
-- `stage: &'a mut StageInfo<L>`
-- `parent: Option<Statement>`
-- `name: Option<String>`
-- `ports: Vec<(L::Type, Option<String>)>` — edge ports
-- `captures: Vec<(L::Type, Option<String>)>` — capture ports
-- `nodes: Vec<Statement>` — graph node statements
-- `yields: Vec<SSAValue>` — output edges
-
-**`.new()` logic:**
-1. Allocate `DiGraph` ID
-2. Create `Port` SSAValues for edge ports (index `0..ports.len()`) and captures (index `ports.len()..`)
-3. Resolve `BuilderPort(index)` placeholders in statement operands to real `Port` IDs
-4. Build petgraph: add each statement as a node, analyze SSA def-use to add directed edges (if operand is a `ResultValue` of another node in this graph, add edge from producer → consumer with `SSAValue` as weight)
-5. Topo sort + reindex (DAG) or keep insertion order (cycle)
-6. Set `StatementParent::DiGraph(id)` on all statements
-7. Allocate `DiGraphInfo` in the arena
-
-### UnGraphBuilder
-
-```rust
-UnGraphBuilder::from_stage(stage)
-    .name("ug0")
-    .port(Wire).port_name("p0")
-    .port(Wire).port_name("p1")
-    .capture(F64).capture_name("zero")
-    .edge(wire_stmt1)
-    .node(z_spider_stmt)
-    .node(x_spider_stmt)
-    .edge(wire_stmt2)
-    .node(another_stmt)
-    .new()  // -> UnGraph
-```
-
-`.edge()` and `.node()` can be interleaved in any order.
-
-**Fields:**
-- `stage: &'a mut StageInfo<L>`
-- `parent: Option<Statement>`
-- `name: Option<String>`
-- `ports: Vec<(L::Type, Option<String>)>` — boundary edge ports
-- `captures: Vec<(L::Type, Option<String>)>` — capture ports
-- `edge_stmts: Vec<Statement>` — edge declaration statements
-- `nodes: Vec<Statement>` — node statements
-
-**`.new()` logic:**
-1. Allocate `UnGraph` ID
-2. Create `Port` SSAValues for boundary edge ports and captures
-3. Resolve `BuilderPort(index)` placeholders
-4. Build petgraph: add each node statement as a petgraph node, find shared edge SSAValues between nodes to add undirected edges
-5. **Validate:** each edge SSAValue referenced by at most 2 node statements (strict ungraph constraint)
-6. BFS reindex from boundary-connected nodes + reorder `edge_stmts` to match
-7. Set `StatementParent::UnGraph(id)` on all node statements and edge statements
-8. Allocate `UnGraphInfo` in the arena
-
-### BuilderPort Resolution
-
-Same pattern as `BuilderBlockArgument`. Statements reference `SSAKind::BuilderPort(index)` placeholders. At `.new()` time, the builder scans statement operands and replaces `BuilderPort(index)` with real `Port` IDs. Index maps to `all_ports[index]` where `all_ports = edge_ports ++ capture_ports`.
-
 ## Printer Design
 
 Three new methods on `Document<'a, L>` in `ir_render.rs`.
@@ -199,8 +87,5 @@ Parser-side `unimplemented!()`s remain — parser support is a separate future t
 
 | Action | File | Change |
 |--------|------|--------|
-| Create | `crates/kirin-ir/src/builder/digraph.rs` | `DiGraphBuilder` |
-| Create | `crates/kirin-ir/src/builder/ungraph.rs` | `UnGraphBuilder` |
-| Modify | `crates/kirin-ir/src/builder/mod.rs` | Declare new modules |
 | Modify | `crates/kirin-prettyless/src/document/ir_render.rs` | Add `print_digraph`, `print_ungraph`, `print_ports` |
 | Modify | `crates/kirin-derive-chumsky/src/field_kind.rs` | Replace `unimplemented!()` in `print_expr` |
