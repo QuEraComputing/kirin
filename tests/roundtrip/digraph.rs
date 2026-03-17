@@ -36,16 +36,14 @@ fn test_digraph_add_roundtrip() {
 
 #[test]
 fn test_digraph_constant_roundtrip() {
-    roundtrip::assert_statement_roundtrip::<DiGraphLanguage>(
-        "%c = constant 3.14",
-        &[],
-    );
+    roundtrip::assert_statement_roundtrip::<DiGraphLanguage>("%c = constant 3.14", &[]);
 }
 
 #[test]
 fn test_digraph_body_parse_and_render() {
     // Parse a digraph body and verify it renders correctly
-    let input = "%out = graph_func digraph ^dg0(%p0: f64) { %c = constant 1; %r = add %p0, %c; yield %r; }";
+    let input =
+        "%out = graph_func digraph ^dg0(%p0: f64) { %c = constant 1; %r = add %p0, %c; yield %r; }";
     let (stage, stmt) = roundtrip::emit_statement::<DiGraphLanguage>(input, &[]);
     let rendered = roundtrip::render_statement::<DiGraphLanguage>(&stage, stmt);
 
@@ -60,7 +58,11 @@ fn test_digraph_body_parse_and_render() {
     // So reparsing the rendered output should succeed.
     let (stage2, stmt2) = roundtrip::emit_statement::<DiGraphLanguage>(rendered.trim(), &[]);
     let rendered2 = roundtrip::render_statement::<DiGraphLanguage>(&stage2, stmt2);
-    assert_eq!(rendered.trim(), rendered2.trim(), "multi-node digraph roundtrip should be stable");
+    assert_eq!(
+        rendered.trim(),
+        rendered2.trim(),
+        "multi-node digraph roundtrip should be stable"
+    );
 }
 
 #[test]
@@ -72,7 +74,11 @@ fn test_digraph_single_node_roundtrip() {
 
     let (stage2, stmt2) = roundtrip::emit_statement::<DiGraphLanguage>(rendered.trim(), &[]);
     let rendered2 = roundtrip::render_statement::<DiGraphLanguage>(&stage2, stmt2);
-    assert_eq!(rendered.trim(), rendered2.trim(), "roundtrip should be stable");
+    assert_eq!(
+        rendered.trim(),
+        rendered2.trim(),
+        "roundtrip should be stable"
+    );
 }
 
 #[test]
@@ -93,13 +99,18 @@ fn test_digraph_with_captures_roundtrip() {
 fn test_digraph_forward_reference_roundtrip() {
     // Forward reference: add uses %c before it's defined (reversed from input order)
     // This tests the relaxed dominance support in the parser.
-    let input = "%out = graph_func digraph ^dg0(%p0: f64) { %r = add %p0, %c; %c = constant 1; yield %r; }";
+    let input =
+        "%out = graph_func digraph ^dg0(%p0: f64) { %r = add %p0, %c; %c = constant 1; yield %r; }";
     let (stage, stmt) = roundtrip::emit_statement::<DiGraphLanguage>(input, &[]);
     let rendered = roundtrip::render_statement::<DiGraphLanguage>(&stage, stmt);
 
     let (stage2, stmt2) = roundtrip::emit_statement::<DiGraphLanguage>(rendered.trim(), &[]);
     let rendered2 = roundtrip::render_statement::<DiGraphLanguage>(&stage2, stmt2);
-    assert_eq!(rendered.trim(), rendered2.trim(), "forward-ref digraph roundtrip should be stable");
+    assert_eq!(
+        rendered.trim(),
+        rendered2.trim(),
+        "forward-ref digraph roundtrip should be stable"
+    );
 }
 
 #[test]

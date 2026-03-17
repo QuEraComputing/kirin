@@ -12,8 +12,7 @@ fn test_standalone_is_terminator() {
             value: Value,
         }
     };
-    let tokens =
-        generate_property(&input, IS_TERMINATOR).expect("Failed to generate IsTerminator");
+    let tokens = generate_property(&input, IS_TERMINATOR).expect("Failed to generate IsTerminator");
     insta::assert_snapshot!(rustfmt(tokens.to_string()));
 }
 
@@ -42,8 +41,7 @@ fn test_standalone_has_results() {
             arg: SSAValue,
         }
     };
-    let tokens =
-        generate_field_iter(&input, HAS_RESULTS).expect("Failed to generate HasResults");
+    let tokens = generate_field_iter(&input, HAS_RESULTS).expect("Failed to generate HasResults");
     insta::assert_snapshot!(rustfmt(tokens.to_string()));
 }
 
@@ -55,8 +53,7 @@ fn test_standalone_has_regions() {
             body: Region,
         }
     };
-    let tokens =
-        generate_field_iter(&input, HAS_REGIONS).expect("Failed to generate HasRegions");
+    let tokens = generate_field_iter(&input, HAS_REGIONS).expect("Failed to generate HasRegions");
     insta::assert_snapshot!(rustfmt(tokens.to_string()));
 }
 
@@ -68,8 +65,7 @@ fn test_standalone_has_digraphs() {
             body: DiGraph,
         }
     };
-    let tokens =
-        generate_field_iter(&input, HAS_DIGRAPHS).expect("Failed to generate HasDigraphs");
+    let tokens = generate_field_iter(&input, HAS_DIGRAPHS).expect("Failed to generate HasDigraphs");
     insta::assert_snapshot!(rustfmt(tokens.to_string()));
 }
 
@@ -81,8 +77,7 @@ fn test_standalone_has_ungraphs() {
             body: UnGraph,
         }
     };
-    let tokens =
-        generate_field_iter(&input, HAS_UNGRAPHS).expect("Failed to generate HasUngraphs");
+    let tokens = generate_field_iter(&input, HAS_UNGRAPHS).expect("Failed to generate HasUngraphs");
     insta::assert_snapshot!(rustfmt(tokens.to_string()));
 }
 

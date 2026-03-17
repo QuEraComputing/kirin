@@ -26,9 +26,7 @@ impl PrettyPrint for SimpleLanguage {
             SimpleLanguage::Constant(value, res) => {
                 res.pretty_print(doc) + doc.text(format!(" = constant {}", value))
             }
-            SimpleLanguage::Return(retval) => {
-                doc.text("return ") + retval.pretty_print(doc)
-            }
+            SimpleLanguage::Return(retval) => doc.text("return ") + retval.pretty_print(doc),
             SimpleLanguage::Function(region, _) => doc.print_region(region),
         }
     }

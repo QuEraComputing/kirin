@@ -86,12 +86,13 @@ impl<'src, StmtOutput> UnGraphStatement<'src, StmtOutput> {
     }
 }
 
-// --- Helper: collect port/capture info eagerly ---
+// --- Shared helpers for graph emit ---
 
 struct PortInfo {
     name: String,
 }
 
+/// Collect port/capture names and types eagerly from parsed block arguments.
 fn collect_port_info<'src, TypeOutput, IR>(
     args: &[Spanned<super::BlockArgument<'src, TypeOutput>>],
     ctx: &mut EmitContext<'_, IR>,
@@ -110,6 +111,57 @@ where
         });
     }
     Ok((infos, types))
+}
+
+/// Create temporary placeholder SSAs for ports/captures and register them by name.
+///
+/// These placeholders are resolved when the graph builder finalizes.
+fn register_placeholder_ssas<IR>(
+    infos: &[PortInfo],
+    types: &[IR::Type],
+    resolution: fn(kirin_ir::BuilderKey) -> kirin_ir::ResolutionInfo,
+    ctx: &mut EmitContext<'_, IR>,
+) where
+    IR: Dialect,
+    IR::Type: Placeholder + Clone,
+{
+    for (i, info) in infos.iter().enumerate() {
+        let ssa = ctx
+            .stage
+            .ssa()
+            .name(info.name.clone())
+            .ty(types[i].clone())
+            .kind(SSAKind::Unresolved(resolution(
+                kirin_ir::BuilderKey::Index(i),
+            )))
+            .new();
+        ctx.register_ssa(info.name.clone(), ssa);
+    }
+}
+
+/// Collect (SSAValue, name) pairs from built graph ports and their corresponding infos.
+///
+/// Returns a `Vec` so the caller can drop the borrow on `ctx.stage` before
+/// calling `ctx.register_ssa` for each pair.
+fn collect_port_ssa_names(
+    ports: &[kirin_ir::Port],
+    infos: &[PortInfo],
+) -> Vec<(kirin_ir::SSAValue, String)> {
+    ports
+        .iter()
+        .zip(infos.iter())
+        .map(|(port, info)| (kirin_ir::SSAValue::from(*port), info.name.clone()))
+        .collect()
+}
+
+/// Register collected (SSAValue, name) pairs in the emit context.
+fn register_ssa_names<IR: Dialect>(
+    pairs: Vec<(kirin_ir::SSAValue, String)>,
+    ctx: &mut EmitContext<'_, IR>,
+) {
+    for (ssa, name) in pairs {
+        ctx.register_ssa(name, ssa);
+    }
 }
 
 // --- EmitIR implementations ---
@@ -136,27 +188,18 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         let (cap_infos, cap_types) = collect_port_info(&header.captures, ctx)?;
 
         // Phase 1: Create temporary port/capture SSAs and register names
-        for (i, info) in port_infos.iter().enumerate() {
-            let ssa = ctx
-                .stage
-                .ssa()
-                .name(info.name.clone())
-                .ty(port_types[i].clone())
-                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Port(kirin_ir::BuilderKey::Index(i))))
-                .new();
-            ctx.register_ssa(info.name.clone(), ssa);
-        }
-
-        for (i, info) in cap_infos.iter().enumerate() {
-            let ssa = ctx
-                .stage
-                .ssa()
-                .name(info.name.clone())
-                .ty(cap_types[i].clone())
-                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Capture(kirin_ir::BuilderKey::Index(i))))
-                .new();
-            ctx.register_ssa(info.name.clone(), ssa);
-        }
+        register_placeholder_ssas(
+            &port_infos,
+            &port_types,
+            kirin_ir::ResolutionInfo::Port,
+            ctx,
+        );
+        register_placeholder_ssas(
+            &cap_infos,
+            &cap_types,
+            kirin_ir::ResolutionInfo::Capture,
+            ctx,
+        );
 
         // Phase 2: Emit all statements with relaxed dominance.
         // Graph bodies allow forward SSA references — a statement may reference
@@ -202,25 +245,10 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
 
         // Phase 5: Register real port/capture SSAs in emit context
         let dg_info = dg.expect_info(ctx.stage);
-        let port_ssa_names: Vec<(kirin_ir::SSAValue, String)> = dg_info
-            .edge_ports()
-            .iter()
-            .zip(port_infos.iter())
-            .map(|(port, info)| (kirin_ir::SSAValue::from(*port), info.name.clone()))
-            .collect();
-        let cap_ssa_names: Vec<(kirin_ir::SSAValue, String)> = dg_info
-            .capture_ports()
-            .iter()
-            .zip(cap_infos.iter())
-            .map(|(port, info)| (kirin_ir::SSAValue::from(*port), info.name.clone()))
-            .collect();
-
-        for (ssa, name) in port_ssa_names {
-            ctx.register_ssa(name, ssa);
-        }
-        for (ssa, name) in cap_ssa_names {
-            ctx.register_ssa(name, ssa);
-        }
+        let port_ssas = collect_port_ssa_names(dg_info.edge_ports(), &port_infos);
+        let cap_ssas = collect_port_ssa_names(dg_info.capture_ports(), &cap_infos);
+        register_ssa_names(port_ssas, ctx);
+        register_ssa_names(cap_ssas, ctx);
 
         Ok(dg)
     }
@@ -262,27 +290,18 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
         let (cap_infos, cap_types) = collect_port_info(&header.captures, ctx)?;
 
         // Phase 1: Create temporary port/capture SSAs and register names
-        for (i, info) in port_infos.iter().enumerate() {
-            let ssa = ctx
-                .stage
-                .ssa()
-                .name(info.name.clone())
-                .ty(port_types[i].clone())
-                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Port(kirin_ir::BuilderKey::Index(i))))
-                .new();
-            ctx.register_ssa(info.name.clone(), ssa);
-        }
-
-        for (i, info) in cap_infos.iter().enumerate() {
-            let ssa = ctx
-                .stage
-                .ssa()
-                .name(info.name.clone())
-                .ty(cap_types[i].clone())
-                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Capture(kirin_ir::BuilderKey::Index(i))))
-                .new();
-            ctx.register_ssa(info.name.clone(), ssa);
-        }
+        register_placeholder_ssas(
+            &port_infos,
+            &port_types,
+            kirin_ir::ResolutionInfo::Port,
+            ctx,
+        );
+        register_placeholder_ssas(
+            &cap_infos,
+            &cap_types,
+            kirin_ir::ResolutionInfo::Capture,
+            ctx,
+        );
 
         // Phase 2: Emit all statements with relaxed dominance, tracking edge vs node
         ctx.set_relaxed_dominance(true);
@@ -321,25 +340,10 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
 
         // Phase 4: Register real port/capture SSAs in emit context
         let ug_info = ug.expect_info(ctx.stage);
-        let port_ssa_names: Vec<(kirin_ir::SSAValue, String)> = ug_info
-            .edge_ports()
-            .iter()
-            .zip(port_infos.iter())
-            .map(|(port, info)| (kirin_ir::SSAValue::from(*port), info.name.clone()))
-            .collect();
-        let cap_ssa_names: Vec<(kirin_ir::SSAValue, String)> = ug_info
-            .capture_ports()
-            .iter()
-            .zip(cap_infos.iter())
-            .map(|(port, info)| (kirin_ir::SSAValue::from(*port), info.name.clone()))
-            .collect();
-
-        for (ssa, name) in port_ssa_names {
-            ctx.register_ssa(name, ssa);
-        }
-        for (ssa, name) in cap_ssa_names {
-            ctx.register_ssa(name, ssa);
-        }
+        let port_ssas = collect_port_ssa_names(ug_info.edge_ports(), &port_infos);
+        let cap_ssas = collect_port_ssa_names(ug_info.capture_ports(), &cap_infos);
+        register_ssa_names(port_ssas, ctx);
+        register_ssa_names(cap_ssas, ctx);
 
         Ok(ug)
     }

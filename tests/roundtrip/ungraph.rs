@@ -36,10 +36,7 @@ enum UngraphTestLanguage {
 
 #[test]
 fn test_ungraph_wire_roundtrip() {
-    roundtrip::assert_statement_roundtrip::<UngraphTestLanguage>(
-        "%w = wire",
-        &[],
-    );
+    roundtrip::assert_statement_roundtrip::<UngraphTestLanguage>("%w = wire", &[]);
 }
 
 #[test]

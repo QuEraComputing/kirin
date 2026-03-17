@@ -8,8 +8,8 @@ use super::values::ssa_name;
 /// Parses a `capture(...)` clause.
 ///
 /// Matches: `capture(%name: Type, ...)`
-fn capture_clause<'t, I, T>(
-) -> impl Parser<'t, I, Vec<Spanned<BlockArgument<'t, <T as HasParser<'t>>::Output>>>, ParserError<'t>>
+fn capture_clause<'t, I, T>()
+-> impl Parser<'t, I, Vec<Spanned<BlockArgument<'t, <T as HasParser<'t>>::Output>>>, ParserError<'t>>
 where
     I: TokenInput<'t>,
     T: HasParser<'t>,
@@ -20,13 +20,8 @@ where
 }
 
 /// Parses a graph header: `^name(%port: Type, ...) [capture(%cap: Type, ...)]`
-fn graph_header<'t, I, T>(
-) -> impl Parser<
-    't,
-    I,
-    Spanned<GraphHeader<'t, <T as HasParser<'t>>::Output>>,
-    ParserError<'t>,
->
+fn graph_header<'t, I, T>()
+-> impl Parser<'t, I, Spanned<GraphHeader<'t, <T as HasParser<'t>>::Output>>, ParserError<'t>>
 where
     I: TokenInput<'t>,
     T: HasParser<'t>,
@@ -81,12 +76,7 @@ where
 /// ```
 pub fn digraph<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
-) -> impl Parser<
-    't,
-    I,
-    DiGraph<'t, <T as HasParser<'t>>::Output, S>,
-    ParserError<'t>,
->
+) -> impl Parser<'t, I, DiGraph<'t, <T as HasParser<'t>>::Output, S>, ParserError<'t>>
 where
     I: TokenInput<'t>,
     T: HasParser<'t>,
@@ -138,9 +128,7 @@ where
             span: e.span(),
         }))
         .then_ignore(just(Token::Semicolon))
-        .map(|(edge_span, stmt)| {
-            UnGraphStatement::new(edge_span.is_some(), stmt, edge_span)
-        })
+        .map(|(edge_span, stmt)| UnGraphStatement::new(edge_span.is_some(), stmt, edge_span))
         .labelled("ungraph statement")
 }
 
@@ -156,12 +144,7 @@ where
 /// ```
 pub fn ungraph<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
-) -> impl Parser<
-    't,
-    I,
-    UnGraph<'t, <T as HasParser<'t>>::Output, S>,
-    ParserError<'t>,
->
+) -> impl Parser<'t, I, UnGraph<'t, <T as HasParser<'t>>::Output, S>, ParserError<'t>>
 where
     I: TokenInput<'t>,
     T: HasParser<'t>,
@@ -176,9 +159,6 @@ where
 
     header
         .then(body)
-        .map(|(header, statements)| UnGraph {
-            header,
-            statements,
-        })
+        .map(|(header, statements)| UnGraph { header, statements })
         .labelled("ungraph")
 }

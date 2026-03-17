@@ -9,9 +9,9 @@ pub mod ungraph;
 
 use std::collections::HashMap;
 
+use crate::InternTable;
 use crate::node::ssa::BuilderKey;
 use crate::node::symbol::Symbol;
-use crate::InternTable;
 
 /// Resolve a `BuilderKey` to a positional index.
 ///

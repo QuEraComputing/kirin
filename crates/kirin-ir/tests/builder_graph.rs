@@ -336,7 +336,9 @@ fn ungraph_isolated_node_appended_after_bfs() {
     let port_placeholder = stage
         .ssa()
         .ty(TestType::Qubit)
-        .kind(SSAKind::Unresolved(ResolutionInfo::Port(BuilderKey::Index(0))))
+        .kind(SSAKind::Unresolved(ResolutionInfo::Port(
+            BuilderKey::Index(0),
+        )))
         .new();
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);
@@ -351,10 +353,7 @@ fn ungraph_isolated_node_appended_after_bfs() {
         .new();
 
     // Create an isolated node with no edge connections
-    let n_isolated = stage
-        .statement()
-        .definition(BuilderDialect::Isolated)
-        .new();
+    let n_isolated = stage.statement().definition(BuilderDialect::Isolated).new();
 
     // Insert isolated node first — BFS should place it last
     let ug = stage

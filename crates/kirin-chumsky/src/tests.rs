@@ -1365,7 +1365,13 @@ fn test_parse_ast_collects_errors_with_spans() {
 macro_rules! graph_lang {
     () => {{
         use chumsky::prelude::*;
-        chumsky::recursive::recursive::<_, _, chumsky::extra::Err<Rich<'_, kirin_lexer::Token<'_>>>, _, _>(|_| {
+        chumsky::recursive::recursive::<
+            _,
+            _,
+            chumsky::extra::Err<Rich<'_, kirin_lexer::Token<'_>>>,
+            _,
+            _,
+        >(|_| {
             select! { kirin_lexer::Token::Int(v) => v.parse::<i32>().unwrap() }
         })
     }};

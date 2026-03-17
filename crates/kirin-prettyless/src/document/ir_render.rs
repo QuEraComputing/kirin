@@ -189,11 +189,7 @@ where
             inner += self.text("yield ") + yield_doc + self.text(";");
         }
 
-        header
-            + self.text(" {")
-            + self.block_indent(inner)
-            + self.line_()
-            + self.text("}")
+        header + self.text(" {") + self.block_indent(inner) + self.line_() + self.text("}")
     }
 
     /// Pretty print an undirected graph body.
@@ -242,8 +238,7 @@ where
                     if !first {
                         inner += self.line_();
                     }
-                    inner +=
-                        self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
+                    inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
                     first = false;
                 }
             }
@@ -262,17 +257,12 @@ where
                 if !first {
                     inner += self.line_();
                 }
-                inner +=
-                    self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
+                inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
                 first = false;
             }
         }
 
-        header
-            + self.text(" {")
-            + self.block_indent(inner)
-            + self.line_()
-            + self.text("}")
+        header + self.text(" {") + self.block_indent(inner) + self.line_() + self.text("}")
     }
 
     /// Pretty print a specialized function with its full header.

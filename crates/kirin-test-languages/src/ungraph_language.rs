@@ -97,11 +97,7 @@ mod tests {
 
     /// Create a NodeA statement with placeholder operands.
     fn make_node_a(stage: &mut StageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
-        let placeholder = stage
-            .ssa()
-            .ty(SimpleType::Any)
-            .kind(SSAKind::Test)
-            .new();
+        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
         stage
             .statement()
             .definition(UngraphNodeA {
@@ -113,11 +109,7 @@ mod tests {
 
     /// Create a NodeB statement with placeholder operands.
     fn make_node_b(stage: &mut StageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
-        let placeholder = stage
-            .ssa()
-            .ty(SimpleType::Any)
-            .kind(SSAKind::Test)
-            .new();
+        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
         stage
             .statement()
             .definition(UngraphNodeB {
@@ -174,11 +166,7 @@ mod tests {
             .new();
 
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
-        let placeholder = stage
-            .ssa()
-            .ty(SimpleType::Any)
-            .kind(SSAKind::Test)
-            .new();
+        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
         let compound_stmt = stage
             .statement()
             .definition(UngraphCompound {
@@ -280,11 +268,7 @@ mod tests {
 
         // Wrap inner ungraph in a compound statement
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
-        let placeholder = stage
-            .ssa()
-            .ty(SimpleType::Any)
-            .kind(SSAKind::Test)
-            .new();
+        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
         let compound_stmt = stage
             .statement()
             .definition(UngraphCompound {
@@ -341,11 +325,7 @@ mod tests {
             .new();
 
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
-        let placeholder = stage
-            .ssa()
-            .ty(SimpleType::Any)
-            .kind(SSAKind::Test)
-            .new();
+        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
         let compound_stmt = stage
             .statement()
             .definition(UngraphCompound {

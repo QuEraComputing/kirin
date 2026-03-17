@@ -451,10 +451,7 @@ fn remap_block_identity_remaps_parents_and_ssa_kinds() {
 
     stage.remap_block_identity(stub, real);
 
-    assert_eq!(
-        *s0.parent(&stage),
-        Some(StatementParent::Block(stub))
-    );
+    assert_eq!(*s0.parent(&stage), Some(StatementParent::Block(stub)));
 
     let stub_info = stub.expect_info(&stage);
     assert_eq!(stub_info.arguments.len(), 1);

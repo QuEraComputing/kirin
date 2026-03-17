@@ -99,20 +99,19 @@ where
             .as_ref()
             .map(|t| t.emit(ctx))
             .transpose()?
-            .unwrap_or_else(|| IR::Type::placeholder());
+            .unwrap_or_else(IR::Type::placeholder);
 
         // Check if a forward-reference placeholder exists for this name
-        if let Some(existing) = ctx.lookup_ssa(self.name.value) {
-            if let Some(info) = existing.get_info_mut(ctx.stage) {
-                if matches!(
-                    info.kind(),
-                    SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))
-                ) {
-                    // Reuse the forward-ref SSA — update type in place
-                    info.set_ty(ty);
-                    return Ok(existing.into());
-                }
-            }
+        if let Some(existing) = ctx.lookup_ssa(self.name.value)
+            && let Some(info) = existing.get_info_mut(ctx.stage)
+            && matches!(
+                info.kind(),
+                SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))
+            )
+        {
+            // Reuse the forward-ref SSA — update type in place
+            info.set_ty(ty);
+            return Ok(existing.into());
         }
 
         // Create a new SSA value with the parsed name and type

@@ -113,10 +113,10 @@ impl<L: Dialect> StageInfo<L> {
             .map(|rv| SSAValue::from(*rv))
             .collect();
         for ssa in result_ssas {
-            if let Some(info) = self.ssas.get_mut(ssa) {
-                if let SSAKind::Unresolved(ResolutionInfo::Result(idx)) = info.kind {
-                    info.kind = SSAKind::Result(id, idx);
-                }
+            if let Some(info) = self.ssas.get_mut(ssa)
+                && let SSAKind::Unresolved(ResolutionInfo::Result(idx)) = info.kind
+            {
+                info.kind = SSAKind::Result(id, idx);
             }
         }
 
@@ -153,7 +153,7 @@ impl<L: Dialect> StageInfo<L> {
     where
         L::Type: crate::Placeholder,
     {
-        let sig = signature.unwrap_or_else(|| Signature::placeholder());
+        let sig = signature.unwrap_or_else(Signature::placeholder);
 
         // Check policy conflicts for named staged functions.
         if name.is_some() {

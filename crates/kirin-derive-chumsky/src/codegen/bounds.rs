@@ -180,10 +180,7 @@ impl ImplBounds {
     /// Returns `<Lang as Dialect>::Type: Placeholder`. When the IR type is a
     /// type parameter (e.g. `T`), also returns `T: Placeholder` directly
     /// so the compiler can resolve the bound without normalization.
-    pub fn placeholder_predicates(
-        &self,
-        language: &TokenStream,
-    ) -> Vec<syn::WherePredicate> {
+    pub fn placeholder_predicates(&self, language: &TokenStream) -> Vec<syn::WherePredicate> {
         let ir_path = &self.ir_path;
         let mut preds = vec![
             syn::parse_quote! { <#language as #ir_path::Dialect>::Type: #ir_path::Placeholder },
