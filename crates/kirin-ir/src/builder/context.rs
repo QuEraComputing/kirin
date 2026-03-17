@@ -1,4 +1,5 @@
 use super::block::BlockBuilder;
+use super::digraph::DiGraphBuilder;
 use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
 use super::region::RegionBuilder;
 
@@ -16,6 +17,10 @@ impl<L: Dialect> StageInfo<L> {
 
     pub fn region(&mut self) -> RegionBuilder<'_, L> {
         RegionBuilder::from_stage(self)
+    }
+
+    pub fn digraph(&mut self) -> DiGraphBuilder<'_, L> {
+        DiGraphBuilder::from_stage(self)
     }
 
     pub fn link_statements(&mut self, ptrs: &[Statement]) -> LinkedList<Statement> {
