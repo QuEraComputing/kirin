@@ -10,7 +10,7 @@ fn test_constant_pretty_print() {
     let arena_doc = doc.print_statement(&const_op.id);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
-    insta::assert_snapshot!(buf, @"constant 42");
+    insta::assert_snapshot!(buf, @"%0 = constant 42");
 }
 
 #[test]
@@ -28,5 +28,5 @@ fn test_add_pretty_print() {
     let arena_doc = doc.print_statement(&add.id);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
-    insta::assert_snapshot!(buf, @"add %0, %1");
+    insta::assert_snapshot!(buf, @"%2 = add %0, %1");
 }

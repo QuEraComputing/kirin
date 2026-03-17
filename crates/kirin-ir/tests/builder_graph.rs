@@ -74,12 +74,7 @@ fn digraph_builder_port_and_capture_creation() {
 fn digraph_builder_resolves_builder_port_placeholders() {
     let mut stage = new_stage();
 
-    // Create a BuilderPort placeholder using the public ssa() builder
-    let placeholder = stage
-        .ssa()
-        .ty(TestType::I32)
-        .kind(SSAKind::BuilderPort(0))
-        .new();
+    let placeholder = stage.graph_port().index(0);
 
     let s0 = stage
         .statement()
@@ -151,12 +146,7 @@ fn ungraph_two_nodes_one_edge() {
 fn ungraph_boundary_port_bfs_ordering() {
     let mut stage = new_stage();
 
-    // Create a boundary port placeholder using the public ssa() builder
-    let port_placeholder = stage
-        .ssa()
-        .ty(TestType::Qubit)
-        .kind(SSAKind::BuilderPort(0))
-        .new();
+    let port_placeholder = stage.graph_port().index(0);
 
     let (wire0_stmt, wire0_ssa) = make_wire(&mut stage);
     let (wire1_stmt, wire1_ssa) = make_wire(&mut stage);
@@ -346,7 +336,7 @@ fn ungraph_isolated_node_appended_after_bfs() {
     let port_placeholder = stage
         .ssa()
         .ty(TestType::Qubit)
-        .kind(SSAKind::BuilderPort(0))
+        .kind(SSAKind::BuilderPort(BuilderKey::Index(0)))
         .new();
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);

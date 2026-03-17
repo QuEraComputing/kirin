@@ -3,6 +3,6 @@ source: crates/kirin-prettyless/src/tests/edge_cases.rs
 expression: buf
 ---
 ^0 {
-        constant 1;
+        %0 = constant 1;
         return %0;
 }

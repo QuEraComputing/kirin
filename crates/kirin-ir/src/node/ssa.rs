@@ -111,6 +111,16 @@ pub struct Use {
     operand_index: usize,
 }
 
+/// A lookup key for builder placeholders — resolved at build time to the real SSA value.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum BuilderKey {
+    /// Lookup by positional index.
+    Index(usize),
+    /// Lookup by name (interned symbol, matched against the builder's name declarations).
+    Named(Symbol),
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::manual_non_exhaustive)]
@@ -120,11 +130,11 @@ pub enum SSAKind {
     Port(PortParent, usize),
     // should not appear in final SSA IR
     #[doc(hidden)]
-    BuilderPort(usize),
-    /// A placeholder for builders to update the Block information later.
-    /// It holds the index of the argument in the block's argument list.
+    BuilderPort(BuilderKey),
     #[doc(hidden)]
-    BuilderBlockArgument(usize),
+    BuilderCapture(BuilderKey),
+    #[doc(hidden)]
+    BuilderBlockArgument(BuilderKey),
     /// A placeholder for builders to update the Result information later when building the statement.
     /// It holds the index of the result in the statement's result list.
     #[doc(hidden)]

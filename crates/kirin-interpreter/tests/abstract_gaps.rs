@@ -171,7 +171,7 @@ fn test_summary_cache_tightest_match() {
     // Build a simple add_one style function.
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let sf = stage.staged_function().new().unwrap();
-    let ba_x = stage.block_argument(0);
+    let ba_x = stage.block_argument().index(0);
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, SSAValue::from(ba_x), c1.result);
     let ret = Return::<ArithType>::new(stage, add.result);
@@ -223,7 +223,7 @@ fn test_summary_seed_refinable() {
 
     let stage = pipeline.stage_mut(stage_id).unwrap();
     let sf = stage.staged_function().new().unwrap();
-    let ba_x = stage.block_argument(0);
+    let ba_x = stage.block_argument().index(0);
     let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
     let add = kirin_arith::Arith::<ArithType>::op_add(stage, SSAValue::from(ba_x), c1.result);
     let ret = Return::<ArithType>::new(stage, add.result);

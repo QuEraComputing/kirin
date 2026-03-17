@@ -5,7 +5,7 @@ expression: output
 stage @0 fn @my_function(i64) -> i64;
 specialize @0 fn @my_function(i64) -> i64 {
   ^0 {
-    constant 42;
+    %0 = constant 42;
     return %0;
   }
 }

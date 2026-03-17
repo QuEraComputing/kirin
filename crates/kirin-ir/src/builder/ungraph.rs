@@ -128,7 +128,26 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             all_ports.push(port);
         }
 
-        // Step 3: Resolve BuilderPort(index) placeholders in node AND edge statement operands
+        // Step 3: Resolve BuilderPort/BuilderCapture placeholders in node AND edge statement operands
+        let port_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
+            [..edge_count]
+            .iter()
+            .enumerate()
+            .filter_map(|(i, port)| {
+                let info = self.stage.ssas.get(SSAValue::from(*port))?;
+                info.name().map(|sym| (sym, i))
+            })
+            .collect();
+        let capture_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
+            [edge_count..]
+            .iter()
+            .enumerate()
+            .filter_map(|(i, port)| {
+                let info = self.stage.ssas.get(SSAValue::from(*port))?;
+                info.name().map(|sym| (sym, i))
+            })
+            .collect();
+
         let all_stmts: Vec<Statement> = self
             .nodes
             .iter()
@@ -143,9 +162,30 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                     .ssas
                     .get(*arg)
                     .expect("SSAValue not found in stage");
-                if let SSAKind::BuilderPort(port_index) = ssa_info.kind {
-                    self.stage.ssas.delete(*arg);
-                    *arg = all_ports[port_index].into();
+                match ssa_info.kind {
+                    SSAKind::BuilderPort(key) => {
+                        let index = super::resolve_builder_key(
+                            key,
+                            edge_count,
+                            &port_name_to_index,
+                            &self.stage.symbols,
+                            "ungraph port",
+                        );
+                        self.stage.ssas.delete(*arg);
+                        *arg = all_ports[index].into();
+                    }
+                    SSAKind::BuilderCapture(key) => {
+                        let index = super::resolve_builder_key(
+                            key,
+                            all_ports.len() - edge_count,
+                            &capture_name_to_index,
+                            &self.stage.symbols,
+                            "ungraph capture",
+                        );
+                        self.stage.ssas.delete(*arg);
+                        *arg = all_ports[edge_count + index].into();
+                    }
+                    _ => {}
                 }
             }
         }

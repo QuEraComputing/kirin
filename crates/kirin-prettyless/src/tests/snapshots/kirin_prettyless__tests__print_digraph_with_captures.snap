@@ -1,0 +1,9 @@
+---
+source: crates/kirin-prettyless/src/tests/graph_snapshot.rs
+expression: buf
+---
+digraph ^dg0(%p0: f64, %p1: f64) capture(%theta: f64) {
+  %3 = add %p0, %theta;
+  %4 = add %3, %p1;
+  yield %4;
+}

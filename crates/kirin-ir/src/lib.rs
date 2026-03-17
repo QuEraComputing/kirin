@@ -30,11 +30,11 @@ pub use language::{
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice};
 pub use node::{
-    Block, BlockArgument, BlockInfo, CompileStage, DeletedSSAValue, DiGraph, DiGraphInfo, Function,
-    FunctionInfo, GlobalSymbol, LinkedList, LinkedListNode, Port, PortParent, Region, ResultValue,
-    SSAInfo, SSAKind, SSAValue, SpecializedFunction, SpecializedFunctionInfo, StagedFunction,
-    StagedFunctionInfo, StagedNamePolicy, Statement, StatementInfo, StatementParent, Successor,
-    Symbol, TestSSAValue, UnGraph, UnGraphInfo,
+    Block, BlockArgument, BlockInfo, BuilderKey, CompileStage, DeletedSSAValue, DiGraph,
+    DiGraphInfo, Function, FunctionInfo, GlobalSymbol, LinkedList, LinkedListNode, Port, PortParent,
+    Region, ResultValue, SSAInfo, SSAKind, SSAValue, SpecializedFunction,
+    SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo, StagedNamePolicy, Statement,
+    StatementInfo, StatementParent, Successor, Symbol, TestSSAValue, UnGraph, UnGraphInfo,
 };
 pub use pipeline::Pipeline;
 pub use signature::{

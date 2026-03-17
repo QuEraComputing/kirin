@@ -118,6 +118,16 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             })
             .collect::<Vec<_>>();
 
+        // Build name→index map for named block argument lookup
+        let arg_name_to_index: std::collections::HashMap<Symbol, usize> = block_args
+            .iter()
+            .enumerate()
+            .filter_map(|(i, arg)| {
+                let info = self.stage.ssas.get(SSAValue::from(*arg))?;
+                info.name().map(|sym| (sym, i))
+            })
+            .collect();
+
         for &stmt_id in &self.statements {
             let info = &mut self.stage.statements[stmt_id];
             info.parent = Some(StatementParent::Block(id));
@@ -127,9 +137,16 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                     .ssas
                     .get(*arg)
                     .expect("SSAValue not found in stage");
-                if let SSAKind::BuilderBlockArgument(arg_index) = ssa_info.kind {
+                if let SSAKind::BuilderBlockArgument(key) = ssa_info.kind {
+                    let index = super::resolve_builder_key(
+                        key,
+                        block_args.len(),
+                        &arg_name_to_index,
+                        &self.stage.symbols,
+                        "block argument",
+                    );
                     self.stage.ssas.delete(*arg);
-                    *arg = block_args[arg_index].into();
+                    *arg = block_args[index].into();
                 }
             }
         }

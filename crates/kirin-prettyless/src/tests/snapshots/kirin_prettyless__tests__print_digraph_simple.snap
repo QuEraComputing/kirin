@@ -1,0 +1,9 @@
+---
+source: crates/kirin-prettyless/src/tests/graph_snapshot.rs
+expression: buf
+---
+digraph ^dg0(%p0: f64) {
+  %1 = constant 1;
+  %2 = add %p0, %1;
+  yield %2;
+}

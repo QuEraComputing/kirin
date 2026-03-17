@@ -271,7 +271,7 @@ fn test_print_block_with_named_args() {
     let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
-    let ret_val = stage.block_argument(0);
+    let ret_val = stage.block_argument().index(0);
     let ret = SimpleLanguage::op_return(&mut stage, ret_val);
     let block = stage
         .block()

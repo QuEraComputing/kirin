@@ -21,7 +21,7 @@ fn test_block() {
     let a = SimpleLanguage::op_constant(&mut stage, 1.2);
     let b = SimpleLanguage::op_constant(&mut stage, 3.4);
     let c = SimpleLanguage::op_add(&mut stage, a.result, b.result);
-    let block_arg_x = stage.block_argument(0);
+    let block_arg_x = stage.block_argument().index(0);
     let d = SimpleLanguage::op_add(&mut stage, c.result, block_arg_x);
     let ret = SimpleLanguage::op_return(&mut stage, d.result);
 

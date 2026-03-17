@@ -43,8 +43,8 @@ fn block_builder_creates_block_with_arguments_and_statements() {
 fn block_builder_substitutes_builder_block_arguments() {
     let mut stage = new_stage();
 
-    let arg0 = stage.block_argument(0);
-    let arg1 = stage.block_argument(1);
+    let arg0 = stage.block_argument().index(0);
+    let arg1 = stage.block_argument().index(1);
 
     let add_stmt = stage
         .statement()

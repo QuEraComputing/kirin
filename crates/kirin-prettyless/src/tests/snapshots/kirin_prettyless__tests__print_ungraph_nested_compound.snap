@@ -1,0 +1,12 @@
+---
+source: crates/kirin-prettyless/src/tests/graph_snapshot.rs
+expression: buf
+---
+ungraph ^ug1(%op0: any) capture(%phi: f64) {
+  %5 = compound(%op0) ungraph ^ug0(%ip0: any) {
+    %1 = wire;
+    node_b(%ip0, %ip0, %1);
+  };
+  %6 = wire;
+  node_a(%phi, %6);
+}

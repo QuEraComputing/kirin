@@ -130,7 +130,27 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             all_ports.push(port);
         }
 
-        // Step 3: Resolve BuilderPort(index) placeholders in node statement operands
+        // Step 3: Resolve BuilderPort/BuilderCapture placeholders in node statement operands
+        // Build name→index maps for port and capture lookup
+        let port_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
+            [..edge_count]
+            .iter()
+            .enumerate()
+            .filter_map(|(i, port)| {
+                let info = self.stage.ssas.get(SSAValue::from(*port))?;
+                info.name().map(|sym| (sym, i))
+            })
+            .collect();
+        let capture_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
+            [edge_count..]
+            .iter()
+            .enumerate()
+            .filter_map(|(i, port)| {
+                let info = self.stage.ssas.get(SSAValue::from(*port))?;
+                info.name().map(|sym| (sym, i))
+            })
+            .collect();
+
         for &stmt_id in &self.nodes {
             let info = &mut self.stage.statements[stmt_id];
             for arg in info.definition.arguments_mut() {
@@ -139,9 +159,30 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                     .ssas
                     .get(*arg)
                     .expect("SSAValue not found in stage");
-                if let SSAKind::BuilderPort(port_index) = ssa_info.kind {
-                    self.stage.ssas.delete(*arg);
-                    *arg = all_ports[port_index].into();
+                match ssa_info.kind {
+                    SSAKind::BuilderPort(key) => {
+                        let index = super::resolve_builder_key(
+                            key,
+                            edge_count,
+                            &port_name_to_index,
+                            &self.stage.symbols,
+                            "digraph port",
+                        );
+                        self.stage.ssas.delete(*arg);
+                        *arg = all_ports[index].into();
+                    }
+                    SSAKind::BuilderCapture(key) => {
+                        let index = super::resolve_builder_key(
+                            key,
+                            all_ports.len() - edge_count,
+                            &capture_name_to_index,
+                            &self.stage.symbols,
+                            "digraph capture",
+                        );
+                        self.stage.ssas.delete(*arg);
+                        *arg = all_ports[edge_count + index].into();
+                    }
+                    _ => {}
                 }
             }
         }

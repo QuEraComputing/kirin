@@ -1,0 +1,10 @@
+---
+source: crates/kirin-prettyless/src/tests/graph_snapshot.rs
+expression: buf
+---
+ungraph ^ug0(%p0: any) capture(%theta: f64) {
+  %2 = wire;
+  %3 = wire;
+  node_a(%p0, %2, %3);
+  node_b(%theta, %p0, %2);
+}

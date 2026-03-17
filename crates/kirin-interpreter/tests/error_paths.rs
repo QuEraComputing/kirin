@@ -234,7 +234,7 @@ fn test_arity_mismatch_too_few_args() {
 
     // Build a block with 2 arguments.
     let sf = stage.staged_function().new().unwrap();
-    let ba_x = stage.block_argument(0);
+    let ba_x = stage.block_argument().index(0);
     let ret = Return::<ArithType>::new(stage, SSAValue::from(ba_x));
     let block = stage
         .block()
@@ -277,7 +277,7 @@ fn test_arity_mismatch_too_many_args() {
 
     // Build a block with 1 argument.
     let sf = stage.staged_function().new().unwrap();
-    let ba_x = stage.block_argument(0);
+    let ba_x = stage.block_argument().index(0);
     let ret = Return::<ArithType>::new(stage, SSAValue::from(ba_x));
     let block = stage.block().argument(ArithType::I64).terminator(ret).new();
     let region = stage.region().add_block(block).new();

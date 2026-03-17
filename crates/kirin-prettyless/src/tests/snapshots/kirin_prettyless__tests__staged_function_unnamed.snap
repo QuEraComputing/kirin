@@ -5,7 +5,7 @@ expression: output
 stage @X fn @unnamed() -> i64;
 specialize @X fn @unnamed() -> i64 {
   ^0 {
-    constant 0;
+    %0 = constant 0;
     return %0;
   }
 }

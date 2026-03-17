@@ -88,7 +88,7 @@ fn test_pipeline_function_no_stages() {
 fn test_print_block_multiple_unnamed_args() {
     let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
 
-    let ret_val = stage.block_argument(0);
+    let ret_val = stage.block_argument().index(0);
     let ret = SimpleLanguage::op_return(&mut stage, ret_val);
     let block = stage
         .block()

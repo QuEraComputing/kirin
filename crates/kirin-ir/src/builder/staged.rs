@@ -7,6 +7,55 @@ use crate::node::*;
 use crate::signature::Signature;
 use crate::{Dialect, StageInfo};
 
+#[derive(Clone, Copy)]
+enum PlaceholderKind {
+    Port,
+    Capture,
+    BlockArgument,
+}
+
+/// Builder for creating placeholder SSA values that reference graph ports,
+/// captures, or block arguments by index or name.
+///
+/// Created by [`StageInfo::graph_port`], [`StageInfo::graph_capture`],
+/// or [`StageInfo::block_argument`]. Finalize with `.index(n)` or `.name("x")`.
+pub struct PlaceholderBuilder<'a, L: Dialect> {
+    stage: &'a mut StageInfo<L>,
+    kind: PlaceholderKind,
+}
+
+impl<'a, L: Dialect> PlaceholderBuilder<'a, L>
+where
+    L::Type: Placeholder,
+{
+    fn make_ssa_kind(&self, key: BuilderKey) -> SSAKind {
+        match self.kind {
+            PlaceholderKind::Port => SSAKind::BuilderPort(key),
+            PlaceholderKind::Capture => SSAKind::BuilderCapture(key),
+            PlaceholderKind::BlockArgument => SSAKind::BuilderBlockArgument(key),
+        }
+    }
+
+    /// Look up by positional index.
+    pub fn index(self, index: usize) -> SSAValue {
+        let kind = self.make_ssa_kind(BuilderKey::Index(index));
+        let id = self.stage.ssas.next_id();
+        let ssa = SSAInfo::new(id, None, L::Type::placeholder(), kind);
+        self.stage.ssas.alloc(ssa);
+        id
+    }
+
+    /// Look up by name (matched against the builder's `.port_name()` / `.arg_name()` / `.capture_name()` declarations).
+    pub fn name(self, name: &str) -> SSAValue {
+        let symbol = self.stage.symbols.intern(name.to_string());
+        let kind = self.make_ssa_kind(BuilderKey::Named(symbol));
+        let id = self.stage.ssas.next_id();
+        let ssa = SSAInfo::new(id, None, L::Type::placeholder(), kind);
+        self.stage.ssas.alloc(ssa);
+        id
+    }
+}
+
 #[bon::bon]
 impl<L: Dialect> StageInfo<L> {
     #[builder(finish_fn = new)]
@@ -22,20 +71,28 @@ impl<L: Dialect> StageInfo<L> {
         id
     }
 
-    /// create a placeholder block argument SSAValue
-    pub fn block_argument(&mut self, index: usize) -> BlockArgument
-    where
-        L::Type: crate::Placeholder,
-    {
-        let id: BlockArgument = self.ssas.next_id().into();
-        let ssa = SSAInfo::new(
-            id.into(),
-            None,
-            L::Type::placeholder(),
-            SSAKind::BuilderBlockArgument(index),
-        );
-        self.ssas.alloc(ssa);
-        id
+    /// Create a placeholder for a block argument, resolved when the block is built.
+    pub fn block_argument(&mut self) -> PlaceholderBuilder<'_, L> {
+        PlaceholderBuilder {
+            stage: self,
+            kind: PlaceholderKind::BlockArgument,
+        }
+    }
+
+    /// Create a placeholder for a graph edge port, resolved when the graph is built.
+    pub fn graph_port(&mut self) -> PlaceholderBuilder<'_, L> {
+        PlaceholderBuilder {
+            stage: self,
+            kind: PlaceholderKind::Port,
+        }
+    }
+
+    /// Create a placeholder for a graph capture, resolved when the graph is built.
+    pub fn graph_capture(&mut self) -> PlaceholderBuilder<'_, L> {
+        PlaceholderBuilder {
+            stage: self,
+            kind: PlaceholderKind::Capture,
+        }
     }
 
     #[builder(finish_fn = new)]
