@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, Placeholder, SSAKind, StageInfo};
+use kirin_ir::{BuilderStageInfo, Dialect, Placeholder, SSAKind, StageInfo};
 use rustc_hash::FxHashMap;
 
 /// Error type for IR emission from parsed AST nodes.
@@ -26,10 +26,14 @@ impl std::error::Error for EmitError {}
 
 /// Type-erased function that creates a forward-reference SSA.
 /// Stored in `EmitContext` so that `SSAValue::emit` doesn't need a `Placeholder` bound.
-type ForwardRefCreator<L> =
-    fn(&mut StageInfo<L>, &str) -> kirin_ir::SSAValue;
+type ForwardRefCreator<L> = fn(&mut StageInfo<L>, &str) -> kirin_ir::SSAValue;
 
 /// Context for emitting IR from parsed AST, tracking name mappings.
+///
+/// The `stage` field is a `&mut StageInfo<L>`, typically obtained by
+/// dereferencing a [`BuilderStageInfo<L>`]. Callers constructing IR from text
+/// should create a `BuilderStageInfo`, then pass a mutable reference to the
+/// inner `StageInfo` (via `DerefMut`) to `EmitContext::new`.
 pub struct EmitContext<'a, L: Dialect> {
     pub stage: &'a mut StageInfo<L>,
     ssa_names: FxHashMap<String, kirin_ir::SSAValue>,
@@ -47,6 +51,14 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
             block_names: FxHashMap::default(),
             forward_ref_creator: None,
         }
+    }
+
+    /// Create an `EmitContext` from a [`BuilderStageInfo`].
+    ///
+    /// This is a convenience constructor equivalent to
+    /// `EmitContext::new(&mut *builder_stage)`.
+    pub fn from_builder(builder_stage: &'a mut BuilderStageInfo<L>) -> Self {
+        Self::new(&mut *builder_stage)
     }
 
     pub fn lookup_ssa(&self, name: &str) -> Option<kirin_ir::SSAValue> {

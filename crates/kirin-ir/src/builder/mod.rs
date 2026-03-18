@@ -4,8 +4,11 @@ pub mod digraph;
 pub mod error;
 mod redefine;
 mod region;
+mod stage_info;
 mod staged;
 pub mod ungraph;
+
+pub use stage_info::{BuilderStageInfo, FinalizeError};
 
 use std::collections::HashMap;
 

@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{Dialect, Pipeline, StageInfo};
+use kirin_ir::{BuilderStageInfo, Dialect, Pipeline, StageInfo};
 
 use super::emit_ir::EmitContext;
 use super::has_parser::ParseError;
@@ -94,6 +94,19 @@ where
         input: &str,
     ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
         parse_statement_on_stage::<L>(self, input)
+    }
+}
+
+impl<L> ParseStatementText<L> for BuilderStageInfo<L>
+where
+    L: Dialect + ParseEmit<L>,
+{
+    fn parse_statement(
+        &mut self,
+        (): (),
+        input: &str,
+    ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
+        parse_statement_on_stage::<L>(&mut *self, input)
     }
 }
 

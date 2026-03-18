@@ -258,10 +258,7 @@ impl<L: Dialect> StageInfo<L> {
             let info = stmt_id.expect_info(self);
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
-                let ssa_info = self
-                    .ssas
-                    .get(operand)
-                    .expect("SSAValue not found in stage");
+                let ssa_info = self.ssas.get(operand).expect("SSAValue not found in stage");
                 if let SSAKind::Result(producer_stmt, _) = ssa_info.kind
                     && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
                 {

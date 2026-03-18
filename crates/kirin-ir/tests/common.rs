@@ -220,8 +220,8 @@ pub fn make_wire(stage: &mut StageInfo<BuilderDialect>) -> (Statement, SSAValue)
     (stmt, wire_ssa)
 }
 
-/// Create a new StageInfo with the unified BuilderDialect.
+/// Create a new BuilderStageInfo with the unified BuilderDialect.
 #[allow(dead_code)]
-pub fn new_stage() -> StageInfo<BuilderDialect> {
-    StageInfo::default()
+pub fn new_stage() -> BuilderStageInfo<BuilderDialect> {
+    BuilderStageInfo::default()
 }

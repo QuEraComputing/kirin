@@ -20,7 +20,7 @@ fn strip_trailing_whitespace(s: &str) -> String {
 /// Test roundtrip: parse -> emit -> print should produce output matching input.
 #[test]
 fn test_roundtrip_add() {
-    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     // Create operand SSAs with types
     let ssa_a = stage
@@ -74,7 +74,7 @@ fn test_roundtrip_add() {
 fn test_roundtrip_constant() {
     use kirin::pretty::PrettyPrint as _;
 
-    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     // Parse - type annotation in input
     let input = "%x = constant 42 -> f64";
@@ -111,7 +111,7 @@ fn test_roundtrip_constant() {
 fn test_roundtrip_return() {
     use kirin::pretty::PrettyPrint as _;
 
-    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     // Create operand SSA
     let ssa_v = stage
@@ -153,7 +153,7 @@ fn test_roundtrip_return() {
 /// (e.g., block names, result alignment), but the core structure is preserved.
 #[test]
 fn test_roundtrip_function() {
-    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     // Parse a function with a region containing a block with multiple statements
     let input = r#"%f = function {
@@ -199,7 +199,7 @@ fn test_roundtrip_function() {
 /// The exact output format may differ from input due to Block/Region pretty printing details.
 #[test]
 fn test_roundtrip_function_multiple_blocks() {
-    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     // Parse a function with a region containing multiple blocks
     let input = r#"%f = function {

@@ -99,7 +99,7 @@ fn test_roundtrip_all_operations_with_float_types() {
 
 #[test]
 fn test_composes_with_constant_and_control_flow() {
-    let mut stage: StageInfo<NumericLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<NumericLanguage> = BuilderStageInfo::default();
     let const_a = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(1));
     let const_b = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(2));
     let add_stmt = Arith::<ArithType>::op_add(&mut stage, const_a.result, const_b.result);

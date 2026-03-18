@@ -6,7 +6,7 @@ fn test_block() {
     let mut gs: kirin_ir::InternTable<String, kirin_ir::GlobalSymbol> =
         kirin_ir::InternTable::default();
     let foo = gs.intern("foo".to_string());
-    let mut stage: StageInfo<SimpleLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let staged_function = stage
         .staged_function()
         .name(foo)

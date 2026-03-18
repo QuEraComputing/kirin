@@ -84,7 +84,7 @@ fn test_shift_operations_are_pure_but_not_speculatable() {
 
 #[test]
 fn test_composes_with_constant_and_control_flow() {
-    let mut stage: StageInfo<NumericLanguage> = StageInfo::default();
+    let mut stage: BuilderStageInfo<NumericLanguage> = BuilderStageInfo::default();
     let const_a = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(0b1010));
     let const_b = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(0b1100));
     let and_stmt = Bitwise::<ArithType>::op_and(&mut stage, const_a.result, const_b.result);

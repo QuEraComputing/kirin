@@ -19,6 +19,7 @@ pub use builder::error::{
     PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,
     StagedFunctionError,
 };
+pub use builder::{BuilderStageInfo, FinalizeError};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
 pub use context::StageInfo;
 pub use detach::Detach;
@@ -49,8 +50,9 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, CompileStage, Dialect, Function, GetInfo, HasStageInfo, Pipeline, Region,
-        ResultValue, SSAValue, Signature, SignatureSemantics, StageInfo, StageMeta, Statement,
+        Block, BuilderStageInfo, CompileStage, Dialect, Function, GetInfo, HasStageInfo, Pipeline,
+        Region, ResultValue, SSAValue, Signature, SignatureSemantics, StageInfo, StageMeta,
+        Statement,
     };
     pub use crate::{CompileTimeValue, Placeholder, Typeof};
 }

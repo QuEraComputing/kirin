@@ -76,12 +76,12 @@ mod tests {
     use super::*;
     use kirin_ir::*;
 
-    fn new_stage() -> StageInfo<UngraphLanguage> {
-        StageInfo::default()
+    fn new_stage() -> BuilderStageInfo<UngraphLanguage> {
+        BuilderStageInfo::default()
     }
 
     /// Create an edge statement that produces a ResultValue.
-    fn make_edge(stage: &mut StageInfo<UngraphLanguage>) -> (Statement, SSAValue) {
+    fn make_edge(stage: &mut BuilderStageInfo<UngraphLanguage>) -> (Statement, SSAValue) {
         let result_id: ResultValue = stage.ssa_arena().next_id().into();
         let stmt = stage
             .statement()
@@ -96,7 +96,7 @@ mod tests {
     }
 
     /// Create a NodeA statement with placeholder operands.
-    fn make_node_a(stage: &mut StageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
+    fn make_node_a(stage: &mut BuilderStageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
         let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
         stage
             .statement()
@@ -108,7 +108,7 @@ mod tests {
     }
 
     /// Create a NodeB statement with placeholder operands.
-    fn make_node_b(stage: &mut StageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
+    fn make_node_b(stage: &mut BuilderStageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
         let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
         stage
             .statement()
