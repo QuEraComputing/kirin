@@ -37,7 +37,7 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
     pub fn index(self, index: usize) -> SSAValue {
         let kind = self.make_ssa_kind(BuilderKey::Index(index));
         let id = self.stage.ssas.next_id();
-        let ssa = SSAInfo::new(id, None, None, kind);
+        let ssa = BuilderSSAInfo::new(id, None, None, kind);
         self.stage.ssas.alloc(ssa);
         id
     }
@@ -47,7 +47,7 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
         let symbol = self.stage.symbols.intern(name.to_string());
         let kind = self.make_ssa_kind(BuilderKey::Named(symbol));
         let id = self.stage.ssas.next_id();
-        let ssa = SSAInfo::new(id, None, None, kind);
+        let ssa = BuilderSSAInfo::new(id, None, None, kind);
         self.stage.ssas.alloc(ssa);
         id
     }
@@ -63,7 +63,7 @@ impl<L: Dialect> StageInfo<L> {
         kind: BuilderSSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
-        let ssa = SSAInfo::new(id, name.map(|n| self.symbols.intern(n)), Some(ty), kind);
+        let ssa = BuilderSSAInfo::new(id, name.map(|n| self.symbols.intern(n)), Some(ty), kind);
         self.ssas.alloc(ssa);
         id
     }
@@ -120,24 +120,6 @@ impl<L: Dialect> StageInfo<L> {
     }
 
     /// Create a new staged function.
-    ///
-    /// The `name` parameter accepts a [`GlobalSymbol`] pre-interned via
-    /// [`Pipeline::intern`](crate::Pipeline::intern). This ensures function
-    /// names are consistent across compilation stages.
-    ///
-    /// Returns `Err(StagedFunctionError)` when staged-function name policy would
-    /// be violated:
-    ///
-    /// - `DuplicateSignature`: same name + same signature already exists.
-    /// - `SignatureMismatchUnderSingleInterface`: same name + different signature
-    ///   exists while [`StagedNamePolicy::SingleInterface`] is active.
-    ///
-    /// The error preserves all construction arguments so the caller can pass
-    /// it to [`StageInfo::redefine_staged_function`] to intentionally overwrite
-    /// the existing staged function.
-    ///
-    /// Anonymous staged functions (name = `None`) are never considered
-    /// conflicting since they have no identity to collide on.
     #[builder(finish_fn = new)]
     pub fn staged_function(
         &mut self,
@@ -151,7 +133,6 @@ impl<L: Dialect> StageInfo<L> {
     {
         let sig = signature.unwrap_or_else(Signature::placeholder);
 
-        // Check policy conflicts for named staged functions.
         if name.is_some() {
             let same_name: Vec<_> = self
                 .staged_functions
@@ -213,31 +194,6 @@ impl<L: Dialect> StageInfo<L> {
         Ok(id)
     }
 
-    /// Create a specialized function from a staged function.
-    ///
-    /// Returns `Err(SpecializeError)` if a non-invalidated specialization with
-    /// the same signature already exists. The error preserves all construction
-    /// arguments so the caller can pass it to [`StageInfo::redefine_specialization`]
-    /// to intentionally overwrite the existing specialization.
-    ///
-    /// # Design: Signature ownership
-    ///
-    /// Signatures are explicitly provided here rather than derived from the body
-    /// statement. This is intentional:
-    ///
-    /// - **StagedFunction** owns the user-declared signature from the frontend.
-    /// - **SpecializedFunction** owns the compiler-derived signature (a subset of
-    ///   staged). If not provided, it defaults to the staged function's signature.
-    /// - **Body statement** is a structural container (Region + dialect-specific
-    ///   context) and does not encode signature information. A Region's block
-    ///   arguments have dialect-specific semantics and do not universally
-    ///   correspond to function parameters.
-    /// - **Extern functions** are represented as StagedFunctions with no
-    ///   specializations (empty `specializations` vec).
-    ///
-    /// Signature validation (e.g., checking that the specialized signature is a
-    /// subset of the staged signature) is the caller's responsibility via
-    /// [`crate::SignatureSemantics::applicable`].
     #[builder(finish_fn = new)]
     pub fn specialize(
         &mut self,
@@ -250,7 +206,6 @@ impl<L: Dialect> StageInfo<L> {
 
         let signature = signature.unwrap_or(staged_function_info.signature.clone());
 
-        // Check for existing non-invalidated specializations with the same signature
         let conflicting: Vec<SpecializedFunction> = staged_function_info
             .specializations
             .iter()

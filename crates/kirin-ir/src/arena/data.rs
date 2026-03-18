@@ -72,6 +72,36 @@ impl<I: Identifier, T> Arena<I, T> {
             .iter_mut()
             .filter(|arena_item| !arena_item.deleted)
     }
+
+    /// Map all live items, skipping deleted tombstones.
+    /// Returns a new arena preserving layout and indices.
+    /// Deleted items are preserved as deleted tombstones with default data.
+    pub fn try_map_live<U: Default, E>(
+        self,
+        mut f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<Arena<I, U>, E> {
+        let items = self
+            .items
+            .into_iter()
+            .map(|item| {
+                if item.deleted {
+                    Ok(Item {
+                        deleted: true,
+                        data: U::default(),
+                    })
+                } else {
+                    Ok(Item {
+                        deleted: false,
+                        data: f(item.data)?,
+                    })
+                }
+            })
+            .collect::<Result<Vec<_>, E>>()?;
+        Ok(Arena {
+            items,
+            marker: std::marker::PhantomData,
+        })
+    }
 }
 
 impl<T, I: Identifier> std::ops::Index<I> for Arena<I, T> {

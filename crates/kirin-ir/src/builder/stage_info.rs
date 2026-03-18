@@ -83,7 +83,8 @@ impl<L: Dialect> From<StageInfo<L>> for BuilderStageInfo<L> {
 impl<L: Dialect> BuilderStageInfo<L> {
     /// Validate the IR and return the underlying [`StageInfo`].
     ///
-    /// Checks that no `BuilderSSAKind::Unresolved` or `BuilderSSAKind::Test` values remain.
+    /// Checks that no `BuilderSSAKind::Unresolved` or `BuilderSSAKind::Test` values remain,
+    /// and that all SSAs have types set.
     pub fn finalize(self) -> Result<StageInfo<L>, FinalizeError> {
         for ssa_info in self.0.ssas.iter() {
             match ssa_info.kind {

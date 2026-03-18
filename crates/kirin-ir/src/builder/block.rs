@@ -1,4 +1,5 @@
 use crate::arena::GetInfo;
+use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, ResolutionInfo, SSAValue};
 use crate::node::stmt::StatementParent;
 use crate::node::*;
 use crate::{Dialect, StageInfo};
@@ -43,14 +44,6 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     }
 
     /// Name the most recently added argument.
-    ///
-    /// Must be called immediately after [`argument`](Self::argument).
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// builder.argument(F64).arg_name("y")
-    /// ```
     pub fn arg_name<S: Into<String>>(mut self, name: S) -> Self {
         debug_assert!(
             !self.arguments.is_empty(),
@@ -107,7 +100,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             .enumerate()
             .map(|(index, (ty, name))| {
                 let arg: BlockArgument = self.stage.ssas.next_id().into();
-                let ssa = SSAInfo::new(
+                let ssa = BuilderSSAInfo::new(
                     arg.into(),
                     name.map(|n| self.stage.symbols.intern(n)),
                     Some(ty),
@@ -119,7 +112,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             .collect::<Vec<_>>();
 
         // Build name→index map for named block argument lookup
-        let arg_name_to_index: std::collections::HashMap<Symbol, usize> = block_args
+        let arg_name_to_index: std::collections::HashMap<crate::Symbol, usize> = block_args
             .iter()
             .enumerate()
             .filter_map(|(i, arg)| {
@@ -128,10 +121,15 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             })
             .collect();
 
+        // Build replacement map: placeholder SSA -> resolved block arg SSA
+        let mut replacements: std::collections::HashMap<SSAValue, SSAValue> =
+            std::collections::HashMap::new();
         for &stmt_id in &self.statements {
-            let info = &mut self.stage.statements[stmt_id];
-            info.parent = Some(StatementParent::Block(id));
-            for arg in info.definition.arguments_mut() {
+            let info = &self.stage.statements[stmt_id];
+            for arg in info.definition.arguments() {
+                if replacements.contains_key(arg) {
+                    continue;
+                }
                 let ssa_info = self
                     .stage
                     .ssas
@@ -147,8 +145,20 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                         &self.stage.symbols,
                         "block argument",
                     );
-                    self.stage.ssas.delete(*arg);
-                    *arg = block_args[index].into();
+                    replacements.insert(*arg, block_args[index].into());
+                }
+            }
+        }
+        // Apply replacements and delete placeholder SSAs
+        for (&old, _) in &replacements {
+            self.stage.ssas.delete(old);
+        }
+        for &stmt_id in &self.statements {
+            let info = &mut self.stage.statements[stmt_id];
+            info.parent = Some(StatementParent::Block(id));
+            for arg in info.definition.arguments_mut() {
+                if let Some(&replacement) = replacements.get(arg) {
+                    *arg = replacement;
                 }
             }
         }

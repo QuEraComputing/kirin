@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use kirin_ir::{
-    Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Item, Port, Region, SSAInfo, SSAValue,
-    Signature, SpecializedFunction, StagedFunction, Statement, UnGraph,
+    Block, BuilderSSAInfo, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Item, Port, Region,
+    SSAValue, Signature, SpecializedFunction, StagedFunction, Statement, UnGraph,
 };
 use petgraph::visit::IntoNodeReferences;
 use prettyless::DocAllocator;
@@ -48,7 +48,7 @@ where
                 if i > 0 {
                     args_doc += self.text(", ");
                 }
-                let arg_info: &Item<SSAInfo<L>> = arg.expect_info(self.stage);
+                let arg_info: &Item<BuilderSSAInfo<L>> = arg.expect_info(self.stage);
                 let name = if let Some(name_sym) = arg_info.name() {
                     self.stage
                         .symbol_table()
@@ -113,7 +113,7 @@ where
                 if i > 0 {
                     doc += self.text(", ");
                 }
-                let info: &Item<SSAInfo<L>> = port.expect_info(self.stage);
+                let info: &Item<BuilderSSAInfo<L>> = port.expect_info(self.stage);
                 let name = if let Some(name_sym) = info.name() {
                     self.stage
                         .symbol_table()
@@ -180,7 +180,7 @@ where
                 inner += self.line_();
             }
             let yield_doc = self.list(info.yields().iter(), ", ", |ssa| {
-                let ssa_info: &Item<SSAInfo<L>> = ssa.expect_info(self.stage);
+                let ssa_info: &Item<BuilderSSAInfo<L>> = ssa.expect_info(self.stage);
                 let name = if let Some(name_sym) = ssa_info.name() {
                     self.stage
                         .symbol_table()

@@ -21,7 +21,6 @@ impl<'a, L: Dialect> RegionBuilder<'a, L> {
     }
 
     pub fn add_block(mut self, block: Block) -> Self {
-        // check if block is already pushed?
         if self.blocks.contains(&block) {
             panic!("Block `{}` is already added to the region", block);
         }

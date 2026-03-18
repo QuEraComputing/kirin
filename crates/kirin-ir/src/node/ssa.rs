@@ -54,10 +54,66 @@ impl_ssa_display!(DeletedSSAValue);
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct TestSSAValue(pub usize);
 
-/// Information about an SSA value in the database.
+/// Information about an SSA value in finalized IR.
+///
+/// After [`BuilderStageInfo::finalize`](crate::BuilderStageInfo::finalize),
+/// every SSA value is guaranteed to have a type and a resolved kind.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SSAInfo<L: Dialect> {
+    pub(crate) id: SSAValue,
+    pub(crate) name: Option<Symbol>,
+    pub(crate) ty: L::Type,
+    pub(crate) kind: SSAKind,
+    pub(crate) uses: SmallVec<[Use; 2]>,
+}
+
+impl<L: Dialect> SSAInfo<L> {
+    pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::Type, kind: SSAKind) -> Self {
+        Self {
+            id,
+            name,
+            ty,
+            kind,
+            uses: SmallVec::new(),
+        }
+    }
+
+    pub fn id(&self) -> SSAValue {
+        self.id
+    }
+
+    pub fn name(&self) -> Option<Symbol> {
+        self.name
+    }
+
+    pub fn ty(&self) -> &L::Type {
+        &self.ty
+    }
+
+    pub fn set_ty(&mut self, ty: L::Type) {
+        self.ty = ty;
+    }
+
+    /// Returns the [`SSAKind`] for this SSA value.
+    pub fn kind(&self) -> &SSAKind {
+        &self.kind
+    }
+
+    pub fn uses(&self) -> &SmallVec<[Use; 2]> {
+        &self.uses
+    }
+
+    pub fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
+        &mut self.uses
+    }
+}
+
+/// Build-time SSA info — type may be absent, kind may be unresolved.
+/// Used during IR construction by parsers and builders.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BuilderSSAInfo<L: Dialect> {
     pub(crate) id: SSAValue,
     pub(crate) name: Option<Symbol>,
     pub(crate) ty: Option<L::Type>,
@@ -65,7 +121,7 @@ pub struct SSAInfo<L: Dialect> {
     pub(crate) uses: SmallVec<[Use; 2]>,
 }
 
-impl<L: Dialect> SSAInfo<L> {
+impl<L: Dialect> BuilderSSAInfo<L> {
     pub fn new(
         id: SSAValue,
         name: Option<Symbol>,
@@ -106,7 +162,7 @@ impl<L: Dialect> SSAInfo<L> {
     pub fn kind(&self) -> SSAKind {
         self.kind.as_resolved().unwrap_or_else(|| {
             panic!(
-                "SSAInfo::kind() called on unresolved SSA value {:?} (kind: {:?}). \
+                "BuilderSSAInfo::kind() called on unresolved SSA value {:?} (kind: {:?}). \
                  Use builder_kind() for build-time access.",
                 self.id, self.kind
             )
@@ -127,6 +183,35 @@ impl<L: Dialect> SSAInfo<L> {
 
     pub fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
         &mut self.uses
+    }
+
+    /// Convert to finalized SSAInfo. Fails if kind unresolved or type missing.
+    pub fn finalize(self) -> Result<SSAInfo<L>, crate::FinalizeError> {
+        let kind = self.kind.as_resolved().ok_or_else(|| match self.kind {
+            BuilderSSAKind::Unresolved(_) => crate::FinalizeError::UnresolvedSSA(self.id),
+            BuilderSSAKind::Test => crate::FinalizeError::TestSSA(self.id),
+            _ => unreachable!(),
+        })?;
+        let ty = self.ty.ok_or(crate::FinalizeError::MissingType(self.id))?;
+        Ok(SSAInfo {
+            id: self.id,
+            name: self.name,
+            ty,
+            kind,
+            uses: self.uses,
+        })
+    }
+}
+
+impl<L: Dialect> From<SSAInfo<L>> for BuilderSSAInfo<L> {
+    fn from(info: SSAInfo<L>) -> Self {
+        Self {
+            id: info.id,
+            name: info.name,
+            ty: Some(info.ty),
+            kind: BuilderSSAKind::from(info.kind),
+            uses: info.uses,
+        }
     }
 }
 
@@ -278,11 +363,14 @@ impl_from_test!(BlockArgument);
 impl_from_test!(DeletedSSAValue);
 impl_from_test!(Port);
 
+/// GetInfo impl for SSAValue — returns `Item<BuilderSSAInfo<L>>` since
+/// `StageInfo` uses `BuilderSSAInfo` internally during both building and
+/// finalized access.
 impl<L: Dialect, T> GetInfo<L> for T
 where
     T: Into<SSAValue> + Identifier,
 {
-    type Info = crate::arena::Item<SSAInfo<L>>;
+    type Info = crate::arena::Item<BuilderSSAInfo<L>>;
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.ssas.get(*self)

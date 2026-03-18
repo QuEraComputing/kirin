@@ -129,7 +129,7 @@ where
                 .intern(self.name.value.to_string());
             let ssas = ctx.stage.ssa_arena_mut();
             let id = ssas.next_id();
-            let ssa_info = kirin_ir::SSAInfo::new(
+            let ssa_info = kirin_ir::BuilderSSAInfo::new(
                 id,
                 Some(symbol),
                 None,

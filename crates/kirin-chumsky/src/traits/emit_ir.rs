@@ -1,4 +1,4 @@
-use kirin_ir::{BuilderSSAKind, BuilderStageInfo, Dialect, StageInfo};
+use kirin_ir::{BuilderSSAInfo, BuilderSSAKind, BuilderStageInfo, Dialect, StageInfo};
 use rustc_hash::FxHashMap;
 
 /// Error type for IR emission from parsed AST nodes.
@@ -114,7 +114,7 @@ fn create_forward_ref<L: Dialect>(stage: &mut StageInfo<L>, name: &str) -> kirin
     let symbol = stage.symbol_table_mut().intern(name.to_string());
     let ssas = stage.ssa_arena_mut();
     let id = ssas.next_id();
-    let ssa = kirin_ir::SSAInfo::new(
+    let ssa = BuilderSSAInfo::new(
         id,
         Some(symbol),
         None,
