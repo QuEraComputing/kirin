@@ -30,6 +30,3 @@ def convert_bits(x: int, length: int):
         return (x >> i) & 1
 
     return ilist.map(_shift, ilist.range(length))
-
-
-__all__ = ["bit_length", "convert_bits"]
