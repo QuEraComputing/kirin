@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, GetInfo, IsEdge, Placeholder, SSAValue};
+use kirin_ir::{Dialect, GetInfo, IsEdge, SSAValue};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -120,7 +120,7 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
     ) -> Result<kirin_ir::DiGraph, EmitError>
     where
         IR: Dialect + IsEdge,
-        IR::Type: Placeholder + Clone,
+        IR::Type: Clone,
         TypeOutput: EmitIR<IR, Output = IR::Type>,
     {
         let header = &self.header.value;
@@ -195,7 +195,7 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
 impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for DiGraph<'src, TypeOutput, StmtOutput>
 where
     IR: Dialect + IsEdge,
-    IR::Type: Placeholder + Clone,
+    IR::Type: Clone,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
@@ -217,7 +217,7 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
     ) -> Result<kirin_ir::UnGraph, EmitError>
     where
         IR: Dialect + IsEdge,
-        IR::Type: Placeholder + Clone,
+        IR::Type: Clone,
         TypeOutput: EmitIR<IR, Output = IR::Type>,
     {
         let header = &self.header.value;
@@ -285,7 +285,7 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
 impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for UnGraph<'src, TypeOutput, StmtOutput>
 where
     IR: Dialect + IsEdge,
-    IR::Type: Placeholder + Clone,
+    IR::Type: Clone,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {

@@ -48,7 +48,7 @@ pub trait ParseDispatch: StageMeta {
 impl<L> ParseDispatch for StageInfo<L>
 where
     L: Dialect + ParseEmit<L>,
-    L::Type: kirin_ir::Placeholder,
+    L::Type: kirin_ir::Placeholder, // Still needed for staged_function() on StageInfo
     for<'t> L: HasParser<'t>,
     for<'t> L::Type: HasParser<'t, Output = L::Type>,
 {

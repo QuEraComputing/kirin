@@ -50,7 +50,10 @@ impl PrettyPrint for ResultValue {
         L::Type: std::fmt::Display,
     {
         let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
-        doc.text(format!("{}", info.ty()))
+        doc.text(match info.ty() {
+            Some(ty) => format!("{}", ty),
+            None => "?".to_string(),
+        })
     }
 }
 
@@ -96,7 +99,10 @@ impl PrettyPrint for SSAValue {
         L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.stage());
-        doc.text(format!("{}", info.ty()))
+        doc.text(match info.ty() {
+            Some(ty) => format!("{}", ty),
+            None => "?".to_string(),
+        })
     }
 }
 

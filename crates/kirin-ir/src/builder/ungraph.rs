@@ -107,7 +107,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             let ssa = SSAInfo::new(
                 port.into(),
                 name.map(|n| self.stage.symbols.intern(n)),
-                ty,
+                Some(ty),
                 BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
             self.stage.ssas.alloc(ssa);
@@ -121,7 +121,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             let ssa = SSAInfo::new(
                 port.into(),
                 name.map(|n| self.stage.symbols.intern(n)),
-                ty,
+                Some(ty),
                 BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
             self.stage.ssas.alloc(ssa);

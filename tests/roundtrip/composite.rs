@@ -53,7 +53,11 @@ fn test_roundtrip_add() {
     if let SimpleLanguage::Add(_, _, res) = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
         let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
-        assert_eq!(res_info.ty(), &SimpleType::F64, "Result type should be F64");
+        assert_eq!(
+            res_info.ty(),
+            Some(&SimpleType::F64),
+            "Result type should be F64"
+        );
     }
 
     // Pretty print directly using the trait
@@ -90,7 +94,11 @@ fn test_roundtrip_constant() {
     if let SimpleLanguage::Constant(_, res) = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
         let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
-        assert_eq!(res_info.ty(), &SimpleType::F64, "Result type should be F64");
+        assert_eq!(
+            res_info.ty(),
+            Some(&SimpleType::F64),
+            "Result type should be F64"
+        );
     }
 
     // Pretty print

@@ -95,7 +95,6 @@ where
         MyLanguage,
         MyLanguageASTSelf<'t, <SimpleType as ::kirin::parsers::HasParser<'t>>::Output>,
     >,
-    <MyLanguage as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
 {
     fn emit_parsed(
         output: &<Self as ::kirin::parsers::HasParser<'t>>::Output,
@@ -137,7 +136,6 @@ where
         ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
     ArithOps: ::kirin::parsers::HasDialectEmitIR<'tokens, Language, LanguageOutput>,
     CfOps: ::kirin::parsers::HasDialectEmitIR<'tokens, Language, LanguageOutput>,
-    SimpleType: ::kirin::ir::Placeholder,
 {
     #[inline]
     fn emit_output<__TypeOutput, __EmitLanguageOutput>(

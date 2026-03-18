@@ -107,6 +107,14 @@ impl<L: Dialect> StageInfo<L> {
         &self.ssas
     }
 
+    /// Get a mutable reference to the SSA values arena.
+    ///
+    /// Used by builder code that needs to create SSA values with `ty: None`
+    /// (e.g., forward references in relaxed dominance mode).
+    pub fn ssa_arena_mut(&mut self) -> &mut Arena<SSAValue, SSAInfo<L>> {
+        &mut self.ssas
+    }
+
     /// Get a reference to the symbols intern table.
     pub fn symbol_table(&self) -> &InternTable<String, Symbol> {
         &self.symbols

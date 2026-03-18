@@ -380,7 +380,7 @@ fn ssa_with_name_is_resolvable() {
 
     let info = ssa.expect_info(&stage);
     assert!(info.name().is_some());
-    assert_eq!(info.ty(), &TestType::I32);
+    assert_eq!(info.ty(), Some(&TestType::I32));
     assert_eq!(*info.builder_kind(), BuilderSSAKind::Test);
 }
 
@@ -395,7 +395,7 @@ fn ssa_without_name() {
 
     let info = ssa.expect_info(&stage);
     assert!(info.name().is_none());
-    assert_eq!(info.ty(), &TestType::I64);
+    assert_eq!(info.ty(), Some(&TestType::I64));
 }
 
 // --- link_statements edge cases ---

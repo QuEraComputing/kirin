@@ -14,6 +14,8 @@ pub enum FinalizeError {
     /// A `BuilderSSAKind::Test` SSA was found — test-only SSAs must not appear in
     /// finalized IR.
     TestSSA(SSAValue),
+    /// An SSA value has no type set (`ty` is `None`).
+    MissingType(SSAValue),
 }
 
 impl fmt::Display for FinalizeError {
@@ -24,6 +26,9 @@ impl fmt::Display for FinalizeError {
             }
             FinalizeError::TestSSA(ssa) => {
                 write!(f, "test SSA value {ssa} in finalized IR")
+            }
+            FinalizeError::MissingType(ssa) => {
+                write!(f, "SSA value {ssa} has no type set in finalized IR")
             }
         }
     }
@@ -89,6 +94,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
                     return Err(FinalizeError::TestSSA(ssa_info.id()));
                 }
                 _ => {}
+            }
+            if ssa_info.ty.is_none() {
+                return Err(FinalizeError::MissingType(ssa_info.id()));
             }
         }
         Ok(self.0)

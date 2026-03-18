@@ -1,6 +1,5 @@
 use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
 
-use crate::Placeholder;
 use crate::arena::GetInfo;
 use crate::node::symbol::GlobalSymbol;
 use crate::node::*;
@@ -24,10 +23,7 @@ pub struct PlaceholderBuilder<'a, L: Dialect> {
     kind: PlaceholderKind,
 }
 
-impl<'a, L: Dialect> PlaceholderBuilder<'a, L>
-where
-    L::Type: Placeholder,
-{
+impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
     fn make_ssa_kind(&self, key: BuilderKey) -> BuilderSSAKind {
         let info = match self.kind {
             PlaceholderKind::Port => ResolutionInfo::Port(key),
@@ -41,7 +37,7 @@ where
     pub fn index(self, index: usize) -> SSAValue {
         let kind = self.make_ssa_kind(BuilderKey::Index(index));
         let id = self.stage.ssas.next_id();
-        let ssa = SSAInfo::new(id, None, L::Type::placeholder(), kind);
+        let ssa = SSAInfo::new(id, None, None, kind);
         self.stage.ssas.alloc(ssa);
         id
     }
@@ -51,7 +47,7 @@ where
         let symbol = self.stage.symbols.intern(name.to_string());
         let kind = self.make_ssa_kind(BuilderKey::Named(symbol));
         let id = self.stage.ssas.next_id();
-        let ssa = SSAInfo::new(id, None, L::Type::placeholder(), kind);
+        let ssa = SSAInfo::new(id, None, None, kind);
         self.stage.ssas.alloc(ssa);
         id
     }
@@ -67,7 +63,7 @@ impl<L: Dialect> StageInfo<L> {
         kind: BuilderSSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
-        let ssa = SSAInfo::new(id, name.map(|n| self.symbols.intern(n)), ty, kind);
+        let ssa = SSAInfo::new(id, name.map(|n| self.symbols.intern(n)), Some(ty), kind);
         self.ssas.alloc(ssa);
         id
     }

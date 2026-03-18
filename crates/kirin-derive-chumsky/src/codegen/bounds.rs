@@ -64,14 +64,21 @@ impl ImplBounds {
         !self.wrapper_types.is_empty()
     }
 
-    /// True when any statement has `ResultValue` fields (needs `Placeholder`).
+    /// True when any statement has `ResultValue` fields.
+    ///
+    /// Note: `Placeholder` is no longer needed for `ResultValue::emit` since
+    /// forward refs now use `ty: None`. This returns false unconditionally.
+    /// The builder path (Dialect derive) still uses `Placeholder` for auto-placeholder,
+    /// but that's handled separately in `kirin-derive-toolkit`.
     pub fn needs_placeholder(&self) -> bool {
-        self.has_result_fields
+        false
     }
 
     /// True when `Placeholder` is needed considering wrappers too.
+    ///
+    /// Returns false — `Placeholder` is no longer needed in the EmitIR path.
     pub fn needs_placeholder_with_wrappers(&self) -> bool {
-        self.has_result_fields || self.has_wrappers()
+        false
     }
 
     // --- IR type predicates ---

@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{BuilderSSAKind, Dialect, GetInfo, Placeholder};
+use kirin_ir::{BuilderSSAKind, Dialect, GetInfo};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -86,19 +86,13 @@ where
 impl<'src, TypeOutput, IR> EmitIR<IR> for ResultValue<'src, TypeOutput>
 where
     IR: Dialect,
-    IR::Type: kirin_ir::Placeholder,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
 {
     type Output = kirin_ir::ResultValue;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
-        // Convert the parsed type to Dialect::Type via EmitIR, or use placeholder if no type annotation
-        let ty: IR::Type = self
-            .ty
-            .as_ref()
-            .map(|t| t.emit(ctx))
-            .transpose()?
-            .unwrap_or_else(IR::Type::placeholder);
+        // Convert the parsed type to Dialect::Type via EmitIR, or None if no type annotation
+        let ty: Option<IR::Type> = self.ty.as_ref().map(|t| t.emit(ctx)).transpose()?;
 
         // Check if a forward-reference placeholder exists for this name
         if let Some(existing) = ctx.lookup_ssa(self.name.value)
@@ -108,21 +102,42 @@ where
                 BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))
             )
         {
-            // Reuse the forward-ref SSA — update type in place
-            info.set_ty(ty);
+            // Reuse the forward-ref SSA — update type in place if provided
+            if let Some(ty) = ty {
+                info.set_ty(ty);
+            }
             return Ok(existing.into());
         }
 
-        // Create a new SSA value with the parsed name and type
-        let ssa = ctx
-            .stage
-            .ssa()
-            .name(self.name.value.to_string())
-            .ty(ty)
-            .kind(BuilderSSAKind::Unresolved(
-                kirin_ir::ResolutionInfo::Result(0),
-            ))
-            .new();
+        // Create a new SSA value with the parsed name and type.
+        // If no type annotation, create with ty: None (will be resolved later or
+        // caught by finalize).
+        let ssa = if let Some(ty) = ty {
+            ctx.stage
+                .ssa()
+                .name(self.name.value.to_string())
+                .ty(ty)
+                .kind(BuilderSSAKind::Unresolved(
+                    kirin_ir::ResolutionInfo::Result(0),
+                ))
+                .new()
+        } else {
+            // No type annotation — create SSA with ty: None directly
+            let symbol = ctx
+                .stage
+                .symbol_table_mut()
+                .intern(self.name.value.to_string());
+            let ssas = ctx.stage.ssa_arena_mut();
+            let id = ssas.next_id();
+            let ssa_info = kirin_ir::SSAInfo::new(
+                id,
+                Some(symbol),
+                None,
+                BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)),
+            );
+            ssas.alloc(ssa_info);
+            id
+        };
 
         // Register the SSA in the symbol table for later reference
         ctx.register_ssa(self.name.value.to_string(), ssa);

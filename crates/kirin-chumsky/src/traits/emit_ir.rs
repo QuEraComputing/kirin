@@ -1,4 +1,4 @@
-use kirin_ir::{BuilderSSAKind, BuilderStageInfo, Dialect, Placeholder, StageInfo};
+use kirin_ir::{BuilderSSAKind, BuilderStageInfo, Dialect, StageInfo};
 use rustc_hash::FxHashMap;
 
 /// Error type for IR emission from parsed AST nodes.
@@ -83,11 +83,10 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
     }
 
     /// Enable relaxed dominance mode: undefined SSA references create
-    /// forward-reference `Unresolved(Result(0))` placeholders.
-    pub fn set_relaxed_dominance(&mut self, relaxed: bool)
-    where
-        L::Type: Placeholder,
-    {
+    /// forward-reference `Unresolved(Result(0))` placeholders with `ty: None`.
+    ///
+    /// No `Placeholder` bound needed — forward refs use `Option<L::Type>` = `None`.
+    pub fn set_relaxed_dominance(&mut self, relaxed: bool) {
         self.forward_ref_creator = if relaxed {
             Some(create_forward_ref::<L>)
         } else {
@@ -109,18 +108,20 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
 }
 
 /// Create a forward-reference SSA for an undefined name in relaxed dominance mode.
-fn create_forward_ref<L: Dialect>(stage: &mut StageInfo<L>, name: &str) -> kirin_ir::SSAValue
-where
-    L::Type: Placeholder,
-{
-    stage
-        .ssa()
-        .name(name.to_string())
-        .ty(L::Type::placeholder())
-        .kind(BuilderSSAKind::Unresolved(
-            kirin_ir::ResolutionInfo::Result(0),
-        ))
-        .new()
+///
+/// No `Placeholder` bound needed — uses `ty: None` via direct `SSAInfo::new`.
+fn create_forward_ref<L: Dialect>(stage: &mut StageInfo<L>, name: &str) -> kirin_ir::SSAValue {
+    let symbol = stage.symbol_table_mut().intern(name.to_string());
+    let ssas = stage.ssa_arena_mut();
+    let id = ssas.next_id();
+    let ssa = kirin_ir::SSAInfo::new(
+        id,
+        Some(symbol),
+        None,
+        BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)),
+    );
+    ssas.alloc(ssa);
+    id
 }
 
 /// Trait for emitting IR nodes from parsed AST nodes.

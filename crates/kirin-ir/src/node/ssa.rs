@@ -60,13 +60,18 @@ pub struct TestSSAValue(pub usize);
 pub struct SSAInfo<L: Dialect> {
     pub(crate) id: SSAValue,
     pub(crate) name: Option<Symbol>,
-    pub(crate) ty: L::Type,
+    pub(crate) ty: Option<L::Type>,
     pub(crate) kind: BuilderSSAKind,
     pub(crate) uses: SmallVec<[Use; 2]>,
 }
 
 impl<L: Dialect> SSAInfo<L> {
-    pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::Type, kind: BuilderSSAKind) -> Self {
+    pub fn new(
+        id: SSAValue,
+        name: Option<Symbol>,
+        ty: Option<L::Type>,
+        kind: BuilderSSAKind,
+    ) -> Self {
         Self {
             id,
             name,
@@ -84,12 +89,12 @@ impl<L: Dialect> SSAInfo<L> {
         self.name
     }
 
-    pub fn ty(&self) -> &L::Type {
-        &self.ty
+    pub fn ty(&self) -> Option<&L::Type> {
+        self.ty.as_ref()
     }
 
     pub fn set_ty(&mut self, ty: L::Type) {
-        self.ty = ty;
+        self.ty = Some(ty);
     }
 
     /// Returns the clean [`SSAKind`] for this SSA value.

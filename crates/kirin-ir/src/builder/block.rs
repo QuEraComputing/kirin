@@ -110,7 +110,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                 let ssa = SSAInfo::new(
                     arg.into(),
                     name.map(|n| self.stage.symbols.intern(n)),
-                    ty,
+                    Some(ty),
                     BuilderSSAKind::BlockArgument(id, index),
                 );
                 self.stage.ssas.alloc(ssa);

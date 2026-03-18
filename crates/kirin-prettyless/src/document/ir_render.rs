@@ -58,7 +58,10 @@ where
                 } else {
                     format!("{}", Id::from(*arg).raw())
                 };
-                args_doc += self.text(format!("%{}: {}", name, arg_info.ty()));
+                args_doc += self.text(match arg_info.ty() {
+                    Some(ty) => format!("%{}: {}", name, ty),
+                    None => format!("%{}: ?", name),
+                });
             }
             header += args_doc.enclose("(", ")");
         }
@@ -120,7 +123,10 @@ where
                 } else {
                     format!("{}", Id::from(*port).raw())
                 };
-                doc += self.text(format!("%{}: {}", name, info.ty()));
+                doc += self.text(match info.ty() {
+                    Some(ty) => format!("%{}: {}", name, ty),
+                    None => format!("%{}: ?", name),
+                });
             }
             doc
         };
