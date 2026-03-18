@@ -6,11 +6,55 @@ use crate::{BuilderStageInfo, Dialect, node::*};
 
 use super::arenas::Arenas;
 
-/// The core stage info type for finalized IR.
+/// Finalized IR for a single compilation stage.
 ///
-/// After [`BuilderStageInfo::finalize`](crate::BuilderStageInfo::finalize),
-/// every SSA value is guaranteed to have a type and a resolved kind.
-/// The SSA arena holds clean [`SSAInfo`] values with `L::Type` and [`SSAKind`].
+/// `StageInfo` holds the node arenas (blocks, statements, regions, graphs,
+/// functions) and a clean SSA arena where every value has a resolved type and
+/// kind. It is the read-only output of [`BuilderStageInfo::finalize`].
+///
+/// # Obtaining a `StageInfo`
+///
+/// Build IR with [`BuilderStageInfo`], then call
+/// [`finalize()`](crate::BuilderStageInfo::finalize):
+///
+/// ```ignore
+/// let mut builder = BuilderStageInfo::<MyDialect>::default();
+/// // ... construct IR ...
+/// let stage: StageInfo<MyDialect> = builder.finalize().unwrap();
+/// ```
+///
+/// # Querying
+///
+/// Use [`GetInfo`](crate::GetInfo) to look up node info by ID:
+///
+/// ```ignore
+/// let block_info = block.expect_info(&stage);
+/// let ssa_info = ssa_value.expect_info(&stage);   // SSAInfo with ty: L::Type
+/// let stmts: Vec<_> = block.statements(&stage).collect();
+/// ```
+///
+/// # Constructing new functions on an existing `StageInfo`
+///
+/// When working through a [`Pipeline`](crate::Pipeline), stages are stored as
+/// `StageInfo`. To add new functions, use [`with_builder`](Self::with_builder)
+/// which temporarily converts to a [`BuilderStageInfo`]:
+///
+/// ```ignore
+/// let stage: &mut StageInfo<MyDialect> = pipeline.stage_mut(stage_id).unwrap();
+/// stage.with_builder(|b| {
+///     // b is &mut BuilderStageInfo<MyDialect>
+///     let sf = b.staged_function().name(func_name).new().unwrap();
+///
+///     let arg = b.block_argument().index(0);
+///     let ret = b.statement().definition(MyDialect::Return(arg)).new();
+///     let block = b.block().argument(MyType::I64).terminator(ret).new();
+///     let region = b.region().add_block(block).new();
+///     let body = b.statement().definition(MyDialect::FuncBody(region)).new();
+///
+///     b.specialize().staged_func(sf).body(body).new().unwrap();
+/// });
+/// // stage is back to StageInfo with the new function added
+/// ```
 #[derive(Debug)]
 pub struct StageInfo<L: Dialect> {
     pub(crate) nodes: Arenas<L>,
@@ -63,11 +107,16 @@ impl<L: Dialect> StageInfo<L> {
         &self.ssas
     }
 
-    /// Temporarily convert this `StageInfo` into a [`BuilderStageInfo`], run
-    /// the closure, then convert back.
+    /// Temporarily convert to a [`BuilderStageInfo`] for construction, then
+    /// convert back.
     ///
-    /// This is the bridge for code paths (e.g. [`Pipeline`](crate::Pipeline))
-    /// that hold `&mut StageInfo<L>` via trait dispatch but need builder methods.
+    /// This is the bridge for code that holds `&mut StageInfo<L>` (e.g. via
+    /// [`Pipeline::stage_mut`](crate::Pipeline::stage_mut) or
+    /// [`HasStageInfo`](crate::HasStageInfo)) but needs builder methods.
+    ///
+    /// The SSA arena is converted in each direction (O(n)), so prefer
+    /// batching construction inside a single `with_builder` call rather than
+    /// calling it per-statement.
     pub fn with_builder<R>(&mut self, f: impl FnOnce(&mut BuilderStageInfo<L>) -> R) -> R {
         let stage = std::mem::take(self);
         let mut builder = BuilderStageInfo::from(stage);
