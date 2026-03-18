@@ -7,6 +7,7 @@ mod intern;
 mod language;
 mod lattice;
 mod node;
+mod node_arenas;
 mod pipeline;
 mod signature;
 mod stage;
@@ -38,6 +39,7 @@ pub use node::{
     StagedNamePolicy, Statement, StatementInfo, StatementParent, Successor, Symbol, TestSSAValue,
     UnGraph, UnGraphInfo,
 };
+pub use node_arenas::NodeArenas;
 pub use pipeline::Pipeline;
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,

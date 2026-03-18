@@ -1,13 +1,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
+use std::ops::{Deref, DerefMut};
 
 use crate::arena::Arena;
-use crate::node::digraph::{DiGraph, DiGraphInfo};
-use crate::node::region::RegionInfo;
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, SSAValue};
 use crate::node::stmt::StatementParent;
-use crate::node::ungraph::{UnGraph, UnGraphInfo};
-use crate::{Dialect, InternTable, StageInfo, node::*};
+use crate::node_arenas::NodeArenas;
+use crate::{Dialect, StageInfo, node::*};
 
 /// Error returned by [`BuilderStageInfo::finalize`] when build-time SSAs
 /// have not been resolved.
@@ -51,33 +50,15 @@ impl std::error::Error for FinalizeError {}
 /// Call [`finalize`](BuilderStageInfo::finalize) to validate SSAs and convert to
 /// a [`StageInfo`] with clean [`SSAInfo`](crate::node::ssa::SSAInfo) values.
 pub struct BuilderStageInfo<L: Dialect> {
-    pub(crate) name: Option<GlobalSymbol>,
-    pub(crate) stage_id: Option<crate::node::function::CompileStage>,
-    pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
-    pub(crate) staged_name_policy: StagedNamePolicy,
-    pub(crate) regions: Arena<Region, RegionInfo<L>>,
-    pub(crate) blocks: Arena<Block, BlockInfo<L>>,
-    pub(crate) statements: Arena<Statement, StatementInfo<L>>,
+    pub(crate) nodes: NodeArenas<L>,
     pub(crate) ssas: Arena<SSAValue, BuilderSSAInfo<L>>,
-    pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
-    pub(crate) ungraphs: Arena<UnGraph, UnGraphInfo<L>>,
-    pub(crate) symbols: InternTable<String, Symbol>,
 }
 
 impl<L: Dialect> Default for BuilderStageInfo<L> {
     fn default() -> Self {
         Self {
-            name: None,
-            stage_id: None,
-            staged_functions: Arena::default(),
-            staged_name_policy: StagedNamePolicy::default(),
-            regions: Arena::default(),
-            blocks: Arena::default(),
-            statements: Arena::default(),
+            nodes: NodeArenas::default(),
             ssas: Arena::default(),
-            digraphs: Arena::default(),
-            ungraphs: Arena::default(),
-            symbols: InternTable::default(),
         }
     }
 }
@@ -85,8 +66,8 @@ impl<L: Dialect> Default for BuilderStageInfo<L> {
 impl<L: Dialect> fmt::Debug for BuilderStageInfo<L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BuilderStageInfo")
-            .field("name", &self.name)
-            .field("stage_id", &self.stage_id)
+            .field("name", &self.nodes.name)
+            .field("stage_id", &self.nodes.stage_id)
             .finish_non_exhaustive()
     }
 }
@@ -94,116 +75,37 @@ impl<L: Dialect> fmt::Debug for BuilderStageInfo<L> {
 impl<L: Dialect> From<StageInfo<L>> for BuilderStageInfo<L> {
     fn from(stage: StageInfo<L>) -> Self {
         Self {
-            name: stage.name,
-            stage_id: stage.stage_id,
-            staged_functions: stage.staged_functions,
-            staged_name_policy: stage.staged_name_policy,
-            regions: stage.regions,
-            blocks: stage.blocks,
-            statements: stage.statements,
+            nodes: stage.nodes,
             ssas: stage.ssas.map(|info| BuilderSSAInfo::from(info)),
-            digraphs: stage.digraphs,
-            ungraphs: stage.ungraphs,
-            symbols: stage.symbols,
         }
     }
 }
 
-// ---- Read-only accessor methods ----
+impl<L: Dialect> Deref for BuilderStageInfo<L> {
+    type Target = NodeArenas<L>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.nodes
+    }
+}
+
+impl<L: Dialect> DerefMut for BuilderStageInfo<L> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.nodes
+    }
+}
+
+// ---- SSA-specific accessor methods ----
 
 impl<L: Dialect> BuilderStageInfo<L> {
-    /// Get the optional stage name for this context.
-    pub fn name(&self) -> Option<GlobalSymbol> {
-        self.name
-    }
-
-    /// Get the compile-stage ID assigned by the pipeline, if any.
-    pub fn stage_id(&self) -> Option<crate::node::function::CompileStage> {
-        self.stage_id
-    }
-
-    /// Get a reference to the statements arena.
-    pub fn statement_arena(&self) -> &Arena<Statement, StatementInfo<L>> {
-        &self.statements
-    }
-
     /// Get a reference to the SSA values arena (builder variant).
     pub fn ssa_arena(&self) -> &Arena<SSAValue, BuilderSSAInfo<L>> {
         &self.ssas
     }
 
-    /// Get a reference to the symbols intern table.
-    pub fn symbol_table(&self) -> &InternTable<String, Symbol> {
-        &self.symbols
-    }
-
-    /// Get a reference to the staged functions arena.
-    pub fn staged_function_arena(&self) -> &Arena<StagedFunction, StagedFunctionInfo<L>> {
-        &self.staged_functions
-    }
-
-    /// Get the policy controlling staged-function name/signature compatibility.
-    pub fn staged_name_policy(&self) -> StagedNamePolicy {
-        self.staged_name_policy
-    }
-
-    /// Get a reference to the regions arena.
-    pub fn region_arena(&self) -> &Arena<Region, RegionInfo<L>> {
-        &self.regions
-    }
-
-    /// Get a reference to the blocks arena.
-    pub fn block_arena(&self) -> &Arena<Block, BlockInfo<L>> {
-        &self.blocks
-    }
-
-    /// Get a reference to the directed graph arena.
-    pub fn digraph_arena(&self) -> &Arena<DiGraph, DiGraphInfo<L>> {
-        &self.digraphs
-    }
-
-    /// Get a reference to the undirected graph arena.
-    pub fn ungraph_arena(&self) -> &Arena<UnGraph, UnGraphInfo<L>> {
-        &self.ungraphs
-    }
-}
-
-// ---- Mutable accessor methods for builder access ----
-
-impl<L: Dialect> BuilderStageInfo<L> {
     /// Get a mutable reference to the SSA values arena (builder variant).
     pub fn ssa_arena_mut(&mut self) -> &mut Arena<SSAValue, BuilderSSAInfo<L>> {
         &mut self.ssas
-    }
-
-    /// Get a mutable reference to the symbols intern table.
-    pub fn symbol_table_mut(&mut self) -> &mut InternTable<String, Symbol> {
-        &mut self.symbols
-    }
-
-    /// Set the stage name for this context.
-    pub fn set_name(&mut self, name: Option<GlobalSymbol>) {
-        self.name = name;
-    }
-
-    /// Set the compile-stage ID for this context.
-    pub fn set_stage_id(&mut self, id: Option<crate::node::function::CompileStage>) {
-        self.stage_id = id;
-    }
-
-    /// Set the policy controlling staged-function name/signature compatibility.
-    pub fn set_staged_name_policy(&mut self, policy: StagedNamePolicy) {
-        self.staged_name_policy = policy;
-    }
-
-    /// Get a mutable reference to the blocks arena.
-    pub fn block_arena_mut(&mut self) -> &mut Arena<Block, BlockInfo<L>> {
-        &mut self.blocks
-    }
-
-    /// Get a mutable reference to the statements arena.
-    pub fn statement_arena_mut(&mut self) -> &mut Arena<Statement, StatementInfo<L>> {
-        &mut self.statements
     }
 }
 
@@ -243,17 +145,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
             |_info| unsafe { std::mem::zeroed() },
         );
         Ok(StageInfo {
-            name: self.name,
-            stage_id: self.stage_id,
-            staged_functions: self.staged_functions,
-            staged_name_policy: self.staged_name_policy,
-            regions: self.regions,
-            blocks: self.blocks,
-            statements: self.statements,
+            nodes: self.nodes,
             ssas,
-            digraphs: self.digraphs,
-            ungraphs: self.ungraphs,
-            symbols: self.symbols,
         })
     }
 
@@ -302,17 +195,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
             |_info| unsafe { std::mem::zeroed() },
         );
         StageInfo {
-            name: self.name,
-            stage_id: self.stage_id,
-            staged_functions: self.staged_functions,
-            staged_name_policy: self.staged_name_policy,
-            regions: self.regions,
-            blocks: self.blocks,
-            statements: self.statements,
+            nodes: self.nodes,
             ssas,
-            digraphs: self.digraphs,
-            ungraphs: self.ungraphs,
-            symbols: self.symbols,
         }
     }
 }
