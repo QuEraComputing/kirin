@@ -36,7 +36,7 @@ impl<'a, L: Dialect> RegionBuilder<'a, L> {
             .blocks(self.stage.link_blocks(&self.blocks))
             .maybe_parent(self.parent)
             .new();
-        self.stage.0.regions.alloc(info);
+        self.stage.regions.alloc(info);
         id
     }
 }

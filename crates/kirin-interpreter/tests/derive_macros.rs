@@ -88,7 +88,7 @@ fn build_add_one_eval_call(
         let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
-        let x: SSAValue = entry.expect_info(b).arguments[0].into();
+        let x: SSAValue = b.block_arena()[entry].arguments[0].into();
 
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let sum = Arith::<ArithType>::op_add(b, x, c1.result);
@@ -99,9 +99,9 @@ fn build_add_one_eval_call(
         {
             use kirin_ir::query::ParentInfo;
             let br_stmt: Statement = br.into();
-            *br_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+            *b.statement_arena_mut()[br_stmt].get_parent_mut() =
                 Some(StatementParent::Block(entry));
-            let entry_info = entry.get_info_mut(b.as_inner_mut()).unwrap();
+            let entry_info = b.block_arena_mut().get_mut(entry).unwrap();
             entry_info.terminator = Some(br_stmt);
         }
 
@@ -120,7 +120,7 @@ fn build_add_one_interpretable(
         let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
-        let x: SSAValue = entry.expect_info(b).arguments[0].into();
+        let x: SSAValue = b.block_arena()[entry].arguments[0].into();
 
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let sum = Arith::<ArithType>::op_add(b, x, c1.result);
@@ -131,9 +131,9 @@ fn build_add_one_interpretable(
         {
             use kirin_ir::query::ParentInfo;
             let br_stmt: Statement = br.into();
-            *br_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+            *b.statement_arena_mut()[br_stmt].get_parent_mut() =
                 Some(StatementParent::Block(entry));
-            let entry_info = entry.get_info_mut(b.as_inner_mut()).unwrap();
+            let entry_info = b.block_arena_mut().get_mut(entry).unwrap();
             entry_info.terminator = Some(br_stmt);
         }
 

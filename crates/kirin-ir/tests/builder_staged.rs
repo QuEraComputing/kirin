@@ -146,6 +146,7 @@ fn redefine_specialization_invalidates_and_registers() {
 
     let spec2 = stage.redefine_specialization(err);
 
+    let stage = stage.into_inner();
     let old = spec1.get_info(&stage).unwrap();
     assert!(old.is_invalidated());
 
@@ -169,6 +170,7 @@ fn redefine_staged_function_invalidates_and_registers() {
 
     let sf2 = stage.redefine_staged_function(err);
 
+    let stage = stage.into_inner();
     let old_info = sf1.get_info(&stage).unwrap();
     assert!(old_info.is_invalidated());
 
@@ -211,6 +213,7 @@ fn staged_function_all_matching_returns_most_specific() {
         .new()
         .unwrap();
 
+    let stage = stage.into_inner();
     let sf_info = sf.get_info(&stage).unwrap();
 
     let matches = sf_info.all_matching::<ExactSemantics>(&sig_i32);
@@ -242,6 +245,7 @@ fn staged_function_all_matching_excludes_invalidated() {
         .expect_err("duplicate");
     let _spec2 = stage.redefine_specialization(err);
 
+    let stage = stage.into_inner();
     let sf_info = sf.get_info(&stage).unwrap();
     let matches = sf_info.all_matching::<ExactSemantics>(&default_sig);
 

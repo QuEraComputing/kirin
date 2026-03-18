@@ -17,23 +17,31 @@ fn strip_trailing_whitespace(s: &str) -> String {
     res
 }
 
+/// Create a dummy block argument SSA kind for test operand SSAs.
+fn test_ssa_kind(block: Block) -> BuilderSSAKind {
+    BuilderSSAKind::BlockArgument(block, 0)
+}
+
 /// Test roundtrip: parse -> emit -> print should produce output matching input.
 #[test]
 fn test_roundtrip_add() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
+
+    // Create a dummy block so block argument SSAs have a valid owner
+    let _dummy = stage.block().new();
 
     // Create operand SSAs with types
     let ssa_a = stage
         .ssa()
         .name("a".to_string())
         .ty(SimpleType::I64)
-        .kind(BuilderSSAKind::Test)
+        .kind(test_ssa_kind(_dummy))
         .new();
     let ssa_b = stage
         .ssa()
         .name("b".to_string())
         .ty(SimpleType::I64)
-        .kind(BuilderSSAKind::Test)
+        .kind(test_ssa_kind(_dummy))
         .new();
 
     // Parse - type annotation in input
@@ -46,6 +54,9 @@ fn test_roundtrip_add() {
     emit_ctx.register_ssa("b".to_string(), ssa_b);
 
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
+
+    // Convert to StageInfo for querying
+    let stage = stage.into_inner();
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -53,11 +64,7 @@ fn test_roundtrip_add() {
     if let SimpleLanguage::Add(_, _, res) = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
         let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
-        assert_eq!(
-            res_info.ty(),
-            Some(&SimpleType::F64),
-            "Result type should be F64"
-        );
+        assert_eq!(res_info.ty(), &SimpleType::F64, "Result type should be F64");
     }
 
     // Pretty print directly using the trait
@@ -87,6 +94,9 @@ fn test_roundtrip_constant() {
     // Emit
     let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
+
+    // Convert to StageInfo for querying
+    let stage = stage.into_inner();
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -94,11 +104,7 @@ fn test_roundtrip_constant() {
     if let SimpleLanguage::Constant(_, res) = dialect {
         let res_ssa: kirin_ir::SSAValue = (*res).into();
         let res_info = res_ssa.get_info(&stage).expect("result SSA should exist");
-        assert_eq!(
-            res_info.ty(),
-            Some(&SimpleType::F64),
-            "Result type should be F64"
-        );
+        assert_eq!(res_info.ty(), &SimpleType::F64, "Result type should be F64");
     }
 
     // Pretty print
@@ -121,12 +127,15 @@ fn test_roundtrip_return() {
 
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
+    // Create a dummy block so block argument SSAs have a valid owner
+    let _dummy = stage.block().new();
+
     // Create operand SSA
     let ssa_v = stage
         .ssa()
         .name("v".to_string())
         .ty(SimpleType::I64)
-        .kind(BuilderSSAKind::Test)
+        .kind(test_ssa_kind(_dummy))
         .new();
 
     // Parse
@@ -138,6 +147,9 @@ fn test_roundtrip_return() {
     emit_ctx.register_ssa("v".to_string(), ssa_v);
 
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
+
+    // Convert to StageInfo for querying and pretty printing
+    let stage = stage.into_inner();
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -155,15 +167,10 @@ fn test_roundtrip_return() {
 }
 
 /// Test roundtrip for a full function with region containing multiple blocks and statements.
-///
-/// Note: This test verifies that parsing and emitting functions with regions works correctly.
-/// The exact output format may differ from input due to Block/Region pretty printing details
-/// (e.g., block names, result alignment), but the core structure is preserved.
 #[test]
 fn test_roundtrip_function() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
-    // Parse a function with a region containing a block with multiple statements
     let input = r#"%f = function {
     ^entry(%x: f64) {
         %y = add %x, %x -> f64;
@@ -180,6 +187,7 @@ fn test_roundtrip_function() {
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
     // Pretty print using Document method
+    let stage = stage.into_inner_with_placeholder();
     let doc = Document::new(Config::default(), &stage);
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;
@@ -202,14 +210,10 @@ fn test_roundtrip_function() {
 }
 
 /// Test roundtrip for a function with multiple blocks in the region.
-///
-/// Note: This test verifies that parsing and emitting functions with multiple blocks works.
-/// The exact output format may differ from input due to Block/Region pretty printing details.
 #[test]
 fn test_roundtrip_function_multiple_blocks() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
-    // Parse a function with a region containing multiple blocks
     let input = r#"%f = function {
     ^entry(%x: f64) {
         %y = add %x, %x -> f64;
@@ -232,6 +236,7 @@ fn test_roundtrip_function_multiple_blocks() {
         tab_spaces: 4,
         ..Default::default()
     };
+    let stage = stage.into_inner();
     let doc = Document::new(config, &stage);
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;

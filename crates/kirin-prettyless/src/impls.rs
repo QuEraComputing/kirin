@@ -1,8 +1,8 @@
 //! PrettyPrint implementations for IR types.
 
 use kirin_ir::{
-    BuilderSSAInfo, Dialect, GetInfo, GlobalSymbol, Item, ResultValue, SSAValue,
-    SpecializedFunction, StagedFunction, Successor, Symbol,
+    Dialect, GetInfo, GlobalSymbol, Item, ResultValue, SSAInfo, SSAValue, SpecializedFunction,
+    StagedFunction, Successor, Symbol,
 };
 use prettyless::DocAllocator;
 
@@ -33,7 +33,7 @@ impl PrettyPrint for ResultValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info: &Item<BuilderSSAInfo<L>> = self.expect_info(doc.stage());
+        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
         if let Some(name) = info.name()
             && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
         {
@@ -49,11 +49,8 @@ impl PrettyPrint for ResultValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info: &Item<BuilderSSAInfo<L>> = self.expect_info(doc.stage());
-        doc.text(match info.ty() {
-            Some(ty) => format!("{}", ty),
-            None => "?".to_string(),
-        })
+        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
+        doc.text(format!("{}", info.ty()))
     }
 }
 
@@ -99,10 +96,7 @@ impl PrettyPrint for SSAValue {
         L::Type: std::fmt::Display,
     {
         let info = self.expect_info(doc.stage());
-        doc.text(match info.ty() {
-            Some(ty) => format!("{}", ty),
-            None => "?".to_string(),
-        })
+        doc.text(format!("{}", info.ty()))
     }
 }
 

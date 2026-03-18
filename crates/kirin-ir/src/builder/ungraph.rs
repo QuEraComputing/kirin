@@ -84,11 +84,11 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.0.symbols.intern(n)),
+                name.map(|n| self.stage.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
-            self.stage.0.ssas.alloc(ssa);
+            self.stage.ssas.alloc(ssa);
             all_ports.push(port);
         }
         for (i, (ty, name)) in self.captures.into_iter().enumerate() {
@@ -96,11 +96,11 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.0.symbols.intern(n)),
+                name.map(|n| self.stage.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
-            self.stage.0.ssas.alloc(ssa);
+            self.stage.ssas.alloc(ssa);
             all_ports.push(port);
         }
 
@@ -169,10 +169,10 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             }
         }
         for (&old, _) in &replacements {
-            self.stage.0.ssas.delete(old);
+            self.stage.ssas.delete(old);
         }
         for &stmt_id in &all_stmts {
-            let info = &mut self.stage.0.statements[stmt_id];
+            let info = &mut self.stage.statements[stmt_id];
             for arg in info.definition.arguments_mut() {
                 if let Some(&replacement) = replacements.get(arg) {
                     *arg = replacement;
@@ -316,13 +316,13 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
         let edge_stmts = bfs_edge_order;
 
         for &stmt_id in &reordered_nodes {
-            self.stage.0.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
+            self.stage.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
         }
         for &stmt_id in &edge_stmts {
-            self.stage.0.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
+            self.stage.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
         }
 
-        let name_symbol = self.name.map(|n| self.stage.0.symbols.intern(n));
+        let name_symbol = self.name.map(|n| self.stage.symbols.intern(n));
         let info = UnGraphInfo::new(
             id,
             self.parent,
@@ -332,7 +332,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             graph,
             edge_stmts,
         );
-        self.stage.0.ungraphs.alloc(info);
+        self.stage.ungraphs.alloc(info);
         id
     }
 }

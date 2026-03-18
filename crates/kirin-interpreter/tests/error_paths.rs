@@ -52,8 +52,8 @@ fn build_recursive_func(
         let call_block = b.block().argument(ArithType::I64).new();
         let exit_block = b.block().new();
 
-        let x: SSAValue = entry.expect_info(b).arguments[0].into();
-        let call_arg: SSAValue = call_block.expect_info(b).arguments[0].into();
+        let x: SSAValue = b.block_arena()[entry].arguments[0].into();
+        let call_arg: SSAValue = b.block_arena()[call_block].arguments[0].into();
 
         // exit_block: c0 = const 0; ret c0
         let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
@@ -61,14 +61,14 @@ fn build_recursive_func(
         {
             let stmts: Vec<Statement> = vec![c0.into()];
             for stmt in &stmts {
-                *stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                *b.statement_arena_mut()[*stmt].get_parent_mut() =
                     Some(StatementParent::Block(exit_block));
             }
             let linked = b.link_statements(&stmts);
             let ret_stmt: Statement = ret0.into();
-            *ret_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+            *b.statement_arena_mut()[ret_stmt].get_parent_mut() =
                 Some(StatementParent::Block(exit_block));
-            let exit_info = exit_block.get_info_mut(b.as_inner_mut()).unwrap();
+            let exit_info = b.block_arena_mut().get_mut(exit_block).unwrap();
             exit_info.statements = linked;
             exit_info.terminator = Some(ret_stmt);
         }
@@ -79,13 +79,13 @@ fn build_recursive_func(
         let ret_call = Return::<ArithType>::new(b, call.res);
         {
             let call_stmt: Statement = call.into();
-            *call_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+            *b.statement_arena_mut()[call_stmt].get_parent_mut() =
                 Some(StatementParent::Block(call_block));
             let linked = b.link_statements(&[call_stmt]);
             let ret_stmt: Statement = ret_call.into();
-            *ret_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+            *b.statement_arena_mut()[ret_stmt].get_parent_mut() =
                 Some(StatementParent::Block(call_block));
-            let call_info = call_block.get_info_mut(b.as_inner_mut()).unwrap();
+            let call_info = b.block_arena_mut().get_mut(call_block).unwrap();
             call_info.statements = linked;
             call_info.terminator = Some(ret_stmt);
         }
@@ -104,14 +104,14 @@ fn build_recursive_func(
         {
             let stmts: Vec<Statement> = vec![c1.into(), dec.into()];
             for stmt in &stmts {
-                *stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                *b.statement_arena_mut()[*stmt].get_parent_mut() =
                     Some(StatementParent::Block(entry));
             }
             let linked = b.link_statements(&stmts);
             let cond_stmt: Statement = cond.into();
-            *cond_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+            *b.statement_arena_mut()[cond_stmt].get_parent_mut() =
                 Some(StatementParent::Block(entry));
-            let entry_info = entry.get_info_mut(b.as_inner_mut()).unwrap();
+            let entry_info = b.block_arena_mut().get_mut(entry).unwrap();
             entry_info.statements = linked;
             entry_info.terminator = Some(cond_stmt);
         }

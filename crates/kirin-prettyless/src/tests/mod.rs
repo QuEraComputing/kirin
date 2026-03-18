@@ -1,6 +1,6 @@
 //! Integration and unit tests for pretty printing.
 
-use kirin_ir::{Block, BuilderStageInfo, Dialect, GlobalSymbol, InternTable, Pipeline};
+use kirin_ir::{Block, BuilderStageInfo, Dialect, GlobalSymbol, InternTable, Pipeline, StageInfo};
 use kirin_test_languages::*;
 use prettyless::DocAllocator;
 
@@ -33,7 +33,7 @@ impl PrettyPrint for SimpleLanguage {
 }
 
 fn create_test_function() -> (
-    BuilderStageInfo<SimpleLanguage>,
+    StageInfo<SimpleLanguage>,
     InternTable<String, GlobalSymbol>,
     kirin_ir::SpecializedFunction,
 ) {
@@ -86,7 +86,7 @@ fn create_test_function() -> (
         .new()
         .unwrap();
 
-    (stage, gs, f)
+    (stage.into_inner(), gs, f)
 }
 
 include!("snapshot.rs");

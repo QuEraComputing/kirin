@@ -118,6 +118,7 @@ fn print_digraph_simple() {
         .yield_value(b.result.into())
         .new();
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_digraph(&dg);
     let mut buf = String::new();
@@ -151,6 +152,7 @@ fn print_digraph_with_captures() {
         .yield_value(b.result.into())
         .new();
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_digraph(&dg);
     let mut buf = String::new();
@@ -179,6 +181,7 @@ fn print_digraph_named() {
         .yield_value(b.result.into())
         .new();
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_digraph(&dg);
     let mut buf = String::new();
@@ -254,6 +257,7 @@ fn print_ungraph_simple() {
         .node(n1)
         .new();
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_ungraph(&ug);
     let mut buf = String::new();
@@ -288,6 +292,7 @@ fn print_ungraph_with_captures() {
         .node(n1)
         .new();
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_ungraph(&ug);
     let mut buf = String::new();
@@ -317,6 +322,7 @@ fn print_ungraph_named() {
         .node(n1)
         .new();
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_ungraph(&ug);
     let mut buf = String::new();
@@ -379,6 +385,7 @@ fn print_ungraph_nested_compound() {
         .new();
 
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_ungraph(&ug);
     let mut buf = String::new();

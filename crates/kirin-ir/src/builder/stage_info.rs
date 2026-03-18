@@ -1,10 +1,13 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
-use std::ops::Deref;
 
+use crate::arena::Arena;
+use crate::node::digraph::{DiGraph, DiGraphInfo};
+use crate::node::region::RegionInfo;
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, SSAValue};
 use crate::node::stmt::StatementParent;
-use crate::{Dialect, StageInfo, node::*};
+use crate::node::ungraph::{UnGraph, UnGraphInfo};
+use crate::{Dialect, InternTable, StageInfo, node::*};
 
 /// Error returned by [`BuilderStageInfo::finalize`] when build-time SSAs
 /// have not been resolved.
@@ -38,84 +41,185 @@ impl fmt::Display for FinalizeError {
 
 impl std::error::Error for FinalizeError {}
 
-/// A builder wrapper around [`StageInfo`] that provides the mutable builder API.
+/// A builder for constructing IR, with a separate SSA arena using [`BuilderSSAInfo`].
 ///
 /// `BuilderStageInfo` provides the builder API surface for constructing IR:
 /// creating SSA values, statements, blocks, regions, graphs, staged functions,
-/// and specializations. The inner [`StageInfo`] is accessible via [`Deref`] for
-/// read-only access (queries, `GetInfo`, iteration).
+/// and specializations. The SSA arena holds [`BuilderSSAInfo`] (with `Option<L::Type>`
+/// and [`BuilderSSAKind`]) during construction.
 ///
-/// Mutable builder operations (creating nodes, linking, attaching) are only
-/// available through `BuilderStageInfo` methods, not through `DerefMut`.
-///
-/// Call [`finalize`](BuilderStageInfo::finalize) to validate the IR and obtain
-/// the underlying `StageInfo`. Use [`into_inner`](BuilderStageInfo::into_inner)
-/// to skip validation (escape hatch for tests and intermediate transforms).
-pub struct BuilderStageInfo<L: Dialect>(pub(crate) StageInfo<L>);
+/// Call [`finalize`](BuilderStageInfo::finalize) to validate SSAs and convert to
+/// a [`StageInfo`] with clean [`SSAInfo`](crate::node::ssa::SSAInfo) values.
+/// Use [`into_inner`](BuilderStageInfo::into_inner) to skip validation (escape
+/// hatch for tests and intermediate transforms).
+pub struct BuilderStageInfo<L: Dialect> {
+    pub(crate) name: Option<GlobalSymbol>,
+    pub(crate) stage_id: Option<crate::node::function::CompileStage>,
+    pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
+    pub(crate) staged_name_policy: StagedNamePolicy,
+    pub(crate) regions: Arena<Region, RegionInfo<L>>,
+    pub(crate) blocks: Arena<Block, BlockInfo<L>>,
+    pub(crate) statements: Arena<Statement, StatementInfo<L>>,
+    pub(crate) ssas: Arena<SSAValue, BuilderSSAInfo<L>>,
+    pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
+    pub(crate) ungraphs: Arena<UnGraph, UnGraphInfo<L>>,
+    pub(crate) symbols: InternTable<String, Symbol>,
+}
 
 impl<L: Dialect> Default for BuilderStageInfo<L> {
     fn default() -> Self {
-        Self(StageInfo::default())
+        Self {
+            name: None,
+            stage_id: None,
+            staged_functions: Arena::default(),
+            staged_name_policy: StagedNamePolicy::default(),
+            regions: Arena::default(),
+            blocks: Arena::default(),
+            statements: Arena::default(),
+            ssas: Arena::default(),
+            digraphs: Arena::default(),
+            ungraphs: Arena::default(),
+            symbols: InternTable::default(),
+        }
     }
 }
 
 impl<L: Dialect> fmt::Debug for BuilderStageInfo<L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("BuilderStageInfo").field(&self.0).finish()
-    }
-}
-
-impl<L: Dialect> Deref for BuilderStageInfo<L> {
-    type Target = StageInfo<L>;
-    fn deref(&self) -> &StageInfo<L> {
-        &self.0
+        f.debug_struct("BuilderStageInfo")
+            .field("name", &self.name)
+            .field("stage_id", &self.stage_id)
+            .finish_non_exhaustive()
     }
 }
 
 impl<L: Dialect> From<StageInfo<L>> for BuilderStageInfo<L> {
     fn from(stage: StageInfo<L>) -> Self {
-        Self(stage)
+        Self {
+            name: stage.name,
+            stage_id: stage.stage_id,
+            staged_functions: stage.staged_functions,
+            staged_name_policy: stage.staged_name_policy,
+            regions: stage.regions,
+            blocks: stage.blocks,
+            statements: stage.statements,
+            ssas: stage.ssas.map(|info| BuilderSSAInfo::from(info)),
+            digraphs: stage.digraphs,
+            ungraphs: stage.ungraphs,
+            symbols: stage.symbols,
+        }
     }
 }
 
-// ---- Accessor methods for mutable builder access ----
+// ---- Read-only accessor methods ----
+
+impl<L: Dialect> BuilderStageInfo<L> {
+    /// Get the optional stage name for this context.
+    pub fn name(&self) -> Option<GlobalSymbol> {
+        self.name
+    }
+
+    /// Get the compile-stage ID assigned by the pipeline, if any.
+    pub fn stage_id(&self) -> Option<crate::node::function::CompileStage> {
+        self.stage_id
+    }
+
+    /// Get a reference to the statements arena.
+    pub fn statement_arena(&self) -> &Arena<Statement, StatementInfo<L>> {
+        &self.statements
+    }
+
+    /// Get a reference to the SSA values arena (builder variant).
+    pub fn ssa_arena(&self) -> &Arena<SSAValue, BuilderSSAInfo<L>> {
+        &self.ssas
+    }
+
+    /// Get a reference to the symbols intern table.
+    pub fn symbol_table(&self) -> &InternTable<String, Symbol> {
+        &self.symbols
+    }
+
+    /// Get a reference to the staged functions arena.
+    pub fn staged_function_arena(&self) -> &Arena<StagedFunction, StagedFunctionInfo<L>> {
+        &self.staged_functions
+    }
+
+    /// Get the policy controlling staged-function name/signature compatibility.
+    pub fn staged_name_policy(&self) -> StagedNamePolicy {
+        self.staged_name_policy
+    }
+
+    /// Get a reference to the regions arena.
+    pub fn region_arena(&self) -> &Arena<Region, RegionInfo<L>> {
+        &self.regions
+    }
+
+    /// Get a reference to the blocks arena.
+    pub fn block_arena(&self) -> &Arena<Block, BlockInfo<L>> {
+        &self.blocks
+    }
+
+    /// Get a reference to the directed graph arena.
+    pub fn digraph_arena(&self) -> &Arena<DiGraph, DiGraphInfo<L>> {
+        &self.digraphs
+    }
+
+    /// Get a reference to the undirected graph arena.
+    pub fn ungraph_arena(&self) -> &Arena<UnGraph, UnGraphInfo<L>> {
+        &self.ungraphs
+    }
+}
+
+// ---- Mutable accessor methods for builder access ----
 
 impl<L: Dialect> BuilderStageInfo<L> {
     /// Get a mutable reference to the SSA values arena (builder variant).
-    pub fn ssa_arena_mut(&mut self) -> &mut crate::arena::Arena<SSAValue, BuilderSSAInfo<L>> {
-        &mut self.0.ssas
+    pub fn ssa_arena_mut(&mut self) -> &mut Arena<SSAValue, BuilderSSAInfo<L>> {
+        &mut self.ssas
     }
 
     /// Get a mutable reference to the symbols intern table.
-    pub fn symbol_table_mut(&mut self) -> &mut crate::InternTable<String, Symbol> {
-        &mut self.0.symbols
+    pub fn symbol_table_mut(&mut self) -> &mut InternTable<String, Symbol> {
+        &mut self.symbols
     }
 
     /// Set the stage name for this context.
     pub fn set_name(&mut self, name: Option<GlobalSymbol>) {
-        self.0.name = name;
+        self.name = name;
     }
 
     /// Set the compile-stage ID for this context.
     pub fn set_stage_id(&mut self, id: Option<crate::node::function::CompileStage>) {
-        self.0.stage_id = id;
+        self.stage_id = id;
     }
 
     /// Set the policy controlling staged-function name/signature compatibility.
     pub fn set_staged_name_policy(&mut self, policy: StagedNamePolicy) {
-        self.0.staged_name_policy = policy;
+        self.staged_name_policy = policy;
+    }
+
+    /// Get a mutable reference to the blocks arena.
+    pub fn block_arena_mut(&mut self) -> &mut Arena<Block, BlockInfo<L>> {
+        &mut self.blocks
+    }
+
+    /// Get a mutable reference to the statements arena.
+    pub fn statement_arena_mut(&mut self) -> &mut Arena<Statement, StatementInfo<L>> {
+        &mut self.statements
     }
 }
 
 // ---- Finalization ----
 
 impl<L: Dialect> BuilderStageInfo<L> {
-    /// Validate the IR and return the underlying [`StageInfo`].
+    /// Validate the IR and return a [`StageInfo`] with clean SSA types.
     ///
     /// Checks that no `BuilderSSAKind::Unresolved` or `BuilderSSAKind::Test` values remain,
-    /// and that all SSAs have types set.
+    /// and that all SSAs have types set. Converts the SSA arena from [`BuilderSSAInfo`]
+    /// to [`SSAInfo`](crate::node::ssa::SSAInfo).
     pub fn finalize(self) -> Result<StageInfo<L>, FinalizeError> {
-        for ssa_info in self.0.ssas.iter() {
+        // Validate all SSAs first
+        for ssa_info in self.ssas.iter() {
             match ssa_info.builder_kind() {
                 BuilderSSAKind::Unresolved(_) => {
                     return Err(FinalizeError::UnresolvedSSA(ssa_info.id()));
@@ -129,23 +233,153 @@ impl<L: Dialect> BuilderStageInfo<L> {
                 return Err(FinalizeError::MissingType(ssa_info.id()));
             }
         }
-        Ok(self.0)
+        // All live SSAs are valid — infallible conversion.
+        // Deleted SSAs may have unresolved kinds, so use map_live to handle
+        // them separately. Deleted items are never accessed through public APIs.
+        let ssas = self.ssas.map_live(
+            |info| {
+                info.finalize()
+                    .expect("finalize: SSA validation passed but conversion failed")
+            },
+            // SAFETY: deleted items are tombstoned and never dereferenced.
+            |_info| unsafe { std::mem::zeroed() },
+        );
+        Ok(StageInfo {
+            name: self.name,
+            stage_id: self.stage_id,
+            staged_functions: self.staged_functions,
+            staged_name_policy: self.staged_name_policy,
+            regions: self.regions,
+            blocks: self.blocks,
+            statements: self.statements,
+            ssas,
+            digraphs: self.digraphs,
+            ungraphs: self.ungraphs,
+            symbols: self.symbols,
+        })
     }
 
     /// Return the underlying [`StageInfo`] without validation.
     ///
     /// This is an escape hatch for tests and intermediate transforms that
-    /// do not require finalization guarantees.
+    /// do not require finalization guarantees. Panics if any SSA value has
+    /// an unresolved kind or missing type.
     pub fn into_inner(self) -> StageInfo<L> {
-        self.0
+        let ssas = self.ssas.map_live(
+            |info| {
+                // Best-effort conversion: preserve as much info as possible
+                // even when type or kind is incomplete (e.g., parser emit).
+                let id = info.id;
+                let name = info.name;
+                let kind = info
+                    .kind
+                    .as_resolved()
+                    .unwrap_or(crate::node::ssa::SSAKind::Result(
+                        crate::node::stmt::Statement(crate::arena::Id(0)),
+                        0,
+                    ));
+                let uses = info.uses;
+                match info.ty {
+                    Some(ty) => crate::node::ssa::SSAInfo {
+                        id,
+                        name,
+                        ty,
+                        kind,
+                        uses,
+                    },
+                    None => {
+                        // SAFETY: The type field is zeroed. This SSA will render
+                        // as a placeholder type. The SSA is structurally valid
+                        // (id, name, kind, uses are preserved).
+                        let mut ssa_info: crate::node::ssa::SSAInfo<L> =
+                            unsafe { std::mem::zeroed() };
+                        ssa_info.id = id;
+                        ssa_info.name = name;
+                        ssa_info.kind = kind;
+                        ssa_info.uses = uses;
+                        ssa_info
+                    }
+                }
+            },
+            // SAFETY: deleted items are tombstoned and never dereferenced.
+            |_info| unsafe { std::mem::zeroed() },
+        );
+        StageInfo {
+            name: self.name,
+            stage_id: self.stage_id,
+            staged_functions: self.staged_functions,
+            staged_name_policy: self.staged_name_policy,
+            regions: self.regions,
+            blocks: self.blocks,
+            statements: self.statements,
+            ssas,
+            digraphs: self.digraphs,
+            ungraphs: self.ungraphs,
+            symbols: self.symbols,
+        }
     }
 
-    /// Get a mutable reference to the underlying [`StageInfo`].
+    /// Return the underlying [`StageInfo`] without validation, using placeholder
+    /// types for SSA values that lack type annotations.
     ///
-    /// This is an escape hatch for post-build mutations (e.g., `detach`)
-    /// that operate on `&mut StageInfo<L>` directly.
-    pub fn as_inner_mut(&mut self) -> &mut StageInfo<L> {
-        &mut self.0
+    /// Requires `L::Type: Placeholder`. Use this when the builder may contain
+    /// SSAs with `None` types (e.g., parser output with unresolved type annotations).
+    pub fn into_inner_with_placeholder(self) -> StageInfo<L>
+    where
+        L::Type: crate::Placeholder,
+    {
+        let ssas = self.ssas.map_live(
+            |mut info| {
+                let id = info.id();
+                let name = info.name();
+                let ty = info
+                    .ty
+                    .take()
+                    .unwrap_or_else(|| crate::Placeholder::placeholder());
+                let kind = info.builder_kind().as_resolved().unwrap_or_else(|| {
+                    panic!(
+                        "into_inner_with_placeholder: SSA {:?} has unresolved kind {:?}",
+                        id,
+                        info.builder_kind()
+                    )
+                });
+                crate::node::ssa::SSAInfo::new(id, name, ty, kind)
+            },
+            // SAFETY: deleted items are tombstoned and never dereferenced.
+            |_info| unsafe { std::mem::zeroed() },
+        );
+        StageInfo {
+            name: self.name,
+            stage_id: self.stage_id,
+            staged_functions: self.staged_functions,
+            staged_name_policy: self.staged_name_policy,
+            regions: self.regions,
+            blocks: self.blocks,
+            statements: self.statements,
+            ssas,
+            digraphs: self.digraphs,
+            ungraphs: self.ungraphs,
+            symbols: self.symbols,
+        }
+    }
+}
+
+// ---- Inner StageInfo access ----
+
+impl<L: Dialect> BuilderStageInfo<L> {
+    /// Temporarily convert to a [`StageInfo`] for read-only queries, then
+    /// convert back.
+    ///
+    /// This enables using `GetInfo`, `expect_info`, `block.statements()`, and
+    /// other `StageInfo`-based APIs from builder code. The O(n) cost of
+    /// converting the SSA arena in each direction is acceptable for test and
+    /// diagnostic paths.
+    pub fn with_inner<R>(&mut self, f: impl FnOnce(&mut StageInfo<L>) -> R) -> R {
+        let builder = std::mem::take(self);
+        let mut inner = builder.into_inner();
+        let result = f(&mut inner);
+        *self = BuilderStageInfo::from(inner);
+        result
     }
 }
 
@@ -160,40 +394,39 @@ impl<L: Dialect> BuilderStageInfo<L> {
         terminator: Option<Statement>,
     ) {
         for &stmt in stmts {
-            self.0.statements[stmt].parent = Some(StatementParent::Block(block));
+            self.statements[stmt].parent = Some(StatementParent::Block(block));
         }
         if let Some(term) = terminator {
-            self.0.statements[term].parent = Some(StatementParent::Block(block));
+            self.statements[term].parent = Some(StatementParent::Block(block));
         }
         let linked = self.link_statements(stmts);
-        let block_info = &mut self.0.blocks[block];
+        let block_info = &mut self.blocks[block];
         block_info.statements = linked;
         block_info.terminator = terminator;
     }
 
     /// Move `real` block payload into `stub`, preserving external block IDs.
     pub fn remap_block_identity(&mut self, stub: Block, real: Block) {
-        let mut real_info: BlockInfo<L> = (*self.0.blocks[real]).clone();
+        let mut real_info: BlockInfo<L> = (*self.blocks[real]).clone();
 
         // Collect statements by walking the linked list directly
         let mut statements = Vec::new();
         let mut current = real_info.statements.head().copied();
         while let Some(stmt) = current {
             statements.push(stmt);
-            current = self.0.statements[stmt].node.next;
+            current = self.statements[stmt].node.next;
         }
         let terminator = real_info.terminator;
 
         for stmt in statements {
-            self.0.statements[stmt].parent = Some(StatementParent::Block(stub));
+            self.statements[stmt].parent = Some(StatementParent::Block(stub));
         }
         if let Some(term) = terminator {
-            self.0.statements[term].parent = Some(StatementParent::Block(stub));
+            self.statements[term].parent = Some(StatementParent::Block(stub));
         }
 
         for (idx, arg) in real_info.arguments.iter().copied().enumerate() {
             let arg_info = self
-                .0
                 .ssas
                 .get_mut(arg)
                 .expect("block argument SSA not found in builder stage");
@@ -207,8 +440,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
 
         real_info.node.ptr = stub;
-        *self.0.blocks[stub] = real_info;
-        self.0.blocks.delete(real);
+        *self.blocks[stub] = real_info;
+        self.blocks.delete(real);
     }
 
     /// Attach node statements and yield values to an existing digraph.
@@ -218,7 +451,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         nodes: &[Statement],
         yields: &[SSAValue],
     ) {
-        let dg_info = &self.0.digraphs[dg];
+        let dg_info = &self.digraphs[dg];
         let id = dg_info.id();
 
         let mut stmt_to_node: HashMap<Statement, petgraph::graph::NodeIndex> = HashMap::new();
@@ -229,14 +462,10 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
         for &stmt_id in nodes {
             let consumer_ni = stmt_to_node[&stmt_id];
-            let info = &self.0.statements[stmt_id];
+            let info = &self.statements[stmt_id];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
-                let ssa_info = self
-                    .0
-                    .ssas
-                    .get(operand)
-                    .expect("SSAValue not found in stage");
+                let ssa_info = self.ssas.get(operand).expect("SSAValue not found in stage");
                 if let BuilderSSAKind::Result(producer_stmt, _) = ssa_info.kind
                     && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
                 {
@@ -245,10 +474,10 @@ impl<L: Dialect> BuilderStageInfo<L> {
             }
         }
         for &stmt_id in nodes {
-            let info = &mut self.0.statements[stmt_id];
+            let info = &mut self.statements[stmt_id];
             info.parent = Some(StatementParent::DiGraph(id));
         }
-        let dg_info = &mut self.0.digraphs[dg];
+        let dg_info = &mut self.digraphs[dg];
         dg_info.graph = graph;
         dg_info.yields = yields.to_vec();
     }
@@ -260,14 +489,14 @@ impl<L: Dialect> BuilderStageInfo<L> {
         edge_stmts: &[Statement],
         node_stmts: &[Statement],
     ) {
-        let ug_info = &self.0.ungraphs[ug];
+        let ug_info = &self.ungraphs[ug];
         let id = ug_info.id();
         let edge_count = ug_info.edge_count();
         let all_ports: Vec<crate::node::port::Port> = ug_info.ports().to_vec();
 
         let mut edge_ssa_set: HashSet<SSAValue> = HashSet::new();
         for &edge_stmt in edge_stmts {
-            let info = &self.0.statements[edge_stmt];
+            let info = &self.statements[edge_stmt];
             for result in info.definition.results() {
                 edge_ssa_set.insert((*result).into());
             }
@@ -280,7 +509,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
 
         let mut edge_ssa_to_nodes: HashMap<SSAValue, Vec<Statement>> = HashMap::new();
         for &node_stmt in node_stmts {
-            let info = &self.0.statements[node_stmt];
+            let info = &self.statements[node_stmt];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
                 if edge_ssa_set.contains(&operand) || boundary_ssa_set.contains(&operand) {
@@ -322,13 +551,13 @@ impl<L: Dialect> BuilderStageInfo<L> {
 
         let mut ssa_to_edge_stmt: HashMap<SSAValue, Statement> = HashMap::new();
         for &edge_stmt in edge_stmts {
-            let info = &self.0.statements[edge_stmt];
+            let info = &self.statements[edge_stmt];
             for result in info.definition.results() {
                 ssa_to_edge_stmt.insert((*result).into(), edge_stmt);
             }
         }
         for &node_stmt in node_stmts {
-            let info = &self.0.statements[node_stmt];
+            let info = &self.statements[node_stmt];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             if operands.iter().any(|op| boundary_ssa_set.contains(op)) {
                 let ni = stmt_to_node[&node_stmt];
@@ -340,7 +569,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
         while let Some(ni) = queue.pop_front() {
             let stmt = graph[ni];
-            let info = &self.0.statements[stmt];
+            let info = &self.statements[stmt];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
                 if !visited_edges.contains(&operand) && edge_ssa_set.contains(&operand) {
@@ -390,12 +619,12 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
 
         for &stmt_id in &reordered_nodes {
-            self.0.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
+            self.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
         }
         for &stmt_id in &bfs_edge_order {
-            self.0.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
+            self.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
         }
-        let ug_info = &mut self.0.ungraphs[ug];
+        let ug_info = &mut self.ungraphs[ug];
         ug_info.graph = new_graph;
         ug_info.edge_statements = bfs_edge_order;
     }
@@ -404,16 +633,16 @@ impl<L: Dialect> BuilderStageInfo<L> {
         for window in ptrs.windows(2) {
             let current = window[0];
             let next = window[1];
-            let current_stmt = &mut self.0.statements[current];
+            let current_stmt = &mut self.statements[current];
             if let Some(next_node) = current_stmt.node.next {
-                let info = &self.0.statements[next_node];
+                let info = &self.statements[next_node];
                 panic!("Statement already has a next node: {:?}", info.definition);
             }
             current_stmt.node.next = Some(next);
 
-            let next_stmt = &mut self.0.statements[next];
+            let next_stmt = &mut self.statements[next];
             if let Some(prev_node) = next_stmt.node.prev {
-                let info = &self.0.statements[prev_node];
+                let info = &self.statements[prev_node];
                 panic!(
                     "Statement already has a previous node: {:?}",
                     info.definition
@@ -432,16 +661,16 @@ impl<L: Dialect> BuilderStageInfo<L> {
         for window in ptrs.windows(2) {
             let current = window[0];
             let next = window[1];
-            let current_block = &mut self.0.blocks[current];
+            let current_block = &mut self.blocks[current];
             if let Some(next_node) = current_block.node.next {
-                let info = &self.0.blocks[next_node];
+                let info = &self.blocks[next_node];
                 panic!("Block already has a next node: {:?}", info);
             }
             current_block.node.next = Some(next);
 
-            let next_block = &mut self.0.blocks[next];
+            let next_block = &mut self.blocks[next];
             if let Some(prev_node) = next_block.node.prev {
-                let info = &self.0.blocks[prev_node];
+                let info = &self.blocks[prev_node];
                 panic!("Block already has a previous node: {:?}", info);
             }
             next_block.node.prev = Some(current);

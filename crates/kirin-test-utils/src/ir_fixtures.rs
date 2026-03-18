@@ -105,25 +105,25 @@ pub fn build_select_program(
         let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
-        let x: SSAValue = entry.expect_info(b).arguments[0].into();
+        let x: SSAValue = b.block_arena()[entry].arguments[0].into();
 
         // truthy_block(val): ret val
         let truthy_block = b.block().argument(ArithType::I64).new();
-        let truthy_val: SSAValue = truthy_block.expect_info(b).arguments[0].into();
+        let truthy_val: SSAValue = b.block_arena()[truthy_block].arguments[0].into();
         let ret_truthy = Return::<ArithType>::new(b, truthy_val);
         {
             let truthy_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                truthy_block.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(truthy_block).unwrap();
             truthy_info.terminator = Some(ret_truthy.into());
         }
 
         // falsy_block(val): ret val
         let falsy_block = b.block().argument(ArithType::I64).new();
-        let falsy_val: SSAValue = falsy_block.expect_info(b).arguments[0].into();
+        let falsy_val: SSAValue = b.block_arena()[falsy_block].arguments[0].into();
         let ret_falsy = Return::<ArithType>::new(b, falsy_val);
         {
             let falsy_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                falsy_block.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(falsy_block).unwrap();
             falsy_info.terminator = Some(ret_falsy.into());
         }
 
@@ -142,17 +142,17 @@ pub fn build_select_program(
         {
             let stmts: Vec<Statement> = vec![c1.into(), sum.into(), c42.into()];
             for &s in &stmts {
-                let info = s.expect_info_mut(b.as_inner_mut());
+                let info = &mut b.statement_arena_mut()[s];
                 *info.get_parent_mut() = Some(StatementParent::Block(entry));
             }
             let linked = b.link_statements(&stmts);
 
             let cond_br_stmt: Statement = cond_br.into();
-            let info = cond_br_stmt.expect_info_mut(b.as_inner_mut());
+            let info = &mut b.statement_arena_mut()[cond_br_stmt];
             *info.get_parent_mut() = Some(StatementParent::Block(entry));
 
             let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                entry.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(entry).unwrap();
             entry_info.statements = linked;
             entry_info.terminator = Some(cond_br_stmt);
         }
@@ -184,25 +184,25 @@ pub fn build_branch_fork_program(
         let sf = b.staged_function().new().unwrap();
 
         let entry_block_node = b.block().argument(ArithType::I64).new();
-        let x: SSAValue = entry_block_node.expect_info(b).arguments[0].into();
+        let x: SSAValue = b.block_arena()[entry_block_node].arguments[0].into();
 
         // neg_block(val): ret val
         let neg_block = b.block().argument(ArithType::I64).new();
-        let neg_val: SSAValue = neg_block.expect_info(b).arguments[0].into();
+        let neg_val: SSAValue = b.block_arena()[neg_block].arguments[0].into();
         let ret_neg = Return::<ArithType>::new(b, neg_val);
         {
             let neg_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                neg_block.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(neg_block).unwrap();
             neg_info.terminator = Some(ret_neg.into());
         }
 
         // pos_block(val): ret val
         let pos_block = b.block().argument(ArithType::I64).new();
-        let pos_val: SSAValue = pos_block.expect_info(b).arguments[0].into();
+        let pos_val: SSAValue = b.block_arena()[pos_block].arguments[0].into();
         let ret_pos = Return::<ArithType>::new(b, pos_val);
         {
             let pos_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                pos_block.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(pos_block).unwrap();
             pos_info.terminator = Some(ret_pos.into());
         }
 
@@ -219,17 +219,17 @@ pub fn build_branch_fork_program(
         {
             let stmts: Vec<Statement> = vec![neg_result.into()];
             for &s in &stmts {
-                let info = s.expect_info_mut(b.as_inner_mut());
+                let info = &mut b.statement_arena_mut()[s];
                 *info.get_parent_mut() = Some(StatementParent::Block(entry_block_node));
             }
             let linked = b.link_statements(&stmts);
 
             let cond_br_stmt: Statement = cond_br.into();
-            let info = cond_br_stmt.expect_info_mut(b.as_inner_mut());
+            let info = &mut b.statement_arena_mut()[cond_br_stmt];
             *info.get_parent_mut() = Some(StatementParent::Block(entry_block_node));
 
             let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                entry_block_node.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(entry_block_node).unwrap();
             entry_info.statements = linked;
             entry_info.terminator = Some(cond_br_stmt);
         }
@@ -262,24 +262,24 @@ pub fn build_loop_program(
         let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
-        let x: SSAValue = entry.expect_info(b).arguments[0].into();
+        let x: SSAValue = b.block_arena()[entry].arguments[0].into();
 
         let header = b.block().argument(ArithType::I64).new();
-        let i: SSAValue = header.expect_info(b).arguments[0].into();
+        let i: SSAValue = b.block_arena()[header].arguments[0].into();
 
         // loop_exit(result): ret result
         let loop_exit = b.block().argument(ArithType::I64).new();
-        let exit_val: SSAValue = loop_exit.expect_info(b).arguments[0].into();
+        let exit_val: SSAValue = b.block_arena()[loop_exit].arguments[0].into();
         let ret_exit = Return::<ArithType>::new(b, exit_val);
         {
             let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                loop_exit.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(loop_exit).unwrap();
             exit_info.terminator = Some(ret_exit.into());
         }
 
         // loop_body(val): c1 = const 1; sum = add val, c1; br header(sum)
         let loop_body = b.block().argument(ArithType::I64).new();
-        let body_val: SSAValue = loop_body.expect_info(b).arguments[0].into();
+        let body_val: SSAValue = b.block_arena()[loop_body].arguments[0].into();
 
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let sum = kirin_arith::Arith::<ArithType>::op_add(b, body_val, c1.result);
@@ -291,19 +291,18 @@ pub fn build_loop_program(
         {
             let stmts: Vec<Statement> = vec![c1.into(), sum.into()];
             for &s in &stmts {
-                let info = s.expect_info_mut(b.as_inner_mut());
+                let info = &mut b.statement_arena_mut()[s];
                 *info.get_parent_mut() = Some(StatementParent::Block(loop_body));
             }
             let linked = b.link_statements(&stmts);
 
             let br_stmt: Statement = br_back.into();
-            br_stmt
-                .expect_info_mut(b.as_inner_mut())
+            b.statement_arena_mut()[br_stmt]
                 .get_parent_mut()
                 .replace(StatementParent::Block(loop_body));
 
             let body_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                loop_body.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(loop_body).unwrap();
             body_info.statements = linked;
             body_info.terminator = Some(br_stmt);
         }
@@ -313,12 +312,11 @@ pub fn build_loop_program(
             ControlFlow::<ArithType>::op_branch(b, Successor::from_block(header), vec![x]);
         {
             let br_stmt: Statement = br_header.into();
-            br_stmt
-                .expect_info_mut(b.as_inner_mut())
+            b.statement_arena_mut()[br_stmt]
                 .get_parent_mut()
                 .replace(StatementParent::Block(entry));
             let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                entry.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(entry).unwrap();
             entry_info.terminator = Some(br_stmt);
         }
 
@@ -333,12 +331,11 @@ pub fn build_loop_program(
         );
         {
             let cond_stmt: Statement = cond_br.into();
-            cond_stmt
-                .expect_info_mut(b.as_inner_mut())
+            b.statement_arena_mut()[cond_stmt]
                 .get_parent_mut()
                 .replace(StatementParent::Block(header));
             let header_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                header.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(header).unwrap();
             header_info.terminator = Some(cond_stmt);
         }
 
@@ -371,34 +368,33 @@ pub fn build_infinite_loop(
         let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
-        let x: SSAValue = entry.expect_info(b).arguments[0].into();
+        let x: SSAValue = b.block_arena()[entry].arguments[0].into();
 
         let header = b.block().argument(ArithType::I64).new();
-        let i: SSAValue = header.expect_info(b).arguments[0].into();
+        let i: SSAValue = b.block_arena()[header].arguments[0].into();
 
         // exit(result): ret result
         let exit = b.block().argument(ArithType::I64).new();
-        let exit_val: SSAValue = exit.expect_info(b).arguments[0].into();
+        let exit_val: SSAValue = b.block_arena()[exit].arguments[0].into();
         let ret_exit = Return::<ArithType>::new(b, exit_val);
         {
             let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                exit.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(exit).unwrap();
             exit_info.terminator = Some(ret_exit.into());
         }
 
         // body(val): br header(val)
         let body = b.block().argument(ArithType::I64).new();
-        let body_val: SSAValue = body.expect_info(b).arguments[0].into();
+        let body_val: SSAValue = b.block_arena()[body].arguments[0].into();
         let br_back =
             ControlFlow::<ArithType>::op_branch(b, Successor::from_block(header), vec![body_val]);
         {
             let br_stmt: Statement = br_back.into();
-            br_stmt
-                .expect_info_mut(b.as_inner_mut())
+            b.statement_arena_mut()[br_stmt]
                 .get_parent_mut()
                 .replace(StatementParent::Block(body));
             let body_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                body.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(body).unwrap();
             body_info.terminator = Some(br_stmt);
         }
 
@@ -413,12 +409,11 @@ pub fn build_infinite_loop(
         );
         {
             let cond_stmt: Statement = cond_br.into();
-            cond_stmt
-                .expect_info_mut(b.as_inner_mut())
+            b.statement_arena_mut()[cond_stmt]
                 .get_parent_mut()
                 .replace(StatementParent::Block(header));
             let header_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                header.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(header).unwrap();
             header_info.terminator = Some(cond_stmt);
         }
 
@@ -427,12 +422,11 @@ pub fn build_infinite_loop(
             ControlFlow::<ArithType>::op_branch(b, Successor::from_block(header), vec![x]);
         {
             let br_stmt: Statement = br_header.into();
-            br_stmt
-                .expect_info_mut(b.as_inner_mut())
+            b.statement_arena_mut()[br_stmt]
                 .get_parent_mut()
                 .replace(StatementParent::Block(entry));
             let entry_info: &mut Item<BlockInfo<CompositeLanguage>> =
-                entry.get_info_mut(b.as_inner_mut()).unwrap();
+                b.block_arena_mut().get_mut(entry).unwrap();
             entry_info.terminator = Some(br_stmt);
         }
 

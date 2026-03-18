@@ -378,14 +378,13 @@ impl_from_test!(BlockArgument);
 impl_from_test!(DeletedSSAValue);
 impl_from_test!(Port);
 
-/// GetInfo impl for SSAValue — returns `Item<BuilderSSAInfo<L>>` since
-/// `StageInfo` uses `BuilderSSAInfo` internally during both building and
-/// finalized access.
+/// GetInfo impl for SSAValue — returns `Item<SSAInfo<L>>` from
+/// finalized `StageInfo` (clean types with `L::Type` and `SSAKind`).
 impl<L: Dialect, T> GetInfo<L> for T
 where
     T: Into<SSAValue> + Identifier,
 {
-    type Info = crate::arena::Item<BuilderSSAInfo<L>>;
+    type Info = crate::arena::Item<SSAInfo<L>>;
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.ssas.get(*self)

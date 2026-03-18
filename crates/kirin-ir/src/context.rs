@@ -2,16 +2,15 @@ use crate::arena::Arena;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::function::CompileStage;
 use crate::node::region::RegionInfo;
-use crate::node::ssa::BuilderSSAInfo;
+use crate::node::ssa::SSAInfo;
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{BuilderStageInfo, Dialect, InternTable, node::*};
 
-/// The core stage info type used during both building and finalized access.
+/// The core stage info type for finalized IR.
 ///
-/// During construction, the SSA arena contains [`BuilderSSAInfo`] values with
-/// `Option<L::Type>` and [`BuilderSSAKind`]. After
-/// [`BuilderStageInfo::finalize`](crate::BuilderStageInfo::finalize), the arena
-/// is validated to contain only resolved, typed SSAs.
+/// After [`BuilderStageInfo::finalize`](crate::BuilderStageInfo::finalize),
+/// every SSA value is guaranteed to have a type and a resolved kind.
+/// The SSA arena holds clean [`SSAInfo`] values with `L::Type` and [`SSAKind`].
 #[derive(Debug)]
 pub struct StageInfo<L: Dialect> {
     /// Optional human-readable name for this compilation stage.
@@ -22,7 +21,7 @@ pub struct StageInfo<L: Dialect> {
     pub(crate) regions: Arena<Region, RegionInfo<L>>,
     pub(crate) blocks: Arena<Block, BlockInfo<L>>,
     pub(crate) statements: Arena<Statement, StatementInfo<L>>,
-    pub(crate) ssas: Arena<SSAValue, BuilderSSAInfo<L>>,
+    pub(crate) ssas: Arena<SSAValue, SSAInfo<L>>,
     pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
     pub(crate) ungraphs: Arena<UnGraph, UnGraphInfo<L>>,
     pub(crate) symbols: InternTable<String, Symbol>,
@@ -53,7 +52,7 @@ impl<L> Clone for StageInfo<L>
 where
     L: Dialect,
     StatementInfo<L>: Clone,
-    BuilderSSAInfo<L>: Clone,
+    SSAInfo<L>: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -99,13 +98,8 @@ impl<L: Dialect> StageInfo<L> {
     }
 
     /// Get a reference to the SSA values arena.
-    pub fn ssa_arena(&self) -> &Arena<SSAValue, BuilderSSAInfo<L>> {
+    pub fn ssa_arena(&self) -> &Arena<SSAValue, SSAInfo<L>> {
         &self.ssas
-    }
-
-    /// Get a mutable reference to the SSA values arena.
-    pub fn ssa_arena_mut(&mut self) -> &mut Arena<SSAValue, BuilderSSAInfo<L>> {
-        &mut self.ssas
     }
 
     /// Get a reference to the symbols intern table.

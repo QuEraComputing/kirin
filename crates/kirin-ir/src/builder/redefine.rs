@@ -18,7 +18,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
     /// Callers should inspect the [`SpecializeError::conflicting`] backedges
     /// to determine what needs recompilation.
     pub fn redefine_specialization(&mut self, error: SpecializeError<L>) -> SpecializedFunction {
-        let staged_function_info = &mut self.0.staged_functions[error.staged_function];
+        let staged_function_info = &mut self.staged_functions[error.staged_function];
 
         // Invalidate all conflicting specializations
         for conflict in &error.conflicting {
@@ -54,7 +54,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
     pub fn redefine_staged_function(&mut self, error: StagedFunctionError<L>) -> StagedFunction {
         // Invalidate all conflicting staged functions
         for &conflict in &error.conflicting {
-            let info = &mut self.0.staged_functions[conflict];
+            let info = &mut self.staged_functions[conflict];
             info.invalidate();
         }
 
@@ -68,7 +68,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             backedges: error.backedges,
             invalidated: false,
         };
-        self.0.staged_functions.alloc(staged_function);
+        self.staged_functions.alloc(staged_function);
         id
     }
 }

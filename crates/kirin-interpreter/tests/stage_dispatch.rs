@@ -204,23 +204,22 @@ fn build_cross_stage_recursive_body(
     let call_block = stage.block().argument(ArithType::I64).new();
     let exit_block = stage.block().new();
 
-    let n: SSAValue = entry.expect_info(stage).arguments[0].into();
-    let call_arg: SSAValue = call_block.expect_info(stage).arguments[0].into();
+    let n: SSAValue = stage.block_arena()[entry].arguments[0].into();
+    let call_arg: SSAValue = stage.block_arena()[call_block].arguments[0].into();
 
     let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
     let ret0 = Return::<ArithType>::new(stage, c0.result);
     {
         let stmts: Vec<Statement> = vec![c0.into()];
         for stmt in &stmts {
-            *stmt.expect_info_mut(stage.as_inner_mut()).get_parent_mut() =
+            *stage.statement_arena_mut()[*stmt].get_parent_mut() =
                 Some(StatementParent::Block(exit_block));
         }
         let linked = stage.link_statements(&stmts);
         let ret_stmt: Statement = ret0.into();
-        *ret_stmt
-            .expect_info_mut(stage.as_inner_mut())
-            .get_parent_mut() = Some(StatementParent::Block(exit_block));
-        let exit_info = exit_block.get_info_mut(stage.as_inner_mut()).unwrap();
+        *stage.statement_arena_mut()[ret_stmt].get_parent_mut() =
+            Some(StatementParent::Block(exit_block));
+        let exit_info = stage.block_arena_mut().get_mut(exit_block).unwrap();
         exit_info.statements = linked;
         exit_info.terminator = Some(ret_stmt);
     }
@@ -229,15 +228,13 @@ fn build_cross_stage_recursive_body(
     let ret = Return::<ArithType>::new(stage, call.result);
     {
         let call_stmt: Statement = call.into();
-        *call_stmt
-            .expect_info_mut(stage.as_inner_mut())
-            .get_parent_mut() = Some(StatementParent::Block(call_block));
+        *stage.statement_arena_mut()[call_stmt].get_parent_mut() =
+            Some(StatementParent::Block(call_block));
         let linked = stage.link_statements(&[call_stmt]);
         let ret_stmt: Statement = ret.into();
-        *ret_stmt
-            .expect_info_mut(stage.as_inner_mut())
-            .get_parent_mut() = Some(StatementParent::Block(call_block));
-        let call_info = call_block.get_info_mut(stage.as_inner_mut()).unwrap();
+        *stage.statement_arena_mut()[ret_stmt].get_parent_mut() =
+            Some(StatementParent::Block(call_block));
+        let call_info = stage.block_arena_mut().get_mut(call_block).unwrap();
         call_info.statements = linked;
         call_info.terminator = Some(ret_stmt);
     }
@@ -255,15 +252,14 @@ fn build_cross_stage_recursive_body(
     {
         let stmts: Vec<Statement> = vec![c1.into(), dec.into()];
         for stmt in &stmts {
-            *stmt.expect_info_mut(stage.as_inner_mut()).get_parent_mut() =
+            *stage.statement_arena_mut()[*stmt].get_parent_mut() =
                 Some(StatementParent::Block(entry));
         }
         let linked = stage.link_statements(&stmts);
         let cond_stmt: Statement = cond.into();
-        *cond_stmt
-            .expect_info_mut(stage.as_inner_mut())
-            .get_parent_mut() = Some(StatementParent::Block(entry));
-        let entry_info = entry.get_info_mut(stage.as_inner_mut()).unwrap();
+        *stage.statement_arena_mut()[cond_stmt].get_parent_mut() =
+            Some(StatementParent::Block(entry));
+        let entry_info = stage.block_arena_mut().get_mut(entry).unwrap();
         entry_info.statements = linked;
         entry_info.terminator = Some(cond_stmt);
     }

@@ -54,6 +54,7 @@ fn test_block() {
         .unwrap();
 
     // Pretty print the function using the Document method
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_specialized_function(&f);
     let max_width = doc.config().max_width;

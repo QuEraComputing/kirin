@@ -91,11 +91,11 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.0.symbols.intern(n)),
+                name.map(|n| self.stage.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::DiGraph(id), index),
             );
-            self.stage.0.ssas.alloc(ssa);
+            self.stage.ssas.alloc(ssa);
             all_ports.push(port);
         }
 
@@ -104,11 +104,11 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.0.symbols.intern(n)),
+                name.map(|n| self.stage.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::DiGraph(id), index),
             );
-            self.stage.0.ssas.alloc(ssa);
+            self.stage.ssas.alloc(ssa);
             all_ports.push(port);
         }
 
@@ -171,10 +171,10 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
         }
         // Apply replacements and delete placeholder SSAs
         for (&old, _) in &replacements {
-            self.stage.0.ssas.delete(old);
+            self.stage.ssas.delete(old);
         }
         for &stmt_id in &self.nodes {
-            let info = &mut self.stage.0.statements[stmt_id];
+            let info = &mut self.stage.statements[stmt_id];
             for arg in info.definition.arguments_mut() {
                 if let Some(&replacement) = replacements.get(arg) {
                     *arg = replacement;
@@ -210,11 +210,11 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
 
         let nodes = self.nodes;
         for &stmt_id in &nodes {
-            let info = &mut self.stage.0.statements[stmt_id];
+            let info = &mut self.stage.statements[stmt_id];
             info.parent = Some(StatementParent::DiGraph(id));
         }
 
-        let name_symbol = self.name.map(|n| self.stage.0.symbols.intern(n));
+        let name_symbol = self.name.map(|n| self.stage.symbols.intern(n));
         let info = DiGraphInfo::new(
             id,
             self.parent,
@@ -224,7 +224,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             graph,
             self.yields,
         );
-        self.stage.0.digraphs.alloc(info);
+        self.stage.digraphs.alloc(info);
         id
     }
 }

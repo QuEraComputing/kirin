@@ -28,6 +28,7 @@ fn test_sprint_with_globals() {
         .unwrap();
 
     // render with globals should resolve the function name
+    let stage = stage.into_inner();
     let output = staged_function.render(&stage).globals(&gs).to_string().unwrap();
     insta::assert_snapshot!(output);
 }

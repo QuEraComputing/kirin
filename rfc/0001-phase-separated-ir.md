@@ -1,6 +1,6 @@
 # RFC 0001: Phase-Separated IR — Build vs Finalized Stages
 
-- **Status**: Draft
+- **Status**: Implemented
 - **Authors**: roger, claude
 - **Created**: 2026-03-17
 

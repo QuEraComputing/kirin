@@ -38,17 +38,17 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
         let kind = self.make_ssa_kind(BuilderKey::Index(index));
         let id = self.stage.ssas.next_id();
         let ssa = BuilderSSAInfo::new(id, None, None, kind);
-        self.stage.0.ssas.alloc(ssa);
+        self.stage.ssas.alloc(ssa);
         id
     }
 
     /// Look up by name (matched against the builder's `.port_name()` / `.arg_name()` / `.capture_name()` declarations).
     pub fn name(self, name: &str) -> SSAValue {
-        let symbol = self.stage.0.symbols.intern(name.to_string());
+        let symbol = self.stage.symbols.intern(name.to_string());
         let kind = self.make_ssa_kind(BuilderKey::Named(symbol));
         let id = self.stage.ssas.next_id();
         let ssa = BuilderSSAInfo::new(id, None, None, kind);
-        self.stage.0.ssas.alloc(ssa);
+        self.stage.ssas.alloc(ssa);
         id
     }
 }
@@ -63,8 +63,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
         kind: BuilderSSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
-        let ssa = BuilderSSAInfo::new(id, name.map(|n| self.0.symbols.intern(n)), Some(ty), kind);
-        self.0.ssas.alloc(ssa);
+        let ssa = BuilderSSAInfo::new(id, name.map(|n| self.symbols.intern(n)), Some(ty), kind);
+        self.ssas.alloc(ssa);
         id
     }
 
@@ -100,7 +100,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             parent: None,
             definition,
         };
-        self.0.statements.alloc(statement);
+        self.statements.alloc(statement);
 
         // Resolve Unresolved(Result(idx)) SSAs now that the statement ID is known
         let result_ssas: Vec<SSAValue> = self.statements[id]
@@ -109,7 +109,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             .map(|rv| SSAValue::from(*rv))
             .collect();
         for ssa in result_ssas {
-            if let Some(info) = self.0.ssas.get_mut(ssa)
+            if let Some(info) = self.ssas.get_mut(ssa)
                 && let BuilderSSAKind::Unresolved(ResolutionInfo::Result(idx)) = info.kind
             {
                 info.kind = BuilderSSAKind::Result(id, idx);
@@ -190,7 +190,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             backedges: backedges.unwrap_or_default(),
             invalidated: false,
         };
-        self.0.staged_functions.alloc(staged_function);
+        self.staged_functions.alloc(staged_function);
         Ok(id)
     }
 
@@ -202,7 +202,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         #[builder(into)] body: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Result<SpecializedFunction, SpecializeError<L>> {
-        let staged_function_info = &mut self.0.staged_functions[func];
+        let staged_function_info = &mut self.staged_functions[func];
 
         let signature = signature.unwrap_or(staged_function_info.signature.clone());
 

@@ -25,6 +25,7 @@ fn digraph_builder_two_node_dag() {
 
     let dg = stage.digraph().node(s0).node(s1).name("test_dag").new();
 
+    let stage = stage.into_inner();
     let info = dg.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 2); // two operands both ref s0
@@ -47,6 +48,7 @@ fn digraph_builder_port_and_capture_creation() {
         .capture_name("theta")
         .new();
 
+    let stage = stage.into_inner();
     let info = dg.expect_info(&stage);
     assert_eq!(info.ports().len(), 3);
     assert_eq!(info.edge_count(), 2);
@@ -55,15 +57,15 @@ fn digraph_builder_port_and_capture_creation() {
 
     let edge0 = info.edge_ports()[0];
     let ssa0 = edge0.expect_info(&stage);
-    assert_eq!(ssa0.kind(), SSAKind::Port(PortParent::DiGraph(dg), 0));
+    assert_eq!(*ssa0.kind(), SSAKind::Port(PortParent::DiGraph(dg), 0));
 
     let edge1 = info.edge_ports()[1];
     let ssa1 = edge1.expect_info(&stage);
-    assert_eq!(ssa1.kind(), SSAKind::Port(PortParent::DiGraph(dg), 1));
+    assert_eq!(*ssa1.kind(), SSAKind::Port(PortParent::DiGraph(dg), 1));
 
     let cap0 = info.capture_ports()[0];
     let ssa_cap = cap0.expect_info(&stage);
-    assert_eq!(ssa_cap.kind(), SSAKind::Port(PortParent::DiGraph(dg), 2));
+    assert_eq!(*ssa_cap.kind(), SSAKind::Port(PortParent::DiGraph(dg), 2));
 
     assert!(ssa0.name().is_some());
     assert!(ssa1.name().is_some());
@@ -88,6 +90,11 @@ fn digraph_builder_resolves_builder_port_placeholders() {
         .node(s0)
         .new();
 
+    // Check placeholder deletion via builder arena before converting
+    let placeholder_item = stage.ssa_arena().get(placeholder).unwrap();
+    assert!(placeholder_item.deleted());
+
+    let stage = stage.into_inner();
     let info = dg.expect_info(&stage);
     let real_port: SSAValue = info.edge_ports()[0].into();
 
@@ -98,10 +105,6 @@ fn digraph_builder_resolves_builder_port_placeholders() {
         }
         _ => panic!("expected Add"),
     }
-
-    // Verify the placeholder SSA was deleted
-    let placeholder_item = stage.ssa_arena().get(placeholder).unwrap();
-    assert!(placeholder_item.deleted());
 }
 
 // --- UnGraph tests ---
@@ -129,6 +132,7 @@ fn ungraph_two_nodes_one_edge() {
         .name("test_ug")
         .new();
 
+    let stage = stage.into_inner();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 1);
@@ -179,6 +183,7 @@ fn ungraph_boundary_port_bfs_ordering() {
         .node(n_near)
         .new();
 
+    let stage = stage.into_inner();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
 
@@ -255,6 +260,7 @@ fn ungraph_interleaved_edge_node_order() {
         .node(n1)
         .new();
 
+    let stage = stage.into_inner();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
     assert_eq!(info.graph().edge_count(), 2);
@@ -301,6 +307,7 @@ fn ungraph_port_and_capture_creation() {
         .node(n1)
         .new();
 
+    let stage = stage.into_inner();
     let info = ug.expect_info(&stage);
     // Total ports = 2 edge + 1 capture = 3
     assert_eq!(info.ports().len(), 3);
@@ -311,16 +318,16 @@ fn ungraph_port_and_capture_creation() {
     // Edge ports get indices 0..N
     let edge0 = info.edge_ports()[0];
     let ssa0 = edge0.expect_info(&stage);
-    assert_eq!(ssa0.kind(), SSAKind::Port(PortParent::UnGraph(ug), 0));
+    assert_eq!(*ssa0.kind(), SSAKind::Port(PortParent::UnGraph(ug), 0));
 
     let edge1 = info.edge_ports()[1];
     let ssa1 = edge1.expect_info(&stage);
-    assert_eq!(ssa1.kind(), SSAKind::Port(PortParent::UnGraph(ug), 1));
+    assert_eq!(*ssa1.kind(), SSAKind::Port(PortParent::UnGraph(ug), 1));
 
     // Capture port gets index N (after edge ports)
     let cap0 = info.capture_ports()[0];
     let ssa_cap = cap0.expect_info(&stage);
-    assert_eq!(ssa_cap.kind(), SSAKind::Port(PortParent::UnGraph(ug), 2));
+    assert_eq!(*ssa_cap.kind(), SSAKind::Port(PortParent::UnGraph(ug), 2));
 
     // Verify names
     assert!(ssa0.name().is_some());
@@ -365,6 +372,7 @@ fn ungraph_isolated_node_appended_after_bfs() {
         .node(n1)
         .new();
 
+    let stage = stage.into_inner();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
 

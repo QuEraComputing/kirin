@@ -146,6 +146,7 @@ mod tests {
             .node(n2)
             .new();
 
+        let stage = stage.into_inner();
         let info = ug.expect_info(&stage);
         assert_eq!(info.edge_ports().len(), 1);
         assert_eq!(info.capture_ports().len(), 1);
@@ -193,6 +194,7 @@ mod tests {
             .kind(BuilderSSAKind::Result(compound_stmt, 0))
             .new();
 
+        let stage = stage.into_inner();
         let def = compound_stmt.definition(&stage);
         let ungraphs: Vec<_> = def.ungraphs().collect();
         assert_eq!(ungraphs.len(), 1, "compound should have one ungraph body");
@@ -313,6 +315,7 @@ mod tests {
             .node(compound_stmt)
             .new();
 
+        let stage = stage.into_inner();
         let outer_info = outer_ug.expect_info(&stage);
         assert_eq!(
             outer_info.graph().node_count(),
@@ -340,11 +343,12 @@ mod tests {
             .node(node)
             .new();
 
+        let dummy_block = stage.block().new();
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
         let placeholder = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(BuilderSSAKind::Test)
+            .kind(BuilderSSAKind::BlockArgument(dummy_block, 0))
             .new();
         let compound_stmt = stage
             .statement()
@@ -357,9 +361,10 @@ mod tests {
 
         let block = stage.block().stmt(compound_stmt).new();
 
+        let stage = stage.into_inner();
         let stmts: Vec<_> = block.statements(&stage).collect();
         assert_eq!(stmts.len(), 1);
-        let def = stmts[0].definition(&stage);
+        let def: &UngraphLanguage = stmts[0].definition(&stage);
         assert_eq!(def.ungraphs().count(), 1, "block stmt has ungraph body");
     }
 }

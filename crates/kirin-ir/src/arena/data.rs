@@ -133,6 +133,31 @@ impl<I: Identifier, T> Arena<I, T> {
         })
     }
 
+    /// Map live items with `f`, deleted items with `tombstone`.
+    /// Returns a new arena preserving layout and indices.
+    pub fn map_live<U>(
+        self,
+        mut f: impl FnMut(T) -> U,
+        mut tombstone: impl FnMut(T) -> U,
+    ) -> Arena<I, U> {
+        let items = self
+            .items
+            .into_iter()
+            .map(|item| Item {
+                deleted: item.deleted,
+                data: if item.deleted {
+                    tombstone(item.data)
+                } else {
+                    f(item.data)
+                },
+            })
+            .collect();
+        Arena {
+            items,
+            marker: std::marker::PhantomData,
+        }
+    }
+
     /// Map all items (live and deleted) infallibly.
     /// Returns a new arena preserving layout and indices.
     pub fn map<U>(self, mut f: impl FnMut(T) -> U) -> Arena<I, U> {

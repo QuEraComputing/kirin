@@ -105,6 +105,7 @@ fn test_composes_with_constant_and_control_flow() {
     let add_stmt = Arith::<ArithType>::op_add(&mut stage, const_a.result, const_b.result);
     let ret_stmt = Return::<ArithType>::new(&mut stage, add_stmt.result);
 
+    let stage = stage.into_inner();
     let const_a_def = const_a
         .id
         .get_info(&stage)

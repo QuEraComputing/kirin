@@ -14,11 +14,13 @@ where
     let mut stage: StageInfo<L> = StageInfo::default();
 
     stage.with_builder(|b| {
-        for (name, ty) in operands {
+        // Create a dummy block to serve as the owner of operand SSAs
+        let dummy_block = b.block().new();
+        for (idx, (name, ty)) in operands.iter().enumerate() {
             b.ssa()
                 .name((*name).to_string())
                 .ty(ty.clone())
-                .kind(BuilderSSAKind::Test)
+                .kind(BuilderSSAKind::BlockArgument(dummy_block, idx))
                 .new();
         }
     });

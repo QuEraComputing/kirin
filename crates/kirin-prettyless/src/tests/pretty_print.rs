@@ -6,6 +6,7 @@ fn test_constant_pretty_print() {
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let const_op = SimpleLanguage::op_constant(&mut stage, 42i64);
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_statement(&const_op.id);
     let mut buf = String::new();
@@ -24,6 +25,7 @@ fn test_add_pretty_print() {
     let b = SimpleLanguage::op_constant(&mut stage, 2i64);
     let add = SimpleLanguage::op_add(&mut stage, a.result, b.result);
 
+    let stage = stage.into_inner();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_statement(&add.id);
     let mut buf = String::new();
