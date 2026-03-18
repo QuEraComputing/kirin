@@ -28,13 +28,13 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L>
 where
     L::Type: Placeholder,
 {
-    fn make_ssa_kind(&self, key: BuilderKey) -> SSAKind {
+    fn make_ssa_kind(&self, key: BuilderKey) -> BuilderSSAKind {
         let info = match self.kind {
             PlaceholderKind::Port => ResolutionInfo::Port(key),
             PlaceholderKind::Capture => ResolutionInfo::Capture(key),
             PlaceholderKind::BlockArgument => ResolutionInfo::BlockArgument(key),
         };
-        SSAKind::Unresolved(info)
+        BuilderSSAKind::Unresolved(info)
     }
 
     /// Look up by positional index.
@@ -64,7 +64,7 @@ impl<L: Dialect> StageInfo<L> {
         &mut self,
         #[builder(into)] name: Option<String>,
         ty: L::Type,
-        kind: SSAKind,
+        kind: BuilderSSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
         let ssa = SSAInfo::new(id, name.map(|n| self.symbols.intern(n)), ty, kind);
@@ -114,9 +114,9 @@ impl<L: Dialect> StageInfo<L> {
             .collect();
         for ssa in result_ssas {
             if let Some(info) = self.ssas.get_mut(ssa)
-                && let SSAKind::Unresolved(ResolutionInfo::Result(idx)) = info.kind
+                && let BuilderSSAKind::Unresolved(ResolutionInfo::Result(idx)) = info.kind
             {
-                info.kind = SSAKind::Result(id, idx);
+                info.kind = BuilderSSAKind::Result(id, idx);
             }
         }
 

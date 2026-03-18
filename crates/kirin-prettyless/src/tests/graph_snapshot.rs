@@ -2,7 +2,7 @@
 // Snapshot tests for digraph and ungraph pretty printing
 // ============================================================================
 
-use kirin_ir::{ResultValue, SSAKind, SSAValue};
+use kirin_ir::{BuilderSSAKind, ResultValue, SSAValue};
 use kirin_test_languages::{
     UngraphCompound, UngraphEdge, UngraphLanguage, UngraphNodeA, UngraphNodeB,
 };
@@ -203,7 +203,7 @@ fn make_edge(stage: &mut kirin_ir::StageInfo<UngraphLanguage>) -> (kirin_ir::Sta
     let wire_ssa = stage
         .ssa()
         .ty(SimpleType::Any)
-        .kind(SSAKind::Result(stmt, 0))
+        .kind(BuilderSSAKind::Result(stmt, 0))
         .new();
     (stmt, wire_ssa)
 }
@@ -360,7 +360,7 @@ fn print_ungraph_nested_compound() {
     let _compound_ssa = stage
         .ssa()
         .ty(SimpleType::Any)
-        .kind(SSAKind::Result(compound_stmt, 0))
+        .kind(BuilderSSAKind::Result(compound_stmt, 0))
         .new();
 
     // Outer node uses capture and an edge

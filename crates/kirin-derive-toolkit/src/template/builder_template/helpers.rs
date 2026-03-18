@@ -185,10 +185,11 @@ fn build_fn_body(
     info: &StatementInfo,
     input: &InputMeta,
     result_name_map: &std::collections::HashMap<usize, syn::Ident>,
+    crate_path: &syn::Path,
 ) -> proc_macro2::TokenStream {
     let statement_id = statement_id_name(info);
     let let_inputs = build_fn_let_inputs(info);
-    let let_results = let_name_eq_result_value(info, result_name_map);
+    let let_results = let_name_eq_result_value(info, result_name_map, crate_path);
 
     let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
     let constructor = if input.is_enum {
@@ -240,6 +241,7 @@ fn build_fn_body(
 fn let_name_eq_result_value(
     info: &StatementInfo,
     result_name_map: &std::collections::HashMap<usize, syn::Ident>,
+    crate_path: &syn::Path,
 ) -> proc_macro2::TokenStream {
     let mut results = Vec::new();
     let statement_id = statement_id_name(info);
@@ -280,7 +282,7 @@ fn let_name_eq_result_value(
         results.push(quote! {
             let #name: ResultValue = stage
                 .ssa()
-                .kind(SSAKind::Result(#statement_id, #index))
+                .kind(#crate_path::BuilderSSAKind::Result(#statement_id, #index))
                 .ty(Lang::Type::from(#ssa_ty))
                 .new()
                 .into();
@@ -313,7 +315,7 @@ pub(super) fn build_fn_for_statement(
         .zip(result_names.iter().cloned())
         .map(|(field, name)| (field.index, name))
         .collect::<std::collections::HashMap<_, _>>();
-    let body = build_fn_body(info, input, &result_name_map);
+    let body = build_fn_body(info, input, &result_name_map, crate_path);
     let self_ty = quote! { #name #ty_generics };
 
     let needs_placeholder_bound = info.fields.iter().any(|f| f.is_auto_placeholder());

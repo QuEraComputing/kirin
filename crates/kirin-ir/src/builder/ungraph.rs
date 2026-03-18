@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::arena::GetInfo;
 use crate::node::port::{Port, PortParent};
-use crate::node::ssa::{ResolutionInfo, SSAInfo, SSAKind, SSAValue};
+use crate::node::ssa::{BuilderSSAKind, ResolutionInfo, SSAInfo, SSAValue};
 use crate::node::stmt::{Statement, StatementParent};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{Dialect, StageInfo};
@@ -108,7 +108,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                 port.into(),
                 name.map(|n| self.stage.symbols.intern(n)),
                 ty,
-                SSAKind::Port(PortParent::UnGraph(id), index),
+                BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
             self.stage.ssas.alloc(ssa);
             all_ports.push(port);
@@ -122,7 +122,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                 port.into(),
                 name.map(|n| self.stage.symbols.intern(n)),
                 ty,
-                SSAKind::Port(PortParent::UnGraph(id), index),
+                BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
             self.stage.ssas.alloc(ssa);
             all_ports.push(port);
@@ -163,7 +163,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                     .get(*arg)
                     .expect("SSAValue not found in stage");
                 match ssa_info.kind {
-                    SSAKind::Unresolved(ResolutionInfo::Port(key)) => {
+                    BuilderSSAKind::Unresolved(ResolutionInfo::Port(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             edge_count,
@@ -174,7 +174,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                         self.stage.ssas.delete(*arg);
                         *arg = all_ports[index].into();
                     }
-                    SSAKind::Unresolved(ResolutionInfo::Capture(key)) => {
+                    BuilderSSAKind::Unresolved(ResolutionInfo::Capture(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             all_ports.len() - edge_count,

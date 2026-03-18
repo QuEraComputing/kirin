@@ -61,12 +61,12 @@ pub struct SSAInfo<L: Dialect> {
     pub(crate) id: SSAValue,
     pub(crate) name: Option<Symbol>,
     pub(crate) ty: L::Type,
-    pub(crate) kind: SSAKind,
+    pub(crate) kind: BuilderSSAKind,
     pub(crate) uses: SmallVec<[Use; 2]>,
 }
 
 impl<L: Dialect> SSAInfo<L> {
-    pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::Type, kind: SSAKind) -> Self {
+    pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::Type, kind: BuilderSSAKind) -> Self {
         Self {
             id,
             name,
@@ -92,7 +92,27 @@ impl<L: Dialect> SSAInfo<L> {
         self.ty = ty;
     }
 
-    pub fn kind(&self) -> &SSAKind {
+    /// Returns the clean [`SSAKind`] for this SSA value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the SSA kind is `Unresolved` or `Test`. This should only be
+    /// called on finalized IR (after [`BuilderStageInfo::finalize`](crate::BuilderStageInfo::finalize)).
+    pub fn kind(&self) -> SSAKind {
+        self.kind.as_resolved().unwrap_or_else(|| {
+            panic!(
+                "SSAInfo::kind() called on unresolved SSA value {:?} (kind: {:?}). \
+                 Use builder_kind() for build-time access.",
+                self.id, self.kind
+            )
+        })
+    }
+
+    /// Returns the build-time [`BuilderSSAKind`] for this SSA value.
+    ///
+    /// Use this in builder code that may encounter `Unresolved` or `Test` variants.
+    /// Downstream consumers should use [`kind()`](Self::kind) instead.
+    pub fn builder_kind(&self) -> &BuilderSSAKind {
         &self.kind
     }
 
@@ -121,7 +141,7 @@ pub enum BuilderKey {
     Named(Symbol),
 }
 
-/// Build-time resolution info for [`SSAKind::Unresolved`] placeholders.
+/// Build-time resolution info for [`BuilderSSAKind::Unresolved`] placeholders.
 ///
 /// Each variant describes what the SSA value will eventually resolve to
 /// once the enclosing builder (block, digraph, ungraph, statement) finalizes.
@@ -140,20 +160,57 @@ pub enum ResolutionInfo {
     Result(usize),
 }
 
+/// The kind of an SSA value in finalized IR.
+///
+/// After [`BuilderStageInfo::finalize`](crate::BuilderStageInfo::finalize),
+/// every SSA value is guaranteed to have one of these three kinds.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[allow(clippy::manual_non_exhaustive)]
 pub enum SSAKind {
+    Result(Statement, usize),
+    BlockArgument(Block, usize),
+    Port(PortParent, usize),
+}
+
+/// Build-time SSA kind that includes unresolved placeholders.
+///
+/// Used internally during IR construction. Must be resolved to an [`SSAKind`]
+/// variant before finalization. Use [`BuilderSSAKind::as_resolved`] to convert.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum BuilderSSAKind {
     Result(Statement, usize),
     BlockArgument(Block, usize),
     Port(PortParent, usize),
     /// Build-time placeholder — resolved by the appropriate builder/emitter.
     /// Must not appear in finalized IR.
-    #[doc(hidden)]
     Unresolved(ResolutionInfo),
     /// A placeholder for tests to create SSA values that do not exist in the SSA database.
-    #[doc(hidden)]
     Test,
+}
+
+impl BuilderSSAKind {
+    /// Convert to a clean [`SSAKind`] if this is a resolved variant.
+    ///
+    /// Returns `None` for `Unresolved` and `Test` variants.
+    pub fn as_resolved(&self) -> Option<SSAKind> {
+        match *self {
+            BuilderSSAKind::Result(stmt, idx) => Some(SSAKind::Result(stmt, idx)),
+            BuilderSSAKind::BlockArgument(block, idx) => Some(SSAKind::BlockArgument(block, idx)),
+            BuilderSSAKind::Port(parent, idx) => Some(SSAKind::Port(parent, idx)),
+            BuilderSSAKind::Unresolved(_) | BuilderSSAKind::Test => None,
+        }
+    }
+}
+
+impl From<SSAKind> for BuilderSSAKind {
+    fn from(kind: SSAKind) -> Self {
+        match kind {
+            SSAKind::Result(stmt, idx) => BuilderSSAKind::Result(stmt, idx),
+            SSAKind::BlockArgument(block, idx) => BuilderSSAKind::BlockArgument(block, idx),
+            SSAKind::Port(parent, idx) => BuilderSSAKind::Port(parent, idx),
+        }
+    }
 }
 
 impl From<TestSSAValue> for Id {

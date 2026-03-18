@@ -1,4 +1,4 @@
-use kirin_ir::{BuilderStageInfo, Dialect, Placeholder, SSAKind, StageInfo};
+use kirin_ir::{BuilderSSAKind, BuilderStageInfo, Dialect, Placeholder, StageInfo};
 use rustc_hash::FxHashMap;
 
 /// Error type for IR emission from parsed AST nodes.
@@ -117,7 +117,9 @@ where
         .ssa()
         .name(name.to_string())
         .ty(L::Type::placeholder())
-        .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)))
+        .kind(BuilderSSAKind::Unresolved(
+            kirin_ir::ResolutionInfo::Result(0),
+        ))
         .new()
 }
 

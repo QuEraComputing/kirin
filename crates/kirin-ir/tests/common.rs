@@ -215,7 +215,7 @@ pub fn make_wire(stage: &mut StageInfo<BuilderDialect>) -> (Statement, SSAValue)
     let wire_ssa = stage
         .ssa()
         .ty(TestType::Qubit)
-        .kind(SSAKind::Result(stmt, 0))
+        .kind(BuilderSSAKind::Result(stmt, 0))
         .new();
     (stmt, wire_ssa)
 }

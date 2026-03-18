@@ -1,5 +1,5 @@
 use crate::{SimpleType, Value};
-use kirin_ir::{Dialect, Region, ResultValue, SSAKind, SSAValue};
+use kirin_ir::{Dialect, Region, ResultValue, SSAValue};
 
 #[derive(Clone, Debug, PartialEq, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]

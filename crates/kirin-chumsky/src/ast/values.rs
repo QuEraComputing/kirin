@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{Dialect, GetInfo, Placeholder, SSAKind};
+use kirin_ir::{BuilderSSAKind, Dialect, GetInfo, Placeholder};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -81,8 +81,8 @@ where
 /// `SSAValue::emit` in relaxed dominance mode), reuses it — updating its type
 /// in place. Otherwise creates a new SSA value.
 ///
-/// The SSA starts with `SSAKind::Unresolved(ResolutionInfo::Result(0))` which is
-/// resolved to `SSAKind::Result(stmt, idx)` when the statement builder finalizes.
+/// The SSA starts with `BuilderSSAKind::Unresolved(ResolutionInfo::Result(0))` which is
+/// resolved to `BuilderSSAKind::Result(stmt, idx)` when the statement builder finalizes.
 impl<'src, TypeOutput, IR> EmitIR<IR> for ResultValue<'src, TypeOutput>
 where
     IR: Dialect,
@@ -104,8 +104,8 @@ where
         if let Some(existing) = ctx.lookup_ssa(self.name.value)
             && let Some(info) = existing.get_info_mut(ctx.stage)
             && matches!(
-                info.kind(),
-                SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))
+                info.builder_kind(),
+                BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))
             )
         {
             // Reuse the forward-ref SSA — update type in place
@@ -119,7 +119,9 @@ where
             .ssa()
             .name(self.name.value.to_string())
             .ty(ty)
-            .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)))
+            .kind(BuilderSSAKind::Unresolved(
+                kirin_ir::ResolutionInfo::Result(0),
+            ))
             .new();
 
         // Register the SSA in the symbol table for later reference

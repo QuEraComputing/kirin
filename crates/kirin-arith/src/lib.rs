@@ -61,7 +61,7 @@ pub use types::{ArithType, ArithValue};
 /// # Usage
 ///
 /// ```rust,ignore
-/// use kirin::ir::{SSAKind, StageInfo};
+/// use kirin::ir::{BuilderSSAKind, StageInfo};
 /// use kirin_arith::{Arith, ArithType};
 ///
 /// let mut stage: StageInfo<Arith<ArithType>> = StageInfo::default();
@@ -69,13 +69,13 @@ pub use types::{ArithType, ArithValue};
 ///     .ssa()
 ///     .name("a".to_string())
 ///     .ty(ArithType::I32)
-///     .kind(SSAKind::Test)
+///     .kind(BuilderSSAKind::Test)
 ///     .new();
 /// let b = stage
 ///     .ssa()
 ///     .name("b".to_string())
 ///     .ty(ArithType::I32)
-///     .kind(SSAKind::Test)
+///     .kind(BuilderSSAKind::Test)
 ///     .new();
 ///
 /// let add_stmt = Arith::<ArithType>::op_add(&mut stage, a, b);

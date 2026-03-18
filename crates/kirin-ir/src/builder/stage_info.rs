@@ -1,17 +1,17 @@
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-use crate::node::ssa::{SSAKind, SSAValue};
+use crate::node::ssa::{BuilderSSAKind, SSAValue};
 use crate::{Dialect, StageInfo};
 
 /// Error returned by [`BuilderStageInfo::finalize`] when build-time SSAs
 /// have not been resolved.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FinalizeError {
-    /// An `SSAKind::Unresolved` SSA was found — the builder did not resolve
+    /// A `BuilderSSAKind::Unresolved` SSA was found — the builder did not resolve
     /// all placeholder references.
     UnresolvedSSA(SSAValue),
-    /// An `SSAKind::Test` SSA was found — test-only SSAs must not appear in
+    /// A `BuilderSSAKind::Test` SSA was found — test-only SSAs must not appear in
     /// finalized IR.
     TestSSA(SSAValue),
 }
@@ -78,14 +78,14 @@ impl<L: Dialect> From<StageInfo<L>> for BuilderStageInfo<L> {
 impl<L: Dialect> BuilderStageInfo<L> {
     /// Validate the IR and return the underlying [`StageInfo`].
     ///
-    /// Checks that no `SSAKind::Unresolved` or `SSAKind::Test` values remain.
+    /// Checks that no `BuilderSSAKind::Unresolved` or `BuilderSSAKind::Test` values remain.
     pub fn finalize(self) -> Result<StageInfo<L>, FinalizeError> {
         for ssa_info in self.0.ssas.iter() {
             match ssa_info.kind {
-                SSAKind::Unresolved(_) => {
+                BuilderSSAKind::Unresolved(_) => {
                     return Err(FinalizeError::UnresolvedSSA(ssa_info.id()));
                 }
-                SSAKind::Test => {
+                BuilderSSAKind::Test => {
                     return Err(FinalizeError::TestSSA(ssa_info.id()));
                 }
                 _ => {}

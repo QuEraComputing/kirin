@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, SSAKind, SSAValue, StageInfo};
+use kirin_ir::{BuilderSSAKind, Dialect, SSAValue, StageInfo};
 
 pub fn new_test_ssa<L: Dialect>(
     stage: &mut StageInfo<L>,
@@ -9,6 +9,6 @@ pub fn new_test_ssa<L: Dialect>(
         .ssa()
         .name(name.into())
         .ty(ty)
-        .kind(SSAKind::Test)
+        .kind(BuilderSSAKind::Test)
         .new()
 }

@@ -7,7 +7,7 @@
 //!
 //! Based on the text format in `docs/design/graph-ir-node.md`.
 
-use kirin_ir::{Dialect, Placeholder, ResultValue, SSAKind, SSAValue, UnGraph};
+use kirin_ir::{BuilderSSAKind, Dialect, Placeholder, ResultValue, SSAValue, UnGraph};
 use kirin_test_types::SimpleType;
 
 /// Edge operation — creates an edge SSAValue in an ungraph.
@@ -90,14 +90,18 @@ mod tests {
         let wire_ssa = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(SSAKind::Result(stmt, 0))
+            .kind(BuilderSSAKind::Result(stmt, 0))
             .new();
         (stmt, wire_ssa)
     }
 
     /// Create a NodeA statement with placeholder operands.
     fn make_node_a(stage: &mut BuilderStageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
-        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
+        let placeholder = stage
+            .ssa()
+            .ty(SimpleType::Any)
+            .kind(BuilderSSAKind::Test)
+            .new();
         stage
             .statement()
             .definition(UngraphNodeA {
@@ -109,7 +113,11 @@ mod tests {
 
     /// Create a NodeB statement with placeholder operands.
     fn make_node_b(stage: &mut BuilderStageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
-        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
+        let placeholder = stage
+            .ssa()
+            .ty(SimpleType::Any)
+            .kind(BuilderSSAKind::Test)
+            .new();
         stage
             .statement()
             .definition(UngraphNodeB {
@@ -166,7 +174,11 @@ mod tests {
             .new();
 
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
-        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
+        let placeholder = stage
+            .ssa()
+            .ty(SimpleType::Any)
+            .kind(BuilderSSAKind::Test)
+            .new();
         let compound_stmt = stage
             .statement()
             .definition(UngraphCompound {
@@ -178,7 +190,7 @@ mod tests {
         let _compound_ssa = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(SSAKind::Result(compound_stmt, 0))
+            .kind(BuilderSSAKind::Result(compound_stmt, 0))
             .new();
 
         let def = compound_stmt.definition(&stage);
@@ -268,7 +280,11 @@ mod tests {
 
         // Wrap inner ungraph in a compound statement
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
-        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
+        let placeholder = stage
+            .ssa()
+            .ty(SimpleType::Any)
+            .kind(BuilderSSAKind::Test)
+            .new();
         let compound_stmt = stage
             .statement()
             .definition(UngraphCompound {
@@ -280,7 +296,7 @@ mod tests {
         let _compound_ssa = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(SSAKind::Result(compound_stmt, 0))
+            .kind(BuilderSSAKind::Result(compound_stmt, 0))
             .new();
 
         // Outer ungraph: NodeA + the nested compound
@@ -325,7 +341,11 @@ mod tests {
             .new();
 
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
-        let placeholder = stage.ssa().ty(SimpleType::Any).kind(SSAKind::Test).new();
+        let placeholder = stage
+            .ssa()
+            .ty(SimpleType::Any)
+            .kind(BuilderSSAKind::Test)
+            .new();
         let compound_stmt = stage
             .statement()
             .definition(UngraphCompound {

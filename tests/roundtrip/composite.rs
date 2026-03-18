@@ -27,13 +27,13 @@ fn test_roundtrip_add() {
         .ssa()
         .name("a".to_string())
         .ty(SimpleType::I64)
-        .kind(SSAKind::Test)
+        .kind(BuilderSSAKind::Test)
         .new();
     let ssa_b = stage
         .ssa()
         .name("b".to_string())
         .ty(SimpleType::I64)
-        .kind(SSAKind::Test)
+        .kind(BuilderSSAKind::Test)
         .new();
 
     // Parse - type annotation in input
@@ -118,7 +118,7 @@ fn test_roundtrip_return() {
         .ssa()
         .name("v".to_string())
         .ty(SimpleType::I64)
-        .kind(SSAKind::Test)
+        .kind(BuilderSSAKind::Test)
         .new();
 
     // Parse

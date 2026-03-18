@@ -30,7 +30,7 @@ fn block_builder_creates_block_with_arguments_and_statements() {
 
     for (idx, &arg) in info.arguments.iter().enumerate() {
         let ssa = arg.expect_info(&stage);
-        assert_eq!(*ssa.kind(), SSAKind::BlockArgument(block, idx));
+        assert_eq!(ssa.kind(), SSAKind::BlockArgument(block, idx));
     }
 
     let stmts: Vec<_> = block.statements(&stage).collect();
@@ -375,19 +375,23 @@ fn ssa_with_name_is_resolvable() {
         .ssa()
         .name("x")
         .ty(TestType::I32)
-        .kind(SSAKind::Test)
+        .kind(BuilderSSAKind::Test)
         .new();
 
     let info = ssa.expect_info(&stage);
     assert!(info.name().is_some());
     assert_eq!(info.ty(), &TestType::I32);
-    assert_eq!(*info.kind(), SSAKind::Test);
+    assert_eq!(*info.builder_kind(), BuilderSSAKind::Test);
 }
 
 #[test]
 fn ssa_without_name() {
     let mut stage = new_stage();
-    let ssa = stage.ssa().ty(TestType::I64).kind(SSAKind::Test).new();
+    let ssa = stage
+        .ssa()
+        .ty(TestType::I64)
+        .kind(BuilderSSAKind::Test)
+        .new();
 
     let info = ssa.expect_info(&stage);
     assert!(info.name().is_none());
@@ -457,7 +461,7 @@ fn remap_block_identity_remaps_parents_and_ssa_kinds() {
     assert_eq!(stub_info.arguments.len(), 1);
     let arg = stub_info.arguments[0];
     let arg_info = arg.expect_info(&stage);
-    assert!(matches!(arg_info.kind(), SSAKind::BlockArgument(owner, 0) if *owner == stub));
+    assert!(matches!(arg_info.kind(), SSAKind::BlockArgument(owner, 0) if owner == stub));
 
     assert!(stage.block_arena().get(real).unwrap().deleted());
 }

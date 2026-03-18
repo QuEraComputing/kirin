@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::arena::GetInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::port::{Port, PortParent};
-use crate::node::ssa::{ResolutionInfo, SSAInfo, SSAKind, SSAValue};
+use crate::node::ssa::{BuilderSSAKind, ResolutionInfo, SSAInfo, SSAValue};
 use crate::node::stmt::{Statement, StatementParent};
 use crate::{Dialect, StageInfo};
 
@@ -108,7 +108,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                 port.into(),
                 name.map(|n| self.stage.symbols.intern(n)),
                 ty,
-                SSAKind::Port(PortParent::DiGraph(id), index),
+                BuilderSSAKind::Port(PortParent::DiGraph(id), index),
             );
             self.stage.ssas.alloc(ssa);
             all_ports.push(port);
@@ -122,7 +122,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                 port.into(),
                 name.map(|n| self.stage.symbols.intern(n)),
                 ty,
-                SSAKind::Port(PortParent::DiGraph(id), index),
+                BuilderSSAKind::Port(PortParent::DiGraph(id), index),
             );
             self.stage.ssas.alloc(ssa);
             all_ports.push(port);
@@ -158,7 +158,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                     .get(*arg)
                     .expect("SSAValue not found in stage");
                 match ssa_info.kind {
-                    SSAKind::Unresolved(ResolutionInfo::Port(key)) => {
+                    BuilderSSAKind::Unresolved(ResolutionInfo::Port(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             edge_count,
@@ -169,7 +169,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                         self.stage.ssas.delete(*arg);
                         *arg = all_ports[index].into();
                     }
-                    SSAKind::Unresolved(ResolutionInfo::Capture(key)) => {
+                    BuilderSSAKind::Unresolved(ResolutionInfo::Capture(key)) => {
                         let index = super::resolve_builder_key(
                             key,
                             all_ports.len() - edge_count,
@@ -206,7 +206,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
                     .ssas
                     .get(operand)
                     .expect("SSAValue not found in stage");
-                if let SSAKind::Result(producer_stmt, _) = ssa_info.kind
+                if let BuilderSSAKind::Result(producer_stmt, _) = ssa_info.kind
                     && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
                 {
                     graph.add_edge(producer_ni, consumer_ni, operand);

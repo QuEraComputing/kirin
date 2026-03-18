@@ -210,12 +210,12 @@ impl<L: Dialect> StageInfo<L> {
 
         for (idx, arg) in real_info.arguments.iter().copied().enumerate() {
             let arg_info = arg.expect_info_mut(self);
-            if let SSAKind::BlockArgument(owner, _) = arg_info.kind {
+            if let BuilderSSAKind::BlockArgument(owner, _) = arg_info.kind {
                 debug_assert_eq!(
                     owner, real,
                     "unexpected block-arg owner while remapping block identity"
                 );
-                arg_info.kind = SSAKind::BlockArgument(stub, idx);
+                arg_info.kind = BuilderSSAKind::BlockArgument(stub, idx);
             }
         }
 
@@ -259,7 +259,7 @@ impl<L: Dialect> StageInfo<L> {
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
                 let ssa_info = self.ssas.get(operand).expect("SSAValue not found in stage");
-                if let SSAKind::Result(producer_stmt, _) = ssa_info.kind
+                if let BuilderSSAKind::Result(producer_stmt, _) = ssa_info.kind
                     && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
                 {
                     graph.add_edge(producer_ni, consumer_ni, operand);
