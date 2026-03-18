@@ -56,7 +56,7 @@ fn test_roundtrip_add() {
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
     // Convert to StageInfo for querying
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -96,7 +96,7 @@ fn test_roundtrip_constant() {
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
     // Convert to StageInfo for querying
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -149,7 +149,7 @@ fn test_roundtrip_return() {
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
     // Convert to StageInfo for querying and pretty printing
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let stmt_info = statement.get_info(&stage).expect("stmt should exist");
     let dialect = stmt_info.definition();
 
@@ -186,8 +186,17 @@ fn test_roundtrip_function() {
     let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
+    // The function format "{1:name} = {.function} {0}" doesn't include a type
+    // annotation, so the emit path leaves the function result SSA untyped.
+    // Set missing types before finalize.
+    for ssa in stage.ssa_arena_mut().iter_mut() {
+        if ssa.ty().is_none() {
+            ssa.set_ty(SimpleType::F64);
+        }
+    }
+
     // Pretty print using Document method
-    let stage = stage.into_inner_with_placeholder();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Config::default(), &stage);
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;
@@ -231,12 +240,20 @@ fn test_roundtrip_function_multiple_blocks() {
     let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
+    // The function format doesn't include a type annotation for the result,
+    // so the emit path leaves the function result SSA untyped. Set missing types.
+    for ssa in stage.ssa_arena_mut().iter_mut() {
+        if ssa.ty().is_none() {
+            ssa.set_ty(SimpleType::F64);
+        }
+    }
+
     // Pretty print using Document method with 4-space indentation to match input
     let config = Config {
         tab_spaces: 4,
         ..Default::default()
     };
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(config, &stage);
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;

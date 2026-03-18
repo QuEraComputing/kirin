@@ -31,7 +31,7 @@ fn test_config_zero_tab_spaces() {
     let block = stage.block().stmt(a).terminator(ret).new();
 
     let config = Config::default().with_tab_spaces(0);
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(config, &stage);
     let arena_doc = doc.print_block(&block);
     let mut buf = String::new();
@@ -49,7 +49,7 @@ fn test_config_large_tab_spaces() {
     let block = stage.block().stmt(a).terminator(ret).new();
 
     let config = Config::default().with_tab_spaces(8);
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(config, &stage);
     let arena_doc = doc.print_block(&block);
     let mut buf = String::new();
@@ -100,7 +100,7 @@ fn test_print_block_multiple_unnamed_args() {
         .terminator(ret)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_block(&block);
     let mut buf = String::new();
@@ -133,7 +133,7 @@ fn test_print_region_multiple_blocks() {
         .add_block(block3)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_region(&region);
     let mut buf = String::new();
@@ -353,7 +353,7 @@ fn test_staged_function_no_params() {
         .new()
         .unwrap();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let output = staged_function.render(&stage).globals(&gs).to_string().unwrap();
     insta::assert_snapshot!(output);
 }
@@ -484,7 +484,7 @@ fn test_render_very_narrow_width() {
         .new()
         .unwrap();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let output = sf
         .render(&stage)
         .config(Config::default().with_width(10))

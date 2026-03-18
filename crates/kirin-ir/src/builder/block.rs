@@ -123,7 +123,16 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         // Build replacement map: placeholder SSA -> resolved block arg SSA
         let mut replacements: std::collections::HashMap<SSAValue, SSAValue> =
             std::collections::HashMap::new();
-        for &stmt_id in &self.statements {
+
+        // Collect all statement IDs to scan (regular + terminator)
+        let all_stmt_ids: Vec<Statement> = self
+            .statements
+            .iter()
+            .copied()
+            .chain(self.terminator)
+            .collect();
+
+        for &stmt_id in &all_stmt_ids {
             let info = &self.stage.statements[stmt_id];
             for arg in info.definition.arguments() {
                 if replacements.contains_key(arg) {
@@ -165,6 +174,11 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         if let Some(term_id) = self.terminator {
             let info = &mut self.stage.statements[term_id];
             info.parent = Some(StatementParent::Block(id));
+            for arg in info.definition.arguments_mut() {
+                if let Some(&replacement) = replacements.get(arg) {
+                    *arg = replacement;
+                }
+            }
         }
 
         let block = BlockInfo::builder()

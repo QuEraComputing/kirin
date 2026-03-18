@@ -156,7 +156,7 @@ impl<L: Dialect> StageInfo<L> {
         let stage = std::mem::take(self);
         let mut builder = BuilderStageInfo::from(stage);
         let result = f(&mut builder);
-        *self = builder.into_inner();
+        *self = builder.finalize_unchecked();
         result
     }
 }

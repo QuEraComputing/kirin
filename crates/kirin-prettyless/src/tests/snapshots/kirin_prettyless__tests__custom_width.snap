@@ -11,6 +11,6 @@ specialize @0 fn @test_func(i64) -> i64 {
     return %4;
   }
   ^1(%7: f64) {
-    return %3;
+    return %7;
   }
 }

@@ -25,7 +25,7 @@ fn digraph_builder_two_node_dag() {
 
     let dg = stage.digraph().node(s0).node(s1).name("test_dag").new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = dg.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 2); // two operands both ref s0
@@ -48,7 +48,7 @@ fn digraph_builder_port_and_capture_creation() {
         .capture_name("theta")
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = dg.expect_info(&stage);
     assert_eq!(info.ports().len(), 3);
     assert_eq!(info.edge_count(), 2);
@@ -94,7 +94,7 @@ fn digraph_builder_resolves_builder_port_placeholders() {
     let placeholder_item = stage.ssa_arena().get(placeholder).unwrap();
     assert!(placeholder_item.deleted());
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = dg.expect_info(&stage);
     let real_port: SSAValue = info.edge_ports()[0].into();
 
@@ -132,7 +132,7 @@ fn ungraph_two_nodes_one_edge() {
         .name("test_ug")
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 1);
@@ -183,7 +183,7 @@ fn ungraph_boundary_port_bfs_ordering() {
         .node(n_near)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
 
@@ -260,7 +260,7 @@ fn ungraph_interleaved_edge_node_order() {
         .node(n1)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
     assert_eq!(info.graph().edge_count(), 2);
@@ -307,7 +307,7 @@ fn ungraph_port_and_capture_creation() {
         .node(n1)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = ug.expect_info(&stage);
     // Total ports = 2 edge + 1 capture = 3
     assert_eq!(info.ports().len(), 3);
@@ -372,7 +372,7 @@ fn ungraph_isolated_node_appended_after_bfs() {
         .node(n1)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
 

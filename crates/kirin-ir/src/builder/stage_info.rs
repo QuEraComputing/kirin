@@ -50,8 +50,6 @@ impl std::error::Error for FinalizeError {}
 ///
 /// Call [`finalize`](BuilderStageInfo::finalize) to validate SSAs and convert to
 /// a [`StageInfo`] with clean [`SSAInfo`](crate::node::ssa::SSAInfo) values.
-/// Use [`into_inner`](BuilderStageInfo::into_inner) to skip validation (escape
-/// hatch for tests and intermediate transforms).
 pub struct BuilderStageInfo<L: Dialect> {
     pub(crate) name: Option<GlobalSymbol>,
     pub(crate) stage_id: Option<crate::node::function::CompileStage>,
@@ -259,16 +257,14 @@ impl<L: Dialect> BuilderStageInfo<L> {
         })
     }
 
-    /// Return the underlying [`StageInfo`] without validation.
+    /// Convert to [`StageInfo`] without validation.
     ///
-    /// This is an escape hatch for tests and intermediate transforms that
-    /// do not require finalization guarantees. Panics if any SSA value has
-    /// an unresolved kind or missing type.
-    pub fn into_inner(self) -> StageInfo<L> {
+    /// This is a `pub(crate)` escape hatch used by [`StageInfo::with_builder`]
+    /// to round-trip through the builder. SSAs with missing types or unresolved
+    /// kinds get best-effort defaults. Not part of the public API.
+    pub(crate) fn finalize_unchecked(self) -> StageInfo<L> {
         let ssas = self.ssas.map_live(
             |info| {
-                // Best-effort conversion: preserve as much info as possible
-                // even when type or kind is incomplete (e.g., parser emit).
                 let id = info.id;
                 let name = info.name;
                 let kind = info
@@ -288,9 +284,10 @@ impl<L: Dialect> BuilderStageInfo<L> {
                         uses,
                     },
                     None => {
-                        // SAFETY: The type field is zeroed. This SSA will render
-                        // as a placeholder type. The SSA is structurally valid
-                        // (id, name, kind, uses are preserved).
+                        // SAFETY: The type field is zeroed. This is only used in
+                        // the with_builder round-trip path where SSAs created by
+                        // the parser may lack types. Deleted items are tombstoned
+                        // and never dereferenced.
                         let mut ssa_info: crate::node::ssa::SSAInfo<L> =
                             unsafe { std::mem::zeroed() };
                         ssa_info.id = id;
@@ -317,69 +314,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
             ungraphs: self.ungraphs,
             symbols: self.symbols,
         }
-    }
-
-    /// Return the underlying [`StageInfo`] without validation, using placeholder
-    /// types for SSA values that lack type annotations.
-    ///
-    /// Requires `L::Type: Placeholder`. Use this when the builder may contain
-    /// SSAs with `None` types (e.g., parser output with unresolved type annotations).
-    pub fn into_inner_with_placeholder(self) -> StageInfo<L>
-    where
-        L::Type: crate::Placeholder,
-    {
-        let ssas = self.ssas.map_live(
-            |mut info| {
-                let id = info.id();
-                let name = info.name();
-                let ty = info
-                    .ty
-                    .take()
-                    .unwrap_or_else(|| crate::Placeholder::placeholder());
-                let kind = info.builder_kind().as_resolved().unwrap_or_else(|| {
-                    panic!(
-                        "into_inner_with_placeholder: SSA {:?} has unresolved kind {:?}",
-                        id,
-                        info.builder_kind()
-                    )
-                });
-                crate::node::ssa::SSAInfo::new(id, name, ty, kind)
-            },
-            // SAFETY: deleted items are tombstoned and never dereferenced.
-            |_info| unsafe { std::mem::zeroed() },
-        );
-        StageInfo {
-            name: self.name,
-            stage_id: self.stage_id,
-            staged_functions: self.staged_functions,
-            staged_name_policy: self.staged_name_policy,
-            regions: self.regions,
-            blocks: self.blocks,
-            statements: self.statements,
-            ssas,
-            digraphs: self.digraphs,
-            ungraphs: self.ungraphs,
-            symbols: self.symbols,
-        }
-    }
-}
-
-// ---- Inner StageInfo access ----
-
-impl<L: Dialect> BuilderStageInfo<L> {
-    /// Temporarily convert to a [`StageInfo`] for read-only queries, then
-    /// convert back.
-    ///
-    /// This enables using `GetInfo`, `expect_info`, `block.statements()`, and
-    /// other `StageInfo`-based APIs from builder code. The O(n) cost of
-    /// converting the SSA arena in each direction is acceptable for test and
-    /// diagnostic paths.
-    pub fn with_inner<R>(&mut self, f: impl FnOnce(&mut StageInfo<L>) -> R) -> R {
-        let builder = std::mem::take(self);
-        let mut inner = builder.into_inner();
-        let result = f(&mut inner);
-        *self = BuilderStageInfo::from(inner);
-        result
     }
 }
 

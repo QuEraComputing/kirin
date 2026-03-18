@@ -90,7 +90,7 @@ fn test_composes_with_constant_and_control_flow() {
     let and_stmt = Bitwise::<ArithType>::op_and(&mut stage, const_a.result, const_b.result);
     let ret_stmt = Return::<ArithType>::new(&mut stage, and_stmt.result);
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let const_a_def = const_a
         .id
         .get_info(&stage)

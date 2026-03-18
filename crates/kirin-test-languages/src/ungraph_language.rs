@@ -80,6 +80,11 @@ mod tests {
         BuilderStageInfo::default()
     }
 
+    /// Create a dummy block to serve as the owner of placeholder SSAs.
+    fn dummy_block(stage: &mut BuilderStageInfo<UngraphLanguage>) -> Block {
+        stage.block().new()
+    }
+
     /// Create an edge statement that produces a ResultValue.
     fn make_edge(stage: &mut BuilderStageInfo<UngraphLanguage>) -> (Statement, SSAValue) {
         let result_id: ResultValue = stage.ssa_arena().next_id().into();
@@ -95,12 +100,13 @@ mod tests {
         (stmt, wire_ssa)
     }
 
-    /// Create a NodeA statement with placeholder operands.
+    /// Create a NodeA statement with dummy operands.
     fn make_node_a(stage: &mut BuilderStageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
+        let block = dummy_block(stage);
         let placeholder = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(BuilderSSAKind::Test)
+            .kind(BuilderSSAKind::BlockArgument(block, 0))
             .new();
         stage
             .statement()
@@ -111,12 +117,13 @@ mod tests {
             .new()
     }
 
-    /// Create a NodeB statement with placeholder operands.
+    /// Create a NodeB statement with dummy operands.
     fn make_node_b(stage: &mut BuilderStageInfo<UngraphLanguage>, n_ports: usize) -> Statement {
+        let block = dummy_block(stage);
         let placeholder = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(BuilderSSAKind::Test)
+            .kind(BuilderSSAKind::BlockArgument(block, 0))
             .new();
         stage
             .statement()
@@ -146,7 +153,7 @@ mod tests {
             .node(n2)
             .new();
 
-        let stage = stage.into_inner();
+        let stage = stage.finalize().unwrap();
         let info = ug.expect_info(&stage);
         assert_eq!(info.edge_ports().len(), 1);
         assert_eq!(info.capture_ports().len(), 1);
@@ -175,10 +182,11 @@ mod tests {
             .new();
 
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
+        let dummy = dummy_block(&mut stage);
         let placeholder = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(BuilderSSAKind::Test)
+            .kind(BuilderSSAKind::BlockArgument(dummy, 0))
             .new();
         let compound_stmt = stage
             .statement()
@@ -194,7 +202,7 @@ mod tests {
             .kind(BuilderSSAKind::Result(compound_stmt, 0))
             .new();
 
-        let stage = stage.into_inner();
+        let stage = stage.finalize().unwrap();
         let def = compound_stmt.definition(&stage);
         let ungraphs: Vec<_> = def.ungraphs().collect();
         assert_eq!(ungraphs.len(), 1, "compound should have one ungraph body");
@@ -282,10 +290,11 @@ mod tests {
 
         // Wrap inner ungraph in a compound statement
         let compound_res: ResultValue = stage.ssa_arena().next_id().into();
+        let dummy = dummy_block(&mut stage);
         let placeholder = stage
             .ssa()
             .ty(SimpleType::Any)
-            .kind(BuilderSSAKind::Test)
+            .kind(BuilderSSAKind::BlockArgument(dummy, 0))
             .new();
         let compound_stmt = stage
             .statement()
@@ -315,7 +324,7 @@ mod tests {
             .node(compound_stmt)
             .new();
 
-        let stage = stage.into_inner();
+        let stage = stage.finalize().unwrap();
         let outer_info = outer_ug.expect_info(&stage);
         assert_eq!(
             outer_info.graph().node_count(),
@@ -361,7 +370,7 @@ mod tests {
 
         let block = stage.block().stmt(compound_stmt).new();
 
-        let stage = stage.into_inner();
+        let stage = stage.finalize().unwrap();
         let stmts: Vec<_> = block.statements(&stage).collect();
         assert_eq!(stmts.len(), 1);
         let def: &UngraphLanguage = stmts[0].definition(&stage);

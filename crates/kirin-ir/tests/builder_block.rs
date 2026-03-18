@@ -25,7 +25,7 @@ fn block_builder_creates_block_with_arguments_and_statements() {
         .stmt(s1)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = block.expect_info(&stage);
     assert_eq!(info.arguments.len(), 2);
 
@@ -59,7 +59,7 @@ fn block_builder_substitutes_builder_block_arguments() {
         .stmt(add_stmt)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let block_info = block.expect_info(&stage);
     let real_arg0: SSAValue = block_info.arguments[0].into();
     let real_arg1: SSAValue = block_info.arguments[1].into();
@@ -105,7 +105,7 @@ fn statement_iter_double_ended() {
 
     let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let mut iter = block.statements(&stage);
     let last = iter.next_back().unwrap();
     let mid = iter.next_back().unwrap();
@@ -124,7 +124,7 @@ fn statement_iter_exact_size() {
 
     let block = stage.block().stmt(s0).stmt(s1).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let mut iter = block.statements(&stage);
     assert_eq!(iter.len(), 2);
     iter.next();
@@ -139,7 +139,7 @@ fn block_first_last_statement_with_terminator_only() {
     let ret = stage.statement().definition(BuilderDialect::Return).new();
     let block = stage.block().terminator(ret).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     assert_eq!(block.statements(&stage).len(), 0);
     assert_eq!(block.first_statement(&stage), Some(ret));
     assert_eq!(block.last_statement(&stage), Some(ret));
@@ -152,7 +152,7 @@ fn block_last_statement_without_terminator() {
     let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     assert_eq!(block.terminator(&stage), None);
     assert_eq!(block.last_statement(&stage), Some(s1));
     assert_eq!(block.first_statement(&stage), Some(s0));
@@ -167,7 +167,7 @@ fn block_with_statements_and_terminator() {
 
     let block = stage.block().stmt(s0).stmt(s1).terminator(ret).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let stmts: Vec<_> = block.statements(&stage).collect();
     assert_eq!(stmts, vec![s0, s1]);
     assert_eq!(block.terminator(&stage), Some(ret));
@@ -180,7 +180,7 @@ fn empty_block_iteration() {
     let mut stage = new_stage();
     let block = stage.block().new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let stmts: Vec<_> = block.statements(&stage).collect();
     assert!(stmts.is_empty());
     assert_eq!(block.statements(&stage).len(), 0);
@@ -195,7 +195,7 @@ fn single_statement_double_ended_iteration() {
     let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let mut iter = block.statements(&stage);
     assert_eq!(iter.next(), Some(s0));
     assert_eq!(iter.next(), None);
@@ -211,7 +211,7 @@ fn block_argument_placeholder_substitution_with_zero_args() {
     let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let info = block.expect_info(&stage);
     assert!(info.arguments.is_empty());
 }
@@ -232,7 +232,7 @@ fn region_builder_creates_region_with_ordered_blocks() {
         .add_block(b2)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     assert_eq!(region.blocks(&stage).len(), 3);
     let blocks: Vec<_> = region.blocks(&stage).collect();
     assert_eq!(blocks, vec![b0, b1, b2]);
@@ -261,7 +261,7 @@ fn region_block_iter_single_block() {
     let b0 = stage.block().new();
     let region = stage.region().add_block(b0).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let blocks: Vec<_> = region.blocks(&stage).collect();
     assert_eq!(blocks, vec![b0]);
     assert_eq!(region.blocks(&stage).len(), 1);
@@ -280,7 +280,7 @@ fn region_block_iter_double_ended() {
         .add_block(b2)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let mut iter = region.blocks(&stage);
     assert_eq!(iter.next_back(), Some(b2));
     assert_eq!(iter.next(), Some(b0));
@@ -296,7 +296,7 @@ fn region_block_iter_exact_size() {
     let b1 = stage.block().new();
     let region = stage.region().add_block(b0).add_block(b1).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let mut iter = region.blocks(&stage);
     assert_eq!(iter.len(), 2);
     iter.next();
@@ -310,7 +310,7 @@ fn empty_region() {
     let mut stage = new_stage();
     let region = stage.region().new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let blocks: Vec<_> = region.blocks(&stage).collect();
     assert!(blocks.is_empty());
     assert_eq!(region.blocks(&stage).len(), 0);
@@ -326,11 +326,9 @@ fn detach_statement_updates_neighbors_and_parent_len() {
     let s2 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
 
-    stage.with_inner(|inner| {
-        s1.detach(inner);
-    });
+    let mut stage = stage.finalize().unwrap();
+    s1.detach(&mut stage);
 
-    let stage = stage.into_inner();
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.len(), 2);
 
@@ -349,11 +347,9 @@ fn detach_head_statement_updates_block_head() {
     let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
-    stage.with_inner(|inner| {
-        s0.detach(inner);
-    });
+    let mut stage = stage.finalize().unwrap();
+    s0.detach(&mut stage);
 
-    let stage = stage.into_inner();
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.head(), Some(&s1));
     assert_eq!(block_info.statements.len(), 1);
@@ -366,11 +362,9 @@ fn detach_tail_statement_updates_block_tail() {
     let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
-    stage.with_inner(|inner| {
-        s1.detach(inner);
-    });
+    let mut stage = stage.finalize().unwrap();
+    s1.detach(&mut stage);
 
-    let stage = stage.into_inner();
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.tail(), Some(&s0));
     assert_eq!(block_info.statements.len(), 1);
@@ -382,11 +376,9 @@ fn detach_only_statement_leaves_empty_block() {
     let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).new();
 
-    stage.with_inner(|inner| {
-        s0.detach(inner);
-    });
+    let mut stage = stage.finalize().unwrap();
+    s0.detach(&mut stage);
 
-    let stage = stage.into_inner();
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.len(), 0);
     assert!(block_info.statements.head().is_none());
@@ -556,25 +548,16 @@ fn finalize_block_with_statements_produces_clean_stage() {
 }
 
 #[test]
-fn into_inner_vs_finalize_both_produce_stage_info() {
-    // into_inner is the escape hatch; finalize validates
-    let mut stage1 = new_stage();
-    let b1 = stage1.block().argument(TestType::I32).new();
-    let inner = stage1.into_inner();
-    let info1 = b1.expect_info(&inner);
-    assert_eq!(info1.arguments.len(), 1);
+fn finalize_produces_stage_info() {
+    let mut stage = new_stage();
+    let block = stage.block().argument(TestType::I32).new();
+    let finalized = stage.finalize().unwrap();
+    let info = block.expect_info(&finalized);
+    assert_eq!(info.arguments.len(), 1);
 
-    let mut stage2 = new_stage();
-    let b2 = stage2.block().argument(TestType::I32).new();
-    let finalized = stage2.finalize().unwrap();
-    let info2 = b2.expect_info(&finalized);
-    assert_eq!(info2.arguments.len(), 1);
-
-    // Both return StageInfo with SSAInfo (not BuilderSSAInfo)
-    let arg1: SSAValue = info1.arguments[0].into();
-    let arg2: SSAValue = info2.arguments[0].into();
-    assert_eq!(*arg1.expect_info(&inner).ty(), TestType::I32);
-    assert_eq!(*arg2.expect_info(&finalized).ty(), TestType::I32);
+    // SSAInfo has non-optional ty and clean SSAKind
+    let arg: SSAValue = info.arguments[0].into();
+    assert_eq!(*arg.expect_info(&finalized).ty(), TestType::I32);
 }
 
 // --- link_statements edge cases ---
@@ -596,7 +579,7 @@ fn link_statements_single_element() {
     assert_eq!(list.len(), 1);
     assert_eq!(list.head(), Some(&s0));
     assert_eq!(list.tail(), Some(&s0));
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     assert_eq!(*s0.prev(&stage), None);
     assert_eq!(*s0.next(&stage), None);
 }
@@ -635,7 +618,7 @@ fn remap_block_identity_remaps_parents_and_ssa_kinds() {
 
     stage.remap_block_identity(stub, real);
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     assert_eq!(*s0.parent(&stage), Some(StatementParent::Block(stub)));
 
     let stub_info = stub.expect_info(&stage);

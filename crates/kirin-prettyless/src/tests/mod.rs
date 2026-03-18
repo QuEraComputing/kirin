@@ -86,7 +86,7 @@ fn create_test_function() -> (
         .new()
         .unwrap();
 
-    (stage.into_inner(), gs, f)
+    (stage.finalize().unwrap(), gs, f)
 }
 
 include!("snapshot.rs");

@@ -187,7 +187,7 @@ fn test_pretty_print_u64() {
 fn test_pretty_print_symbol_resolved() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let sym = stage.symbol_table_mut().intern("my_var".to_string());
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = sym.pretty_print(&doc);
     let mut buf = String::new();
@@ -203,7 +203,7 @@ fn test_pretty_print_successor() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let block = stage.block().new();
     let succ = Successor::from_block(block);
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = succ.pretty_print(&doc);
     let mut buf = String::new();
@@ -241,7 +241,7 @@ fn test_print_block_empty_body() {
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let block = stage.block().new();
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_block(&block);
     let mut buf = String::new();
@@ -260,7 +260,7 @@ fn test_print_block_only_terminator() {
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
     let block = stage.block().stmt(a).terminator(ret).new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_block(&block);
     let mut buf = String::new();
@@ -284,7 +284,7 @@ fn test_print_block_with_named_args() {
         .terminator(ret)
         .new();
 
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_block(&block);
     let mut buf = String::new();
@@ -304,7 +304,7 @@ fn test_print_region_empty() {
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let region = stage.region().new();
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_region(&region);
     let mut buf = String::new();
@@ -363,7 +363,7 @@ fn test_render_builder_config() {
         .unwrap();
 
     // Render with narrow width
-    let stage = stage.into_inner();
+    let stage = stage.finalize().unwrap();
     let output = PrettyPrintExt::<SimpleLanguage>::render(&f, &stage)
         .config(Config::default().with_width(30))
         .globals(&gs)
