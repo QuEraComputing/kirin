@@ -8,14 +8,16 @@ use crate::{Dialect, InternTable, node::*};
 /// Shared arena storage for all IR nodes except SSA values.
 ///
 /// Both [`StageInfo`](crate::StageInfo) and [`BuilderStageInfo`](crate::BuilderStageInfo)
-/// contain a `NodeArenas<L>`. The only difference between the two stage-info
+/// contain an `Arenas<L>`. The only difference between the two stage-info
 /// types is the SSA arena (`SSAInfo` vs `BuilderSSAInfo`); everything else
 /// lives here.
 ///
-/// Accessor methods defined on `NodeArenas` are available on both stage-info
+/// Accessor methods defined on `Arenas` are available on both stage-info
 /// types via `Deref`/`DerefMut`.
+///
+/// Re-exported at the crate root as [`StageArenas`](crate::StageArenas).
 #[derive(Debug)]
-pub struct NodeArenas<L: Dialect> {
+pub struct Arenas<L: Dialect> {
     pub(crate) name: Option<GlobalSymbol>,
     pub(crate) stage_id: Option<CompileStage>,
     pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
@@ -28,7 +30,7 @@ pub struct NodeArenas<L: Dialect> {
     pub(crate) symbols: InternTable<String, Symbol>,
 }
 
-impl<L> Default for NodeArenas<L>
+impl<L> Default for Arenas<L>
 where
     L: Dialect,
 {
@@ -48,7 +50,7 @@ where
     }
 }
 
-impl<L> Clone for NodeArenas<L>
+impl<L> Clone for Arenas<L>
 where
     L: Dialect,
     StatementInfo<L>: Clone,
@@ -69,7 +71,7 @@ where
     }
 }
 
-impl<L: Dialect> NodeArenas<L> {
+impl<L: Dialect> Arenas<L> {
     /// Get the optional stage name for this context.
     pub fn name(&self) -> Option<GlobalSymbol> {
         self.name

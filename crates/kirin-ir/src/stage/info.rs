@@ -2,8 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 use crate::arena::Arena;
 use crate::node::ssa::SSAInfo;
-use crate::node_arenas::NodeArenas;
 use crate::{BuilderStageInfo, Dialect, node::*};
+
+use super::arenas::Arenas;
 
 /// The core stage info type for finalized IR.
 ///
@@ -12,7 +13,7 @@ use crate::{BuilderStageInfo, Dialect, node::*};
 /// The SSA arena holds clean [`SSAInfo`] values with `L::Type` and [`SSAKind`].
 #[derive(Debug)]
 pub struct StageInfo<L: Dialect> {
-    pub(crate) nodes: NodeArenas<L>,
+    pub(crate) nodes: Arenas<L>,
     pub(crate) ssas: Arena<SSAValue, SSAInfo<L>>,
 }
 
@@ -22,7 +23,7 @@ where
 {
     fn default() -> Self {
         Self {
-            nodes: NodeArenas::default(),
+            nodes: Arenas::default(),
             ssas: Arena::default(),
         }
     }
@@ -43,7 +44,7 @@ where
 }
 
 impl<L: Dialect> Deref for StageInfo<L> {
-    type Target = NodeArenas<L>;
+    type Target = Arenas<L>;
 
     fn deref(&self) -> &Self::Target {
         &self.nodes

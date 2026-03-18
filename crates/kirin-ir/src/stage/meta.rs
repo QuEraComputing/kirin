@@ -1,4 +1,4 @@
-use crate::context::StageInfo;
+use super::info::StageInfo;
 use crate::language::Dialect;
 use crate::node::function::CompileStage;
 use crate::node::symbol::GlobalSymbol;

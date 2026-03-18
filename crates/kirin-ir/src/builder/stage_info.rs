@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 use crate::arena::Arena;
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, SSAValue};
 use crate::node::stmt::StatementParent;
-use crate::node_arenas::NodeArenas;
+use crate::stage::arenas::Arenas;
 use crate::{Dialect, StageInfo, node::*};
 
 /// Error returned by [`BuilderStageInfo::finalize`] when build-time SSAs
@@ -50,14 +50,14 @@ impl std::error::Error for FinalizeError {}
 /// Call [`finalize`](BuilderStageInfo::finalize) to validate SSAs and convert to
 /// a [`StageInfo`] with clean [`SSAInfo`](crate::node::ssa::SSAInfo) values.
 pub struct BuilderStageInfo<L: Dialect> {
-    pub(crate) nodes: NodeArenas<L>,
+    pub(crate) nodes: Arenas<L>,
     pub(crate) ssas: Arena<SSAValue, BuilderSSAInfo<L>>,
 }
 
 impl<L: Dialect> Default for BuilderStageInfo<L> {
     fn default() -> Self {
         Self {
-            nodes: NodeArenas::default(),
+            nodes: Arenas::default(),
             ssas: Arena::default(),
         }
     }
@@ -82,7 +82,7 @@ impl<L: Dialect> From<StageInfo<L>> for BuilderStageInfo<L> {
 }
 
 impl<L: Dialect> Deref for BuilderStageInfo<L> {
-    type Target = NodeArenas<L>;
+    type Target = Arenas<L>;
 
     fn deref(&self) -> &Self::Target {
         &self.nodes

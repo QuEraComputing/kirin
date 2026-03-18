@@ -1,13 +1,11 @@
 mod arena;
 mod builder;
 mod comptime;
-mod context;
 mod detach;
 mod intern;
 mod language;
 mod lattice;
 mod node;
-mod node_arenas;
 mod pipeline;
 mod signature;
 mod stage;
@@ -22,7 +20,6 @@ pub use builder::error::{
 };
 pub use builder::{BuilderStageInfo, FinalizeError};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
-pub use context::StageInfo;
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
@@ -39,14 +36,14 @@ pub use node::{
     StagedNamePolicy, Statement, StatementInfo, StatementParent, Successor, Symbol, TestSSAValue,
     UnGraph, UnGraphInfo,
 };
-pub use node_arenas::NodeArenas;
 pub use pipeline::Pipeline;
 pub use signature::{
     ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
 pub use stage::{
-    HasStageInfo, StageAction, StageActionMut, StageDispatch, StageDispatchMiss, StageDispatchMut,
-    StageDispatchRequiredError, StageMeta, SupportsStageDispatch, SupportsStageDispatchMut,
+    HasStageInfo, StageAction, StageActionMut, StageArenas, StageDispatch, StageDispatchMiss,
+    StageDispatchMut, StageDispatchRequiredError, StageInfo, StageMeta, SupportsStageDispatch,
+    SupportsStageDispatchMut,
 };
 
 /// Re-exports of the most commonly used types for dialect authors.
