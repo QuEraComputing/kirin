@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet, VecDeque};
+
 use crate::arena::{Arena, GetInfo};
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::function::CompileStage;
@@ -221,5 +223,250 @@ impl<L: Dialect> StageInfo<L> {
         real_info.node.ptr = stub;
         *stub.expect_info_mut(self) = real_info;
         self.blocks.delete(real);
+    }
+
+    /// Attach node statements and yield values to an existing digraph.
+    ///
+    /// The digraph must already have been created (with ports/captures) via the
+    /// builder. This method sets `StatementParent::DiGraph` on all nodes, builds
+    /// the petgraph edges, and updates the `DiGraphInfo` in the arena.
+    ///
+    /// This is the second phase of the two-phase emit pattern: the first phase
+    /// creates the graph with ports only, the second phase attaches statements
+    /// after they have been emitted referencing real port SSAs.
+    pub fn attach_nodes_to_digraph(
+        &mut self,
+        dg: DiGraph,
+        nodes: &[Statement],
+        yields: &[SSAValue],
+    ) {
+        let dg_info = dg.expect_info(self);
+        let id = dg_info.id();
+
+        // Build petgraph::DiGraph<Statement, SSAValue>
+        let mut stmt_to_node: HashMap<Statement, petgraph::graph::NodeIndex> = HashMap::new();
+        let mut graph = petgraph::Graph::<Statement, SSAValue, petgraph::Directed>::new();
+
+        for &stmt_id in nodes {
+            let ni = graph.add_node(stmt_id);
+            stmt_to_node.insert(stmt_id, ni);
+        }
+
+        // For each node's operands, if the operand's producer is also in this graph, add an edge
+        for &stmt_id in nodes {
+            let consumer_ni = stmt_to_node[&stmt_id];
+            let info = stmt_id.expect_info(self);
+            let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
+            for operand in operands {
+                let ssa_info = self
+                    .ssas
+                    .get(operand)
+                    .expect("SSAValue not found in stage");
+                if let SSAKind::Result(producer_stmt, _) = ssa_info.kind
+                    && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
+                {
+                    graph.add_edge(producer_ni, consumer_ni, operand);
+                }
+            }
+        }
+
+        // Set StatementParent::DiGraph on all node statements
+        for &stmt_id in nodes {
+            let info = &mut self.statements[stmt_id];
+            info.parent = Some(StatementParent::DiGraph(id));
+        }
+
+        // Update DiGraphInfo with graph and yields
+        let dg_info = dg.expect_info_mut(self);
+        dg_info.graph = graph;
+        dg_info.yields = yields.to_vec();
+    }
+
+    /// Attach edge and node statements to an existing ungraph.
+    ///
+    /// The ungraph must already have been created (with ports/captures) via the
+    /// builder. This method sets `StatementParent::UnGraph` on all statements,
+    /// builds the petgraph with BFS reordering, and updates the `UnGraphInfo`.
+    ///
+    /// This is the second phase of the two-phase emit pattern.
+    pub fn attach_nodes_to_ungraph(
+        &mut self,
+        ug: UnGraph,
+        edge_stmts: &[Statement],
+        node_stmts: &[Statement],
+    ) {
+        let ug_info = ug.expect_info(self);
+        let id = ug_info.id();
+        let edge_count = ug_info.edge_count();
+        let all_ports: Vec<crate::node::port::Port> = ug_info.ports().to_vec();
+
+        // Collect the set of edge SSAValues (ResultValues produced by edge_stmts)
+        let mut edge_ssa_set: HashSet<SSAValue> = HashSet::new();
+        for &edge_stmt in edge_stmts {
+            let info = edge_stmt.expect_info(self);
+            for result in info.definition.results() {
+                edge_ssa_set.insert((*result).into());
+            }
+        }
+
+        // Boundary port SSAValues for graph wiring
+        let boundary_ssa_set: HashSet<SSAValue> = all_ports
+            .iter()
+            .take(edge_count)
+            .map(|p| (*p).into())
+            .collect();
+
+        // Build map: edge SSAValue -> list of node statements that use it
+        let mut edge_ssa_to_nodes: HashMap<SSAValue, Vec<Statement>> = HashMap::new();
+        for &node_stmt in node_stmts {
+            let info = node_stmt.expect_info(self);
+            let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
+            for operand in operands {
+                if edge_ssa_set.contains(&operand) || boundary_ssa_set.contains(&operand) {
+                    edge_ssa_to_nodes
+                        .entry(operand)
+                        .or_default()
+                        .push(node_stmt);
+                }
+            }
+        }
+
+        // Validate: no edge SSAValue used by more than 2 node statements
+        for (ssa, nodes) in &edge_ssa_to_nodes {
+            if nodes.len() > 2 {
+                panic!(
+                    "UnGraph constraint violated: edge SSAValue {} is used by {} node statements \
+                     (max 2 allowed for undirected graph edges)",
+                    ssa,
+                    nodes.len()
+                );
+            }
+        }
+
+        // Build the petgraph
+        let mut stmt_to_node: HashMap<Statement, petgraph::graph::NodeIndex> = HashMap::new();
+        let mut graph =
+            petgraph::Graph::<Statement, SSAValue, petgraph::Undirected>::new_undirected();
+
+        for &stmt_id in node_stmts {
+            let ni = graph.add_node(stmt_id);
+            stmt_to_node.insert(stmt_id, ni);
+        }
+
+        for (ssa, nodes) in &edge_ssa_to_nodes {
+            if nodes.len() == 2 {
+                let n0 = stmt_to_node[&nodes[0]];
+                let n1 = stmt_to_node[&nodes[1]];
+                graph.add_edge(n0, n1, *ssa);
+            }
+        }
+
+        // BFS reindex from boundary-port-connected nodes
+        let mut visited_nodes: HashSet<petgraph::graph::NodeIndex> = HashSet::new();
+        let mut visited_edges: HashSet<SSAValue> = HashSet::new();
+        let mut bfs_node_order: Vec<petgraph::graph::NodeIndex> = Vec::new();
+        let mut bfs_edge_order: Vec<Statement> = Vec::new();
+        let mut queue: VecDeque<petgraph::graph::NodeIndex> = VecDeque::new();
+
+        // Build map: edge SSAValue -> edge statement
+        let mut ssa_to_edge_stmt: HashMap<SSAValue, Statement> = HashMap::new();
+        for &edge_stmt in edge_stmts {
+            let info = edge_stmt.expect_info(self);
+            for result in info.definition.results() {
+                ssa_to_edge_stmt.insert((*result).into(), edge_stmt);
+            }
+        }
+
+        // Seed BFS with nodes that use boundary port SSAValues
+        for &node_stmt in node_stmts {
+            let info = node_stmt.expect_info(self);
+            let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
+            let uses_boundary = operands.iter().any(|op| boundary_ssa_set.contains(op));
+            if uses_boundary {
+                let ni = stmt_to_node[&node_stmt];
+                if visited_nodes.insert(ni) {
+                    queue.push_back(ni);
+                    bfs_node_order.push(ni);
+                }
+            }
+        }
+
+        // BFS traversal
+        while let Some(ni) = queue.pop_front() {
+            let stmt = graph[ni];
+            let info = stmt.expect_info(self);
+            let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
+            for operand in operands {
+                if !visited_edges.contains(&operand) && edge_ssa_set.contains(&operand) {
+                    visited_edges.insert(operand);
+                    if let Some(&edge_stmt) = ssa_to_edge_stmt.get(&operand) {
+                        bfs_edge_order.push(edge_stmt);
+                    }
+                    if let Some(nodes) = edge_ssa_to_nodes.get(&operand) {
+                        for &other_stmt in nodes {
+                            let other_ni = stmt_to_node[&other_stmt];
+                            if visited_nodes.insert(other_ni) {
+                                queue.push_back(other_ni);
+                                bfs_node_order.push(other_ni);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Append remaining unvisited nodes (isolated)
+        for &stmt_id in node_stmts {
+            let ni = stmt_to_node[&stmt_id];
+            if visited_nodes.insert(ni) {
+                bfs_node_order.push(ni);
+            }
+        }
+
+        // Append remaining unvisited edge statements
+        let bfs_edge_set: HashSet<Statement> = bfs_edge_order.iter().copied().collect();
+        for &edge_stmt in edge_stmts {
+            if !bfs_edge_set.contains(&edge_stmt) {
+                bfs_edge_order.push(edge_stmt);
+            }
+        }
+
+        // Rebuild petgraph in BFS node order
+        let mut new_graph =
+            petgraph::Graph::<Statement, SSAValue, petgraph::Undirected>::new_undirected();
+        let mut old_to_new: HashMap<petgraph::graph::NodeIndex, petgraph::graph::NodeIndex> =
+            HashMap::new();
+        let mut reordered_nodes = Vec::with_capacity(bfs_node_order.len());
+
+        for &old_ni in &bfs_node_order {
+            let stmt = graph[old_ni];
+            let new_ni = new_graph.add_node(stmt);
+            old_to_new.insert(old_ni, new_ni);
+            reordered_nodes.push(stmt);
+        }
+
+        for edge in graph.edge_indices() {
+            let (src, dst) = graph.edge_endpoints(edge).unwrap();
+            let weight = graph[edge];
+            new_graph.add_edge(old_to_new[&src], old_to_new[&dst], weight);
+        }
+
+        let graph = new_graph;
+        let final_edge_stmts = bfs_edge_order;
+
+        // Set StatementParent::UnGraph on all node + edge statements
+        for &stmt_id in &reordered_nodes {
+            let info = &mut self.statements[stmt_id];
+            info.parent = Some(StatementParent::UnGraph(id));
+        }
+        for &stmt_id in &final_edge_stmts {
+            let info = &mut self.statements[stmt_id];
+            info.parent = Some(StatementParent::UnGraph(id));
+        }
+
+        // Update UnGraphInfo with graph and edge statements
+        let ug_info = ug.expect_info_mut(self);
+        ug_info.graph = graph;
+        ug_info.edge_statements = final_edge_stmts;
     }
 }

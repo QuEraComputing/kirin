@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, GetInfo, IsEdge, Placeholder, SSAKind};
+use kirin_ir::{Dialect, GetInfo, IsEdge, Placeholder, SSAValue};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -88,80 +88,23 @@ impl<'src, StmtOutput> UnGraphStatement<'src, StmtOutput> {
 
 // --- Shared helpers for graph emit ---
 
-struct PortInfo {
-    name: String,
-}
-
 /// Collect port/capture names and types eagerly from parsed block arguments.
 fn collect_port_info<'src, TypeOutput, IR>(
     args: &[Spanned<super::BlockArgument<'src, TypeOutput>>],
     ctx: &mut EmitContext<'_, IR>,
-) -> Result<(Vec<PortInfo>, Vec<IR::Type>), EmitError>
+) -> Result<(Vec<String>, Vec<IR::Type>), EmitError>
 where
     IR: Dialect,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
 {
-    let mut infos = Vec::with_capacity(args.len());
+    let mut names = Vec::with_capacity(args.len());
     let mut types = Vec::with_capacity(args.len());
     for arg in args.iter() {
         let ty: IR::Type = arg.value.ty.value.emit(ctx)?;
         types.push(ty);
-        infos.push(PortInfo {
-            name: arg.value.name.value.to_string(),
-        });
+        names.push(arg.value.name.value.to_string());
     }
-    Ok((infos, types))
-}
-
-/// Create temporary placeholder SSAs for ports/captures and register them by name.
-///
-/// These placeholders are resolved when the graph builder finalizes.
-fn register_placeholder_ssas<IR>(
-    infos: &[PortInfo],
-    types: &[IR::Type],
-    resolution: fn(kirin_ir::BuilderKey) -> kirin_ir::ResolutionInfo,
-    ctx: &mut EmitContext<'_, IR>,
-) where
-    IR: Dialect,
-    IR::Type: Placeholder + Clone,
-{
-    for (i, info) in infos.iter().enumerate() {
-        let ssa = ctx
-            .stage
-            .ssa()
-            .name(info.name.clone())
-            .ty(types[i].clone())
-            .kind(SSAKind::Unresolved(resolution(
-                kirin_ir::BuilderKey::Index(i),
-            )))
-            .new();
-        ctx.register_ssa(info.name.clone(), ssa);
-    }
-}
-
-/// Collect (SSAValue, name) pairs from built graph ports and their corresponding infos.
-///
-/// Returns a `Vec` so the caller can drop the borrow on `ctx.stage` before
-/// calling `ctx.register_ssa` for each pair.
-fn collect_port_ssa_names(
-    ports: &[kirin_ir::Port],
-    infos: &[PortInfo],
-) -> Vec<(kirin_ir::SSAValue, String)> {
-    ports
-        .iter()
-        .zip(infos.iter())
-        .map(|(port, info)| (kirin_ir::SSAValue::from(*port), info.name.clone()))
-        .collect()
-}
-
-/// Register collected (SSAValue, name) pairs in the emit context.
-fn register_ssa_names<IR: Dialect>(
-    pairs: Vec<(kirin_ir::SSAValue, String)>,
-    ctx: &mut EmitContext<'_, IR>,
-) {
-    for (ssa, name) in pairs {
-        ctx.register_ssa(name, ssa);
-    }
+    Ok((names, types))
 }
 
 // --- EmitIR implementations ---
@@ -184,24 +127,44 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         let graph_name = header.name.value.to_string();
 
         // Collect all port/capture types eagerly (before borrowing ctx.stage via builder)
-        let (port_infos, port_types) = collect_port_info(&header.ports, ctx)?;
-        let (cap_infos, cap_types) = collect_port_info(&header.captures, ctx)?;
+        let (port_names, port_types) = collect_port_info(&header.ports, ctx)?;
+        let (cap_names, cap_types) = collect_port_info(&header.captures, ctx)?;
 
-        // Phase 1: Create temporary port/capture SSAs and register names
-        register_placeholder_ssas(
-            &port_infos,
-            &port_types,
-            kirin_ir::ResolutionInfo::Port,
-            ctx,
-        );
-        register_placeholder_ssas(
-            &cap_infos,
-            &cap_types,
-            kirin_ir::ResolutionInfo::Capture,
-            ctx,
-        );
+        // Phase 1: Create the digraph with ports/captures only (no nodes/yields).
+        // This produces real port SSAs immediately.
+        let mut builder = ctx.stage.digraph().name(graph_name);
 
-        // Phase 2: Emit all statements with relaxed dominance.
+        for (name, ty) in port_names.iter().zip(port_types.iter()) {
+            builder = builder.port(ty.clone()).port_name(name.clone());
+        }
+
+        for (name, ty) in cap_names.iter().zip(cap_types.iter()) {
+            builder = builder.capture(ty.clone()).capture_name(name.clone());
+        }
+
+        let dg = builder.new();
+
+        // Phase 2: Read back real port/capture SSAs and register them in emit context.
+        // Collect SSA values first to avoid borrow conflict with ctx.
+        let dg_info = dg.expect_info(ctx.stage);
+        let port_ssas: Vec<SSAValue> = dg_info
+            .edge_ports()
+            .iter()
+            .map(|p| SSAValue::from(*p))
+            .collect();
+        let cap_ssas: Vec<SSAValue> = dg_info
+            .capture_ports()
+            .iter()
+            .map(|p| SSAValue::from(*p))
+            .collect();
+        for (ssa, name) in port_ssas.into_iter().zip(port_names.iter()) {
+            ctx.register_ssa(name.clone(), ssa);
+        }
+        for (ssa, name) in cap_ssas.into_iter().zip(cap_names.iter()) {
+            ctx.register_ssa(name.clone(), ssa);
+        }
+
+        // Phase 3: Emit all statements with relaxed dominance.
         // Graph bodies allow forward SSA references — a statement may reference
         // SSAs defined by later statements (e.g. cycles in signal processing graphs).
         ctx.set_relaxed_dominance(true);
@@ -212,7 +175,7 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         }
         ctx.set_relaxed_dominance(false);
 
-        // Phase 3: Resolve yield references
+        // Phase 4: Resolve yield references
         let mut yield_ssas = Vec::new();
         for y in &self.yields {
             let ssa = ctx
@@ -221,34 +184,9 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
             yield_ssas.push(ssa);
         }
 
-        // Phase 4: Build digraph using builder — it will create real port SSAs
-        // and resolve Unresolved(Port/Capture) placeholders in statement operands
-        let mut builder = ctx.stage.digraph().name(graph_name);
-
-        for (info, ty) in port_infos.iter().zip(port_types.iter()) {
-            builder = builder.port(ty.clone()).port_name(info.name.clone());
-        }
-
-        for (info, ty) in cap_infos.iter().zip(cap_types.iter()) {
-            builder = builder.capture(ty.clone()).capture_name(info.name.clone());
-        }
-
-        for stmt in &node_stmts {
-            builder = builder.node(*stmt);
-        }
-
-        for ssa in &yield_ssas {
-            builder = builder.yield_value(*ssa);
-        }
-
-        let dg = builder.new();
-
-        // Phase 5: Register real port/capture SSAs in emit context
-        let dg_info = dg.expect_info(ctx.stage);
-        let port_ssas = collect_port_ssa_names(dg_info.edge_ports(), &port_infos);
-        let cap_ssas = collect_port_ssa_names(dg_info.capture_ports(), &cap_infos);
-        register_ssa_names(port_ssas, ctx);
-        register_ssa_names(cap_ssas, ctx);
+        // Phase 5: Attach nodes and yields to the already-created digraph.
+        ctx.stage
+            .attach_nodes_to_digraph(dg, &node_stmts, &yield_ssas);
 
         Ok(dg)
     }
@@ -286,24 +224,43 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
         let graph_name = header.name.value.to_string();
 
         // Collect all port/capture types eagerly
-        let (port_infos, port_types) = collect_port_info(&header.ports, ctx)?;
-        let (cap_infos, cap_types) = collect_port_info(&header.captures, ctx)?;
+        let (port_names, port_types) = collect_port_info(&header.ports, ctx)?;
+        let (cap_names, cap_types) = collect_port_info(&header.captures, ctx)?;
 
-        // Phase 1: Create temporary port/capture SSAs and register names
-        register_placeholder_ssas(
-            &port_infos,
-            &port_types,
-            kirin_ir::ResolutionInfo::Port,
-            ctx,
-        );
-        register_placeholder_ssas(
-            &cap_infos,
-            &cap_types,
-            kirin_ir::ResolutionInfo::Capture,
-            ctx,
-        );
+        // Phase 1: Create the ungraph with ports/captures only (no edges/nodes).
+        let mut builder = ctx.stage.ungraph().name(graph_name);
 
-        // Phase 2: Emit all statements with relaxed dominance, tracking edge vs node
+        for (name, ty) in port_names.iter().zip(port_types.iter()) {
+            builder = builder.port(ty.clone()).port_name(name.clone());
+        }
+
+        for (name, ty) in cap_names.iter().zip(cap_types.iter()) {
+            builder = builder.capture(ty.clone()).capture_name(name.clone());
+        }
+
+        let ug = builder.new();
+
+        // Phase 2: Read back real port/capture SSAs and register them in emit context.
+        // Collect SSA values first to avoid borrow conflict with ctx.
+        let ug_info = ug.expect_info(ctx.stage);
+        let port_ssas: Vec<SSAValue> = ug_info
+            .edge_ports()
+            .iter()
+            .map(|p| SSAValue::from(*p))
+            .collect();
+        let cap_ssas: Vec<SSAValue> = ug_info
+            .capture_ports()
+            .iter()
+            .map(|p| SSAValue::from(*p))
+            .collect();
+        for (ssa, name) in port_ssas.into_iter().zip(port_names.iter()) {
+            ctx.register_ssa(name.clone(), ssa);
+        }
+        for (ssa, name) in cap_ssas.into_iter().zip(cap_names.iter()) {
+            ctx.register_ssa(name.clone(), ssa);
+        }
+
+        // Phase 3: Emit all statements with relaxed dominance, tracking edge vs node
         ctx.set_relaxed_dominance(true);
         let mut edge_stmts = Vec::new();
         let mut node_stmts = Vec::new();
@@ -317,33 +274,9 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
         }
         ctx.set_relaxed_dominance(false);
 
-        // Phase 3: Build ungraph using builder
-        let mut builder = ctx.stage.ungraph().name(graph_name);
-
-        for (info, ty) in port_infos.iter().zip(port_types.iter()) {
-            builder = builder.port(ty.clone()).port_name(info.name.clone());
-        }
-
-        for (info, ty) in cap_infos.iter().zip(cap_types.iter()) {
-            builder = builder.capture(ty.clone()).capture_name(info.name.clone());
-        }
-
-        for stmt in &edge_stmts {
-            builder = builder.edge(*stmt);
-        }
-
-        for stmt in &node_stmts {
-            builder = builder.node(*stmt);
-        }
-
-        let ug = builder.new();
-
-        // Phase 4: Register real port/capture SSAs in emit context
-        let ug_info = ug.expect_info(ctx.stage);
-        let port_ssas = collect_port_ssa_names(ug_info.edge_ports(), &port_infos);
-        let cap_ssas = collect_port_ssa_names(ug_info.capture_ports(), &cap_infos);
-        register_ssa_names(port_ssas, ctx);
-        register_ssa_names(cap_ssas, ctx);
+        // Phase 4: Attach edges and nodes to the already-created ungraph.
+        ctx.stage
+            .attach_nodes_to_ungraph(ug, &edge_stmts, &node_stmts);
 
         Ok(ug)
     }
