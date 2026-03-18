@@ -6,150 +6,200 @@
 
 ## Summary
 
-Split `SSAInfo` (and potentially other IR info types) into two phases: a **build-time** representation that allows `Option` types, `Unresolved` SSA kinds, and incomplete metadata; and a **finalized** representation where every field is guaranteed present and no build-time placeholders remain. This makes the phase distinction type-safe rather than relying on runtime assertions.
+Split the IR into two phases: a **build-time** representation (internal, used by parsers and builders) and a **finalized** representation (public, used by interpreters, rewrites, and dialect authors). The finalized types keep clean, familiar names (`SSAKind`, `SSAInfo`, `StageInfo`). The build-time types are internal and qualified (`BuilderSSAKind`, `BuilderSSAInfo`).
 
 ## Motivation
 
-Today, `SSAInfo<L>` serves double duty:
+Today, `SSAInfo<L>` serves double duty — construction and consumption share the same type:
 
 ```rust
 pub struct SSAInfo<L: Dialect> {
-    pub(crate) id: SSAValue,
-    pub(crate) name: Option<Symbol>,
-    pub(crate) ty: L::Type,        // ← must be present, even during building
-    pub(crate) kind: SSAKind,      // ← may be Unresolved during building
-    pub(crate) uses: SmallVec<[Use; 2]>,
+    ty: L::Type,      // must be present, even during building
+    kind: SSAKind,    // may be Unresolved during building
+    // ...
 }
 ```
 
-During IR construction:
-- The `ty` field may not be known yet (forward references in graph bodies with relaxed dominance). Currently we require `L::Type: Placeholder` to fill it with a sentinel, which forces this trait bound onto graph emit paths — even for type systems where "placeholder" has no meaning (e.g., a simple `{ I64, F64 }` enum).
-- The `kind` field may be `SSAKind::Unresolved(ResolutionInfo)`, which must not appear in finalized IR but nothing in the type system prevents it.
+**Build-time problems:**
+- Forward references in graph bodies need an SSA before its type is known. Currently this requires `L::Type: Placeholder` to fill the type slot with a sentinel — forcing the bound onto graph emit paths, even for type systems where "placeholder" has no meaning (e.g., `{ I64, F64 }`).
+- `SSAKind::Unresolved(ResolutionInfo)` is a build-time concern that leaks into the public enum.
 
-During IR consumption (interpretation, analysis, rewrites):
-- Consumers must match on `Unresolved` and `Test` variants even though they should never appear. This adds dead code and hides bugs if a builder fails to resolve.
+**Consumption-time problems:**
+- Interpreters and rewrite passes must match on `SSAKind::Unresolved` and `SSAKind::Test` even though they should never appear. This adds dead arms and hides builder bugs.
+- `SSAInfo.ty()` is always `&L::Type` but could in principle be uninitialized if a builder forgot to resolve a forward ref.
 
-### Concrete problem
+### Design principle
 
-Graph body emit (`DiGraph::emit_with`, `UnGraph::emit_with`) requires `IR::Type: Placeholder + Clone` in its where clause because `set_relaxed_dominance(true)` internally calls `L::Type::placeholder()` to create forward-reference SSAs. A dialect with a type system that has no natural placeholder value (e.g., `enum SimpleNumericType { I64, F64 }`) cannot use graph bodies without adding a synthetic `Placeholder` impl.
+**Downstream developers should only see finalized types.** The building stage is internal plumbing — it should be hidden behind parser/builder APIs that produce clean, validated IR.
 
 ## Design
 
-### Core idea: parameterize the phase
+### Naming convention
+
+The public API uses clean names. Build-time internals are prefixed:
+
+| Public (finalized) | Internal (build-time) |
+|--------------------|-----------------------|
+| `SSAKind` | `BuilderSSAKind` |
+| `SSAInfo<L>` | `BuilderSSAInfo<L>` |
+| `StageInfo<L>` | `BuilderStageInfo<L>` |
+
+Downstream code never writes `BuilderSSAKind` — it's `pub(crate)` or gated behind a `builder` module.
+
+### `SSAKind` — the clean, downstream enum
 
 ```rust
-/// Marker for the building phase — types may be absent, kinds may be unresolved.
-pub struct Building;
-
-/// Marker for the finalized phase — all fields present, no unresolved kinds.
-pub struct Finalized;
-
-pub struct SSAInfo<L: Dialect, Phase = Finalized> {
-    pub(crate) id: SSAValue,
-    pub(crate) name: Option<Symbol>,
-    pub(crate) ty: PhaseType<L::Type, Phase>,
-    pub(crate) kind: PhaseKind<Phase>,
-    pub(crate) uses: SmallVec<[Use; 2]>,
-}
-```
-
-Where `PhaseType` and `PhaseKind` are type-level switches:
-
-```rust
-// Type field: Option during building, required when finalized
-type PhaseType<T, Phase> = <Phase as PhaseSpec>::Type<T>;
-
-trait PhaseSpec {
-    type Type<T>;
-    type Kind;
-}
-
-impl PhaseSpec for Building {
-    type Type<T> = Option<T>;     // may be absent for forward refs
-    type Kind = SSAKind;          // includes Unresolved variant
-}
-
-impl PhaseSpec for Finalized {
-    type Type<T> = T;             // always present
-    type Kind = FinalizedSSAKind; // no Unresolved, no Test
-}
-```
-
-```rust
-pub enum FinalizedSSAKind {
+/// The kind of an SSA value in finalized IR.
+/// Exhaustive — no hidden variants, no build-time placeholders.
+pub enum SSAKind {
     Result(Statement, usize),
     BlockArgument(Block, usize),
     Port(PortParent, usize),
 }
 ```
 
-### Finalization step
+Three variants. Exhaustive `match`. No `_ =>` needed.
 
-A `finalize()` method on `StageInfo<L, Building>` produces `StageInfo<L, Finalized>`:
+### `BuilderSSAKind` — internal build-time enum
 
 ```rust
-impl<L: Dialect> StageInfo<L, Building> {
-    pub fn finalize(self) -> Result<StageInfo<L, Finalized>, FinalizeError> {
-        // Walk all SSAs, verify no Unresolved kinds remain, all types present
-        // Convert Building arenas to Finalized arenas
+/// SSA kind during IR construction. Includes unresolved placeholders.
+#[doc(hidden)]
+pub(crate) enum BuilderSSAKind {
+    /// Already resolved to a final kind.
+    Resolved(SSAKind),
+    /// Placeholder — will be resolved when the enclosing builder finalizes.
+    Unresolved(ResolutionInfo),
+    /// Test-only placeholder.
+    Test,
+}
+```
+
+Builders create `BuilderSSAKind::Unresolved(...)`. When the builder finalizes, it resolves to `BuilderSSAKind::Resolved(SSAKind::Result(...))`. The `finalize()` step unwraps `Resolved` and rejects any remaining `Unresolved`.
+
+### `SSAInfo` vs `BuilderSSAInfo`
+
+```rust
+/// Finalized SSA info — type always present, kind always resolved.
+pub struct SSAInfo<L: Dialect> {
+    id: SSAValue,
+    name: Option<Symbol>,
+    ty: L::Type,         // ← always present
+    kind: SSAKind,       // ← no Unresolved
+    uses: SmallVec<[Use; 2]>,
+}
+
+/// Build-time SSA info — type may be absent, kind may be unresolved.
+pub(crate) struct BuilderSSAInfo<L: Dialect> {
+    id: SSAValue,
+    name: Option<Symbol>,
+    ty: Option<L::Type>, // ← None for forward refs (no Placeholder needed!)
+    kind: BuilderSSAKind,
+    uses: SmallVec<[Use; 2]>,
+}
+```
+
+### `StageInfo` vs `BuilderStageInfo`
+
+```rust
+/// Finalized stage — all SSAs resolved, all types present.
+/// Used by interpreters, printers, and rewrite passes.
+pub struct StageInfo<L: Dialect> {
+    ssas: Arena<SSAValue, SSAInfo<L>>,
+    // ... blocks, regions, digraphs, ungraphs — all finalized
+}
+
+/// Build-time stage — used by parsers and builders.
+/// Contains BuilderSSAInfo with Option types and Unresolved kinds.
+pub(crate) struct BuilderStageInfo<L: Dialect> {
+    ssas: Arena<SSAValue, BuilderSSAInfo<L>>,
+    // ... same structure but with builder info types
+}
+
+impl<L: Dialect> BuilderStageInfo<L> {
+    /// Validate and convert to finalized StageInfo.
+    /// Errors if any SSA has Unresolved kind or None type.
+    pub fn finalize(self) -> Result<StageInfo<L>, FinalizeError> { ... }
+}
+```
+
+### How the parser uses this
+
+```rust
+// Parser creates a BuilderStageInfo, emits IR, then finalizes
+let mut builder_stage: BuilderStageInfo<MyDialect> = BuilderStageInfo::default();
+let mut ctx = EmitContext::new(&mut builder_stage);
+// ... emit statements, graphs, blocks ...
+
+// Finalize: validates all SSAs are resolved, types present
+let stage: StageInfo<MyDialect> = builder_stage.finalize()?;
+```
+
+The `EmitContext` works with `BuilderStageInfo`. Forward-ref SSAs use `ty: None` — no `Placeholder` bound needed anywhere.
+
+### What downstream developers see
+
+```rust
+// Interpreter code — only uses StageInfo and SSAKind
+fn interpret(stage: &StageInfo<L>, stmt: Statement) {
+    let ssa_info = stmt.results(stage).next().unwrap();
+    match ssa_info.kind() {
+        SSAKind::Result(stmt, idx) => { ... }
+        SSAKind::BlockArgument(block, idx) => { ... }
+        SSAKind::Port(parent, idx) => { ... }
+        // No Unresolved! No Test! Exhaustive.
     }
 }
 ```
 
-This is the single validation checkpoint. If any `Unresolved` SSA or `None` type remains, `finalize()` returns an error with diagnostic info.
+### Migration path
 
-### What changes
+1. Default type parameter: `SSAInfo<L>` stays as the finalized type (no second parameter).
+2. `BuilderSSAInfo<L>` is a new, separate type — not a parameterization of `SSAInfo`.
+3. Public APIs (`ParseStatementText`, `ParsePipelineText`) continue to return `StageInfo<L>` — the builder stage is internal to the parser.
+4. Existing code that creates `StageInfo` directly (tests, manual builders) gets thin wrappers or uses `BuilderStageInfo` + `finalize()`.
 
-| Component | Before | After |
-|-----------|--------|-------|
-| `SSAInfo` | Single type, runtime `Unresolved` check | Parameterized by phase |
-| `StageInfo` | Single type | `StageInfo<L, Building>` for construction, `StageInfo<L, Finalized>` for consumption |
-| Builders | Create `SSAInfo` with `Placeholder::placeholder()` | Create `SSAInfo<L, Building>` with `ty: None` |
-| `SSAKind` | Has `Unresolved` + `Test` | Split into `SSAKind` (with `Unresolved`) and `FinalizedSSAKind` (without) |
-| Interpreters/rewrites | Match on `Unresolved => unreachable!()` | Only see `FinalizedSSAKind` — exhaustive match on 3 variants |
-| `Placeholder` bound | Required on graph emit paths | Not needed — `None` used instead |
-| Forward-ref SSAs | `ty: L::Type::placeholder()` | `ty: None` |
+### What simplifies for downstream
 
-### What doesn't change
-
-- The `SSAValue`, `ResultValue`, `BlockArgument`, `Port` ID types — they're phase-independent arena indices.
-- The `Pipeline` type — stages are already independently typed.
-- Parser/printer APIs — they work with `StageInfo<L, Building>` internally, but the public roundtrip APIs can accept either phase via a trait bound.
+| API | Before | After |
+|-----|--------|-------|
+| `SSAKind` match | 5 arms (Result, BlockArgument, Port, Unresolved, Test) | 3 arms (Result, BlockArgument, Port) |
+| `SSAInfo.ty()` | `&L::Type` (but could be placeholder) | `&L::Type` (guaranteed real) |
+| Graph body emit | Requires `L::Type: Placeholder` | No Placeholder bound |
+| `Interpretable` impls | Must handle Unresolved panic | Impossible state eliminated |
+| `PrettyPrint` impls | Must handle Unresolved | Clean match only |
 
 ## Crate impact
 
-| Crate | Impact |
-|-------|--------|
-| `kirin-ir` | Core change: `SSAInfo`, `SSAKind`, `StageInfo`, all builders |
-| `kirin-chumsky` | `EmitContext` works with `Building` phase; remove `Placeholder` bounds |
-| `kirin-prettyless` | Printer works with `Finalized` phase (or trait-abstracted) |
-| `kirin-interpreter` | Receives `Finalized` stage — no `Unresolved` matching |
-| `kirin-derive-*` | Generated code targets `Building` phase for emit, `Finalized` for interpret |
-| Dialect crates | No change if they don't interact with phase directly |
+| Crate | Impact | Visibility |
+|-------|--------|------------|
+| `kirin-ir` | Core: add `BuilderSSAInfo`, `BuilderSSAKind`, `BuilderStageInfo`, `finalize()` | Internal |
+| `kirin-chumsky` | `EmitContext` uses `BuilderStageInfo`; remove `Placeholder` bounds; `ParseStatementText` calls `finalize()` | Internal |
+| `kirin-prettyless` | No change — works with `StageInfo` (finalized) | None |
+| `kirin-interpreter` | Remove `Unresolved => unreachable!()` arms | Simplification |
+| `kirin-derive-*` | Emit codegen targets `BuilderStageInfo`; interpret codegen targets `StageInfo` | Internal |
+| Dialect crates | No change — public API unchanged | None |
 
 ## Alternatives
 
-### A: `Option<L::Type>` without phase parameterization
+### A: Single `SSAInfo<L, Phase>` with generic parameter
 
-Make `SSAInfo.ty` an `Option<L::Type>` always. Simpler change, but:
-- Every `ty()` consumer returns `Option<&L::Type>` — lots of unwrapping.
-- No type-level guarantee that finalized IR has all types.
-- `Unresolved` kind still lives in the same enum.
+Use a phase marker instead of separate types. Cleaner DRY but forces `Phase` parameter everywhere `SSAInfo` appears — cascades through `StageInfo`, `Arena`, `Pipeline`, every trait bound.
 
-### B: Keep current design with Placeholder bound
+### B: `Option<L::Type>` without separate types
 
-Accept that graph body emit requires `Placeholder`. Dialect authors using graph bodies add `impl Placeholder for MyType`. This works today and is the status quo.
+Make `SSAInfo.ty` an `Option<L::Type>` always. Every consumer unwraps. No type-level phase separation.
 
-**Downside**: `Placeholder` is a type-system concept ("infer this later") being used for a build-time concern ("I haven't parsed the definition yet"). These are semantically different.
+### C: Keep current design
+
+Accept the `Placeholder` bound and `Unresolved` matching. Simplest, least work. Status quo.
 
 ## Open questions
 
-1. **Should `StageInfo` be the phase boundary, or should individual arenas be parameterized?** If only `SSAInfo` needs the phase, parameterizing `StageInfo` is overkill.
+1. **Shared ID space**: `BuilderSSAInfo` and `SSAInfo` use the same `SSAValue` IDs. The `finalize()` step just converts info types in the arena. Does this require arena changes?
 
-2. **Can we use GATs (Generic Associated Types) on a `Phase` trait instead of marker structs?** This avoids the extra type parameter on `SSAInfo` but requires careful lifetime handling.
+2. **Incremental building**: Some workflows add to a stage after it's finalized (e.g., specialization). Should `StageInfo` support re-entering build mode?
 
-3. **How does serialization work across phases?** `serde` derives would need to handle both phases. Likely only `Finalized` is serialized.
+3. **Printer during build**: The printer is useful during debugging before finalization. Should it work with `BuilderStageInfo` too (handling `None` types gracefully)?
 
-4. **Should `finalize()` be fallible or panicking?** Fallible is more correct but forces error handling at every pipeline stage boundary.
-
-5. **Migration path**: Can we introduce the phase parameter with `Phase = Finalized` as default, making the change backwards-compatible for consumers? Only builders would need to opt into `Building`.
+4. **`Test` SSAKind**: Currently used for test fixtures. Should tests use `BuilderStageInfo` directly, or should there be a test-only mechanism in `SSAInfo`?
