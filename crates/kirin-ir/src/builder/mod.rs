@@ -30,7 +30,7 @@ mod stage_info;
 mod staged;
 pub mod ungraph;
 
-pub use stage_info::{BuilderStageInfo, FinalizeError};
+pub use stage_info::{AsBuildStage, BuilderStageInfo, FinalizeError};
 
 use std::collections::HashMap;
 

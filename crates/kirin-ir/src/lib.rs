@@ -18,7 +18,7 @@ pub use builder::error::{
     PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,
     StagedFunctionError,
 };
-pub use builder::{BuilderStageInfo, FinalizeError};
+pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
 pub use detach::Detach;
 pub use intern::InternTable;

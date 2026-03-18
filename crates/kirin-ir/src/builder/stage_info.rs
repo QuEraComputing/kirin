@@ -8,6 +8,27 @@ use crate::node::stmt::StatementParent;
 use crate::stage::arenas::Arenas;
 use crate::{Dialect, StageInfo, node::*};
 
+/// Trait for types that provide mutable access to a [`BuilderStageInfo`].
+///
+/// Only [`BuilderStageInfo`] implements this. The trait exists so that
+/// derive-generated builder functions can use it as a bound and produce a
+/// helpful compiler error when someone accidentally passes `&mut StageInfo`
+/// instead of `&mut BuilderStageInfo`.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not a builder stage — cannot construct IR on finalized `StageInfo`",
+    note = "use `stage.with_builder(|b| {{ ... }})` to get a `&mut BuilderStageInfo` for construction"
+)]
+pub trait AsBuildStage<L: Dialect> {
+    /// Get a mutable reference to the underlying [`BuilderStageInfo`].
+    fn as_build_stage(&mut self) -> &mut BuilderStageInfo<L>;
+}
+
+impl<L: Dialect> AsBuildStage<L> for BuilderStageInfo<L> {
+    fn as_build_stage(&mut self) -> &mut BuilderStageInfo<L> {
+        self
+    }
+}
+
 /// Error returned by [`BuilderStageInfo::finalize`] when build-time SSAs
 /// have not been resolved.
 #[derive(Debug, Clone, PartialEq, Eq)]
