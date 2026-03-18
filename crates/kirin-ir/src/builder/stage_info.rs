@@ -40,15 +40,71 @@ impl fmt::Display for FinalizeError {
 
 impl std::error::Error for FinalizeError {}
 
-/// A builder for constructing IR, with a separate SSA arena using [`BuilderSSAInfo`].
+/// Builder for constructing IR within a single compilation stage.
 ///
-/// `BuilderStageInfo` provides the builder API surface for constructing IR:
-/// creating SSA values, statements, blocks, regions, graphs, staged functions,
-/// and specializations. The SSA arena holds [`BuilderSSAInfo`] (with `Option<L::Type>`
-/// and [`BuilderSSAKind`]) during construction.
+/// `BuilderStageInfo` holds the same node arenas as [`StageInfo`] (blocks,
+/// statements, regions, graphs, etc.) but uses [`BuilderSSAInfo`] for the SSA
+/// arena — allowing `Option<L::Type>` and [`BuilderSSAKind`] placeholders during
+/// construction.
 ///
-/// Call [`finalize`](BuilderStageInfo::finalize) to validate SSAs and convert to
-/// a [`StageInfo`] with clean [`SSAInfo`](crate::node::ssa::SSAInfo) values.
+/// # Lifecycle
+///
+/// 1. Create: `BuilderStageInfo::default()` or `BuilderStageInfo::from(stage_info)`
+/// 2. Build: use builder methods to construct IR nodes
+/// 3. Finalize: call [`finalize()`](Self::finalize) to validate and convert to [`StageInfo`]
+///
+/// # Building blocks
+///
+/// Statements and SSA values:
+/// ```ignore
+/// let mut stage = BuilderStageInfo::<MyDialect>::default();
+///
+/// // Create a statement (the dialect enum value is the "definition")
+/// let stmt = stage.statement().definition(MyDialect::Nop).new();
+///
+/// // Create a typed SSA value
+/// let ssa = stage.ssa().name("x").ty(MyType::I32).kind(BuilderSSAKind::Result(stmt, 0)).new();
+/// ```
+///
+/// Blocks with arguments and placeholder substitution:
+/// ```ignore
+/// // Placeholders reference block arguments by index — resolved when the block is built
+/// let arg0 = stage.block_argument().index(0);
+/// let arg1 = stage.block_argument().index(1);
+///
+/// let add = stage.statement().definition(MyDialect::Add(arg0, arg1)).new();
+/// let ret = stage.statement().definition(MyDialect::Return).new();
+///
+/// let block = stage
+///     .block()
+///     .argument(MyType::I32).arg_name("x")
+///     .argument(MyType::I64).arg_name("y")
+///     .stmt(add)
+///     .terminator(ret)
+///     .new();
+/// ```
+///
+/// Regions (containers of blocks):
+/// ```ignore
+/// let entry = stage.block().new();
+/// let exit = stage.block().new();
+/// let region = stage.region().add_block(entry).add_block(exit).new();
+/// ```
+///
+/// # Finalization
+///
+/// [`finalize()`](Self::finalize) validates that all SSA values have types and
+/// resolved kinds, then converts the arena from [`BuilderSSAInfo`] to
+/// [`SSAInfo`](crate::node::ssa::SSAInfo):
+///
+/// ```ignore
+/// let finalized: StageInfo<MyDialect> = stage.finalize().unwrap();
+///
+/// // SSAInfo on finalized StageInfo has non-optional type and clean kind:
+/// let ssa_info = some_ssa.expect_info(&finalized);
+/// let ty: &MyType = ssa_info.ty();       // not Option
+/// let kind: &SSAKind = ssa_info.kind();  // not BuilderSSAKind
+/// ```
 pub struct BuilderStageInfo<L: Dialect> {
     pub(crate) nodes: Arenas<L>,
     pub(crate) ssas: Arena<SSAValue, BuilderSSAInfo<L>>,

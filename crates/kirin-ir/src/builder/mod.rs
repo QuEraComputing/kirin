@@ -1,3 +1,25 @@
+//! IR construction via [`BuilderStageInfo`].
+//!
+//! The builder module provides the mutable construction API for IR nodes.
+//! All construction goes through [`BuilderStageInfo`], which holds build-time
+//! arenas with placeholder support ([`BuilderSSAInfo`](crate::BuilderSSAInfo),
+//! [`BuilderSSAKind`](crate::BuilderSSAKind)).
+//!
+//! # Workflow
+//!
+//! ```text
+//! BuilderStageInfo::default()
+//!   → stage.statement()          create statements
+//!   → stage.block_argument()     create placeholder SSAs
+//!   → stage.block()              build blocks (resolves placeholders)
+//!   → stage.region()             group blocks into regions
+//!   → stage.staged_function()    register callable functions
+//!   → stage.specialize()         add specializations
+//!   → stage.finalize()           validate → StageInfo (clean SSAInfo)
+//! ```
+//!
+//! See [`BuilderStageInfo`] for detailed usage examples.
+
 mod block;
 mod context;
 pub mod digraph;

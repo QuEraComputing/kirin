@@ -55,6 +55,10 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
 
 #[bon::bon]
 impl<L: Dialect> BuilderStageInfo<L> {
+    /// Create a new SSA value with a type and kind.
+    ///
+    /// Usually created implicitly by block/graph builders. Direct use is for
+    /// test SSAs or pre-allocated results before their parent statement exists.
     #[builder(finish_fn = new)]
     pub fn ssa(
         &mut self,
@@ -92,6 +96,11 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
     }
 
+    /// Create a statement from a dialect definition.
+    ///
+    /// Any `ResultValue` fields in the definition that were created as
+    /// `Unresolved(Result(idx))` placeholders are automatically resolved
+    /// to point at this statement.
     #[builder(finish_fn = new)]
     pub fn statement(&mut self, #[builder(into)] definition: L) -> Statement {
         let id = self.statements.next_id();
