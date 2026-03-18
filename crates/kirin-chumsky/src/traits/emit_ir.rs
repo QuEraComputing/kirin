@@ -1,4 +1,4 @@
-use kirin_ir::{BuilderSSAInfo, BuilderSSAKind, BuilderStageInfo, Dialect, StageInfo};
+use kirin_ir::{BuilderSSAInfo, BuilderSSAKind, BuilderStageInfo, Dialect};
 use rustc_hash::FxHashMap;
 
 /// Error type for IR emission from parsed AST nodes.
@@ -26,16 +26,14 @@ impl std::error::Error for EmitError {}
 
 /// Type-erased function that creates a forward-reference SSA.
 /// Stored in `EmitContext` so that `SSAValue::emit` doesn't need a `Placeholder` bound.
-type ForwardRefCreator<L> = fn(&mut StageInfo<L>, &str) -> kirin_ir::SSAValue;
+type ForwardRefCreator<L> = fn(&mut BuilderStageInfo<L>, &str) -> kirin_ir::SSAValue;
 
 /// Context for emitting IR from parsed AST, tracking name mappings.
 ///
-/// The `stage` field is a `&mut StageInfo<L>`, typically obtained by
-/// dereferencing a [`BuilderStageInfo<L>`]. Callers constructing IR from text
-/// should create a `BuilderStageInfo`, then pass a mutable reference to the
-/// inner `StageInfo` (via `DerefMut`) to `EmitContext::new`.
+/// The `stage` field is a `&mut BuilderStageInfo<L>` since emit is a build-time
+/// operation that needs access to builder methods (block, region, ssa, etc.).
 pub struct EmitContext<'a, L: Dialect> {
-    pub stage: &'a mut StageInfo<L>,
+    pub stage: &'a mut BuilderStageInfo<L>,
     ssa_names: FxHashMap<String, kirin_ir::SSAValue>,
     block_names: FxHashMap<String, kirin_ir::Block>,
     /// When set, undefined SSA references use this function to create
@@ -44,21 +42,13 @@ pub struct EmitContext<'a, L: Dialect> {
 }
 
 impl<'a, L: Dialect> EmitContext<'a, L> {
-    pub fn new(stage: &'a mut StageInfo<L>) -> Self {
+    pub fn new(stage: &'a mut BuilderStageInfo<L>) -> Self {
         Self {
             stage,
             ssa_names: FxHashMap::default(),
             block_names: FxHashMap::default(),
             forward_ref_creator: None,
         }
-    }
-
-    /// Create an `EmitContext` from a [`BuilderStageInfo`].
-    ///
-    /// This is a convenience constructor equivalent to
-    /// `EmitContext::new(&mut *builder_stage)`.
-    pub fn from_builder(builder_stage: &'a mut BuilderStageInfo<L>) -> Self {
-        Self::new(&mut *builder_stage)
     }
 
     pub fn lookup_ssa(&self, name: &str) -> Option<kirin_ir::SSAValue> {
@@ -110,7 +100,10 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
 /// Create a forward-reference SSA for an undefined name in relaxed dominance mode.
 ///
 /// No `Placeholder` bound needed — uses `ty: None` via direct `SSAInfo::new`.
-fn create_forward_ref<L: Dialect>(stage: &mut StageInfo<L>, name: &str) -> kirin_ir::SSAValue {
+fn create_forward_ref<L: Dialect>(
+    stage: &mut BuilderStageInfo<L>,
+    name: &str,
+) -> kirin_ir::SSAValue {
     let symbol = stage.symbol_table_mut().intern(name.to_string());
     let ssas = stage.ssa_arena_mut();
     let id = ssas.next_id();

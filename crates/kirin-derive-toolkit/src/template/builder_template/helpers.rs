@@ -327,7 +327,7 @@ pub(super) fn build_fn_for_statement(
     };
 
     let fn_tokens = quote! {
-        pub fn #build_fn_name<Lang>(stage: &mut #crate_path::StageInfo<Lang>, #(#inputs),*) -> #build_result_path
+        pub fn #build_fn_name<Lang>(stage: &mut #crate_path::BuilderStageInfo<Lang>, #(#inputs),*) -> #build_result_path
         where
             Lang: #crate_path::Dialect + From<#self_ty>,
             Lang::Type: From<#ir_type>

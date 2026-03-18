@@ -278,14 +278,15 @@ impl<S> Pipeline<S> {
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
             .ok_or(PipelineError::UnknownFunction(func))?;
 
-        // Delegate to StageInfo::staged_function builder.
-        let sf = stage_info
-            .staged_function()
-            .maybe_name(name)
-            .maybe_signature(signature)
-            .maybe_specializations(specializations)
-            .maybe_backedges(backedges)
-            .new()?;
+        // Delegate to BuilderStageInfo::staged_function via with_builder.
+        let sf = stage_info.with_builder(|b| {
+            b.staged_function()
+                .maybe_name(name)
+                .maybe_signature(signature)
+                .maybe_specializations(specializations)
+                .maybe_backedges(backedges)
+                .new()
+        })?;
 
         // Auto-link the staged function to the abstract Function.
         self.functions
@@ -348,10 +349,7 @@ impl<S> Pipeline<S> {
 
         // Omit signature — specialize defaults to the staged function's signature.
         let spec = stage_info
-            .specialize()
-            .staged_func(sf)
-            .body(body)
-            .new()
+            .with_builder(|b| b.specialize().staged_func(sf).body(body).new())
             .expect("specialization conflict on newly created staged function");
 
         Ok((func, sf, spec))

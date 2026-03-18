@@ -3,7 +3,7 @@ use super::item::Item;
 
 #[derive(Debug, Clone)]
 pub struct Arena<I: Identifier, T> {
-    pub(super) items: Vec<Item<T>>,
+    pub(crate) items: Vec<Item<T>>,
     marker: std::marker::PhantomData<I>,
 }
 
@@ -101,6 +101,53 @@ impl<I: Identifier, T> Arena<I, T> {
             items,
             marker: std::marker::PhantomData,
         })
+    }
+
+    /// Fallibly map all live items, using an `Option`-based tombstone for deleted items.
+    /// Deleted items become `None` tombstones, live items become `Some(f(data))`.
+    /// This avoids requiring `Default` on the output type.
+    pub fn try_map_live_option<U, E>(
+        self,
+        mut f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<Arena<I, Option<U>>, E> {
+        let items = self
+            .items
+            .into_iter()
+            .map(|item| {
+                if item.deleted {
+                    Ok(Item {
+                        deleted: true,
+                        data: None,
+                    })
+                } else {
+                    Ok(Item {
+                        deleted: false,
+                        data: Some(f(item.data)?),
+                    })
+                }
+            })
+            .collect::<Result<Vec<_>, E>>()?;
+        Ok(Arena {
+            items,
+            marker: std::marker::PhantomData,
+        })
+    }
+
+    /// Map all items (live and deleted) infallibly.
+    /// Returns a new arena preserving layout and indices.
+    pub fn map<U>(self, mut f: impl FnMut(T) -> U) -> Arena<I, U> {
+        let items = self
+            .items
+            .into_iter()
+            .map(|item| Item {
+                deleted: item.deleted,
+                data: f(item.data),
+            })
+            .collect();
+        Arena {
+            items,
+            marker: std::marker::PhantomData,
+        }
     }
 }
 

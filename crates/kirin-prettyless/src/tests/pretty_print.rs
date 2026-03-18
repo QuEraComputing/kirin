@@ -2,7 +2,7 @@
 fn test_constant_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let const_op = SimpleLanguage::op_constant(&mut stage, 42i64);
@@ -17,7 +17,7 @@ fn test_constant_pretty_print() {
 fn test_add_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);

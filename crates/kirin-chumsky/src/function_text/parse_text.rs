@@ -538,10 +538,13 @@ where
     }
 
     let staged_function = stage
-        .staged_function()
-        .name(function_symbol)
-        .signature(header.signature.clone())
-        .new()
+        .with_builder(|builder| {
+            builder
+                .staged_function()
+                .name(function_symbol)
+                .signature(header.signature.clone())
+                .new()
+        })
         .map_err(|err| {
             FunctionParseError::new(
                 FunctionParseErrorKind::EmitFailed,
@@ -570,31 +573,35 @@ where
     let (function, staged_function) =
         resolve_specialize_target::<L>(stage_id, header, span, function_lookup, staged_lookup)?;
 
-    let body_statement = {
-        let mut emit_ctx = EmitContext::new(stage);
-        L::parse_and_emit(body_text, &mut emit_ctx).map_err(|errs| {
-            let message = errs
-                .iter()
-                .map(|e| e.to_string())
-                .collect::<Vec<_>>()
-                .join("; ");
-            FunctionParseError::new(FunctionParseErrorKind::EmitFailed, Some(span), message)
-        })?
-    };
+    stage.with_builder(|builder| {
+        let body_statement = {
+            let mut emit_ctx = EmitContext::new(builder);
+            L::parse_and_emit(body_text, &mut emit_ctx).map_err(|errs| {
+                let message = errs
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                FunctionParseError::new(FunctionParseErrorKind::EmitFailed, Some(span), message)
+            })?
+        };
 
-    stage
-        .specialize()
-        .staged_func(staged_function)
-        .signature(header.signature.clone())
-        .body(body_statement)
-        .new()
-        .map_err(|err| {
-            FunctionParseError::new(
-                FunctionParseErrorKind::EmitFailed,
-                Some(span),
-                err.to_string(),
-            )
-        })?;
+        builder
+            .specialize()
+            .staged_func(staged_function)
+            .signature(header.signature.clone())
+            .body(body_statement)
+            .new()
+            .map_err(|err| {
+                FunctionParseError::new(
+                    FunctionParseErrorKind::EmitFailed,
+                    Some(span),
+                    err.to_string(),
+                )
+            })?;
+
+        Ok(())
+    })?;
 
     state.record(function);
     Ok(())

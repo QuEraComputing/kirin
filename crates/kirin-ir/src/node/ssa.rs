@@ -68,6 +68,21 @@ pub struct SSAInfo<L: Dialect> {
     pub(crate) uses: SmallVec<[Use; 2]>,
 }
 
+impl<L: Dialect> Default for SSAInfo<L>
+where
+    L::Type: Default,
+{
+    fn default() -> Self {
+        Self {
+            id: SSAValue(Id(0)),
+            name: None,
+            ty: L::Type::default(),
+            kind: SSAKind::Result(Statement(Id(0)), 0),
+            uses: SmallVec::new(),
+        }
+    }
+}
+
 impl<L: Dialect> SSAInfo<L> {
     pub fn new(id: SSAValue, name: Option<Symbol>, ty: L::Type, kind: SSAKind) -> Self {
         Self {

@@ -1,14 +1,13 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::arena::GetInfo;
 use crate::node::port::{Port, PortParent};
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, ResolutionInfo, SSAValue};
 use crate::node::stmt::{Statement, StatementParent};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
-use crate::{Dialect, StageInfo};
+use crate::{BuilderStageInfo, Dialect};
 
 pub struct UnGraphBuilder<'a, L: Dialect> {
-    stage: &'a mut StageInfo<L>,
+    stage: &'a mut BuilderStageInfo<L>,
     parent: Option<Statement>,
     name: Option<String>,
     ports: Vec<(L::Type, Option<String>)>,
@@ -18,7 +17,7 @@ pub struct UnGraphBuilder<'a, L: Dialect> {
 }
 
 impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
-    pub(crate) fn from_stage(stage: &'a mut StageInfo<L>) -> Self {
+    pub(crate) fn from_stage(stage: &'a mut BuilderStageInfo<L>) -> Self {
         UnGraphBuilder {
             stage,
             parent: None,
@@ -85,11 +84,11 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.symbols.intern(n)),
+                name.map(|n| self.stage.0.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
-            self.stage.ssas.alloc(ssa);
+            self.stage.0.ssas.alloc(ssa);
             all_ports.push(port);
         }
         for (i, (ty, name)) in self.captures.into_iter().enumerate() {
@@ -97,11 +96,11 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.symbols.intern(n)),
+                name.map(|n| self.stage.0.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::UnGraph(id), index),
             );
-            self.stage.ssas.alloc(ssa);
+            self.stage.0.ssas.alloc(ssa);
             all_ports.push(port);
         }
 
@@ -170,10 +169,10 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             }
         }
         for (&old, _) in &replacements {
-            self.stage.ssas.delete(old);
+            self.stage.0.ssas.delete(old);
         }
         for &stmt_id in &all_stmts {
-            let info = &mut self.stage.statements[stmt_id];
+            let info = &mut self.stage.0.statements[stmt_id];
             for arg in info.definition.arguments_mut() {
                 if let Some(&replacement) = replacements.get(arg) {
                     *arg = replacement;
@@ -183,7 +182,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
 
         let mut edge_ssa_set: HashSet<SSAValue> = HashSet::new();
         for &edge_stmt in &self.edge_stmts {
-            let info = edge_stmt.expect_info(self.stage);
+            let info = &self.stage.statements[edge_stmt];
             for result in info.definition.results() {
                 edge_ssa_set.insert((*result).into());
             }
@@ -196,7 +195,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
 
         let mut edge_ssa_to_nodes: HashMap<SSAValue, Vec<Statement>> = HashMap::new();
         for &node_stmt in &self.nodes {
-            let info = node_stmt.expect_info(self.stage);
+            let info = &self.stage.statements[node_stmt];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
                 if edge_ssa_set.contains(&operand) || boundary_ssa_set.contains(&operand) {
@@ -241,14 +240,14 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
 
         let mut ssa_to_edge_stmt: HashMap<SSAValue, Statement> = HashMap::new();
         for &edge_stmt in &self.edge_stmts {
-            let info = edge_stmt.expect_info(self.stage);
+            let info = &self.stage.statements[edge_stmt];
             for result in info.definition.results() {
                 ssa_to_edge_stmt.insert((*result).into(), edge_stmt);
             }
         }
 
         for &node_stmt in &self.nodes {
-            let info = node_stmt.expect_info(self.stage);
+            let info = &self.stage.statements[node_stmt];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             let uses_boundary = operands.iter().any(|op| boundary_ssa_set.contains(op));
             if uses_boundary {
@@ -262,7 +261,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
 
         while let Some(ni) = queue.pop_front() {
             let stmt = graph[ni];
-            let info = stmt.expect_info(self.stage);
+            let info = &self.stage.statements[stmt];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
                 if !visited_edges.contains(&operand) && edge_ssa_set.contains(&operand) {
@@ -317,13 +316,13 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
         let edge_stmts = bfs_edge_order;
 
         for &stmt_id in &reordered_nodes {
-            self.stage.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
+            self.stage.0.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
         }
         for &stmt_id in &edge_stmts {
-            self.stage.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
+            self.stage.0.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
         }
 
-        let name_symbol = self.name.map(|n| self.stage.symbols.intern(n));
+        let name_symbol = self.name.map(|n| self.stage.0.symbols.intern(n));
         let info = UnGraphInfo::new(
             id,
             self.parent,
@@ -333,7 +332,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             graph,
             edge_stmts,
         );
-        self.stage.ungraphs.alloc(info);
+        self.stage.0.ungraphs.alloc(info);
         id
     }
 }

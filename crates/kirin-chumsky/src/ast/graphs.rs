@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, GetInfo, IsEdge, SSAValue};
+use kirin_ir::{Dialect, IsEdge, SSAValue};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -146,7 +146,11 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
 
         // Phase 2: Read back real port/capture SSAs and register them in emit context.
         // Collect SSA values first to avoid borrow conflict with ctx.
-        let dg_info = dg.expect_info(ctx.stage);
+        let dg_info = ctx
+            .stage
+            .digraph_arena()
+            .get(dg)
+            .expect("digraph should exist");
         let port_ssas: Vec<SSAValue> = dg_info
             .edge_ports()
             .iter()
@@ -242,7 +246,11 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
 
         // Phase 2: Read back real port/capture SSAs and register them in emit context.
         // Collect SSA values first to avoid borrow conflict with ctx.
-        let ug_info = ug.expect_info(ctx.stage);
+        let ug_info = ctx
+            .stage
+            .ungraph_arena()
+            .get(ug)
+            .expect("ungraph should exist");
         let port_ssas: Vec<SSAValue> = ug_info
             .edge_ports()
             .iter()

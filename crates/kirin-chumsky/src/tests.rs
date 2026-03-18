@@ -389,7 +389,7 @@ enum TestDialect {
 
 #[test]
 fn test_emit_context_ssa_lookup() {
-    let mut stage: kirin_ir::StageInfo<TestDialect> = kirin_ir::StageInfo::default();
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
     let ssa = kirin_ir::SSAValue::from(stage.block_argument().index(0));
 
     let mut ctx = crate::traits::EmitContext::new(&mut stage);
@@ -407,7 +407,7 @@ fn test_emit_context_ssa_lookup() {
 
 #[test]
 fn test_emit_context_block_lookup() {
-    let mut stage: kirin_ir::StageInfo<TestDialect> = kirin_ir::StageInfo::default();
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
     let block = stage.block().new();
 
     let mut ctx = crate::traits::EmitContext::new(&mut stage);
@@ -422,7 +422,7 @@ fn test_emit_context_block_lookup() {
 
 #[test]
 fn test_emit_context_ssa_overwrite() {
-    let mut stage: kirin_ir::StageInfo<TestDialect> = kirin_ir::StageInfo::default();
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
     let ssa1 = kirin_ir::SSAValue::from(stage.block_argument().index(0));
     let ssa2 = kirin_ir::SSAValue::from(stage.block_argument().index(1));
 
@@ -947,7 +947,7 @@ fn test_spanned_copy_for_copy_types() {
 
 #[test]
 fn test_emit_context_block_overwrite() {
-    let mut stage: kirin_ir::StageInfo<TestDialect> = kirin_ir::StageInfo::default();
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
     let block1 = stage.block().new();
     let block2 = stage.block().new();
 
@@ -961,7 +961,7 @@ fn test_emit_context_block_overwrite() {
 
 #[test]
 fn test_emit_context_multiple_distinct_names() {
-    let mut stage: kirin_ir::StageInfo<TestDialect> = kirin_ir::StageInfo::default();
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
     let ssa_a = kirin_ir::SSAValue::from(stage.block_argument().index(0));
     let ssa_b = kirin_ir::SSAValue::from(stage.block_argument().index(1));
 

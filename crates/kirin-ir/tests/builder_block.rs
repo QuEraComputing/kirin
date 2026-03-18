@@ -311,7 +311,7 @@ fn detach_statement_updates_neighbors_and_parent_len() {
     let s2 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
 
-    s1.detach(&mut stage);
+    s1.detach(stage.as_inner_mut());
 
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.len(), 2);
@@ -331,7 +331,7 @@ fn detach_head_statement_updates_block_head() {
     let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
-    s0.detach(&mut stage);
+    s0.detach(stage.as_inner_mut());
 
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.head(), Some(&s1));
@@ -345,7 +345,7 @@ fn detach_tail_statement_updates_block_tail() {
     let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
-    s1.detach(&mut stage);
+    s1.detach(stage.as_inner_mut());
 
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.tail(), Some(&s0));
@@ -358,7 +358,7 @@ fn detach_only_statement_leaves_empty_block() {
     let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).new();
 
-    s0.detach(&mut stage);
+    s0.detach(stage.as_inner_mut());
 
     let block_info = block.expect_info(&stage);
     assert_eq!(block_info.statements.len(), 0);

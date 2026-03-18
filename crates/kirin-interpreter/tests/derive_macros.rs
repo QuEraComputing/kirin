@@ -84,33 +84,31 @@ fn build_add_one_eval_call(
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let sf = stage.staged_function().new().unwrap();
+    stage.with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
 
-    let entry = stage.block().argument(ArithType::I64).new();
-    let x: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        let bi = entry.expect_info(si);
-        bi.arguments[0].into()
-    };
+        let entry = b.block().argument(ArithType::I64).new();
+        let x: SSAValue = entry.expect_info(b).arguments[0].into();
 
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
-    let sum = Arith::<ArithType>::op_add(stage, x, c1.result);
-    let ret = Return::<ArithType>::new(stage, sum.result);
-    let code_block = stage.block().stmt(c1).stmt(sum).terminator(ret).new();
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let sum = Arith::<ArithType>::op_add(b, x, c1.result);
+        let ret = Return::<ArithType>::new(b, sum.result);
+        let code_block = b.block().stmt(c1).stmt(sum).terminator(ret).new();
 
-    let br = ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(code_block), vec![]);
-    {
-        use kirin_ir::query::ParentInfo;
-        let br_stmt: Statement = br.into();
-        *br_stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
-        let entry_info = entry.get_info_mut(stage).unwrap();
-        entry_info.terminator = Some(br_stmt);
-    }
+        let br = ControlFlow::<ArithType>::op_branch(b, Successor::from_block(code_block), vec![]);
+        {
+            use kirin_ir::query::ParentInfo;
+            let br_stmt: Statement = br.into();
+            *br_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                Some(StatementParent::Block(entry));
+            let entry_info = entry.get_info_mut(b.as_inner_mut()).unwrap();
+            entry_info.terminator = Some(br_stmt);
+        }
 
-    let region = stage.region().add_block(entry).add_block(code_block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().staged_func(sf).body(body).new().unwrap()
+        let region = b.region().add_block(entry).add_block(code_block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    })
 }
 
 fn build_add_one_interpretable(
@@ -118,33 +116,31 @@ fn build_add_one_interpretable(
     stage_id: CompileStage,
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
-    let sf = stage.staged_function().new().unwrap();
+    stage.with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
 
-    let entry = stage.block().argument(ArithType::I64).new();
-    let x: SSAValue = {
-        let si = pipeline.stage(stage_id).unwrap();
-        let bi = entry.expect_info(si);
-        bi.arguments[0].into()
-    };
+        let entry = b.block().argument(ArithType::I64).new();
+        let x: SSAValue = entry.expect_info(b).arguments[0].into();
 
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
-    let sum = Arith::<ArithType>::op_add(stage, x, c1.result);
-    let ret = Return::<ArithType>::new(stage, sum.result);
-    let code_block = stage.block().stmt(c1).stmt(sum).terminator(ret).new();
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let sum = Arith::<ArithType>::op_add(b, x, c1.result);
+        let ret = Return::<ArithType>::new(b, sum.result);
+        let code_block = b.block().stmt(c1).stmt(sum).terminator(ret).new();
 
-    let br = ControlFlow::<ArithType>::op_branch(stage, Successor::from_block(code_block), vec![]);
-    {
-        use kirin_ir::query::ParentInfo;
-        let br_stmt: Statement = br.into();
-        *br_stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
-        let entry_info = entry.get_info_mut(stage).unwrap();
-        entry_info.terminator = Some(br_stmt);
-    }
+        let br = ControlFlow::<ArithType>::op_branch(b, Successor::from_block(code_block), vec![]);
+        {
+            use kirin_ir::query::ParentInfo;
+            let br_stmt: Statement = br.into();
+            *br_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                Some(StatementParent::Block(entry));
+            let entry_info = entry.get_info_mut(b.as_inner_mut()).unwrap();
+            entry_info.terminator = Some(br_stmt);
+        }
 
-    let region = stage.region().add_block(entry).add_block(code_block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    stage.specialize().staged_func(sf).body(body).new().unwrap()
+        let region = b.region().add_block(entry).add_block(code_block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    })
 }
 
 // ---------------------------------------------------------------------------

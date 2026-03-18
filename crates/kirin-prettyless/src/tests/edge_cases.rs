@@ -24,7 +24,7 @@ fn test_config_zero_width() {
 
 #[test]
 fn test_config_zero_tab_spaces() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
@@ -41,7 +41,7 @@ fn test_config_zero_tab_spaces() {
 
 #[test]
 fn test_config_large_tab_spaces() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
@@ -86,7 +86,7 @@ fn test_pipeline_function_no_stages() {
 
 #[test]
 fn test_print_block_multiple_unnamed_args() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let ret_val = stage.block_argument().index(0);
     let ret = SimpleLanguage::op_return(&mut stage, ret_val);
@@ -109,7 +109,7 @@ fn test_print_block_multiple_unnamed_args() {
 
 #[test]
 fn test_print_region_multiple_blocks() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
     let ret1 = SimpleLanguage::op_return(&mut stage, a.result);
@@ -305,13 +305,14 @@ fn test_staged_function_unnamed() {
         .new()
         .unwrap();
 
-    let ctx = pipeline.stage_mut(stage_id).unwrap();
-    let a = SimpleLanguage::op_constant(ctx, 0i64);
-    let ret = SimpleLanguage::op_return(ctx, a.result);
-    let block = ctx.block().stmt(a).terminator(ret).new();
-    let body = ctx.region().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(ctx, body);
-    ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+        let a = SimpleLanguage::op_constant(ctx, 0i64);
+        let ret = SimpleLanguage::op_return(ctx, a.result);
+        let block = ctx.block().stmt(a).terminator(ret).new();
+        let body = ctx.region().add_block(block).new();
+        let fdef = SimpleLanguage::op_function(ctx, body);
+        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+    });
 
     let output = func.sprint(&pipeline);
     // Should contain "unnamed" since no name was set
@@ -324,7 +325,7 @@ fn test_staged_function_unnamed() {
 fn test_staged_function_no_params() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_func = gs.intern("nullary".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let staged_function = stage
         .staged_function()
         .name(test_func)
@@ -392,13 +393,14 @@ fn test_pipeline_render_builder_write_to() {
         .new()
         .unwrap();
 
-    let ctx = pipeline.stage_mut(stage_id).unwrap();
-    let a = SimpleLanguage::op_constant(ctx, 5i64);
-    let ret = SimpleLanguage::op_return(ctx, a.result);
-    let block = ctx.block().stmt(a).terminator(ret).new();
-    let body = ctx.region().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(ctx, body);
-    ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+        let a = SimpleLanguage::op_constant(ctx, 5i64);
+        let ret = SimpleLanguage::op_return(ctx, a.result);
+        let block = ctx.block().stmt(a).terminator(ret).new();
+        let body = ctx.region().add_block(block).new();
+        let fdef = SimpleLanguage::op_function(ctx, body);
+        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+    });
 
     let mut output = Vec::new();
     pipeline.render().write_to(&mut output).unwrap();
@@ -431,13 +433,14 @@ fn test_function_render_builder_write_to() {
         .new()
         .unwrap();
 
-    let ctx = pipeline.stage_mut(stage_id).unwrap();
-    let a = SimpleLanguage::op_constant(ctx, 99i64);
-    let ret = SimpleLanguage::op_return(ctx, a.result);
-    let block = ctx.block().stmt(a).terminator(ret).new();
-    let body = ctx.region().add_block(block).new();
-    let fdef = SimpleLanguage::op_function(ctx, body);
-    ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+        let a = SimpleLanguage::op_constant(ctx, 99i64);
+        let ret = SimpleLanguage::op_return(ctx, a.result);
+        let block = ctx.block().stmt(a).terminator(ret).new();
+        let body = ctx.region().add_block(block).new();
+        let fdef = SimpleLanguage::op_function(ctx, body);
+        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+    });
 
     let mut output = Vec::new();
     func.render(&pipeline).write_to(&mut output).unwrap();
@@ -452,7 +455,7 @@ fn test_function_render_builder_write_to() {
 fn test_render_very_narrow_width() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_func = gs.intern("narrow".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let sf = stage
         .staged_function()
         .name(test_func)

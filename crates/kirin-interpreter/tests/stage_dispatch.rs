@@ -161,7 +161,7 @@ enum FunctionCallLang {
 }
 
 fn specialize_return_const(
-    stage: &mut StageInfo<FunctionCallLang>,
+    stage: &mut BuilderStageInfo<FunctionCallLang>,
     staged_function: StagedFunction,
     value: i64,
     with_arg: bool,
@@ -194,7 +194,7 @@ fn specialize_return_const(
 }
 
 fn build_cross_stage_recursive_body(
-    stage: &mut StageInfo<StageDynLang>,
+    stage: &mut BuilderStageInfo<StageDynLang>,
     target_func: Function,
     target_stage: CompileStage,
 ) -> Statement {
@@ -212,14 +212,15 @@ fn build_cross_stage_recursive_body(
     {
         let stmts: Vec<Statement> = vec![c0.into()];
         for stmt in &stmts {
-            *stmt.expect_info_mut(stage).get_parent_mut() =
+            *stmt.expect_info_mut(stage.as_inner_mut()).get_parent_mut() =
                 Some(StatementParent::Block(exit_block));
         }
         let linked = stage.link_statements(&stmts);
         let ret_stmt: Statement = ret0.into();
-        *ret_stmt.expect_info_mut(stage).get_parent_mut() =
-            Some(StatementParent::Block(exit_block));
-        let exit_info = exit_block.get_info_mut(stage).unwrap();
+        *ret_stmt
+            .expect_info_mut(stage.as_inner_mut())
+            .get_parent_mut() = Some(StatementParent::Block(exit_block));
+        let exit_info = exit_block.get_info_mut(stage.as_inner_mut()).unwrap();
         exit_info.statements = linked;
         exit_info.terminator = Some(ret_stmt);
     }
@@ -228,13 +229,15 @@ fn build_cross_stage_recursive_body(
     let ret = Return::<ArithType>::new(stage, call.result);
     {
         let call_stmt: Statement = call.into();
-        *call_stmt.expect_info_mut(stage).get_parent_mut() =
-            Some(StatementParent::Block(call_block));
+        *call_stmt
+            .expect_info_mut(stage.as_inner_mut())
+            .get_parent_mut() = Some(StatementParent::Block(call_block));
         let linked = stage.link_statements(&[call_stmt]);
         let ret_stmt: Statement = ret.into();
-        *ret_stmt.expect_info_mut(stage).get_parent_mut() =
-            Some(StatementParent::Block(call_block));
-        let call_info = call_block.get_info_mut(stage).unwrap();
+        *ret_stmt
+            .expect_info_mut(stage.as_inner_mut())
+            .get_parent_mut() = Some(StatementParent::Block(call_block));
+        let call_info = call_block.get_info_mut(stage.as_inner_mut()).unwrap();
         call_info.statements = linked;
         call_info.terminator = Some(ret_stmt);
     }
@@ -252,12 +255,15 @@ fn build_cross_stage_recursive_body(
     {
         let stmts: Vec<Statement> = vec![c1.into(), dec.into()];
         for stmt in &stmts {
-            *stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
+            *stmt.expect_info_mut(stage.as_inner_mut()).get_parent_mut() =
+                Some(StatementParent::Block(entry));
         }
         let linked = stage.link_statements(&stmts);
         let cond_stmt: Statement = cond.into();
-        *cond_stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
-        let entry_info = entry.get_info_mut(stage).unwrap();
+        *cond_stmt
+            .expect_info_mut(stage.as_inner_mut())
+            .get_parent_mut() = Some(StatementParent::Block(entry));
+        let entry_info = entry.get_info_mut(stage.as_inner_mut()).unwrap();
         entry_info.statements = linked;
         entry_info.terminator = Some(cond_stmt);
     }
@@ -291,26 +297,22 @@ fn test_cross_stage_recursive_call() {
         .new()
         .unwrap();
 
-    let spec_a = {
-        let stage = pipeline.stage_mut(stage_a).unwrap();
-        let body = build_cross_stage_recursive_body(stage, func, stage_b);
-        stage
-            .specialize()
+    let spec_a = pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
+        let body = build_cross_stage_recursive_body(b, func, stage_b);
+        b.specialize()
             .staged_func(staged_a)
             .body(body)
             .new()
             .unwrap()
-    };
-    {
-        let stage = pipeline.stage_mut(stage_b).unwrap();
-        let body = build_cross_stage_recursive_body(stage, func, stage_a);
-        stage
-            .specialize()
+    });
+    pipeline.stage_mut(stage_b).unwrap().with_builder(|b| {
+        let body = build_cross_stage_recursive_body(b, func, stage_a);
+        b.specialize()
             .staged_func(staged_b)
             .body(body)
             .new()
             .unwrap();
-    }
+    });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_a);
     let result = interp.call(spec_a, stage_a, &[6]).unwrap();
@@ -318,7 +320,7 @@ fn test_cross_stage_recursive_call() {
 }
 
 fn build_caller_with_function_call(
-    stage: &mut StageInfo<FunctionCallLang>,
+    stage: &mut BuilderStageInfo<FunctionCallLang>,
     target: &str,
 ) -> Statement {
     let target_symbol = stage.symbol_table_mut().intern(target.to_string());
@@ -352,20 +354,19 @@ fn test_function_call_missing_stage_mapping_error() {
         .unwrap();
 
     {
-        let stage = pipeline.stage_mut(stage_a).unwrap();
-        specialize_return_const(stage, callee_staged_a, 7, false);
+        pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
+            specialize_return_const(b, callee_staged_a, 7, false);
+        });
     }
 
-    let caller_spec = {
-        let stage = pipeline.stage_mut(stage_b).unwrap();
-        let body = build_caller_with_function_call(stage, "callee");
-        stage
-            .specialize()
+    let caller_spec = pipeline.stage_mut(stage_b).unwrap().with_builder(|b| {
+        let body = build_caller_with_function_call(b, "callee");
+        b.specialize()
             .staged_func(caller_staged_b)
             .body(body)
             .new()
             .unwrap()
-    };
+    });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_b);
     let err = interp.call(caller_spec, stage_b, &[]).unwrap_err();
@@ -402,16 +403,14 @@ fn test_function_call_no_specialization_error() {
         .new()
         .unwrap();
 
-    let caller_spec = {
-        let stage_info = pipeline.stage_mut(stage).unwrap();
-        let body = build_caller_with_function_call(stage_info, "callee");
-        stage_info
-            .specialize()
+    let caller_spec = pipeline.stage_mut(stage).unwrap().with_builder(|b| {
+        let body = build_caller_with_function_call(b, "callee");
+        b.specialize()
             .staged_func(caller_staged)
             .body(body)
             .new()
             .unwrap()
-    };
+    });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
     let err = interp.call(caller_spec, stage, &[]).unwrap_err();
@@ -449,21 +448,20 @@ fn test_function_call_ambiguous_specialization_error() {
         .unwrap();
 
     {
-        let stage_info = pipeline.stage_mut(stage).unwrap();
-        specialize_return_const(stage_info, callee_staged, 3, false);
-        specialize_return_const(stage_info, callee_staged, 5, true);
+        pipeline.stage_mut(stage).unwrap().with_builder(|b| {
+            specialize_return_const(b, callee_staged, 3, false);
+            specialize_return_const(b, callee_staged, 5, true);
+        });
     }
 
-    let caller_spec = {
-        let stage_info = pipeline.stage_mut(stage).unwrap();
-        let body = build_caller_with_function_call(stage_info, "callee");
-        stage_info
-            .specialize()
+    let caller_spec = pipeline.stage_mut(stage).unwrap().with_builder(|b| {
+        let body = build_caller_with_function_call(b, "callee");
+        b.specialize()
             .staged_func(caller_staged)
             .body(body)
             .new()
             .unwrap()
-    };
+    });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
     let err = interp.call(caller_spec, stage, &[]).unwrap_err();
@@ -501,20 +499,19 @@ fn test_function_call_unique_specialization_success() {
         .unwrap();
 
     {
-        let stage_info = pipeline.stage_mut(stage).unwrap();
-        specialize_return_const(stage_info, callee_staged, 11, false);
+        pipeline.stage_mut(stage).unwrap().with_builder(|b| {
+            specialize_return_const(b, callee_staged, 11, false);
+        });
     }
 
-    let caller_spec = {
-        let stage_info = pipeline.stage_mut(stage).unwrap();
-        let body = build_caller_with_function_call(stage_info, "callee");
-        stage_info
-            .specialize()
+    let caller_spec = pipeline.stage_mut(stage).unwrap().with_builder(|b| {
+        let body = build_caller_with_function_call(b, "callee");
+        b.specialize()
             .staged_func(caller_staged)
             .body(body)
             .new()
             .unwrap()
-    };
+    });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
     let result = interp.call(caller_spec, stage, &[]).unwrap();
@@ -636,13 +633,10 @@ fn test_typed_call_reports_stage_mismatch() {
         let MixedStage::Dyn(stage) = pipeline.stage_mut(dyn_stage).unwrap() else {
             unreachable!();
         };
-        let body = build_cross_stage_recursive_body(stage, func, dyn_stage);
-        stage
-            .specialize()
-            .staged_func(staged)
-            .body(body)
-            .new()
-            .unwrap()
+        stage.with_builder(|b| {
+            let body = build_cross_stage_recursive_body(b, func, dyn_stage);
+            b.specialize().staged_func(staged).body(body).new().unwrap()
+        })
     };
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, dummy_stage);

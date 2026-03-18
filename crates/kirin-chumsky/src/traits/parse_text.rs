@@ -55,7 +55,9 @@ where
 }
 
 /// Helper: collect pre-existing named SSAs from a stage for emit-context seeding.
-fn collect_existing_ssas(stage: &StageInfo<impl Dialect>) -> Vec<(String, kirin_ir::SSAValue)> {
+fn collect_existing_ssas(
+    stage: &BuilderStageInfo<impl Dialect>,
+) -> Vec<(String, kirin_ir::SSAValue)> {
     let symbols = stage.symbol_table();
     stage
         .ssa_arena()
@@ -68,9 +70,9 @@ fn collect_existing_ssas(stage: &StageInfo<impl Dialect>) -> Vec<(String, kirin_
         .collect()
 }
 
-/// Helper: parse text into IR on a `StageInfo<L>`.
-fn parse_statement_on_stage<L>(
-    stage: &mut StageInfo<L>,
+/// Helper: parse text into IR on a `BuilderStageInfo<L>`.
+fn parse_statement_on_builder_stage<L>(
+    stage: &mut BuilderStageInfo<L>,
     input: &str,
 ) -> Result<kirin_ir::Statement, Vec<ParseError>>
 where
@@ -93,7 +95,7 @@ where
         (): (),
         input: &str,
     ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
-        parse_statement_on_stage::<L>(self, input)
+        self.with_builder(|builder| parse_statement_on_builder_stage::<L>(builder, input))
     }
 }
 
@@ -106,7 +108,7 @@ where
         (): (),
         input: &str,
     ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
-        parse_statement_on_stage::<L>(&mut *self, input)
+        parse_statement_on_builder_stage::<L>(self, input)
     }
 }
 
@@ -133,6 +135,6 @@ where
                     span: SimpleSpan::from(0..0),
                 }]
             })?;
-        parse_statement_on_stage::<L>(stage, input)
+        stage.with_builder(|builder| parse_statement_on_builder_stage::<L>(builder, input))
     }
 }

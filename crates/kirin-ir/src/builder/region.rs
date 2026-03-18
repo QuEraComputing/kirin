@@ -1,13 +1,13 @@
-use crate::{Block, Dialect, Region, Statement, node::RegionInfo};
+use crate::{Block, BuilderStageInfo, Dialect, Region, Statement, node::RegionInfo};
 
 pub struct RegionBuilder<'a, L: Dialect> {
-    pub(super) stage: &'a mut crate::StageInfo<L>,
+    pub(super) stage: &'a mut BuilderStageInfo<L>,
     pub(super) parent: Option<Statement>,
     pub(super) blocks: Vec<Block>,
 }
 
 impl<'a, L: Dialect> RegionBuilder<'a, L> {
-    pub fn from_stage(stage: &'a mut crate::StageInfo<L>) -> Self {
+    pub fn from_stage(stage: &'a mut BuilderStageInfo<L>) -> Self {
         Self {
             stage,
             parent: None,
@@ -36,7 +36,7 @@ impl<'a, L: Dialect> RegionBuilder<'a, L> {
             .blocks(self.stage.link_blocks(&self.blocks))
             .maybe_parent(self.parent)
             .new();
-        self.stage.regions.alloc(info);
+        self.stage.0.regions.alloc(info);
         id
     }
 }

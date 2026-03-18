@@ -1,7 +1,7 @@
-use kirin_ir::{BuilderSSAKind, Dialect, SSAValue, StageInfo};
+use kirin_ir::{BuilderSSAKind, BuilderStageInfo, Dialect, SSAValue};
 
 pub fn new_test_ssa<L: Dialect>(
-    stage: &mut StageInfo<L>,
+    stage: &mut BuilderStageInfo<L>,
     name: impl Into<String>,
     ty: L::Type,
 ) -> SSAValue {

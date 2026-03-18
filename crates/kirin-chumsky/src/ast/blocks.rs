@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, GetInfo, Id};
+use kirin_ir::{Dialect, Id};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -139,8 +139,12 @@ where
     let block = builder.new();
 
     // Read back the real BlockArgument SSAs and register them in emit context.
-    let block_args: Vec<kirin_ir::SSAValue> = block
-        .expect_info(ctx.stage)
+    let block_info = ctx
+        .stage
+        .block_arena()
+        .get(block)
+        .expect("block should exist");
+    let block_args: Vec<kirin_ir::SSAValue> = block_info
         .arguments
         .iter()
         .map(|arg| kirin_ir::SSAValue::from(Id::from(*arg)))
@@ -154,8 +158,10 @@ where
     let mut terminator = None;
     for stmt_ast in &block_ast.statements {
         let stmt = emit_statement(&stmt_ast.value, ctx)?;
-        let is_terminator = stmt
-            .get_info(ctx.stage)
+        let is_terminator = ctx
+            .stage
+            .statement_arena()
+            .get(stmt)
             .expect("statement should exist")
             .definition()
             .is_terminator();

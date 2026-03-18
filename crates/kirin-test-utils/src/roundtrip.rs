@@ -13,14 +13,15 @@ where
 {
     let mut stage: StageInfo<L> = StageInfo::default();
 
-    for (name, ty) in operands {
-        stage
-            .ssa()
-            .name((*name).to_string())
-            .ty(ty.clone())
-            .kind(BuilderSSAKind::Test)
-            .new();
-    }
+    stage.with_builder(|b| {
+        for (name, ty) in operands {
+            b.ssa()
+                .name((*name).to_string())
+                .ty(ty.clone())
+                .kind(BuilderSSAKind::Test)
+                .new();
+        }
+    });
 
     let statement = stage.parse_statement(input).expect("parse should succeed");
     (stage, statement)

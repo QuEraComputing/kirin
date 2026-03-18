@@ -2,12 +2,12 @@
 /// to the item Id and whether it has been marked as deleted.
 #[derive(Debug, Clone)]
 pub struct Item<T> {
-    pub(super) deleted: bool,
-    pub(super) data: T,
+    pub(crate) deleted: bool,
+    pub(crate) data: T,
 }
 
 impl<T> Item<T> {
-    pub(super) fn new(data: T) -> Self {
+    pub(crate) fn new(data: T) -> Self {
         Self {
             data,
             deleted: false,

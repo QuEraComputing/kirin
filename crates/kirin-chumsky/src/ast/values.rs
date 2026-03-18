@@ -1,5 +1,5 @@
 use chumsky::span::SimpleSpan;
-use kirin_ir::{BuilderSSAKind, Dialect, GetInfo};
+use kirin_ir::{BuilderSSAKind, Dialect};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -96,7 +96,7 @@ where
 
         // Check if a forward-reference placeholder exists for this name
         if let Some(existing) = ctx.lookup_ssa(self.name.value)
-            && let Some(info) = existing.get_info_mut(ctx.stage)
+            && let Some(info) = ctx.stage.ssa_arena_mut().get_mut(existing)
             && matches!(
                 info.builder_kind(),
                 BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))

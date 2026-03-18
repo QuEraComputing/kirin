@@ -1,15 +1,14 @@
 /// Methods for intentionally redefining (overwriting) existing functions.
 ///
-/// These consume the error returned by [`StageInfo::specialize`] or
-/// [`StageInfo::staged_function`] when a duplicate is detected, invalidate the
+/// These consume the error returned by [`BuilderStageInfo::specialize`] or
+/// [`BuilderStageInfo::staged_function`] when a duplicate is detected, invalidate the
 /// conflicting entries, and register the new definition.
 use super::error::{SpecializeError, StagedFunctionError};
 
-use crate::arena::GetInfo;
 use crate::node::*;
-use crate::{Dialect, StageInfo};
+use crate::{BuilderStageInfo, Dialect};
 
-impl<L: Dialect> StageInfo<L> {
+impl<L: Dialect> BuilderStageInfo<L> {
     /// Redefine a specialization by consuming a [`SpecializeError`].
     ///
     /// Invalidates all conflicting specializations identified in the error
@@ -19,7 +18,7 @@ impl<L: Dialect> StageInfo<L> {
     /// Callers should inspect the [`SpecializeError::conflicting`] backedges
     /// to determine what needs recompilation.
     pub fn redefine_specialization(&mut self, error: SpecializeError<L>) -> SpecializedFunction {
-        let staged_function_info = error.staged_function.expect_info_mut(self);
+        let staged_function_info = &mut self.0.staged_functions[error.staged_function];
 
         // Invalidate all conflicting specializations
         for conflict in &error.conflicting {
@@ -55,7 +54,7 @@ impl<L: Dialect> StageInfo<L> {
     pub fn redefine_staged_function(&mut self, error: StagedFunctionError<L>) -> StagedFunction {
         // Invalidate all conflicting staged functions
         for &conflict in &error.conflicting {
-            let info = conflict.expect_info_mut(self);
+            let info = &mut self.0.staged_functions[conflict];
             info.invalidate();
         }
 
@@ -69,7 +68,7 @@ impl<L: Dialect> StageInfo<L> {
             backedges: error.backedges,
             invalidated: false,
         };
-        self.staged_functions.alloc(staged_function);
+        self.0.staged_functions.alloc(staged_function);
         id
     }
 }

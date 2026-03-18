@@ -249,24 +249,24 @@ fn test_concrete_fuel_sufficient() {
 fn test_session_abstract_interp_with_args() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let ba_x = b.block_argument().index(0);
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
+        let ret = Return::<ArithType>::new(b, add.result);
 
-    let sf = stage.staged_function().new().unwrap();
-    let ba_x = stage.block_argument().index(0);
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
-    let add = kirin_arith::Arith::<ArithType>::op_add(stage, SSAValue::from(ba_x), c1.result);
-    let ret = Return::<ArithType>::new(stage, add.result);
-
-    let block = stage
-        .block()
-        .argument(ArithType::I64)
-        .stmt(c1)
-        .stmt(add)
-        .terminator(ret)
-        .new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(body).new().unwrap();
+        let block = b
+            .block()
+            .argument(ArithType::I64)
+            .stmt(c1)
+            .stmt(add)
+            .terminator(ret)
+            .new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    });
 
     // Resolve entry info for manual frame setup
     let stage_info = pipeline.stage(stage_id).unwrap();

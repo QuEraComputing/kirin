@@ -3,7 +3,7 @@ fn test_sprint_with_globals() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_func = gs.intern("my_function".to_string());
 
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let staged_function = stage
         .staged_function()
         .name(test_func)

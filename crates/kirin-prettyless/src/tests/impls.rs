@@ -185,7 +185,7 @@ fn test_pretty_print_u64() {
 
 #[test]
 fn test_pretty_print_symbol_resolved() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let sym = stage.symbol_table_mut().intern("my_var".to_string());
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = sym.pretty_print(&doc);
@@ -199,7 +199,7 @@ fn test_pretty_print_symbol_resolved() {
 #[test]
 fn test_pretty_print_successor() {
     use kirin_ir::Successor;
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let block = stage.block().new();
     let succ = Successor::from_block(block);
     let doc = Document::new(Default::default(), &stage);
@@ -235,7 +235,7 @@ fn test_block_indent() {
 fn test_print_block_empty_body() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let block = stage.block().new();
@@ -250,7 +250,7 @@ fn test_print_block_empty_body() {
 fn test_print_block_only_terminator() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
@@ -268,7 +268,7 @@ fn test_print_block_only_terminator() {
 fn test_print_block_with_named_args() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let ret_val = stage.block_argument().index(0);
@@ -295,7 +295,7 @@ fn test_print_block_with_named_args() {
 fn test_print_region_empty() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let region = stage.region().new();
@@ -324,7 +324,7 @@ fn test_render_builder_write_to() {
 fn test_render_builder_config() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let sf = stage
         .staged_function()
         .name(test_sym)

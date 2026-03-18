@@ -283,17 +283,17 @@ fn test_pipeline_roundtrip_print_parse_print() {
         .new()
         .unwrap();
 
-    let stage = pipeline.stage_mut(stage_a).unwrap();
-    let block = stage.block().new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::new(stage, region);
-    stage
-        .specialize()
-        .staged_func(staged_function)
-        .signature(unit_sig())
-        .body(body)
-        .new()
-        .unwrap();
+    pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
+        let block = b.block().new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::new(b, region);
+        b.specialize()
+            .staged_func(staged_function)
+            .signature(unit_sig())
+            .body(body)
+            .new()
+            .unwrap();
+    });
 
     let rendered = function.sprint(&pipeline);
 

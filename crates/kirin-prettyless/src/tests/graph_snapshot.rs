@@ -2,7 +2,7 @@
 // Snapshot tests for digraph and ungraph pretty printing
 // ============================================================================
 
-use kirin_ir::{BuilderSSAKind, ResultValue, SSAValue};
+use kirin_ir::{BuilderSSAKind, BuilderStageInfo as BSI, ResultValue, SSAValue};
 use kirin_test_languages::{
     UngraphCompound, UngraphEdge, UngraphLanguage, UngraphNodeA, UngraphNodeB,
 };
@@ -102,7 +102,7 @@ impl PrettyPrint for UngraphLanguage {
 
 #[test]
 fn print_digraph_simple() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let port_ref = stage.graph_port().index(0);
 
@@ -129,7 +129,7 @@ fn print_digraph_simple() {
 
 #[test]
 fn print_digraph_with_captures() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let port0_ref = stage.graph_port().index(0);
     let port1_ref = stage.graph_port().index(1);
@@ -162,7 +162,7 @@ fn print_digraph_with_captures() {
 
 #[test]
 fn print_digraph_named() {
-    let mut stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let port_ref = stage.graph_port().index(0);
 
@@ -190,11 +190,11 @@ fn print_digraph_named() {
 
 // --- Ungraph snapshot tests (using UngraphLanguage) ---
 
-fn ungraph_stage() -> kirin_ir::StageInfo<UngraphLanguage> {
-    kirin_ir::StageInfo::default()
+fn ungraph_stage() -> BSI<UngraphLanguage> {
+    BSI::default()
 }
 
-fn make_edge(stage: &mut kirin_ir::StageInfo<UngraphLanguage>) -> (kirin_ir::Statement, SSAValue) {
+fn make_edge(stage: &mut BSI<UngraphLanguage>) -> (kirin_ir::Statement, SSAValue) {
     let result_id: ResultValue = stage.ssa_arena().next_id().into();
     let stmt = stage
         .statement()
@@ -209,7 +209,7 @@ fn make_edge(stage: &mut kirin_ir::StageInfo<UngraphLanguage>) -> (kirin_ir::Sta
 }
 
 fn make_node_a(
-    stage: &mut kirin_ir::StageInfo<UngraphLanguage>,
+    stage: &mut BSI<UngraphLanguage>,
     param: SSAValue,
     ports: Vec<SSAValue>,
 ) -> kirin_ir::Statement {
@@ -220,7 +220,7 @@ fn make_node_a(
 }
 
 fn make_node_b(
-    stage: &mut kirin_ir::StageInfo<UngraphLanguage>,
+    stage: &mut BSI<UngraphLanguage>,
     param0: SSAValue,
     param1: SSAValue,
     ports: Vec<SSAValue>,
@@ -377,6 +377,7 @@ fn print_ungraph_nested_compound() {
         .node(outer_node)
         .node(compound_stmt)
         .new();
+
 
     let doc = Document::new(Default::default(), &stage);
     let arena_doc = doc.print_ungraph(&ug);

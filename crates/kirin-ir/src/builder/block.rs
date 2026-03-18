@@ -1,11 +1,10 @@
-use crate::arena::GetInfo;
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, ResolutionInfo, SSAValue};
 use crate::node::stmt::StatementParent;
 use crate::node::*;
-use crate::{Dialect, StageInfo};
+use crate::{BuilderStageInfo, Dialect};
 
 pub struct BlockBuilder<'a, L: Dialect> {
-    stage: &'a mut StageInfo<L>,
+    stage: &'a mut BuilderStageInfo<L>,
     parent: Option<Region>,
     name: Option<String>,
     arguments: Vec<(L::Type, Option<String>)>,
@@ -14,7 +13,7 @@ pub struct BlockBuilder<'a, L: Dialect> {
 }
 
 impl<'a, L: Dialect> BlockBuilder<'a, L> {
-    pub(crate) fn from_stage(stage: &'a mut StageInfo<L>) -> Self {
+    pub(crate) fn from_stage(stage: &'a mut BuilderStageInfo<L>) -> Self {
         BlockBuilder {
             stage,
             parent: None,
@@ -65,7 +64,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     /// Add a statement to the block.
     pub fn stmt(mut self, stmt: impl Into<Statement>) -> Self {
         let stmt = stmt.into();
-        let info = stmt.expect_info(self.stage);
+        let info = &self.stage.statements[stmt];
 
         assert!(
             !info.definition.is_terminator(),
@@ -79,7 +78,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     /// Set the terminator statement of the block.
     pub fn terminator(mut self, term: impl Into<Statement>) -> Self {
         let term = term.into();
-        let info = term.expect_info(self.stage);
+        let info = &self.stage.statements[term];
 
         assert!(
             info.definition.is_terminator(),
@@ -102,11 +101,11 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                 let arg: BlockArgument = self.stage.ssas.next_id().into();
                 let ssa = BuilderSSAInfo::new(
                     arg.into(),
-                    name.map(|n| self.stage.symbols.intern(n)),
+                    name.map(|n| self.stage.0.symbols.intern(n)),
                     Some(ty),
                     BuilderSSAKind::BlockArgument(id, index),
                 );
-                self.stage.ssas.alloc(ssa);
+                self.stage.0.ssas.alloc(ssa);
                 arg
             })
             .collect::<Vec<_>>();
@@ -151,10 +150,10 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         }
         // Apply replacements and delete placeholder SSAs
         for (&old, _) in &replacements {
-            self.stage.ssas.delete(old);
+            self.stage.0.ssas.delete(old);
         }
         for &stmt_id in &self.statements {
-            let info = &mut self.stage.statements[stmt_id];
+            let info = &mut self.stage.0.statements[stmt_id];
             info.parent = Some(StatementParent::Block(id));
             for arg in info.definition.arguments_mut() {
                 if let Some(&replacement) = replacements.get(arg) {
@@ -164,19 +163,19 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         }
 
         if let Some(term_id) = self.terminator {
-            let info = &mut self.stage.statements[term_id];
+            let info = &mut self.stage.0.statements[term_id];
             info.parent = Some(StatementParent::Block(id));
         }
 
         let block = BlockInfo::builder()
             .maybe_parent(self.parent)
-            .maybe_name(self.name.map(|n| self.stage.symbols.intern(n)))
+            .maybe_name(self.name.map(|n| self.stage.0.symbols.intern(n)))
             .node(LinkedListNode::new(id))
             .arguments(block_args)
             .statements(self.stage.link_statements(&self.statements))
             .maybe_terminator(self.terminator)
             .new();
-        self.stage.blocks.alloc(block);
+        self.stage.0.blocks.alloc(block);
         id
     }
 }

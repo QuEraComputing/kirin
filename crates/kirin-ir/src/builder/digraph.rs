@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 
-use crate::arena::GetInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::port::{Port, PortParent};
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, ResolutionInfo, SSAValue};
 use crate::node::stmt::{Statement, StatementParent};
-use crate::{Dialect, StageInfo};
+use crate::{BuilderStageInfo, Dialect};
 
 pub struct DiGraphBuilder<'a, L: Dialect> {
-    stage: &'a mut StageInfo<L>,
+    stage: &'a mut BuilderStageInfo<L>,
     parent: Option<Statement>,
     name: Option<String>,
     ports: Vec<(L::Type, Option<String>)>,
@@ -18,7 +17,7 @@ pub struct DiGraphBuilder<'a, L: Dialect> {
 }
 
 impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
-    pub(crate) fn from_stage(stage: &'a mut StageInfo<L>) -> Self {
+    pub(crate) fn from_stage(stage: &'a mut BuilderStageInfo<L>) -> Self {
         DiGraphBuilder {
             stage,
             parent: None,
@@ -92,11 +91,11 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.symbols.intern(n)),
+                name.map(|n| self.stage.0.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::DiGraph(id), index),
             );
-            self.stage.ssas.alloc(ssa);
+            self.stage.0.ssas.alloc(ssa);
             all_ports.push(port);
         }
 
@@ -105,11 +104,11 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             let port: Port = self.stage.ssas.next_id().into();
             let ssa = BuilderSSAInfo::new(
                 port.into(),
-                name.map(|n| self.stage.symbols.intern(n)),
+                name.map(|n| self.stage.0.symbols.intern(n)),
                 Some(ty),
                 BuilderSSAKind::Port(PortParent::DiGraph(id), index),
             );
-            self.stage.ssas.alloc(ssa);
+            self.stage.0.ssas.alloc(ssa);
             all_ports.push(port);
         }
 
@@ -172,10 +171,10 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
         }
         // Apply replacements and delete placeholder SSAs
         for (&old, _) in &replacements {
-            self.stage.ssas.delete(old);
+            self.stage.0.ssas.delete(old);
         }
         for &stmt_id in &self.nodes {
-            let info = &mut self.stage.statements[stmt_id];
+            let info = &mut self.stage.0.statements[stmt_id];
             for arg in info.definition.arguments_mut() {
                 if let Some(&replacement) = replacements.get(arg) {
                     *arg = replacement;
@@ -193,7 +192,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
 
         for &stmt_id in &self.nodes {
             let consumer_ni = stmt_to_node[&stmt_id];
-            let info = stmt_id.expect_info(self.stage);
+            let info = &self.stage.statements[stmt_id];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
                 let ssa_info = self
@@ -211,11 +210,11 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
 
         let nodes = self.nodes;
         for &stmt_id in &nodes {
-            let info = &mut self.stage.statements[stmt_id];
+            let info = &mut self.stage.0.statements[stmt_id];
             info.parent = Some(StatementParent::DiGraph(id));
         }
 
-        let name_symbol = self.name.map(|n| self.stage.symbols.intern(n));
+        let name_symbol = self.name.map(|n| self.stage.0.symbols.intern(n));
         let info = DiGraphInfo::new(
             id,
             self.parent,
@@ -225,7 +224,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             graph,
             self.yields,
         );
-        self.stage.digraphs.alloc(info);
+        self.stage.0.digraphs.alloc(info);
         id
     }
 }

@@ -1,10 +1,10 @@
 use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
+use super::stage_info::BuilderStageInfo;
 
-use crate::arena::GetInfo;
+use crate::Dialect;
 use crate::node::symbol::GlobalSymbol;
 use crate::node::*;
 use crate::signature::Signature;
-use crate::{Dialect, StageInfo};
 
 #[derive(Clone, Copy)]
 enum PlaceholderKind {
@@ -16,10 +16,10 @@ enum PlaceholderKind {
 /// Builder for creating placeholder SSA values that reference graph ports,
 /// captures, or block arguments by index or name.
 ///
-/// Created by [`StageInfo::graph_port`], [`StageInfo::graph_capture`],
-/// or [`StageInfo::block_argument`]. Finalize with `.index(n)` or `.name("x")`.
+/// Created by [`BuilderStageInfo::graph_port`], [`BuilderStageInfo::graph_capture`],
+/// or [`BuilderStageInfo::block_argument`]. Finalize with `.index(n)` or `.name("x")`.
 pub struct PlaceholderBuilder<'a, L: Dialect> {
-    stage: &'a mut StageInfo<L>,
+    stage: &'a mut BuilderStageInfo<L>,
     kind: PlaceholderKind,
 }
 
@@ -38,23 +38,23 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
         let kind = self.make_ssa_kind(BuilderKey::Index(index));
         let id = self.stage.ssas.next_id();
         let ssa = BuilderSSAInfo::new(id, None, None, kind);
-        self.stage.ssas.alloc(ssa);
+        self.stage.0.ssas.alloc(ssa);
         id
     }
 
     /// Look up by name (matched against the builder's `.port_name()` / `.arg_name()` / `.capture_name()` declarations).
     pub fn name(self, name: &str) -> SSAValue {
-        let symbol = self.stage.symbols.intern(name.to_string());
+        let symbol = self.stage.0.symbols.intern(name.to_string());
         let kind = self.make_ssa_kind(BuilderKey::Named(symbol));
         let id = self.stage.ssas.next_id();
         let ssa = BuilderSSAInfo::new(id, None, None, kind);
-        self.stage.ssas.alloc(ssa);
+        self.stage.0.ssas.alloc(ssa);
         id
     }
 }
 
 #[bon::bon]
-impl<L: Dialect> StageInfo<L> {
+impl<L: Dialect> BuilderStageInfo<L> {
     #[builder(finish_fn = new)]
     pub fn ssa(
         &mut self,
@@ -63,8 +63,8 @@ impl<L: Dialect> StageInfo<L> {
         kind: BuilderSSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
-        let ssa = BuilderSSAInfo::new(id, name.map(|n| self.symbols.intern(n)), Some(ty), kind);
-        self.ssas.alloc(ssa);
+        let ssa = BuilderSSAInfo::new(id, name.map(|n| self.0.symbols.intern(n)), Some(ty), kind);
+        self.0.ssas.alloc(ssa);
         id
     }
 
@@ -100,7 +100,7 @@ impl<L: Dialect> StageInfo<L> {
             parent: None,
             definition,
         };
-        self.statements.alloc(statement);
+        self.0.statements.alloc(statement);
 
         // Resolve Unresolved(Result(idx)) SSAs now that the statement ID is known
         let result_ssas: Vec<SSAValue> = self.statements[id]
@@ -109,7 +109,7 @@ impl<L: Dialect> StageInfo<L> {
             .map(|rv| SSAValue::from(*rv))
             .collect();
         for ssa in result_ssas {
-            if let Some(info) = self.ssas.get_mut(ssa)
+            if let Some(info) = self.0.ssas.get_mut(ssa)
                 && let BuilderSSAKind::Unresolved(ResolutionInfo::Result(idx)) = info.kind
             {
                 info.kind = BuilderSSAKind::Result(id, idx);
@@ -147,7 +147,7 @@ impl<L: Dialect> StageInfo<L> {
             let duplicate_signature: Vec<_> = same_name
                 .iter()
                 .copied()
-                .filter(|id| id.expect_info(self).signature() == &sig)
+                .filter(|id| self.staged_functions[*id].signature() == &sig)
                 .collect();
 
             if !duplicate_signature.is_empty() {
@@ -164,7 +164,7 @@ impl<L: Dialect> StageInfo<L> {
             if self.staged_name_policy == StagedNamePolicy::SingleInterface {
                 let signature_mismatch: Vec<_> = same_name
                     .into_iter()
-                    .filter(|id| id.expect_info(self).signature() != &sig)
+                    .filter(|id| self.staged_functions[*id].signature() != &sig)
                     .collect();
 
                 if !signature_mismatch.is_empty() {
@@ -190,7 +190,7 @@ impl<L: Dialect> StageInfo<L> {
             backedges: backedges.unwrap_or_default(),
             invalidated: false,
         };
-        self.staged_functions.alloc(staged_function);
+        self.0.staged_functions.alloc(staged_function);
         Ok(id)
     }
 
@@ -202,7 +202,7 @@ impl<L: Dialect> StageInfo<L> {
         #[builder(into)] body: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Result<SpecializedFunction, SpecializeError<L>> {
-        let staged_function_info = func.expect_info_mut(self);
+        let staged_function_info = &mut self.0.staged_functions[func];
 
         let signature = signature.unwrap_or(staged_function_info.signature.clone());
 

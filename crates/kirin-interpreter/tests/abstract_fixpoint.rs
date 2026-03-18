@@ -46,24 +46,18 @@ fn test_loop_convergence_ir_snapshot() {
 fn test_abstract_interp_constants() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
+        let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(32));
+        let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
+        let ret = Return::<ArithType>::new(b, add.result);
 
-    let sf = stage.staged_function().new().unwrap();
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(10));
-    let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(32));
-    let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
-    let ret = Return::<ArithType>::new(stage, add.result);
-
-    let block = stage
-        .block()
-        .stmt(c1)
-        .stmt(c2)
-        .stmt(add)
-        .terminator(ret)
-        .new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(body).new().unwrap();
+        let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    });
 
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
@@ -148,24 +142,18 @@ fn test_abstract_interp_loop_convergence() {
 fn test_abstract_interp_call_caches_summary() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(7));
+        let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(3));
+        let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
+        let ret = Return::<ArithType>::new(b, add.result);
 
-    let sf = stage.staged_function().new().unwrap();
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(7));
-    let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(3));
-    let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
-    let ret = Return::<ArithType>::new(stage, add.result);
-
-    let block = stage
-        .block()
-        .stmt(c1)
-        .stmt(c2)
-        .stmt(add)
-        .terminator(ret)
-        .new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(body).new().unwrap();
+        let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    });
 
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);
@@ -455,33 +443,28 @@ fn test_abstract_analysis_result_queries() {
 fn test_abstract_analysis_result_ssa_values() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let (spec_fn, c1_result, c2_result, add_result) =
+        pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+            let sf = b.staged_function().new().unwrap();
+            let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(7));
+            let c1_result = c1.result;
+            let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(3));
+            let c2_result = c2.result;
+            let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
+            let add_result = add.result;
+            let ret = Return::<ArithType>::new(b, add.result);
 
-    // Inline builder: c1 = const 7; c2 = const 3; sum = add c1, c2; ret sum
-    let sf = stage.staged_function().new().unwrap();
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(7));
-    let c1_result = c1.result;
-    let c2 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(3));
-    let c2_result = c2.result;
-    let add = kirin_arith::Arith::<ArithType>::op_add(stage, c1.result, c2.result);
-    let add_result = add.result;
-    let ret = Return::<ArithType>::new(stage, add.result);
-
-    let block = stage
-        .block()
-        .stmt(c1)
-        .stmt(c2)
-        .stmt(add)
-        .terminator(ret)
-        .new();
-    let region = stage.region().add_block(block).new();
-    let func_body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage
-        .specialize()
-        .staged_func(sf)
-        .body(func_body)
-        .new()
-        .unwrap();
+            let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
+            let region = b.region().add_block(block).new();
+            let func_body = FunctionBody::<ArithType>::new(b, region);
+            let spec_fn = b
+                .specialize()
+                .staged_func(sf)
+                .body(func_body)
+                .new()
+                .unwrap();
+            (spec_fn, c1_result, c2_result, add_result)
+        });
 
     let mut interp: AbstractInterpreter<Interval, _> =
         AbstractInterpreter::new(&pipeline, stage_id);

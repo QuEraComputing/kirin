@@ -46,88 +46,85 @@ fn build_recursive_func(
         .new()
         .unwrap();
 
-    let stage = pipeline.stage_mut(stage_id).unwrap();
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        // entry(x): c1 = const 1; dec = sub x, c1; cond_br x call_block(dec) exit_block()
+        let entry = b.block().argument(ArithType::I64).new();
+        let call_block = b.block().argument(ArithType::I64).new();
+        let exit_block = b.block().new();
 
-    // entry(x): c1 = const 1; dec = sub x, c1; cond_br x call_block(dec) exit_block()
-    let entry = stage.block().argument(ArithType::I64).new();
-    let call_block = stage.block().argument(ArithType::I64).new();
-    let exit_block = stage.block().new();
+        let x: SSAValue = entry.expect_info(b).arguments[0].into();
+        let call_arg: SSAValue = call_block.expect_info(b).arguments[0].into();
 
-    let x: SSAValue = entry.expect_info(stage).arguments[0].into();
-    let call_arg: SSAValue = call_block.expect_info(stage).arguments[0].into();
-
-    // exit_block: c0 = const 0; ret c0
-    let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
-    let ret0 = Return::<ArithType>::new(stage, c0.result);
-    {
-        let stmts: Vec<Statement> = vec![c0.into()];
-        for stmt in &stmts {
-            *stmt.expect_info_mut(stage).get_parent_mut() =
+        // exit_block: c0 = const 0; ret c0
+        let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
+        let ret0 = Return::<ArithType>::new(b, c0.result);
+        {
+            let stmts: Vec<Statement> = vec![c0.into()];
+            for stmt in &stmts {
+                *stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                    Some(StatementParent::Block(exit_block));
+            }
+            let linked = b.link_statements(&stmts);
+            let ret_stmt: Statement = ret0.into();
+            *ret_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
                 Some(StatementParent::Block(exit_block));
+            let exit_info = exit_block.get_info_mut(b.as_inner_mut()).unwrap();
+            exit_info.statements = linked;
+            exit_info.terminator = Some(ret_stmt);
         }
-        let linked = stage.link_statements(&stmts);
-        let ret_stmt: Statement = ret0.into();
-        *ret_stmt.expect_info_mut(stage).get_parent_mut() =
-            Some(StatementParent::Block(exit_block));
-        let exit_info = exit_block.get_info_mut(stage).unwrap();
-        exit_info.statements = linked;
-        exit_info.terminator = Some(ret_stmt);
-    }
 
-    // call_block(arg): call rec(arg); ret call_result
-    let rec_symbol = stage.symbol_table_mut().intern("rec".to_string());
-    let call = kirin_function::Call::<ArithType>::new(stage, rec_symbol, vec![call_arg]);
-    let ret_call = Return::<ArithType>::new(stage, call.res);
-    {
-        let call_stmt: Statement = call.into();
-        *call_stmt.expect_info_mut(stage).get_parent_mut() =
-            Some(StatementParent::Block(call_block));
-        let linked = stage.link_statements(&[call_stmt]);
-        let ret_stmt: Statement = ret_call.into();
-        *ret_stmt.expect_info_mut(stage).get_parent_mut() =
-            Some(StatementParent::Block(call_block));
-        let call_info = call_block.get_info_mut(stage).unwrap();
-        call_info.statements = linked;
-        call_info.terminator = Some(ret_stmt);
-    }
-
-    // entry: c1 = const 1; dec = sub x, c1; cond_br x call_block(dec) exit_block()
-    let c1 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(1));
-    let dec = Arith::<ArithType>::op_sub(stage, x, c1.result);
-    let cond = ControlFlow::<ArithType>::op_conditional_branch(
-        stage,
-        x,
-        Successor::from_block(call_block),
-        vec![dec.result.into()],
-        Successor::from_block(exit_block),
-        vec![],
-    );
-    {
-        let stmts: Vec<Statement> = vec![c1.into(), dec.into()];
-        for stmt in &stmts {
-            *stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
+        // call_block(arg): call rec(arg); ret call_result
+        let rec_symbol = b.symbol_table_mut().intern("rec".to_string());
+        let call = kirin_function::Call::<ArithType>::new(b, rec_symbol, vec![call_arg]);
+        let ret_call = Return::<ArithType>::new(b, call.res);
+        {
+            let call_stmt: Statement = call.into();
+            *call_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                Some(StatementParent::Block(call_block));
+            let linked = b.link_statements(&[call_stmt]);
+            let ret_stmt: Statement = ret_call.into();
+            *ret_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                Some(StatementParent::Block(call_block));
+            let call_info = call_block.get_info_mut(b.as_inner_mut()).unwrap();
+            call_info.statements = linked;
+            call_info.terminator = Some(ret_stmt);
         }
-        let linked = stage.link_statements(&stmts);
-        let cond_stmt: Statement = cond.into();
-        *cond_stmt.expect_info_mut(stage).get_parent_mut() = Some(StatementParent::Block(entry));
-        let entry_info = entry.get_info_mut(stage).unwrap();
-        entry_info.statements = linked;
-        entry_info.terminator = Some(cond_stmt);
-    }
 
-    let region = stage
-        .region()
-        .add_block(entry)
-        .add_block(call_block)
-        .add_block(exit_block)
-        .new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    stage
-        .specialize()
-        .staged_func(staged)
-        .body(body)
-        .new()
-        .unwrap()
+        // entry: c1 = const 1; dec = sub x, c1; cond_br x call_block(dec) exit_block()
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let dec = Arith::<ArithType>::op_sub(b, x, c1.result);
+        let cond = ControlFlow::<ArithType>::op_conditional_branch(
+            b,
+            x,
+            Successor::from_block(call_block),
+            vec![dec.result.into()],
+            Successor::from_block(exit_block),
+            vec![],
+        );
+        {
+            let stmts: Vec<Statement> = vec![c1.into(), dec.into()];
+            for stmt in &stmts {
+                *stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                    Some(StatementParent::Block(entry));
+            }
+            let linked = b.link_statements(&stmts);
+            let cond_stmt: Statement = cond.into();
+            *cond_stmt.expect_info_mut(b.as_inner_mut()).get_parent_mut() =
+                Some(StatementParent::Block(entry));
+            let entry_info = entry.get_info_mut(b.as_inner_mut()).unwrap();
+            entry_info.statements = linked;
+            entry_info.terminator = Some(cond_stmt);
+        }
+
+        let region = b
+            .region()
+            .add_block(entry)
+            .add_block(call_block)
+            .add_block(exit_block)
+            .new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize().staged_func(staged).body(body).new().unwrap()
+    })
 }
 
 // ===========================================================================
@@ -196,16 +193,15 @@ fn test_max_depth_one_too_few() {
 fn test_unbound_value_in_frame() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-
-    // Build a minimal specialization just for the frame.
-    let sf = stage.staged_function().new().unwrap();
-    let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
-    let ret = Return::<ArithType>::new(stage, c0.result);
-    let block = stage.block().stmt(c0).terminator(ret).new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(body).new().unwrap();
+    let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
+        let ret = Return::<ArithType>::new(b, c0.result);
+        let block = b.block().stmt(c0).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
@@ -230,21 +226,21 @@ fn test_unbound_value_in_frame() {
 fn test_arity_mismatch_too_few_args() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-
-    // Build a block with 2 arguments.
-    let sf = stage.staged_function().new().unwrap();
-    let ba_x = stage.block_argument().index(0);
-    let ret = Return::<ArithType>::new(stage, SSAValue::from(ba_x));
-    let block = stage
-        .block()
-        .argument(ArithType::I64)
-        .argument(ArithType::I64)
-        .terminator(ret)
-        .new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(body).new().unwrap();
+    let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let ba_x = b.block_argument().index(0);
+        let ret = Return::<ArithType>::new(b, SSAValue::from(ba_x));
+        let block = b
+            .block()
+            .argument(ArithType::I64)
+            .argument(ArithType::I64)
+            .terminator(ret)
+            .new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
+        (spec_fn, block)
+    });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
     let stage_info = pipeline.stage(stage_id).unwrap();
@@ -273,16 +269,16 @@ fn test_arity_mismatch_too_few_args() {
 fn test_arity_mismatch_too_many_args() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-
-    // Build a block with 1 argument.
-    let sf = stage.staged_function().new().unwrap();
-    let ba_x = stage.block_argument().index(0);
-    let ret = Return::<ArithType>::new(stage, SSAValue::from(ba_x));
-    let block = stage.block().argument(ArithType::I64).terminator(ret).new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(body).new().unwrap();
+    let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let ba_x = b.block_argument().index(0);
+        let ret = Return::<ArithType>::new(b, SSAValue::from(ba_x));
+        let block = b.block().argument(ArithType::I64).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
+        (spec_fn, block)
+    });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
     let stage_info = pipeline.stage(stage_id).unwrap();
@@ -311,16 +307,16 @@ fn test_arity_mismatch_too_many_args() {
 fn test_arity_mismatch_zero_args_block() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-
-    // Build a block with 0 arguments.
-    let sf = stage.staged_function().new().unwrap();
-    let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
-    let ret = Return::<ArithType>::new(stage, c0.result);
-    let block = stage.block().stmt(c0).terminator(ret).new();
-    let region = stage.region().add_block(block).new();
-    let body = FunctionBody::<ArithType>::new(stage, region);
-    let spec_fn = stage.specialize().staged_func(sf).body(body).new().unwrap();
+    let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
+        let ret = Return::<ArithType>::new(b, c0.result);
+        let block = b.block().stmt(c0).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
+        (spec_fn, block)
+    });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
     let stage_info = pipeline.stage(stage_id).unwrap();
@@ -466,18 +462,18 @@ fn test_halt_during_nested_call() {
         .new()
         .unwrap();
 
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let halt = HaltStmt::new(stage);
-    let block = stage.block().stmt(halt).new();
-    // No terminator — the Halt interrupts before we need one.
-    let region = stage.region().add_block(block).new();
-    let callee_body = FunctionBody::<ArithType>::new(stage, region);
-    let _callee_spec = stage
-        .specialize()
-        .staged_func(callee_staged)
-        .body(callee_body)
-        .new()
-        .unwrap();
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let halt = HaltStmt::new(b);
+        let block = b.block().stmt(halt).new();
+        // No terminator — the Halt interrupts before we need one.
+        let region = b.region().add_block(block).new();
+        let callee_body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize()
+            .staged_func(callee_staged)
+            .body(callee_body)
+            .new()
+            .unwrap();
+    });
 
     // Build caller: calls the callee function by name.
     let caller_func = pipeline.function().name("caller").new().unwrap();
@@ -488,21 +484,19 @@ fn test_halt_during_nested_call() {
         .new()
         .unwrap();
 
-    let caller_spec = {
-        let stage = pipeline.stage_mut(stage_id).unwrap();
-        let halter_sym = stage.symbol_table_mut().intern("halter".to_string());
-        let call = kirin_function::Call::<ArithType>::new(stage, halter_sym, vec![]);
-        let ret = Return::<ArithType>::new(stage, call.res);
-        let block = stage.block().stmt(call).terminator(ret).new();
-        let region = stage.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(stage, region);
-        stage
-            .specialize()
+    let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let halter_sym = b.symbol_table_mut().intern("halter".to_string());
+        let call = kirin_function::Call::<ArithType>::new(b, halter_sym, vec![]);
+        let ret = Return::<ArithType>::new(b, call.res);
+        let block = b.block().stmt(call).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(b, region);
+        b.specialize()
             .staged_func(caller_staged)
             .body(body)
             .new()
             .unwrap()
-    };
+    });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
     let err = interp.call(caller_spec, stage_id, &[]).unwrap_err();
@@ -565,18 +559,13 @@ fn test_missing_entry_from_bad_body() {
     let mut pipeline: Pipeline<StageInfo<BadBodyLang>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let stage = pipeline.stage_mut(stage_id).unwrap();
-    let sf = stage.staged_function().new().unwrap();
-
-    let block = stage.block().new();
-    let region = stage.region().add_block(block).new();
-    let bad_body = BadBody::new(stage, region);
-    let spec_fn = stage
-        .specialize()
-        .staged_func(sf)
-        .body(bad_body)
-        .new()
-        .unwrap();
+    let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let block = b.block().new();
+        let region = b.region().add_block(block).new();
+        let bad_body = BadBody::new(b, region);
+        b.specialize().staged_func(sf).body(bad_body).new().unwrap()
+    });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
     let err = interp

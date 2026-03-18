@@ -206,7 +206,7 @@ impl Dialect for BuilderDialect {
 /// statement with that id as its ResultValue, then allocates the SSA result
 /// via the public `ssa()` builder.
 #[allow(dead_code)]
-pub fn make_wire(stage: &mut StageInfo<BuilderDialect>) -> (Statement, SSAValue) {
+pub fn make_wire(stage: &mut BuilderStageInfo<BuilderDialect>) -> (Statement, SSAValue) {
     let result_id: ResultValue = stage.ssa_arena().next_id().into();
     let stmt = stage
         .statement()
