@@ -24,15 +24,19 @@ impl std::fmt::Display for EmitError {
 
 impl std::error::Error for EmitError {}
 
+/// Type-erased function that creates a forward-reference SSA.
+/// Stored in `EmitContext` so that `SSAValue::emit` doesn't need a `Placeholder` bound.
+type ForwardRefCreator<L> =
+    fn(&mut StageInfo<L>, &str) -> kirin_ir::SSAValue;
+
 /// Context for emitting IR from parsed AST, tracking name mappings.
 pub struct EmitContext<'a, L: Dialect> {
     pub stage: &'a mut StageInfo<L>,
     ssa_names: FxHashMap<String, kirin_ir::SSAValue>,
     block_names: FxHashMap<String, kirin_ir::Block>,
-    /// When true, undefined SSA references create forward-reference
-    /// placeholders instead of returning errors. Used for graph bodies
-    /// with relaxed dominance.
-    relaxed_dominance: bool,
+    /// When set, undefined SSA references use this function to create
+    /// forward-reference placeholders. Used for graph bodies with relaxed dominance.
+    forward_ref_creator: Option<ForwardRefCreator<L>>,
 }
 
 impl<'a, L: Dialect> EmitContext<'a, L> {
@@ -41,7 +45,7 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
             stage,
             ssa_names: FxHashMap::default(),
             block_names: FxHashMap::default(),
-            relaxed_dominance: false,
+            forward_ref_creator: None,
         }
     }
 
@@ -49,35 +53,34 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
         self.ssa_names.get(name).copied()
     }
 
-    /// Look up an SSA value by name. In relaxed dominance mode, creates a
-    /// forward-reference placeholder if the name is not yet defined.
+    /// Look up an SSA value by name. If not found and a forward-reference
+    /// creator is installed (relaxed dominance mode), creates a placeholder SSA.
     ///
-    /// The placeholder uses `Unresolved(Result(0))` and `Placeholder::placeholder()`
-    /// as the type — both are updated when the defining `ResultValue` is emitted.
-    pub fn resolve_ssa(&mut self, name: &str) -> Result<kirin_ir::SSAValue, EmitError>
-    where
-        L::Type: Placeholder,
-    {
+    /// No `Placeholder` bound needed — the bound is captured in the creator
+    /// function installed by [`set_relaxed_dominance`].
+    pub fn resolve_ssa(&mut self, name: &str) -> Result<kirin_ir::SSAValue, EmitError> {
         if let Some(ssa) = self.ssa_names.get(name).copied() {
             return Ok(ssa);
         }
-        if self.relaxed_dominance {
-            let ssa = self
-                .stage
-                .ssa()
-                .name(name.to_string())
-                .ty(L::Type::placeholder())
-                .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)))
-                .new();
+        if let Some(creator) = self.forward_ref_creator {
+            let ssa = creator(self.stage, name);
             self.ssa_names.insert(name.to_string(), ssa);
             return Ok(ssa);
         }
         Err(EmitError::UndefinedSSA(name.to_string()))
     }
 
-    /// Enable or disable relaxed dominance mode.
-    pub fn set_relaxed_dominance(&mut self, relaxed: bool) {
-        self.relaxed_dominance = relaxed;
+    /// Enable relaxed dominance mode: undefined SSA references create
+    /// forward-reference `Unresolved(Result(0))` placeholders.
+    pub fn set_relaxed_dominance(&mut self, relaxed: bool)
+    where
+        L::Type: Placeholder,
+    {
+        self.forward_ref_creator = if relaxed {
+            Some(create_forward_ref::<L>)
+        } else {
+            None
+        };
     }
 
     pub fn register_ssa(&mut self, name: String, ssa: kirin_ir::SSAValue) {
@@ -91,6 +94,19 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
     pub fn register_block(&mut self, name: String, block: kirin_ir::Block) {
         self.block_names.insert(name, block);
     }
+}
+
+/// Create a forward-reference SSA for an undefined name in relaxed dominance mode.
+fn create_forward_ref<L: Dialect>(stage: &mut StageInfo<L>, name: &str) -> kirin_ir::SSAValue
+where
+    L::Type: Placeholder,
+{
+    stage
+        .ssa()
+        .name(name.to_string())
+        .ty(L::Type::placeholder())
+        .kind(SSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)))
+        .new()
 }
 
 /// Trait for emitting IR nodes from parsed AST nodes.

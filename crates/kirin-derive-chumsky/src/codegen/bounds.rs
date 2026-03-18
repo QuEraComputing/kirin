@@ -26,6 +26,7 @@ pub(crate) struct ImplBounds {
     ir_type: syn::Path,
     value_types: Vec<syn::Type>,
     wrapper_types: Vec<syn::Type>,
+    has_result_fields: bool,
     ir_type_is_param: bool,
 }
 
@@ -52,6 +53,7 @@ impl ImplBounds {
             ir_type: config.ir_type.clone(),
             value_types,
             wrapper_types,
+            has_result_fields: super::has_result_fields(ir_input),
             ir_type_is_param,
         }
     }
@@ -62,19 +64,14 @@ impl ImplBounds {
         !self.wrapper_types.is_empty()
     }
 
-    /// True when `Placeholder` is needed.
-    ///
-    /// Always true because `SSAValue::emit` requires `IR::Type: Placeholder`
-    /// for forward-reference support in graph bodies with relaxed dominance.
+    /// True when any statement has `ResultValue` fields (needs `Placeholder`).
     pub fn needs_placeholder(&self) -> bool {
-        true
+        self.has_result_fields
     }
 
     /// True when `Placeholder` is needed considering wrappers too.
-    ///
-    /// Always true because `SSAValue::emit` requires `IR::Type: Placeholder`.
     pub fn needs_placeholder_with_wrappers(&self) -> bool {
-        true
+        self.has_result_fields || self.has_wrappers()
     }
 
     // --- IR type predicates ---

@@ -55,7 +55,6 @@ where
     SimpleType: ::kirin::parsers::HasParser<'t> + 't,
     <SimpleType as ::kirin::parsers::HasParser<'t>>::Output:
         ::kirin::parsers::EmitIR<ArithOps, Output = <ArithOps as ::kirin::ir::Dialect>::Type>,
-    <ArithOps as ::kirin::ir::Dialect>::Type: ::kirin::ir::Placeholder,
 {
     fn emit_parsed(
         output: &<Self as ::kirin::parsers::HasParser<'t>>::Output,
@@ -95,7 +94,6 @@ where
     SimpleType: ::kirin::parsers::HasParser<'tokens> + 'tokens,
     <SimpleType as ::kirin::parsers::HasParser<'tokens>>::Output:
         ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
-    SimpleType: ::kirin::ir::Placeholder,
 {
     #[inline]
     fn emit_output<__TypeOutput, __EmitLanguageOutput>(

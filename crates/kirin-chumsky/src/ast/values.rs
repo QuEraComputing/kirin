@@ -67,7 +67,6 @@ pub struct NameofSSAValue<'src> {
 impl<'src, TypeOutput, IR> EmitIR<IR> for SSAValue<'src, TypeOutput>
 where
     IR: Dialect,
-    IR::Type: kirin_ir::Placeholder,
 {
     type Output = kirin_ir::SSAValue;
 
