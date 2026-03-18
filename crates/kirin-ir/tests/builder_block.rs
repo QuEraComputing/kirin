@@ -393,10 +393,10 @@ fn detach_only_statement_leaves_empty_block() {
     assert!(block_info.statements.tail().is_none());
 }
 
-// --- SSA creation edge cases ---
+// --- SSA creation edge cases (builder-side) ---
 
 #[test]
-fn ssa_with_name_is_resolvable() {
+fn builder_ssa_has_optional_type_and_builder_kind() {
     let mut stage = new_stage();
     let ssa = stage
         .ssa()
@@ -405,6 +405,7 @@ fn ssa_with_name_is_resolvable() {
         .kind(BuilderSSAKind::Test)
         .new();
 
+    // On BuilderStageInfo, SSA info is BuilderSSAInfo with Option<Type>
     let info = stage.ssa_arena().get(ssa).unwrap();
     assert!(info.name().is_some());
     assert_eq!(info.ty(), Some(&TestType::I32));
@@ -412,7 +413,7 @@ fn ssa_with_name_is_resolvable() {
 }
 
 #[test]
-fn ssa_without_name() {
+fn builder_ssa_without_name() {
     let mut stage = new_stage();
     let ssa = stage
         .ssa()
@@ -423,6 +424,157 @@ fn ssa_without_name() {
     let info = stage.ssa_arena().get(ssa).unwrap();
     assert!(info.name().is_none());
     assert_eq!(info.ty(), Some(&TestType::I64));
+}
+
+// --- Finalization tests ---
+
+#[test]
+fn finalize_succeeds_with_resolved_typed_ssas() {
+    let mut stage = new_stage();
+
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let block = stage
+        .block()
+        .argument(TestType::I32)
+        .arg_name("x")
+        .stmt(s0)
+        .new();
+
+    let finalized = stage.finalize().expect("finalize should succeed");
+
+    // Verify it's a StageInfo (not BuilderStageInfo)
+    let info = block.expect_info(&finalized);
+    assert_eq!(info.arguments.len(), 1);
+
+    // SSAInfo has non-optional ty and clean SSAKind
+    let arg_ssa: SSAValue = info.arguments[0].into();
+    let ssa_info = arg_ssa.expect_info(&finalized);
+    assert_eq!(*ssa_info.ty(), TestType::I32);
+    assert!(matches!(*ssa_info.kind(), SSAKind::BlockArgument(_, 0)));
+}
+
+#[test]
+fn finalize_rejects_unresolved_ssa() {
+    let mut stage = new_stage();
+
+    // Create an unresolved placeholder that's never resolved
+    let _placeholder = stage.block_argument().index(0);
+
+    let err = stage.finalize().expect_err("should reject unresolved SSA");
+    assert!(matches!(err, FinalizeError::UnresolvedSSA(_)));
+}
+
+#[test]
+fn finalize_rejects_test_ssa() {
+    let mut stage = new_stage();
+
+    stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Test)
+        .new();
+
+    let err = stage.finalize().expect_err("should reject test SSA");
+    assert!(matches!(err, FinalizeError::TestSSA(_)));
+}
+
+#[test]
+fn finalize_rejects_missing_type() {
+    let mut stage = new_stage();
+
+    // Create a statement first to get a valid Statement ID
+    let stmt = stage.statement().definition(BuilderDialect::Nop).new();
+
+    // Create an SSA with no type via low-level arena access
+    let ssas = stage.ssa_arena_mut();
+    let id = ssas.next_id();
+    ssas.alloc(BuilderSSAInfo::new(
+        id,
+        None,
+        None,
+        BuilderSSAKind::Result(stmt, 0),
+    ));
+
+    let err = stage.finalize().expect_err("should reject missing type");
+    assert!(matches!(err, FinalizeError::MissingType(_)));
+}
+
+#[test]
+fn finalized_ssa_info_has_non_optional_type() {
+    let mut stage = new_stage();
+
+    let block = stage.block().argument(TestType::I64).arg_name("val").new();
+
+    let finalized = stage.finalize().expect("finalize should succeed");
+
+    let block_info = block.expect_info(&finalized);
+    let arg_ssa: SSAValue = block_info.arguments[0].into();
+    let ssa_info = arg_ssa.expect_info(&finalized);
+
+    // ty() returns &L::Type directly (not Option)
+    let ty: &TestType = ssa_info.ty();
+    assert_eq!(*ty, TestType::I64);
+
+    // kind() returns &SSAKind directly (not BuilderSSAKind)
+    let kind: &SSAKind = ssa_info.kind();
+    assert!(matches!(kind, SSAKind::BlockArgument(b, 0) if *b == block));
+}
+
+#[test]
+fn finalize_block_with_statements_produces_clean_stage() {
+    let mut stage = new_stage();
+
+    let arg0 = stage.block_argument().index(0);
+    let arg1 = stage.block_argument().index(1);
+    let add = stage
+        .statement()
+        .definition(BuilderDialect::Add(arg0, arg1))
+        .new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+
+    let block = stage
+        .block()
+        .argument(TestType::I32)
+        .argument(TestType::I64)
+        .stmt(add)
+        .terminator(ret)
+        .new();
+
+    let finalized = stage.finalize().expect("finalize should succeed");
+
+    // All block args have clean SSAInfo
+    let block_info = block.expect_info(&finalized);
+    for (idx, &arg) in block_info.arguments.iter().enumerate() {
+        let ssa_info = arg.expect_info(&finalized);
+        assert!(matches!(*ssa_info.kind(), SSAKind::BlockArgument(b, i) if b == block && i == idx));
+    }
+
+    // Statements are accessible via clean StageInfo
+    let stmts: Vec<_> = block.statements(&finalized).collect();
+    assert_eq!(stmts.len(), 1); // add only, terminator not in stmt iter
+    assert_eq!(block.terminator(&finalized), Some(ret));
+}
+
+#[test]
+fn into_inner_vs_finalize_both_produce_stage_info() {
+    // into_inner is the escape hatch; finalize validates
+    let mut stage1 = new_stage();
+    let b1 = stage1.block().argument(TestType::I32).new();
+    let inner = stage1.into_inner();
+    let info1 = b1.expect_info(&inner);
+    assert_eq!(info1.arguments.len(), 1);
+
+    let mut stage2 = new_stage();
+    let b2 = stage2.block().argument(TestType::I32).new();
+    let finalized = stage2.finalize().unwrap();
+    let info2 = b2.expect_info(&finalized);
+    assert_eq!(info2.arguments.len(), 1);
+
+    // Both return StageInfo with SSAInfo (not BuilderSSAInfo)
+    let arg1: SSAValue = info1.arguments[0].into();
+    let arg2: SSAValue = info2.arguments[0].into();
+    assert_eq!(*arg1.expect_info(&inner).ty(), TestType::I32);
+    assert_eq!(*arg2.expect_info(&finalized).ty(), TestType::I32);
 }
 
 // --- link_statements edge cases ---
