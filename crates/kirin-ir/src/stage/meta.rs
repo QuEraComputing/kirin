@@ -25,6 +25,10 @@ use crate::node::symbol::GlobalSymbol;
 /// ```
 ///
 /// Composable via bounds: `S: HasStageInfo<LangA> + HasStageInfo<LangB>`.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not contain a `StageInfo<{L}>` variant",
+    note = "add a variant wrapping `StageInfo<{L}>` to your stage enum, or check your `#[derive(StageMeta)]`"
+)]
 pub trait HasStageInfo<L: Dialect> {
     /// Try to get a reference to the stage info for dialect `L`.
     ///
@@ -65,6 +69,10 @@ impl<L: Dialect> HasStageInfo<L> for StageInfo<L> {
 ///     Lower(StageInfo<LangB>),
 /// }
 /// ```
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement `StageMeta`",
+    note = "use `#[derive(StageMeta)]` on your stage enum to generate stage identity methods"
+)]
 pub trait StageMeta: Sized {
     /// The dialect dispatch list for `pipeline.parse(text)`.
     ///

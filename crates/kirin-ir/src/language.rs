@@ -100,6 +100,10 @@ pub trait IsEdge {
 /// can rely on a single `Dialect` bound instead of enumerating individual
 /// capabilities. The `#[derive(Dialect)]` macro generates all required impls
 /// automatically, so dialect authors pay no boilerplate cost.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement `Dialect`",
+    note = "use `#[derive(Dialect)]` to generate the required IR accessor trait implementations"
+)]
 pub trait Dialect:
     for<'a> HasArguments<'a>
     + for<'a> HasResults<'a>

@@ -9,6 +9,10 @@ use crate::{BlockEvaluator, Interpreter, InterpreterError, StageAccess};
 /// - Non-SSA bodies (e.g. circuit graphs) can implement this directly
 ///
 /// `L` is moved to the method level to avoid recursive trait resolution cycles.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement `CallSemantics` for this interpreter",
+    note = "implement `SSACFGRegion` for standard function body evaluation, or implement `CallSemantics` directly for custom call semantics"
+)]
 pub trait CallSemantics<'ir, I: Interpreter<'ir>>: Dialect {
     type Result;
 
