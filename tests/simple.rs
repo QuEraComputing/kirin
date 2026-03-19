@@ -10,7 +10,11 @@ fn test_block() {
     let staged_function = stage
         .staged_function()
         .name(foo)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new(
+            vec![SimpleType::I64],
+            SimpleType::I64,
+            (),
+        ))
         .new()
         .unwrap();
 

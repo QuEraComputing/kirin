@@ -1,5 +1,5 @@
-use super::semantics::{ExactSemantics, SignatureCmp, SignatureSemantics};
 use super::definition::Signature;
+use super::semantics::{ExactSemantics, SignatureCmp, SignatureSemantics};
 
 // A simple type for testing ExactSemantics
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

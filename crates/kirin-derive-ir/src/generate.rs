@@ -202,10 +202,7 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
     }
 
     for config in PROPERTY_CONFIGS {
-        builder = builder.add(TraitImplTemplate::bool_property(
-            config,
-            DEFAULT_IR_CRATE,
-        ));
+        builder = builder.add(TraitImplTemplate::bool_property(config, DEFAULT_IR_CRATE));
     }
 
     builder = builder
@@ -237,9 +234,6 @@ pub(crate) fn generate_property(
 ) -> darling::Result<TokenStream> {
     let ir = Input::<StandardLayout>::from_derive_input(ast)?;
     ir.compose()
-        .add(TraitImplTemplate::bool_property(
-            config,
-            DEFAULT_IR_CRATE,
-        ))
+        .add(TraitImplTemplate::bool_property(config, DEFAULT_IR_CRATE))
         .build()
 }
