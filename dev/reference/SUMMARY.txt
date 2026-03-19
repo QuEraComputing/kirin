@@ -228,6 +228,8 @@
             * [supportedtypes](kirin/serialization/core/supportedtypes.md)
         * [jsonserializer](kirin/serialization/jsonserializer.md)
     * [source](kirin/source.md)
+    * [stdlib](kirin/stdlib/index.md)
+        * [bits](kirin/stdlib/bits.md)
     * [symbol_table](kirin/symbol_table.md)
     * [testing](kirin/testing/index.md)
         * [statements](kirin/testing/statements.md)
