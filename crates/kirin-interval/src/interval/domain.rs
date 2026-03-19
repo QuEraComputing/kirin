@@ -3,8 +3,20 @@ use super::Bound;
 /// An interval [lo, hi] where lo > hi represents bottom (empty).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Interval {
-    pub lo: Bound,
-    pub hi: Bound,
+    pub(crate) lo: Bound,
+    pub(crate) hi: Bound,
+}
+
+impl Interval {
+    /// Returns the lower bound of the interval.
+    pub fn lo(&self) -> Bound {
+        self.lo
+    }
+
+    /// Returns the upper bound of the interval.
+    pub fn hi(&self) -> Bound {
+        self.hi
+    }
 }
 
 impl Interval {
@@ -23,7 +35,7 @@ impl Interval {
         Interval::new(v, v)
     }
 
-    pub fn bottom_interval() -> Self {
+    pub(crate) fn bottom_interval() -> Self {
         Interval {
             lo: Bound::PosInf,
             hi: Bound::NegInf,

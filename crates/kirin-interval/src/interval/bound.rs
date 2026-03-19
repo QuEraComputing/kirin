@@ -78,6 +78,8 @@ impl Bound {
         }
     }
 
+    /// Negate this bound. For `Finite(i64::MIN)`, `checked_neg` fails and we
+    /// return `PosInf` as a sound over-approximation since `|i64::MIN| > i64::MAX`.
     pub fn negate(self) -> Self {
         match self {
             Bound::NegInf => Bound::PosInf,
