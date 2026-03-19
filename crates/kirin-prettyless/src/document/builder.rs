@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};
+use kirin_ir::{Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, SSAInfo, StageInfo};
 use prettyless::{Arena, DocAllocator};
 
 use crate::{ArenaDoc, Config, PrettyPrint};
@@ -100,6 +100,25 @@ impl<'a, L: Dialect> Document<'a, L> {
             first = false;
         }
         doc
+    }
+
+    /// Resolve the display name of an SSA value.
+    ///
+    /// Returns the symbol-table name if one exists, otherwise falls back
+    /// to the numeric ID. The returned string is the bare name without
+    /// a `%` prefix.
+    pub fn ssa_name<V>(&self, value: V) -> String
+    where
+        V: Copy + GetInfo<L, Info = Item<SSAInfo<L>>>,
+        Id: From<V>,
+    {
+        let info = value.expect_info(self.stage);
+        if let Some(name_sym) = info.name() {
+            if let Some(resolved) = self.stage.symbol_table().resolve(name_sym) {
+                return resolved.clone();
+            }
+        }
+        format!("{}", Id::from(value).raw())
     }
 
     /// Render a node to a string.

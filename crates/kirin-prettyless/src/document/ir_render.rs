@@ -16,6 +16,27 @@ impl<'a, L: Dialect + PrettyPrint> Document<'a, L>
 where
     L::Type: std::fmt::Display,
 {
+    /// Print an SSA value reference as `%name`.
+    ///
+    /// Resolves the name via [`Document::ssa_name`] and prepends `%`.
+    pub fn print_ssa_ref<V>(&'a self, value: V) -> ArenaDoc<'a>
+    where
+        V: Copy + GetInfo<L, Info = Item<SSAInfo<L>>>,
+        Id: From<V>,
+    {
+        self.text(format!("%{}", self.ssa_name(value)))
+    }
+
+    /// Print the type of an SSA value.
+    pub fn print_ssa_type<V>(&'a self, value: V) -> ArenaDoc<'a>
+    where
+        V: Copy + GetInfo<L, Info = Item<SSAInfo<L>>>,
+        Id: From<V>,
+    {
+        let info = value.expect_info(self.stage);
+        self.text(format!("{}", info.ty()))
+    }
+
     /// Pretty print a statement by printing its definition.
     pub fn print_statement(&'a self, stmt: &Statement) -> ArenaDoc<'a> {
         let stmt_info = stmt.expect_info(self.stage);
@@ -48,17 +69,9 @@ where
                 if i > 0 {
                     args_doc += self.text(", ");
                 }
-                let arg_info: &Item<SSAInfo<L>> = arg.expect_info(self.stage);
-                let name = if let Some(name_sym) = arg_info.name() {
-                    self.stage
-                        .symbol_table()
-                        .resolve(name_sym)
-                        .cloned()
-                        .unwrap_or_else(|| format!("{}", Id::from(*arg).raw()))
-                } else {
-                    format!("{}", Id::from(*arg).raw())
-                };
-                args_doc += self.text(format!("%{}: {}", name, arg_info.ty()));
+                let name = self.ssa_name(*arg);
+                let info = arg.expect_info(self.stage);
+                args_doc += self.text(format!("%{}: {}", name, info.ty()));
             }
             header += args_doc.enclose("(", ")");
         }
@@ -110,16 +123,8 @@ where
                 if i > 0 {
                     doc += self.text(", ");
                 }
+                let name = self.ssa_name(*port);
                 let info: &Item<SSAInfo<L>> = port.expect_info(self.stage);
-                let name = if let Some(name_sym) = info.name() {
-                    self.stage
-                        .symbol_table()
-                        .resolve(name_sym)
-                        .cloned()
-                        .unwrap_or_else(|| format!("{}", Id::from(*port).raw()))
-                } else {
-                    format!("{}", Id::from(*port).raw())
-                };
                 doc += self.text(format!("%{}: {}", name, info.ty()));
             }
             doc
@@ -173,19 +178,7 @@ where
             if !first {
                 inner += self.line_();
             }
-            let yield_doc = self.list(info.yields().iter(), ", ", |ssa| {
-                let ssa_info: &Item<SSAInfo<L>> = ssa.expect_info(self.stage);
-                let name = if let Some(name_sym) = ssa_info.name() {
-                    self.stage
-                        .symbol_table()
-                        .resolve(name_sym)
-                        .cloned()
-                        .unwrap_or_else(|| format!("{}", Id::from(*ssa).raw()))
-                } else {
-                    format!("{}", Id::from(*ssa).raw())
-                };
-                self.text(format!("%{}", name))
-            });
+            let yield_doc = self.list(info.yields().iter(), ", ", |ssa| self.print_ssa_ref(*ssa));
             inner += self.text("yield ") + yield_doc + self.text(";");
         }
 
