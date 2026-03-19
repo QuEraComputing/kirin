@@ -192,6 +192,14 @@ impl<L: Dialect> BuilderSSAInfo<L> {
         &self.kind
     }
 
+    /// Sets the build-time [`BuilderSSAKind`] for this SSA value.
+    ///
+    /// Used by the emit layer to update forward-reference placeholders
+    /// with the correct result index.
+    pub fn set_builder_kind(&mut self, kind: BuilderSSAKind) {
+        self.kind = kind;
+    }
+
     pub fn uses(&self) -> &SmallVec<[Use; 2]> {
         &self.uses
     }

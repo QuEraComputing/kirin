@@ -32,6 +32,10 @@ pub struct ResultValue<'src, TypeOutput> {
     pub name: Spanned<&'src str>,
     /// The optional type annotation (often inferred).
     pub ty: Option<TypeOutput>,
+    /// The index of this result among all results in the statement (0-indexed).
+    /// Used for `ResolutionInfo::Result(idx)` during emit.
+    /// Defaults to 0 for backward compatibility with legacy single-result format.
+    pub result_index: usize,
 }
 
 /// The type portion of an SSA value annotation.
@@ -94,6 +98,8 @@ where
         // Convert the parsed type to Dialect::Type via EmitIR, or None if no type annotation
         let ty: Option<IR::Type> = self.ty.as_ref().map(|t| t.emit(ctx)).transpose()?;
 
+        let result_index = self.result_index;
+
         // Check if a forward-reference placeholder exists for this name
         if let Some(existing) = ctx.lookup_ssa(self.name.value)
             && let Some(info) = ctx.stage.ssa_arena_mut().get_mut(existing)
@@ -102,10 +108,13 @@ where
                 BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(_))
             )
         {
-            // Reuse the forward-ref SSA — update type in place if provided
+            // Reuse the forward-ref SSA — update type and result index in place
             if let Some(ty) = ty {
                 info.set_ty(ty);
             }
+            info.set_builder_kind(BuilderSSAKind::Unresolved(
+                kirin_ir::ResolutionInfo::Result(result_index),
+            ));
             return Ok(existing.into());
         }
 
@@ -118,7 +127,7 @@ where
                 .name(self.name.value.to_string())
                 .ty(ty)
                 .kind(BuilderSSAKind::Unresolved(
-                    kirin_ir::ResolutionInfo::Result(0),
+                    kirin_ir::ResolutionInfo::Result(result_index),
                 ))
                 .new()
         } else {
@@ -133,7 +142,7 @@ where
                 id,
                 Some(symbol),
                 None,
-                BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)),
+                BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(result_index)),
             );
             ssas.alloc(ssa_info);
             id

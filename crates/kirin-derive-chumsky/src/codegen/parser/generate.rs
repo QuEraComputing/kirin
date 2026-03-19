@@ -1,9 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use kirin_derive_toolkit::ir::fields::FieldCategory;
+
 use crate::ChumskyLayout;
 use crate::format::Format;
-use crate::validation::validate_format;
+use crate::validation::{FormatMode, validate_format};
 
 use crate::codegen::{GeneratorConfig, format_for_statement};
 
@@ -127,6 +129,7 @@ impl GenerateHasDialectParser {
 
         let validation_result = validate_format(stmt, &format, &collected)?;
         let occurrences = validation_result.occurrences;
+        let format_mode = validation_result.format_mode;
 
         let ir_type = &ir_input.attrs.ir_type;
 
@@ -150,23 +153,51 @@ impl GenerateHasDialectParser {
 
         let var_names: Vec<_> = occurrences.iter().map(|o| o.var_name.clone()).collect();
         let pattern = chain::build_pattern(&var_names);
-        let constructor = self.ast_constructor(
-            ast_name,
-            variant,
-            &collected,
-            &occurrences,
-            crate_path,
-            &type_params,
-        );
 
         let type_output = quote! { __TypeOutput };
         let language_output = quote! { __LanguageOutput };
         let return_type =
             self.build_ast_type_reference(ir_input, ast_name, &type_output, &language_output);
-        Ok(quote! {{
-            use #crate_path::Token;
-            #parser_expr.map(|#pattern| -> #return_type { #constructor })
-        }})
+
+        // Count result fields for new-format mode
+        let result_field_count = collected
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Result)
+            .count();
+
+        if format_mode == FormatMode::New && result_field_count > 0 {
+            // New-format mode: parse result names generically, then the format body
+            let constructor = self.ast_constructor_new_format(
+                ast_name,
+                variant,
+                &collected,
+                &occurrences,
+                crate_path,
+                &type_params,
+            );
+
+            Ok(quote! {{
+                use #crate_path::Token;
+                #crate_path::result_name_list()
+                    .then(#parser_expr)
+                    .map(|(__result_names, #pattern)| -> #return_type { #constructor })
+            }})
+        } else {
+            // Legacy mode or zero-result: original behavior
+            let constructor = self.ast_constructor(
+                ast_name,
+                variant,
+                &collected,
+                &occurrences,
+                crate_path,
+                &type_params,
+            );
+
+            Ok(quote! {{
+                use #crate_path::Token;
+                #parser_expr.map(|#pattern| -> #return_type { #constructor })
+            }})
+        }
     }
 
     fn build_wrapper_parser(

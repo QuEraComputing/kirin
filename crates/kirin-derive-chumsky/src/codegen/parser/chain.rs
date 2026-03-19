@@ -8,6 +8,8 @@ use quote::quote;
 use crate::ChumskyLayout;
 use kirin_derive_toolkit::ir::fields::{Collection, FieldInfo};
 
+use kirin_derive_toolkit::ir::fields::FieldCategory;
+
 use crate::field_kind;
 use crate::format::{Format, FormatElement, FormatOption};
 use crate::validation::FieldOccurrence;
@@ -166,12 +168,26 @@ impl GenerateHasDialectParser {
             quote! { ::core::marker::PhantomData::<fn() -> (&'t (), #(#type_params,)* __TypeOutput, __LanguageOutput)> }
         };
 
+        // Track result index for multi-result support
+        let mut result_idx = 0usize;
+
         if has_named {
-            let assigns = ast_fields.iter().map(|field| {
-                let name = field.ident.as_ref().unwrap();
-                let value = self.build_field_value(field, &field_occurrences, crate_path);
-                quote! { #name: #value }
-            });
+            let assigns: Vec<_> = ast_fields
+                .iter()
+                .map(|field| {
+                    let name = field.ident.as_ref().unwrap();
+                    let ri = if field.category() == FieldCategory::Result {
+                        let idx = result_idx;
+                        result_idx += 1;
+                        Some(idx)
+                    } else {
+                        None
+                    };
+                    let value =
+                        self.build_field_value(field, &field_occurrences, crate_path, ri);
+                    quote! { #name: #value }
+                })
+                .collect();
             match variant {
                 Some(v) => quote! { #ast_name::#v { #(#assigns),* } },
                 None => quote! { #ast_name { #(#assigns,)* _marker: #phantom_data } },
@@ -180,12 +196,149 @@ impl GenerateHasDialectParser {
             let mut sorted_ast_fields: Vec<_> = ast_fields.clone();
             sorted_ast_fields.sort_by_key(|f| f.index);
 
-            let values = sorted_ast_fields
+            let values: Vec<_> = sorted_ast_fields
                 .iter()
-                .map(|field| self.build_field_value(field, &field_occurrences, crate_path));
+                .map(|field| {
+                    let ri = if field.category() == FieldCategory::Result {
+                        let idx = result_idx;
+                        result_idx += 1;
+                        Some(idx)
+                    } else {
+                        None
+                    };
+                    self.build_field_value(field, &field_occurrences, crate_path, ri)
+                })
+                .collect();
             match variant {
                 Some(v) => quote! { #ast_name::#v ( #(#values),* ) },
                 None => quote! { #ast_name ( #(#values,)* #phantom_data ) },
+            }
+        }
+    }
+
+    /// Builds an AST constructor for new-format mode where result names
+    /// come from the generic `result_name_list()` parser.
+    ///
+    /// The `__result_names` variable is a `Vec<Spanned<&'t str>>` available
+    /// in the generated code, containing the parsed result names in order.
+    pub(super) fn ast_constructor_new_format(
+        &self,
+        ast_name: &syn::Ident,
+        variant: Option<&syn::Ident>,
+        collected: &[FieldInfo<ChumskyLayout>],
+        occurrences: &[FieldOccurrence<'_>],
+        crate_path: &syn::Path,
+        type_params: &[TokenStream],
+    ) -> TokenStream {
+        let mut field_occurrences: HashMap<usize, Vec<&FieldOccurrence>> = HashMap::new();
+        for occ in occurrences {
+            field_occurrences
+                .entry(occ.field.index)
+                .or_default()
+                .push(occ);
+        }
+
+        let ast_fields: Vec<_> = collected
+            .iter()
+            .filter(|f| {
+                // In new-format, result fields are always included (even without occurrences)
+                f.category() == FieldCategory::Result
+                    || field_occurrences.contains_key(&f.index)
+                    || !f.has_default()
+            })
+            .collect();
+
+        let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
+
+        let phantom_data = if type_params.is_empty() {
+            quote! { ::core::marker::PhantomData::<fn() -> (&'t (), __TypeOutput, __LanguageOutput)> }
+        } else {
+            quote! { ::core::marker::PhantomData::<fn() -> (&'t (), #(#type_params,)* __TypeOutput, __LanguageOutput)> }
+        };
+
+        // Count result fields to generate index-based access into __result_names
+        let mut result_idx = 0usize;
+
+        if has_named {
+            let assigns: Vec<_> = ast_fields
+                .iter()
+                .map(|field| {
+                    let name = field.ident.as_ref().unwrap();
+                    if field.category() == FieldCategory::Result {
+                        let value = self.build_new_format_result_value(
+                            field,
+                            &field_occurrences,
+                            crate_path,
+                            result_idx,
+                        );
+                        result_idx += 1;
+                        quote! { #name: #value }
+                    } else {
+                        let value =
+                            self.build_field_value(field, &field_occurrences, crate_path, None);
+                        quote! { #name: #value }
+                    }
+                })
+                .collect();
+            match variant {
+                Some(v) => quote! { #ast_name::#v { #(#assigns),* } },
+                None => quote! { #ast_name { #(#assigns,)* _marker: #phantom_data } },
+            }
+        } else {
+            let mut sorted_ast_fields: Vec<_> = ast_fields.clone();
+            sorted_ast_fields.sort_by_key(|f| f.index);
+
+            let values: Vec<_> = sorted_ast_fields
+                .iter()
+                .map(|field| {
+                    if field.category() == FieldCategory::Result {
+                        let value = self.build_new_format_result_value(
+                            field,
+                            &field_occurrences,
+                            crate_path,
+                            result_idx,
+                        );
+                        result_idx += 1;
+                        value
+                    } else {
+                        self.build_field_value(field, &field_occurrences, crate_path, None)
+                    }
+                })
+                .collect();
+            match variant {
+                Some(v) => quote! { #ast_name::#v ( #(#values),* ) },
+                None => quote! { #ast_name ( #(#values,)* #phantom_data ) },
+            }
+        }
+    }
+
+    /// Builds a ResultValue AST field for new-format mode.
+    ///
+    /// The name comes from `__result_names[idx]` and the type comes from
+    /// the `:type` occurrence in the format string (if present).
+    fn build_new_format_result_value(
+        &self,
+        field: &FieldInfo<ChumskyLayout>,
+        field_occurrences: &HashMap<usize, Vec<&FieldOccurrence>>,
+        crate_path: &syn::Path,
+        result_idx: usize,
+    ) -> TokenStream {
+        let type_occ = field_occurrences
+            .get(&field.index)
+            .and_then(|occs| occs.iter().find(|o| matches!(o.option, FormatOption::Type)));
+
+        let ty_expr = if let Some(type_occ) = type_occ {
+            let var = &type_occ.var_name;
+            quote! { Some(#var.ty.clone()) }
+        } else {
+            quote! { None }
+        };
+
+        quote! {
+            #crate_path::ResultValue {
+                name: __result_names[#result_idx].clone(),
+                ty: #ty_expr,
+                result_index: #result_idx,
             }
         }
     }
@@ -195,6 +348,7 @@ impl GenerateHasDialectParser {
         field: &FieldInfo<ChumskyLayout>,
         field_occurrences: &HashMap<usize, Vec<&FieldOccurrence>>,
         crate_path: &syn::Path,
+        result_index: Option<usize>,
     ) -> TokenStream {
         let occs = field_occurrences.get(&field.index);
         match occs {
@@ -210,8 +364,13 @@ impl GenerateHasDialectParser {
 
                 match &occ.option {
                     FormatOption::Name => {
-                        field_kind::construct_from_name_only(field, crate_path, var)
-                            .unwrap_or_else(|| quote! { #var })
+                        field_kind::construct_from_name_only(
+                            field,
+                            crate_path,
+                            var,
+                            result_index,
+                        )
+                        .unwrap_or_else(|| quote! { #var })
                     }
                     FormatOption::Type if field.category().is_ssa_like() => {
                         unreachable!(
@@ -232,6 +391,7 @@ impl GenerateHasDialectParser {
                         crate_path,
                         &name.var_name,
                         &ty.var_name,
+                        result_index,
                     )
                     .unwrap_or_else(|| {
                         let var = &occs[0].var_name;

@@ -201,15 +201,23 @@ pub fn construct_from_name_only(
     field: &FieldInfo<impl Layout>,
     crate_path: &syn::Path,
     name_var: &syn::Ident,
+    result_index: Option<usize>,
 ) -> Option<TokenStream> {
     let type_name = syn::Ident::new(
         field.category().ssa_type_name()?,
         proc_macro2::Span::call_site(),
     );
+    let extra_fields = if field.category() == FieldCategory::Result {
+        let idx = result_index.unwrap_or(0);
+        quote! { result_index: #idx, }
+    } else {
+        quote! {}
+    };
     Some(quote! {
         #crate_path::#type_name {
             name: #crate_path::Spanned { value: #name_var.name, span: #name_var.span },
             ty: None,
+            #extra_fields
         }
     })
 }
@@ -220,15 +228,23 @@ pub fn construct_from_name_and_type(
     crate_path: &syn::Path,
     name_var: &syn::Ident,
     type_var: &syn::Ident,
+    result_index: Option<usize>,
 ) -> Option<TokenStream> {
     let type_name = syn::Ident::new(
         field.category().ssa_type_name()?,
         proc_macro2::Span::call_site(),
     );
+    let extra_fields = if field.category() == FieldCategory::Result {
+        let idx = result_index.unwrap_or(0);
+        quote! { result_index: #idx, }
+    } else {
+        quote! {}
+    };
     Some(quote! {
         #crate_path::#type_name {
             name: #crate_path::Spanned { value: #name_var.name, span: #name_var.span },
             ty: Some(#type_var.ty.clone()),
+            #extra_fields
         }
     })
 }

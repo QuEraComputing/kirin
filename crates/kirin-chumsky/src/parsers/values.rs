@@ -56,7 +56,11 @@ where
 {
     ssa_name()
         .then(just(Token::Colon).ignore_then(T::parser()).or_not())
-        .map(|(name, ty)| ResultValue { name, ty })
+        .map(|(name, ty)| ResultValue {
+            name,
+            ty,
+            result_index: 0,
+        })
         .labelled("result value")
 }
 
@@ -90,6 +94,26 @@ where
             span: extra.span(),
         })
         .labelled("type annotation")
+}
+
+/// Parses a result name list: `%name1, %name2, ... =`
+///
+/// Used in new-format mode where result names are parsed generically
+/// at the statement level rather than by the dialect format string.
+///
+/// Returns the list of parsed result names. If there are no results
+/// (zero-result operation), returns an empty Vec.
+pub fn result_name_list<'t, I>()
+-> impl Parser<'t, I, Vec<Spanned<&'t str>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+{
+    ssa_name()
+        .separated_by(just(Token::Comma))
+        .at_least(1)
+        .collect::<Vec<_>>()
+        .then_ignore(just(Token::Equal))
+        .labelled("result name list")
 }
 
 /// Parses a literal integer and converts it using the provided function.
