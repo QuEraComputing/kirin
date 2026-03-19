@@ -1,14 +1,14 @@
 use crate::types::QubitType;
 use kirin::prelude::*;
 
-/// Function body holding a Region for circuit-stage programs.
-/// Uses Region (like FunctionBody) so the function text parser's
-/// brace-delimited body is consumed correctly.
+/// Function body holding a DiGraph for circuit-stage programs.
+/// Circuits are naturally directed acyclic graphs: qubit values flow
+/// forward through gates.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "{body}")]
 pub struct CircuitFunction {
-    pub body: Region,
+    pub body: DiGraph,
 }
 
 /// Single-qubit Hadamard gate.

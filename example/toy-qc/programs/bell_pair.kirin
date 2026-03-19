@@ -1,9 +1,8 @@
 stage @circuit fn @bell_pair(Qubit, Qubit) -> Qubit;
 
-specialize @circuit fn @bell_pair(Qubit, Qubit) -> Qubit {
-  ^entry(%q0: Qubit, %q1: Qubit) {
-    %q0_h = h %q0 -> Qubit;
-    %q0_out = cnot_ctrl %q0_h, %q1 -> Qubit;
-    %q1_out = cnot_tgt %q0_h, %q1 -> Qubit;
-  }
+specialize @circuit fn @bell_pair(Qubit, Qubit) -> Qubit digraph ^dg0(%q0: Qubit, %q1: Qubit) {
+  %q0_h = h %q0 -> Qubit;
+  %q0_out = cnot_ctrl %q0_h, %q1 -> Qubit;
+  %q1_out = cnot_tgt %q0_h, %q1 -> Qubit;
+  yield %q0_out, %q1_out;
 }

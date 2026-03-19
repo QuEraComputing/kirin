@@ -1,11 +1,10 @@
 stage @circuit fn @ghz(Qubit, Qubit, Qubit) -> Qubit;
 
-specialize @circuit fn @ghz(Qubit, Qubit, Qubit) -> Qubit {
-  ^entry(%q0: Qubit, %q1: Qubit, %q2: Qubit) {
-    %q0_h = h %q0 -> Qubit;
-    %q0_out = cnot_ctrl %q0_h, %q1 -> Qubit;
-    %q1_out = cnot_tgt %q0_h, %q1 -> Qubit;
-    %q0_final = cnot_ctrl %q0_out, %q2 -> Qubit;
-    %q2_out = cnot_tgt %q0_out, %q2 -> Qubit;
-  }
+specialize @circuit fn @ghz(Qubit, Qubit, Qubit) -> Qubit digraph ^dg0(%q0: Qubit, %q1: Qubit, %q2: Qubit) {
+  %q0_h = h %q0 -> Qubit;
+  %q0_out = cnot_ctrl %q0_h, %q1 -> Qubit;
+  %q1_out = cnot_tgt %q0_h, %q1 -> Qubit;
+  %q0_final = cnot_ctrl %q0_out, %q2 -> Qubit;
+  %q2_out = cnot_tgt %q0_out, %q2 -> Qubit;
+  yield %q0_final, %q1_out, %q2_out;
 }

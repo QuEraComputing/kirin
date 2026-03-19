@@ -1,12 +1,14 @@
 use crate::types::QubitType;
 use kirin::prelude::*;
 
-/// Function body holding a Region for ZX-stage programs.
+/// Function body holding an UnGraph for ZX-stage programs.
+/// ZX calculus diagrams are undirected graphs: wires are edges
+/// and spiders/boxes are nodes connected by those edges.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "{body}")]
 pub struct ZXFunction {
-    pub body: Region,
+    pub body: UnGraph,
 }
 
 /// Wire edge operation — creates an edge SSAValue.

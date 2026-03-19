@@ -67,23 +67,29 @@ where
         .labelled("function signature")
 }
 
-/// Brace-balanced body scanner. Matches `{ ... }` with arbitrary nesting,
-/// returning only the span. Does not parse the body contents.
-fn brace_body_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>
+/// Body span scanner. Matches an optional keyword prefix (e.g. `digraph`,
+/// `ungraph`) followed by a brace-balanced `{ ... }` region. Returns the
+/// span covering everything from the first non-brace token (or the opening
+/// brace) through the matching closing brace. Does not parse body contents.
+fn body_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>
 where
     I: TokenInput<'src>,
 {
     chumsky::primitive::custom(|input: &mut chumsky::input::InputRef<'src, '_, I, _>| {
         let start = input.cursor();
-        match input.next() {
-            Some(Token::LBrace) => {}
-            Some(found) => {
-                return Err(Rich::custom(
-                    input.span_since(&start),
-                    format!("expected '{{', found {found}"),
-                ));
+        // Skip tokens until we find the opening brace. This allows keyword
+        // prefixes like `digraph ^name(ports...) {` or `ungraph ^name(...) {`.
+        loop {
+            match input.next() {
+                Some(Token::LBrace) => break,
+                Some(_) => {}
+                None => {
+                    return Err(Rich::custom(
+                        input.span_since(&start),
+                        "expected '{' in body",
+                    ));
+                }
             }
-            None => return Err(Rich::custom(input.span_since(&start), "expected '{'")),
         }
         let mut depth: u32 = 1;
         while depth > 0 {
@@ -121,7 +127,7 @@ where
     let specialize_decl = identifier("specialize")
         .ignore_then(symbol())
         .then(fn_signature_parser::<I, L>())
-        .then(brace_body_span::<I>())
+        .then(body_span::<I>())
         .map_with(|((stage, sig), body_span), extra| Declaration::Specialize {
             header: Header {
                 stage,
