@@ -1,5 +1,5 @@
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
-use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
+use kirin_interpreter::{Interpretable, Interpreter, InterpreterError, InterpreterExt};
 
 use crate::Cmp;
 
@@ -232,7 +232,10 @@ where
     <I::Value as CompareValue>::Bool: Into<I::Value>,
     T: CompileTimeValue,
 {
-    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(
+        &self,
+        interp: &mut I,
+    ) -> Result<kirin_interpreter::Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -241,52 +244,22 @@ where
         match self {
             Cmp::Eq {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_eq(&b).into())?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a.cmp_eq(&b).into()),
             Cmp::Ne {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_ne(&b).into())?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a.cmp_ne(&b).into()),
             Cmp::Lt {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_lt(&b).into())?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a.cmp_lt(&b).into()),
             Cmp::Le {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_le(&b).into())?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a.cmp_le(&b).into()),
             Cmp::Gt {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_gt(&b).into())?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a.cmp_gt(&b).into()),
             Cmp::Ge {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_ge(&b).into())?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a.cmp_ge(&b).into()),
             Self::__Phantom(..) => unreachable!(),
         }
     }

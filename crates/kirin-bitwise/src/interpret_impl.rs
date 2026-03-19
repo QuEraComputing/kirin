@@ -1,7 +1,7 @@
 use std::ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr};
 
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
-use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
+use kirin_interpreter::{Interpretable, Interpreter, InterpreterError, InterpreterExt};
 
 use crate::Bitwise;
 
@@ -17,7 +17,10 @@ where
         + Shr<Output = I::Value>,
     T: CompileTimeValue,
 {
-    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(
+        &self,
+        interp: &mut I,
+    ) -> Result<kirin_interpreter::Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -26,51 +29,22 @@ where
         match self {
             Bitwise::And {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a & b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a & b),
             Bitwise::Or {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a | b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a | b),
             Bitwise::Xor {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a ^ b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a ^ b),
             Bitwise::Not {
                 operand, result, ..
-            } => {
-                let a = interp.read(*operand)?;
-                interp.write(*result, !a)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.unary_op(*operand, *result, |a| !a),
             Bitwise::Shl {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a << b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a << b),
             Bitwise::Shr {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a >> b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a >> b),
             Self::__Phantom(..) => unreachable!(),
         }
     }

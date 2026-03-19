@@ -1,7 +1,9 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
-use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
+use kirin_interpreter::{
+    Continuation, Interpretable, Interpreter, InterpreterError, InterpreterExt,
+};
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
@@ -37,57 +39,28 @@ where
         match self {
             Arith::Add {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a + b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a + b),
             Arith::Sub {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a - b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a - b),
             Arith::Mul {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                interp.write(*result, a * b)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a * b),
             Arith::Div {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                let v = a
-                    .checked_div(b)
-                    .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
-                interp.write(*result, v)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.try_binary_op(*lhs, *rhs, *result, |a, b| {
+                a.checked_div(b)
+                    .ok_or_else(|| InterpreterError::custom(DivisionByZero).into())
+            }),
             Arith::Rem {
                 lhs, rhs, result, ..
-            } => {
-                let a = interp.read(*lhs)?;
-                let b = interp.read(*rhs)?;
-                let v = a
-                    .checked_rem(b)
-                    .ok_or_else(|| InterpreterError::custom(DivisionByZero))?;
-                interp.write(*result, v)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.try_binary_op(*lhs, *rhs, *result, |a, b| {
+                a.checked_rem(b)
+                    .ok_or_else(|| InterpreterError::custom(DivisionByZero).into())
+            }),
             Arith::Neg {
                 operand, result, ..
-            } => {
-                let a = interp.read(*operand)?;
-                interp.write(*result, -a)?;
-                Ok(Continuation::Continue)
-            }
+            } => interp.unary_op(*operand, *result, |a| -a),
             Self::__Phantom(..) => unreachable!(),
         }
     }

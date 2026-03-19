@@ -12,6 +12,7 @@ mod call;
 mod control;
 pub mod dispatch;
 mod error;
+pub mod ext;
 mod frame;
 mod frame_stack;
 mod interpretable;
@@ -32,6 +33,7 @@ pub use block_eval::BlockEvaluator;
 pub use call::{CallSemantics, SSACFGRegion};
 pub use control::{Args, ConcreteExt, Continuation};
 pub use error::{InterpreterError, MissingEntryError, StageResolutionError};
+pub use ext::InterpreterExt;
 pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use interpretable::Interpretable;
@@ -49,7 +51,7 @@ pub use widening::WideningStrategy;
 pub mod prelude {
     pub use crate::{
         BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
-        SSACFGRegion,
+        InterpreterExt, SSACFGRegion,
     };
 }
 
