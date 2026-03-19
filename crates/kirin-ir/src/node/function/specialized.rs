@@ -77,7 +77,7 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
     }
 
     pub fn return_type(&self) -> &L::Type {
-        &self.signature.ret
+        self.signature.ret()
     }
 
     pub fn signature(&self) -> &Signature<L::Type> {

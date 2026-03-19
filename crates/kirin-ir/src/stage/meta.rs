@@ -108,6 +108,8 @@ impl<L: Dialect> StageMeta for StageInfo<L> {
         self.stage_id = id;
     }
 
+    /// For single-dialect pipelines, there is only one possible stage, so the
+    /// `stage_name` argument is ignored and a default `StageInfo` is returned.
     fn from_stage_name(_stage_name: &str) -> Result<Self, String> {
         Ok(StageInfo::default())
     }

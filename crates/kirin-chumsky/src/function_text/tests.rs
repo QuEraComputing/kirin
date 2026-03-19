@@ -132,11 +132,7 @@ enum MixedStage {
 const BODY: &str = "{ ^0() {} }";
 
 fn unit_sig() -> Signature<UnitType> {
-    Signature {
-        params: vec![UnitType],
-        ret: UnitType,
-        constraints: (),
-    }
+    Signature::new(vec![UnitType], UnitType, ())
 }
 
 fn function_name<S>(pipeline: &Pipeline<S>, function: Function) -> String {
@@ -347,11 +343,7 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
         .signature();
     assert_eq!(
         stage_b_sig,
-        &Signature {
-            params: vec![I32Type],
-            ret: I32Type,
-            constraints: ()
-        }
+        &Signature::new(vec![I32Type], I32Type, ())
     );
 }
 

@@ -62,11 +62,7 @@ where
         .then(L::Type::parser())
         .map(|((function, params), ret)| ParsedFnSignature {
             function,
-            signature: Signature {
-                params,
-                ret,
-                constraints: (),
-            },
+            signature: Signature::new(params, ret, ()),
         })
         .labelled("function signature")
 }

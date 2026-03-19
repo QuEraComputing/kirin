@@ -7,11 +7,7 @@ use common::{BuilderDialect, TestType, new_stage};
 use kirin_ir::*;
 
 fn sig(ty: TestType) -> Signature<TestType> {
-    Signature {
-        params: vec![ty.clone()],
-        ret: ty,
-        constraints: (),
-    }
+    Signature::new(vec![ty.clone()], ty, ())
 }
 
 // --- Staged function name policy tests ---
@@ -186,11 +182,7 @@ fn staged_function_all_matching_returns_most_specific() {
     let sf = stage.staged_function().new().unwrap();
 
     let body1 = stage.statement().definition(BuilderDialect::Return).new();
-    let sig_i32 = Signature {
-        params: vec![TestType::I32],
-        ret: TestType::Any,
-        constraints: (),
-    };
+    let sig_i32 = Signature::new(vec![TestType::I32], TestType::Any, ());
     let _spec1 = stage
         .specialize()
         .staged_func(sf)
@@ -200,11 +192,7 @@ fn staged_function_all_matching_returns_most_specific() {
         .unwrap();
 
     let body2 = stage.statement().definition(BuilderDialect::Return).new();
-    let sig_i64 = Signature {
-        params: vec![TestType::I64],
-        ret: TestType::Any,
-        constraints: (),
-    };
+    let sig_i64 = Signature::new(vec![TestType::I64], TestType::Any, ());
     let _spec2 = stage
         .specialize()
         .staged_func(sf)

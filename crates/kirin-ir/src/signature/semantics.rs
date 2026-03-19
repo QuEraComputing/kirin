@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::lattice::TypeLattice;
 
-use super::signature::Signature;
+use super::definition::Signature;
 
 /// Result of comparing two candidate signatures for specialization dispatch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,16 +50,16 @@ impl<T: PartialEq, C: PartialEq> SignatureSemantics<T, C> for ExactSemantics {
     type Env = ();
 
     fn applicable(call: &Signature<T, C>, cand: &Signature<T, C>) -> Option<Self::Env> {
-        if call.params.len() != cand.params.len() {
+        if call.params().len() != cand.params().len() {
             return None;
         }
         let params_match = call
-            .params
+            .params()
             .iter()
-            .zip(cand.params.iter())
+            .zip(cand.params().iter())
             .all(|(a, b)| a == b);
         #[allow(clippy::unit_cmp)]
-        if params_match && call.ret == cand.ret && call.constraints == cand.constraints {
+        if params_match && call.ret() == cand.ret() && call.constraints() == cand.constraints() {
             Some(())
         } else {
             None
@@ -91,22 +91,22 @@ impl<T: TypeLattice> SignatureSemantics<T> for LatticeSemantics<T> {
     type Env = ();
 
     fn applicable(call: &Signature<T>, cand: &Signature<T>) -> Option<Self::Env> {
-        if call.params.len() != cand.params.len() {
+        if call.params().len() != cand.params().len() {
             return None;
         }
         #[allow(clippy::unit_cmp)]
-        if call.constraints != cand.constraints {
+        if call.constraints() != cand.constraints() {
             return None;
         }
         // Call return type must match candidate return type if specified
-        if call.ret != cand.ret {
+        if call.ret() != cand.ret() {
             return None;
         }
         // Call params must be subtypes (more specific or equal) of candidate params
         let all_applicable = call
-            .params
+            .params()
             .iter()
-            .zip(cand.params.iter())
+            .zip(cand.params().iter())
             .all(|(call_param, cand_param)| call_param.is_subseteq(cand_param));
         if all_applicable { Some(()) } else { None }
     }
@@ -117,19 +117,19 @@ impl<T: TypeLattice> SignatureSemantics<T> for LatticeSemantics<T> {
         b: &Signature<T>,
         _b_env: &Self::Env,
     ) -> SignatureCmp {
-        if a.params.len() != b.params.len() {
+        if a.params().len() != b.params().len() {
             return SignatureCmp::Incomparable;
         }
 
         let a_sub_b = a
-            .params
+            .params()
             .iter()
-            .zip(b.params.iter())
+            .zip(b.params().iter())
             .all(|(ap, bp)| ap.is_subseteq(bp));
         let b_sub_a = b
-            .params
+            .params()
             .iter()
-            .zip(a.params.iter())
+            .zip(a.params().iter())
             .all(|(bp, ap)| bp.is_subseteq(ap));
 
         match (a_sub_b, b_sub_a) {
@@ -198,11 +198,7 @@ mod tests {
     impl TypeLattice for SimpleType {}
 
     fn make_sig(params: Vec<SimpleType>, ret: SimpleType) -> Signature<SimpleType> {
-        Signature {
-            params,
-            ret,
-            constraints: (),
-        }
+        Signature::new(params, ret, ())
     }
 
     #[test]
@@ -267,27 +263,15 @@ mod tests {
 
     #[test]
     fn exact_semantics_applicable_and_cmp() {
-        let sig1 = Signature {
-            params: vec![1, 2],
-            ret: 3,
-            constraints: (),
-        };
-        let sig2 = Signature {
-            params: vec![1, 2],
-            ret: 3,
-            constraints: (),
-        };
+        let sig1 = Signature::new(vec![1, 2], 3, ());
+        let sig2 = Signature::new(vec![1, 2], 3, ());
         assert!(ExactSemantics::applicable(&sig1, &sig2).is_some());
         assert_eq!(
             ExactSemantics::cmp_candidate(&sig1, &(), &sig2, &()),
             SignatureCmp::Equal
         );
 
-        let sig3 = Signature {
-            params: vec![1, 99],
-            ret: 3,
-            constraints: (),
-        };
+        let sig3 = Signature::new(vec![1, 99], 3, ());
         assert!(ExactSemantics::applicable(&sig1, &sig3).is_none());
     }
 }
