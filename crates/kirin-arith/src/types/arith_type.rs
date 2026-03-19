@@ -1,9 +1,8 @@
 use std::fmt::{Display, Formatter};
 
-use kirin::ir::Dialect;
 use kirin::parsers::chumsky::prelude::*;
-use kirin::parsers::{BoxedParser, DirectlyParsable, HasParser, PrettyPrint, Token, TokenInput};
-use kirin::pretty::{ArenaDoc, DocAllocator, Document};
+use kirin::parsers::{BoxedParser, DirectlyParsable, HasParser, Token, TokenInput};
+use kirin::pretty::PrettyPrintViaDisplay;
 
 /// Built-in arithmetic type lattice for `kirin-arith`.
 ///
@@ -101,15 +100,4 @@ impl<'t> HasParser<'t> for ArithType {
     }
 }
 
-impl PrettyPrint for ArithType {
-    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-        _namespace: &[&str],
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        doc.text(self.to_string())
-    }
-}
+impl PrettyPrintViaDisplay for ArithType {}

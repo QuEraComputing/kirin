@@ -4,6 +4,7 @@ use std::io::{Write, stdout};
 
 use crate::{ArenaDoc, Config, Document, RenderError};
 use kirin_ir::{Dialect, GlobalSymbol, InternTable, StageInfo};
+use prettyless::DocAllocator;
 
 /// Core trait for pretty printing values to a document.
 ///
@@ -224,35 +225,30 @@ where
     }
 }
 
-impl<T: PrettyPrint> PrettyPrint for &T {
+/// Marker trait for types whose `PrettyPrint` implementation is just
+/// `doc.text(self.to_string())`. Implement this (empty) trait on your type
+/// to get a blanket `PrettyPrint` impl.
+///
+/// # Requirements
+/// - The type must implement `Display`.
+/// - The type must NOT have a manual `PrettyPrint` impl (would conflict).
+///
+/// # Example
+/// ```ignore
+/// impl PrettyPrintViaDisplay for MyType {}
+/// // Now MyType: PrettyPrint, rendering via Display::fmt
+/// ```
+pub trait PrettyPrintViaDisplay: std::fmt::Display {}
+
+impl<T: PrettyPrintViaDisplay> PrettyPrint for T {
     fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
         &self,
         doc: &'a Document<'a, L>,
-        namespace: &[&str],
+        _namespace: &[&str],
     ) -> ArenaDoc<'a>
     where
         L::Type: std::fmt::Display,
     {
-        T::namespaced_pretty_print(self, doc, namespace)
-    }
-
-    fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        (*self).pretty_print_name(doc)
-    }
-
-    fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        (*self).pretty_print_type(doc)
+        doc.text(self.to_string())
     }
 }

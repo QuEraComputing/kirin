@@ -1,12 +1,12 @@
 //! PrettyPrint implementations for IR types.
 
 use kirin_ir::{
-    Dialect, GetInfo, GlobalSymbol, Item, ResultValue, SSAInfo, SSAValue, SpecializedFunction,
-    StagedFunction, Successor, Symbol,
+    Dialect, GlobalSymbol, ResultValue, SSAValue, SpecializedFunction, StagedFunction, Successor,
+    Symbol,
 };
 use prettyless::DocAllocator;
 
-use crate::{ArenaDoc, Document, PrettyPrint};
+use crate::{ArenaDoc, Document, PrettyPrint, PrettyPrintViaDisplay};
 
 impl PrettyPrint for ResultValue {
     fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
@@ -17,13 +17,7 @@ impl PrettyPrint for ResultValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info = self.expect_info(doc.stage());
-        if let Some(name) = info.name()
-            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
-        {
-            return doc.text(format!("%{}", resolved_name));
-        }
-        doc.text(self.to_string())
+        doc.print_ssa_ref(*self)
     }
 
     fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
@@ -33,13 +27,7 @@ impl PrettyPrint for ResultValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
-        if let Some(name) = info.name()
-            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
-        {
-            return doc.text(format!("%{}", resolved_name));
-        }
-        doc.text(self.to_string())
+        doc.print_ssa_ref(*self)
     }
 
     fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
@@ -49,8 +37,7 @@ impl PrettyPrint for ResultValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info: &Item<SSAInfo<L>> = self.expect_info(doc.stage());
-        doc.text(format!("{}", info.ty()))
+        doc.print_ssa_type(*self)
     }
 }
 
@@ -63,13 +50,7 @@ impl PrettyPrint for SSAValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info = self.expect_info(doc.stage());
-        if let Some(name) = info.name()
-            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
-        {
-            return doc.text(format!("%{}", resolved_name));
-        }
-        doc.text(self.to_string())
+        doc.print_ssa_ref(*self)
     }
 
     fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
@@ -79,13 +60,7 @@ impl PrettyPrint for SSAValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info = self.expect_info(doc.stage());
-        if let Some(name) = info.name()
-            && let Some(resolved_name) = doc.stage().symbol_table().resolve(name)
-        {
-            return doc.text(format!("%{}", resolved_name));
-        }
-        doc.text(self.to_string())
+        doc.print_ssa_ref(*self)
     }
 
     fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
@@ -95,23 +70,11 @@ impl PrettyPrint for SSAValue {
     where
         L::Type: std::fmt::Display,
     {
-        let info = self.expect_info(doc.stage());
-        doc.text(format!("{}", info.ty()))
+        doc.print_ssa_type(*self)
     }
 }
 
-impl PrettyPrint for Successor {
-    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-        _namespace: &[&str],
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        doc.text(self.to_string())
-    }
-}
+impl PrettyPrintViaDisplay for Successor {}
 
 impl PrettyPrint for Symbol {
     fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
@@ -209,28 +172,12 @@ impl PrettyPrint for StagedFunction {
 // PrettyPrint implementations for builtin types
 // ============================================================================
 
-// Macro to reduce boilerplate for integer types
-macro_rules! impl_pretty_print_int {
-    ($($ty:ty),*) => {
-        $(
-            impl PrettyPrint for $ty {
-                fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
-                    &self,
-                    doc: &'a Document<'a, L>,
-                    _namespace: &[&str],
-                ) -> ArenaDoc<'a>
-                where
-                    L::Type: std::fmt::Display,
-                {
-                    doc.text(self.to_string())
-                }
-            }
-        )*
-    };
+// Integer types use Display for pretty printing
+macro_rules! impl_pretty_print_via_display {
+    ($($ty:ty),*) => { $(impl PrettyPrintViaDisplay for $ty {})* };
 }
 
-// Implement for all integer types
-impl_pretty_print_int!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
+impl_pretty_print_via_display!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 
 // Macro to reduce boilerplate for floating point types (need decimal point)
 macro_rules! impl_pretty_print_float {

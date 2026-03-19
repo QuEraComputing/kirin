@@ -40,7 +40,7 @@ pub use pipeline::{
 pub use error::RenderError;
 #[cfg(feature = "derive")]
 pub use kirin_derive_prettyless::RenderDispatch;
-pub use traits::{PrettyPrint, PrettyPrintExt, RenderBuilder};
+pub use traits::{PrettyPrint, PrettyPrintExt, PrettyPrintViaDisplay, RenderBuilder};
 
 // Re-export from prettyless for convenience
 pub use prettyless::{Arena, DocAllocator};
@@ -50,8 +50,8 @@ pub type ArenaDoc<'a> = prettyless::DocBuilder<'a, Arena<'a>>;
 pub mod prelude {
     pub use crate::{
         ArenaDoc, Config, DocAllocator, Document, FunctionRenderBuilder, PipelineDocument,
-        PipelinePrintExt, PipelineRenderBuilder, PrettyPrint, PrettyPrintExt, PrintExt,
-        RenderDispatch, RenderError,
+        PipelinePrintExt, PipelineRenderBuilder, PrettyPrint, PrettyPrintExt,
+        PrettyPrintViaDisplay, PrintExt, RenderDispatch, RenderError,
     };
     pub use prettyless;
 }
