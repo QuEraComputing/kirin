@@ -13,6 +13,22 @@ use syn::{DeriveInput, Type};
 pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let variants = stage::parse_stage_variants(input)?;
 
+    // Check for duplicate stage names.
+    {
+        let mut seen: std::collections::HashMap<&str, &StageVariantInfo> =
+            std::collections::HashMap::new();
+        for v in &variants {
+            if let Some(prev) = seen.get(v.stage_name.as_str()) {
+                let msg = format!(
+                    "duplicate stage name \"{}\": already used by variant `{}`",
+                    v.stage_name, prev.ident,
+                );
+                return Err(syn::Error::new(v.ident.span(), msg));
+            }
+            seen.insert(&v.stage_name, v);
+        }
+    }
+
     let ir_crate_str = stage::parse_ir_crate_path(&input.attrs)?;
     let ir_crate: syn::Path = syn::parse_str(&ir_crate_str)
         .map_err(|e| syn::Error::new_spanned(input, format!("invalid crate path: {e}")))?;
@@ -160,4 +176,28 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     });
 
     Ok(tokens)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_duplicate_stage_name_error() {
+        let input: DeriveInput = syn::parse_quote! {
+            enum Stage {
+                #[stage(name = "source")]
+                Source(StageInfo<HighLevel>),
+                #[stage(name = "source")]
+                AlsoSource(StageInfo<LowLevel>),
+            }
+        };
+        let result = generate(&input);
+        assert!(result.is_err());
+        let err = result.err().unwrap().to_string();
+        assert!(
+            err.contains("duplicate stage name"),
+            "Expected 'duplicate stage name' in error: {err}"
+        );
+    }
 }

@@ -43,6 +43,10 @@ impl<L: Layout> Input<L> {
     /// Parse a `syn::DeriveInput` into a Kirin-typed `Input`.
     ///
     /// Supports structs and enums; unions produce an error.
+    ///
+    /// Variants prefixed with `__` (e.g., `__Phantom`) are excluded from generated
+    /// match arms and produce a wildcard `_ => unreachable!()` fallback. Use this
+    /// for `PhantomData` variants that exist only to carry generic parameters.
     pub fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
         let attrs = GlobalOptions::from_derive_input(input)?;
         let extra_attrs = L::ExtraGlobalAttrs::from_derive_input(input)?;

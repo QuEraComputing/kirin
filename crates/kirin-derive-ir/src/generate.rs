@@ -11,171 +11,128 @@ use proc_macro2::TokenStream;
 const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 const TRAIT_LIFETIME: &str = "'a";
 
-#[derive(Clone, Copy)]
-pub(crate) struct LocalFieldIterConfig {
-    kind: FieldIterKind,
-    mutable: bool,
-    trait_name: &'static str,
-    matching_type: &'static str,
-    trait_method: &'static str,
-    trait_type_iter: &'static str,
-}
+/// Type alias — previously a local wrapper; now that [`FieldIterConfig`] derives `Copy`,
+/// we use the toolkit type directly.
+pub(crate) type LocalFieldIterConfig = FieldIterConfig;
 
-impl LocalFieldIterConfig {
-    pub(crate) const fn new(
-        kind: FieldIterKind,
-        mutable: bool,
-        trait_name: &'static str,
-        matching_type: &'static str,
-        trait_method: &'static str,
-        trait_type_iter: &'static str,
-    ) -> Self {
-        Self {
-            kind,
-            mutable,
-            trait_name,
-            matching_type,
-            trait_method,
-            trait_type_iter,
-        }
-    }
-}
+/// Type alias — previously a local wrapper; now that [`BoolPropertyConfig`] derives `Copy`,
+/// we use the toolkit type directly.
+pub(crate) type LocalPropertyConfig = BoolPropertyConfig;
 
-#[derive(Clone, Copy)]
-pub(crate) struct LocalPropertyConfig {
-    kind: PropertyKind,
-    trait_name: &'static str,
-    trait_method: &'static str,
-}
+pub(crate) const HAS_ARGUMENTS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Arguments,
+    mutable: false,
+    trait_name: "HasArguments",
+    matching_type: "SSAValue",
+    trait_method: "arguments",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_ARGUMENTS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Arguments,
+    mutable: true,
+    trait_name: "HasArgumentsMut",
+    matching_type: "SSAValue",
+    trait_method: "arguments_mut",
+    trait_type_iter: "IterMut",
+};
+pub(crate) const HAS_RESULTS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Results,
+    mutable: false,
+    trait_name: "HasResults",
+    matching_type: "ResultValue",
+    trait_method: "results",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_RESULTS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Results,
+    mutable: true,
+    trait_name: "HasResultsMut",
+    matching_type: "ResultValue",
+    trait_method: "results_mut",
+    trait_type_iter: "IterMut",
+};
+pub(crate) const HAS_BLOCKS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Blocks,
+    mutable: false,
+    trait_name: "HasBlocks",
+    matching_type: "Block",
+    trait_method: "blocks",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_BLOCKS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Blocks,
+    mutable: true,
+    trait_name: "HasBlocksMut",
+    matching_type: "Block",
+    trait_method: "blocks_mut",
+    trait_type_iter: "IterMut",
+};
+pub(crate) const HAS_SUCCESSORS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Successors,
+    mutable: false,
+    trait_name: "HasSuccessors",
+    matching_type: "Successor",
+    trait_method: "successors",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_SUCCESSORS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Successors,
+    mutable: true,
+    trait_name: "HasSuccessorsMut",
+    matching_type: "Successor",
+    trait_method: "successors_mut",
+    trait_type_iter: "IterMut",
+};
+pub(crate) const HAS_REGIONS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Regions,
+    mutable: false,
+    trait_name: "HasRegions",
+    matching_type: "Region",
+    trait_method: "regions",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_REGIONS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Regions,
+    mutable: true,
+    trait_name: "HasRegionsMut",
+    matching_type: "Region",
+    trait_method: "regions_mut",
+    trait_type_iter: "IterMut",
+};
+pub(crate) const HAS_DIGRAPHS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Digraphs,
+    mutable: false,
+    trait_name: "HasDigraphs",
+    matching_type: "DiGraph",
+    trait_method: "digraphs",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_DIGRAPHS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Digraphs,
+    mutable: true,
+    trait_name: "HasDigraphsMut",
+    matching_type: "DiGraph",
+    trait_method: "digraphs_mut",
+    trait_type_iter: "IterMut",
+};
+pub(crate) const HAS_UNGRAPHS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Ungraphs,
+    mutable: false,
+    trait_name: "HasUngraphs",
+    matching_type: "UnGraph",
+    trait_method: "ungraphs",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_UNGRAPHS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Ungraphs,
+    mutable: true,
+    trait_name: "HasUngraphsMut",
+    matching_type: "UnGraph",
+    trait_method: "ungraphs_mut",
+    trait_type_iter: "IterMut",
+};
 
-impl LocalPropertyConfig {
-    pub(crate) const fn new(
-        kind: PropertyKind,
-        trait_name: &'static str,
-        trait_method: &'static str,
-    ) -> Self {
-        Self {
-            kind,
-            trait_name,
-            trait_method,
-        }
-    }
-}
-
-pub(crate) const HAS_ARGUMENTS: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Arguments,
-    false,
-    "HasArguments",
-    "SSAValue",
-    "arguments",
-    "Iter",
-);
-pub(crate) const HAS_ARGUMENTS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Arguments,
-    true,
-    "HasArgumentsMut",
-    "SSAValue",
-    "arguments_mut",
-    "IterMut",
-);
-pub(crate) const HAS_RESULTS: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Results,
-    false,
-    "HasResults",
-    "ResultValue",
-    "results",
-    "Iter",
-);
-pub(crate) const HAS_RESULTS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Results,
-    true,
-    "HasResultsMut",
-    "ResultValue",
-    "results_mut",
-    "IterMut",
-);
-pub(crate) const HAS_BLOCKS: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Blocks,
-    false,
-    "HasBlocks",
-    "Block",
-    "blocks",
-    "Iter",
-);
-pub(crate) const HAS_BLOCKS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Blocks,
-    true,
-    "HasBlocksMut",
-    "Block",
-    "blocks_mut",
-    "IterMut",
-);
-pub(crate) const HAS_SUCCESSORS: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Successors,
-    false,
-    "HasSuccessors",
-    "Successor",
-    "successors",
-    "Iter",
-);
-pub(crate) const HAS_SUCCESSORS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Successors,
-    true,
-    "HasSuccessorsMut",
-    "Successor",
-    "successors_mut",
-    "IterMut",
-);
-pub(crate) const HAS_REGIONS: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Regions,
-    false,
-    "HasRegions",
-    "Region",
-    "regions",
-    "Iter",
-);
-pub(crate) const HAS_REGIONS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Regions,
-    true,
-    "HasRegionsMut",
-    "Region",
-    "regions_mut",
-    "IterMut",
-);
-pub(crate) const HAS_DIGRAPHS: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Digraphs,
-    false,
-    "HasDigraphs",
-    "DiGraph",
-    "digraphs",
-    "Iter",
-);
-pub(crate) const HAS_DIGRAPHS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Digraphs,
-    true,
-    "HasDigraphsMut",
-    "DiGraph",
-    "digraphs_mut",
-    "IterMut",
-);
-pub(crate) const HAS_UNGRAPHS: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Ungraphs,
-    false,
-    "HasUngraphs",
-    "UnGraph",
-    "ungraphs",
-    "Iter",
-);
-pub(crate) const HAS_UNGRAPHS_MUT: LocalFieldIterConfig = LocalFieldIterConfig::new(
-    FieldIterKind::Ungraphs,
-    true,
-    "HasUngraphsMut",
-    "UnGraph",
-    "ungraphs_mut",
-    "IterMut",
-);
-
-pub(crate) const FIELD_ITER_CONFIGS: [LocalFieldIterConfig; 14] = [
+pub(crate) const FIELD_ITER_CONFIGS: [FieldIterConfig; 14] = [
     HAS_ARGUMENTS,
     HAS_ARGUMENTS_MUT,
     HAS_RESULTS,
@@ -192,47 +149,39 @@ pub(crate) const FIELD_ITER_CONFIGS: [LocalFieldIterConfig; 14] = [
     HAS_UNGRAPHS_MUT,
 ];
 
-pub(crate) const IS_TERMINATOR: LocalPropertyConfig =
-    LocalPropertyConfig::new(PropertyKind::Terminator, "IsTerminator", "is_terminator");
-pub(crate) const IS_CONSTANT: LocalPropertyConfig =
-    LocalPropertyConfig::new(PropertyKind::Constant, "IsConstant", "is_constant");
-pub(crate) const IS_PURE: LocalPropertyConfig =
-    LocalPropertyConfig::new(PropertyKind::Pure, "IsPure", "is_pure");
-pub(crate) const IS_SPECULATABLE: LocalPropertyConfig = LocalPropertyConfig::new(
-    PropertyKind::Speculatable,
-    "IsSpeculatable",
-    "is_speculatable",
-);
+pub(crate) const IS_TERMINATOR: BoolPropertyConfig = BoolPropertyConfig {
+    kind: PropertyKind::Terminator,
+    trait_name: "IsTerminator",
+    trait_method: "is_terminator",
+};
+pub(crate) const IS_CONSTANT: BoolPropertyConfig = BoolPropertyConfig {
+    kind: PropertyKind::Constant,
+    trait_name: "IsConstant",
+    trait_method: "is_constant",
+};
+pub(crate) const IS_PURE: BoolPropertyConfig = BoolPropertyConfig {
+    kind: PropertyKind::Pure,
+    trait_name: "IsPure",
+    trait_method: "is_pure",
+};
+pub(crate) const IS_SPECULATABLE: BoolPropertyConfig = BoolPropertyConfig {
+    kind: PropertyKind::Speculatable,
+    trait_name: "IsSpeculatable",
+    trait_method: "is_speculatable",
+};
+pub(crate) const IS_EDGE: BoolPropertyConfig = BoolPropertyConfig {
+    kind: PropertyKind::Edge,
+    trait_name: "IsEdge",
+    trait_method: "is_edge",
+};
 
-pub(crate) const IS_EDGE: LocalPropertyConfig =
-    LocalPropertyConfig::new(PropertyKind::Edge, "IsEdge", "is_edge");
-
-pub(crate) const PROPERTY_CONFIGS: [LocalPropertyConfig; 5] = [
+pub(crate) const PROPERTY_CONFIGS: [BoolPropertyConfig; 5] = [
     IS_TERMINATOR,
     IS_CONSTANT,
     IS_PURE,
     IS_SPECULATABLE,
     IS_EDGE,
 ];
-
-pub(crate) fn to_field_iter_config(config: LocalFieldIterConfig) -> FieldIterConfig {
-    FieldIterConfig {
-        kind: config.kind,
-        mutable: config.mutable,
-        trait_name: config.trait_name,
-        matching_type: config.matching_type,
-        trait_method: config.trait_method,
-        trait_type_iter: config.trait_type_iter,
-    }
-}
-
-pub(crate) fn to_bool_property_config(config: LocalPropertyConfig) -> BoolPropertyConfig {
-    BoolPropertyConfig {
-        kind: config.kind,
-        trait_name: config.trait_name,
-        trait_method: config.trait_method,
-    }
-}
 
 /// Generate the full Dialect derive output (all field iters, properties, builder, marker).
 pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenStream> {
@@ -246,7 +195,7 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
 
     for config in FIELD_ITER_CONFIGS {
         builder = builder.add(TraitImplTemplate::field_iter(
-            to_field_iter_config(config),
+            config,
             DEFAULT_IR_CRATE,
             TRAIT_LIFETIME,
         ));
@@ -254,7 +203,7 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
 
     for config in PROPERTY_CONFIGS {
         builder = builder.add(TraitImplTemplate::bool_property(
-            to_bool_property_config(config),
+            config,
             DEFAULT_IR_CRATE,
         ));
     }
@@ -269,12 +218,12 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
 /// Generate a single field-iter derive.
 pub(crate) fn generate_field_iter(
     ast: &syn::DeriveInput,
-    config: LocalFieldIterConfig,
+    config: FieldIterConfig,
 ) -> darling::Result<TokenStream> {
     let ir = Input::<StandardLayout>::from_derive_input(ast)?;
     ir.compose()
         .add(TraitImplTemplate::field_iter(
-            to_field_iter_config(config),
+            config,
             DEFAULT_IR_CRATE,
             TRAIT_LIFETIME,
         ))
@@ -284,12 +233,12 @@ pub(crate) fn generate_field_iter(
 /// Generate a single bool-property derive.
 pub(crate) fn generate_property(
     ast: &syn::DeriveInput,
-    config: LocalPropertyConfig,
+    config: BoolPropertyConfig,
 ) -> darling::Result<TokenStream> {
     let ir = Input::<StandardLayout>::from_derive_input(ast)?;
     ir.compose()
         .add(TraitImplTemplate::bool_property(
-            to_bool_property_config(config),
+            config,
             DEFAULT_IR_CRATE,
         ))
         .build()
