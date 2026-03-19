@@ -172,11 +172,7 @@ fn specialize_return_const(
         stage
             .specialize()
             .staged_func(staged_function)
-            .signature(Signature {
-                params: vec![ArithType::I64],
-                ret: ArithType::I64,
-                constraints: (),
-            })
+            .signature(Signature::new(vec![ArithType::I64], ArithType::I64, ()))
             .body(body)
             .new()
             .unwrap()
